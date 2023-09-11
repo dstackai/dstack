@@ -7,9 +7,11 @@ import (
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 type Executor struct {
@@ -62,7 +64,7 @@ func (ex *Executor) Run(ctx context.Context) error {
 	}
 	defer func() { _ = jobLogFile.Close() }()
 
-	logger := io.MultiWriter(runnerLogFile, ex.runnerLogs)
+	logger := io.MultiWriter(runnerLogFile, os.Stdout, ex.runnerLogs)
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
 	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
 
@@ -80,10 +82,31 @@ func (ex *Executor) Run(ctx context.Context) error {
 	// todo gateway
 
 	ex.SetJobState(ctx, states.Running)
-	if err := ex.execJob(ctx, jobLogFile); err != nil {
-		// todo fail reason
+	timeoutCtx := ctx
+	var cancelTimeout context.CancelFunc
+	if ex.jobSpec.MaxDuration != 0 {
+		timeoutCtx, cancelTimeout = context.WithTimeout(ctx, time.Duration(ex.jobSpec.MaxDuration)*time.Second)
+		defer cancelTimeout()
+	}
+	if err := ex.execJob(timeoutCtx, jobLogFile); err != nil {
+		select {
+		case <-ctx.Done():
+			log.Error(ctx, "Job canceled")
+			ex.SetJobState(ctx, states.Terminated)
+			return gerrors.Wrap(err)
+		default:
+		}
+
+		select {
+		case <-timeoutCtx.Done():
+			log.Error(ctx, "Max duration exceeded", "max_duration", ex.jobSpec.MaxDuration)
+			ex.SetJobState(ctx, states.Terminated)
+			return gerrors.Wrap(err)
+		default:
+		}
+
+		// todo fail reason?
 		ex.SetJobState(ctx, states.Failed)
-		return gerrors.Wrap(err)
 	}
 
 	ex.SetJobState(ctx, states.Done)

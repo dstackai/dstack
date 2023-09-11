@@ -71,9 +71,11 @@ func (s *Server) Run() error {
 	select {
 	case <-s.jobBarrierCh: // job started
 	case <-time.After(s.submitWaitDuration):
-		log.Error(context.TODO(), "Job didn't start in 2 minutes, shutting down")
+		log.Error(context.TODO(), "Job didn't start in time, shutting down")
 		return gerrors.Newf("no job")
 	}
+
+	// todo timeout on code and run
 
 	signal.Notify(signalCh, signals...)
 	select {
@@ -90,7 +92,7 @@ func (s *Server) Run() error {
 	case <-s.logsDoneCh:
 		log.Info(context.TODO(), "Logs streaming finished")
 	case <-time.After(s.logsWaitDuration):
-		log.Error(context.TODO(), "Logs streaming didn't finish in 30 seconds")
+		log.Error(context.TODO(), "Logs streaming didn't finish in time")
 	}
 
 	return nil

@@ -25,6 +25,8 @@ type PullResponse struct {
 	JobLogs     []LogEvent      `json:"job_logs"`
 	RunnerLogs  []LogEvent      `json:"runner_logs"`
 	LastUpdated int64           `json:"last_updated"`
+	// todo Result
+	// todo HasMore
 }
 
 type Run struct {

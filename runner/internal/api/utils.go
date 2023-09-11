@@ -93,12 +93,13 @@ func writeJSONResponse(w http.ResponseWriter, statusCode int, payload interface{
 
 func setHandleFunc(mux *http.ServeMux, method string, path string, handler func(http.ResponseWriter, *http.Request) (int, string)) {
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		log.Debug(r.Context(), "", "method", r.Method, "endpoint", r.URL.Path)
+		log.Trace(r.Context(), "", "method", r.Method, "endpoint", r.URL.Path)
 		if method != "" && r.Method != method {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
 		status, body := handler(w, r)
+		log.Debug(r.Context(), "", "status", status, "method", r.Method, "endpoint", r.URL.Path)
 		if status != 200 {
 			http.Error(w, http.StatusText(status), status)
 		} else {

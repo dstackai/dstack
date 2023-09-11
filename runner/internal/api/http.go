@@ -36,6 +36,8 @@ func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (int,
 	}
 
 	s.executor.SetJob(body)
+	s.jobBarrierCh <- nil // notify server that job submitted
+
 	return 200, "ok"
 }
 
@@ -81,7 +83,6 @@ func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (int, st
 		s.jobBarrierCh <- nil      // notify server that job finished
 	}()
 	s.executor.SetRunnerState(executor.ServeLogs)
-	s.jobBarrierCh <- nil // notify server that job started
 
 	return 200, "ok"
 }
@@ -106,7 +107,6 @@ func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (int, st
 
 func (s *Server) stopPostHandler(w http.ResponseWriter, r *http.Request) (int, string) {
 	s.stop()
-	// todo log
 
 	return 200, "ok"
 }
