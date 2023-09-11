@@ -1,4 +1,4 @@
-package api
+package executor
 
 import (
 	"context"
@@ -21,6 +21,12 @@ func NewMonotonicTimestamp() *MonotonicTimestamp {
 	}
 }
 
+func (t *MonotonicTimestamp) GetLatest() int64 {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.unix*1000 + int64(t.counter)
+}
+
 func (t *MonotonicTimestamp) Next() int64 {
 	// warning: time.Now() is not monotonic in general
 	t.mu.Lock()
@@ -36,10 +42,4 @@ func (t *MonotonicTimestamp) Next() int64 {
 	}
 	t.mu.Unlock()
 	return t.GetLatest()
-}
-
-func (t *MonotonicTimestamp) GetLatest() int64 {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	return t.unix*1000 + int64(t.counter)
 }

@@ -1,4 +1,4 @@
-package api
+package schemas
 
 import "fmt"
 

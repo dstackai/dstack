@@ -3,96 +3,118 @@ package executor
 import (
 	"context"
 	"github.com/dstackai/dstack/runner/consts/states"
-	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/schemas"
 	"io"
 	"os/exec"
 	"path/filepath"
+	"sync"
 )
 
 type Executor struct {
-	server        *api.ServerAdapter
-	workingDir    string
-	jobLogsWriter io.Writer
+	tempDir    string
+	workingDir string
 
-	run             api.Run
-	jobSpec         api.JobSpec
+	run             schemas.Run
+	jobSpec         schemas.JobSpec
 	secrets         map[string]string
-	repoCredentials *api.RepoCredentials
+	repoCredentials *schemas.RepoCredentials
 	codePath        string
+
+	mu              *sync.RWMutex
+	state           string
+	jobStateHistory []schemas.JobStateEvent
+	jobLogs         *appendWriter
+	runnerLogs      *appendWriter
+	timestamp       *MonotonicTimestamp
 }
 
-func NewExecutor(workingDir string, jobLogsWriter io.Writer, adapter *api.ServerAdapter) *Executor {
+func NewExecutor(tempDir string, workingDir string) *Executor {
+	mu := &sync.RWMutex{}
+	timestamp := NewMonotonicTimestamp()
 	return &Executor{
-		server:        adapter,
-		workingDir:    workingDir,
-		jobLogsWriter: jobLogsWriter,
+		tempDir:    tempDir,
+		workingDir: workingDir,
+
+		mu:              mu,
+		state:           WaitSubmit,
+		jobStateHistory: make([]schemas.JobStateEvent, 0),
+		jobLogs:         newAppendWriter(mu, timestamp),
+		runnerLogs:      newAppendWriter(mu, timestamp),
+		timestamp:       timestamp,
 	}
 }
 
+// Run must be called after SetJob and SetCodePath
 func (ex *Executor) Run(ctx context.Context) error {
-	select {
-	case body := <-ex.server.GetJob():
-		log.Debug(ctx, "Executor received a job")
-		ex.run = body.Run
-		ex.jobSpec = body.JobSpec
-		ex.secrets = body.Secrets
-		ex.repoCredentials = body.RepoCredentials
-	case <-ctx.Done():
-		ex.server.SetJobState(states.Terminated)
-		return gerrors.New("executor was terminated before it received a job")
-		// todo timeout
+	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "runner.log"))
+	if err != nil {
+		ex.SetJobState(ctx, states.Failed)
+		return gerrors.Wrap(err)
 	}
+	defer func() { _ = runnerLogFile.Close() }()
 
-	select {
-	case codePath := <-ex.server.GetCode():
-		log.Debug(ctx, "Executor received a code")
-		ex.codePath = codePath
-	case <-ctx.Done():
-		ex.server.SetJobState(states.Terminated)
-		return gerrors.New("executor was terminated before it received a code")
-		// todo timeout
+	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "job.log"))
+	if err != nil {
+		ex.SetJobState(ctx, states.Failed)
+		return gerrors.Wrap(err)
 	}
+	defer func() { _ = jobLogFile.Close() }()
 
-	select {
-	case <-ex.server.WaitRun():
-		log.Debug(ctx, "Executor received a start signal")
-	case <-ctx.Done():
-		ex.server.SetJobState(states.Terminated)
-		return gerrors.New("executor was terminated before it received a start signal")
-		// todo timeout
-	}
+	logger := io.MultiWriter(runnerLogFile, ex.runnerLogs)
+	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
+	log.Info(ctx, "Run job", "log_level", log.GetLogger(ctx).Logger.Level.String())
 
 	if err := ex.setupRepo(ctx); err != nil {
-		ex.server.SetJobState(states.Failed)
+		ex.SetJobState(ctx, states.Failed)
 		return gerrors.Wrap(err)
 	}
 	cleanupCredentials, err := ex.setupCredentials(ctx)
 	if err != nil {
-		ex.server.SetJobState(states.Failed)
+		ex.SetJobState(ctx, states.Failed)
 		return gerrors.Wrap(err)
 	}
 	defer cleanupCredentials()
 
-	// todo artifacts in
-
 	// todo gateway
 
-	ex.server.SetJobState(states.Running)
-	if err := ex.execJob(ctx); err != nil {
+	ex.SetJobState(ctx, states.Running)
+	if err := ex.execJob(ctx, jobLogFile); err != nil {
 		// todo fail reason
-		ex.server.SetJobState(states.Failed)
+		ex.SetJobState(ctx, states.Failed)
 		return gerrors.Wrap(err)
 	}
 
-	// todo artifacts out
-
-	ex.server.SetJobState(states.Done)
+	ex.SetJobState(ctx, states.Done)
 	return nil
 }
 
-func (ex *Executor) execJob(ctx context.Context) error {
+func (ex *Executor) SetJob(body schemas.SubmitBody) {
+	ex.run = body.Run
+	ex.jobSpec = body.JobSpec
+	ex.secrets = body.Secrets
+	ex.repoCredentials = body.RepoCredentials
+	ex.state = WaitCode
+}
+
+func (ex *Executor) SetCodePath(codePath string) {
+	ex.codePath = codePath
+	ex.state = WaitRun
+}
+
+func (ex *Executor) SetJobState(ctx context.Context, state string) {
+	ex.mu.Lock()
+	ex.jobStateHistory = append(ex.jobStateHistory, schemas.JobStateEvent{State: state, Timestamp: ex.timestamp.Next()})
+	ex.mu.Unlock()
+	log.Info(ctx, "Job state changed", "new", state)
+}
+
+func (ex *Executor) SetRunnerState(state string) {
+	ex.state = state
+}
+
+func (ex *Executor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	// todo recover
 	args := makeArgs(ex.jobSpec.Entrypoint, ex.jobSpec.Commands)
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Entrypoint[0], args...)
@@ -109,7 +131,8 @@ func (ex *Executor) execJob(ctx context.Context) error {
 	if err := cmd.Start(); err != nil {
 		return gerrors.Wrap(err)
 	}
-	if _, err := io.Copy(ex.jobLogsWriter, cmdReader); err != nil {
+	logger := io.MultiWriter(jobLogFile, ex.jobLogs)
+	if _, err := io.Copy(logger, cmdReader); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return gerrors.Wrap(cmd.Wait())

@@ -91,7 +91,7 @@ func writeJSONResponse(w http.ResponseWriter, statusCode int, payload interface{
 	return statusCode, string(bytes)
 }
 
-func setHandleFunc(mux *http.ServeMux, method string, path string, handler func(w http.ResponseWriter, r *http.Request) (int, string)) {
+func setHandleFunc(mux *http.ServeMux, method string, path string, handler func(http.ResponseWriter, *http.Request) (int, string)) {
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		log.Debug(r.Context(), "", "method", r.Method, "endpoint", r.URL.Path)
 		if method != "" && r.Method != method {
@@ -106,22 +106,4 @@ func setHandleFunc(mux *http.ServeMux, method string, path string, handler func(
 			_, _ = w.Write([]byte(body))
 		}
 	})
-}
-
-type OrderedEvent interface {
-	GetTimestamp() int64
-}
-
-func eventsAfter[T OrderedEvent](events []T, timestamp int64) []T {
-	left := 0
-	right := len(events)
-	for left < right {
-		mid := (left + right) / 2
-		if events[mid].GetTimestamp() <= timestamp {
-			left = mid + 1
-		} else {
-			right = mid
-		}
-	}
-	return events[left:]
 }

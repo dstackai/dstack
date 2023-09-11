@@ -3,39 +3,33 @@ package api
 import (
 	"context"
 	"errors"
+	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"io"
+	"github.com/dstackai/dstack/runner/internal/log"
 	"net/http"
-	"sync"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 type Server struct {
 	srv        *http.Server
 	tempDir    string
-	shutdownCh chan interface{} // todo how to use it?
+	workingDir string
 
-	jobTerminatedCh chan interface{} // job terminated from the outside
-	doneCh          chan interface{} // all logs have been collected
+	shutdownCh   chan interface{} // server closes this chan on shutdown
+	jobBarrierCh chan interface{} // only server listens on this chan
+	logsDoneCh   chan interface{}
 
-	stateMutex  sync.RWMutex
-	serverState string // runner state machine
-	// todo timeout waiting for the job or code or run
-	jobCh  chan SubmitBody  // user submitted a job
-	codeCh chan string      // user submitted a code
-	runCh  chan interface{} // user triggered a run
+	submitWaitDuration time.Duration
+	logsWaitDuration   time.Duration
 
-	jobStateCh   chan string // executor sets job state
-	jobLogsCh    chan []byte // executor writes job logs
-	runnerLogsCh chan []byte // context logger writes runner logs
-
-	historyMutex      sync.RWMutex
-	timestamp         *MonotonicTimestamp
-	jobStateHistory   []JobStateEvent
-	jobLogsHistory    []LogEvent
-	runnerLogsHistory []LogEvent
+	executor  *executor.Executor
+	cancelRun context.CancelFunc
 }
 
-func NewServer(tempDir string, address string) *Server {
+func NewServer(tempDir string, workingDir string, address string) *Server {
 	mux := http.NewServeMux()
 	s := &Server{
 		srv: &http.Server{
@@ -43,26 +37,15 @@ func NewServer(tempDir string, address string) *Server {
 			Handler: mux,
 		},
 		tempDir:    tempDir,
-		shutdownCh: make(chan interface{}),
+		workingDir: workingDir,
 
-		jobTerminatedCh: make(chan interface{}),
-		doneCh:          make(chan interface{}),
+		shutdownCh:   make(chan interface{}),
+		jobBarrierCh: make(chan interface{}),
 
-		stateMutex:  sync.RWMutex{},
-		serverState: WaitSubmit,
-		jobCh:       make(chan SubmitBody),
-		codeCh:      make(chan string),
-		runCh:       make(chan interface{}),
+		submitWaitDuration: 2 * time.Minute,
+		logsWaitDuration:   30 * time.Second,
 
-		jobStateCh:   make(chan string),
-		jobLogsCh:    make(chan []byte),
-		runnerLogsCh: make(chan []byte),
-
-		historyMutex:      sync.RWMutex{},
-		timestamp:         NewMonotonicTimestamp(),
-		jobStateHistory:   make([]JobStateEvent, 0),
-		jobLogsHistory:    make([]LogEvent, 0),
-		runnerLogsHistory: make([]LogEvent, 0),
+		executor: executor.NewExecutor(tempDir, workingDir),
 	}
 	setHandleFunc(mux, "GET", "/api/healthcheck", s.healthcheckGetHandler)
 	setHandleFunc(mux, "POST", "/api/submit", s.submitPostHandler)
@@ -70,63 +53,54 @@ func NewServer(tempDir string, address string) *Server {
 	setHandleFunc(mux, "POST", "/api/run", s.runPostHandler)
 	setHandleFunc(mux, "GET", "/api/pull", s.pullGetHandler)
 	setHandleFunc(mux, "POST", "/api/stop", s.stopPostHandler)
-	setHandleFunc(mux, "", "/logs_ws", s.logsWsGetHandler)
+	setHandleFunc(mux, "GET", "/logs_ws", s.logsWsGetHandler)
 	return s
 }
 
 func (s *Server) Run() error {
-	go s.collect()
-	if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return gerrors.Wrap(err)
+	signals := []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGQUIT}
+	signalCh := make(chan os.Signal, 1)
+
+	go func() {
+		if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error(context.TODO(), "Server failed", "err", err)
+		}
+	}()
+	defer func() { _ = s.srv.Shutdown(context.TODO()) }()
+
+	select {
+	case <-s.jobBarrierCh: // job started
+	case <-time.After(s.submitWaitDuration):
+		log.Error(context.TODO(), "Job didn't start in 2 minutes, shutting down")
+		return gerrors.Newf("no job")
 	}
+
+	signal.Notify(signalCh, signals...)
+	select {
+	case <-signalCh:
+		log.Error(context.TODO(), "Received interrupt signal, shutting down")
+		s.stop()
+	case <-s.jobBarrierCh:
+		log.Info(context.TODO(), "Job finished, shutting down")
+	}
+	close(s.shutdownCh)
+	signal.Reset(signals...)
+
+	select {
+	case <-s.logsDoneCh:
+		log.Info(context.TODO(), "Logs streaming finished")
+	case <-time.After(s.logsWaitDuration):
+		log.Error(context.TODO(), "Logs streaming didn't finish in 30 seconds")
+	}
+
 	return nil
 }
 
-func (s *Server) Stop(ctx context.Context) error {
-	close(s.shutdownCh)
-	return gerrors.Wrap(s.srv.Shutdown(ctx))
-}
-
-func (s *Server) GetAdapter() *ServerAdapter {
-	return &ServerAdapter{
-		jobStateCh: s.jobStateCh,
-		jobCh:      s.jobCh,
-		codeCh:     s.codeCh,
-		runCh:      s.runCh,
+func (s *Server) stop() {
+	s.executor.Lock()
+	defer s.executor.Unlock()
+	if s.executor.GetRunnerState() == executor.ServeLogs {
+		s.cancelRun()
 	}
-}
-
-func (s *Server) JobTerminated() <-chan interface{} {
-	return s.jobTerminatedCh
-}
-
-func (s *Server) Done() <-chan interface{} {
-	return s.doneCh
-}
-
-func (s *Server) RunnerLogsWriter() io.Writer {
-	return NewLogsWriter(s.runnerLogsCh)
-}
-
-func (s *Server) JobLogsWriter() io.Writer {
-	return NewLogsWriter(s.jobLogsCh)
-}
-
-func (s *Server) collect() {
-	for {
-		select {
-		case state := <-s.jobStateCh:
-			s.historyMutex.Lock()
-			s.jobStateHistory = append(s.jobStateHistory, JobStateEvent{state, s.timestamp.Next()})
-		case message := <-s.jobLogsCh:
-			s.historyMutex.Lock()
-			s.jobLogsHistory = append(s.jobLogsHistory, LogEvent{message, s.timestamp.Next()})
-		case message := <-s.runnerLogsCh:
-			s.historyMutex.Lock()
-			s.runnerLogsHistory = append(s.runnerLogsHistory, LogEvent{message, s.timestamp.Next()})
-		case <-s.shutdownCh:
-			return
-		}
-		s.historyMutex.Unlock()
-	}
+	s.executor.SetRunnerState(executor.WaitLogsFinished)
 }

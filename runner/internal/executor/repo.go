@@ -10,6 +10,7 @@ import (
 	"os"
 )
 
+// setupRepo must be called from Run
 func (ex *Executor) setupRepo(ctx context.Context) error {
 	if _, err := os.Stat(ex.workingDir); err != nil {
 		if err = os.MkdirAll(ex.workingDir, 0777); err != nil {

@@ -33,27 +33,29 @@ func (s *Server) streamJobLogs(conn *websocket.Conn) {
 	}()
 
 	for {
-		s.historyMutex.RLock()
+		s.executor.RLock()
+		jobLogsHistory := s.executor.GetJobLogsHistory()
 		select {
 		case <-s.shutdownCh:
-			if currentPos >= len(s.jobLogsHistory) {
-				s.historyMutex.RUnlock()
+			if currentPos >= len(jobLogsHistory) {
+				s.executor.RUnlock()
+				//s.logsDoneCh <- nil
 				return
 			}
 		default:
-			if currentPos >= len(s.jobLogsHistory) {
-				s.historyMutex.RUnlock()
+			if currentPos >= len(jobLogsHistory) {
+				s.executor.RUnlock()
 				time.Sleep(100 * time.Millisecond)
 			}
 		}
-		for currentPos < len(s.jobLogsHistory) {
-			if err := conn.WriteMessage(websocket.BinaryMessage, s.jobLogsHistory[currentPos].Message); err != nil {
-				s.historyMutex.RUnlock()
+		for currentPos < len(jobLogsHistory) {
+			if err := conn.WriteMessage(websocket.BinaryMessage, jobLogsHistory[currentPos].Message); err != nil {
+				s.executor.RUnlock()
 				log.Error(context.TODO(), "Failed to write message", "err", err)
 				return
 			}
 			currentPos++
 		}
-		s.historyMutex.RUnlock()
+		s.executor.RUnlock()
 	}
 }

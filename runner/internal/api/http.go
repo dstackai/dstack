@@ -1,8 +1,11 @@
 package api
 
 import (
+	"context"
 	"errors"
+	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/schemas"
 	"io"
 	"net/http"
 	"os"
@@ -15,13 +18,13 @@ func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (
 }
 
 func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (int, string) {
-	s.stateMutex.Lock()
-	defer s.stateMutex.Unlock()
-	if s.serverState != WaitSubmit {
+	s.executor.Lock()
+	defer s.executor.Unlock()
+	if s.executor.GetRunnerState() != executor.WaitSubmit {
 		return http.StatusConflict, ""
 	}
 
-	var body SubmitBody
+	var body schemas.SubmitBody
 	if err := decodeJSONBody(w, r, &body, true); err != nil {
 		log.Error(r.Context(), "Failed to decode submit body", "err", err)
 		var mr *malformedRequest
@@ -32,22 +35,19 @@ func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (int,
 		}
 	}
 
-	s.jobCh <- body
-	close(s.jobCh)
-
-	s.serverState = WaitCode
+	s.executor.SetJob(body)
 	return 200, "ok"
 }
 
 func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (int, string) {
-	s.stateMutex.Lock()
-	defer s.stateMutex.Unlock()
-	if s.serverState != WaitCode {
+	s.executor.Lock()
+	defer s.executor.Unlock()
+	if s.executor.GetRunnerState() != executor.WaitCode {
 		return http.StatusConflict, ""
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
-	codePath := filepath.Join(s.tempDir, "code")
+	codePath := filepath.Join(s.tempDir, "code") // todo random name?
 	file, err := os.Create(codePath)
 	if err != nil {
 		log.Error(r.Context(), "Failed to create code file", "err", err)
@@ -63,29 +63,32 @@ func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (
 		}
 	}
 
-	s.codeCh <- codePath
-	close(s.codeCh)
-
-	s.serverState = WaitRun
+	s.executor.SetCodePath(codePath)
 	return 200, "ok"
 }
 
 func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (int, string) {
-	s.stateMutex.Lock()
-	defer s.stateMutex.Unlock()
-	if s.serverState != WaitRun {
+	s.executor.Lock()
+	defer s.executor.Unlock()
+	if s.executor.GetRunnerState() != executor.WaitRun {
 		return http.StatusConflict, ""
 	}
 
-	close(s.runCh) // triggers executor to start the run
+	runCtx := context.Background()
+	runCtx, s.cancelRun = context.WithCancel(runCtx)
+	go func() {
+		_ = s.executor.Run(runCtx) // todo handle error
+		s.jobBarrierCh <- nil      // notify server that job finished
+	}()
+	s.executor.SetRunnerState(executor.ServeLogs)
+	s.jobBarrierCh <- nil // notify server that job started
 
-	s.serverState = ServeLogs
 	return 200, "ok"
 }
 
 func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (int, string) {
-	s.historyMutex.RLock()
-	defer s.historyMutex.RUnlock()
+	s.executor.RLock()
+	defer s.executor.RUnlock()
 	timestamp := int64(0)
 	if r.URL.Query().Has("timestamp") {
 		var err error
@@ -95,23 +98,15 @@ func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (int, st
 		}
 	}
 
-	return writeJSONResponse(w, http.StatusOK, PullResponse{
-		JobStates:   eventsAfter(s.jobStateHistory, timestamp),
-		JobLogs:     eventsAfter(s.jobLogsHistory, timestamp),
-		RunnerLogs:  eventsAfter(s.runnerLogsHistory, timestamp),
-		LastUpdated: s.timestamp.GetLatest(),
-	})
+	//if noMoreLogs {  // todo
+	//	defer func() { s.logsDoneCh <- nil }()
+	//}
+	return writeJSONResponse(w, http.StatusOK, s.executor.GetHistory(timestamp))
 }
 
 func (s *Server) stopPostHandler(w http.ResponseWriter, r *http.Request) (int, string) {
-	s.stateMutex.RLock()
-	defer s.stateMutex.RUnlock()
-	if s.serverState != ServeLogs {
-		return http.StatusConflict, ""
-	}
+	s.stop()
+	// todo log
 
-	// todo do not stop twice, do not stop stopped
-
-	close(s.jobTerminatedCh)
 	return 200, "ok"
 }
