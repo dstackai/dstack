@@ -18,10 +18,10 @@
     new Termynal('.tx-landing__hero_code>[data-termynal]',
         {
             lineData: [
-                {type: 'input', value: 'dstack run . --gpu A100'},
+                {type: 'input', value: 'dstack run . --gpu 40GB'},
                 {delay: 0, value: ' ', class: 'newline'},
                 {delay: 0, value: ' Configuration               .dstack.yml', class: 'newline'},
-                {delay: 0, value: ' Min resources               2xCPUs, 8GB, 1xA100', class: 'newline'},
+                {delay: 0, value: ' Min resources               2xCPUs, 8GB, 1x40GB', class: 'newline'},
                 {delay: 0, value: ' Max price                   -', class: 'newline'},
                 {delay: 0, value: ' Spot policy                 auto', class: 'newline'},
                 {delay: 0, value: ' Max duration                72h', class: 'newline'},
@@ -48,7 +48,7 @@
     new Termynal('#tx-landing__major_feature_training_terminal',
         {
             lineData: [
-                {type: 'input', value: 'dstack run . -f llama-2/train.dstack.yml --gpu 24GB -y'},
+                {type: 'input', value: 'dstack run . -f llama-2/train.dstack.yml --gpu 40GB -y'},
                 {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
@@ -86,7 +86,7 @@
     new Termynal('#tx-landing__major_feature_inference_terminal',
         {
             lineData: [
-                {type: 'input', value: 'dstack run . -f llama-2/serve.dstack.yml --gpu 24GB -y'},
+                {type: 'input', value: 'dstack run . -f llama-2/serve.dstack.yml --gpu 40GB -y'},
                 {delay: 0, value: ' ', class: 'newline'},
                 {
                     delay: 0,
@@ -125,10 +125,11 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Run LLM workloads across any clouds</h1>
+                <h1>Orchestrate LLM workloads in any clouds</h1>
                 <p>
-                    <strong>dstack</strong> is an open-source toolkit for running LLM workloads across any clouds, offering a
-                    cost-efficient and user-friendly interface for training, inference, and development.
+                    <strong>dstack</strong> is an open-source toolkit for orchestrating LLM workloads in any cloud.
+                    It provides a cloud-agnostic interface for training, fine-tuning, inference, and development of
+                    LLMs.
                 </p>
 
                 <!--<p>Deploy run <strong>tasks</strong>, <strong>services</strong>, and provision
@@ -150,7 +151,7 @@
 
         <div class="tx-landing__integrations">
             <div class="tx-landing__integrations_text">
-                <h2>Optimal GPU price and availability across multiple providers</h2>
+                <h2>Bring your own cloud accounts</h2>
             </div>
             <div class="tx-landing__integrations_logos">
                 <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
@@ -339,7 +340,7 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
                     </pre>
                 </div>
                 <p class="tx-landing__bottom_cta_text">
-                    <strong>Done!</strong> Configure clouds and start running LLM workloads.
+                    <strong>Done!</strong> Configure clouds and begin using the CLI or Python API to run LLM workloads.
                 </p>
 
                 <a href="/docs" class="md-button md-button--primary">

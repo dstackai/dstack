@@ -28,7 +28,7 @@ cost-efficient and user-friendly interface for training, inference, and developm
 
 ## Latest news ✨
 
-- [2023/09] [Managed gateways for serving LLMs across clouds](https://dstack.ai/blog/2023/09/01/managed-gateways) (Release)
+- [2023/09] [Managed gateways](https://dstack.ai/blog/2023/09/01/managed-gateways) (Release)
 - [2023/08] [Fine-tuning with Llama 2](https://dstack.ai/examples/finetuning-llama-2) (Example)
 - [2023/08] [Serving SDXL with FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
 - [2023/07] [Serving LLMS with TGI](https://dstack.ai/examples/text-generation-inference) (Example)
@@ -42,7 +42,7 @@ To use `dstack`, install it with `pip`, and start the server.
 pip install "dstack[aws,gcp,azure,lambda]"
 dstack start
 ```
-## Configure backends
+## Configure clouds
 
 Upon startup, the server sets up the default project called `main`. Prior to using `dstack`, you must log in to the
 UI, open the project's settings, and configure cloud backends 

@@ -6,7 +6,7 @@
 .tx-landing__hero_text h1 {
     margin-bottom: 1.7rem;
     font-weight: 800;
-    font-size: 2.3em;
+    font-size: 2.5em;
     background: -webkit-linear-gradient(45deg, #ff00ff, #8500ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -64,7 +64,7 @@
 
     .tx-landing__hero_code {
         order: 1;
-        min-width: 34rem;
+        min-width: 30rem;
         margin-top: 3rem;
         margin-left: 2rem;
     }

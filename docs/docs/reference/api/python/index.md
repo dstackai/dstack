@@ -2,17 +2,17 @@
 
 The Python API allows for programmatically running tasks and services across multiple regions and clouds.
 
-## Installation
+!!! info "Installation"
 
-The Python API is experimental and requires you to use version `0.11.2rc1`. Here's how to install it:
+    The Python API is experimental and requires you to use version `0.11.2rc2`:
+    
+    ```shell
+    pip install "dstack[all]==0.11.2rc2"
+    ```
 
-```shell
-pip install "dstack[all]==0.11.2rc1"
-```
+#### Usage example
 
-## Usage example
-
-The code below runs quantized LLama 2 13B as a task.
+The code below runs quantized LLama 2 13B Chat as a task.
 
 <div editor-title=""> 
 
@@ -21,26 +21,26 @@ import sys
 
 import dstack
 
+task = dstack.Task(
+    image="ghcr.io/huggingface/text-generation-inference:latest",
+    env={"MODEL_ID": "TheBloke/Llama-2-13B-chat-GPTQ"},
+    commands=[
+        "text-generation-launcher --trust-remote-code --quantize gptq",
+    ],
+    ports=["8080:80"],
+)
+resources = dstack.Resources(gpu=dstack.GPU(memory="20GB"))
+
 if __name__ == "__main__":
     print("Initializing the client...")
     client = dstack.Client.from_config(repo_dir="~/dstack-examples")
 
     print("Submitting the run...")
-    run = client.runs.submit(
-        dstack.Task(
-            image="ghcr.io/huggingface/text-generation-inference:latest",
-            env={"MODEL_ID": "TheBloke/Llama-2-13B-chat-GPTQ"},
-            commands=[
-                "text-generation-launcher --trust-remote-code --quantize gptq",
-            ],
-            ports=["8080:80"],
-        ),
-        resources=dstack.Resources(gpu=dstack.GPU(memory="24GB"), memory="48GB"),
-    )
+    run = client.runs.submit(configuration=task, resources=resources)
+    
     print(f"Run {run.name}: " + run.status())
 
     print("Attaching to the run...")
-
     run.attach()
     
     # After the endpoint is up, http://127.0.0.1:8080/health will return 200 (OK).
@@ -49,6 +49,7 @@ if __name__ == "__main__":
         for log in run.logs():
             sys.stdout.buffer.write(log)
             sys.stdout.buffer.flush()
+            
     except KeyboardInterrupt:
         print("Aborting the run...")
         run.stop(abort=True)
@@ -58,13 +59,11 @@ if __name__ == "__main__":
 
 </div>
 
-## Reference
-
-### Client
+## Client
 
 To use the `dstack` server, start by creating a client.
 
-#### from_config()
+### from_config()
 
 Create a new instance of [`dstack.Client`](#client).
 
@@ -82,15 +81,15 @@ Parameters:
 !!! info "NOTE:"
     The call of `Client.from_config()` is equal to [`dstack init`](../../cli/init.md).
 
-#### runs
+### runs
 
 This property returns an instance of [`dstack.RunCollection`](#runcollection).
 
-### Runs
+## Runs
 
 Methods available on [`client.runs`](#runs):
 
-#### submit()
+### submit()
 
 Submit a new run.
 
@@ -111,7 +110,7 @@ Parameters:
 
 [//]: # (TODO: backends)
 
-#### list()
+### list()
 
 Load the list of runs within the current repo.
 
@@ -119,7 +118,7 @@ Parameters:
 
 - `all: bool` – (Optional) Load all runs. If not set to `True`, returns only unfinished or the latest finished runs.
 
-#### get()
+### get()
 
 Load a run by name.
 
@@ -127,7 +126,7 @@ Parameters:
 
 - `run_name: str` - (Required) The name of the run.
 
-### Task
+## Task
 
 A configuration of a [task](../../../guides/tasks.md).
 
@@ -143,7 +142,7 @@ Parameters:
 - `entrypoint: Optional[]` - (Optional) Override the entrypoint of the Docker image. 
 - `registry_auth: Optional[RegistryAuth]` – (Optional) The credentials to access the private Docker registry.
 
-### Service
+## Service
 
 A configuration of a [service](../../../guides/services.md).
 
@@ -157,26 +156,26 @@ Parameters:
 - `entrypoint: Optional[]` - (Optional) Override the entrypoint of the Docker image. 
 - `registry_auth: Optional[RegistryAuth]` – (Optional) The credentials to access the private Docker registry.
 
-### Run
+## Run
 
-#### name
+### name
 
 Returns the name of the run. Unique within a project.
 
-#### status()
+### status()
 
 Returns the current status of the run. See [`dstack.RunStatus`](#runstatus).
 
-#### attach()
+### attach()
 
 Wait until the run status changes from `dstack.RunStatus.SUBMITTED` or `dstack.RunStatus.PENDING`, and establish an SSH
 tunnel to the run container for streaming logs and port forwarding.
 
-#### detach()
+### detach()
 
 Close the SSH tunnel.
 
-#### stop()
+### stop()
 
 Stop the run.
 
@@ -184,7 +183,7 @@ Parameters:
 
 - `abort: bool` – (Optional) If `True`, do not wait for a graceful stop. Defaults to `False`.
 
-### Resources
+## Resources
 
 Parameters:
 
@@ -192,7 +191,7 @@ Parameters:
 - `memory: Optional[Union[int, str]]` – (Optional) The minimum RAM requirements, `"24GB"`.
 - `shm_size: Optional[Union[int, str]]` – (Optional) The size of shared memory, `"12GB"`.
 
-### GPU
+## GPU
 
 The minimum GPU requirements.
 
@@ -202,7 +201,7 @@ Attributes:
 - `count: Optional[int]` – (Optional) The number of GPU.
 - `memory: Optional[Union[int, str]]` – (Optional) The minimum VRAM requirements, e.g. `"24GB"`.
 
-### RetryPolicy
+## RetryPolicy
 
 The policy of waiting for capacity.
 
@@ -211,7 +210,7 @@ Attributes:
 - `retry: Optional[str]` – (Optional) Defaults to `False`.
 - `limit: Optional[Union[int, str]]` – (Optional) The maximum duration of retrying, e.g. `3d` or `12h`.
 
-### SpotPolicy
+## SpotPolicy
 
 The policy of using spot instances.
 
@@ -221,7 +220,7 @@ Possible values:
 - `SpotPolicy.SPOT` – Use spot instances only. 
 - `SpotPolicy.ON_DEMAN` – Use on-demand instances only. 
 
-### RegistryAuth
+## RegistryAuth
 
 The credentials to access the private Docker registry.
 
@@ -230,7 +229,7 @@ Attributes:
 - `username: str` – (Required) The username.
 - `password: str` – (Required) The password or secure token.
 
-### RunStatus
+## RunStatus
 
 The status of the run.
 

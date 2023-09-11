@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source toolkit for running LLM workloads across any clouds.
+  dstack is an open-source toolkit for orchestrating LLM workloads in any clouds.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack

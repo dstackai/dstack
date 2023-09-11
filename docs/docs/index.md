@@ -1,7 +1,7 @@
 # Quickstart
 
-`dstack` is an open-source toolkit for running LLM workloads across any clouds, offering a cost-efficient and
-user-friendly interface for training, inference, and development
+`dstack` is an open-source toolkit for orchestrating LLM workloads in any cloud. It provides a cloud-agnostic interface
+for training, fine-tuning, inference, and development of LLMs.
 
 ## Installation
 
@@ -20,8 +20,9 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 
 ## Configure clouds
 
-Upon startup, the server sets up the default project called `main`.
-Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configuring-clouds-with-dstack).
+!!! info "NOTE:"
+    Upon startup, the server sets up the default project called `main`.
+    Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configuring-clouds-with-dstack).
 
 [//]: # (![]&#40;../assets/images/dstack-hub-view-project-empty.png&#41;{ width=800 })
 
