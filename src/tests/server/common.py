@@ -1,4 +1,5 @@
 import json
+import uuid
 from typing import Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,8 +17,10 @@ async def create_user(
     session: AsyncSession,
     name: str = "test_user",
     global_role: GlobalRole = GlobalRole.ADMIN,
-    token: str = "1234",
+    token: Optional[str] = None,
 ) -> UserModel:
+    if token is None:
+        token = str(uuid.uuid4())
     user = UserModel(
         name=name,
         global_role=global_role,

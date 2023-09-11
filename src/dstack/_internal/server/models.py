@@ -58,7 +58,7 @@ class MemberModel(BaseModel):
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    user: Mapped[UserModel] = relationship()
+    user: Mapped[UserModel] = relationship(lazy="joined")
     project_role: Mapped[ProjectRole] = mapped_column(Enum(ProjectRole))
 
 

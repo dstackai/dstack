@@ -1,10 +1,14 @@
+from unittest.mock import patch
+from uuid import UUID
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.users import ProjectRole
-from dstack._internal.server.db import reuse_or_make_session
+from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
+from dstack._internal.server.models import MemberModel, ProjectModel
 from dstack._internal.server.services.projects import add_project_member
 from tests.server.common import create_project, create_user, get_auth_headers
 
@@ -17,14 +21,14 @@ class TestListProjects:
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
-    async def test_returns_empty_list(self, test_db, session):
+    async def test_returns_empty_list(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         response = client.post("/api/projects/list", headers=get_auth_headers(user.token))
         assert response.status_code in [200]
         assert response.json() == []
 
     @pytest.mark.asyncio
-    async def test_returns_projects(self, test_db, session):
+    async def test_returns_projects(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session)
         await add_project_member(
@@ -32,4 +36,207 @@ class TestListProjects:
         )
         response = client.post("/api/projects/list", headers=get_auth_headers(user.token))
         assert response.status_code in [200]
-        assert response.json() == [{}]
+        assert response.json() == [
+            {
+                "project_id": str(project.id),
+                "project_name": project.name,
+                "backends": [],
+                "members": [
+                    {
+                        "user": {
+                            "id": str(user.id),
+                            "username": user.name,
+                            "global_role": user.global_role,
+                        },
+                        "project_role": ProjectRole.ADMIN,
+                    }
+                ],
+            }
+        ]
+
+
+class TestCreateProject:
+    def test_returns_40x_if_not_authenticated(self):
+        response = client.post("/api/projects/create")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    async def test_creates_project(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+        project_name = "test_project"
+        body = {"project_name": project_name}
+        with patch("uuid.uuid4") as m:
+            m.return_value = project_id
+            response = client.post(
+                "/api/projects/create",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "project_id": str(project_id),
+            "project_name": project_name,
+            "backends": [],
+            "members": [
+                {
+                    "user": {
+                        "id": str(user.id),
+                        "username": user.name,
+                        "global_role": user.global_role,
+                    },
+                    "project_role": ProjectRole.ADMIN,
+                }
+            ],
+        }
+
+
+class TestDeleteProject:
+    def test_returns_40x_if_not_authenticated(self):
+        response = client.post("/api/projects/delete")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    async def test_deletes_projects(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        response = client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(ProjectModel))
+        assert len(res.all()) == 0
+
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_project_admin(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project1 = await create_project(session=session, name="project1")
+        project2 = await create_project(session=session, name="project2")
+        await add_project_member(
+            session=session, project=project1, user=user, project_role=ProjectRole.ADMIN
+        )
+        await add_project_member(
+            session=session, project=project2, user=user, project_role=ProjectRole.USER
+        )
+        response = client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project1.name, project2.name]},
+        )
+        assert response.status_code == 403
+        res = await session.execute(select(ProjectModel))
+        assert len(res.all()) == 2
+
+
+class TestGetProject:
+    def test_returns_40x_if_not_authenticated(self):
+        response = client.post("/api/projects/test_project/get")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    async def test_returns_404_if_project_does_not_exist(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        response = client.post(
+            "/api/projects/test_project/get",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 404, response.json()
+
+    @pytest.mark.asyncio
+    async def test_returns_project(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        response = client.post(
+            "/api/projects/test_project/get",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "project_id": str(project.id),
+            "project_name": project.name,
+            "backends": [],
+            "members": [
+                {
+                    "user": {
+                        "id": str(user.id),
+                        "username": user.name,
+                        "global_role": user.global_role,
+                    },
+                    "project_role": ProjectRole.ADMIN,
+                }
+            ],
+        }
+
+
+class TestSetProjectMembers:
+    def test_returns_40x_if_not_authenticated(self):
+        response = client.post("/api/projects/test_project/get")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    async def test_sets_project_members(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        admin = await create_user(session=session)
+        await add_project_member(
+            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+        )
+        user1 = await create_user(session=session, name="user1")
+        user2 = await create_user(session=session, name="user2")
+        members = [
+            {
+                "username": admin.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "username": user1.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "username": user2.name,
+                "project_role": ProjectRole.USER,
+            },
+        ]
+        body = {"members": members}
+        response = client.post(
+            f"/api/projects/{project.name}/set_members",
+            headers=get_auth_headers(admin.token),
+            json=body,
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json()["members"] == [
+            {
+                "user": {
+                    "id": str(admin.id),
+                    "username": admin.name,
+                    "global_role": admin.global_role,
+                },
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "user": {
+                    "id": str(user1.id),
+                    "username": user1.name,
+                    "global_role": user1.global_role,
+                },
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "user": {
+                    "id": str(user2.id),
+                    "username": user2.name,
+                    "global_role": user2.global_role,
+                },
+                "project_role": ProjectRole.USER,
+            },
+        ]
+        res = await session.execute(select(MemberModel))
+        members = res.scalars().all()
+        assert len(members) == 3

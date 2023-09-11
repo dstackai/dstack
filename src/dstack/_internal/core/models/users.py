@@ -5,8 +5,7 @@ from pydantic import UUID4, BaseModel
 
 class ProjectRole(str, enum.Enum):
     ADMIN = "admin"
-    RUN = "run"
-    READ = "read"
+    USER = "user"
 
 
 class GlobalRole(str, enum.Enum):
