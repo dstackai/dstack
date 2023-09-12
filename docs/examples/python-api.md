@@ -4,8 +4,8 @@ title: Deploying LLMs with Python API
 
 # Deploying LLMs with Python API
 
-The [Python API](../../docs/docs/reference/api/python/index.md) of `dstack` can be used to run tasks
-and services programmatically.
+The [Python API](../docs/reference/api/python/index.md) of `dstack` can be used to run 
+[tasks](../docs/guides/tasks.md) and [services](../docs/guides/services.md) programmatically.
 
 Below is an example of a Streamlit app that uses `dstack`'s API to deploy a quantized version of Llama 2 to your cloud
 with a simple click of a button.
@@ -18,10 +18,10 @@ with a simple click of a button.
 
     To get started, create an instance of `dstack.Client` and use its methods to submit and manage runs.
 
-    With `dstack.Client`, you can run [tasks](../../docs/guides/tasks.md) and [services](../../docs/guides/services.md). Running a task allows you to programmatically access its ports and
+    With `dstack.Client`, you can run [tasks](../docs/guides/tasks.md) and [services](../docs/guides/services.md). Running a task allows you to programmatically access its ports and
     forward traffic to your local machine. For example, if you run an LLM as a task, you can access it on localhost.
 
-    For more details on the Python API, please refer to its [reference](../../docs/docs/reference/api/python/index.md).
+    For more details on the Python API, please refer to its [reference](../docs/docs/reference/api/python/index.md).
 
 ## Prerequisites
 
