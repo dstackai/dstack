@@ -10,7 +10,7 @@ To use `dstack`, install it with `pip`, and start the server.
 <div class="termy">
 
 ```shell
-$ pip install "dstack[aws,gcp,azure,lambda]"
+$ pip install "dstack[all]" -U
 $ dstack start
 
 The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
@@ -18,18 +18,15 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 
 </div>
 
-## Configure clouds
-
-!!! info "NOTE:"
+!!! info "Configure clouds"
     Upon startup, the server sets up the default project called `main`.
-    Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configuring-clouds-with-dstack).
+    Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configuring-backends).
 
-[//]: # (![]&#40;../assets/images/dstack-hub-view-project-empty.png&#41;{ width=800 })
+Once the server is up, you can orchestrate LLM workloads using either the CLI or the Python API.
 
-[//]: # (Once cloud backends are configured, `dstack` will be able to provision cloud resources across configured clouds, ensuring)
-[//]: # (the best price and higher availability.)
+## Using CLI
 
-## Initialize the repo
+### Initialize the repo
 
 To use `dstack` for your project, make sure to first run the [`dstack init`](reference/cli/init.md) command in the root folder of the project.
 
@@ -42,12 +39,13 @@ $ dstack init
 
 </div>
 
-## Define a configuration
+### Define a configuration
 
-A configuration is a YAML file that describes what you want to run with `dstack`. Configurations can be of three
-types: `dev-environment`, `task`, and `service`.
+The CLI allows you to define what you want to run as a YAMl file and run it via the `dstack run` CLI command.
 
-### Dev environments
+Configurations can be of three types: `dev-environment`, `task`, and `service`.
+
+#### Dev environments
 
 A dev environment is a virtual machine pre-configured an IDE.
 
@@ -68,7 +66,7 @@ ide: vscode
 
 Once it's live, you can open it in your local VS Code by clicking the provided URL in the output.
 
-### Tasks
+#### Tasks
 
 A task can be any script that you may want to run on demand: a batch job, or a web application.
 
@@ -89,10 +87,10 @@ commands:
 
 </div>
 
-While the task runs in the cloud, the CLI forwards traffic, allowing you to access the application from your local
-machine. 
+While the task is running in the cloud, the CLI forwards its ports traffic to `localhost`
+for convenient access.
 
-### Services
+#### Services
 
 A service is an application that is accessible through a public endpoint.
 
@@ -102,8 +100,6 @@ A service is an application that is accessible through a public endpoint.
 type: service
 
 python: "3.11" # (Optional) If not specified, your local version is used
-
-gateway: ${{ secrets.GATEWAY_ADDRESS }}
 
 port: 7860
 
@@ -115,20 +111,13 @@ commands:
 </div>
 
 Once the service is up, `dstack` makes it accessible from the Internet through
-the [gateway](guides/services.md#configure-a-gateway-address).
-
-[//]: # (!!! info "Configuration filename")
-[//]: # (    The configuration file must be named with the suffix `.dstack.yml`. For example,)
-[//]: # (    you can name the configuration file `.dstack.yml` or `serve.dstack.yml`. You can define)
-[//]: # (    these configurations anywhere within your project. )
-[//]: # (    )
-[//]: # (    Each folder may have one default configuration file named `.dstack.yml`.)
+the [gateway](guides/clouds.md#configuring-gateways).
 
 For more details on the file syntax, refer to [`.dstack.yml`](../docs/reference/dstack.yml/index.md).
 
-## Run the configuration
+### Run the configuration
 
-### Default configurations
+#### Default configurations
 
 To run a configuration, you have to call the [`dstack run`](reference/cli/run.md) command and pass the path to the 
 directory which you want to use as a working directory when running the configuration.
@@ -154,7 +143,7 @@ To open in VS Code Desktop, use this link:
 If you've not specified a specific configuration file, `dstack` will use the default configuration
 defined in the given directory (named `.dstack.yml`).
 
-### Non-default configurations
+#### Non-default configurations
 
 If you want to run a non-default configuration, you have to specify the path to the configuration
 using the `-f` argument:
@@ -175,12 +164,9 @@ Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
 
 </div>
 
-[//]: # (!!! info "Port forwarding")
-[//]: # (    By default, `dstack` forwards the ports used by dev environments and tasks to your local machine for convenient access.)
-
 For more details on the run command, refer to [`dstack run`](reference/cli/run.md).
 
-### Requesting resources
+#### Requesting resources
 
 You can request resources using the [`--gpu`](reference/cli/run.md#GPU) 
 and [`--memory`](reference/cli/run.md#MEMORY) arguments with `dstack run`, 
@@ -193,3 +179,49 @@ more.
 !!! info "Automatic instance discovery"
     `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
     price and availability.
+
+## Using Python API
+
+As an alternative to the CLI, you can run tasks and services programmatically 
+via [Python API](../docs/reference/api/python/index.md).
+
+```python
+import sys
+
+import dstack
+
+task = dstack.Task(
+    image="ghcr.io/huggingface/text-generation-inference:latest",
+    env={"MODEL_ID": "TheBloke/Llama-2-13B-chat-GPTQ"},
+    commands=[
+        "text-generation-launcher --trust-remote-code --quantize gptq",
+    ],
+    ports=["8080:80"],
+)
+resources = dstack.Resources(gpu=dstack.GPU(memory="20GB"))
+
+if __name__ == "__main__":
+    print("Initializing the client...")
+    client = dstack.Client.from_config(repo_dir="~/dstack-examples")
+
+    print("Submitting the run...")
+    run = client.runs.submit(configuration=task, resources=resources)
+
+    print(f"Run {run.name}: " + run.status())
+
+    print("Attaching to the run...")
+    run.attach()
+
+    # After the endpoint is up, http://127.0.0.1:8080/health will return 200 (OK).
+
+    try:
+        for log in run.logs():
+            sys.stdout.buffer.write(log)
+            sys.stdout.buffer.flush()
+
+    except KeyboardInterrupt:
+        print("Aborting the run...")
+        run.stop(abort=True)
+    finally:
+        run.detach()
+```
