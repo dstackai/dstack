@@ -27,13 +27,18 @@ func App() {
 				Usage: "Start dstack-runner",
 				Flags: []cli.Flag{
 					&cli.PathFlag{
-						Name:     "working-dir",
-						Usage:    "Base path for the job",
+						Name:     "temp-dir",
+						Usage:    "Temporary directory for logs and other files",
 						Required: true,
 					},
 					&cli.PathFlag{
-						Name:     "temp-dir",
-						Usage:    "Temporary directory for logs and other files",
+						Name:     "home-dir",
+						Usage:    "Home directory for credentials and $HOME",
+						Required: true,
+					},
+					&cli.PathFlag{
+						Name:     "working-dir",
+						Usage:    "Base path for the job",
 						Required: true,
 					},
 					&cli.StringFlag{
@@ -42,7 +47,7 @@ func App() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					start(c.Int("log-level"), c.Int("http-port"), c.Path("working-dir"), c.Path("temp-dir"))
+					start(c.Path("temp-dir"), c.Path("home-dir"), c.Path("working-dir"), c.Int("http-port"), c.Int("log-level"))
 					return nil
 				},
 			},

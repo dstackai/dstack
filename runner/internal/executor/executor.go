@@ -16,6 +16,7 @@ import (
 
 type Executor struct {
 	tempDir    string
+	homeDir    string
 	workingDir string
 
 	run             schemas.Run
@@ -32,11 +33,12 @@ type Executor struct {
 	timestamp       *MonotonicTimestamp
 }
 
-func NewExecutor(tempDir string, workingDir string) *Executor {
+func NewExecutor(tempDir string, homeDir string, workingDir string) *Executor {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
 	return &Executor{
 		tempDir:    tempDir,
+		homeDir:    homeDir,
 		workingDir: workingDir,
 
 		mu:              mu,
@@ -139,12 +141,22 @@ func (ex *Executor) SetRunnerState(state string) {
 
 func (ex *Executor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	// todo recover
+	workingDir, err := joinRelPath(ex.workingDir, ex.jobSpec.WorkingDir)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+
 	args := makeArgs(ex.jobSpec.Entrypoint, ex.jobSpec.Commands)
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Entrypoint[0], args...)
-	cmd.Env = makeEnv(ex.jobSpec.Env, ex.secrets)
-	cmd.Dir = filepath.Join(ex.workingDir, ex.jobSpec.WorkingDir) // todo error on illegal path
-	// todo call SIGINT in cmd.Cancel
+	cmd.Env = makeEnv(ex.homeDir, ex.jobSpec.Env, ex.secrets)
+	cmd.Dir = workingDir
+	cmd.Cancel = func() error {
+		// returns error on Windows
+		return gerrors.Wrap(cmd.Process.Signal(os.Interrupt))
+	}
+	cmd.WaitDelay = 10 * time.Second // kills the process if it doesn't exit in time
 
+	// todo creack/pty
 	cmdReader, err := cmd.StdoutPipe()
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -154,6 +166,7 @@ func (ex *Executor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	if err := cmd.Start(); err != nil {
 		return gerrors.Wrap(err)
 	}
+	// todo defer wait?
 	logger := io.MultiWriter(jobLogFile, ex.jobLogs)
 	if _, err := io.Copy(logger, cmdReader); err != nil {
 		return gerrors.Wrap(err)

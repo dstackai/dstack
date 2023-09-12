@@ -2,6 +2,8 @@ package executor
 
 import (
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"path/filepath"
 	"strings"
 )
 
@@ -13,7 +15,7 @@ func makeArgs(entrypoint []string, commands []string) []string {
 	return append(args, joinShellCommands(commands)...)
 }
 
-func makeEnv(mapping map[string]string, secrets map[string]string) []string {
+func makeEnv(homeDir string, mapping map[string]string, secrets map[string]string) []string {
 	list := make([]string, 0)
 	for key, value := range mapping {
 		list = append(list, fmt.Sprintf("%s=%s", key, value))
@@ -21,6 +23,7 @@ func makeEnv(mapping map[string]string, secrets map[string]string) []string {
 	for key, value := range secrets {
 		list = append(list, fmt.Sprintf("%s=%s", key, value))
 	}
+	list = append(list, fmt.Sprintf("HOME=%s", homeDir))
 	return list
 }
 
@@ -43,4 +46,15 @@ func joinShellCommands(commands []string) []string {
 		}
 	}
 	return []string{sb.String()}
+}
+
+func joinRelPath(rootDir string, path string) (string, error) {
+	if filepath.IsAbs(path) {
+		return "", gerrors.New("path must be relative")
+	}
+	targetPath := filepath.Join(rootDir, path)
+	if !strings.HasPrefix(targetPath, rootDir) {
+		return "", gerrors.New("path is outside of the root directory")
+	}
+	return targetPath, nil
 }

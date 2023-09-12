@@ -17,7 +17,7 @@ func main() {
 	App()
 }
 
-func start(logLevel int, httpPort int, workingDir string, tempDir string) {
+func start(tempDir string, homeDir string, workingDir string, httpPort int, logLevel int) {
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		log.Error(context.TODO(), "Failed to create temp directory", "err", err)
 		os.Exit(1)
@@ -42,7 +42,7 @@ func start(logLevel int, httpPort int, workingDir string, tempDir string) {
 			os.Exit(1)
 		}
 	}
-	server := api.NewServer(tempDir, workingDir, fmt.Sprintf(":%d", httpPort))
+	server := api.NewServer(tempDir, homeDir, workingDir, fmt.Sprintf(":%d", httpPort))
 
 	log.Trace(context.TODO(), "Starting API server", "port", httpPort)
 	if err := server.Run(); err != nil {

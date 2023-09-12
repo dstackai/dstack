@@ -6,9 +6,9 @@ import (
 )
 
 type appendWriter struct {
-	mu        *sync.RWMutex
+	mu        *sync.RWMutex // shares with executor
 	history   []schemas.LogEvent
-	timestamp *MonotonicTimestamp
+	timestamp *MonotonicTimestamp // shares with executor
 }
 
 func newAppendWriter(mu *sync.RWMutex, timestamp *MonotonicTimestamp) *appendWriter {

@@ -25,11 +25,11 @@ type Server struct {
 	submitWaitDuration time.Duration
 	logsWaitDuration   time.Duration
 
-	executor  *executor.Executor
+	executor  *executor.Executor // todo use interface for mocking
 	cancelRun context.CancelFunc
 }
 
-func NewServer(tempDir string, workingDir string, address string) *Server {
+func NewServer(tempDir string, homeDir string, workingDir string, address string) *Server {
 	mux := http.NewServeMux()
 	s := &Server{
 		srv: &http.Server{
@@ -45,7 +45,7 @@ func NewServer(tempDir string, workingDir string, address string) *Server {
 		submitWaitDuration: 2 * time.Minute,
 		logsWaitDuration:   30 * time.Second,
 
-		executor: executor.NewExecutor(tempDir, workingDir),
+		executor: executor.NewExecutor(tempDir, homeDir, workingDir),
 	}
 	setHandleFunc(mux, "GET", "/api/healthcheck", s.healthcheckGetHandler)
 	setHandleFunc(mux, "POST", "/api/submit", s.submitPostHandler)

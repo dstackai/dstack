@@ -34,6 +34,7 @@ func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (int,
 			return http.StatusInternalServerError, ""
 		}
 	}
+	// todo go-playground/validator
 
 	s.executor.SetJob(body)
 	s.jobBarrierCh <- nil // notify server that job submitted
