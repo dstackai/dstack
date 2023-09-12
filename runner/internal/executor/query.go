@@ -2,11 +2,11 @@ package executor
 
 import "github.com/dstackai/dstack/runner/internal/schemas"
 
-func (ex *Executor) GetJobLogsHistory() []schemas.LogEvent {
+func (ex *RunExecutor) GetJobLogsHistory() []schemas.LogEvent {
 	return ex.jobLogs.history
 }
 
-func (ex *Executor) GetHistory(timestamp int64) schemas.PullResponse {
+func (ex *RunExecutor) GetHistory(timestamp int64) schemas.PullResponse {
 	return schemas.PullResponse{
 		JobStates:   eventsAfter(ex.jobStateHistory, timestamp),
 		JobLogs:     eventsAfter(ex.jobLogs.history, timestamp),
@@ -15,7 +15,7 @@ func (ex *Executor) GetHistory(timestamp int64) schemas.PullResponse {
 	}
 }
 
-func (ex *Executor) GetRunnerState() string {
+func (ex *RunExecutor) GetRunnerState() string {
 	return ex.state
 }
 

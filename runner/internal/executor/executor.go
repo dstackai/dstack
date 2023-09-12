@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-type Executor struct {
+type RunExecutor struct {
 	tempDir    string
 	homeDir    string
 	workingDir string
@@ -36,10 +36,10 @@ type Executor struct {
 	killDelay time.Duration
 }
 
-func NewExecutor(tempDir string, homeDir string, workingDir string) *Executor {
+func NewRunExecutor(tempDir string, homeDir string, workingDir string) *RunExecutor {
 	mu := &sync.RWMutex{}
 	timestamp := NewMonotonicTimestamp()
-	return &Executor{
+	return &RunExecutor{
 		tempDir:    tempDir,
 		homeDir:    homeDir,
 		workingDir: workingDir,
@@ -56,7 +56,7 @@ func NewExecutor(tempDir string, homeDir string, workingDir string) *Executor {
 }
 
 // Run must be called after SetJob and SetCodePath
-func (ex *Executor) Run(ctx context.Context) (err error) {
+func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "runner.log"))
 	if err != nil {
 		ex.SetJobState(ctx, states.Failed)
@@ -129,7 +129,7 @@ func (ex *Executor) Run(ctx context.Context) (err error) {
 	return nil
 }
 
-func (ex *Executor) SetJob(body schemas.SubmitBody) {
+func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
 	ex.run = body.Run
 	ex.jobSpec = body.JobSpec
 	ex.secrets = body.Secrets
@@ -137,23 +137,23 @@ func (ex *Executor) SetJob(body schemas.SubmitBody) {
 	ex.state = WaitCode
 }
 
-func (ex *Executor) SetCodePath(codePath string) {
+func (ex *RunExecutor) SetCodePath(codePath string) {
 	ex.codePath = codePath
 	ex.state = WaitRun
 }
 
-func (ex *Executor) SetJobState(ctx context.Context, state string) {
+func (ex *RunExecutor) SetJobState(ctx context.Context, state string) {
 	ex.mu.Lock()
 	ex.jobStateHistory = append(ex.jobStateHistory, schemas.JobStateEvent{State: state, Timestamp: ex.timestamp.Next()})
 	ex.mu.Unlock()
 	log.Info(ctx, "Job state changed", "new", state)
 }
 
-func (ex *Executor) SetRunnerState(state string) {
+func (ex *RunExecutor) SetRunnerState(state string) {
 	ex.state = state
 }
 
-func (ex *Executor) execJob(ctx context.Context, jobLogFile io.Writer) error {
+func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	// todo recover
 	workingDir, err := joinRelPath(ex.workingDir, ex.jobSpec.WorkingDir)
 	if err != nil {
@@ -188,7 +188,7 @@ func (ex *Executor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	return gerrors.Wrap(cmd.Wait())
 }
 
-func (ex *Executor) setupCredentials(ctx context.Context) (func(), error) {
+func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 	if ex.repoCredentials == nil {
 		return func() {}, nil
 	}

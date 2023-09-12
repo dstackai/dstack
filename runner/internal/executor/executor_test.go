@@ -139,7 +139,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 
 /* Helpers */
 
-func makeTestExecutor(t *testing.T) *Executor {
+func makeTestExecutor(t *testing.T) *RunExecutor {
 	t.Helper()
 	baseDir, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
@@ -172,7 +172,7 @@ func makeTestExecutor(t *testing.T) *Executor {
 	_ = os.Mkdir(home, 0700)
 	repo := filepath.Join(baseDir, "repo")
 	_ = os.Mkdir(repo, 0700)
-	ex := NewExecutor(temp, home, repo)
+	ex := NewRunExecutor(temp, home, repo)
 	ex.SetJob(body)
 	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
 	return ex

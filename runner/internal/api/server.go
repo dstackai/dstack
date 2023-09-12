@@ -25,7 +25,7 @@ type Server struct {
 	submitWaitDuration time.Duration
 	logsWaitDuration   time.Duration
 
-	executor  *executor.Executor // todo use interface for mocking
+	executor  executor.Executor
 	cancelRun context.CancelFunc
 }
 
@@ -45,7 +45,7 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 		submitWaitDuration: 2 * time.Minute,
 		logsWaitDuration:   30 * time.Second,
 
-		executor: executor.NewExecutor(tempDir, homeDir, workingDir),
+		executor: executor.NewRunExecutor(tempDir, homeDir, workingDir),
 	}
 	setHandleFunc(mux, "GET", "/api/healthcheck", s.healthcheckGetHandler)
 	setHandleFunc(mux, "POST", "/api/submit", s.submitPostHandler)

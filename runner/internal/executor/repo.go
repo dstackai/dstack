@@ -11,7 +11,7 @@ import (
 )
 
 // setupRepo must be called from Run
-func (ex *Executor) setupRepo(ctx context.Context) error {
+func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 	if _, err := os.Stat(ex.workingDir); err != nil {
 		if err = os.MkdirAll(ex.workingDir, 0777); err != nil {
 			return gerrors.Wrap(err)
@@ -34,7 +34,7 @@ func (ex *Executor) setupRepo(ctx context.Context) error {
 	return nil
 }
 
-func (ex *Executor) prepareGit(ctx context.Context) error {
+func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 	repoManager := repo.NewManager(ctx, ex.run.RepoData.FormatURL(consts.REPO_HTTPS_URL), ex.run.RepoData.RepoBranch, ex.run.RepoData.RepoHash).WithLocalPath(ex.workingDir)
 	if ex.repoCredentials != nil {
 		log.Trace(ctx, "Credentials is not empty")
@@ -79,7 +79,7 @@ func (ex *Executor) prepareGit(ctx context.Context) error {
 	return nil
 }
 
-func (ex *Executor) prepareArchive(ctx context.Context) error {
+func (ex *RunExecutor) prepareArchive(ctx context.Context) error {
 	file, err := os.Open(ex.codePath)
 	if err != nil {
 		return gerrors.Wrap(err)

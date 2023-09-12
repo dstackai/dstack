@@ -1,17 +1,17 @@
 package executor
 
-func (ex *Executor) Lock() {
+func (ex *RunExecutor) Lock() {
 	ex.mu.Lock()
 }
 
-func (ex *Executor) Unlock() {
+func (ex *RunExecutor) Unlock() {
 	ex.mu.Unlock()
 }
 
-func (ex *Executor) RLock() {
+func (ex *RunExecutor) RLock() {
 	ex.mu.RLock()
 }
 
-func (ex *Executor) RUnlock() {
+func (ex *RunExecutor) RUnlock() {
 	ex.mu.RUnlock()
 }
