@@ -5,6 +5,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.errors import ForbiddenError
 from dstack._internal.core.models.projects import Member, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
@@ -13,14 +14,6 @@ from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import get_configurator
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
-
-
-class ProjectsServiceError(Exception):
-    pass
-
-
-class ForbiddenError(ProjectsServiceError):
-    pass
 
 
 async def list_user_projects(
@@ -161,7 +154,7 @@ def project_model_to_project(project_model: ProjectModel) -> Project:
     backends = []
     for b in project_model.backends:
         configurator = get_configurator(b.type)
-        backends.append(configurator.get_backend_config())
+        backends.append(configurator.get_config_info())
     return Project(
         project_id=project_model.id,
         project_name=project_model.name,

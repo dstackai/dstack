@@ -1,15 +1,15 @@
 import enum
-from typing import List, Union
+from typing import List, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 
 class BackendType(str, enum.Enum):
-    aws = "aws"
-    azure = "azure"
-    gcp = "gcp"
-    lambdalabs = "lambda"
+    AWS = "aws"
+    AZURE = "azure"
+    GCP = "gcp"
+    LAMBDA = "lambda"
 
 
 class AWSConfigInfo(BaseModel):
@@ -23,8 +23,25 @@ class AWSAccessKeyCreds(BaseModel):
     secret_key: str
 
 
+class AWSDefaultCreds(BaseModel):
+    type: Literal["default"] = "default"
+
+
+AnyAWSCreds = Union[AWSAccessKeyCreds, AWSDefaultCreds]
+
+
+class AWSCreds(BaseModel):
+    __root__: AnyAWSCreds = Field(..., discriminator="type")
+
+
 class AWSConfigInfoWithCreds(AWSConfigInfo):
-    creds: AWSAccessKeyCreds
+    creds: AnyAWSCreds
+
+
+class AWSConfigInfoWithCredsPartial(BaseModel):
+    type: Literal["aws"] = "aws"
+    creds: Optional[AnyAWSCreds]
+    regions: Optional[List[str]]
 
 
 class GCPConfigInfo(BaseModel):
@@ -42,24 +59,46 @@ class GCPConfigInfoWithCreds(GCPConfigInfo):
     creds: GCPServiceAccountCreds
 
 
-AnyBackendConfigWithoutCreds = Union[
+AnyConfigInfoWithoutCreds = Union[
     AWSConfigInfo,
     GCPConfigInfo,
 ]
 
 
-AnyBackendConfigWithCreds = Union[
+AnyConfigInfoWithCreds = Union[
     AWSConfigInfoWithCreds,
     GCPConfigInfoWithCreds,
 ]
 
 
-AnyBackendConfig = Union[AnyBackendConfigWithoutCreds, AnyBackendConfigWithCreds]
+AnyConfigInfoWithCredsPartial = Union[
+    AWSConfigInfoWithCredsPartial,
+    None,
+]
+
+
+AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 
 
 class BackendInfo(BaseModel):
     name: str
-    config: AnyBackendConfigWithoutCreds
+    config: AnyConfigInfoWithoutCreds
 
 
-ConfigValues = ...
+class ConfigElementValue(BaseModel):
+    value: str
+    label: str
+
+
+class ConfigMultiElement(BaseModel):
+    selected: List[str] = []
+    values: List[ConfigElementValue] = []
+
+
+class AWSConfigValues(BaseModel):
+    type: Literal["aws"] = "aws"
+    default_creds: bool = False
+    regions: Optional[ConfigMultiElement]
+
+
+AnyConfigValues = Union[AWSConfigValues, None]

@@ -3,6 +3,7 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ForbiddenError
 from dstack._internal.core.models.projects import Project
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -51,7 +52,7 @@ async def delete_projects(
             user=user,
             projects_names=body.projects_names,
         )
-    except projects.ForbiddenError:
+    except ForbiddenError:
         raise_forbidden()
 
 

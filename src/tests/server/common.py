@@ -4,9 +4,10 @@ from typing import Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.backends import BackendType
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.db import reuse_or_make_session
-from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.server.models import BackendModel, ProjectModel, UserModel
 
 
 def get_auth_headers(token: str) -> Dict:
@@ -47,30 +48,29 @@ async def create_project(
     return project
 
 
-# async def create_backend(
-#     project_name: str,
-#     backend_type: str = "aws",
-#     config: Optional[Dict] = None,
-#     auth: Optional[Dict] = None,
-# ) -> Backend:
-#     if config is None:
-#         config = {
-#             "regions": ["eu-west-1"],
-#             "s3_bucket_name": "dstack-test-eu-west-1",
-#             "ec2_subnet_id": None,
-#         }
-#     if auth is None:
-#         auth = {
-#             "type": "access_key",
-#             "access_key": "test_access_key",
-#             "secret_key": "test_secret_key",
-#         }
-#     backend = Backend(
-#         project_name=project_name,
-#         type=backend_type,
-#         name=backend_type,
-#         config=json.dumps(config),
-#         auth=json.dumps(auth),
-#     )
-#     await ProjectManager._create_backend(backend)
-#     return backend
+async def create_backend(
+    session: AsyncSession,
+    project_id: uuid.UUID,
+    backend_type: BackendType = BackendType.AWS,
+    config: Optional[Dict] = None,
+    auth: Optional[Dict] = None,
+) -> BackendModel:
+    if config is None:
+        config = {
+            "regions": ["eu-west-1"],
+        }
+    if auth is None:
+        auth = {
+            "type": "access_key",
+            "access_key": "test_access_key",
+            "secret_key": "test_secret_key",
+        }
+    backend = BackendModel(
+        project_id=project_id,
+        type=backend_type,
+        config=json.dumps(config),
+        auth=json.dumps(auth),
+    )
+    session.add(backend)
+    await session.commit()
+    return backend
