@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
 	"fmt"
@@ -11,11 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
-// todo should we test context cancellation?
-
-// todo test local repo (tar)
 // todo test get history
 
 func TestExecutor_WorkingDir(t *testing.T) {
@@ -66,6 +65,47 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 	assert.Equal(t, key, b.String())
 }
 
+func TestExecutor_LocalRepo(t *testing.T) {
+	var b bytes.Buffer
+	ex := makeTestExecutor(t)
+	ex.jobSpec.Commands = []string{"cat foo"}
+	makeCodeTar(t, ex.codePath)
+
+	err := ex.setupRepo(context.TODO())
+	require.NoError(t, err)
+
+	err = ex.execJob(context.TODO(), io.Writer(&b))
+	assert.NoError(t, err)
+	assert.Equal(t, "bar\n", b.String())
+}
+
+func TestExecutor_Recover(t *testing.T) {
+	ex := makeTestExecutor(t)
+	ex.jobSpec.Commands = nil // cause a panic
+	ex.jobSpec.Entrypoint = nil
+	makeCodeTar(t, ex.codePath)
+
+	err := ex.Run(context.TODO())
+	assert.ErrorContains(t, err, "recovered: ")
+}
+
+/* Long tests */
+
+func TestExecutor_MaxDuration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	ex := makeTestExecutor(t)
+	ex.killDelay = 500 * time.Millisecond
+	ex.jobSpec.Commands = []string{"echo 1", "sleep 2", "echo 2"}
+	ex.jobSpec.MaxDuration = 1 // seconds
+	makeCodeTar(t, ex.codePath)
+
+	err := ex.Run(context.TODO())
+	assert.ErrorContains(t, err, "killed")
+}
+
 func TestExecutor_RemoteRepo(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
@@ -73,8 +113,6 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = []string{"git rev-parse HEAD", "git config user.name", "git config user.email"}
-	ex.repoCredentials = &schemas.RepoCredentials{Protocol: "https"}
 	ex.run.RepoData = schemas.RepoData{
 		RepoType:        "remote",
 		RepoHostName:    "github.com",
@@ -86,6 +124,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 		RepoConfigName:  "Dstack Developer",
 		RepoConfigEmail: "developer@dstack.ai",
 	}
+	ex.jobSpec.Commands = []string{"git rev-parse HEAD", "git config user.name", "git config user.email"}
 	err := os.WriteFile(ex.codePath, []byte{}, 0600) // empty diff
 	require.NoError(t, err)
 
@@ -98,6 +137,8 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 	assert.Equal(t, expected, b.String())
 }
 
+/* Helpers */
+
 func makeTestExecutor(t *testing.T) *Executor {
 	t.Helper()
 	baseDir, err := filepath.EvalSymlinks(t.TempDir())
@@ -105,25 +146,24 @@ func makeTestExecutor(t *testing.T) *Executor {
 
 	body := schemas.SubmitBody{
 		Run: schemas.Run{
-			Id:      "test",
-			RunName: "red-turtle-1",
-			RepoId:  "test-000000",
-			RepoData: schemas.RepoData{
-				RepoType: "local",
-			},
+			Id:       "test",
+			RunName:  "red-turtle-1",
+			RepoId:   "test-000000",
+			RepoData: schemas.RepoData{RepoType: "local"},
 			Configuration: schemas.Configuration{
 				Type: "task",
 			},
 			ConfigurationPath: ".dstack.yml",
 		},
 		JobSpec: schemas.JobSpec{
-			Commands:    nil, // note: fill before run
-			Entrypoint:  []string{"/bin/bash", "-c"},
+			Commands:    nil,                         // note: fill before run
+			Entrypoint:  []string{"/bin/bash", "-c"}, // no interactive shell
 			Env:         make(map[string]string),
 			MaxDuration: 0, // no timeout
 			WorkingDir:  ".",
 		},
-		Secrets: make(map[string]string),
+		Secrets:         make(map[string]string),
+		RepoCredentials: &schemas.RepoCredentials{Protocol: "https"},
 	}
 
 	temp := filepath.Join(baseDir, "temp")
@@ -136,4 +176,24 @@ func makeTestExecutor(t *testing.T) *Executor {
 	ex.SetJob(body)
 	ex.SetCodePath(filepath.Join(baseDir, "code")) // note: create file before run
 	return ex
+}
+
+func makeCodeTar(t *testing.T, path string) {
+	t.Helper()
+	file, err := os.Create(path)
+	require.NoError(t, err)
+	defer func() { _ = file.Close() }()
+	tw := tar.NewWriter(file)
+
+	var files = []struct{ name, body string }{
+		{"foo", "bar\n"},
+	}
+
+	for _, f := range files {
+		hdr := &tar.Header{Name: f.name, Mode: 0600, Size: int64(len(f.body))}
+		require.NoError(t, tw.WriteHeader(hdr))
+		_, err := tw.Write([]byte(f.body))
+		require.NoError(t, err)
+	}
+	require.NoError(t, tw.Close())
 }

@@ -32,6 +32,8 @@ type Executor struct {
 	jobLogs         *appendWriter
 	runnerLogs      *appendWriter
 	timestamp       *MonotonicTimestamp
+
+	killDelay time.Duration
 }
 
 func NewExecutor(tempDir string, homeDir string, workingDir string) *Executor {
@@ -48,11 +50,13 @@ func NewExecutor(tempDir string, homeDir string, workingDir string) *Executor {
 		jobLogs:         newAppendWriter(mu, timestamp),
 		runnerLogs:      newAppendWriter(mu, timestamp),
 		timestamp:       timestamp,
+
+		killDelay: 10 * time.Second,
 	}
 }
 
 // Run must be called after SetJob and SetCodePath
-func (ex *Executor) Run(ctx context.Context) error {
+func (ex *Executor) Run(ctx context.Context) (err error) {
 	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "runner.log"))
 	if err != nil {
 		ex.SetJobState(ctx, states.Failed)
@@ -66,6 +70,15 @@ func (ex *Executor) Run(ctx context.Context) error {
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = jobLogFile.Close() }()
+
+	defer func() {
+		// recover goes after runnerLogFile.Close() to keep the log
+		if r := recover(); r != nil {
+			log.Error(ctx, "Executor PANIC", "err", r)
+			ex.SetJobState(ctx, states.Failed)
+			err = gerrors.Newf("recovered: %v", r)
+		}
+	}()
 
 	logger := io.MultiWriter(runnerLogFile, os.Stdout, ex.runnerLogs)
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
@@ -155,7 +168,7 @@ func (ex *Executor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 		// returns error on Windows
 		return gerrors.Wrap(cmd.Process.Signal(os.Interrupt))
 	}
-	cmd.WaitDelay = 10 * time.Second // kills the process if it doesn't exit in time
+	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
 	// todo creack/pty
 	cmdReader, err := cmd.StdoutPipe()
@@ -167,7 +180,7 @@ func (ex *Executor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	if err := cmd.Start(); err != nil {
 		return gerrors.Wrap(err)
 	}
-	// todo defer wait?
+	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 	logger := io.MultiWriter(jobLogFile, ex.jobLogs)
 	if _, err := io.Copy(logger, cmdReader); err != nil {
 		return gerrors.Wrap(err)
