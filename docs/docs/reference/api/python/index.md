@@ -1,14 +1,16 @@
 # Python API
 
-The Python API allows for programmatically running tasks and services across multiple regions and clouds.
+The Python API allows for programmatically running tasks and services across configured clouds.
 
-!!! info "Installation"
+#### Installation
 
-    The Python API is experimental and requires you to use version `0.11.2rc2`:
+Before you can use `dstack` Python API, ensure you have installed the `dstack` package, 
+started a `dstack` server with [configured clouds](../../docs/docs/guides/clouds.md).
     
-    ```shell
-    pip install "dstack[all]==0.11.2rc2"
-    ```
+```shell
+pip install "dstack[all]>=0.11.2rc2"
+dstack start
+```
 
 #### Usage example
 
