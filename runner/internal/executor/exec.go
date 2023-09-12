@@ -16,6 +16,7 @@ func makeArgs(entrypoint []string, commands []string) []string {
 }
 
 func makeEnv(homeDir string, mapping map[string]string, secrets map[string]string) []string {
+	// todo set job vars
 	list := make([]string, 0)
 	for key, value := range mapping {
 		list = append(list, fmt.Sprintf("%s=%s", key, value))

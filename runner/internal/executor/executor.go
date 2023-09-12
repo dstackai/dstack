@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"fmt"
 	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -175,6 +176,49 @@ func (ex *Executor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 }
 
 func (ex *Executor) setupCredentials(ctx context.Context) (func(), error) {
-	// todo
-	return func() {}, nil
+	if ex.repoCredentials == nil {
+		return func() {}, nil
+	}
+	switch ex.repoCredentials.Protocol {
+	case "ssh":
+		if ex.repoCredentials.PrivateKey == nil {
+			return nil, gerrors.New("private key is missing")
+		}
+		keyPath := filepath.Join(ex.homeDir, ".ssh/id_rsa")
+		if _, err := os.Stat(keyPath); err == nil {
+			return nil, gerrors.New("private key already exists")
+		}
+		if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
+			return nil, gerrors.Wrap(err)
+		}
+		log.Info(ctx, "Writing private key", "path", keyPath)
+		if err := os.WriteFile(keyPath, []byte(*ex.repoCredentials.PrivateKey), 0600); err != nil {
+			return nil, gerrors.Wrap(err)
+		}
+		return func() {
+			log.Info(ctx, "Removing private key", "path", keyPath)
+			_ = os.Remove(keyPath)
+		}, nil
+	case "https":
+		if ex.repoCredentials.OAuthToken == nil {
+			return func() {}, nil
+		}
+		hostsPath := filepath.Join(ex.homeDir, ".config/gh/hosts.yml")
+		if _, err := os.Stat(hostsPath); err == nil {
+			return nil, gerrors.New("hosts.yml file already exists")
+		}
+		if err := os.MkdirAll(filepath.Dir(hostsPath), 0700); err != nil {
+			return nil, gerrors.Wrap(err)
+		}
+		log.Info(ctx, "Writing OAuth token", "path", hostsPath)
+		ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", ex.run.RepoData.RepoHostName, *ex.repoCredentials.OAuthToken)
+		if err := os.WriteFile(hostsPath, []byte(ghHost), 0644); err != nil {
+			return nil, gerrors.Wrap(err)
+		}
+		return func() {
+			log.Info(ctx, "Removing OAuth token", "path", hostsPath)
+			_ = os.Remove(hostsPath)
+		}, nil
+	}
+	return nil, gerrors.Newf("unknown protocol %s", ex.repoCredentials.Protocol)
 }
