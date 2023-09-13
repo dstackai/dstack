@@ -11,7 +11,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.instances import InstanceCandidate, InstanceType
 from dstack._internal.core.models.profiles import Profile, SpotPolicy
-from dstack._internal.core.models.repos import AnyRepoData
+from dstack._internal.core.models.repos import AnyRunRepoData
 
 
 class AppSpec(BaseModel):
@@ -140,7 +140,7 @@ class Run(BaseModel):
     run_name: str
     project_id: str
     repo_id: str
-    repo_data: Annotated[AnyRepoData, Field(discriminator="repo_type")]
+    repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
     repo_code_hash: Optional[str]
     user: str
     created_at: datetime
@@ -162,7 +162,7 @@ class RunPlan(BaseModel):
     project_id: str
     user: str
     repo_id: str
-    repo_data: Annotated[AnyRepoData, Field(discriminator="repo_type")]
+    repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
     repo_code_hash: Optional[str]
     configuration_path: str
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]

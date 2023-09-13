@@ -1,11 +1,12 @@
 import uuid
-from typing import List
+from typing import List, Optional
 
-from sqlalchemy import Enum, ForeignKey, MetaData, String, Text
+from sqlalchemy import Enum, ForeignKey, MetaData, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends import BackendType
+from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 
 constraint_naming_convention = {
@@ -74,6 +75,24 @@ class BackendModel(BaseModel):
 
     config: Mapped[str] = mapped_column(String(2000))
     auth: Mapped[str] = mapped_column(String(2000))
+
+
+class RepoModel(BaseModel):
+    __tablename__ = "repos"
+
+    id: Mapped[UUIDType] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship()
+    # RepoModel.name stores repo_id
+    name: Mapped[str] = mapped_column(String(100))
+    type: Mapped[RepoType] = mapped_column(Enum(RepoType))
+
+    info: Mapped[str] = mapped_column(String(2000))
+    creds: Mapped[Optional[str]] = mapped_column(String(2000))
+
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_repos_project_id_name"),)
 
 
 # class Job(BaseModel):

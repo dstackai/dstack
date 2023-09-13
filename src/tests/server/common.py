@@ -5,9 +5,9 @@ from typing import Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends import BackendType
+from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.server.db import reuse_or_make_session
-from dstack._internal.server.models import BackendModel, ProjectModel, UserModel
+from dstack._internal.server.models import BackendModel, ProjectModel, RepoModel, UserModel
 
 
 def get_auth_headers(token: str) -> Dict:
@@ -74,3 +74,37 @@ async def create_backend(
     session.add(backend)
     await session.commit()
     return backend
+
+
+async def create_repo(
+    session: AsyncSession,
+    project_id: uuid.UUID,
+    repo_id: str = "test_repo",
+    repo_type: RepoType = RepoType.REMOTE,
+    info: Optional[Dict] = None,
+    creds: Optional[Dict] = None,
+):
+    if info is None:
+        info = {
+            "repo_type": "remote",
+            "repo_host_name": "github.com",
+            "repo_port": None,
+            "repo_user_name": "dstackai",
+            "repo_name": "dstack",
+        }
+    if creds is None:
+        creds = {
+            "protocol": "https",
+            "private_key": None,
+            "oauth_token": "test_token",
+        }
+    repo = RepoModel(
+        project_id=project_id,
+        name=repo_id,
+        type=repo_type,
+        info=json.dumps(info),
+        creds=json.dumps(creds),
+    )
+    session.add(repo)
+    await session.commit()
+    return repo

@@ -4,13 +4,13 @@ from pydantic import BaseModel, Field
 
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.repos import AnyRepoData
+from dstack._internal.core.models.repos import AnyRunRepoData
 
 
 class SubmitRunRequest(BaseModel):
     repo_id: str
     repo_code_hash: Optional[str]
-    repo_data: Annotated[AnyRepoData, Field(discriminator="repo_type")]
+    repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
     configuration_path: str
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
     profile: Profile

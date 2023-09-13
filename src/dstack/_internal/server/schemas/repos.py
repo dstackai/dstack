@@ -1,18 +1,20 @@
-from typing import List
+from typing import List, Optional
 
-from dstack._internal.core.models.repos.remote import RemoteRepoCredentials
+from dstack._internal.core.models.repos import AnyRepoInfo
+from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.server.schemas.common import RepoRequest
 
 
 class GetRepoRequest(RepoRequest):
-    pass
+    include_creds: bool
 
 
-class SaveRepoCredentialsRequest(RepoRequest):
-    credentials: RemoteRepoCredentials
+class SaveRepoCredsRequest(RepoRequest):
+    repo_info: AnyRepoInfo
+    repo_creds: Optional[RemoteRepoCreds]
 
 
-class GetRepoCredentialsRequest(RepoRequest):
+class GetRepoCredsRequest(RepoRequest):
     pass
 
 
