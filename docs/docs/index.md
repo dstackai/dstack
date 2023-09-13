@@ -1,7 +1,7 @@
 # Quickstart
 
-`dstack` is an open-source toolkit for orchestrating LLM workloads in any cloud. It provides a cloud-agnostic interface
-for training, fine-tuning, inference, and development of LLMs.
+`dstack` is an open-source toolkit for training, fine-tuning, inference, and development
+across multiple cloud GPU providers.
 
 ## Installation
 
@@ -180,7 +180,7 @@ more.
     `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
     price and availability.
 
-## Using Python API
+## Using API
 
 As an alternative to the CLI, you can run tasks and services programmatically 
 via [Python API](../docs/reference/api/python/index.md).

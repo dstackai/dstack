@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Run LLM workloads across any clouds
+Orchestrate GPU workloads across clouds
 </h3>
 
 <p align="center">
@@ -23,12 +23,12 @@ Run LLM workloads across any clouds
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source toolkit for orchestrating LLM workloads in any cloud. It provides a cloud-agnostic interface
-for training, fine-tuning, inference, and development of LLMs.
+`dstack` is an open-source toolkit for training, fine-tuning, inference, and development
+across multiple cloud GPU providers.
 
 ## Latest news ✨
 
-- [2023/09] [Deploying LLMs with Python API](https://dstack.ai/examples/python-api) (Example)
+- [2023/09] [Deploying LLMs with API](https://dstack.ai/examples/python-api) (Example)
 - [2023/09] [Managed gateways](https://dstack.ai/blog/2023/09/01/managed-gateways) (Release)
 - [2023/08] [Fine-tuning Llama 2](https://dstack.ai/examples/finetuning-llama-2) (Example)
 - [2023/08] [Serving SDXL with FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
@@ -48,14 +48,14 @@ dstack start
 Upon startup, the server sets up the default project called `main`.
 Prior to using `dstack`, make sure to [configure clouds](https://dstack.ai/docs/guides/clouds#configuring-backends).
 
-Once the server is up, you can orchestrate LLM workloads using
+Once the server is up, you can orchestrate GPU workloads using
 either the CLI or Python API.
 
 ## Using CLI
 
 ### Define a configuration
 
-The CLI allows you to define what you want to run as a YAMl file and
+The CLI allows you to define what you want to run as a YAML file and
 run it via the `dstack run` CLI command.
 
 Configurations can be of three types: `dev-environment`, `task`, and `service`.
@@ -128,7 +128,7 @@ Privisioning...
 Serving on https://tasty-zebra-1.mydomain.com
 ```
 
-## Using Python API
+## Using API
 
 As an alternative to the CLI, you can run tasks and services programmatically 
 via [Python API](https://dstack.ai/docs/reference/api/python/).

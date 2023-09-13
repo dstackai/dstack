@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: Orchestrate LLM workloads in any clouds
+title: Orchestrate GPU workloads across clouds
 hide:
    - navigation
    - toc
