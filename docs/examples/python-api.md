@@ -21,7 +21,7 @@ with a simple click of a button.
     With `dstack.Client`, you can run [tasks](../docs/guides/tasks.md) and [services](../docs/guides/services.md). Running a task allows you to programmatically access its ports and
     forward traffic to your local machine. For example, if you run an LLM as a task, you can access it on localhost.
 
-    For more details on the Python API, please refer to its [reference](../docs/docs/reference/api/python/index.md).
+    For more details on the Python API, please refer to its [reference](../docs/reference/api/python/index.md).
 
 ## Prerequisites
 
