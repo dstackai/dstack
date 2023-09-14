@@ -8,6 +8,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 func main() {
@@ -155,5 +156,5 @@ func getDstackHome(flag string) (string, error) {
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
-	return home + "/.dstack", nil
+	return filepath.Join(home, ".dstack"), nil
 }
