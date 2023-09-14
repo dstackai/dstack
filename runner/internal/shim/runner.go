@@ -27,6 +27,10 @@ func (c *RunnerParameters) GetDockerCommands() []string {
 	}
 }
 
+func (c *RunnerParameters) GetTempDir() string {
+	return c.TempDir
+}
+
 func (c *RunnerParameters) getRunnerArgs() []string {
 	return []string{
 		"--log-level", strconv.Itoa(c.LogLevel),

@@ -16,6 +16,7 @@ func main() {
 		Runner:      &runnerParams,
 		OpenSSHPort: 10022,
 	}
+	var dstackHome string
 
 	app := &cli.App{
 		Name:    "dstack-shim",
@@ -28,21 +29,35 @@ func main() {
 				Required:    true,
 				Destination: &backendName,
 				EnvVars:     []string{"DSTACK_BACKEND"},
+				Action: func(c *cli.Context, s string) error {
+					for _, backend := range []string{"aws", "azure", "gcp", "lambda", "local"} {
+						if s == backend {
+							return nil
+						}
+					}
+					return gerrors.Newf("unknown backend %s", s)
+				},
+			},
+			&cli.PathFlag{
+				Name:        "home",
+				Usage:       "Dstack home directory",
+				Destination: &dstackHome,
+				EnvVars:     []string{"DSTACK_HOME"},
 			},
 			/* Runner Parameters */
 			&cli.IntFlag{
-				Name:        "http-port",
+				Name:        "runner-http-port",
 				Usage:       "Set runner's http port",
 				Value:       10999,
 				Destination: &runnerParams.HttpPort,
-				EnvVars:     []string{"DSTACK_HTTP_PORT"},
+				EnvVars:     []string{"DSTACK_RUNNER_HTTP_PORT"},
 			},
 			&cli.IntFlag{
-				Name:        "log-level",
+				Name:        "runner-log-level",
 				Usage:       "Set runner's log level",
 				Value:       4,
 				Destination: &runnerParams.LogLevel,
-				EnvVars:     []string{"DSTACK_LOG_LEVEL"},
+				EnvVars:     []string{"DSTACK_RUNNER_LOG_LEVEL"},
 			},
 			&cli.StringFlag{
 				Name:        "runner-version",
@@ -84,18 +99,25 @@ func main() {
 						Name:        "ssh-key",
 						Usage:       "Public SSH key",
 						Required:    true,
-						FilePath:    "~/.ssh/authorized_keys",
+						FilePath:    "~/.ssh/authorized_keys", // todo check if user expand works
 						Destination: &dockerParams.PublicSSHKey,
 						EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
 					},
 				},
 				Action: func(c *cli.Context) error {
-					log.Printf("Runner: %+v\n", runnerParams)
-					log.Printf("Docker: %+v\n", dockerParams)
-					return nil
-					runnerParams.TempDir = "/tmp/runner" // todo mount on host?
+					log.Printf("Backend: %s\n", backendName)
+					runnerParams.TempDir = "/tmp/runner"
 					runnerParams.HomeDir = "/root"
 					runnerParams.WorkingDir = "/workflow"
+					log.Printf("Runner: %+v\n", runnerParams)
+
+					var err error
+					dockerParams.DstackHome, err = getDstackHome(dstackHome)
+					if err != nil {
+						return gerrors.Wrap(err)
+					}
+					log.Printf("Docker: %+v\n", dockerParams)
+					return nil
 					return gerrors.Wrap(shim.RunDocker(context.TODO(), &dockerParams))
 				},
 			},
@@ -116,4 +138,15 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getDstackHome(flag string) (string, error) {
+	if flag != "" {
+		return flag, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	return home + "/.dstack", nil
 }

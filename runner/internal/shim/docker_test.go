@@ -18,10 +18,13 @@ func TestDocker_SSHServer(t *testing.T) {
 		t.Skip()
 	}
 
+	tempDir := t.TempDir()
+
 	dockerParams := &DockerParameters{
 		Runner:      &DummyRunnerConfig{dockerCommands: []string{"echo 1"}},
 		ImageName:   "ubuntu",
 		OpenSSHPort: 10022,
+		DstackHome:  tempDir + "/.dstack",
 	}
 
 	timeout := 60 // seconds
@@ -47,6 +50,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 		ImageName:    "ubuntu",
 		OpenSSHPort:  10022,
 		PublicSSHKey: string(publicBytes),
+		DstackHome:   tempDir + "/.dstack",
 	}
 
 	timeout := 60 // seconds
@@ -84,4 +88,8 @@ type DummyRunnerConfig struct {
 
 func (c *DummyRunnerConfig) GetDockerCommands() []string {
 	return c.dockerCommands
+}
+
+func (c *DummyRunnerConfig) GetTempDir() string {
+	return "/tmp/runner"
 }

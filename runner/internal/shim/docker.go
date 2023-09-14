@@ -6,15 +6,19 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/mount"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
 	rt "runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func RunDocker(ctx context.Context, config DockerConfig) error {
@@ -24,6 +28,7 @@ func RunDocker(ctx context.Context, config DockerConfig) error {
 	}
 
 	// todo run server & wait for credentials
+	// todo serve pulling status
 	//if config.WithAuth {
 	//	return gerrors.New("not implemented")
 	//}
@@ -80,6 +85,21 @@ func (c *DockerParameters) CreateContainer(ctx context.Context, client docker.AP
 	commands = append(commands, c.runOpenSSHServer()...)
 	commands = append(commands, c.Runner.GetDockerCommands()...)
 
+	var mounts []mount.Mount = nil
+	if c.DstackHome != "" {
+		mountPath := filepath.Join(c.DstackHome, "runners", time.Now().Format("20060102-150405"))
+		if err = os.MkdirAll(mountPath, 0755); err != nil {
+			return "", gerrors.Wrap(err)
+		}
+		mounts = []mount.Mount{
+			{
+				Type:   mount.TypeBind,
+				Source: mountPath,
+				Target: c.Runner.GetTempDir(),
+			},
+		}
+	}
+
 	containerConfig := &container.Config{
 		Image:        c.ImageName,
 		Cmd:          []string{strings.Join(commands, " && ")},
@@ -92,6 +112,7 @@ func (c *DockerParameters) CreateContainer(ctx context.Context, client docker.AP
 		PublishAllPorts: true,
 		Sysctls:         map[string]string{},
 		Runtime:         runtime,
+		Mounts:          mounts,
 	}
 	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
 	if err != nil {

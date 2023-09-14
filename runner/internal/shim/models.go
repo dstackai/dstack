@@ -7,6 +7,7 @@ import (
 
 type RunnerConfig interface {
 	GetDockerCommands() []string
+	GetTempDir() string
 }
 
 type RunnerParameters struct {
@@ -39,4 +40,6 @@ type DockerParameters struct {
 
 	RegistryAuthBase64 string
 	KeepContainer      bool // cli
+
+	DstackHome string // dstack home dir
 }
