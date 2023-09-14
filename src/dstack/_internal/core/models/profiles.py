@@ -35,6 +35,8 @@ def parse_memory(v: Optional[Union[int, str]]) -> Optional[int]:
     >>> parse_memory("1 GB")
     1024
     """
+    if v is None:
+        return None
     if isinstance(v, str):
         m = re.fullmatch(r"(\d+) *([mg]b)?", v.strip().lower())
         if not m:
@@ -45,7 +47,9 @@ def parse_memory(v: Optional[Union[int, str]]) -> Optional[int]:
     return int(v)
 
 
-def parse_duration(v: Union[int, str]) -> int:
+def parse_duration(v: Optional[Union[int, str]]) -> int:
+    if v is None:
+        return None
     if isinstance(v, int):
         return v
     regex = re.compile(r"(?P<amount>\d+) *(?P<unit>[smhdw])$")
@@ -65,7 +69,7 @@ def parse_duration(v: Union[int, str]) -> int:
 
 def parse_max_duration(v: Union[int, str]) -> int:
     if v == "off":
-        return -1
+        return "off"
     return parse_duration(v)
 
 
@@ -108,22 +112,18 @@ class ProfileResources(ForbidExtra):
 class ProfileRetryPolicy(ForbidExtra):
     retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
     limit: Annotated[
-        Union[int, str],
+        Optional[Union[int, str]],
         Field(description="The maximum period of retrying the run, e.g., 4h or 1d"),
     ] = None
 
-    @validator("limit", pre=True, allow_reuse=True)
-    def _validate_limit(cls, v: Union[int, str, None]):
-        if v is None:
-            ValueError()
-        return parse_duration(v)
+    _validate_limit = validator("limit", pre=True, allow_reuse=True)(parse_duration)
 
     @root_validator()
     @classmethod
     def _validate_fields(cls, field_values):
         if field_values["retry"] and "limit" not in field_values:
             field_values["limit"] = DEFAULT_RETRY_LIMIT
-        if field_values["limit"] is not None:
+        if field_values.get("limit") is not None:
             field_values["retry"] = True
         return field_values
 
@@ -142,7 +142,7 @@ class Profile(ForbidExtra):
         ProfileRetryPolicy, Field(description="The policy for re-submitting the run")
     ] = ProfileRetryPolicy()
     max_duration: Annotated[
-        Optional[Union[int, str]],
+        Optional[Union[Literal["off"], str, int]],
         Field(
             description="The maximum duration of a run (e.g., 2h, 1d, etc). After it elapses, the run is forced to stop"
         ),

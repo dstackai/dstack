@@ -31,13 +31,11 @@ async def get_repo(
     repo_id: str,
     include_creds: bool,
 ) -> Optional[RepoHeadWithCreds]:
-    res = await session.execute(
-        select(RepoModel).where(
-            RepoModel.project_id == project.id,
-            RepoModel.name == repo_id,
-        )
+    repo = await get_repo_model(
+        session=session,
+        project=project,
+        repo_id=repo_id,
     )
-    repo = res.scalar()
     if repo is None:
         return None
     return repo_model_to_repo_head(repo, include_creds=include_creds)
@@ -125,6 +123,20 @@ async def delete_repos(
     await session.execute(
         delete(RepoModel).where(RepoModel.project_id == project.id, RepoModel.name.in_(repos_ids))
     )
+
+
+async def get_repo_model(
+    session: AsyncSession,
+    project: ProjectModel,
+    repo_id: str,
+) -> Optional[RepoModel]:
+    res = await session.execute(
+        select(RepoModel).where(
+            RepoModel.project_id == project.id,
+            RepoModel.name == repo_id,
+        )
+    )
+    return res.scalar()
 
 
 def repo_model_to_repo_head(
