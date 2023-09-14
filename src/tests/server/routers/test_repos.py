@@ -72,6 +72,20 @@ class TestGetRepo:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    async def test_returns_404_if_repo_does_not_exist(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        response = client.post(
+            f"/api/project/{project.name}/repos/get",
+            headers=get_auth_headers(user.token),
+            json={"repo_id": "some_repo", "include_creds": False},
+        )
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
     async def test_returns_repo(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session)
@@ -208,3 +222,33 @@ class TestInitRepo:
         res = await session.execute(select(RepoModel))
         repo = res.scalar_one()
         assert json.loads(repo.creds) == body2["repo_creds"]
+
+
+class TestDeleteRepos:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        response = client.post(
+            f"/api/project/{project.name}/repos/delete",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_deletes_repos(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        repo = await create_repo(session=session, project_id=project.id)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        response = client.post(
+            f"/api/project/{project.name}/repos/delete",
+            headers=get_auth_headers(user.token),
+            json={"repos_ids": [repo.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(RepoModel))
+        repo = res.scalar()
+        assert repo is None

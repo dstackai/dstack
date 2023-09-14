@@ -148,7 +148,6 @@ class Run(BaseModel):
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
     profile: Profile
     ssh_key_pub: str
-    code_hash: Optional[str]
     jobs: List[Job]
 
 

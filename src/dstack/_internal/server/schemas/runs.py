@@ -9,10 +9,9 @@ from dstack._internal.core.models.repos import AnyRunRepoData
 
 class SubmitRunRequest(BaseModel):
     repo_id: str
-    repo_code_hash: Optional[str]
     repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
+    repo_code_hash: Optional[str]
     configuration_path: str
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
     profile: Profile
     ssh_key_pub: str
-    code_hash: Optional[str]

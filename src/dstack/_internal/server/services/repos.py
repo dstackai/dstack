@@ -117,6 +117,16 @@ async def update_repo(
     return repo
 
 
+async def delete_repos(
+    session: AsyncSession,
+    project: ProjectModel,
+    repos_ids: List[str],
+):
+    await session.execute(
+        delete(RepoModel).where(RepoModel.project_id == project.id, RepoModel.name.in_(repos_ids))
+    )
+
+
 def repo_model_to_repo_head(
     repo_model: RepoModel,
     include_creds: bool = False,

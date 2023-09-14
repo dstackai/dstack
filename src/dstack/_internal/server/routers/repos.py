@@ -19,6 +19,7 @@ from dstack._internal.server.schemas.repos import (
 )
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import repos
+from dstack._internal.server.utils.routers import raise_not_found
 
 router = APIRouter(prefix="/api/project/{project_name}/repos", tags=["repos"])
 
@@ -45,6 +46,8 @@ async def get_repo(
         repo_id=body.repo_id,
         include_creds=body.include_creds,
     )
+    if repo is None:
+        raise_not_found()
     return repo
 
 
@@ -66,5 +69,10 @@ async def init_repo(
 
 
 @router.post("/delete")
-async def delete_repos(project_name: str, body: DeleteReposRequest):
-    pass
+async def delete_repos(
+    body: DeleteReposRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+):
+    _, project = user_project
+    await repos.delete_repos(session=session, project=project, repos_ids=body.repos_ids)
