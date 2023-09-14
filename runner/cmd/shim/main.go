@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/shim"
+	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/urfave/cli/v2"
 	"log"
 	"os"
@@ -117,7 +118,7 @@ func main() {
 						return gerrors.Wrap(err)
 					}
 					log.Printf("Docker: %+v\n", dockerParams)
-					return nil
+
 					return gerrors.Wrap(shim.RunDocker(context.TODO(), &dockerParams))
 				},
 			},
@@ -132,7 +133,13 @@ func main() {
 	}
 
 	defer func() {
-		// todo kill VM
+		backend, err := backends.NewBackend(context.TODO(), backendName)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err = backend.Terminate(context.TODO()); err != nil {
+			log.Fatal(err)
+		}
 	}()
 
 	if err := app.Run(os.Args); err != nil {
