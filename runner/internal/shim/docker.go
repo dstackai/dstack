@@ -55,8 +55,12 @@ func RunDocker(ctx context.Context, config DockerConfig) error {
 }
 
 func (c *DockerParameters) PullImage(ctx context.Context, client docker.APIClient) error {
+	imageName := c.ImageName
+	if !strings.Contains(imageName, ":") {
+		imageName += ":latest"
+	}
 	images, err := client.ImageList(ctx, types.ImageListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", c.ImageName)),
+		Filters: filters.NewArgs(filters.Arg("reference", imageName)),
 	})
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -65,7 +69,7 @@ func (c *DockerParameters) PullImage(ctx context.Context, client docker.APIClien
 		return nil
 	}
 
-	reader, err := client.ImagePull(ctx, c.ImageName, types.ImagePullOptions{RegistryAuth: c.RegistryAuthBase64})
+	reader, err := client.ImagePull(ctx, imageName, types.ImagePullOptions{RegistryAuth: c.RegistryAuthBase64})
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
