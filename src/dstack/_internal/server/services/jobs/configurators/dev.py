@@ -3,9 +3,9 @@ from typing import List, Optional
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import RetryPolicy, RunSpec
-from dstack._internal.server.services.jobs.base import JobConfigurator
-from dstack._internal.server.services.jobs.extensions.ssh import SSHd
-from dstack._internal.server.services.jobs.extensions.vscode import VSCodeDesktop
+from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
+from dstack._internal.server.services.jobs.configurators.extensions.ssh import SSHd
+from dstack._internal.server.services.jobs.configurators.extensions.vscode import VSCodeDesktop
 
 DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
 

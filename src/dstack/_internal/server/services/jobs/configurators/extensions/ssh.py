@@ -1,7 +1,9 @@
 from typing import List, Optional
 
 from dstack._internal.core.models.runs import AppSpec
-from dstack._internal.server.services.jobs.extensions.base import get_required_commands
+from dstack._internal.server.services.jobs.configurators.extensions.base import (
+    get_required_commands,
+)
 
 
 class SSHd:

@@ -2,8 +2,8 @@ from typing import List
 
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.runs import Job, RunSpec
-from dstack._internal.server.services.jobs.base import JobConfigurator
-from dstack._internal.server.services.jobs.dev import DevEnvironmentJobConfigurator
+from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
+from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
 
 
 def get_jobs_from_run_spec(run_spec: RunSpec) -> List[Job]:

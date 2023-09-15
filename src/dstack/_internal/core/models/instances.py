@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from dstack._internal.core.models.backends import BackendType
+from dstack._internal.core.models.backends.base import BackendType
 
 
 class Gpu(BaseModel):

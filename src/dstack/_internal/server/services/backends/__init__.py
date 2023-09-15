@@ -8,16 +8,16 @@ from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
     AnyConfigInfoWithCredsPartial,
     AnyConfigValues,
-    BackendType,
 )
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.models import BackendModel, ProjectModel
-from dstack._internal.server.services.backends.base import Configurator
+from dstack._internal.server.services.backends.configurators.base import Configurator
 from dstack._internal.server.utils.common import run_async
 
 configurators_classes: List[Configurator] = []
 
 try:
-    from dstack._internal.server.services.backends.aws import AWSConfigurator
+    from dstack._internal.server.services.backends.configurators.aws import AWSConfigurator
 
     configurators_classes.append(AWSConfigurator)
 except ImportError:

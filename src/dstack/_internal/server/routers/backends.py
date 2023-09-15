@@ -8,8 +8,8 @@ from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
     AnyConfigInfoWithCredsPartial,
     AnyConfigValues,
-    BackendType,
 )
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.backends import DeleteBackendsRequest

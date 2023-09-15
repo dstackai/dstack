@@ -4,7 +4,7 @@ from typing import List
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.runs import Run, RunSpec
+from dstack._internal.core.models.runs import JobStatus, Run, RunSpec
 from dstack._internal.server.models import ProjectModel, RunModel, UserModel
 from dstack._internal.server.services import repos
 from dstack._internal.server.services.jobs import get_jobs_from_run_spec
@@ -43,6 +43,7 @@ async def submit_run(
         repo_id=repo.id,
         user_id=user.id,
         run_name=run_spec.run_name,
+        status=JobStatus.SUBMITTED,
         run_spec=run_spec.json(),
     )
     session.add(run_model)

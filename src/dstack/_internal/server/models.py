@@ -15,7 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy_utils import UUIDType
 
-from dstack._internal.core.models.backends import BackendType
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -121,6 +121,7 @@ class RunModel(BaseModel):
     user: Mapped["UserModel"] = relationship()
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
     run_name: Mapped[str] = mapped_column(String(100))
+    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
     run_spec: Mapped[str] = mapped_column(String(4000))
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="run", lazy="selectin")
 

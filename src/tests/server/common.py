@@ -4,7 +4,7 @@ from typing import Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.backends import BackendType
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import BackendModel, ProjectModel, RepoModel, UserModel

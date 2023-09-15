@@ -8,19 +8,23 @@ from boto3.session import Session
 from dstack._internal.core.backends.aws import AwsBackend
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base import Backend
-from dstack._internal.core.models.backends import (
-    AnyConfigInfo,
+from dstack._internal.core.models.backends.aws import (
+    AnyAWSConfigInfo,
     AWSConfigInfo,
     AWSConfigInfoWithCreds,
     AWSConfigInfoWithCredsPartial,
     AWSConfigValues,
     AWSCreds,
+)
+from dstack._internal.core.models.backends.base import (
     BackendType,
     ConfigElementValue,
     ConfigMultiElement,
 )
 from dstack._internal.server.models import BackendModel, ProjectModel
-from dstack._internal.server.services.backends.base import raise_invalid_credentials_error
+from dstack._internal.server.services.backends.configurators.base import (
+    raise_invalid_credentials_error,
+)
 
 REGIONS = [
     ("US East, N. Virginia", "us-east-1"),
@@ -76,7 +80,7 @@ class AWSConfigurator(ABC):
             auth=AWSCreds.parse_obj(config.creds).__root__.json(),
         )
 
-    def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyConfigInfo:
+    def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAWSConfigInfo:
         config = AWSConfigInfo.parse_raw(model.config)
         creds = AWSCreds.parse_raw(model.auth).__root__
         if include_creds:

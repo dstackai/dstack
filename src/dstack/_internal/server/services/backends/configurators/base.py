@@ -8,8 +8,8 @@ from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
     AnyConfigInfoWithCredsPartial,
     AnyConfigValues,
-    BackendType,
 )
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.models import BackendModel, ProjectModel
 
 

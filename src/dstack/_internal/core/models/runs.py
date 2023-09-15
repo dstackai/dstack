@@ -21,6 +21,7 @@ class AppSpec(BaseModel):
 class JobStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
+    PROVISIONING = "provisioning"
     RUNNING = "running"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
