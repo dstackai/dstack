@@ -179,12 +179,12 @@ nav:
   - Examples:
     - examples/index.md
     - Examples:
-      - Deploying LLMs with API: examples/python-api.md
-      - Fine-tuning Llama 2: examples/finetuning-llama-2.md
-      - Serving LLMs with TGI: examples/text-generation-inference.md
-      - Serving SDXL with FastAPI: examples/stable-diffusion-xl.md
-      - Serving LLMs with vLLM: examples/vllm.md
-      - LLM as Chatbot: examples/llmchat.md
+      - RAG with Llama Index and Weaviate: examples/llama-index-weaviate.md
+      - Deploying LLMs using Python API: examples/python-api.md
+      - Fine-tuning Llama 2 using QLoRA: examples/finetuning-llama-2.md
+      - Deploying LLMs using TGI: examples/text-generation-inference.md
+      - Deploying SDXL using FastAPI: examples/stable-diffusion-xl.md
+      - Deploying LLMs using vLLM: examples/vllm.md
   - Blog:
       - blog/index.md
   - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ

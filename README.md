@@ -46,7 +46,7 @@ dstack start
 ## Configure clouds
 
 Upon startup, the server sets up the default project called `main`.
-Prior to using `dstack`, make sure to [configure clouds](https://dstack.ai/docs/guides/clouds#configuring-backends).
+Prior to using `dstack`, make sure to [configure clouds](https://dstack.ai/docs/guides/clouds#configure-backends).
 
 Once the server is up, you can orchestrate GPU workloads using
 either the CLI or Python API.
@@ -110,7 +110,7 @@ commands:
 ```
 
 Once the service is up, `dstack` makes it accessible from the Internet through
-the [gateway](https://dstack.ai/docs/guides/clouds#configuring-gateways).
+the [gateway](https://dstack.ai/docs/guides/clouds#configure-gateways).
 
 ### Run a configuration
 

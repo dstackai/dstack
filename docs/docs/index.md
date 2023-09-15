@@ -20,7 +20,7 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
 
 !!! info "Configure clouds"
     Upon startup, the server sets up the default project called `main`.
-    Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configuring-backends).
+    Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configure-backends).
 
 Once the server is up, you can orchestrate LLM workloads using either the CLI or the Python API.
 
@@ -111,7 +111,7 @@ commands:
 </div>
 
 Once the service is up, `dstack` makes it accessible from the Internet through
-the [gateway](guides/clouds.md#configuring-gateways).
+the [gateway](guides/clouds.md#configure-gateways).
 
 For more details on the file syntax, refer to [`.dstack.yml`](../docs/reference/dstack.yml/index.md).
 

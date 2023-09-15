@@ -13,7 +13,7 @@ their credentials to `dstack`.
     3. <span>**No vendor lock-in**
        An open-source and cloud-agnostic interface enables easy switching between cloud providers.</span>
 
-## Creating cloud accounts
+## Create cloud accounts
 
 To use clouds with `dstack`, you need to first create an account with each cloud provider.
 
@@ -27,7 +27,7 @@ relevant issues in [our tracker](https://github.com/dstackai/dstack/issues).
     Startups can apply for extra credits, usually by reaching out directly to the provider in the case of smaller providers,
     or through a partner program (such as [NVIDIA Inception](https://www.nvidia.com/en-us/startups/)) for larger providers.
 
-??? info "Requesting GPU quotas"
+??? info "Request GPU quotas"
 
     Larger providers require you to request GPU quotas, essentially obtaining permission from their support
     team, prior to utilizing GPUs with your account. If planning to use GPU through credits, approval for the request might
@@ -38,7 +38,7 @@ relevant issues in [our tracker](https://github.com/dstackai/dstack/issues).
     To use spot instances with certain cloud providers (e.g. AWS), you should request quotes
     for such instances separately.
 
-## Configuring backends
+## Configure backends
 
 To use your cloud accounts with `dstack`, open the project settings and configure a backend for each cloud.
 
@@ -62,7 +62,7 @@ Configuring backends involves providing cloud credentials, and specifying storag
 
 </div>
 
-## Configuring gateways
+## Configure gateways
 
 If you intend to use [services](services.md) (e.g. to deploy public endpoints), you must also configure a gateway. 
 Configuring a backend involves selecting a backend and a region.
@@ -76,7 +76,7 @@ After the gateway is created (and assigned an external IP), set up an A record a
 
 Then, in the gateway's settings, specify the wildcard domain.
 
-## Requesting resources
+## Request resources
 
 You can request resources using the [`--gpu`](../reference/cli/run.md#GPU) 
 and [`--memory`](../reference/cli/run.md#MEMORY) arguments with `dstack run`, 

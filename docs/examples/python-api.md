@@ -1,8 +1,4 @@
----
-title: Deploying LLMs with Python API
----
-
-# Deploying LLMs with Python API
+# Deploying LLMs using Python API
 
 The [Python API](../docs/reference/api/python/index.md) of `dstack` can be used to run 
 [tasks](../docs/guides/tasks.md) and [services](../docs/guides/services.md) programmatically.
@@ -20,8 +16,7 @@ with a simple click of a button.
 
     With `dstack.Client`, you can run [tasks](../docs/guides/tasks.md) and [services](../docs/guides/services.md). Running a task allows you to programmatically access its ports and
     forward traffic to your local machine. For example, if you run an LLM as a task, you can access it on localhost.
-
-    For more details on the Python API, please refer to its [reference](../docs/reference/api/python/index.md).
+    Services on the other hand allow deploying applications as public endpoints.
 
 ## Prerequisites
 

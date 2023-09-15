@@ -516,6 +516,10 @@ code .md-code__nav:hover .md-code__button {
     /*color: var(--md-code-fg-color) !important;*/
 }
 
+.highlight .sd {
+    color: var(--md-code-hl-string-color);
+}
+
 .highlight .na, .highlight .nv, .highlight .vc, .highlight .vg, .highlight .vi {
     color: #c6c052;
 }

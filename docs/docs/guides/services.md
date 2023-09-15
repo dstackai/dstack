@@ -93,8 +93,8 @@ For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstac
 
 ## Run the configuration
 
-!!! info "NOTE:"
-    Before running a service, ensure that you have configured a [gateway](clouds.md#configuring-gateways).
+!!! info "Gateway"
+    Before running a service, ensure that you have configured a [gateway](clouds.md#configure-gateways).
 
 To run a service, use the `dstack run` command followed by the path to the directory you want to use as the
 working directory.
@@ -119,14 +119,14 @@ Serving HTTP on https://yellow-cat-1.mydomain.com ...
 
 This command deploys the service, and forwards the traffic to the gateway's endpoint.
 
-!!! info "Endoint URL"
-    If you've configured a [wildcard domain](clouds.md#configuring-gateways) for the gateway, 
+!!! info "Wildcard domain"
+    If you've configured a [wildcard domain](clouds.md#configure-gateways) for the gateway, 
     `dstack` enables HTTPS automatically and serves the service at 
     `https://<run name>.<your domain name>`.
 
     If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command. 
 
-### Requesting resources
+### Request resources
 
 You can request resources using the [`--gpu`](../reference/cli/run.md#GPU) 
 and [`--memory`](../reference/cli/run.md#MEMORY) arguments with `dstack run`, 
