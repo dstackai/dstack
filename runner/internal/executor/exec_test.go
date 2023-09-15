@@ -14,14 +14,14 @@ func TestJoinRelPath(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "/tmp/repo", res)
 
-	res, err = joinRelPath(base, "..")
+	_, err = joinRelPath(base, "..")
 	assert.Error(t, err)
 
 	res, err = joinRelPath(base, "task")
 	assert.NoError(t, err)
 	assert.Equal(t, "/tmp/repo/task", res)
 
-	res, err = joinRelPath(base, "/tmp/repo/task")
+	_, err = joinRelPath(base, "/tmp/repo/task")
 	assert.Error(t, err)
 }
 

@@ -2,8 +2,8 @@ package common
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"strings"
 )
@@ -51,7 +51,7 @@ func (vi *VariablesInterpolator) Interpolate(ctx context.Context, s string) (str
 		sb.WriteString(s[start:opening])
 		closing := IndexWithOffset(s, PatternClosing, opening)
 		if closing == -1 {
-			return "", errors.New(fmt.Sprintf("no pattern closing: %s", s[opening:]))
+			return "", gerrors.Newf("no pattern closing: %s", s[opening:])
 		}
 
 		name := strings.TrimSpace(s[opening+len(PatternOpening) : closing])

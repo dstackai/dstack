@@ -16,7 +16,7 @@ jobs:
 #  python-lint:
 #    runs-on: ubuntu-latest
 #    steps:
-#      - uses: actions/checkout@v2
+#      - uses: actions/checkout@v3
 #      - uses: actions/setup-python@v2
 #        with:
 #          python-version: 3.11
@@ -43,7 +43,7 @@ jobs:
 #      run:
 #        working-directory: cli
 #    steps:
-#      - uses: actions/checkout@v2
+#      - uses: actions/checkout@v3
 #      - name: Set up Python ${{ matrix.python-version }}
 #        uses: actions/setup-python@v2
 #        with:
@@ -66,7 +66,7 @@ jobs:
 #      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
 #      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 #    steps:
-#      - uses: actions/checkout@v2
+#      - uses: actions/checkout@v3
 #      - name: Set up Python 3.9
 #        uses: actions/setup-python@v2
 #        with:
@@ -174,11 +174,12 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           ACTIONSOS: ${{ matrix.runson }}
+          CGO_ENABLED: 0
         run: |
           VERSION=$((${{ github.run_number }} + 150))
           go build -ldflags "-X '$REPO_NAME/runner/version.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
           go build -ldflags "-X '$REPO_NAME/runner/cmd/shim/version.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: dstack-runner
           path: |
@@ -192,7 +193,7 @@ jobs:
       - name: Install AWS
         run:  pip install awscli
       - name: Download Runner
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: dstack-runner
           path: runner
@@ -238,7 +239,7 @@ jobs:
   #       os: [ ubuntu-latest ]
   #       python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
   #   steps:
-  #     - uses: actions/checkout@v2
+  #     - uses: actions/checkout@v3
   #     - name: Set up Python ${{ matrix.python-version }}
   #       uses: actions/setup-python@v2
   #       with:

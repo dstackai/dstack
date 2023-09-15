@@ -58,8 +58,8 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	defer cancel()
 
 	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		assert.NoError(t, RunDocker(ctx, dockerParams))
 	}()
