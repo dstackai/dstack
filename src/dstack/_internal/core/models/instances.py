@@ -16,7 +16,6 @@ class Resources(BaseModel):
     memory_mib: int
     gpus: List[Gpu]
     spot: bool
-    local: bool
 
 
 class InstanceType(BaseModel):

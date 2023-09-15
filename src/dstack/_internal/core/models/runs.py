@@ -65,8 +65,6 @@ class Requirements(BaseModel):
     memory_mib: Optional[int]
     gpus: Optional[GpusRequirements]
     shm_size_mib: Optional[int]
-    spot: Optional[bool]
-    local: Optional[bool]
     max_price: Optional[float]
 
     def pretty_format(self):
@@ -106,6 +104,7 @@ class JobSpec(BaseModel):
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
     retry_policy: RetryPolicy
+    setup: List[str]
     spot_policy: SpotPolicy
     working_dir: str
 
