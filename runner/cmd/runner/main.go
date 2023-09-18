@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/log"
-	"github.com/dstackai/dstack/runner/internal/ports"
 	"github.com/sirupsen/logrus"
 	"io"
 	_ "net/http/pprof"
@@ -31,17 +30,6 @@ func start(tempDir string, homeDir string, workingDir string, httpPort int, logL
 	log.DefaultEntry.Logger.SetOutput(io.MultiWriter(os.Stdout, defaultLogFile))
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(logLevel))
 
-	if httpPort == 0 {
-		for httpPort = 10999; httpPort >= 10000; httpPort-- {
-			if vacant, _ := ports.CheckPort(httpPort); vacant {
-				break
-			}
-		}
-		if httpPort == 9999 {
-			log.Error(context.TODO(), "Can't pick a vacant port for logs streaming")
-			os.Exit(1)
-		}
-	}
 	server := api.NewServer(tempDir, homeDir, workingDir, fmt.Sprintf(":%d", httpPort))
 
 	log.Trace(context.TODO(), "Starting API server", "port", httpPort)
