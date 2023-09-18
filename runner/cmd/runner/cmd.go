@@ -4,15 +4,13 @@ import (
 	"github.com/urfave/cli/v2"
 	"log"
 	"os"
-
-	"github.com/dstackai/dstack/runner/version"
 )
 
 func App() {
 	app := &cli.App{
 		Name:    "dstack-runner",
 		Usage:   "configure and start dstack-runner",
-		Version: version.Version,
+		Version: Version,
 		Flags: []cli.Flag{
 			&cli.IntFlag{
 				Name:        "log-level",
