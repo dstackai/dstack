@@ -76,6 +76,8 @@ Parameters:
  - `repo_dir: os.PathLike` – (Required) The path to a local directory that acts as a repository.
     When you initiate a run, the client will upload the repository's contents, allowing the run to access any files within.
  - `project_name: Optional[str]` – (Optional) If not specified, it uses the default project.
+ - `server_url: Optional[str]` – (Optional) The URL of the `dstack` server. Must be used with `project_name` and `user_token`.
+ - `user_token: Optional[str]` – (Optional) The token of the `dstack` user. Must be used with `project_name` and `server_url`.
  - `local_repo: bool` – (Optional) If `repo_dir` is a Git repository,
     `dstack` will use it as a Git repository (instead of uploading the entire contents). 
     If you'd like to opt out from this behavior, set `local_repo` to True. It defaults to `False`.

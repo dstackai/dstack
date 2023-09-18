@@ -3,8 +3,8 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source toolkit for training, fine-tuning, inference, and development
-  across multiple cloud GPU providers.
+  dstack is an open-source framework for orchestration GPU workloads and development 
+  of generative AI models across multiple clouds.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -150,11 +150,6 @@ nav:
           - Services: docs/guides/services.md
 #          - Artifacts: docs/guides/artifacts.md
       - Reference:
-          - .dstack.yml:
-              - "type: dev-environment": docs/reference/dstack.yml/dev-environment.md
-              - "type: task": docs/reference/dstack.yml/task.md
-              - "type: service": docs/reference/dstack.yml/service.md
-          - profiles.yml: docs/reference/profiles.yml.md
           - CLI:
               - dstack run: docs/reference/cli/run.md
               - dstack init: docs/reference/cli/init.md
@@ -171,11 +166,16 @@ nav:
               - dstack build: docs/reference/cli/build.md
               - dstack gateway: docs/reference/cli/gateway.md
           - Python API: docs/reference/api/python/index.md
+          - .dstack.yml:
+              - "type: dev-environment": docs/reference/dstack.yml/dev-environment.md
+              - "type: task": docs/reference/dstack.yml/task.md
+              - "type: service": docs/reference/dstack.yml/service.md
+          - profiles.yml: docs/reference/profiles.yml.md
           - Backends:
-              - AWS: docs/reference/backends/aws.md
-              - GCP: docs/reference/backends/gcp.md
-              - Azure: docs/reference/backends/azure.md
-              - Lambda: docs/reference/backends/lambda.md
+            - AWS: docs/reference/backends/aws.md
+            - GCP: docs/reference/backends/gcp.md
+            - Azure: docs/reference/backends/azure.md
+            - Lambda: docs/reference/backends/lambda.md
   - Examples:
     - examples/index.md
     - Examples:

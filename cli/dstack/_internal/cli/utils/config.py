@@ -103,7 +103,9 @@ class CLIConfigManager:
         if dstack_dir is None:
             dstack_dir = get_dstack_dir()
         self.dstack_dir = dstack_dir
-        self.config_filepath = self.dstack_dir / "config.yaml"
+        self.config_filepath = self.dstack_dir / "config.yml"
+        if not self.config_filepath.exists():
+            self.config_filepath = self.dstack_dir / "config.yaml"
         try:
             with open(self.config_filepath, "r") as f:
                 config = yaml.load(f.read(), yaml.FullLoader)
@@ -148,6 +150,18 @@ class CLIConfigManager:
         return None
 
 
+def get_hub_client_from_config(
+    project_config: CLIProjectConfig, repo_dir: PathLike = os.getcwd(), local_repo: bool = False
+):
+    try:
+        repo = load_repo(repo_dir, local_repo)
+    except RepoError as e:
+        raise CLIError(e.message)
+    hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
+    hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)
+    return hub_client
+
+
 def get_hub_client(
     project_name: Optional[str] = None, repo_dir: PathLike = os.getcwd(), local_repo: bool = False
 ) -> HubClient:
@@ -164,12 +178,7 @@ def get_hub_client(
             raise CLIError(
                 f"No default project is configured. Call `dstack start` or `dstack config`."
             )
-    try:
-        repo = load_repo(repo_dir, local_repo)
-    except RepoError as e:
-        raise CLIError(e.message)
-    hub_client_config = HubClientConfig(url=project_config.url, token=project_config.token)
-    hub_client = HubClient(config=hub_client_config, project=project_config.name, repo=repo)
+    hub_client = get_hub_client_from_config(project_config, repo_dir, local_repo)
     return hub_client
 
 

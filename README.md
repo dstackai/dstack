@@ -23,17 +23,18 @@ Orchestrate GPU workloads across clouds
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source toolkit for training, fine-tuning, inference, and development
-across multiple cloud GPU providers.
+`dstack` is an open-source framework for orchestrating GPU workloads
+across multiple cloud GPU providers. It provides a simple cloud-agnostic interface for 
+development and deployment of generative AI models.
 
 ## Latest news ✨
 
-- [2023/09] [Deploying LLMs with API](https://dstack.ai/examples/python-api) (Example)
+- [2023/09] [Deploying LLMs using Python API](https://dstack.ai/examples/python-api) (Example)
 - [2023/09] [Managed gateways](https://dstack.ai/blog/2023/09/01/managed-gateways) (Release)
-- [2023/08] [Fine-tuning Llama 2](https://dstack.ai/examples/finetuning-llama-2) (Example)
-- [2023/08] [Serving SDXL with FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
-- [2023/07] [Serving LLMS with TGI](https://dstack.ai/examples/text-generation-inference) (Example)
-- [2023/07] [Serving LLMS with vLLM](https://dstack.ai/examples/vllm) (Example)
+- [2023/08] [Fine-tuning Llama 2 using QLoRA](https://dstack.ai/examples/finetuning-llama-2) (Example)
+- [2023/08] [Deploying Stable Diffusion using FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
+- [2023/07] [Deploying LLMS using TGI](https://dstack.ai/examples/text-generation-inference) (Example)
+- [2023/07] [Deploying LLMS using vLLM](https://dstack.ai/examples/vllm) (Example)
 
 ## Installation
 

@@ -7,7 +7,13 @@ from queue import Queue
 from typing import Generator, List, Optional, Tuple, Union
 
 from dstack._internal.api.runs import list_runs_hub
-from dstack._internal.cli.utils.config import config, get_hub_client
+from dstack._internal.cli.errors import CLIError
+from dstack._internal.cli.utils.config import (
+    CLIProjectConfig,
+    config,
+    get_hub_client,
+    get_hub_client_from_config,
+)
 from dstack._internal.cli.utils.configuration import get_configurator
 from dstack._internal.cli.utils.init import init_repo
 from dstack._internal.cli.utils.run import (
@@ -37,7 +43,7 @@ from dstack._internal.core.profile import (
     SpotPolicy,
 )
 from dstack._internal.core.userconfig import RepoUserConfig
-from dstack._internal.hub.schemas import RunInfo
+from dstack._internal.hub.schemas import BackendInfo, RunInfo
 from dstack.api.hub import HubClient
 
 Task = TaskConfiguration
@@ -61,6 +67,33 @@ class RepoCollection:
         init_repo(self._hub_client, git_identity_file, oauth_token, ssh_identity_file)
 
 
+class Backend:
+    def __init__(self, hub_client: HubClient, backend_info: BackendInfo) -> None:
+        self._hub_client = hub_client
+        self._backend_info = backend_info
+        self.name = backend_info.name
+
+    def __str__(self) -> str:
+        return f"<Backend '{self.name}'>"
+
+    def __repr__(self) -> str:
+        return f"<Backend '{self.name}'>"
+
+
+class BackendCollection:
+    _hub_client: HubClient
+
+    def __init__(self, hub_client: HubClient) -> None:
+        super().__init__()
+        self._hub_client = hub_client
+
+    def list(self):
+        return [
+            Backend(self._hub_client, backend_info)
+            for backend_info in self._hub_client.list_backends()
+        ]
+
+
 class Run(ABC):
     def __init__(
         self,
@@ -77,6 +110,7 @@ class Run(ABC):
         self._is_attached = False
         self._ports = None
         self._jobs = None
+        self.backend = run_info.backend
 
     def logs(
         self, start_time: datetime = (datetime.now(tz=timezone.utc) - timedelta(days=1))
@@ -254,6 +288,7 @@ class RunCollection:
 class Client:
     _hub_client: HubClient
     repo_dir: os.PathLike
+    backends: BackendCollection
     repos: RepoCollection
     runs: RunCollection
 
@@ -273,19 +308,28 @@ class Client:
         if init:
             self.repos.init(git_identity_file, oauth_token, ssh_identity_file)
         self._repo_user_config = config.repo_user_config(repo_dir)
+        self.backends = BackendCollection(hub_client)
         self.runs = RunCollection(hub_client, self._repo_user_config)
 
     @staticmethod
     def from_config(
-        repo_dir: os.PathLike, project_name: Optional[str] = None, local_repo: bool = False
+        repo_dir: os.PathLike,
+        project_name: Optional[str] = None,
+        server_url: Optional[str] = None,
+        user_token: Optional[str] = None,
+        local_repo: bool = False,
     ):
-        return Client(
-            get_hub_client(project_name=project_name, repo_dir=repo_dir), repo_dir, local_repo
-        )
-
-
-if __name__ == "__main__":
-    client = Client.from_config("~/dstack-examples")
-    run = client.runs.get("streamlist-hello")
-    run.attach()
-    print(run)
+        if server_url is not None and user_token is not None:
+            if project_name is None:
+                raise CLIError(f"The project name is not specified.")
+            project_config = CLIProjectConfig(
+                name=project_name, url=server_url, token=user_token, default=True
+            )
+            hub_client = get_hub_client_from_config(
+                project_config=project_config, repo_dir=repo_dir, local_repo=local_repo
+            )
+        else:
+            hub_client = get_hub_client(
+                project_name=project_name, repo_dir=repo_dir, local_repo=local_repo
+            )
+        return Client(hub_client, repo_dir, local_repo)

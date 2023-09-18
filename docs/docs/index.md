@@ -1,7 +1,8 @@
 # Quickstart
 
-`dstack` is an open-source toolkit for training, fine-tuning, inference, and development
-across multiple cloud GPU providers.
+`dstack` is an open-source framework for orchestrating GPU workloads
+across multiple cloud GPU providers. It provides a simple cloud-agnostic interface for 
+development and deployment of generative AI models.
 
 ## Installation
 
