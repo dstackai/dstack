@@ -6,6 +6,13 @@ from pydantic import BaseModel
 from dstack._internal.core.models.backends.base import BackendType
 
 
+class InstanceState(str, Enum):
+    PROVISIONING = "provisioning"
+    RUNNING = "running"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
+
+
 class Gpu(BaseModel):
     name: str
     memory_mib: int
