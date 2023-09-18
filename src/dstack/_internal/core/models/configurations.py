@@ -11,6 +11,12 @@ CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
 
 
+class ConfigurationType(str, Enum):
+    DEV_ENVIRONMENT = "dev-environment"
+    TASK = "task"
+    SERVICE = "service"
+
+
 class PythonVersion(str, Enum):
     PY37 = "3.7"
     PY38 = "3.8"
@@ -130,7 +136,6 @@ class DevEnvironmentConfiguration(BaseConfigurationWithPorts):
 class TaskConfiguration(BaseConfigurationWithPorts):
     type: Literal["task"] = "task"
     commands: Annotated[CommandsList, Field(description="The bash commands to run")]
-    artifacts: Annotated[List[Artifact], Field(description="The list of output artifacts")] = []
 
 
 class ServiceConfiguration(BaseConfiguration):

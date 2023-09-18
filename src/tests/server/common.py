@@ -1,11 +1,13 @@
 import json
+import uuid
 from typing import Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.server.db import reuse_or_make_session
-from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.server.models import BackendModel, ProjectModel, RepoModel, UserModel
 
 
 def get_auth_headers(token: str) -> Dict:
@@ -16,8 +18,10 @@ async def create_user(
     session: AsyncSession,
     name: str = "test_user",
     global_role: GlobalRole = GlobalRole.ADMIN,
-    token: str = "1234",
+    token: Optional[str] = None,
 ) -> UserModel:
+    if token is None:
+        token = str(uuid.uuid4())
     user = UserModel(
         name=name,
         global_role=global_role,
@@ -44,30 +48,63 @@ async def create_project(
     return project
 
 
-# async def create_backend(
-#     project_name: str,
-#     backend_type: str = "aws",
-#     config: Optional[Dict] = None,
-#     auth: Optional[Dict] = None,
-# ) -> Backend:
-#     if config is None:
-#         config = {
-#             "regions": ["eu-west-1"],
-#             "s3_bucket_name": "dstack-test-eu-west-1",
-#             "ec2_subnet_id": None,
-#         }
-#     if auth is None:
-#         auth = {
-#             "type": "access_key",
-#             "access_key": "test_access_key",
-#             "secret_key": "test_secret_key",
-#         }
-#     backend = Backend(
-#         project_name=project_name,
-#         type=backend_type,
-#         name=backend_type,
-#         config=json.dumps(config),
-#         auth=json.dumps(auth),
-#     )
-#     await ProjectManager._create_backend(backend)
-#     return backend
+async def create_backend(
+    session: AsyncSession,
+    project_id: uuid.UUID,
+    backend_type: BackendType = BackendType.AWS,
+    config: Optional[Dict] = None,
+    auth: Optional[Dict] = None,
+) -> BackendModel:
+    if config is None:
+        config = {
+            "regions": ["eu-west-1"],
+        }
+    if auth is None:
+        auth = {
+            "type": "access_key",
+            "access_key": "test_access_key",
+            "secret_key": "test_secret_key",
+        }
+    backend = BackendModel(
+        project_id=project_id,
+        type=backend_type,
+        config=json.dumps(config),
+        auth=json.dumps(auth),
+    )
+    session.add(backend)
+    await session.commit()
+    return backend
+
+
+async def create_repo(
+    session: AsyncSession,
+    project_id: uuid.UUID,
+    repo_id: str = "test_repo",
+    repo_type: RepoType = RepoType.REMOTE,
+    info: Optional[Dict] = None,
+    creds: Optional[Dict] = None,
+):
+    if info is None:
+        info = {
+            "repo_type": "remote",
+            "repo_host_name": "github.com",
+            "repo_port": None,
+            "repo_user_name": "dstackai",
+            "repo_name": "dstack",
+        }
+    if creds is None:
+        creds = {
+            "protocol": "https",
+            "private_key": None,
+            "oauth_token": "test_token",
+        }
+    repo = RepoModel(
+        project_id=project_id,
+        name=repo_id,
+        type=repo_type,
+        info=json.dumps(info),
+        creds=json.dumps(creds),
+    )
+    session.add(repo)
+    await session.commit()
+    return repo

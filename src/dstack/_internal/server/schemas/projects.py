@@ -13,10 +13,10 @@ class DeleteProjectsRequest(BaseModel):
     projects_names: List[str]
 
 
-class Member(BaseModel):
+class MemberSetting(BaseModel):
     username: str
     project_role: ProjectRole
 
 
 class SetProjectMembersRequest(BaseModel):
-    members: List[Member]
+    members: List[MemberSetting]

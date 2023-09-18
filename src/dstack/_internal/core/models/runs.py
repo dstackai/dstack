@@ -4,14 +4,10 @@ from typing import Annotated, Dict, List, Optional
 
 from pydantic import UUID4, BaseModel, Field
 
-from dstack._internal.core.models.configurations import (
-    AnyRunConfiguration,
-    RegistryAuth,
-    RunConfiguration,
-)
+from dstack._internal.core.models.configurations import AnyRunConfiguration, RegistryAuth
 from dstack._internal.core.models.instances import InstanceCandidate, InstanceType
 from dstack._internal.core.models.profiles import Profile, SpotPolicy
-from dstack._internal.core.models.repos import AnyRepoData
+from dstack._internal.core.models.repos import AnyRunRepoData
 
 
 class AppSpec(BaseModel):
@@ -25,6 +21,7 @@ class AppSpec(BaseModel):
 class JobStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
+    PROVISIONING = "provisioning"
     RUNNING = "running"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
@@ -69,8 +66,6 @@ class Requirements(BaseModel):
     memory_mib: Optional[int]
     gpus: Optional[GpusRequirements]
     shm_size_mib: Optional[int]
-    spot: Optional[bool]
-    local: Optional[bool]
     max_price: Optional[float]
 
     def pretty_format(self):
@@ -97,7 +92,8 @@ class Gateway(BaseModel):
 
 
 class JobSpec(BaseModel):
-    app_names: List[str]
+    job_num: int
+    job_name: str
     app_specs: Optional[List[AppSpec]]
     commands: List[str]
     entrypoint: Optional[List[str]]
@@ -106,10 +102,10 @@ class JobSpec(BaseModel):
     home_dir: Optional[str]
     image_name: str
     max_duration: Optional[int]
-    price: Optional[float]
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
     retry_policy: RetryPolicy
+    setup: List[str]
     spot_policy: SpotPolicy
     working_dir: str
 
@@ -126,29 +122,31 @@ class JobSubmission(BaseModel):
     instance_id: str
     spot_request_id: Optional[str]
     location: str
+    price: float
 
 
 class Job(BaseModel):
-    job_num: int
-    job_name: str
     job_spec: JobSpec
     job_submissions: List[JobSubmission]
 
 
-class Run(BaseModel):
-    id: UUID4
+class RunSpec(BaseModel):
     run_name: str
-    project_id: str
     repo_id: str
-    repo_data: Annotated[AnyRepoData, Field(discriminator="repo_type")]
+    repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
     repo_code_hash: Optional[str]
-    user: str
-    created_at: datetime
+    working_dir: str
     configuration_path: str
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
     profile: Profile
     ssh_key_pub: str
-    code_hash: Optional[str]
+
+
+class Run(BaseModel):
+    id: UUID4
+    project_name: str
+    user: str
+    run_spec: RunSpec
     jobs: List[Job]
 
 
@@ -159,14 +157,5 @@ class JobPlan(BaseModel):
 
 
 class RunPlan(BaseModel):
-    project_id: str
-    user: str
-    repo_id: str
-    repo_data: Annotated[AnyRepoData, Field(discriminator="repo_type")]
-    repo_code_hash: Optional[str]
-    configuration_path: str
-    configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
-    profile: Profile
-    ssh_key_pub: str
-    code_hash: Optional[str]
+    run_spec: RunSpec
     job_plans: List[JobPlan]

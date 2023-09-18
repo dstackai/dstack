@@ -3,6 +3,7 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ForbiddenError
 from dstack._internal.core.models.projects import Project
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -13,6 +14,7 @@ from dstack._internal.server.schemas.projects import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin, ProjectMember
 from dstack._internal.server.services import projects
+from dstack._internal.server.utils.routers import raise_forbidden
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -39,8 +41,19 @@ async def create_project(
 
 
 @router.post("/delete")
-async def delete_projects(body: DeleteProjectsRequest, user: UserModel = Depends(Authenticated())):
-    pass
+async def delete_projects(
+    body: DeleteProjectsRequest,
+    session: AsyncSession = Depends(get_session),
+    user: UserModel = Depends(Authenticated()),
+):
+    try:
+        await projects.delete_projects(
+            session=session,
+            user=user,
+            projects_names=body.projects_names,
+        )
+    except ForbiddenError:
+        raise_forbidden()
 
 
 @router.post("/{project_name}/get")
@@ -57,6 +70,14 @@ async def get_project(
 )
 async def set_project_members(
     body: SetProjectMembersRequest,
+    session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-):
+) -> Project:
     _, project = user_project
+    await projects.set_project_members(
+        session=session,
+        project=project,
+        members=body.members,
+    )
+    await session.refresh(project)
+    return projects.project_model_to_project(project)

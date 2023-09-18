@@ -1,7 +1,5 @@
 import io
-import os
 import subprocess
-import tempfile
 import time
 from typing import BinaryIO, Optional
 
@@ -11,37 +9,31 @@ from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from dstack._internal.core.errors import DstackError
-from dstack._internal.core.models.repos import RepoProtocol
-from dstack._internal.core.models.repos.base import Repo, RepoData, RepoInfo, RepoRef
+from dstack._internal.core.models.repos.base import Repo, RepoProtocol
 from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.hash import get_sha256, slugify
-from dstack._internal.utils.ssh import get_host_config, make_ssh_command_for_git
+from dstack._internal.utils.ssh import get_host_config
 
 
 class RepoError(DstackError):
     pass
 
 
-class RemoteRepoCredentials(BaseModel):
+class RemoteRepoCreds(BaseModel):
     protocol: RepoProtocol
     private_key: Optional[str]
     oauth_token: Optional[str]
 
 
-class RemoteRepoInfo(RepoInfo):
+class RemoteRepoInfo(BaseModel):
     repo_type: Literal["remote"] = "remote"
     repo_host_name: str
     repo_port: Optional[int]
     repo_user_name: str
     repo_name: str
 
-    @property
-    def head_key(self) -> str:
-        return f"{self.repo_type};{self.repo_host_name},{self.repo_port or ''},{self.repo_user_name},{self.repo_name}"
 
-
-class RemoteRepoData(RepoData, RemoteRepoInfo):
-    repo_type: Literal["remote"] = "remote"
+class RemoteRunRepoData(RemoteRepoInfo):
     repo_branch: Optional[str] = None
     repo_hash: Optional[str] = None
     repo_diff: Optional[str] = Field(None, exclude=True)
@@ -51,7 +43,7 @@ class RemoteRepoData(RepoData, RemoteRepoInfo):
     @staticmethod
     def from_url(url: str, parse_ssh_config: bool = True):
         url = giturlparse.parse(url)
-        data = RemoteRepoData(
+        data = RemoteRunRepoData(
             repo_host_name=url.resource,
             repo_port=url.port,
             repo_user_name=url.owner,
@@ -83,28 +75,24 @@ class RemoteRepoData(RepoData, RemoteRepoInfo):
             else:
                 return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
 
-    def write_code_file(self, fp: BinaryIO) -> str:
-        if self.repo_diff is not None:
-            fp.write(self.repo_diff.encode())
-        return f"code/remote/{get_sha256(fp)}.patch"
-
 
 class RemoteRepo(Repo):
     """Represents both local git repository with configured remote and just remote repository"""
 
-    repo_data: RemoteRepoData
+    repo_id: str
+    run_repo_data: RemoteRunRepoData
 
     def __init__(
         self,
         *,
-        repo_ref: Optional[RepoRef] = None,
+        repo_id: Optional[str] = None,
         local_repo_dir: Optional[PathLike] = None,
         repo_url: Optional[str] = None,
-        repo_data: Optional[RemoteRepoData] = None,
+        repo_data: Optional[RemoteRunRepoData] = None,
     ):
         """
         >>> RemoteRepo(local_repo_dir=os.getcwd())
-        >>> RemoteRepo(repo_ref=RepoRef(repo_id="playground"), repo_url="https://github.com/dstackai/dstack-playground.git")
+        >>> RemoteRepo(repo_id="playground", repo_url="https://github.com/dstackai/dstack-playground.git")
         """
 
         self.local_repo_dir = local_repo_dir
@@ -116,7 +104,7 @@ class RemoteRepo(Repo):
             if tracking_branch is None:
                 raise RepoError("No remote branch is configured")
             self.repo_url = repo.remote(tracking_branch.remote_name).url
-            repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
+            repo_data = RemoteRunRepoData.from_url(self.repo_url, parse_ssh_config=True)
             repo_data.repo_branch = tracking_branch.remote_head
             repo_data.repo_hash = tracking_branch.commit.hexsha
             repo_data.repo_config_name = repo.config_reader().get_value("user", "name", "") or None
@@ -125,13 +113,19 @@ class RemoteRepo(Repo):
             )
             repo_data.repo_diff = _repo_diff_verbose(repo, repo_data.repo_hash)
         elif self.repo_url is not None:
-            repo_data = RemoteRepoData.from_url(self.repo_url, parse_ssh_config=True)
+            repo_data = RemoteRunRepoData.from_url(self.repo_url, parse_ssh_config=True)
         elif repo_data is None:
             raise RepoError("No remote repo data provided")
 
-        if repo_ref is None:
-            repo_ref = RepoRef(repo_id=slugify(repo_data.repo_name, repo_data.path("/")))
-        super().__init__(repo_ref, repo_data)
+        if repo_id is None:
+            repo_id = slugify(repo_data.repo_name, repo_data.path("/"))
+        self.repo_id = repo_id
+        self.run_repo_data = repo_data
+
+    def write_code_file(self, fp: BinaryIO) -> str:
+        if self.run_repo_data.repo_diff is not None:
+            fp.write(self.run_repo_data.repo_diff.encode())
+        return f"code/remote/{get_sha256(fp)}.patch"
 
 
 class _DiffCollector:

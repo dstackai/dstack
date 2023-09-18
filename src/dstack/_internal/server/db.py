@@ -45,7 +45,9 @@ async def migrate():
 
 async def get_session():
     async with db.get_session() as session:
-        yield session
+        async with session as s:
+            yield s
+            await s.commit()
 
 
 def reuse_or_make_session(func):
