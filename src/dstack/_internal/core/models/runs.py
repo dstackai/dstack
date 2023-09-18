@@ -67,6 +67,7 @@ class Requirements(BaseModel):
     gpus: Optional[GpusRequirements]
     shm_size_mib: Optional[int]
     max_price: Optional[float]
+    # TODO spot policy
 
     def pretty_format(self):
         res = ""

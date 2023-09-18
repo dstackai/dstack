@@ -5,6 +5,7 @@ import boto3
 import botocore.client
 import botocore.exceptions
 
+import dstack._internal.core.backends.aws.resources as aws_resources
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base.compute import Compute
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
@@ -92,14 +93,69 @@ class AWSCompute(Compute):
             client.terminate_instances(InstanceIds=[instance_id])
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
-                pass  # TODO raise not found
+                raise  # TODO raise not found
             else:
                 raise e
 
     def run_job(
         self, run: Run, job: Job, instance_offer: InstanceOfferWithAvailability
     ) -> LaunchedInstanceInfo:
-        pass
+        project_id = run.project_name  # TODO unique id
+        ec2_client = self.session.client("ec2", region_name=instance_offer.region)
+        iam_client = self.session.client("iam", region_name=instance_offer.region)
+
+        tags = [
+            {"Key": "Name", "Value": run.run_spec.run_name},
+            {"Key": "owner", "Value": "dstack"},
+            {"Key": "dstack_project", "Value": project_id},
+            {"Key": "dstack_user", "Value": run.user},
+            {"Key": "dstack_run", "Value": run.id.hex},
+        ]
+        try:
+            response = ec2_client.run_instances(
+                BlockDeviceMappings=[
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {
+                            "VolumeSize": 100,  # TODO run.run_spec.profile.resources.disk_size
+                            "VolumeType": "gp2",
+                        },
+                    }
+                ],
+                ImageId=aws_resources.get_image_id(
+                    ec2_client, len(instance_offer.instance.resources.gpus) > 0
+                ),
+                InstanceType=instance_offer.instance.name,
+                MinCount=1,
+                MaxCount=1,
+                IamInstanceProfile={
+                    "Arn": aws_resources.create_iam_instance_profile(iam_client, project_id),
+                },
+                UserData=aws_resources.get_user_data(
+                    run.run_spec.configuration.image,
+                    run.run_spec.ssh_key_pub.strip().split("\n"),
+                ),
+                TagSpecifications=[
+                    {
+                        "ResourceType": "instance",
+                        "Tags": tags,
+                    },
+                ],
+                SecurityGroupIds=[aws_resources.create_security_group(ec2_client, project_id)],
+                **aws_resources.get_spot_options(instance_offer.instance.resources.spot),
+            )
+            if instance_offer.instance.resources.spot:  # it will not terminate the instance
+                ec2_client.cancel_spot_instance_requests(
+                    SpotInstanceRequestIds=[response["Instances"][0]["SpotInstanceRequestId"]]
+                )
+            return LaunchedInstanceInfo(
+                instance_id=response["Instances"][0]["InstanceId"],
+                region=instance_offer.region,
+            )
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "InsufficientInstanceCapacity":
+                raise  # TODO raise NoCapacity
+            raise e
 
 
 def _has_quota(quotas: Dict[str, float], instance_name: str) -> bool:
