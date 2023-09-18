@@ -110,19 +110,23 @@ class JobSpec(BaseModel):
     working_dir: str
 
 
-class JobSubmission(BaseModel):
-    id: UUID4
-    submission_num: int
-    created_at: int
-    status: JobStatus
+class JobProvisioningData(BaseModel):
     error_code: Optional[JobErrorCode]
     container_exit_code: Optional[int]
     hostname: str
     instance_type: InstanceType
     instance_id: str
     spot_request_id: Optional[str]
-    location: str
+    region: str
     price: float
+
+
+class JobSubmission(BaseModel):
+    id: UUID4
+    submission_num: int
+    submitted_at: datetime
+    status: JobStatus
+    job_provisioning_data: Optional[JobProvisioningData]
 
 
 class Job(BaseModel):
@@ -146,6 +150,7 @@ class Run(BaseModel):
     id: UUID4
     project_name: str
     user: str
+    submitted_at: datetime
     run_spec: RunSpec
     jobs: List[Job]
 

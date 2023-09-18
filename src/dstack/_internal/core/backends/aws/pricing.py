@@ -5,5 +5,5 @@ from dstack._internal.core.models.instances import InstanceOffer
 
 
 class AWSPricing(Pricing):
-    def get_instances_pricing(self) -> List[InstanceOffer]:
+    def get_instances_offers(self) -> List[InstanceOffer]:
         pass

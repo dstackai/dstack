@@ -29,8 +29,8 @@ class JobConfigurator(ABC):
 
     def get_job_specs(self) -> List[JobSpec]:
         job_spec = JobSpec(
-            job_num=1,
-            job_name=self.run_spec.run_name + "-1",
+            job_num=0,
+            job_name=self.run_spec.run_name + "-0",
             app_specs=self._app_specs(),
             commands=self._commands(),
             entrypoint=self._entrypoint(),

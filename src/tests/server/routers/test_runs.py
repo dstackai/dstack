@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Dict
 from unittest.mock import patch
 from uuid import UUID
@@ -9,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
-from dstack._internal.server.models import RunModel
+from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.projects import add_project_member
 from tests.server.common import create_project, create_repo, create_user, get_auth_headers
 
@@ -18,8 +19,10 @@ client = TestClient(app)
 
 def get_dev_env_run_dict(
     run_id: str,
+    job_id: str,
     project_name: str,
     username: str,
+    submitted_at: str,
     run_name: str = "run_name",
     repo_id: str = "test_repo",
 ) -> Dict:
@@ -27,6 +30,7 @@ def get_dev_env_run_dict(
         "id": run_id,
         "project_name": project_name,
         "user": username,
+        "submitted_at": submitted_at,
         "run_spec": {
             "configuration": {
                 "build": [],
@@ -74,8 +78,8 @@ def get_dev_env_run_dict(
                     "gateway": None,
                     "home_dir": "/root",
                     "image_name": "dstackai/base:py3.7-0.4rc3-cuda-11.8",
-                    "job_name": f"{run_name}-1",
-                    "job_num": 1,
+                    "job_name": f"{run_name}-0",
+                    "job_num": 0,
                     "max_duration": None,
                     "registry_auth": None,
                     "requirements": {
@@ -141,7 +145,15 @@ def get_dev_env_run_dict(
                     "spot_policy": "spot",
                     "working_dir": ".",
                 },
-                "job_submissions": [],
+                "job_submissions": [
+                    {
+                        "id": job_id,
+                        "submission_num": 0,
+                        "submitted_at": submitted_at,
+                        "status": "submitted",
+                        "job_provisioning_data": None,
+                    }
+                ],
             }
         ],
     }
@@ -166,17 +178,24 @@ class TestSubmitRun:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         run_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+        submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        submitted_at_formatted = "2023-01-02T03:04:00+00:00"
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(
             run_id=str(run_id),
+            job_id=str(run_id),
             project_name=project.name,
             username=user.name,
+            submitted_at=submitted_at_formatted,
             run_name="test-run",
             repo_id=repo.name,
         )
         body = {"run_spec": run_dict["run_spec"]}
-        with patch("uuid.uuid4") as m:
-            m.return_value = run_id
+        with patch("uuid.uuid4") as uuid_mock, patch(
+            "dstack._internal.utils.common.get_current_datetime"
+        ) as datetime_mock:
+            uuid_mock.return_value = run_id
+            datetime_mock.return_value = submitted_at
             response = client.post(
                 f"/api/project/{project.name}/runs/submit",
                 headers=get_auth_headers(user.token),
@@ -187,3 +206,6 @@ class TestSubmitRun:
         res = await session.execute(select(RunModel))
         run = res.scalar()
         assert run is not None
+        res = await session.execute(select(JobModel))
+        job = res.scalar()
+        assert job is not None

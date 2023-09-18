@@ -119,7 +119,7 @@ class RunModel(BaseModel):
     repo: Mapped["RepoModel"] = relationship()
     user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped["UserModel"] = relationship()
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    submitted_at: Mapped[datetime] = mapped_column(DateTime)
     run_name: Mapped[str] = mapped_column(String(100))
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
     run_spec: Mapped[str] = mapped_column(String(4000))
@@ -141,20 +141,4 @@ class JobModel(BaseModel):
     submitted_at: Mapped[datetime] = mapped_column(DateTime)
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
     job_spec_data: Mapped[str] = mapped_column(String(4000))
-    job_submission_data: Mapped[str] = mapped_column(String(4000))
-
-
-# class Job(BaseModel):
-#     """
-#     This table stores not started jobs that are not stored in any backend.
-#     After the job is successfully submitted to a backed, it is deleted from the table.
-#     """
-
-#     __tablename__ = "jobs"
-
-#     job_id: Mapped[str] = mapped_column(String(50), primary_key=True)
-#     run_name = mapped_column(String(50), index=True)
-#     project_name: Mapped[str] = mapped_column(ForeignKey("projects.name", ondelete="CASCADE"))
-#     project: Mapped["ProjectModel"] = relationship()
-#     status: Mapped[str] = mapped_column(String(30), index=True)
-#     job_data: Mapped[str] = mapped_column(Text)
+    job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))

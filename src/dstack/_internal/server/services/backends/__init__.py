@@ -1,34 +1,41 @@
-from typing import List, Optional
+import asyncio
+from typing import List, Optional, Tuple
 
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import BackendNotAvailable
+from dstack._internal.core.backends.base import Backend
+from dstack._internal.core.errors import BackendInvalidCredentialsError, BackendNotAvailable
 from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
     AnyConfigInfoWithCredsPartial,
     AnyConfigValues,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.instances import InstanceAvailability, InstanceOffer
+from dstack._internal.core.models.runs import Job
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import Configurator
 from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.logging import get_logger
 
-configurators_classes: List[Configurator] = []
+logger = get_logger(__name__)
+
+_CONFIGURATOR_CLASSES: List[Configurator] = []
 
 try:
     from dstack._internal.server.services.backends.configurators.aws import AWSConfigurator
 
-    configurators_classes.append(AWSConfigurator)
+    _CONFIGURATOR_CLASSES.append(AWSConfigurator)
 except ImportError:
     pass
 
 
-backend_type_to_configurator_class_map = {c.NAME: c for c in configurators_classes}
+_BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP = {c.NAME: c for c in _CONFIGURATOR_CLASSES}
 
 
 def get_configurator(backend_type: BackendType) -> Optional[Configurator]:
-    configurator_class = backend_type_to_configurator_class_map.get(backend_type)
+    configurator_class = _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP.get(backend_type)
     if configurator_class is None:
         return None
     return configurator_class()
@@ -36,7 +43,7 @@ def get_configurator(backend_type: BackendType) -> Optional[Configurator]:
 
 def list_avaialble_backend_types() -> List[BackendType]:
     available_backend_types = []
-    for configurator_class in configurators_classes:
+    for configurator_class in _CONFIGURATOR_CLASSES:
         available_backend_types.append(configurator_class.NAME)
     return available_backend_types
 
@@ -114,3 +121,68 @@ async def delete_backends(
             BackendModel.project_id == project.id,
         )
     )
+
+
+_BACKENDS_CACHE = {}
+
+BackendTuple = Tuple[BackendModel, Backend]
+
+
+async def get_project_backends(project: ProjectModel) -> List[BackendTuple]:
+    key = project.name
+    backends = _BACKENDS_CACHE.get(key)
+    if backends is not None:
+        return backends
+
+    backends = []
+    for backend_model in project.backends:
+        configurator = get_configurator(backend_model.type)
+        if configurator is None:
+            continue
+        try:
+            backend = await run_async(configurator.get_backend, backend_model)
+        except BackendInvalidCredentialsError:
+            logger.warning(
+                "Credentials for %s backend are invalid. Backend will be ignored.",
+                backend_model.name,
+            )
+            continue
+        if backends is None:
+            logger.warning(
+                "Missing dependencies for %s backend. Backend will be ignored.", backend_model.name
+            )
+            continue
+        backends.append((backend_model, backend))
+
+    _BACKENDS_CACHE[key] = backends
+    return _BACKENDS_CACHE[key]
+
+
+def clear_backend_cache(project_name: str):
+    if project_name in _BACKENDS_CACHE:
+        del _BACKENDS_CACHE[project_name]
+
+
+_NOT_AVAILABLE = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}
+
+
+async def get_instance_candidates(
+    backends: List[Backend], job: Job, exclude_not_available: bool = False
+) -> List[Tuple[Backend, InstanceOffer]]:
+    """
+    Returns list of instances satisfying minimal resource requirements sorted by price
+    """
+    candidates = []
+    tasks = [
+        run_async(
+            backend.get_instance_candidates, job.job_spec.requirements, job.job_spec.spot_policy
+        )
+        for backend in backends
+    ]
+    for backend, backend_candidates in zip(backends, await asyncio.gather(*tasks)):
+        for offer in backend_candidates:
+            if not exclude_not_available or offer.availability not in _NOT_AVAILABLE:
+                candidates.append((backend, offer))
+
+    # Put NOT_AVAILABLE and NO_QUOTA instances at the end
+    return sorted(candidates, key=lambda i: (i[1].availability in _NOT_AVAILABLE, i[1].price))

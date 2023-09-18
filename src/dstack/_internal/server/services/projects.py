@@ -24,6 +24,16 @@ async def list_user_projects(
     return [project_model_to_project(p) for p in projects]
 
 
+async def get_project_by_name(
+    session: AsyncSession,
+    project_name: str,
+) -> Optional[Project]:
+    project_model = await get_project_model_by_name(session=session, project_name=project_name)
+    if project_model is None:
+        return None
+    return project_model_to_project(project_model)
+
+
 async def create_project(
     session: AsyncSession, user: UserModel, project_name: str
 ) -> ProjectModel:
