@@ -7,9 +7,11 @@ from dstack._internal.core.models.backends.base import BackendType
 
 
 class InstanceState(str, Enum):
+    NOT_FOUND = "not_found"
     PROVISIONING = "provisioning"
     RUNNING = "running"
-    TERMINATING = "terminating"
+    STOPPED = "stopped"
+    STOPPING = "stopping"
     TERMINATED = "terminated"
 
 

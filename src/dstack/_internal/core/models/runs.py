@@ -1,8 +1,8 @@
-from datetime import datetime
 from enum import Enum
-from typing import Annotated, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import UUID4, BaseModel, Field
+from typing_extensions import Annotated
 
 from dstack._internal.core.models.configurations import AnyRunConfiguration, RegistryAuth
 from dstack._internal.core.models.instances import InstanceCandidate, InstanceType
