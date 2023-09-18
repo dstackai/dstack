@@ -1,0 +1,2 @@
+class DstackError(Exception):
+    pass

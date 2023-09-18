@@ -185,8 +185,8 @@ setup(
     version=get_version(),
     author="Andrey Cheptsov",
     author_email="andrey@dstack.ai",
-    package_dir={"": "cli"},
-    packages=find_packages("cli"),
+    package_dir={"": "src"},
+    packages=find_packages("src"),
     package_data={
         "dstack._internal": [
             "schemas/*.json",
@@ -230,6 +230,6 @@ setup(
         "build_py": npm_first(build_py, strict=is_repo),
         "sdist": npm_first(sdist, strict=True),
         "npm": NPM,
-        "develop": CustomDevelopInstaller,
+        # "develop": CustomDevelopInstaller,
     },
 )

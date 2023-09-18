@@ -1,15 +1,12 @@
 **/__pycache__/
 *.py[co]
+*.egg-info
 
+dist/
 /venv/
 /.cache/
 
-/cli/dstack.egg-info/
-/cli/dstack/_internal/hub/statics/
-
-/runner/runner
-
-/my/
-
 .idea/
-dist/
+
+/cli/dstack/_internal/hub/statics/
+/runner/runner
