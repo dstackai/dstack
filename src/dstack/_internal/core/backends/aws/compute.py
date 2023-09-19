@@ -8,6 +8,7 @@ import botocore.exceptions
 import dstack._internal.core.backends.aws.resources as aws_resources
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base.compute import Compute
+from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -93,7 +94,7 @@ class AWSCompute(Compute):
             client.terminate_instances(InstanceIds=[instance_id])
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
-                raise  # TODO raise not found
+                raise ResourceNotFoundError()
             else:
                 raise e
 
@@ -154,7 +155,7 @@ class AWSCompute(Compute):
             )
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InsufficientInstanceCapacity":
-                raise  # TODO raise NoCapacity
+                raise NoCapacityError()
             raise e
 
 

@@ -56,3 +56,7 @@ class ComputeError(BackendError):
 
 class NoCapacityError(ComputeError):
     pass
+
+
+class ResourceNotFoundError(ComputeError):
+    pass

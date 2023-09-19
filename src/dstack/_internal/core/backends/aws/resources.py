@@ -6,6 +6,7 @@ import botocore.exceptions
 
 import dstack._internal.server.utils.cloudinit as cloudinit
 import dstack.version as version
+from dstack._internal.core.errors import ResourceNotFoundError
 
 
 def get_image_id(ec2_client: botocore.client.BaseClient, cuda: bool) -> str:
@@ -20,7 +21,7 @@ def get_image_id(ec2_client: botocore.client.BaseClient, cuda: bool) -> str:
         reverse=True,
     )
     if not images:
-        raise RuntimeError(f"Image {image_name} not found")  # TODO custom error
+        raise ResourceNotFoundError()
     return images[0]["ImageId"]
 
 
