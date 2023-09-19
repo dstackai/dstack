@@ -68,7 +68,7 @@ class Requirements(BaseModel):
     gpus: Optional[GpusRequirements]
     shm_size_mib: Optional[int]
     max_price: Optional[float]
-    # TODO spot policy
+    spot: Optional[bool]
 
     def pretty_format(self):
         res = ""
@@ -78,6 +78,8 @@ class Requirements(BaseModel):
             res += f", {self.gpus.count}x{self.gpus.name or 'GPU'}"
             if self.gpus.memory_mib:
                 res += f" {self.gpus.memory_mib / 1024:g}GB"
+        if self.spot is not None:
+            res += f", {'spot' if self.spot else 'on-demand'}"
         if self.max_price is not None:
             res += f" under ${self.max_price:g} per hour"
         return res
@@ -108,7 +110,6 @@ class JobSpec(BaseModel):
     requirements: Requirements
     retry_policy: RetryPolicy
     setup: List[str]
-    spot_policy: SpotPolicy
     working_dir: str
 
 

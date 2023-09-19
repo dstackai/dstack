@@ -56,6 +56,8 @@ def satisfies_requirements(offer: InstanceOffer, req: Optional[Requirements]) ->
         return False
     if req.memory_mib is not None and res.memory_mib < req.memory_mib:
         return False
+    if req.spot is not None and res.spot != req.spot:
+        return False
     # todo shm_size_mib
     if req.gpus is not None:
         if len(res.gpus) < req.gpus.count:
