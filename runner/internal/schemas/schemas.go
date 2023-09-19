@@ -5,7 +5,6 @@ import "fmt"
 type JobStateEvent struct {
 	State     string `json:"state"`
 	Timestamp int64  `json:"timestamp"`
-	// todo exitcode?
 }
 
 type LogEvent struct {

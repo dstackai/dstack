@@ -45,7 +45,6 @@ class AsyncRunnerClient:
             secrets=secrets,
             repo_credentials=repo_credentials,
         )
-        print(body.json(indent=2))
         async with self.session.post(self._url("/api/submit"), json=body.dict()) as resp:
             resp.raise_for_status()
 
