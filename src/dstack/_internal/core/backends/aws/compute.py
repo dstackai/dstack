@@ -101,7 +101,8 @@ class AWSCompute(Compute):
     def run_job(
         self, run: Run, job: Job, instance_offer: InstanceOfferWithAvailability
     ) -> LaunchedInstanceInfo:
-        project_id = run.project_name  # TODO unique id
+        project_id = run.project_name
+        ec2 = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         iam_client = self.session.client("iam", region_name=instance_offer.region)
 
@@ -113,7 +114,7 @@ class AWSCompute(Compute):
             {"Key": "dstack_run", "Value": run.id.hex},
         ]
         try:
-            response = ec2_client.run_instances(
+            response = ec2.create_instances(
                 BlockDeviceMappings=[
                     {
                         "DeviceName": "/dev/sda1",
@@ -145,13 +146,19 @@ class AWSCompute(Compute):
                 SecurityGroupIds=[aws_resources.create_security_group(ec2_client, project_id)],
                 **aws_resources.get_spot_options(instance_offer.instance.resources.spot),
             )
+            instance = response[0]
+            instance.wait_until_running()
+            instance.reload()  # populate instance.public_ip_address
+
             if instance_offer.instance.resources.spot:  # it will not terminate the instance
                 ec2_client.cancel_spot_instance_requests(
-                    SpotInstanceRequestIds=[response["Instances"][0]["SpotInstanceRequestId"]]
+                    SpotInstanceRequestIds=[instance.spot_instance_request_id]
                 )
             return LaunchedInstanceInfo(
-                instance_id=response["Instances"][0]["InstanceId"],
+                instance_id=instance.instance_id,
+                ip_address=instance.public_ip_address,
                 region=instance_offer.region,
+                spot_request_id=instance.spot_instance_request_id,  # TODO remove
             )
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InsufficientInstanceCapacity":

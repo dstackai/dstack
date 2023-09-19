@@ -34,9 +34,9 @@ class InstanceType(BaseModel):
 
 class LaunchedInstanceInfo(BaseModel):
     instance_id: str
+    ip_address: str
     spot_request_id: Optional[str]
     region: str
-    # TODO ip address
 
 
 class InstanceAvailability(Enum):
