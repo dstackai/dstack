@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import migrate
 from dstack._internal.server.routers import backends, logs, projects, repos, runs, secrets, users
 
@@ -9,7 +10,9 @@ from dstack._internal.server.routers import backends, logs, projects, repos, run
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await migrate()
+    scheduler = start_background_tasks()
     yield
+    scheduler.shutdown()
 
 
 app = FastAPI(docs_url="/api/docs", lifespan=lifespan)

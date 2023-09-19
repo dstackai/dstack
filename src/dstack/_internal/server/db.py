@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from typing import Optional
 
 from alembic import command, config
@@ -50,15 +51,13 @@ async def get_session():
             await s.commit()
 
 
-def reuse_or_make_session(func):
-    async def new_func(*args, session: Optional[AsyncSession] = None, **kwargs):
-        session_ = session
-        if session_ is None:
-            session_ = db.get_session()
-        res = await func(*args, session=session_, **kwargs)
-        if session is None:
-            await session_.close()
-        return res
+get_session_ctx = asynccontextmanager(get_session)
+
+
+def session_decorator(func):
+    async def new_func(*args, **kwargs):
+        async with get_session_ctx() as s:
+            return await func(*args, session=s, **kwargs)
 
     return new_func
 

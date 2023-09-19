@@ -4,10 +4,11 @@ from dstack._internal.core.backends.aws.compute import AWSCompute
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendInvalidCredentialsError
+from dstack._internal.core.models.backends.base import BackendType
 
 
 class AwsBackend(Backend):
-    NAME = "aws"
+    TYPE: BackendType = BackendType.AWS
 
     def __init__(self, config: AWSConfig):
         self.config = config

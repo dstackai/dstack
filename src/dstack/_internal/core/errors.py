@@ -44,3 +44,15 @@ class BackendInvalidCredentialsError(ServerClientError):
 class BackendNotAvailable(ServerClientError):
     code: ServerClientErrorCode = ServerClientErrorCode.BACKEND_NOT_AVAILABLE
     msg = "Backend not available"
+
+
+class BackendError(DstackError):
+    pass
+
+
+class ComputeError(BackendError):
+    pass
+
+
+class NoCapacityError(ComputeError):
+    pass
