@@ -14,7 +14,7 @@ type LogEvent struct {
 }
 
 type SubmitBody struct {
-	Run             Run               `json:"run"`
+	RunSpec         RunSpec           `json:"run_spec"`
 	JobSpec         JobSpec           `json:"job_spec"`
 	Secrets         map[string]string `json:"secrets"`
 	RepoCredentials *RepoCredentials  `json:"repo_credentials"`
@@ -29,12 +29,10 @@ type PullResponse struct {
 	// todo HasMore
 }
 
-type Run struct {
-	Id                string        `json:"id"`
+type RunSpec struct {
 	RunName           string        `json:"run_name"`
 	RepoId            string        `json:"repo_id"`
 	RepoData          RepoData      `json:"repo_data"`
-	User              string        `json:"user"`
 	Configuration     Configuration `json:"configuration"`
 	ConfigurationPath string        `json:"configuration_path"`
 }

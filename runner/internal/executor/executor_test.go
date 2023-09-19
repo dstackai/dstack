@@ -145,8 +145,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 	require.NoError(t, err)
 
 	body := schemas.SubmitBody{
-		Run: schemas.Run{
-			Id:       "test",
+		RunSpec: schemas.RunSpec{
 			RunName:  "red-turtle-1",
 			RepoId:   "test-000000",
 			RepoData: schemas.RepoData{RepoType: "local"},

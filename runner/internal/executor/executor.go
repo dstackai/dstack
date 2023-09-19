@@ -20,7 +20,7 @@ type RunExecutor struct {
 	homeDir    string
 	workingDir string
 
-	run             schemas.Run
+	run             schemas.RunSpec
 	jobSpec         schemas.JobSpec
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
@@ -79,6 +79,11 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 			err = gerrors.Newf("recovered: %v", r)
 		}
 	}()
+	defer func() {
+		if err != nil {
+			log.Error(ctx, "Executor failed", "err", err)
+		}
+	}()
 
 	logger := io.MultiWriter(runnerLogFile, os.Stdout, ex.runnerLogs)
 	ctx = log.WithLogger(ctx, log.NewEntry(logger, int(log.DefaultEntry.Logger.Level))) // todo loglevel
@@ -130,7 +135,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 }
 
 func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
-	ex.run = body.Run
+	ex.run = body.RunSpec
 	ex.jobSpec = body.JobSpec
 	ex.secrets = body.Secrets
 	ex.repoCredentials = body.RepoCredentials

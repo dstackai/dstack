@@ -30,7 +30,7 @@ async def process_running_jobs():
             _PROCESSING_JOBS_IDS.add(job_model.id)
 
     try:
-        await _process_job(session=session, job_model=job_model)
+        await _process_job(job_model=job_model)
     finally:
         async with _PROCESSING_JOBS_LOCK:
             _PROCESSING_JOBS_IDS.remove(job_model.id)
@@ -39,9 +39,9 @@ async def process_running_jobs():
 async def _process_job(job_model: JobModel):
     async with get_session_ctx() as session:
         if job_model.status == JobStatus.PROVISIONING:
-            _process_provisioning_job(session=session, job_model=job_model)
+            await _process_provisioning_job(session=session, job_model=job_model)
         else:
-            _process_running_job(session=session, job_model=job_model)
+            await _process_running_job(session=session, job_model=job_model)
 
 
 async def _process_provisioning_job(session: AsyncSession, job_model: JobModel):
