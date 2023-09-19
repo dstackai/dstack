@@ -114,7 +114,6 @@ class JobProvisioningData(BaseModel):
     hostname: str
     instance_type: InstanceType
     instance_id: str
-    spot_request_id: Optional[str]
     region: str
     price: float
 

@@ -128,7 +128,7 @@ _BACKENDS_CACHE = {}
 BackendTuple = Tuple[BackendModel, Backend]
 
 
-async def get_project_backends(project: ProjectModel) -> List[BackendTuple]:
+async def get_project_backends_with_models(project: ProjectModel) -> List[BackendTuple]:
     key = project.name
     backends = _BACKENDS_CACHE.get(key)
     if backends is not None:
@@ -156,6 +156,11 @@ async def get_project_backends(project: ProjectModel) -> List[BackendTuple]:
 
     _BACKENDS_CACHE[key] = backends
     return _BACKENDS_CACHE[key]
+
+
+async def get_project_backends(project: ProjectModel) -> List[Backend]:
+    backends_with_models = await get_project_backends_with_models(project)
+    return [b for _, b in backends_with_models]
 
 
 def clear_backend_cache(project_name: str):

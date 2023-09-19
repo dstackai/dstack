@@ -1,13 +1,33 @@
 import json
 import uuid
+from datetime import datetime
 from typing import Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.profiles import Profile, SpotPolicy
 from dstack._internal.core.models.repos.base import RepoType
+from dstack._internal.core.models.repos.local import LocalRunRepoData
+from dstack._internal.core.models.runs import (
+    JobErrorCode,
+    JobSpec,
+    JobStatus,
+    Requirements,
+    RetryPolicy,
+    RunSpec,
+)
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.server.models import BackendModel, ProjectModel, RepoModel, UserModel
+from dstack._internal.server.models import (
+    BackendModel,
+    JobModel,
+    ProjectModel,
+    RepoModel,
+    RunModel,
+    UserModel,
+)
+from dstack._internal.server.services.jobs import get_job_specs_from_run_spec
 
 
 def get_auth_headers(token: str) -> Dict:
@@ -79,7 +99,7 @@ async def create_backend(
 async def create_repo(
     session: AsyncSession,
     project_id: uuid.UUID,
-    repo_id: str = "test_repo",
+    repo_name: str = "test_repo",
     repo_type: RepoType = RepoType.REMOTE,
     info: Optional[Dict] = None,
     creds: Optional[Dict] = None,
@@ -100,7 +120,7 @@ async def create_repo(
         }
     repo = RepoModel(
         project_id=project_id,
-        name=repo_id,
+        name=repo_name,
         type=repo_type,
         info=json.dumps(info),
         creds=json.dumps(creds),
@@ -108,3 +128,68 @@ async def create_repo(
     session.add(repo)
     await session.commit()
     return repo
+
+
+async def create_run(
+    session: AsyncSession,
+    project: ProjectModel,
+    repo: RepoModel,
+    user: UserModel,
+    submitted_at: datetime,
+    run_name: str = "test-run",
+    status: JobStatus = JobStatus.SUBMITTED,
+    run_spec: Optional[RunSpec] = None,
+) -> RunModel:
+    if run_spec is None:
+        run_spec = RunSpec(
+            run_name=run_name,
+            repo_id=repo.name,
+            repo_data=LocalRunRepoData(repo_dir="/"),
+            repo_code_hash=None,
+            working_dir=".",
+            configuration_path="dstack.yaml",
+            configuration=DevEnvironmentConfiguration(ide="vscode"),
+            profile=Profile(name="default"),
+            ssh_key_pub="",
+        )
+    run = RunModel(
+        project_id=project.id,
+        repo_id=repo.id,
+        user_id=user.id,
+        submitted_at=submitted_at,
+        run_name=run_name,
+        status=status,
+        run_spec=run_spec.json(),
+    )
+    session.add(run)
+    await session.commit()
+    return run
+
+
+async def create_job(
+    session: AsyncSession,
+    run: RunModel,
+    submitted_at: datetime,
+    last_processed_at: datetime,
+    submission_num: int = 0,
+    status: JobStatus = JobStatus.SUBMITTED,
+    error_code: Optional[JobErrorCode] = None,
+) -> JobModel:
+    run_spec = RunSpec.parse_raw(run.run_spec)
+    job_spec = get_job_specs_from_run_spec(run_spec)[0]
+    job = JobModel(
+        run_id=run.id,
+        run_name=run.run_name,
+        job_num=0,
+        job_name=run.run_name + "-0",
+        submission_num=submission_num,
+        submitted_at=submitted_at,
+        last_processed_at=last_processed_at,
+        status=status,
+        error_code=error_code,
+        job_spec_data=job_spec.json(),
+        job_provisioning_data=None,
+    )
+    session.add(job)
+    await session.commit()
+    return job

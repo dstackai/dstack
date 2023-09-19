@@ -25,8 +25,8 @@ class InstanceType(BaseModel):
 
 class LaunchedInstanceInfo(BaseModel):
     instance_id: str
-    spot_request_id: Optional[str]
     region: str
+    hostname: str
 
 
 class InstanceAvailability(Enum):
