@@ -111,8 +111,6 @@ class JobSpec(BaseModel):
 
 
 class JobProvisioningData(BaseModel):
-    error_code: Optional[JobErrorCode]
-    container_exit_code: Optional[int]
     hostname: str
     instance_type: InstanceType
     instance_id: str

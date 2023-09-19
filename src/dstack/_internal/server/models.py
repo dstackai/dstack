@@ -17,7 +17,7 @@ from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.repos.base import RepoType
-from dstack._internal.core.models.runs import JobStatus
+from dstack._internal.core.models.runs import JobErrorCode, JobStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.utils.common import get_current_datetime
 
@@ -139,6 +139,8 @@ class JobModel(BaseModel):
     job_name: Mapped[str] = mapped_column(String(100))
     submission_num: Mapped[int] = mapped_column(Integer)
     submitted_at: Mapped[datetime] = mapped_column(DateTime)
+    last_processed_at: Mapped[datetime] = mapped_column(DateTime)
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
+    error_code: Mapped[Optional[JobErrorCode]] = mapped_column(Enum(JobErrorCode))
     job_spec_data: Mapped[str] = mapped_column(String(4000))
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))

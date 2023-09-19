@@ -66,7 +66,9 @@ async def submit_run(
             job_name=job.job_spec.job_name,
             submission_num=0,
             submitted_at=run_model.submitted_at,
+            last_processed_at=run_model.submitted_at,
             status=JobStatus.SUBMITTED,
+            error_code=None,
             job_spec_data=job.job_spec.json(),
             job_provisioning_data=None,
         )
