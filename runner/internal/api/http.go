@@ -100,9 +100,9 @@ func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (int, st
 		}
 	}
 
-	//if noMoreLogs {  // todo
-	//	defer func() { s.logsDoneCh <- nil }()
-	//}
+	if s.executor.GetRunnerState() == executor.WaitLogsFinished {
+		defer func() { s.logsDoneCh <- 0 }()
+	}
 	return writeJSONResponse(w, http.StatusOK, s.executor.GetHistory(timestamp))
 }
 

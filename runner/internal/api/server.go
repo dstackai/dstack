@@ -41,6 +41,7 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 
 		shutdownCh:   make(chan interface{}),
 		jobBarrierCh: make(chan interface{}),
+		logsDoneCh:   make(chan interface{}),
 
 		submitWaitDuration: 2 * time.Minute,
 		logsWaitDuration:   30 * time.Second,

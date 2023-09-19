@@ -25,8 +25,8 @@ type PullResponse struct {
 	JobLogs     []LogEvent      `json:"job_logs"`
 	RunnerLogs  []LogEvent      `json:"runner_logs"`
 	LastUpdated int64           `json:"last_updated"`
+	HasMore     bool            `json:"has_more"`
 	// todo Result
-	// todo HasMore
 }
 
 type RunSpec struct {

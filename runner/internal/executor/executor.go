@@ -78,6 +78,10 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 			ex.SetJobState(ctx, states.Failed)
 			err = gerrors.Newf("recovered: %v", r)
 		}
+		// no more logs will be written after this
+		ex.mu.Lock()
+		ex.SetRunnerState(WaitLogsFinished)
+		ex.mu.Unlock()
 	}()
 	defer func() {
 		if err != nil {
