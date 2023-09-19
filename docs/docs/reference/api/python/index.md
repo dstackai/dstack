@@ -8,7 +8,7 @@ Before you can use `dstack` Python API, ensure you have installed the `dstack` p
 started a `dstack` server with [configured clouds](../../docs/docs/guides/clouds.md).
     
 ```shell
-pip install "dstack[all]>=0.11.2rc2"
+pip install "dstack[all]==0.11.3rc1"
 dstack start
 ```
 
@@ -78,6 +78,9 @@ Parameters:
  - `project_name: Optional[str]` – (Optional) If not specified, it uses the default project.
  - `server_url: Optional[str]` – (Optional) The URL of the `dstack` server. Must be used with `project_name` and `user_token`.
  - `user_token: Optional[str]` – (Optional) The token of the `dstack` user. Must be used with `project_name` and `server_url`.
+ - `git_identity_file: Optional[str]` – (Optional) The path to the private SSH key file for non-public Git repositories.
+ - `oauth_token: Optional[str]` – (Optional) The authentication token for non-public Git repositories.
+ - `ssh_identity_file: Optional[str]` – (Optional) The path to the private SSH key file for SSH port forwarding.
  - `local_repo: bool` – (Optional) If `repo_dir` is a Git repository,
     `dstack` will use it as a Git repository (instead of uploading the entire contents). 
     If you'd like to opt out from this behavior, set `local_repo` to True. It defaults to `False`.

@@ -296,10 +296,10 @@ class Client:
         self,
         hub_client: HubClient,
         repo_dir: os.PathLike,
-        init: bool = True,
         git_identity_file: Optional[str] = None,
         oauth_token: Optional[str] = None,
         ssh_identity_file: Optional[str] = None,
+        init: bool = True,
     ) -> None:
         super().__init__()
         self._hub_client = hub_client
@@ -317,6 +317,9 @@ class Client:
         project_name: Optional[str] = None,
         server_url: Optional[str] = None,
         user_token: Optional[str] = None,
+        git_identity_file: Optional[str] = None,
+        oauth_token: Optional[str] = None,
+        ssh_identity_file: Optional[str] = None,
         local_repo: bool = False,
     ):
         if server_url is not None and user_token is not None:
@@ -332,4 +335,4 @@ class Client:
             hub_client = get_hub_client(
                 project_name=project_name, repo_dir=repo_dir, local_repo=local_repo
             )
-        return Client(hub_client, repo_dir, local_repo)
+        return Client(hub_client, repo_dir, git_identity_file, oauth_token, ssh_identity_file)

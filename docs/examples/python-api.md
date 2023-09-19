@@ -24,7 +24,7 @@ Before you can use `dstack` Python API, ensure you have installed the `dstack` p
 started a `dstack` server with [configured clouds](../../docs/docs/guides/clouds.md).
     
 ```shell
-pip install "dstack[all]>=0.11.2rc2"
+pip install "dstack[all]==0.11.3rc1"  
 dstack start
 ```
 
