@@ -110,7 +110,7 @@ async def _run_job(run: Run, job: Job, backends: List[Backend]) -> Optional[JobP
             continue
         else:
             return JobProvisioningData(
-                hostname=launched_instance_info.hostname,
+                hostname=launched_instance_info.ip_address,
                 instance_type=offer.instance,
                 instance_id=launched_instance_info.instance_id,
                 region=launched_instance_info.region,

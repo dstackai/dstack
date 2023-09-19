@@ -179,9 +179,7 @@ async def get_instance_candidates(
     """
     candidates = []
     tasks = [
-        run_async(
-            backend.get_instance_candidates, job.job_spec.requirements, job.job_spec.spot_policy
-        )
+        run_async(backend.get_instance_candidates, job.job_spec.requirements)
         for backend in backends
     ]
     for backend, backend_candidates in zip(backends, await asyncio.gather(*tasks)):

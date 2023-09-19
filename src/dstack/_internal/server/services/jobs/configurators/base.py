@@ -42,7 +42,6 @@ class JobConfigurator(ABC):
             registry_auth=self._registry_auth(),
             requirements=self._requirements(),
             retry_policy=self._retry_policy(),
-            spot_policy=self._spot_policy(),
             setup=self._setup(),
             working_dir=self._working_dir(),
         )
@@ -107,12 +106,14 @@ class JobConfigurator(ABC):
         return self.run_spec.configuration.registry_auth
 
     def _requirements(self) -> Requirements:
+        spot_policy = self._spot_policy()
         r = Requirements(
             cpus=self.run_spec.profile.resources.cpu,
             memory_mib=self.run_spec.profile.resources.memory,
             gpus=None,
             shm_size_mib=self.run_spec.profile.resources.shm_size,
             max_price=self.run_spec.profile.max_price,
+            spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
         )
         if self.run_spec.profile.resources.gpu:
             r.gpus = GpusRequirements(

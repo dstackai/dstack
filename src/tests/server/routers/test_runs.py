@@ -88,6 +88,7 @@ def get_dev_env_run_dict(
                         "max_price": None,
                         "memory_mib": 8192,
                         "shm_size_mib": None,
+                        "spot": True,
                     },
                     "retry_policy": {"limit": None, "retry": False},
                     "setup": [
@@ -142,7 +143,6 @@ def get_dev_env_run_dict(
                         "echo ''",
                         "echo -n 'To exit, press " "Ctrl+C.'",
                     ],
-                    "spot_policy": "spot",
                     "working_dir": ".",
                 },
                 "job_submissions": [

@@ -120,7 +120,7 @@ class TestProcessSubmittedJobs:
             backend_mock.compute.return_value.run_job.return_value = LaunchedInstanceInfo(
                 instance_id="instance_id",
                 region="us",
-                hostname="host",
+                ip_address="1.1.1.1",
             )
             await process_submitted_jobs()
             m.assert_called_once()

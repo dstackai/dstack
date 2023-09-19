@@ -6,6 +6,15 @@ from pydantic import BaseModel
 from dstack._internal.core.models.backends.base import BackendType
 
 
+class InstanceState(str, Enum):
+    NOT_FOUND = "not_found"
+    PROVISIONING = "provisioning"
+    RUNNING = "running"
+    STOPPED = "stopped"
+    STOPPING = "stopping"
+    TERMINATED = "terminated"
+
+
 class Gpu(BaseModel):
     name: str
     memory_mib: int
@@ -25,8 +34,8 @@ class InstanceType(BaseModel):
 
 class LaunchedInstanceInfo(BaseModel):
     instance_id: str
+    ip_address: str
     region: str
-    hostname: str
 
 
 class InstanceAvailability(Enum):

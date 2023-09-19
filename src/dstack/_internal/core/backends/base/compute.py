@@ -2,43 +2,31 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from dstack._internal.core.models.instances import (
-    InstanceOffer,
     InstanceOfferWithAvailability,
-    InstanceType,
+    InstanceState,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.runs import Job, Run
+from dstack._internal.core.models.runs import Job, Requirements, Run
 
 
 class Compute(ABC):
     @abstractmethod
-    def get_availability(self, offers: List[InstanceOffer]) -> List[InstanceOfferWithAvailability]:
+    def get_offers(
+        self, requirements: Optional[Requirements] = None
+    ) -> List[InstanceOfferWithAvailability]:
         pass
 
     @abstractmethod
-    def get_instance_state(
-        self,
-        instance_id: str,
-        region: str,
-        spot_request_id: Optional[str],
-    ):
+    def get_instance_state(self, instance_id: str, region: str) -> InstanceState:
         pass
 
     @abstractmethod
-    def terminate_instance(
-        self,
-        instance_id: str,
-        region: str,
-        spot_request_id: Optional[str],
-    ):
+    def terminate_instance(self, instance_id: str, region: str):
         pass
 
     @abstractmethod
     def run_job(
-        self,
-        run: Run,
-        job: Job,
-        instance_offer: InstanceOfferWithAvailability,
+        self, run: Run, job: Job, instance_offer: InstanceOfferWithAvailability
     ) -> LaunchedInstanceInfo:
         pass
 
