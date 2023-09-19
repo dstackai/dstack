@@ -178,7 +178,7 @@ def get_user_data(image_name: str, authorized_keys: List[str]) -> str:
     env = {
         "DSTACK_BACKEND": "aws",
         "DSTACK_RUNNER_LOG_LEVEL": "6",
-        "DSTACK_RUNNER_VERSION": cloudinit.get_dstack_runner_version(),
+        "DSTACK_RUNNER_VERSION": build,
         "DSTACK_IMAGE_NAME": image_name,
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
         "DSTACK_HOME": "/root/.dstack",
