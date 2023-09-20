@@ -19,13 +19,13 @@ class ClientError(DstackError):
 
 
 class ServerClientErrorCode(str, enum.Enum):
-    SERVER_ERROR = ""
+    UNSPECIFIED_ERROR = "error"
     INVALID_CREDENTIALS = "invalid_credentials"
     BACKEND_NOT_AVAILABLE = "backend_not_available"
 
 
 class ServerClientError(ServerError, ClientError):
-    code: ServerClientErrorCode = ServerClientErrorCode.SERVER_ERROR
+    code: ServerClientErrorCode = ServerClientErrorCode.UNSPECIFIED_ERROR
     msg: str = ""
     fields: List[List[str]] = []
 

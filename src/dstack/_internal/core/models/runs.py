@@ -30,11 +30,12 @@ class JobStatus(str, Enum):
     FAILED = "failed"
     DONE = "done"
 
-    def is_finished(self):
-        return self in [self.TERMINATED, self.ABORTED, self.FAILED, self.DONE]
+    @classmethod
+    def finished_statuses(cls) -> List["JobStatus"]:
+        return [cls.TERMINATED, cls.ABORTED, cls.FAILED, cls.DONE]
 
-    def is_unfinished(self):
-        return not self.is_finished()
+    def is_finished(self):
+        return self in self.finished_statuses()
 
 
 class RetryPolicy(BaseModel):
@@ -126,6 +127,7 @@ class JobSubmission(BaseModel):
     submission_num: int
     submitted_at: datetime
     status: JobStatus
+    error_code: Optional[JobErrorCode]
     job_provisioning_data: Optional[JobProvisioningData]
 
 
@@ -151,6 +153,7 @@ class Run(BaseModel):
     project_name: str
     user: str
     submitted_at: datetime
+    status: JobStatus
     run_spec: RunSpec
     jobs: List[Job]
 

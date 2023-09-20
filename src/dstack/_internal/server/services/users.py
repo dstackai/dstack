@@ -1,11 +1,23 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, User, UserTokenCreds, UserWithCreds
 from dstack._internal.server.models import UserModel
+
+_ADMIN_USERNAME = "admin"
+
+
+async def get_or_create_admin_user(session: AsyncSession) -> Tuple[UserModel, bool]:
+    admin = await get_user_model_by_name(session=session, username=_ADMIN_USERNAME)
+    if admin is not None:
+        return admin, False
+    admin = await create_user(
+        session=session, username=_ADMIN_USERNAME, global_role=GlobalRole.ADMIN
+    )
+    return admin, True
 
 
 async def list_users(

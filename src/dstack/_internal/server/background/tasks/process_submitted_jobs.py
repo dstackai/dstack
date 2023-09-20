@@ -71,6 +71,7 @@ async def _process_job(job_id: UUID):
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
+    logger.debug("Provisioning job %s", job_model.job_name)
     run_model = job_model.run
     run = run_model_to_run(run_model, include_job_submissions=False)
     job = run.jobs[job_model.job_num]
@@ -106,7 +107,8 @@ async def _run_job(run: Run, job: Job, backends: List[Backend]) -> Optional[JobP
                 job,
                 offer,
             )
-        except BackendError:
+        except BackendError as e:
+            logger.debug("Running job failed: %s", e)
             continue
         else:
             return JobProvisioningData(

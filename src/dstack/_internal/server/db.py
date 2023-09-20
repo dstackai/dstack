@@ -19,6 +19,13 @@ class Database:
             bind=self.engine, expire_on_commit=False, class_=AsyncSession
         )
 
+        @event.listens_for(self.engine.sync_engine, "connect")
+        def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA foreign_keys=ON;")
+            cursor.close()
+
     def get_session(self) -> AsyncSession:
         return self.session_maker()
 
@@ -29,14 +36,6 @@ db = Database(url=DATABASE_URL)
 def override_db(new_db: Database):
     global db
     db = new_db
-
-
-@event.listens_for(db.engine.sync_engine, "connect")
-def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL;")
-    cursor.execute("PRAGMA foreign_keys=ON;")
-    cursor.close()
 
 
 async def migrate():

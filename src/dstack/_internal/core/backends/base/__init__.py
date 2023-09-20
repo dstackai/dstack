@@ -13,8 +13,3 @@ class Backend:
     @abstractmethod
     def compute(self) -> Compute:
         pass
-
-    def get_instance_candidates(
-        self, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
-        return self.compute().get_offers(requirements)

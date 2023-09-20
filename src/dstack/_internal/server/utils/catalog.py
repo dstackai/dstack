@@ -13,7 +13,7 @@ from filelock import FileLock
 from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
-from dstack._internal.server.settings import DSTACK_SERVER_DATA_DIR_PATH
+from dstack._internal.server.settings import SERVER_DATA_DIR_PATH
 from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.logging import get_logger
 
@@ -69,7 +69,7 @@ def open_catalog(path: PathLike) -> zipfile.ZipFile:
 # todo replace with gpuhunt.query
 def query(provider: str) -> List[CatalogItem]:
     items = []
-    with open_catalog(DSTACK_SERVER_DATA_DIR_PATH / "catalog.zip") as zip_file:
+    with open_catalog(SERVER_DATA_DIR_PATH / "catalog.zip") as zip_file:
         with zip_file.open(f"{provider}.csv", "r") as csv_file:
             reader: Iterable[Dict[str, str]] = csv.DictReader(io.TextIOWrapper(csv_file, "utf-8"))
             for item in reader:

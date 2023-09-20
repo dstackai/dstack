@@ -3,13 +3,10 @@ from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 from uuid import UUID
 
-import botocore.exceptions
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import dstack._internal.server.services.backends
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -33,7 +30,6 @@ class TestProcessSubmittedJobs:
             project_id=project.id,
         )
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
-        UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         run = await create_run(
             session=session,
             project=project,
@@ -61,7 +57,6 @@ class TestProcessSubmittedJobs:
             project_id=project.id,
         )
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
-        UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         run = await create_run(
             session=session,
             project=project,
@@ -106,7 +101,7 @@ class TestProcessSubmittedJobs:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock = Mock()
             m.return_value = [backend_mock]
-            backend_mock.get_instance_candidates.return_value = [
+            backend_mock.compute.return_value.get_offers.return_value = [
                 InstanceOfferWithAvailability(
                     instance=InstanceType(
                         name="instance",
@@ -124,7 +119,7 @@ class TestProcessSubmittedJobs:
             )
             await process_submitted_jobs()
             m.assert_called_once()
-            backend_mock.get_instance_candidates.assert_called_once()
+            backend_mock.compute.return_value.get_offers.assert_called_once()
             backend_mock.compute.return_value.run_job.assert_called_once()
         await session.refresh(job)
         assert job is not None

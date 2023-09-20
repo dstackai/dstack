@@ -1,11 +1,12 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import ForbiddenError
+from dstack._internal.core.models.backends import BackendInfo
 from dstack._internal.core.models.projects import Member, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
@@ -14,6 +15,23 @@ from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import get_configurator
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
+
+DEFAULT_PROJECT_NAME = "main"
+
+
+async def get_or_create_default_project(
+    session: AsyncSession, user: UserModel
+) -> Tuple[Project, bool]:
+    default_project = await get_project_by_name(
+        session=session,
+        project_name=DEFAULT_PROJECT_NAME,
+    )
+    if default_project is not None:
+        return default_project, False
+    default_project = await create_project(
+        session=session, user=user, project_name=DEFAULT_PROJECT_NAME
+    )
+    return default_project, True
 
 
 async def list_user_projects(
@@ -164,7 +182,12 @@ def project_model_to_project(project_model: ProjectModel) -> Project:
     backends = []
     for b in project_model.backends:
         configurator = get_configurator(b.type)
-        backends.append(configurator.get_config_info())
+        config_info = configurator.get_config_info(model=b, include_creds=False)
+        backend_info = BackendInfo(
+            name=b.type,
+            config=config_info,
+        )
+        backends.append(backend_info)
     return Project(
         project_id=project_model.id,
         project_name=project_model.name,

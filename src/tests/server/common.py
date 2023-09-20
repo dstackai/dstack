@@ -1,7 +1,8 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,7 +71,7 @@ async def create_project(
 
 async def create_backend(
     session: AsyncSession,
-    project_id: uuid.UUID,
+    project_id: UUID,
     backend_type: BackendType = BackendType.AWS,
     config: Optional[Dict] = None,
     auth: Optional[Dict] = None,
@@ -98,12 +99,12 @@ async def create_backend(
 
 async def create_repo(
     session: AsyncSession,
-    project_id: uuid.UUID,
+    project_id: UUID,
     repo_name: str = "test_repo",
     repo_type: RepoType = RepoType.REMOTE,
     info: Optional[Dict] = None,
     creds: Optional[Dict] = None,
-):
+) -> RepoModel:
     if info is None:
         info = {
             "repo_type": "remote",
@@ -135,9 +136,9 @@ async def create_run(
     project: ProjectModel,
     repo: RepoModel,
     user: UserModel,
-    submitted_at: datetime,
     run_name: str = "test-run",
     status: JobStatus = JobStatus.SUBMITTED,
+    submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
 ) -> RunModel:
     if run_spec is None:
@@ -169,15 +170,16 @@ async def create_run(
 async def create_job(
     session: AsyncSession,
     run: RunModel,
-    submitted_at: datetime,
-    last_processed_at: datetime,
     submission_num: int = 0,
     status: JobStatus = JobStatus.SUBMITTED,
+    submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     error_code: Optional[JobErrorCode] = None,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = get_job_specs_from_run_spec(run_spec)[0]
     job = JobModel(
+        project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
         job_num=0,

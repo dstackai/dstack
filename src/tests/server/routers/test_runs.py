@@ -8,29 +8,38 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.runs import JobSpec, JobStatus, RunSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.projects import add_project_member
-from tests.server.common import create_project, create_repo, create_user, get_auth_headers
+from tests.server.common import (
+    create_job,
+    create_project,
+    create_repo,
+    create_run,
+    create_user,
+    get_auth_headers,
+)
 
 client = TestClient(app)
 
 
 def get_dev_env_run_dict(
-    run_id: str,
-    job_id: str,
-    project_name: str,
-    username: str,
-    submitted_at: str,
+    run_id: str = "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+    job_id: str = "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+    project_name: str = "test_project",
+    username: str = "test_user",
     run_name: str = "run_name",
     repo_id: str = "test_repo",
+    submitted_at: str = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
 ) -> Dict:
     return {
         "id": run_id,
         "project_name": project_name,
         "user": username,
         "submitted_at": submitted_at,
+        "status": "submitted",
         "run_spec": {
             "configuration": {
                 "build": [],
@@ -151,12 +160,83 @@ def get_dev_env_run_dict(
                         "submission_num": 0,
                         "submitted_at": submitted_at,
                         "status": "submitted",
+                        "error_code": None,
                         "job_provisioning_data": None,
                     }
                 ],
             }
         ],
     }
+
+
+class TestListRuns:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        response = client.post(
+            f"/api/project/{project.name}/runs/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_lists_runs(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            submitted_at=submitted_at,
+        )
+        run_spec = RunSpec.parse_raw(run.run_spec)
+        job = await create_job(
+            session=session,
+            run=run,
+            submitted_at=submitted_at,
+            last_processed_at=submitted_at,
+        )
+        job_spec = JobSpec.parse_raw(job.job_spec_data)
+        response = client.post(
+            f"/api/project/{project.name}/runs/list",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "id": str(run.id),
+                "project_name": project.name,
+                "user": user.name,
+                "submitted_at": submitted_at.isoformat(),
+                "status": "submitted",
+                "run_spec": run_spec.dict(),
+                "jobs": [
+                    {
+                        "job_spec": job_spec.dict(),
+                        "job_submissions": [
+                            {
+                                "id": str(job.id),
+                                "submission_num": 0,
+                                "submitted_at": "2023-01-02T03:04:00+00:00",
+                                "status": "submitted",
+                                "error_code": None,
+                                "job_provisioning_data": None,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
 
 
 class TestSubmitRun:
@@ -209,3 +289,173 @@ class TestSubmitRun:
         res = await session.execute(select(JobModel))
         job = res.scalar()
         assert job is not None
+
+    @pytest.mark.asyncio
+    async def test_returns_400_if_repo_does_not_exist(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        run_dict = get_dev_env_run_dict(
+            project_name=project.name,
+            username=user.name,
+            repo_id="repo1234",
+        )
+        body = {"run_spec": run_dict["run_spec"]}
+        response = client.post(
+            f"/api/project/{project.name}/runs/submit",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 400
+
+
+class TestStopRuns:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        response = client.post(
+            f"/api/project/{project.name}/runs/stop",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_terminates_run(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+        )
+        response = client.post(
+            f"/api/project/{project.name}/runs/stop",
+            headers=get_auth_headers(user.token),
+            json={"runs_names": [run.run_name], "abort": False},
+        )
+        assert response.status_code == 200
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATED
+
+    @pytest.mark.asyncio
+    async def test_leaves_finished_runs_unchanged(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+        )
+        response = client.post(
+            f"/api/project/{project.name}/runs/stop",
+            headers=get_auth_headers(user.token),
+            json={"runs_names": [run.run_name], "abort": False},
+        )
+        assert response.status_code == 200
+        await session.refresh(job)
+        assert job.status == JobStatus.FAILED
+
+
+class TestDeleteRuns:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        response = client.post(
+            f"/api/project/{project.name}/runs/delete",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_deletes_runs(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+        )
+        response = client.post(
+            f"/api/project/{project.name}/runs/delete",
+            headers=get_auth_headers(user.token),
+            json={"runs_names": [run.run_name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(RunModel))
+        assert len(res.scalars().all()) == 0
+        res = await session.execute(select(JobModel))
+        assert len(res.scalars().all()) == 0
+
+    @pytest.mark.asyncio
+    async def test_returns_400_if_runs_active(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+        )
+        response = client.post(
+            f"/api/project/{project.name}/runs/delete",
+            headers=get_auth_headers(user.token),
+            json={"runs_names": [run.run_name]},
+        )
+        assert response.status_code == 400
+        res = await session.execute(select(RunModel))
+        assert len(res.scalars().all()) == 1
+        res = await session.execute(select(JobModel))
+        assert len(res.scalars().all()) == 1

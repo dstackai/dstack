@@ -12,7 +12,11 @@ from dstack._internal.core.models.backends import (
     AnyConfigValues,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import InstanceAvailability, InstanceOffer
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOffer,
+    InstanceOfferWithAvailability,
+)
 from dstack._internal.core.models.runs import Job
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import Configurator
@@ -31,7 +35,7 @@ except ImportError:
     pass
 
 
-_BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP = {c.NAME: c for c in _CONFIGURATOR_CLASSES}
+_BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP = {c.TYPE: c for c in _CONFIGURATOR_CLASSES}
 
 
 def get_configurator(backend_type: BackendType) -> Optional[Configurator]:
@@ -44,7 +48,7 @@ def get_configurator(backend_type: BackendType) -> Optional[Configurator]:
 def list_avaialble_backend_types() -> List[BackendType]:
     available_backend_types = []
     for configurator_class in _CONFIGURATOR_CLASSES:
-        available_backend_types.append(configurator_class.NAME)
+        available_backend_types.append(configurator_class.TYPE)
     return available_backend_types
 
 
@@ -138,18 +142,16 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
     for backend_model in project.backends:
         configurator = get_configurator(backend_model.type)
         if configurator is None:
+            logger.warning(
+                "Missing dependencies for %s backend. Backend will be ignored.", backend_model.type
+            )
             continue
         try:
             backend = await run_async(configurator.get_backend, backend_model)
         except BackendInvalidCredentialsError:
             logger.warning(
                 "Credentials for %s backend are invalid. Backend will be ignored.",
-                backend_model.name,
-            )
-            continue
-        if backends is None:
-            logger.warning(
-                "Missing dependencies for %s backend. Backend will be ignored.", backend_model.name
+                backend_model.type,
             )
             continue
         backends.append((backend_model, backend))
@@ -173,14 +175,13 @@ _NOT_AVAILABLE = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QU
 
 async def get_instance_candidates(
     backends: List[Backend], job: Job, exclude_not_available: bool = False
-) -> List[Tuple[Backend, InstanceOffer]]:
+) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
     candidates = []
     tasks = [
-        run_async(backend.get_instance_candidates, job.job_spec.requirements)
-        for backend in backends
+        run_async(backend.compute().get_offers, job.job_spec.requirements) for backend in backends
     ]
     for backend, backend_candidates in zip(backends, await asyncio.gather(*tasks)):
         for offer in backend_candidates:

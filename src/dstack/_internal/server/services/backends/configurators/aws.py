@@ -44,7 +44,7 @@ DEFAULT_REGION = "us-east-1"
 
 
 class AWSConfigurator(ABC):
-    NAME: BackendType = BackendType.AWS
+    TYPE: BackendType = BackendType.AWS
 
     def get_config_values(self, config: AWSConfigInfoWithCredsPartial) -> AWSConfigValues:
         config_values = AWSConfigValues()
@@ -75,7 +75,7 @@ class AWSConfigurator(ABC):
     ) -> BackendModel:
         return BackendModel(
             project_id=project.id,
-            type=self.NAME,
+            type=self.TYPE.value,
             config=AWSConfigInfo.parse_obj(config).json(),
             auth=AWSCreds.parse_obj(config.creds).__root__.json(),
         )

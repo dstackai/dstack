@@ -20,7 +20,6 @@ class AwsBackend(Backend):
 
     def _check_credentials(self):
         try:
-            # TODO
-            self.list_repo_heads()
+            pass
         except (botocore.exceptions.ClientError, botocore.exceptions.NoCredentialsError):
             raise BackendInvalidCredentialsError()

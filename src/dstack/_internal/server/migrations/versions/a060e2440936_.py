@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 2123a37f75f2
+Revision ID: a060e2440936
 Revises: 
-Create Date: 2023-09-19 10:56:17.552142
+Create Date: 2023-09-20 16:34:34.649303
 
 """
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "2123a37f75f2"
+revision = "a060e2440936"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -138,6 +138,9 @@ def upgrade() -> None:
     op.create_table(
         "jobs",
         sa.Column("id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
+        sa.Column(
+            "project_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False
+        ),
         sa.Column("run_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
         sa.Column("run_name", sa.String(length=100), nullable=False),
         sa.Column("job_num", sa.Integer(), nullable=False),
@@ -176,6 +179,12 @@ def upgrade() -> None:
         ),
         sa.Column("job_spec_data", sa.String(length=4000), nullable=False),
         sa.Column("job_provisioning_data", sa.String(length=4000), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["project_id"],
+            ["projects.id"],
+            name=op.f("fk_jobs_project_id_projects"),
+            ondelete="CASCADE",
+        ),
         sa.ForeignKeyConstraint(
             ["run_id"], ["runs.id"], name=op.f("fk_jobs_run_id_runs"), ondelete="CASCADE"
         ),

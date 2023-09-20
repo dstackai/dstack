@@ -14,7 +14,7 @@ from dstack._internal.server.models import BackendModel, ProjectModel
 
 
 class Configurator(ABC):
-    NAME: BackendType
+    TYPE: BackendType
 
     @abstractmethod
     def get_config_values(self, config: AnyConfigInfoWithCredsPartial) -> AnyConfigValues:
