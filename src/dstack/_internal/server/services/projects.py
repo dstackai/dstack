@@ -34,9 +34,7 @@ async def get_project_by_name(
     return project_model_to_project(project_model)
 
 
-async def create_project(
-    session: AsyncSession, user: UserModel, project_name: str
-) -> ProjectModel:
+async def create_project(session: AsyncSession, user: UserModel, project_name: str) -> Project:
     project = await create_project_model(session=session, project_name=project_name)
     await add_project_member(
         session=session,
