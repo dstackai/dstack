@@ -175,10 +175,10 @@ Once `llama_index.VectorStoreIndex` is ready, we can proceed with querying it.
     If we're deploying Llama 2, we have to ensure that the prompt format is correct.
 
 ```python
-from llama_index import QuestionAnswerPrompt
+from llama_index import (QuestionAnswerPrompt, RefinePrompt)
 
-prompt = QuestionAnswerPrompt(
-    """<s>[INST] <<SYS>>
+text_qa_template = QuestionAnswerPrompt(
+        """<s>[INST] <<SYS>>
 We have provided context information below. 
 
 {context_str}
@@ -187,13 +187,33 @@ Given this information, please answer the question.
 <</SYS>>
 
 {query_str} [/INST]"""
+    )
+
+refine_template = RefinePrompt(
+    """<s>[INST] <<SYS>>
+The original query is as follows: 
+
+{query_str}
+
+We have provided an existing answer:
+
+{existing_answer}
+
+We have the opportunity to refine the existing answer (only if needed) with some more context below.
+
+{context_msg}
+<</SYS>>
+
+Given the new context, refine the original answer to better answer the query. If the context isn't useful, return the original answer. [/INST]"""
 )
+
 query_engine = index.as_query_engine(
-    text_qa_template=prompt,
+    text_qa_template=text_qa_template,
+    refine_template=refine_template,
     streaming=True,
 )
 
-response = query_engine.query("What did the author do growing up?")
+response = query_engine.query("Make a bullet-point timeline of the authors biography?")
 response.print_response_stream()
 ```
 
