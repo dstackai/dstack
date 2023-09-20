@@ -321,6 +321,7 @@ class Client:
         oauth_token: Optional[str] = None,
         ssh_identity_file: Optional[str] = None,
         local_repo: bool = False,
+        init: bool = True,
     ):
         if server_url is not None and user_token is not None:
             if project_name is None:
@@ -335,4 +336,6 @@ class Client:
             hub_client = get_hub_client(
                 project_name=project_name, repo_dir=repo_dir, local_repo=local_repo
             )
-        return Client(hub_client, repo_dir, git_identity_file, oauth_token, ssh_identity_file)
+        return Client(
+            hub_client, repo_dir, git_identity_file, oauth_token, ssh_identity_file, init
+        )

@@ -84,9 +84,8 @@ Parameters:
  - `local_repo: bool` – (Optional) If `repo_dir` is a Git repository,
     `dstack` will use it as a Git repository (instead of uploading the entire contents). 
     If you'd like to opt out from this behavior, set `local_repo` to True. It defaults to `False`.
-
-!!! info "NOTE:"
-    The call of `Client.from_config()` is equal to [`dstack init`](../../cli/init.md).
+ - `init: bool` – (Optional) By default, `from_config()` is equivalent to [`dstack init`](../../cli/init.md). Set `init`
+    to `False` to skip automatic repo initialization.
 
 ### runs
 
