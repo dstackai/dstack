@@ -56,7 +56,7 @@ auth_config = weaviate.AuthApiKey(api_key=os.getenv("WEAVIATE_API_TOKEN"))
 
 client = weaviate.Client(url=os.getenv("WEAVIATE_URL"), auth_client_secret=auth_config)
 
-client.schema.delete_class("llama-index-weaviate")
+client.schema.delete_class("DstackExample")
 ```
 
 Next, prepare the Llama Index classes: `llama_index.ServiceContext` (for indexing and querying) and
@@ -77,7 +77,7 @@ embed_model = LangchainEmbedding(HuggingFaceEmbeddings())
 
 service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=None)
 
-vector_store = WeaviateVectorStore(weaviate_client=client, index_name="llama-index-weaviate")
+vector_store = WeaviateVectorStore(weaviate_client=client, index_name="DstackExample")
 
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 ```
@@ -135,6 +135,7 @@ import os
 
 from llama_index import (
     LangchainEmbedding,
+    PromptHelper,
     ServiceContext,
     VectorStoreIndex,
 )
@@ -158,9 +159,10 @@ llm_predictor = LLMPredictor(
 service_context = ServiceContext.from_defaults(
     embed_model=embed_model,
     llm_predictor=llm_predictor,
+    prompt_helper=PromptHelper(context_window=1024),
 )
 
-vector_store = WeaviateVectorStore(weaviate_client=client, index_name="llama-index-weaviate")
+vector_store = WeaviateVectorStore(weaviate_client=client, index_name="DstackExample")
 
 index = VectorStoreIndex.from_vector_store(
     vector_store, service_context=service_context
@@ -184,8 +186,7 @@ We have provided context information below.
 Given this information, please answer the question.
 <</SYS>>
 
-[/INST]</s>
-<s>[INST]{query_str}[/INST]"""
+{query_str} [/INST]"""
 )
 query_engine = index.as_query_engine(
     text_qa_template=prompt,
