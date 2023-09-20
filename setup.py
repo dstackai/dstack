@@ -66,6 +66,7 @@ BASE_DEPS = [
     "watchfiles",
     "docker>=6.0.0",
     "dnspython",
+    "aiohttp",
 ]
 
 AWS_DEPS = [

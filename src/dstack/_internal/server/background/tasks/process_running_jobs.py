@@ -30,7 +30,7 @@ async def process_running_jobs():
             _PROCESSING_JOBS_IDS.add(job_model.id)
 
     try:
-        await _process_job(session=session, job_model=job_model)
+        await _process_job(job_model=job_model)
     finally:
         async with _PROCESSING_JOBS_LOCK:
             _PROCESSING_JOBS_IDS.remove(job_model.id)

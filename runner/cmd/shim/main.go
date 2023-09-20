@@ -101,7 +101,6 @@ func main() {
 						Name:        "ssh-key",
 						Usage:       "Public SSH key",
 						Required:    true,
-						FilePath:    "~/.ssh/authorized_keys", // todo check if user expand works
 						Destination: &dockerParams.PublicSSHKey,
 						EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
 					},

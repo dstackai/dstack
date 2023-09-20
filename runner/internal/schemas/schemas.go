@@ -5,7 +5,6 @@ import "fmt"
 type JobStateEvent struct {
 	State     string `json:"state"`
 	Timestamp int64  `json:"timestamp"`
-	// todo exitcode?
 }
 
 type LogEvent struct {
@@ -14,7 +13,7 @@ type LogEvent struct {
 }
 
 type SubmitBody struct {
-	Run             Run               `json:"run"`
+	RunSpec         RunSpec           `json:"run_spec"`
 	JobSpec         JobSpec           `json:"job_spec"`
 	Secrets         map[string]string `json:"secrets"`
 	RepoCredentials *RepoCredentials  `json:"repo_credentials"`
@@ -25,16 +24,14 @@ type PullResponse struct {
 	JobLogs     []LogEvent      `json:"job_logs"`
 	RunnerLogs  []LogEvent      `json:"runner_logs"`
 	LastUpdated int64           `json:"last_updated"`
+	HasMore     bool            `json:"has_more"`
 	// todo Result
-	// todo HasMore
 }
 
-type Run struct {
-	Id                string        `json:"id"`
+type RunSpec struct {
 	RunName           string        `json:"run_name"`
 	RepoId            string        `json:"repo_id"`
 	RepoData          RepoData      `json:"repo_data"`
-	User              string        `json:"user"`
 	Configuration     Configuration `json:"configuration"`
 	ConfigurationPath string        `json:"configuration_path"`
 }
