@@ -14,15 +14,14 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func (s *Server) logsWsGetHandler(w http.ResponseWriter, r *http.Request) (int, string) {
+func (s *Server) logsWsGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Error(r.Context(), "Failed to upgrade connection", "err", err)
-		return http.StatusInternalServerError, ""
+		return nil, err
 	}
 	// todo memorize clientId?
 	go s.streamJobLogs(conn)
-	return 200, "ok"
+	return nil, nil
 }
 
 func (s *Server) streamJobLogs(conn *websocket.Conn) {

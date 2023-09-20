@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -48,13 +49,13 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 
 		executor: executor.NewRunExecutor(tempDir, homeDir, workingDir),
 	}
-	setHandleFunc(mux, "GET", "/api/healthcheck", s.healthcheckGetHandler)
-	setHandleFunc(mux, "POST", "/api/submit", s.submitPostHandler)
-	setHandleFunc(mux, "POST", "/api/upload_code", s.uploadCodePostHandler)
-	setHandleFunc(mux, "POST", "/api/run", s.runPostHandler)
-	setHandleFunc(mux, "GET", "/api/pull", s.pullGetHandler)
-	setHandleFunc(mux, "POST", "/api/stop", s.stopPostHandler)
-	setHandleFunc(mux, "GET", "/logs_ws", s.logsWsGetHandler)
+	mux.HandleFunc("/api/healthcheck", api.JSONResponseHandler("GET", s.healthcheckGetHandler))
+	mux.HandleFunc("/api/submit", api.JSONResponseHandler("POST", s.submitPostHandler))
+	mux.HandleFunc("/api/upload_code", api.JSONResponseHandler("POST", s.uploadCodePostHandler))
+	mux.HandleFunc("/api/run", api.JSONResponseHandler("POST", s.runPostHandler))
+	mux.HandleFunc("/api/pull", api.JSONResponseHandler("GET", s.pullGetHandler))
+	mux.HandleFunc("/api/stop", api.JSONResponseHandler("POST", s.stopPostHandler))
+	mux.HandleFunc("/logs_ws", api.JSONResponseHandler("GET", s.logsWsGetHandler))
 	return s
 }
 
