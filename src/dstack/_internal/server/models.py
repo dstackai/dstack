@@ -132,6 +132,8 @@ class JobModel(BaseModel):
     id: Mapped[UUIDType] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
+    project_id: Mapped[UUIDType] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship()
     run_id: Mapped[UUIDType] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
     run_name: Mapped[str] = mapped_column(String(100))
     run: Mapped["RunModel"] = relationship()

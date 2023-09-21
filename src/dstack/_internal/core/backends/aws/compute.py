@@ -158,7 +158,6 @@ class AWSCompute(Compute):
                 instance_id=instance.instance_id,
                 ip_address=instance.public_ip_address,
                 region=instance_offer.region,
-                spot_request_id=instance.spot_instance_request_id,  # TODO remove
             )
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InsufficientInstanceCapacity":

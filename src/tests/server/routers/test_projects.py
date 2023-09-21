@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 from uuid import UUID
 
@@ -10,7 +11,7 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import MemberModel, ProjectModel
 from dstack._internal.server.services.projects import add_project_member
-from tests.server.common import create_project, create_user, get_auth_headers
+from tests.server.common import create_backend, create_project, create_user, get_auth_headers
 
 client = TestClient(app)
 
@@ -34,13 +35,25 @@ class TestListProjects:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
+        backend = await create_backend(
+            session=session,
+            project_id=project.id,
+        )
         response = client.post("/api/projects/list", headers=get_auth_headers(user.token))
         assert response.status_code in [200]
         assert response.json() == [
             {
                 "project_id": str(project.id),
                 "project_name": project.name,
-                "backends": [],
+                "backends": [
+                    {
+                        "name": backend.type,
+                        "config": {
+                            "type": backend.type,
+                            "regions": json.loads(backend.config)["regions"],
+                        },
+                    }
+                ],
                 "members": [
                     {
                         "user": {
