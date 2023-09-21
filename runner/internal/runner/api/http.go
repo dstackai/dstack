@@ -2,8 +2,9 @@ package api
 
 import (
 	"context"
-	"errors"
+	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/executor"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 	"io"
@@ -13,68 +14,61 @@ import (
 	"strconv"
 )
 
-func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (int, string) {
-	return 200, "ok"
+func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	return nil, nil
 }
 
-func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (int, string) {
+func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.executor.Lock()
 	defer s.executor.Unlock()
 	if s.executor.GetRunnerState() != executor.WaitSubmit {
-		return http.StatusConflict, ""
+		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
 	var body schemas.SubmitBody
-	if err := decodeJSONBody(w, r, &body, true); err != nil {
+	if err := api.DecodeJSONBody(w, r, &body, true); err != nil {
 		log.Error(r.Context(), "Failed to decode submit body", "err", err)
-		var mr *malformedRequest
-		if errors.As(err, &mr) {
-			return mr.status, mr.msg
-		} else {
-			return http.StatusInternalServerError, ""
-		}
+		return nil, err
 	}
 	// todo go-playground/validator
 
 	s.executor.SetJob(body)
 	s.jobBarrierCh <- nil // notify server that job submitted
 
-	return 200, "ok"
+	return nil, nil
 }
 
-func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (int, string) {
+func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.executor.Lock()
 	defer s.executor.Unlock()
 	if s.executor.GetRunnerState() != executor.WaitCode {
-		return http.StatusConflict, ""
+		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 10*1024*1024)
 	codePath := filepath.Join(s.tempDir, "code") // todo random name?
 	file, err := os.Create(codePath)
 	if err != nil {
-		log.Error(r.Context(), "Failed to create code file", "err", err)
-		return http.StatusInternalServerError, ""
+		return nil, gerrors.Wrap(err)
 	}
 	defer func() { _ = file.Close() }()
 	if _, err = io.Copy(file, r.Body); err != nil {
-		log.Error(r.Context(), "Failed to write code file", "err", err)
 		if err.Error() == "http: request body too large" {
-			return http.StatusRequestEntityTooLarge, ""
+			return nil, &api.Error{Status: http.StatusRequestEntityTooLarge}
 		} else {
-			return http.StatusInternalServerError, ""
+			return nil, gerrors.Wrap(err)
 		}
 	}
 
 	s.executor.SetCodePath(codePath)
-	return 200, "ok"
+	return nil, nil
 }
 
-func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (int, string) {
+func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.executor.Lock()
 	defer s.executor.Unlock()
 	if s.executor.GetRunnerState() != executor.WaitRun {
-		return http.StatusConflict, ""
+		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
 	runCtx := context.Background()
@@ -85,10 +79,10 @@ func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (int, st
 	}()
 	s.executor.SetRunnerState(executor.ServeLogs)
 
-	return 200, "ok"
+	return nil, nil
 }
 
-func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (int, string) {
+func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.executor.RLock()
 	defer s.executor.RUnlock()
 	timestamp := int64(0)
@@ -96,18 +90,18 @@ func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (int, st
 		var err error
 		timestamp, err = strconv.ParseInt(r.URL.Query().Get("timestamp"), 10, 64)
 		if err != nil {
-			return http.StatusBadRequest, ""
+			return nil, &api.Error{Status: http.StatusBadRequest}
 		}
 	}
 
 	if s.executor.GetRunnerState() == executor.WaitLogsFinished {
 		defer func() { s.logsDoneCh <- 0 }()
 	}
-	return writeJSONResponse(w, http.StatusOK, s.executor.GetHistory(timestamp))
+	return s.executor.GetHistory(timestamp), nil
 }
 
-func (s *Server) stopPostHandler(w http.ResponseWriter, r *http.Request) (int, string) {
+func (s *Server) stopPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.stop()
 
-	return 200, "ok"
+	return nil, nil
 }

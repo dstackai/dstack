@@ -6,7 +6,7 @@ import (
 )
 
 type Executor interface {
-	GetHistory(timestamp int64) schemas.PullResponse
+	GetHistory(timestamp int64) *schemas.PullResponse
 	GetJobLogsHistory() []schemas.LogEvent
 	GetRunnerState() string
 	Run(ctx context.Context) error

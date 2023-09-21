@@ -8,8 +8,8 @@ func (ex *RunExecutor) GetJobLogsHistory() []schemas.LogEvent {
 	return ex.jobLogs.history
 }
 
-func (ex *RunExecutor) GetHistory(timestamp int64) schemas.PullResponse {
-	return schemas.PullResponse{
+func (ex *RunExecutor) GetHistory(timestamp int64) *schemas.PullResponse {
+	return &schemas.PullResponse{
 		JobStates:   eventsAfter(ex.jobStateHistory, timestamp),
 		JobLogs:     eventsAfter(ex.jobLogs.history, timestamp),
 		RunnerLogs:  eventsAfter(ex.runnerLogs.history, timestamp),
