@@ -5,12 +5,12 @@ from pydantic import BaseModel, Field, validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
-from dstack._internal.core.models.runs import JobSpec, RunSpec
+from dstack._internal.core.models.runs import JobSpec, JobStatus, RunSpec
 
 
 class JobStateEvent(BaseModel):
     timestamp: int
-    state: str
+    state: JobStatus
 
 
 class LogEvent(BaseModel):

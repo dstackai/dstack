@@ -40,6 +40,9 @@ class AWSCompute(Compute):
         )
         regions = set(i.region for i in offers)
 
+        print(requirements)
+        print(offers)
+
         def get_quotas(client: botocore.client.BaseClient) -> Dict[str, int]:
             region_quotas = {}
             for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):

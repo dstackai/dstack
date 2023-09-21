@@ -17,7 +17,10 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
 from dstack._internal.server.services import repos
-from dstack._internal.server.services.jobs import get_jobs_from_run_spec
+from dstack._internal.server.services.jobs import (
+    get_jobs_from_run_spec,
+    job_model_to_job_submission,
+)
 
 
 async def list_runs(
@@ -140,19 +143,7 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
     if include_job_submissions:
         for job_model in run_model.jobs:
             job = jobs[job_model.job_num]
-            job_provisioning_data = None
-            if job_model.job_provisioning_data is not None:
-                job_provisioning_data = JobProvisioningData.parse_raw(
-                    job_model.job_provisioning_data
-                )
-            job_submission = JobSubmission(
-                id=job_model.id,
-                submission_num=job_model.submission_num,
-                submitted_at=job_model.submitted_at.replace(tzinfo=timezone.utc),
-                status=job_model.status,
-                error_code=job_model.error_code,
-                job_provisioning_data=job_provisioning_data,
-            )
+            job_submission = job_model_to_job_submission(job_model)
             job.job_submissions.append(job_submission)
     run = Run(
         id=run_model.id,
