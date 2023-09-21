@@ -40,9 +40,6 @@ class AWSCompute(Compute):
         )
         regions = set(i.region for i in offers)
 
-        print(requirements)
-        print(offers)
-
         def get_quotas(client: botocore.client.BaseClient) -> Dict[str, int]:
             region_quotas = {}
             for page in client.get_paginator("list_service_quotas").paginate(ServiceCode="ec2"):
@@ -102,7 +99,11 @@ class AWSCompute(Compute):
                 raise e
 
     def run_job(
-        self, run: Run, job: Job, instance_offer: InstanceOfferWithAvailability
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
     ) -> LaunchedInstanceInfo:
         project_id = run.project_name
         ec2 = self.session.resource("ec2", region_name=instance_offer.region)
@@ -137,8 +138,11 @@ class AWSCompute(Compute):
                     "Arn": aws_resources.create_iam_instance_profile(iam_client, project_id),
                 },
                 UserData=aws_resources.get_user_data(
-                    run.run_spec.configuration.image,
-                    run.run_spec.ssh_key_pub.strip().split("\n"),
+                    image_name=job.job_spec.image_name,
+                    authorized_keys=[
+                        run.run_spec.ssh_key_pub.strip(),
+                        project_ssh_public_key.strip(),
+                    ],
                 ),
                 TagSpecifications=[
                     {

@@ -29,7 +29,7 @@ class PullResponse(BaseModel):
     job_logs: List[LogEvent]
     runner_logs: List[LogEvent]
     last_updated: int
-    has_more: bool
+    # has_more: bool
     # TODO job_result: object
 
 

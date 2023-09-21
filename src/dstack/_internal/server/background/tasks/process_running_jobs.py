@@ -70,26 +70,29 @@ async def _process_provisioning_job(job_model: JobModel):
     job = run.jobs[job_model.job_num]
     job_submission = job_model_to_job_submission(job_model)
     server_ssh_private_key = project.ssh_private_key
-    with ssh.SSHTunnel(
-        hostname=job_submission.job_provisioning_data.hostname,
-        ports={_REMOTE_RUNNER_PORT: _LOCAL_RUNNER_PORT},
-        id_rsa=server_ssh_private_key.encode(),
-    ):
-        runner_client = client.AsyncRunnerClient(port=_LOCAL_RUNNER_PORT)
-        alive = await runner_client.healthcheck()
-        if not alive:
-            # TODO if runner never becomes alive?
-            # Fail after a deadline?
-            return
-        await runner_client.submit_job(
-            run_spec=run.run_spec,
-            job_spec=job.job_spec,
-            secrets={},
-            repo_credentials=None,
-        )
-        await runner_client.upload_code("")
-        await runner_client.run_job()
-        job_model.status = JobStatus.RUNNING
+    try:
+        with ssh.SSHTunnel(
+            hostname=job_submission.job_provisioning_data.hostname,
+            ports={_REMOTE_RUNNER_PORT: _LOCAL_RUNNER_PORT},
+            id_rsa=server_ssh_private_key.encode(),
+        ):
+            runner_client = client.AsyncRunnerClient(port=_LOCAL_RUNNER_PORT)
+            alive = await runner_client.healthcheck()
+            if not alive:
+                # TODO if runner never becomes alive?
+                # Fail after a deadline?
+                return
+            await runner_client.submit_job(
+                run_spec=run.run_spec,
+                job_spec=job.job_spec,
+                secrets={},
+                repo_credentials=None,
+            )
+            await runner_client.upload_code("")
+            await runner_client.run_job()
+            job_model.status = JobStatus.RUNNING
+    except (ssh.SSHConnectionRefusedError, ssh.SSHTimeoutError):
+        pass
 
 
 async def _process_running_job(job_model: JobModel):

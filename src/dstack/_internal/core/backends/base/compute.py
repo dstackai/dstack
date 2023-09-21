@@ -26,7 +26,11 @@ class Compute(ABC):
 
     @abstractmethod
     def run_job(
-        self, run: Run, job: Job, instance_offer: InstanceOfferWithAvailability
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
     ) -> LaunchedInstanceInfo:
         pass
 

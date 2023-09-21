@@ -73,10 +73,16 @@ async def _process_job(job_id: UUID):
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     logger.debug("Provisioning job %s", job_model.job_name)
     run_model = job_model.run
+    project_model = run_model.project
     run = run_model_to_run(run_model, include_job_submissions=False)
     job = run.jobs[job_model.job_num]
     backends = await backends_services.get_project_backends(project=run_model.project)
-    job_provisioning_data = await _run_job(run=run, job=job, backends=backends)
+    job_provisioning_data = await _run_job(
+        run=run,
+        job=job,
+        backends=backends,
+        project_ssh_public_key=project_model.ssh_public_key,
+    )
     if job_provisioning_data is not None:
         logger.debug("Provisioning job %s succeded", job_model.job_name)
         job_model.job_provisioning_data = job_provisioning_data.json()
@@ -90,7 +96,12 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     await session.commit()
 
 
-async def _run_job(run: Run, job: Job, backends: List[Backend]) -> Optional[JobProvisioningData]:
+async def _run_job(
+    run: Run,
+    job: Job,
+    backends: List[Backend],
+    project_ssh_public_key: str,
+) -> Optional[JobProvisioningData]:
     candidates = await backends_services.get_instance_candidates(
         backends, job, exclude_not_available=True
     )
@@ -108,6 +119,7 @@ async def _run_job(run: Run, job: Job, backends: List[Backend]) -> Optional[JobP
                 run,
                 job,
                 offer,
+                project_ssh_public_key,
             )
         except BackendError as e:
             logger.debug("Instance launch failed: %s", e)
