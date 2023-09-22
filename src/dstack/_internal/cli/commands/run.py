@@ -1,14 +1,17 @@
 import argparse
+import tempfile
 from pathlib import Path
 
 import requests
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.core.errors import CLIError, ConfigurationError
+from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.configurator import load_run_spec
 from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
+from dstack.api.server.utils import poll_run
 
 
 class RunCommand(APIBaseCommand):
@@ -18,7 +21,7 @@ class RunCommand(APIBaseCommand):
     def _command(self, args: argparse.Namespace):
         super()._command(args)
         try:
-            run_spec = load_run_spec(
+            repo, run_spec = load_run_spec(
                 Path().cwd(), args.working_dir, args.configuration_file, args.profile
             )
             self.api_client.repos.get(self.project_name, run_spec.repo_id, include_creds=False)
@@ -31,31 +34,53 @@ class RunCommand(APIBaseCommand):
                 )
             raise
 
+        ports_lock = None if args.detach else PortsLock({10999: 0}).acquire()
         # run_plan = self.api_client.runs.get_plan(self.project_name, run_spec)
         # TODO show plan
 
-        ports_lock = PortsLock({10999: 0}).acquire()
+        with tempfile.TemporaryFile("w+b") as fp:
+            run_spec.repo_code_hash = repo.write_code_file(fp)
+            fp.seek(0)
+            self.api_client.repos.upload_code(
+                self.project_name, repo.repo_id, run_spec.repo_code_hash, fp
+            )
 
         run = self.api_client.runs.submit(
             self.project_name, run_spec
         )  # TODO reliably handle interrupts
+        run_name = run.run_spec.run_name
+        print(run_name)
+
+        if args.detach:
+            print("Detaching...")
+            return
         stop_at_exit = True
         try:
-            if args.detach:
+            for run in poll_run(self.api_client, self.project_name, run_name):
+                print(run.status)  # TODO spinner with status
+                if run.status not in (
+                    JobStatus.SUBMITTED,
+                    JobStatus.PENDING,
+                    JobStatus.PROVISIONING,
+                ):
+                    break
+            if run.status.is_finished() and run.status != JobStatus.DONE:
                 stop_at_exit = False
                 return
-            # TODO wait till running
 
-            job = run.jobs[0].job_submissions[0]
+            print("Connecting...")
+            hostname = run.jobs[0].job_submissions[0].job_provisioning_data.hostname
             id_rsa_path = ConfigManager().get_repo_config(Path.cwd()).ssh_key_path
-            with SSHAttach(
-                job.job_provisioning_data.hostname, ports_lock, id_rsa_path, run.run_spec.run_name
-            ) as attach:
+            with SSHAttach(hostname, ports_lock, id_rsa_path, run_name) as attach:
                 print(attach.ports)
+                input("Press Enter to detach...")
                 # TODO stream logs
+        except KeyboardInterrupt:
+            print("Interrupted")  # TODO ask to stop or just detach
         finally:
             if stop_at_exit:
-                self.api_client.runs.stop(self.project_name, run.run_spec.run_name)
+                print("Stopping...")
+                self.api_client.runs.stop(self.project_name, [run_name], abort=False)
 
     def _register(self):
         super()._register()

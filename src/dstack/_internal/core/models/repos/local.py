@@ -50,7 +50,7 @@ class LocalRepo(Repo):
                 arcname="",
                 filter=TarIgnore(self.run_repo_data.repo_dir, globs=[".git"]),
             )
-        return f"code/local/{get_sha256(fp)}.tar"
+        return get_sha256(fp)
 
 
 class TarIgnore(GitIgnore):

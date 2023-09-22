@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
 from dstack._internal.core.models.runs import RunSpec
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.configs.configuration import load_configuration
@@ -15,7 +16,7 @@ def load_run_spec(
     working_dir: PathLike,
     configuration_file: Optional[PathLike],
     profile_name: Optional[str],
-) -> RunSpec:
+) -> Tuple[Union[RemoteRepo, LocalRepo], RunSpec]:
     cwd = Path(cwd).absolute()
     repo_config = ConfigManager().get_repo_config(cwd)
     if repo_config is None:
@@ -34,7 +35,7 @@ def load_run_spec(
     profile = load_profile(repo_dir, profile_name)
     repo = load_repo(repo_config)
 
-    return RunSpec(
+    return repo, RunSpec(
         run_name="",
         repo_id=repo_config.repo_id,
         repo_data=repo.run_repo_data,

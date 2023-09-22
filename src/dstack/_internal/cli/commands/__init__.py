@@ -1,7 +1,6 @@
 import argparse
 from abc import ABC, abstractmethod
 
-from dstack._internal.core.errors import DstackError
 from dstack._internal.core.services.configs import get_api_client
 from dstack.api.server import APIClient
 

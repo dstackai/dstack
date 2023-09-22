@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.runs import Job, JobStatus, JobSubmission, Run
-from dstack._internal.core.services import ssh_tunnel
+from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import CodeModel, JobModel, RepoModel, RunModel
 from dstack._internal.server.services.jobs import job_model_to_job_submission

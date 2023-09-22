@@ -15,7 +15,7 @@ from dstack._internal.server.schemas.runs import (
 )
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import runs
-from dstack._internal.server.utils.routers import raise_server_client_error
+from dstack._internal.server.utils.routers import raise_not_found, raise_server_client_error
 
 router = APIRouter(
     prefix="/api/project/{project_name}/runs",
@@ -39,6 +39,17 @@ async def get_run(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Run:
     _, project = user_project
+    try:
+        run = await runs.get_run(
+            session=session,
+            project=project,
+            run_name=body.run_name,
+        )
+        if run is None:
+            raise_not_found()
+        return run
+    except ServerClientError as e:
+        raise_server_client_error(e)
 
 
 @router.post("/get_plan")

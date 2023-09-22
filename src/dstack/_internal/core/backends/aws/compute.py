@@ -18,7 +18,7 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
-from dstack._internal.core.services.offers import get_catalog_offers
+from dstack._internal.server.services.offers import get_catalog_offers
 
 
 class AWSCompute(Compute):

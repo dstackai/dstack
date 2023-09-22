@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import BinaryIO, List, Optional
 
 from pydantic import parse_obj_as
 
@@ -34,3 +34,10 @@ class ReposAPIClient(APIClientGroup):
     def delete(self, project_name: str, repos_ids: List[str]):
         body = DeleteReposRequest(repos_ids=repos_ids)
         self._request(f"/api/project/{project_name}/repos/delete", body=body.json())
+
+    def upload_code(self, project_name: str, repo_id: str, code_hash: str, fp: BinaryIO):
+        self._request(
+            f"/api/project/{project_name}/repos/upload_code",
+            files={"file": (code_hash, fp)},
+            params={"repo_id": repo_id},
+        )

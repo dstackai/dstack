@@ -1,7 +1,8 @@
 import uuid
 from datetime import timezone
-from typing import List
+from typing import List, Optional
 
+import sqlalchemy.exc as sa_exc
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,7 @@ from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     job_model_to_job_submission,
 )
+from dstack._internal.utils.random_names import generate_name
 
 
 async def list_runs(
@@ -39,9 +41,16 @@ async def list_runs(
 async def get_run(
     session: AsyncSession,
     project: ProjectModel,
-    repo_id: str,
-):
-    pass
+    run_name: str,
+) -> Optional[Run]:
+    res = await session.execute(
+        select(RunModel).where(RunModel.project_id == project.id, RunModel.run_name == run_name)
+    )
+    try:
+        run_model = res.scalars().one()  # TODO unique (project_id, run_name)
+        return run_model_to_run(run_model)
+    except sa_exc.NoResultFound:
+        return None
 
 
 async def submit_run(
@@ -57,6 +66,18 @@ async def submit_run(
     )
     if repo is None:
         raise ServerClientError(f"Repo {run_spec.repo_id} does not exist")
+    if run_spec.run_name:
+        if await get_run(session=session, project=project, run_name=run_spec.run_name) is not None:
+            raise ServerClientError(f"Run {run_spec.run_name} already exists")
+    else:
+        idx = 1
+        run_name_base = generate_name()
+        while (
+            await get_run(session=session, project=project, run_name=f"{run_name_base}-{idx}")
+            is not None
+        ):
+            idx += 1  # TODO fix race condition
+        run_spec.run_name = f"{run_name_base}-{idx}"
     run_model = RunModel(
         id=uuid.uuid4(),
         project=project,

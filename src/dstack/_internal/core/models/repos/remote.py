@@ -124,7 +124,7 @@ class RemoteRepo(Repo):
     def write_code_file(self, fp: BinaryIO) -> str:
         if self.run_repo_data.repo_diff is not None:
             fp.write(self.run_repo_data.repo_diff.encode())
-        return f"code/remote/{get_sha256(fp)}.patch"
+        return get_sha256(fp)
 
 
 class _DiffCollector:
