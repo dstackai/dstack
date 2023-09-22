@@ -57,7 +57,7 @@ class SSHTunnel:
         self.id_rsa_path = id_rsa_path
         if id_rsa is not None:
             self.id_rsa_path = os.path.join(self.temp_dir.name, "id_rsa")
-            with open(self.id_rsa_path, "wb") as f:
+            with open(self.id_rsa_path, "wb", opener=_key_opener) as f:
                 f.write(id_rsa)
             os.chmod(f.name, 0o600)
 
@@ -108,3 +108,7 @@ class SSHTunnel:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+
+def _key_opener(path, flags):
+    return os.open(path, flags, 0o600)
