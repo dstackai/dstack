@@ -13,6 +13,7 @@ from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.runs import (
     JobErrorCode,
+    JobProvisioningData,
     JobSpec,
     JobStatus,
     Requirements,
@@ -175,9 +176,12 @@ async def create_job(
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     error_code: Optional[JobErrorCode] = None,
+    job_provisioning_data: Optional[JobProvisioningData] = None,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = get_job_specs_from_run_spec(run_spec)[0]
+    if job_provisioning_data is not None:
+        job_provisioning_data = job_provisioning_data.json()
     job = JobModel(
         project_id=run.project_id,
         run_id=run.id,
@@ -190,7 +194,7 @@ async def create_job(
         status=status,
         error_code=error_code,
         job_spec_data=job_spec.json(),
-        job_provisioning_data=None,
+        job_provisioning_data=job_provisioning_data,
     )
     session.add(job)
     await session.commit()

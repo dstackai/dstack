@@ -4,9 +4,8 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, noload
+from sqlalchemy.orm import joinedload
 
-import dstack._internal.utils.common
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import LaunchedInstanceInfo
@@ -17,11 +16,12 @@ from dstack._internal.core.models.runs import (
     JobStatus,
     Run,
 )
-from dstack._internal.server.db import get_session_ctx, session_decorator
+from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -73,22 +73,35 @@ async def _process_job(job_id: UUID):
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     logger.debug("Provisioning job %s", job_model.job_name)
     run_model = job_model.run
+    project_model = run_model.project
     run = run_model_to_run(run_model, include_job_submissions=False)
     job = run.jobs[job_model.job_num]
     backends = await backends_services.get_project_backends(project=run_model.project)
-    job_provisioning_data = await _run_job(run=run, job=job, backends=backends)
+    job_provisioning_data = await _run_job(
+        run=run,
+        job=job,
+        backends=backends,
+        project_ssh_public_key=project_model.ssh_public_key,
+    )
     if job_provisioning_data is not None:
+        logger.debug("Provisioning job %s succeded", job_model.job_name)
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
     else:
         # TODO resubmit
+        logger.debug("Provisioning job %s failed", job_model.job_name)
         job_model.status = JobStatus.FAILED
         job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
-    job_model.last_processed_at = dstack._internal.utils.common.get_current_datetime()
+    job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
 
 
-async def _run_job(run: Run, job: Job, backends: List[Backend]) -> Optional[JobProvisioningData]:
+async def _run_job(
+    run: Run,
+    job: Job,
+    backends: List[Backend],
+    project_ssh_public_key: str,
+) -> Optional[JobProvisioningData]:
     candidates = await backends_services.get_instance_candidates(
         backends, job, exclude_not_available=True
     )
@@ -106,9 +119,10 @@ async def _run_job(run: Run, job: Job, backends: List[Backend]) -> Optional[JobP
                 run,
                 job,
                 offer,
+                project_ssh_public_key,
             )
         except BackendError as e:
-            logger.debug("Running job failed: %s", e)
+            logger.debug("Instance launch failed: %s", e)
             continue
         else:
             return JobProvisioningData(

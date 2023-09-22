@@ -59,6 +59,7 @@ class SSHTunnel:
             self.id_rsa_path = os.path.join(self.temp_dir.name, "id_rsa")
             with open(self.id_rsa_path, "wb", opener=_key_opener) as f:
                 f.write(id_rsa)
+            os.chmod(f.name, 0o600)
 
     def open(self):
         command = [

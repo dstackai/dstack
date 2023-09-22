@@ -1,19 +1,13 @@
 from typing import List, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.repos import (
-    AnyRepoHead,
-    RemoteRepoCreds,
-    RepoHead,
-    RepoHeadWithCreds,
-)
+from dstack._internal.core.models.repos import RepoHead, RepoHeadWithCreds
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.repos import (
     DeleteReposRequest,
-    GetRepoCredsRequest,
     GetRepoRequest,
     SaveRepoCredsRequest,
 )
@@ -53,7 +47,6 @@ async def get_repo(
 
 @router.post("/init")
 async def init_repo(
-    project_name: str,
     body: SaveRepoCredsRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
@@ -76,3 +69,19 @@ async def delete_repos(
 ):
     _, project = user_project
     await repos.delete_repos(session=session, project=project, repos_ids=body.repos_ids)
+
+
+@router.post("/upload_code")
+async def upload_code(
+    repo_id: str,
+    file: UploadFile,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+):
+    _, project = user_project
+    await repos.upload_code(
+        session=session,
+        project=project,
+        repo_id=repo_id,
+        file=file,
+    )

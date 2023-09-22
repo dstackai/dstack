@@ -16,9 +16,5 @@ class SaveRepoCredsRequest(RepoRequest):
     repo_creds: Optional[RemoteRepoCreds]
 
 
-class GetRepoCredsRequest(RepoRequest):
-    pass
-
-
 class DeleteReposRequest(BaseModel):
     repos_ids: List[str]

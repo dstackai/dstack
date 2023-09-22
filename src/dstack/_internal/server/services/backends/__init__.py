@@ -14,7 +14,6 @@ from dstack._internal.core.models.backends import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
-    InstanceOffer,
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.runs import Job
@@ -74,6 +73,7 @@ async def create_backend(
     backend = configurator.create_backend(project=project, config=config)
     session.add(backend)
     await session.commit()
+    clear_backend_cache(project.name)
     return config
 
 
@@ -98,6 +98,7 @@ async def update_backend(
             auth=backend.auth,
         )
     )
+    clear_backend_cache(project.name)
     return config
 
 
@@ -125,6 +126,7 @@ async def delete_backends(
             BackendModel.project_id == project.id,
         )
     )
+    clear_backend_cache(project.name)
 
 
 _BACKENDS_CACHE = {}

@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import (
+    BLOB,
     DateTime,
     Enum,
     ForeignKey,
@@ -107,6 +108,18 @@ class RepoModel(BaseModel):
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_repos_project_id_name"),)
 
 
+class CodeModel(BaseModel):
+    __tablename__ = "codes"
+
+    id: Mapped[UUIDType] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    repo_id: Mapped[UUIDType] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    repo: Mapped["RepoModel"] = relationship()
+    blob_hash: Mapped[str] = mapped_column(String(4000), unique=True)
+    blob: Mapped[bytes] = mapped_column(BLOB)
+
+
 class RunModel(BaseModel):
     __tablename__ = "runs"
 
@@ -146,3 +159,4 @@ class JobModel(BaseModel):
     error_code: Mapped[Optional[JobErrorCode]] = mapped_column(Enum(JobErrorCode))
     job_spec_data: Mapped[str] = mapped_column(String(4000))
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
+    runner_timestamp: Mapped[Optional[int]] = mapped_column(Integer)
