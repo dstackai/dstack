@@ -7,13 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.instances import (
-    InstanceAvailability,
-    InstanceOfferWithAvailability,
-    InstanceType,
-    LaunchedInstanceInfo,
-    Resources,
-)
+from dstack._internal.core.models.instances import InstanceType, Resources
 from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.models import JobModel
@@ -58,9 +52,7 @@ class TestProcessRunningJobs:
             status=JobStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data,
         )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
+        with patch("dstack._internal.core.services.ssh_tunnel.SSHTunnel") as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.AsyncRunnerClient"
         ) as AsyncRunnerClientMock:
             runner_client_mock = AsyncRunnerClientMock.return_value
@@ -94,9 +86,7 @@ class TestProcessRunningJobs:
             status=JobStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data,
         )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
+        with patch("dstack._internal.core.services.ssh_tunnel.SSHTunnel") as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.AsyncRunnerClient"
         ) as AsyncRunnerClientMock:
             runner_client_mock = AsyncRunnerClientMock.return_value
@@ -136,9 +126,7 @@ class TestProcessRunningJobs:
             status=JobStatus.RUNNING,
             job_provisioning_data=job_provisioning_data,
         )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
+        with patch("dstack._internal.core.services.ssh_tunnel.SSHTunnel") as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.AsyncRunnerClient"
         ) as AsyncRunnerClientMock:
             runner_client_mock = AsyncRunnerClientMock.return_value
@@ -155,9 +143,7 @@ class TestProcessRunningJobs:
         assert job is not None
         assert job.status == JobStatus.RUNNING
         assert job.runner_timestamp == 1
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
+        with patch("dstack._internal.core.services.ssh_tunnel.SSHTunnel") as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.AsyncRunnerClient"
         ) as AsyncRunnerClientMock:
             runner_client_mock = AsyncRunnerClientMock.return_value

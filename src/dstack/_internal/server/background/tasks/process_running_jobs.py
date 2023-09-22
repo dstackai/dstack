@@ -6,11 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.runs import Job, JobStatus, JobSubmission, Run
+from dstack._internal.core.services import ssh_tunnel
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import CodeModel, JobModel, RepoModel, RunModel
 from dstack._internal.server.services.jobs import job_model_to_job_submission
 from dstack._internal.server.services.repos import get_code_model
-from dstack._internal.server.services.runner import client, ssh
+from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
@@ -105,7 +106,7 @@ async def _process_provisioning_job(
     server_ssh_private_key: str,
 ):
     try:
-        with ssh.SSHTunnel(
+        with ssh_tunnel.SSHTunnel(
             hostname=job_submission.job_provisioning_data.hostname,
             ports={_REMOTE_RUNNER_PORT: _LOCAL_RUNNER_PORT},
             id_rsa=server_ssh_private_key.encode(),
@@ -130,7 +131,7 @@ async def _process_provisioning_job(
             await runner_client.run_job()
             job_model.status = JobStatus.RUNNING
             logger.debug("Job %s is running", job_model.job_name)
-    except (ssh.SSHConnectionRefusedError, ssh.SSHTimeoutError):
+    except (ssh_tunnel.SSHConnectionRefusedError, ssh_tunnel.SSHTimeoutError):
         pass
 
 
@@ -141,7 +142,7 @@ async def _process_running_job(
     job_submission: JobSubmission,
     server_ssh_private_key: str,
 ):
-    with ssh.SSHTunnel(
+    with ssh_tunnel.SSHTunnel(
         hostname=job_submission.job_provisioning_data.hostname,
         ports={_REMOTE_RUNNER_PORT: _LOCAL_RUNNER_PORT},
         id_rsa=server_ssh_private_key.encode(),
