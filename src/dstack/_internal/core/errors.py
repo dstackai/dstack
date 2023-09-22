@@ -60,3 +60,11 @@ class NoCapacityError(ComputeError):
 
 class ResourceNotFoundError(ComputeError):
     pass
+
+
+class CLIError(DstackError):
+    pass
+
+
+class ConfigurationError(DstackError):
+    pass

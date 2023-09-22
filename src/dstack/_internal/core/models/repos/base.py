@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import BinaryIO
 
+from pydantic import BaseModel
+
 
 class RepoType(str, Enum):
     REMOTE = "remote"
@@ -14,6 +16,9 @@ class RepoProtocol(str, Enum):
 
 
 class Repo(ABC):
+    repo_id: str
+    run_repo_data: BaseModel  # TODO make it more specific
+
     @abstractmethod
     def write_code_file(self, fp: BinaryIO) -> str:
         pass

@@ -3,7 +3,7 @@ import socket
 from contextlib import closing
 from typing import Dict, Hashable
 
-from dstack._internal.core.services.ssh_tunnel import SSHError, SSHTunnel
+from dstack._internal.core.services.ssh.tunnel import SSHError, SSHTunnel
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 

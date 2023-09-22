@@ -6,9 +6,9 @@ from pydantic import BaseModel
 from typing_extensions import Literal
 
 from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.ignore import GitIgnore
+from dstack._internal.utils.path import PathLike
 
 
 class LocalRepoInfo(BaseModel):
@@ -23,7 +23,6 @@ class LocalRunRepoData(LocalRepoInfo):
 class LocalRepo(Repo):
     """Represents local folder"""
 
-    repo_id: str
     run_repo_data: LocalRunRepoData
 
     def __init__(
@@ -40,6 +39,9 @@ class LocalRepo(Repo):
 
         if repo_id is None:
             repo_id = slugify(Path(repo_data.repo_dir).name, repo_data.repo_dir)
+
+        self.repo_id = repo_id
+        self.run_repo_data = repo_data
 
     def write_code_file(self, fp: BinaryIO) -> str:
         with tarfile.TarFile(mode="w", fileobj=fp) as t:

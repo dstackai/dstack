@@ -7,7 +7,7 @@ from pathlib import Path
 from filelock import FileLock
 from paramiko.config import SSHConfig
 
-from dstack._internal.utils.common import PathLike
+from dstack._internal.utils.path import PathLike
 
 default_ssh_config_path = "~/.ssh/config"
 

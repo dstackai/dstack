@@ -14,8 +14,8 @@ from pydantic import BaseModel, Field
 from typing_extensions import Annotated
 
 from dstack._internal.server.settings import SERVER_DATA_DIR_PATH
-from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.path import PathLike
 
 logger = get_logger(__name__)
 version_url = "https://dstack-gpu-pricing.s3.eu-west-1.amazonaws.com/v1/version"

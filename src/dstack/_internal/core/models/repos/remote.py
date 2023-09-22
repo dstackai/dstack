@@ -10,8 +10,8 @@ from typing_extensions import Literal
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.repos.base import Repo, RepoProtocol
-from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.hash import get_sha256, slugify
+from dstack._internal.utils.path import PathLike
 from dstack._internal.utils.ssh import get_host_config
 
 
@@ -79,7 +79,6 @@ class RemoteRunRepoData(RemoteRepoInfo):
 class RemoteRepo(Repo):
     """Represents both local git repository with configured remote and just remote repository"""
 
-    repo_id: str
     run_repo_data: RemoteRunRepoData
 
     def __init__(

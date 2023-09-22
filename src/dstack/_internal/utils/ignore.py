@@ -3,7 +3,7 @@ from itertools import zip_longest
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from dstack._internal.utils.common import PathLike
+from dstack._internal.utils.path import PathLike
 
 
 class GitIgnore:

@@ -4,8 +4,8 @@ import tempfile
 from typing import Dict, Optional
 
 from dstack._internal.core.errors import DstackError
-from dstack._internal.utils.common import PathLike
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.path import PathLike
 
 logger = get_logger(__name__)
 
