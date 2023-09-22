@@ -17,6 +17,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.models import JobModel
+from dstack._internal.server.schemas.runner import JobStateEvent, PullResponse
 from tests.server.common import create_job, create_project, create_repo, create_run, create_user
 
 
@@ -113,3 +114,63 @@ class TestProcessRunningJobs:
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.RUNNING
+
+    @pytest.mark.asyncio
+    async def test_updates_running_job(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job_provisioning_data = get_job_provisioning_data()
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            job_provisioning_data=job_provisioning_data,
+        )
+        with patch(
+            "dstack._internal.server.services.runner.ssh.SSHTunnel"
+        ) as SSHTunnelMock, patch(
+            "dstack._internal.server.services.runner.client.AsyncRunnerClient"
+        ) as AsyncRunnerClientMock:
+            runner_client_mock = AsyncRunnerClientMock.return_value
+            runner_client_mock.pull = AsyncMock()
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[JobStateEvent(timestamp=1, state=JobStatus.RUNNING)],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=1,
+            )
+            await process_running_jobs()
+            SSHTunnelMock.assert_called_once()
+        await session.refresh(job)
+        assert job is not None
+        assert job.status == JobStatus.RUNNING
+        assert job.runner_timestamp == 1
+        with patch(
+            "dstack._internal.server.services.runner.ssh.SSHTunnel"
+        ) as SSHTunnelMock, patch(
+            "dstack._internal.server.services.runner.client.AsyncRunnerClient"
+        ) as AsyncRunnerClientMock:
+            runner_client_mock = AsyncRunnerClientMock.return_value
+            runner_client_mock.pull = AsyncMock()
+            runner_client_mock.pull.return_value = PullResponse(
+                job_states=[JobStateEvent(timestamp=1, state=JobStatus.DONE)],
+                job_logs=[],
+                runner_logs=[],
+                last_updated=2,
+            )
+            await process_running_jobs()
+            SSHTunnelMock.assert_called_once()
+        await session.refresh(job)
+        assert job is not None
+        assert job.status == JobStatus.DONE
+        assert job.runner_timestamp == 2

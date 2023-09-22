@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
-from dstack._internal.server.models import RepoModel
+from dstack._internal.server.models import CodeModel, RepoModel
 from dstack._internal.server.services.projects import add_project_member
 from tests.server.common import create_project, create_repo, create_user, get_auth_headers
 
@@ -239,10 +239,10 @@ class TestDeleteRepos:
     async def test_deletes_repos(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session)
-        repo = await create_repo(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
+        repo = await create_repo(session=session, project_id=project.id)
         response = client.post(
             f"/api/project/{project.name}/repos/delete",
             headers=get_auth_headers(user.token),
@@ -252,3 +252,37 @@ class TestDeleteRepos:
         res = await session.execute(select(RepoModel))
         repo = res.scalar()
         assert repo is None
+
+
+class TestUploadCode:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        response = client.post(
+            f"/api/project/{project.name}/repos/upload_code",
+            headers=get_auth_headers(user.token),
+            params={"repo_id": "test_repo"},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_uploads_code(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        file = ("blob_hash", b"blob_content")
+        response = client.post(
+            f"/api/project/{project.name}/repos/upload_code",
+            headers=get_auth_headers(user.token),
+            params={"repo_id": repo.name},
+            files={"file": file},
+        )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(CodeModel))
+        code = res.scalar()
+        assert code.blob_hash == file[0]
+        assert code.blob == file[1]

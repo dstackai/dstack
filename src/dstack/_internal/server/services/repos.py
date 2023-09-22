@@ -3,9 +3,11 @@ import uuid
 from typing import List, Optional
 
 import sqlalchemy.exc
+from fastapi import UploadFile
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.repos import (
     AnyRepoHead,
     AnyRepoInfo,
@@ -13,7 +15,7 @@ from dstack._internal.core.models.repos import (
     RepoHeadWithCreds,
 )
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
-from dstack._internal.server.models import ProjectModel, RepoModel
+from dstack._internal.server.models import CodeModel, ProjectModel, RepoModel
 
 
 async def list_repos(
@@ -125,6 +127,33 @@ async def delete_repos(
     )
 
 
+async def upload_code(
+    session: AsyncSession,
+    project: ProjectModel,
+    repo_id: str,
+    file: UploadFile,
+):
+    repo = await get_repo_model(session=session, project=project, repo_id=repo_id)
+    if repo is None:
+        raise ServerClientError(f"Repo {repo_id} does not exist")
+    code_hash = file.filename
+    code = await get_code_model(
+        session=session,
+        repo=repo,
+        code_hash=code_hash,
+    )
+    if code is not None:
+        return
+    blob = await file.read()
+    code = CodeModel(
+        repo_id=repo.id,
+        blob_hash=code_hash,
+        blob=blob,
+    )
+    session.add(code)
+    await session.commit()
+
+
 async def get_repo_model(
     session: AsyncSession,
     project: ProjectModel,
@@ -134,6 +163,20 @@ async def get_repo_model(
         select(RepoModel).where(
             RepoModel.project_id == project.id,
             RepoModel.name == repo_id,
+        )
+    )
+    return res.scalar()
+
+
+async def get_code_model(
+    session: AsyncSession,
+    repo: RepoModel,
+    code_hash: str,
+) -> Optional[CodeModel]:
+    res = await session.execute(
+        select(CodeModel).where(
+            CodeModel.repo_id == repo.id,
+            CodeModel.blob_hash == code_hash,
         )
     )
     return res.scalar()
