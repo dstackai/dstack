@@ -1,8 +1,11 @@
 import argparse
+import logging
+import sys
 import tempfile
 from pathlib import Path
 
 import requests
+from websocket import WebSocketApp
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.core.errors import CLIError, ConfigurationError
@@ -20,6 +23,9 @@ class RunCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
+
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
         try:
             repo, run_spec = load_run_spec(
                 Path().cwd(), args.working_dir, args.configuration_file, args.profile
@@ -49,15 +55,15 @@ class RunCommand(APIBaseCommand):
             self.project_name, run_spec
         )  # TODO reliably handle interrupts
         run_name = run.run_spec.run_name
-        print(run_name)
+        logging.info(run_name)
 
         if args.detach:
-            print("Detaching...")
+            logging.info("Detaching...")
             return
         stop_at_exit = True
         try:
             for run in poll_run(self.api_client, self.project_name, run_name):
-                print(run.status)  # TODO spinner with status
+                logging.info(run.status)  # TODO spinner with status
                 if run.status not in (
                     JobStatus.SUBMITTED,
                     JobStatus.PENDING,
@@ -68,18 +74,31 @@ class RunCommand(APIBaseCommand):
                 stop_at_exit = False
                 return
 
-            print("Connecting...")
+            logging.info("Connecting...")
             hostname = run.jobs[0].job_submissions[0].job_provisioning_data.hostname
             id_rsa_path = ConfigManager().get_repo_config(Path.cwd()).ssh_key_path
             with SSHAttach(hostname, ports_lock, id_rsa_path, run_name) as attach:
-                print(attach.ports)
-                input("Press Enter to detach...")
-                # TODO stream logs
+                logging.info(attach.ports)
+
+                def on_message(_, message):
+                    sys.stdout.buffer.write(message)
+                    sys.stdout.buffer.flush()
+
+                def on_error(_, error):
+                    logging.error(error)
+
+                ws = WebSocketApp(
+                    f"ws://localhost:{attach.ports[10999]}/logs_ws",
+                    on_message=on_message,
+                    on_error=on_error,
+                )
+                ws.run_forever()
+
         except KeyboardInterrupt:
-            print("Interrupted")  # TODO ask to stop or just detach
+            logging.info("Interrupted")  # TODO ask to stop or just detach
         finally:
             if stop_at_exit:
-                print("Stopping...")
+                logging.info("Stopping...")
                 self.api_client.runs.stop(self.project_name, [run_name], abort=False)
 
     def _register(self):
