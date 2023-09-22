@@ -92,5 +92,5 @@ through [GitHub issues](https://github.com/dstackai/dstack/issues/new/choose).
 [//]: # (If you wish to have `dstack` support additional workflow [providers]&#40;../../docs/reference/providers/bash.md&#41; or)
 [//]: # (cloud backends,)
 [//]: # (and are willing to contribute to the cause, please get in touch with us)
-[//]: # (through [Slack]&#40;https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ&#41;)
+[//]: # (through [Discord]&#40;https://discord.gg/u8SmfwPpMd&#41;)
 [//]: # (or [Twitter]&#40;https://twitter.com/dstackai&#41;.)

@@ -165,5 +165,5 @@ are updated to reflect the changes.
 
 !!! info "Try the update and share feedback"
     Go ahead, and install the updated version, give it a spin, and share your feedback in
-    our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+    our [Discord community](https://discord.gg/u8SmfwPpMd).
 

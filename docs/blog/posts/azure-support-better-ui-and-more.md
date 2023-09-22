@@ -60,5 +60,5 @@ you can use the shorter syntax:`pip install dstack`.
 
 !!! info "Feedback"
     If you have any feedback, including issues or questions, please share them in
-    our [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ) or file it as
+    our [Discord community](https://discord.gg/u8SmfwPpMd) or file it as
     a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).

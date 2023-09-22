@@ -88,4 +88,4 @@ $ dstack start
 
 !!! info "Feedback and support"
     Questions and requests for help are very much welcome in our 
-    [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+    [Discord server](https://discord.gg/u8SmfwPpMd).

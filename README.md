@@ -16,7 +16,7 @@ Orchestrate GPU workloads across clouds
 <a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> •
 <a href="https://dstack.ai/examples" target="_blank"><b>Examples</b></a> •
 <a href="https://dstack.ai/blog" target="_blank"><b>Blog</b></a> •
-<a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a>
+<a href="https://discord.gg/u8SmfwPpMd" target="_blank"><b>Discord</b></a>
 </p>
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack?style=flat-square)](https://github.com/dstackai/dstack/commits/)
@@ -182,7 +182,7 @@ For additional information and examples, see the following links:
 - [Docs](https://dstack.ai/docs)
 - [Examples](https://dstack.ai/examples)
 - [Blog](https://dstack.ai/blog)
-- [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+- [Discord](https://discord.gg/u8SmfwPpMd)
 
 ## Licence
 

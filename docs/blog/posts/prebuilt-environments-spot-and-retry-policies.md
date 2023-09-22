@@ -103,5 +103,5 @@ are updated to reflect the changes.
 
 !!! info "Give it a try and share feedback"
     Go ahead, and install the update, give it a spin, and share your feedback in
-    our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+    our [Discord community](https://discord.gg/u8SmfwPpMd).
 

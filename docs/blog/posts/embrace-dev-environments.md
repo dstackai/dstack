@@ -140,4 +140,4 @@ On top of that, you get a lot of other features which you can read about in the 
 !!! info "NOTE:"
     Interested? Give it a try and let us know what you think!
     
-    [Discuss on Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ){ .md-button .md-button--primary }
+    [Discuss on Discord](https://discord.gg/u8SmfwPpMd){ .md-button .md-button--primary }

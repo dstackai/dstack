@@ -127,8 +127,8 @@ extra:
       link: https://pypi.org/project/dstack
     - icon: /fontawesome/brands/docker
       link: https://hub.docker.com/r/dstackai/dstack
-    - icon: /fontawesome/brands/slack
-      link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+    - icon: /fontawesome/brands/discord
+      link: https://discord.gg/u8SmfwPpMd
     - icon: /fontawesome/brands/twitter
       link: https://twitter.com/dstackai
   status:
@@ -187,5 +187,5 @@ nav:
       - Deploying LLMs using vLLM: examples/vllm.md
   - Blog:
       - blog/index.md
-  - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+  - Discord: https://discord.gg/u8SmfwPpMd
   - Twitter: https://twitter.com/dstackai/
