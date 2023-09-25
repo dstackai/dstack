@@ -32,6 +32,7 @@ class ConfigManager:
     def __init__(self, dstack_dir: Optional[PathLike] = None):
         self.dstack_dir = Path(dstack_dir) if dstack_dir else get_dstack_dir()
         self.config_filepath = self.dstack_dir / "config.yaml"
+        self.dstack_ssh_dir.mkdir(parents=True, exist_ok=True)
         self.load()
 
     def save(self):
@@ -109,12 +110,16 @@ class ConfigManager:
         return None
 
     @property
+    def dstack_ssh_dir(self) -> Path:
+        return self.dstack_dir / "ssh"
+
+    @property
     def dstack_key_path(self) -> Path:
-        return self.dstack_dir / "ssh/id_rsa"
+        return self.dstack_ssh_dir / "id_rsa"
 
     @property
     def dstack_ssh_config_path(self) -> Path:
-        return self.dstack_dir / "ssh/config"
+        return self.dstack_ssh_dir / "config"
 
 
 def create_default_project_config(project_name: str, url: str, token: str):
