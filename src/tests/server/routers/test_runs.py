@@ -1,6 +1,7 @@
+import json
 from datetime import datetime, timezone
-from typing import Dict
-from unittest.mock import patch
+from typing import Dict, List
+from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
@@ -8,6 +9,14 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceCandidate,
+    InstanceOfferWithAvailability,
+    InstanceType,
+    Resources,
+)
 from dstack._internal.core.models.runs import JobSpec, JobStatus, RunSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
@@ -23,6 +32,136 @@ from tests.server.common import (
 )
 
 client = TestClient(app)
+
+
+def get_dev_env_run_plan_dict(
+    project_name: str = "test_project",
+    username: str = "test_user",
+    run_name: str = "dry-run",
+    repo_id: str = "test_repo",
+    candidates: List[InstanceCandidate] = [],
+) -> Dict:
+    return {
+        "project_name": project_name,
+        "user": username,
+        "run_spec": {
+            "configuration": {
+                "build": [],
+                "cache": [],
+                "entrypoint": None,
+                "env": {},
+                "home_dir": "/root",
+                "ide": "vscode",
+                "image": None,
+                "init": [],
+                "ports": [],
+                "python": "3.7",
+                "registry_auth": None,
+                "setup": [],
+                "type": "dev-environment",
+            },
+            "configuration_path": "dstack.yaml",
+            "profile": {
+                "backends": ["local", "aws", "azure", "gcp", "lambda"],
+                "default": False,
+                "max_duration": "off",
+                "max_price": None,
+                "name": "string",
+                "resources": {"cpu": 2, "gpu": None, "memory": 8192, "shm_size": None},
+                "retry_policy": {"limit": None, "retry": False},
+                "spot_policy": "spot",
+            },
+            "repo_code_hash": None,
+            "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+            "repo_id": repo_id,
+            "run_name": run_name,
+            "ssh_key_pub": "ssh_key",
+            "working_dir": ".",
+        },
+        "job_plans": [
+            {
+                "job_spec": {
+                    "app_specs": [],
+                    "commands": [
+                        "/usr/sbin/sshd -p 10022 " "-o " "PermitUserEnvironment=yes",
+                        "cat",
+                    ],
+                    "entrypoint": ["/bin/bash", "-i", "-c"],
+                    "env": {},
+                    "gateway": None,
+                    "home_dir": "/root",
+                    "image_name": "dstackai/base:py3.7-0.4rc3-cuda-11.8",
+                    "job_name": f"{run_name}-0",
+                    "job_num": 0,
+                    "max_duration": None,
+                    "registry_auth": None,
+                    "requirements": {
+                        "cpus": 2,
+                        "gpus": None,
+                        "max_price": None,
+                        "memory_mib": 8192,
+                        "shm_size_mib": None,
+                        "spot": True,
+                    },
+                    "retry_policy": {"limit": None, "retry": False},
+                    "setup": [
+                        "sed -i "
+                        '"s/.*PasswordAuthentication.*/PasswordAuthentication '
+                        'no/g" /etc/ssh/sshd_config',
+                        "mkdir -p /run/sshd ~/.ssh",
+                        "chmod 700 ~/.ssh",
+                        "touch ~/.ssh/authorized_keys",
+                        "chmod 600 " "~/.ssh/authorized_keys",
+                        "rm -rf /etc/ssh/ssh_host_*",
+                        'echo "ssh_key" >> ' "~/.ssh/authorized_keys",
+                        "env >> ~/.ssh/environment",
+                        'echo "export PATH=$PATH" >> ' "~/.profile",
+                        "ssh-keygen -A > /dev/null",
+                        "if [ ! -d "
+                        '~/.vscode-server/bin/"1" ]; '
+                        "then if [ $(uname -m) = "
+                        '"aarch64" ]; then '
+                        'arch="arm64"; else '
+                        'arch="x64"; fi && mkdir -p '
+                        "/tmp && wget -q "
+                        "--show-progress "
+                        '"https://update.code.visualstudio.com/commit:1/server-linux-$arch/stable" '
+                        "-O "
+                        '"/tmp/vscode-server-linux-$arch.tar.gz" '
+                        "&& mkdir -vp "
+                        '~/.vscode-server/bin/"1" && '
+                        "tar --no-same-owner -xz "
+                        "--strip-components=1 -C "
+                        '~/.vscode-server/bin/"1" -f '
+                        '"/tmp/vscode-server-linux-$arch.tar.gz" '
+                        "&& rm "
+                        '"/tmp/vscode-server-linux-$arch.tar.gz" '
+                        "&& "
+                        'PATH="$PATH":~/.vscode-server/bin/"1"/bin '
+                        "code-server "
+                        "--install-extension "
+                        '"ms-python.python" '
+                        "--install-extension "
+                        '"ms-toolsai.jupyter"; fi',
+                        "(pip install -q "
+                        "--no-cache-dir ipykernel 2> "
+                        '/dev/null) || echo "no pip, '
+                        'ipykernel was not installed"',
+                        "echo ''",
+                        "echo To open in VS Code " "Desktop, use link below:",
+                        "echo ''",
+                        f"echo '  vscode://vscode-remote/ssh-remote+{run_name}/workflow'",
+                        "echo ''",
+                        f"echo 'To connect via SSH, use: `ssh {run_name}`'",
+                        "echo ''",
+                        "echo -n 'To exit, press " "Ctrl+C.'",
+                    ],
+                    "working_dir": ".",
+                },
+                "candidates": [json.loads(c.json()) for c in candidates],
+            }
+        ],
+    }
 
 
 def get_dev_env_run_dict(
@@ -237,6 +376,59 @@ class TestListRuns:
                 ],
             }
         ]
+
+
+class TestGetRunPlan:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        response = client.post(
+            f"/api/project/{project.name}/runs/get_plan",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_returns_run_plan(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        candidates = [
+            InstanceCandidate(
+                instance=InstanceType(
+                    name="instance",
+                    resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                ),
+                region="us",
+                price=1.0,
+                availability=InstanceAvailability.AVAILABLE,
+                backend=BackendType.AWS,
+            )
+        ]
+        offers = [InstanceOfferWithAvailability.parse_obj(c) for c in candidates]
+        run_plan_dict = get_dev_env_run_plan_dict(
+            project_name=project.name,
+            username=user.name,
+            repo_id=repo.name,
+            candidates=candidates,
+        )
+        body = {"run_spec": run_plan_dict["run_spec"]}
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = offers
+            response = client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        assert response.json() == run_plan_dict
 
 
 class TestSubmitRun:

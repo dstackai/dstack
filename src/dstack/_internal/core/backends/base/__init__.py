@@ -2,9 +2,7 @@ from abc import abstractmethod
 from typing import List
 
 from dstack._internal.core.backends.base.compute import Compute
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability
-from dstack._internal.core.models.profiles import BackendType, SpotPolicy
-from dstack._internal.core.models.runs import Requirements
+from dstack._internal.core.models.backends.base import BackendType
 
 
 class Backend:

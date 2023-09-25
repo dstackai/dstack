@@ -12,7 +12,7 @@ DEFAULT_MEM = "8GB"
 DEFAULT_RETRY_LIMIT = 3600
 
 
-BackendType = Union[
+BackendTypeLiteral = Union[
     Literal["local"],
     Literal["aws"],
     Literal["azure"],
@@ -130,7 +130,7 @@ class ProfileRetryPolicy(ForbidExtra):
 
 class Profile(ForbidExtra):
     name: str
-    backends: Optional[List[BackendType]]
+    backends: Optional[List[BackendTypeLiteral]]
     resources: ProfileResources = ProfileResources()
     spot_policy: Annotated[
         Optional[SpotPolicy],
