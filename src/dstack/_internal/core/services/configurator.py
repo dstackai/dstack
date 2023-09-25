@@ -16,6 +16,7 @@ def load_run_spec(
     working_dir: PathLike,
     configuration_file: Optional[PathLike],
     profile_name: Optional[str],
+    run_name: Optional[str],
 ) -> Tuple[Union[RemoteRepo, LocalRepo], RunSpec]:
     cwd = Path(cwd).absolute()
     repo_config = ConfigManager().get_repo_config(cwd)
@@ -36,7 +37,7 @@ def load_run_spec(
     repo = load_repo(repo_config)
 
     return repo, RunSpec(
-        run_name="",
+        run_name=run_name,
         repo_id=repo_config.repo_id,
         repo_data=repo.run_repo_data,
         repo_code_hash=None,  # TODO

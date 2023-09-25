@@ -15,6 +15,7 @@ from dstack._internal.server.services.jobs import job_model_to_job_submission
 from dstack._internal.server.services.repos import get_code_model
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runs import run_model_to_run
+from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
@@ -77,28 +78,30 @@ async def _process_job(job_id: UUID):
                 repo=repo_model,
                 code_hash=run.run_spec.repo_code_hash,
             )
-            await _process_provisioning_job(
-                job_model=job_model,
-                run=run,
-                job=job,
-                job_submission=job_submission,
-                code=code,
-                server_ssh_private_key=server_ssh_private_key,
+            await run_async(
+                _process_provisioning_job,
+                job_model,
+                run,
+                job,
+                job_submission,
+                code,
+                server_ssh_private_key,
             )
         else:
             logger.debug("Polling running job %s", job_model.job_name)
-            await _process_running_job(
-                job_model=job_model,
-                run=run,
-                job=job,
-                job_submission=job_submission,
-                server_ssh_private_key=server_ssh_private_key,
+            await run_async(
+                _process_running_job,
+                job_model,
+                run,
+                job,
+                job_submission,
+                server_ssh_private_key,
             )
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
 
 
-async def _process_provisioning_job(
+def _process_provisioning_job(
     job_model: JobModel,
     run: Run,
     job: Job,
@@ -108,37 +111,36 @@ async def _process_provisioning_job(
 ):
     ports = _get_ports()
     try:
-        # TODO make async or run in executor
         with ssh_tunnel.SSHTunnel(
             hostname=job_submission.job_provisioning_data.hostname,
             ports=ports,
             id_rsa=server_ssh_private_key.encode(),
         ):
-            runner_client = client.AsyncRunnerClient(port=ports[_REMOTE_RUNNER_PORT])
-            alive = await runner_client.healthcheck()
+            runner_client = client.RunnerClient(port=ports[_REMOTE_RUNNER_PORT])
+            alive = runner_client.healthcheck()
             if not alive:
                 logger.debug("Runner %s is not alive", job_model.job_name)
                 # TODO if runner never becomes alive?
                 # Fail after a deadline?
                 return
             logger.debug("Submitting job %s...", job_model.job_name)
-            await runner_client.submit_job(
+            runner_client.submit_job(
                 run_spec=run.run_spec,
                 job_spec=job.job_spec,
                 secrets={},
                 repo_credentials=None,
             )
             logger.debug("Uploading code %s...", job_model.job_name)
-            await runner_client.upload_code(code)
+            runner_client.upload_code(code)
             logger.debug("Running job %s...", job_model.job_name)
-            await runner_client.run_job()
+            runner_client.run_job()
             job_model.status = JobStatus.RUNNING
             logger.debug("Job %s is running", job_model.job_name)
     except (ssh_tunnel.SSHConnectionRefusedError, ssh_tunnel.SSHTimeoutError):
         pass
 
 
-async def _process_running_job(
+def _process_running_job(
     job_model: JobModel,
     run: Run,
     job: Job,
@@ -151,11 +153,11 @@ async def _process_running_job(
         ports=ports,
         id_rsa=server_ssh_private_key.encode(),
     ):
-        runner_client = client.AsyncRunnerClient(port=ports[_REMOTE_RUNNER_PORT])
+        runner_client = client.RunnerClient(port=ports[_REMOTE_RUNNER_PORT])
         timestamp = 0
         if job_model.runner_timestamp is not None:
             timestamp = job_model.runner_timestamp
-        resp = await runner_client.pull(timestamp)
+        resp = runner_client.pull(timestamp)
         job_model.runner_timestamp = resp.last_updated
         if len(resp.job_states) == 0:
             logger.debug("Got 0 job %s states", job_model.job_name)

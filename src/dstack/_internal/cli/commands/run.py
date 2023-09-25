@@ -31,7 +31,18 @@ class RunCommand(APIBaseCommand):
         self._parser.add_argument("working_dir")
         self._parser.add_argument("-f", "--file", type=Path, dest="configuration_file")
         self._parser.add_argument("--profile")  # TODO env var default
-        self._parser.add_argument("--detach", action="store_true")
+        self._parser.add_argument(
+            "-n",
+            "--name",
+            dest="run_name",
+            help="The name of the run. If not specified, a random name is assigned.",
+        )
+        self._parser.add_argument(
+            "-d",
+            "--detach",
+            help="Do not poll logs and run status",
+            action="store_true",
+        )
         self._parser.add_argument(
             "-y",
             "--yes",
@@ -46,7 +57,11 @@ class RunCommand(APIBaseCommand):
 
         try:
             repo, run_spec = load_run_spec(
-                Path().cwd(), args.working_dir, args.configuration_file, args.profile
+                cwd=Path().cwd(),
+                working_dir=args.working_dir,
+                configuration_file=args.configuration_file,
+                profile_name=args.profile,
+                run_name=args.run_name,
             )
             self.api_client.repos.get(self.project_name, run_spec.repo_id, include_creds=False)
         except ConfigurationError as e:

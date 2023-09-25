@@ -3,10 +3,67 @@ import weakref
 from typing import BinaryIO, Dict, Optional
 
 import aiohttp
+import requests
+import requests.exceptions
 
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.runs import JobSpec, RunSpec
 from dstack._internal.server.schemas.runner import PullResponse, SubmitBody
+
+
+class RunnerClient:
+    def __init__(
+        self,
+        port: int,
+        hostname: str = "localhost",
+    ):
+        self.secure = False
+        self.hostname = hostname
+        self.port = port
+
+    def healthcheck(self) -> bool:
+        try:
+            resp = requests.get(self._url("/api/healthcheck"))
+            return resp.status_code == 200
+        except requests.exceptions.ConnectionError:
+            return False
+
+    def submit_job(
+        self,
+        run_spec: RunSpec,
+        job_spec: JobSpec,
+        secrets: Dict[str, str],
+        repo_credentials: Optional[RemoteRepoCreds],
+    ):
+        body = SubmitBody(
+            run_spec=run_spec,
+            job_spec=job_spec,
+            secrets=secrets,
+            repo_credentials=repo_credentials,
+        ).dict()
+        resp = requests.post(self._url("/api/submit"), json=body)
+        print(resp.content)
+        resp.raise_for_status()
+
+    def upload_code(self, file: BinaryIO):
+        resp = requests.post(self._url("/api/upload_code"), data=file)
+        resp.raise_for_status()
+
+    def run_job(self):
+        resp = requests.post(self._url("/api/run"))
+        resp.raise_for_status()
+
+    def pull(self, timestamp: int) -> PullResponse:
+        resp = requests.get(self._url("/api/pull"), params={"timestamp": timestamp})
+        resp.raise_for_status()
+        return PullResponse.parse_obj(resp.json())
+
+    def stop(self):
+        resp = requests.post(self._url("/api/stop"))
+        resp.raise_for_status()
+
+    def _url(self, path: str) -> str:
+        return f"{'https' if self.secure else 'http'}://{self.hostname}:{self.port}/{path.lstrip('/')}"
 
 
 class AsyncRunnerClient:
