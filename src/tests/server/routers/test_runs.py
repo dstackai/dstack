@@ -291,6 +291,37 @@ class TestSubmitRun:
         assert job is not None
 
     @pytest.mark.asyncio
+    async def test_submits_run_without_run_name(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_dict = get_dev_env_run_dict(
+            project_name=project.name,
+            username=user.name,
+            run_name=None,
+            repo_id=repo.name,
+        )
+        body = {"run_spec": run_dict["run_spec"]}
+        with patch("uuid.uuid4") as uuid_mock:
+            uuid_mock.return_value = run_dict["id"]
+            response = client.post(
+                f"/api/project/{project.name}/runs/submit",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200
+        assert response.json()["run_spec"]["run_name"] is not None
+        res = await session.execute(select(RunModel))
+        run = res.scalar()
+        assert run is not None
+        res = await session.execute(select(JobModel))
+        job = res.scalar()
+        assert job is not None
+
+    @pytest.mark.asyncio
     async def test_returns_400_if_repo_does_not_exist(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session)

@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from datetime import timezone
 from typing import List, Optional
@@ -14,6 +15,7 @@ from dstack._internal.core.models.runs import (
     JobStatus,
     JobSubmission,
     Run,
+    RunPlan,
     RunSpec,
 )
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
@@ -46,11 +48,19 @@ async def get_run(
     res = await session.execute(
         select(RunModel).where(RunModel.project_id == project.id, RunModel.run_name == run_name)
     )
-    try:
-        run_model = res.scalars().one()  # TODO unique (project_id, run_name)
-        return run_model_to_run(run_model)
-    except sa_exc.NoResultFound:
+    run_model = res.scalar()
+    if run_model is None:
         return None
+    return run_model_to_run(run_model)
+
+
+async def get_run_plan(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    run_spec: RunSpec,
+) -> RunPlan:
+    pass
 
 
 async def submit_run(
@@ -66,18 +76,11 @@ async def submit_run(
     )
     if repo is None:
         raise ServerClientError(f"Repo {run_spec.repo_id} does not exist")
-    if run_spec.run_name:
-        if await get_run(session=session, project=project, run_name=run_spec.run_name) is not None:
-            raise ServerClientError(f"Run {run_spec.run_name} already exists")
-    else:
-        idx = 1
-        run_name_base = generate_name()
-        while (
-            await get_run(session=session, project=project, run_name=f"{run_name_base}-{idx}")
-            is not None
-        ):
-            idx += 1  # TODO fix race condition
-        run_spec.run_name = f"{run_name_base}-{idx}"
+    if run_spec.run_name is None:
+        run_spec.run_name = await _generate_run_name(
+            session=session,
+            project=project,
+        )
     run_model = RunModel(
         id=uuid.uuid4(),
         project=project,
@@ -183,3 +186,26 @@ def get_run_status(jobs: List[Job]) -> JobStatus:
     if len(job.job_submissions) == 0:
         return JobStatus.SUBMITTED
     return job.job_submissions[-1].status
+
+
+_PROJECTS_TO_RUN_NAMES_LOCK = {}
+
+
+async def _generate_run_name(
+    session: AsyncSession,
+    project: ProjectModel,
+) -> str:
+    lock = _PROJECTS_TO_RUN_NAMES_LOCK.setdefault(project.name, asyncio.Lock())
+    run_name_base = generate_name()
+    idx = 1
+    async with lock:
+        while (
+            await get_run(
+                session=session,
+                project=project,
+                run_name=f"{run_name_base}-{idx}",
+            )
+            is not None
+        ):
+            idx += 1
+        return f"{run_name_base}-{idx}"

@@ -137,7 +137,7 @@ class Job(BaseModel):
 
 
 class RunSpec(BaseModel):
-    run_name: str
+    run_name: Optional[str]
     repo_id: str
     repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
     repo_code_hash: Optional[str]
