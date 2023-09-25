@@ -45,11 +45,11 @@ async def get_run(
             project=project,
             run_name=body.run_name,
         )
-        if run is None:
-            raise_not_found()
-        return run
     except ServerClientError as e:
         raise_server_client_error(e)
+    if run is None:
+        raise_not_found()
+    return run
 
 
 @router.post("/get_plan")
@@ -58,7 +58,14 @@ async def get_run_plan(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> RunPlan:
-    pass
+    user, project = user_project
+    run_plan = await runs.get_run_plan(
+        session=session,
+        project=project,
+        user=user,
+        run_spec=body.run_spec,
+    )
+    return run_plan
 
 
 @router.post("/submit")

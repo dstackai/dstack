@@ -159,11 +159,12 @@ class Run(BaseModel):
 
 
 class JobPlan(BaseModel):
-    job_num: int
     job_spec: JobSpec
     candidates: List[InstanceCandidate]
 
 
 class RunPlan(BaseModel):
+    project_name: str
+    user: str
     run_spec: RunSpec
     job_plans: List[JobPlan]

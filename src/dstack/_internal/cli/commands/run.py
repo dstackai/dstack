@@ -5,9 +5,12 @@ import tempfile
 from pathlib import Path
 
 import requests
+from rich.prompt import Confirm
 from websocket import WebSocketApp
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.core.services.configs import ConfigManager
@@ -20,6 +23,21 @@ from dstack.api.server.utils import poll_run
 class RunCommand(APIBaseCommand):
     NAME = "run"
     DESCRIPTION = "Run .dstack.yml configuration"
+
+    def _register(self):
+        super()._register()
+        # TODO custom help action
+        # self._parser.add_argument("-h", "--help", nargs="?", choices=("task", "dev-environment", "service"))
+        self._parser.add_argument("working_dir")
+        self._parser.add_argument("-f", "--file", type=Path, dest="configuration_file")
+        self._parser.add_argument("--profile")  # TODO env var default
+        self._parser.add_argument("--detach", action="store_true")
+        self._parser.add_argument(
+            "-y",
+            "--yes",
+            help="Do not ask for plan confirmation",
+            action="store_true",
+        )
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
@@ -40,9 +58,13 @@ class RunCommand(APIBaseCommand):
                 )
             raise
 
+        run_plan = self.api_client.runs.get_plan(self.project_name, run_spec)
+        print_run_plan(run_plan)
+        if not args.yes and not Confirm.ask("Continue?"):
+            console.print("\nExiting...")
+            exit(0)
+
         ports_lock = None if args.detach else PortsLock({10999: 0}).acquire()
-        # run_plan = self.api_client.runs.get_plan(self.project_name, run_spec)
-        # TODO show plan
 
         with tempfile.TemporaryFile("w+b") as fp:
             run_spec.repo_code_hash = repo.write_code_file(fp)
@@ -100,12 +122,3 @@ class RunCommand(APIBaseCommand):
             if stop_at_exit:
                 logging.info("Stopping...")
                 self.api_client.runs.stop(self.project_name, [run_name], abort=False)
-
-    def _register(self):
-        super()._register()
-        # TODO custom help action
-        # self._parser.add_argument("-h", "--help", nargs="?", choices=("task", "dev-environment", "service"))
-        self._parser.add_argument("working_dir")
-        self._parser.add_argument("-f", "--file", type=Path, dest="configuration_file")
-        self._parser.add_argument("--profile")  # TODO env var default
-        self._parser.add_argument("--detach", action="store_true")

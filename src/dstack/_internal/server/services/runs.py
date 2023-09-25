@@ -3,7 +3,6 @@ import uuid
 from datetime import timezone
 from typing import List, Optional
 
-import sqlalchemy.exc as sa_exc
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +10,7 @@ import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.runs import (
     Job,
-    JobProvisioningData,
+    JobPlan,
     JobStatus,
     JobSubmission,
     Run,
@@ -19,6 +18,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
+from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import repos
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
@@ -56,11 +56,30 @@ async def get_run(
 
 async def get_run_plan(
     session: AsyncSession,
-    user: UserModel,
     project: ProjectModel,
+    user: UserModel,
     run_spec: RunSpec,
 ) -> RunPlan:
-    pass
+    backends = await backends_services.get_project_backends(project=project)
+    run_spec.run_name = "dry-run"
+    jobs = get_jobs_from_run_spec(run_spec)
+    job_plans = []
+    job = jobs[0]
+    for job in jobs:
+        candidates = await backends_services.get_instance_candidates(
+            backends=backends,
+            job=job,
+            exclude_not_available=True,
+        )
+        job_plan = JobPlan(
+            job_spec=job.job_spec,
+            candidates=candidates[:50],
+        )
+        job_plans.append(job_plan)
+    run_plan = RunPlan(
+        project_name=project.name, user=user.name, run_spec=run_spec, job_plans=job_plans
+    )
+    return run_plan
 
 
 async def submit_run(

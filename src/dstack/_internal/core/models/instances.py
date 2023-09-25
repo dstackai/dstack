@@ -55,5 +55,5 @@ class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
 
 
-class InstanceCandidate(InstanceOffer):
+class InstanceCandidate(InstanceOfferWithAvailability):
     backend: BackendType

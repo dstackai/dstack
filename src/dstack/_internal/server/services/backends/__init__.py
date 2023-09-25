@@ -14,6 +14,7 @@ from dstack._internal.core.models.backends import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceCandidate,
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.runs import Job
@@ -175,7 +176,7 @@ def clear_backend_cache(project_name: str):
 _NOT_AVAILABLE = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}
 
 
-async def get_instance_candidates(
+async def get_instance_offers(
     backends: List[Backend], job: Job, exclude_not_available: bool = False
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
@@ -192,3 +193,16 @@ async def get_instance_candidates(
 
     # Put NOT_AVAILABLE and NO_QUOTA instances at the end
     return sorted(candidates, key=lambda i: (i[1].availability in _NOT_AVAILABLE, i[1].price))
+
+
+async def get_instance_candidates(
+    backends: List[Backend], job: Job, exclude_not_available: bool = False
+) -> List[InstanceCandidate]:
+    offers = await get_instance_offers(
+        backends=backends, job=job, exclude_not_available=exclude_not_available
+    )
+    candidates = []
+    for backend, offer in offers:
+        candidate = InstanceCandidate(backend=backend.TYPE, **offer.dict())
+        candidates.append(candidate)
+    return candidates

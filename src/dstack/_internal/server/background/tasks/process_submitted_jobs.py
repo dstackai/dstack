@@ -102,7 +102,7 @@ async def _run_job(
     backends: List[Backend],
     project_ssh_public_key: str,
 ) -> Optional[JobProvisioningData]:
-    candidates = await backends_services.get_instance_candidates(
+    candidates = await backends_services.get_instance_offers(
         backends, job, exclude_not_available=True
     )
     for backend, offer in candidates:
