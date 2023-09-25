@@ -1,36 +1,30 @@
 import argparse
 import logging
 import sys
-import tempfile
 from pathlib import Path
 
-import requests
 from rich.prompt import Confirm
-from websocket import WebSocketApp
 
-from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.utils.common import console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError
-from dstack._internal.core.models.runs import JobStatus
-from dstack._internal.core.services.configs import ConfigManager
-from dstack._internal.core.services.configurator import load_run_spec
-from dstack._internal.core.services.ssh.attach import SSHAttach
-from dstack._internal.core.services.ssh.ports import PortsLock
-from dstack.api.server.utils import poll_run
+from dstack._internal.core.services.configs.configuration import find_configuration_file
+from dstack._internal.core.services.configs.profile import load_profile
+from dstack.api import Client
 
 
-class RunCommand(APIBaseCommand):
+class RunCommand(BaseCommand):
     NAME = "run"
     DESCRIPTION = "Run .dstack.yml configuration"
 
     def _register(self):
-        super()._register()
         # TODO custom help action
         # self._parser.add_argument("-h", "--help", nargs="?", choices=("task", "dev-environment", "service"))
         self._parser.add_argument("working_dir")
         self._parser.add_argument("-f", "--file", type=Path, dest="configuration_file")
         self._parser.add_argument("--profile")  # TODO env var default
+        self._parser.add_argument("--project")  # TODO env var default
         self._parser.add_argument(
             "-n",
             "--name",
@@ -49,91 +43,60 @@ class RunCommand(APIBaseCommand):
             help="Do not ask for plan confirmation",
             action="store_true",
         )
+        # TODO --backend
 
     def _command(self, args: argparse.Namespace):
-        super()._command(args)
-
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
         try:
-            repo, run_spec = load_run_spec(
-                cwd=Path().cwd(),
+            api = Client.from_config(Path.cwd(), args.project, init=False)
+            configuration_path = find_configuration_file(
+                Path.cwd(), args.working_dir, args.configuration_file
+            )
+            profile = load_profile(Path.cwd(), args.profile)
+            run_plan = api.runs.get_plan(
+                configuration_path=configuration_path,
+                backends=profile.backends,  # TODO args
+                resources=profile.resources,
+                spot_policy=profile.spot_policy,
+                retry_policy=profile.retry_policy,
+                max_duration=profile.max_duration,
+                max_price=profile.max_price,
                 working_dir=args.working_dir,
-                configuration_file=args.configuration_file,
-                profile_name=args.profile,
                 run_name=args.run_name,
             )
-            self.api_client.repos.get(self.project_name, run_spec.repo_id, include_creds=False)
         except ConfigurationError as e:
-            raise CLIError(f"Invalid configuration\n{e}")
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                raise CLIError(
-                    f"Repository is not initialized in the project {self.project_name}. Call `dstack init` first"
-                )
-            raise
+            raise CLIError(str(e))
 
-        run_plan = self.api_client.runs.get_plan(self.project_name, run_spec)
         print_run_plan(run_plan)
         if not args.yes and not Confirm.ask("Continue?"):
             console.print("\nExiting...")
-            exit(0)
+            return
 
-        ports_lock = None if args.detach else PortsLock({10999: 0}).acquire()
-
-        with tempfile.TemporaryFile("w+b") as fp:
-            run_spec.repo_code_hash = repo.write_code_file(fp)
-            fp.seek(0)
-            self.api_client.repos.upload_code(
-                self.project_name, repo.repo_id, run_spec.repo_code_hash, fp
-            )
-
-        run = self.api_client.runs.submit(
-            self.project_name, run_spec
-        )  # TODO reliably handle interrupts
-        run_name = run.run_spec.run_name
-        logging.info(run_name)
-
+        run_plan.run_spec.run_name = None  # TODO fix server behaviour
+        run = api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
+        logging.info(run.name)
         if args.detach:
             logging.info("Detaching...")
             return
+
         stop_at_exit = True
         try:
-            for run in poll_run(self.api_client, self.project_name, run_name):
-                logging.info(run.status)  # TODO spinner with status
-                if run.status not in (
-                    JobStatus.SUBMITTED,
-                    JobStatus.PENDING,
-                    JobStatus.PROVISIONING,
-                ):
-                    break
-            if run.status.is_finished() and run.status != JobStatus.DONE:
+            # TODO spinner
+            if not run.attach():
+                logging.info(run.status)
+                logging.info("Run is not running")
                 stop_at_exit = False
                 return
-
-            logging.info("Connecting...")
-            hostname = run.jobs[0].job_submissions[0].job_provisioning_data.hostname
-            id_rsa_path = ConfigManager().get_repo_config(Path.cwd()).ssh_key_path
-            with SSHAttach(hostname, ports_lock, id_rsa_path, run_name) as attach:
-                logging.info(attach.ports)
-
-                def on_message(_, message):
-                    sys.stdout.buffer.write(message)
-                    sys.stdout.buffer.flush()
-
-                def on_error(_, error):
-                    logging.error(error)
-
-                ws = WebSocketApp(
-                    f"ws://localhost:{attach.ports[10999]}/logs_ws",
-                    on_message=on_message,
-                    on_error=on_error,
-                )
-                ws.run_forever()
+            logging.info(run.ports)
+            for entry in run.logs():
+                sys.stdout.buffer.write(entry)
+                sys.stdout.buffer.flush()
 
         except KeyboardInterrupt:
             logging.info("Interrupted")  # TODO ask to stop or just detach
         finally:
+            run.detach()
             if stop_at_exit:
                 logging.info("Stopping...")
-                self.api_client.runs.stop(self.project_name, [run_name], abort=False)
+                run.stop()

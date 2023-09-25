@@ -1,29 +1,17 @@
 import json
 import os.path
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 import filelock
 import yaml
 from pydantic import ValidationError
 from rich.prompt import Confirm
 
-from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.config import GlobalConfig, ProjectConfig, RepoConfig
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.utils.common import get_dstack_dir
 from dstack._internal.utils.path import PathLike
-from dstack.api.server import APIClient
-
-
-def get_api_client(project_name: Optional[str] = None) -> Tuple[APIClient, str]:
-    config = ConfigManager()
-    project = config.get_project_config(project_name)
-    if project is None:
-        if project_name is not None:
-            raise DstackError(f"Project {project_name} is not configured")
-        raise DstackError(f"No default project")
-    return APIClient(project.url, project.token), project.name
 
 
 class ConfigManager:

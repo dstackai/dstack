@@ -1,7 +1,7 @@
 import argparse
 from abc import ABC, abstractmethod
 
-from dstack._internal.core.services.configs import get_api_client
+import dstack._internal.core.services.api_client as api_client_service
 from dstack.api.server import APIClient
 
 
@@ -53,4 +53,4 @@ class APIBaseCommand(BaseCommand):
         self._parser.add_argument("--project")  # TODO env var default
 
     def _command(self, args: argparse.Namespace):
-        self.api_client, self.project_name = get_api_client(args.project)
+        self.api_client, self.project_name = api_client_service.get_api_client(args.project)

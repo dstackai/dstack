@@ -1,11 +1,15 @@
+from pathlib import Path
 from typing import Optional, Union
 
 from git import InvalidGitRepositoryError
 
+import dstack._internal.core.services.api_client as api_client_service
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
-from dstack._internal.core.services.configs import ConfigManager, get_api_client
+from dstack._internal.core.models.repos.base import RepoType
+from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.repos import load_repo
+from dstack._internal.utils.crypto import generate_rsa_key_pair
 from dstack._internal.utils.path import PathLike
 from dstack.api._public.backends import BackendCollection
 from dstack.api._public.repos import RepoCollection
@@ -37,7 +41,6 @@ class Client:
         """
         self._repos = RepoCollection(api_client, project_name, repo)
         self._backends = BackendCollection(api_client, project_name)
-        # TODO require ssh identity file
         self._runs = RunCollection(api_client, project_name, repo_dir, repo, ssh_identity_file)
 
         if init:
@@ -71,11 +74,14 @@ class Client:
         :param init: initialize the repo first
         :return: dstack Client
         """
+        config = ConfigManager()
         if not init:
-            repo_config = ConfigManager().get_repo_config(repo_dir)
+            repo_config = config.get_repo_config(repo_dir)
             if repo_config is None:
                 raise ConfigurationError(f"The repo is not initialized")
             repo = load_repo(repo_config)
+            if ssh_identity_file is None:
+                ssh_identity_file = repo_config.ssh_key_path
         else:
             repo = LocalRepo(repo_dir=repo_dir)  # default
             if not local_repo:
@@ -83,12 +89,16 @@ class Client:
                     repo = RemoteRepo(local_repo_dir=repo_dir)
                 except InvalidGitRepositoryError:
                     pass  # use default
+            ssh_identity_file = get_ssh_keypair(ssh_identity_file, config.dstack_key_path)
+            config.save_repo_config(
+                repo_dir, repo.repo_id, RepoType(repo.run_repo_data.repo_type), ssh_identity_file
+            )
         if server_url is not None and user_token is not None:
             if project_name is None:
                 raise ConfigurationError(f"The project name is not specified")
             api_client = APIClient(server_url, user_token)
         else:
-            api_client, project_name = get_api_client(project_name=project_name)
+            api_client, project_name = api_client_service.get_api_client(project_name=project_name)
         return Client(
             api_client,
             project_name,
@@ -111,3 +121,24 @@ class Client:
     @property
     def runs(self) -> RunCollection:
         return self._runs
+
+
+def get_ssh_keypair(key_path: Optional[PathLike], dstack_key_path: Path) -> str:
+    """Returns a path to the private key"""
+    if key_path is not None:
+        key_path = Path(key_path).expanduser().resolve()
+        pub_key = (
+            key_path
+            if key_path.suffix == ".pub"
+            else key_path.with_suffix(key_path.suffix + ".pub")
+        )
+        private_key = pub_key.with_suffix("")
+        if pub_key.exists() and private_key.exists():
+            return str(private_key)
+        raise ConfigurationError(
+            f"Make sure valid keypair exists: {private_key}(.pub) and rerun `dstack init`"
+        )
+
+    if not dstack_key_path.exists():
+        generate_rsa_key_pair(private_key_path=dstack_key_path)
+    return str(dstack_key_path)

@@ -5,7 +5,6 @@ import time
 from abc import ABC
 from copy import copy
 from datetime import datetime, timedelta, timezone
-from multiprocessing import get_logger
 from pathlib import Path
 from queue import Queue
 from typing import Dict, Iterable, List, Optional, Union
@@ -16,9 +15,10 @@ from websocket import WebSocketApp
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models import configurations
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ServiceConfiguration as Service
 from dstack._internal.core.models.configurations import TaskConfiguration as Task
-from dstack._internal.core.models.profiles import BackendType, Profile
+from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.profiles import ProfileResources as Resources
 from dstack._internal.core.models.profiles import ProfileRetryPolicy as RetryPolicy
 from dstack._internal.core.models.profiles import SpotPolicy
@@ -26,9 +26,10 @@ from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
 from dstack._internal.core.models.runs import JobSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
 from dstack._internal.core.models.runs import Run as RunModel
-from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.core.models.runs import RunPlan, RunSpec
 from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike, path_in_dir
 from dstack.api.server import APIClient
 
@@ -104,7 +105,7 @@ class Run(ABC):
                 return False
 
             if self._ports_lock is None:
-                self._ports_lock = reserve_ports(self._run.jobs[0].job_spec)
+                self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
             self._ssh_attach = SSHAttach(
                 self.hostname, self._ports_lock, self._ssh_identity_file, self.name
             )
@@ -154,7 +155,7 @@ class SubmittedRun(Run):
             ws = WebSocketApp(
                 f"ws://localhost:{self.ports[10999]}/logs_ws",
                 on_open=lambda _: logging.debug("WebSocket logs are connected"),
-                on_close=lambda _, error: logging.debug("WebSocket logs are disconnected"),
+                on_close=lambda _, __, ___: logging.debug("WebSocket logs are disconnected"),
                 on_message=lambda _, message: queue.put(message),
             )
             threading.Thread(target=ws_thread).start()
@@ -184,8 +185,6 @@ class RunCollection:
         self._repo_dir = Path(repo_dir)
         self._repo = repo
         self._ssh_identity_file = str(ssh_identity_file)
-        with open(self._ssh_identity_file + ".pub", "r") as f:
-            self._ssh_key_pub = f.read().strip()
 
     def submit(
         self,
@@ -199,7 +198,7 @@ class RunCollection:
         max_price: Optional[float] = None,
         working_dir: Optional[str] = None,
         run_name: Optional[str] = None,
-        verify_ports: bool = True,  # TODO rename to lock_ports
+        verify_ports: bool = True,  # TODO rename to reserve_ports
     ) -> SubmittedRun:
         """
         Submit a run
@@ -215,6 +214,36 @@ class RunCollection:
         :param run_name: desired run_name. Must be unique in the project
         :param verify_ports: reserve local ports before submit
         :return: submitted run
+        """
+        run_plan = self.get_plan(
+            configuration=configuration,
+            configuration_path=configuration_path,
+            backends=backends,
+            resources=resources,
+            spot_policy=spot_policy,
+            retry_policy=retry_policy,
+            max_duration=max_duration,
+            max_price=max_price,
+            working_dir=working_dir,
+            run_name=run_name,
+        )
+        return self.exec_plan(run_plan, reserve_ports=verify_ports)
+
+    def get_plan(
+        self,
+        configuration: Optional[Union[Task, Service]] = None,
+        configuration_path: Optional[PathLike] = None,
+        backends: Optional[List[BackendType]] = None,
+        resources: Optional[Resources] = None,
+        spot_policy: Optional[SpotPolicy] = None,
+        retry_policy: Optional[RetryPolicy] = None,
+        max_duration: Optional[Union[int, str]] = None,
+        max_price: Optional[float] = None,
+        working_dir: Optional[str] = None,
+        run_name: Optional[str] = None,
+    ) -> RunPlan:
+        """
+        Get run plan. Same arguments as `submit`
         """
         if configuration is None and configuration_path is None:
             raise ConfigurationError(
@@ -257,22 +286,29 @@ class RunCollection:
             configuration_path=str(configuration_path),
             configuration=configuration,
             profile=profile,
-            ssh_key_pub=self._ssh_key_pub,
+            ssh_key_pub=Path(self._ssh_identity_file + ".pub").read_text().strip(),
         )
-        run_plan = self._api_client.runs.get_plan(self._project, run_spec)
+        return self._api_client.runs.get_plan(self._project, run_spec)
 
+    def exec_plan(self, run_plan: RunPlan, reserve_ports: bool = True) -> SubmittedRun:
+        """
+        Execute run plan
+        :param run_plan: result of `get_plan` call
+        :param reserve_ports: reserve local ports before submit
+        :return: submitted run
+        """
         ports_lock = None
-        if verify_ports:
+        if reserve_ports:
             # TODO handle multiple jobs
-            ports_lock = reserve_ports(run_plan.job_plans[0].job_spec)
+            ports_lock = _reserve_ports(run_plan.job_plans[0].job_spec)
 
         with tempfile.TemporaryFile("w+b") as fp:
-            run_spec.repo_code_hash = self._repo.write_code_file(fp)
+            run_plan.run_spec.repo_code_hash = self._repo.write_code_file(fp)
             fp.seek(0)
             self._api_client.repos.upload_code(
-                self._project, self._repo.repo_id, run_spec.repo_code_hash, fp
+                self._project, self._repo.repo_id, run_plan.run_spec.repo_code_hash, fp
             )
-        run = self._api_client.runs.submit(self._project, run_spec)
+        run = self._api_client.runs.submit(self._project, run_plan.run_spec)
         return self._model_to_submitted_run(run, ports_lock)
 
     def list(self, all: bool = False) -> List[Run]:
@@ -315,7 +351,7 @@ class RunCollection:
         )
 
 
-def reserve_ports(job_spec: JobSpec) -> PortsLock:
+def _reserve_ports(job_spec: JobSpec) -> PortsLock:
     ports = {10999: 0}  # Runner API
     for app in job_spec.app_specs:
         ports[app.port] = app.map_to_port or 0
