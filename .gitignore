@@ -9,4 +9,5 @@ dist/
 .idea/
 
 /cli/dstack/_internal/hub/statics/
-/runner/runner
+/runner/cmd/shim/shim
+/runner/cmd/runner/runner

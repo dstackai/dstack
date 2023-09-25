@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 import filelock
 import yaml
 from pydantic import ValidationError
+from rich.prompt import Confirm
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.config import GlobalConfig, ProjectConfig, RepoConfig
@@ -33,14 +34,6 @@ class ConfigManager:
         self.config_filepath = self.dstack_dir / "config.yaml"
         self.load()
 
-    def get_project_config(self, name: Optional[str] = None) -> Optional[ProjectConfig]:
-        for project in self.config.projects:
-            if name is None and project.default:
-                return project
-            if project.name == name:
-                return project
-        return None
-
     def save(self):
         self.config_filepath.parent.mkdir(parents=True, exist_ok=True)
         with self.config_filepath.open("w") as f:
@@ -54,6 +47,33 @@ class ConfigManager:
             self.config = GlobalConfig.parse_obj(config)
         except (FileNotFoundError, ValidationError):
             self.config = GlobalConfig()
+
+    def get_project_config(self, name: Optional[str] = None) -> Optional[ProjectConfig]:
+        for project in self.config.projects:
+            if name is None and project.default:
+                return project
+            if project.name == name:
+                return project
+        return None
+
+    def configure_project(self, name: str, url: str, token: str, default: bool):
+        if default:
+            for project in self.config.projects:
+                project.default = False
+        for project in self.config.projects:
+            if project.name == name:
+                project.url = url
+                project.token = token
+                project.default = default or project.default
+                return
+        self.config.projects.append(
+            ProjectConfig(name=name, url=url, token=token, default=default)
+        )
+        if len(self.config.projects) == 1:
+            self.config.projects[0].default = True
+
+    def delete_project(self, name: str):
+        self.config.projects = [p for p in self.config.projects if p.name != name]
 
     def save_repo_config(
         self, repo_path: PathLike, repo_id: str, repo_type: RepoType, ssh_key_path: PathLike
@@ -95,3 +115,22 @@ class ConfigManager:
     @property
     def dstack_ssh_config_path(self) -> Path:
         return self.dstack_dir / "ssh/config"
+
+
+def create_default_project_config(project_name: str, url: str, token: str):
+    config_manager = ConfigManager()
+    default_project_config = config_manager.get_project_config()
+    project_config = config_manager.get_project_config(name=project_name)
+    default = default_project_config is None
+    if project_config is None or default_project_config is None:
+        config_manager.configure_project(name=project_name, url=url, token=token, default=default)
+        config_manager.save()
+        return
+    if project_config.url != url or project_config.token != token:
+        if Confirm.ask(
+            f"The default project in {config_manager.dstack_dir / 'config.yaml'} is outdated. "
+            f"Update it?"
+        ):
+            config_manager.configure_project(name=project_name, url=url, token=token, default=True)
+        config_manager.save()
+        return

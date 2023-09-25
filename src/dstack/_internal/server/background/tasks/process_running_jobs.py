@@ -1,4 +1,5 @@
 import asyncio
+from typing import Dict
 from uuid import UUID
 
 from sqlalchemy import select
@@ -7,6 +8,7 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.runs import Job, JobStatus, JobSubmission, Run
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
+from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import CodeModel, JobModel, RepoModel, RunModel
 from dstack._internal.server.services.jobs import job_model_to_job_submission
@@ -23,7 +25,6 @@ _PROCESSING_JOBS_LOCK = asyncio.Lock()
 _PROCESSING_JOBS_IDS = set()
 
 
-_LOCAL_RUNNER_PORT = 10999
 _REMOTE_RUNNER_PORT = 10999
 
 
@@ -105,13 +106,15 @@ async def _process_provisioning_job(
     code: bytes,
     server_ssh_private_key: str,
 ):
+    ports = _get_ports()
     try:
+        # TODO make async or run in executor
         with ssh_tunnel.SSHTunnel(
             hostname=job_submission.job_provisioning_data.hostname,
-            ports={_REMOTE_RUNNER_PORT: _LOCAL_RUNNER_PORT},
+            ports=ports,
             id_rsa=server_ssh_private_key.encode(),
         ):
-            runner_client = client.AsyncRunnerClient(port=_LOCAL_RUNNER_PORT)
+            runner_client = client.AsyncRunnerClient(port=ports[_REMOTE_RUNNER_PORT])
             alive = await runner_client.healthcheck()
             if not alive:
                 logger.debug("Runner %s is not alive", job_model.job_name)
@@ -142,12 +145,13 @@ async def _process_running_job(
     job_submission: JobSubmission,
     server_ssh_private_key: str,
 ):
+    ports = _get_ports()
     with ssh_tunnel.SSHTunnel(
         hostname=job_submission.job_provisioning_data.hostname,
-        ports={_REMOTE_RUNNER_PORT: _LOCAL_RUNNER_PORT},
+        ports=ports,
         id_rsa=server_ssh_private_key.encode(),
     ):
-        runner_client = client.AsyncRunnerClient(port=_LOCAL_RUNNER_PORT)
+        runner_client = client.AsyncRunnerClient(port=ports[_REMOTE_RUNNER_PORT])
         timestamp = 0
         if job_model.runner_timestamp is not None:
             timestamp = job_model.runner_timestamp
@@ -168,3 +172,11 @@ async def _get_job_code(session: AsyncSession, repo: RepoModel, code_hash: str) 
     if code_model is not None:
         return code_model.blob_hash
     return b""
+
+
+def _get_ports() -> Dict[int, int]:
+    ports_lock = PortsLock({_REMOTE_RUNNER_PORT: 0})
+    ports_lock.acquire()
+    ports = ports_lock.dict()
+    ports_lock.release()
+    return ports

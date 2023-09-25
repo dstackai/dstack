@@ -52,7 +52,7 @@ class TestProcessRunningJobs:
             status=JobStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data,
         )
-        with patch("dstack._internal.core.services.ssh_tunnel.SSHTunnel") as SSHTunnelMock, patch(
+        with patch("dstack._internal.core.services.ssh.tunnel.SSHTunnel") as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.AsyncRunnerClient"
         ) as AsyncRunnerClientMock:
             runner_client_mock = AsyncRunnerClientMock.return_value
@@ -86,7 +86,7 @@ class TestProcessRunningJobs:
             status=JobStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data,
         )
-        with patch("dstack._internal.core.services.ssh_tunnel.SSHTunnel") as SSHTunnelMock, patch(
+        with patch("dstack._internal.core.services.ssh.tunnel.SSHTunnel") as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.AsyncRunnerClient"
         ) as AsyncRunnerClientMock:
             runner_client_mock = AsyncRunnerClientMock.return_value
@@ -126,7 +126,7 @@ class TestProcessRunningJobs:
             status=JobStatus.RUNNING,
             job_provisioning_data=job_provisioning_data,
         )
-        with patch("dstack._internal.core.services.ssh_tunnel.SSHTunnel") as SSHTunnelMock, patch(
+        with patch("dstack._internal.core.services.ssh.tunnel.SSHTunnel") as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.AsyncRunnerClient"
         ) as AsyncRunnerClientMock:
             runner_client_mock = AsyncRunnerClientMock.return_value
@@ -143,7 +143,7 @@ class TestProcessRunningJobs:
         assert job is not None
         assert job.status == JobStatus.RUNNING
         assert job.runner_timestamp == 1
-        with patch("dstack._internal.core.services.ssh_tunnel.SSHTunnel") as SSHTunnelMock, patch(
+        with patch("dstack._internal.core.services.ssh.tunnel.SSHTunnel") as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.AsyncRunnerClient"
         ) as AsyncRunnerClientMock:
             runner_client_mock = AsyncRunnerClientMock.return_value
