@@ -20,7 +20,7 @@ import (
 func TestExecutor_WorkingDir(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = []string{"pwd"}
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "pwd")
 
 	err := ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
@@ -30,7 +30,7 @@ func TestExecutor_WorkingDir(t *testing.T) {
 func TestExecutor_HomeDir(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = []string{"echo ~"}
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo ~")
 
 	err := ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
@@ -39,7 +39,7 @@ func TestExecutor_HomeDir(t *testing.T) {
 
 func TestExecutor_NonZeroExit(t *testing.T) {
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = []string{"ehco 1"} // note: intentional misspelling
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "ehco 1") // note: intentional misspelling
 
 	err := ex.execJob(context.TODO(), io.Discard)
 	assert.Error(t, err)
@@ -50,7 +50,7 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = []string{"cat ~/.ssh/id_rsa"}
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "cat ~/.ssh/id_rsa")
 	ex.repoCredentials = &schemas.RepoCredentials{
 		Protocol:   "ssh",
 		PrivateKey: &key,
@@ -68,7 +68,7 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 func TestExecutor_LocalRepo(t *testing.T) {
 	var b bytes.Buffer
 	ex := makeTestExecutor(t)
-	ex.jobSpec.Commands = []string{"cat foo"}
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "cat foo")
 	makeCodeTar(t, ex.codePath)
 
 	err := ex.setupRepo(context.TODO())
@@ -82,7 +82,6 @@ func TestExecutor_LocalRepo(t *testing.T) {
 func TestExecutor_Recover(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = nil // cause a panic
-	ex.jobSpec.Entrypoint = nil
 	makeCodeTar(t, ex.codePath)
 
 	err := ex.Run(context.TODO())
@@ -98,7 +97,7 @@ func TestExecutor_MaxDuration(t *testing.T) {
 
 	ex := makeTestExecutor(t)
 	ex.killDelay = 500 * time.Millisecond
-	ex.jobSpec.Commands = []string{"echo 1", "sleep 2", "echo 2"}
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "echo 1 && sleep 2 && echo 2")
 	ex.jobSpec.MaxDuration = 1 // seconds
 	makeCodeTar(t, ex.codePath)
 
@@ -124,7 +123,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 		RepoConfigName:  "Dstack Developer",
 		RepoConfigEmail: "developer@dstack.ai",
 	}
-	ex.jobSpec.Commands = []string{"git rev-parse HEAD", "git config user.name", "git config user.email"}
+	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "git rev-parse HEAD && git config user.name && git config user.email")
 	err := os.WriteFile(ex.codePath, []byte{}, 0600) // empty diff
 	require.NoError(t, err)
 
@@ -155,8 +154,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 			ConfigurationPath: ".dstack.yml",
 		},
 		JobSpec: schemas.JobSpec{
-			Commands:    nil,                         // note: fill before run
-			Entrypoint:  []string{"/bin/bash", "-c"}, // no interactive shell
+			Commands:    []string{"/bin/bash", "-c"},
 			Env:         make(map[string]string),
 			MaxDuration: 0, // no timeout
 			WorkingDir:  ".",

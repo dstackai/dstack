@@ -102,7 +102,6 @@ class JobSpec(BaseModel):
     job_name: str
     app_specs: Optional[List[AppSpec]]
     commands: List[str]
-    entrypoint: Optional[List[str]]  # TODO merge with commands
     env: Dict[str, str]
     gateway: Optional[Gateway]
     home_dir: Optional[str]
@@ -111,7 +110,6 @@ class JobSpec(BaseModel):
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
     retry_policy: RetryPolicy
-    setup: List[str]  # TODO merge with commands
     working_dir: str
 
 

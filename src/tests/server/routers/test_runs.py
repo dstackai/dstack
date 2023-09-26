@@ -83,18 +83,21 @@ def get_dev_env_run_plan_dict(
                 "job_spec": {
                     "app_specs": [],
                     "commands": [
-                        '(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"',
-                        "echo ''",
-                        "echo To open in VS Code Desktop, use " "link below:",
-                        "echo ''",
-                        "echo '  " "vscode://vscode-remote/ssh-remote+dry-run/workflow'",
-                        "echo ''",
-                        "echo 'To connect via SSH, use: `ssh dry-run`'",
-                        "echo ''",
-                        "echo -n 'To exit, press Ctrl+C.'",
-                        "tail -f /dev/null",
+                        "/bin/bash",
+                        "-i",
+                        "-c",
+                        "(pip install -q --no-cache-dir "
+                        'ipykernel 2> /dev/null) || echo "no '
+                        'pip, ipykernel was not installed" '
+                        "&& echo '' && echo To open in VS "
+                        "Code Desktop, use link below: && "
+                        "echo '' && echo '  "
+                        "vscode://vscode-remote/ssh-remote+dry-run/workflow' "
+                        "&& echo '' && echo 'To connect via "
+                        "SSH, use: `ssh dry-run`' && echo '' "
+                        "&& echo -n 'To exit, press Ctrl+C.' "
+                        "&& tail -f /dev/null",
                     ],
-                    "entrypoint": ["/bin/bash", "-i", "-c"],
                     "env": {},
                     "gateway": None,
                     "home_dir": "/root",
@@ -112,7 +115,6 @@ def get_dev_env_run_plan_dict(
                         "spot": True,
                     },
                     "retry_policy": {"limit": None, "retry": False},
-                    "setup": [],
                     "working_dir": ".",
                 },
                 "candidates": [json.loads(c.json()) for c in candidates],
@@ -175,18 +177,21 @@ def get_dev_env_run_dict(
                 "job_spec": {
                     "app_specs": [],
                     "commands": [
-                        '(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"',
-                        "echo ''",
-                        "echo To open in VS Code Desktop, use " "link below:",
-                        "echo ''",
-                        "echo '  " "vscode://vscode-remote/ssh-remote+test-run/workflow'",
-                        "echo ''",
-                        "echo 'To connect via SSH, use: `ssh test-run`'",
-                        "echo ''",
-                        "echo -n 'To exit, press Ctrl+C.'",
-                        "tail -f /dev/null",
+                        "/bin/bash",
+                        "-i",
+                        "-c",
+                        "(pip install -q --no-cache-dir "
+                        'ipykernel 2> /dev/null) || echo "no '
+                        'pip, ipykernel was not installed" '
+                        "&& echo '' && echo To open in VS "
+                        "Code Desktop, use link below: && "
+                        "echo '' && echo '  "
+                        "vscode://vscode-remote/ssh-remote+test-run/workflow' "
+                        "&& echo '' && echo 'To connect via "
+                        "SSH, use: `ssh test-run`' && echo '' "
+                        "&& echo -n 'To exit, press Ctrl+C.' "
+                        "&& tail -f /dev/null",
                     ],
-                    "entrypoint": ["/bin/bash", "-i", "-c"],
                     "env": {},
                     "gateway": None,
                     "home_dir": "/root",
@@ -204,7 +209,6 @@ def get_dev_env_run_dict(
                         "spot": True,
                     },
                     "retry_policy": {"limit": None, "retry": False},
-                    "setup": [],
                     "working_dir": ".",
                 },
                 "job_submissions": [

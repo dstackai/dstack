@@ -24,19 +24,3 @@ func TestJoinRelPath(t *testing.T) {
 	_, err = joinRelPath(base, "/tmp/repo/task")
 	assert.Error(t, err)
 }
-
-func TestJoinShellCommand(t *testing.T) {
-	var res []string
-
-	res = joinShellCommands([]string{})
-	assert.Equal(t, []string{}, res)
-
-	res = joinShellCommands([]string{"echo 1"})
-	assert.Equal(t, []string{"echo 1"}, res)
-
-	res = joinShellCommands([]string{"echo 1", "echo 2"})
-	assert.Equal(t, []string{"echo 1 && echo 2"}, res)
-
-	res = joinShellCommands([]string{"echo 1", "echo 2 &"})
-	assert.Equal(t, []string{"echo 1 && { echo 2 & }"}, res)
-}

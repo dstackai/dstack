@@ -163,14 +163,12 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 }
 
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
-	// todo recover
 	workingDir, err := joinRelPath(ex.workingDir, ex.jobSpec.WorkingDir)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 
-	args := makeArgs(ex.jobSpec.Entrypoint, ex.jobSpec.Commands)
-	cmd := exec.CommandContext(ctx, ex.jobSpec.Entrypoint[0], args...)
+	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
 	cmd.Env = makeEnv(ex.homeDir, ex.jobSpec.Env, ex.secrets)
 	cmd.Dir = workingDir
 	cmd.Cancel = func() error {

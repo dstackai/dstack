@@ -22,19 +22,7 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         )
         super().__init__(run_spec)
 
-    def _commands(self) -> List[str]:
-        commands = []
-        commands += self.run_spec.configuration.init
-        commands += ["tail -f /dev/null"]  # idle
-        return commands
-
-    def _default_max_duration(self) -> Optional[int]:
-        return DEFAULT_MAX_DURATION_SECONDS
-
-    def _retry_policy(self) -> RetryPolicy:
-        return RetryPolicy.parse_obj(self.run_spec.profile.retry_policy)
-
-    def _setup(self) -> List[str]:
+    def _shell_commands(self) -> List[str]:
         commands = []
         # commands += self.ide.get_install_if_not_found_commands()  # TODO fix version
         commands.append(INSTALL_IPYKERNEL)
@@ -46,7 +34,15 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
             "echo ''",
             "echo -n 'To exit, press Ctrl+C.'",
         ]
+        commands += self.run_spec.configuration.init
+        commands += ["tail -f /dev/null"]  # idle
         return commands
+
+    def _default_max_duration(self) -> Optional[int]:
+        return DEFAULT_MAX_DURATION_SECONDS
+
+    def _retry_policy(self) -> RetryPolicy:
+        return RetryPolicy.parse_obj(self.run_spec.profile.retry_policy)
 
     def _spot_policy(self) -> SpotPolicy:
         return self.run_spec.profile.spot_policy or SpotPolicy.ONDEMAND
