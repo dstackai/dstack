@@ -4,7 +4,6 @@ from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import RetryPolicy, RunSpec
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
-from dstack._internal.server.services.jobs.configurators.extensions.ssh import SSHd
 from dstack._internal.server.services.jobs.configurators.extensions.vscode import VSCodeDesktop
 
 DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
@@ -21,14 +20,12 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
             version="1",  # TODO pass version
             extensions=["ms-python.python", "ms-toolsai.jupyter"],
         )
-        self.sshd = SSHd(run_spec.ssh_key_pub)
         super().__init__(run_spec)
 
     def _commands(self) -> List[str]:
         commands = []
-        commands += self.sshd.get_start_commands()
         commands += self.run_spec.configuration.init
-        commands += ["cat"]  # idle
+        commands += ["tail -f /dev/null"]  # idle
         return commands
 
     def _default_max_duration(self) -> Optional[int]:
@@ -39,10 +36,7 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
 
     def _setup(self) -> List[str]:
         commands = []
-        if self.run_spec.configuration.image:
-            commands += self.sshd.get_required_commands()
-        commands += self.sshd.get_setup_commands()
-        commands += self.ide.get_install_if_not_found_commands()
+        # commands += self.ide.get_install_if_not_found_commands()  # TODO fix version
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup
         commands.append("echo ''")

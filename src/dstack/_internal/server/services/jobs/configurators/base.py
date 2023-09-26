@@ -32,7 +32,7 @@ class JobConfigurator(ABC):
             job_num=0,
             job_name=self.run_spec.run_name + "-0",
             app_specs=self._app_specs(),
-            commands=self._commands(),
+            commands=self._setup() + self._commands(),
             entrypoint=self._entrypoint(),
             env=self._env(),
             gateway=self._gateway(),
@@ -42,7 +42,7 @@ class JobConfigurator(ABC):
             registry_auth=self._registry_auth(),
             requirements=self._requirements(),
             retry_policy=self._retry_policy(),
-            setup=self._setup(),
+            setup=[],
             working_dir=self._working_dir(),
         )
         return [job_spec]
@@ -75,7 +75,7 @@ class JobConfigurator(ABC):
         if self.run_spec.configuration.entrypoint is not None:
             return shlex.split(self.run_spec.configuration.entrypoint)
         if self.run_spec.configuration.image is None:  # dstackai/base
-            return ["/bin/bash", "-i", "-c"]
+            return ["/bin/bash", "-c"]  # TODO -i
         if self._commands():  # custom docker image with commands
             return ["/bin/sh", "-i", "-c"]
         return None

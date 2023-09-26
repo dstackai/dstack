@@ -45,6 +45,7 @@ func (s *Server) streamJobLogs(conn *websocket.Conn) {
 			if currentPos >= len(jobLogsHistory) {
 				s.executor.RUnlock()
 				time.Sleep(100 * time.Millisecond)
+				continue
 			}
 		}
 		for currentPos < len(jobLogsHistory) {
