@@ -1,6 +1,6 @@
 import asyncio
 import weakref
-from typing import BinaryIO, Dict, Optional
+from typing import BinaryIO, Dict, Optional, Union
 
 import aiohttp
 import requests
@@ -46,7 +46,7 @@ class RunnerClient:
         resp = requests.post(self._url("/api/submit"), json=body)
         resp.raise_for_status()
 
-    def upload_code(self, file: BinaryIO):
+    def upload_code(self, file: Union[BinaryIO, bytes]):
         resp = requests.post(self._url("/api/upload_code"), data=file)
         resp.raise_for_status()
 

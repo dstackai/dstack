@@ -172,5 +172,5 @@ def _process_running_job(
 async def _get_job_code(session: AsyncSession, repo: RepoModel, code_hash: str) -> bytes:
     code_model = await get_code_model(session=session, repo=repo, code_hash=code_hash)
     if code_model is not None:
-        return code_model.blob_hash
+        return code_model.blob
     return b""
