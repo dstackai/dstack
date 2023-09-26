@@ -33,55 +33,24 @@ class SSHPortInUseError(SSHError):
 class SSHTunnel:
     def __init__(
         self,
-        hostname: str,
+        host: str,
+        id_rsa_path: PathLike,
         ports: Dict[int, int],
-        *,
-        user: Optional[str] = "ubuntu",
-        ssh_port: Optional[int] = None,
-        id_rsa: Optional[bytes] = None,
-        id_rsa_path: Optional[PathLike] = None,
-        control_sock_path: Optional[PathLike] = None,
-        options: Optional[Dict[str, str]] = None,
+        control_sock_path: PathLike,
+        options: Dict[str, str],
     ):
         """
         :param ports: Mapping { remote port -> local port }
         """
-        if id_rsa is not None and id_rsa_path is not None:
-            raise ValueError("Only one of id_rsa and id_rsa_path can be specified")
-        if id_rsa is None and id_rsa_path is None:
-            raise ValueError("One of id_rsa and id_rsa_path must be specified")
-
-        self.temp_dir = tempfile.TemporaryDirectory(prefix="dstack-")
-        if user is None:
-            self.host = hostname
-        else:
-            self.host = f"{user}@{hostname}"
-        self.ports = ports
+        self.host = host
         self.id_rsa_path = id_rsa_path
-        if id_rsa is not None:
-            self.id_rsa_path = os.path.join(self.temp_dir.name, "id_rsa")
-            with open(self.id_rsa_path, "wb", opener=_key_opener) as f:
-                f.write(id_rsa)
-        if options is None:
-            self.options = {
-                "StrictHostKeyChecking": "no",
-                "UserKnownHostsFile": "/dev/null",
-                "ExitOnForwardFailure": "yes",
-                "ConnectTimeout": "1",
-            }
-        else:
-            self.options = options
-        if ssh_port is not None:
-            self.options["Port"] = str(ssh_port)
-        if control_sock_path is None:
-            self.control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
-        else:
-            self.control_sock_path = str(control_sock_path)
-        self.options["ControlMaster"] = "auto"
-        self.options["ControlPath"] = self.control_sock_path
+        self.ports = ports
+        self.control_sock_path = control_sock_path
+        self.options = options
 
     def open(self):
-        command = ["ssh", "-f", "-N", "-i", self.id_rsa_path]
+        # ControlMaster and ControlPath are always set
+        command = ["ssh", "-f", "-N", "-M", "-S", self.control_sock_path, "-i", self.id_rsa_path]
         for k, v in self.options.items():
             command += ["-o", f"{k}={v}"]
         for port_remote, port_local in self.ports.items():
@@ -114,5 +83,65 @@ class SSHTunnel:
         self.close()
 
 
-def _key_opener(path, flags):
-    return os.open(path, flags, 0o600)
+class RunnerTunnel(SSHTunnel):
+    """
+    RunnerTunnel cancel forwarding without closing the connection on close()
+    """
+
+    def __init__(
+        self,
+        hostname: str,
+        ssh_port: int,
+        ports: Dict[int, int],
+        id_rsa: str,
+        *,
+        user: str = "ubuntu",
+        control_sock_path: Optional[PathLike] = None,
+        disconnect_delay: int = 5,
+    ):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        id_rsa_path = os.path.join(self.temp_dir.name, "id_rsa")
+        with open(
+            id_rsa_path, opener=lambda path, flags: os.open(path, flags, 0o600), mode="w"
+        ) as f:
+            f.write(id_rsa)
+        if control_sock_path is None:
+            control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
+        super().__init__(
+            host=f"{user}@{hostname}",
+            id_rsa_path=id_rsa_path,
+            ports=ports,
+            control_sock_path=control_sock_path,
+            options={
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+                "ExitOnForwardFailure": "yes",
+                "ConnectTimeout": "1",
+                "ControlPersist": f"{disconnect_delay}s",
+                "Port": ssh_port,
+            },
+        )
+
+    def close(self):
+        # cancel forwarding without closing the connection
+        command = ["ssh", "-S", self.control_sock_path, "-O", "cancel"]
+        for port_remote, port_local in self.ports.items():
+            command += ["-L", f"{port_local}:localhost:{port_remote}"]
+        command += [self.host]
+        subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+class ClientTunnel(SSHTunnel):
+    """
+    CLITunnel connects to the host from ssh config
+    """
+
+    def __init__(self, host: str, ports: Dict[int, int], id_rsa_path: PathLike):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        super().__init__(
+            host=host,
+            id_rsa_path=id_rsa_path,
+            ports=ports,
+            control_sock_path=os.path.join(self.temp_dir.name, "control.sock"),
+            options={},
+        )

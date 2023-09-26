@@ -2,7 +2,7 @@ import time
 
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh.ports import PortsLock
-from dstack._internal.core.services.ssh.tunnel import SSHError, SSHTunnel
+from dstack._internal.core.services.ssh.tunnel import ClientTunnel, SSHError
 from dstack._internal.utils.path import PathLike
 from dstack._internal.utils.ssh import (
     include_ssh_config,
@@ -25,9 +25,7 @@ class SSHAttach:
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
         self.run_name = run_name
-        self.tunnel = SSHTunnel(
-            run_name, self.ports, id_rsa_path=id_rsa_path, user=None, options={}
-        )
+        self.tunnel = ClientTunnel(run_name, self.ports, id_rsa_path=id_rsa_path)
         self.host_config = {
             "HostName": hostname,
             "Port": ssh_port,

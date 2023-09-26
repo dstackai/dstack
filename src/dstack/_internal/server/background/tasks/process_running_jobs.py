@@ -107,12 +107,12 @@ def _process_provisioning_job(
 ):
     ports = get_runner_ports()
     try:
-        with ssh_tunnel.SSHTunnel(
+        with ssh_tunnel.RunnerTunnel(
             hostname=job_submission.job_provisioning_data.hostname,
             ssh_port=job_submission.job_provisioning_data.ssh_port,
             user=job_submission.job_provisioning_data.username,
             ports=ports,
-            id_rsa=server_ssh_private_key.encode(),
+            id_rsa=server_ssh_private_key,
         ):
             runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
             alive = runner_client.healthcheck()
@@ -146,12 +146,12 @@ def _process_running_job(
     server_ssh_private_key: str,
 ):
     ports = get_runner_ports()
-    with ssh_tunnel.SSHTunnel(
+    with ssh_tunnel.RunnerTunnel(
         hostname=job_submission.job_provisioning_data.hostname,
         ssh_port=job_submission.job_provisioning_data.ssh_port,
         user=job_submission.job_provisioning_data.username,
         ports=ports,
-        id_rsa=server_ssh_private_key.encode(),
+        id_rsa=server_ssh_private_key,
     ):
         runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
         timestamp = 0
