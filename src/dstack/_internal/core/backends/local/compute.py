@@ -28,7 +28,7 @@ class LocalCompute(Compute):
                     resources=Resources(cpus=4, memory_mib=8192, gpus=[], spot=False),
                 ),
                 region="local",
-                price="0",
+                price=0.00,
                 availability=InstanceAvailability.AVAILABLE,
             )
         ]

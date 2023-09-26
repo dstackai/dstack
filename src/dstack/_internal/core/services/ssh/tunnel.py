@@ -92,10 +92,10 @@ class RunnerTunnel(SSHTunnel):
         self,
         hostname: str,
         ssh_port: int,
+        user: str,
         ports: Dict[int, int],
         id_rsa: str,
         *,
-        user: str = "ubuntu",
         control_sock_path: Optional[PathLike] = None,
         disconnect_delay: int = 5,
     ):
