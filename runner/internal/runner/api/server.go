@@ -21,7 +21,8 @@ type Server struct {
 
 	shutdownCh   chan interface{} // server closes this chan on shutdown
 	jobBarrierCh chan interface{} // only server listens on this chan
-	logsDoneCh   chan interface{}
+	pullDoneCh   chan interface{} // Closed then /api/pull gave everything
+	wsDoneCh     chan interface{} // Closed then /logs_ws gave everything
 
 	submitWaitDuration time.Duration
 	logsWaitDuration   time.Duration
@@ -42,7 +43,8 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 
 		shutdownCh:   make(chan interface{}),
 		jobBarrierCh: make(chan interface{}),
-		logsDoneCh:   make(chan interface{}),
+		pullDoneCh:   make(chan interface{}),
+		wsDoneCh:     make(chan interface{}),
 
 		submitWaitDuration: 2 * time.Minute,
 		logsWaitDuration:   30 * time.Second,
@@ -90,11 +92,22 @@ func (s *Server) Run() error {
 	close(s.shutdownCh)
 	signal.Reset(signals...)
 
-	select {
-	case <-s.logsDoneCh:
-		log.Info(context.TODO(), "Logs streaming finished")
-	case <-time.After(s.logsWaitDuration):
-		log.Error(context.TODO(), "Logs streaming didn't finish in time")
+	logsToWait := []struct {
+		ch   <-chan interface{}
+		name string
+	}{
+		{s.pullDoneCh, "/api/pull"},
+		{s.wsDoneCh, "/logs_ws"},
+	}
+	waitLogsDone := time.After(s.logsWaitDuration)
+	for _, ch := range logsToWait {
+		select {
+		case <-ch.ch:
+			log.Info(context.TODO(), "Logs streaming finished", "endpoint", ch.name)
+		case <-waitLogsDone:
+			log.Error(context.TODO(), "Logs streaming didn't finish in time")
+			break
+		}
 	}
 
 	return nil

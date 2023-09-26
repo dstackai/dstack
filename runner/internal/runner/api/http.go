@@ -95,7 +95,7 @@ func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (interfa
 	}
 
 	if s.executor.GetRunnerState() == executor.WaitLogsFinished {
-		defer func() { s.logsDoneCh <- 0 }()
+		defer func() { close(s.pullDoneCh) }()
 	}
 	return s.executor.GetHistory(timestamp), nil
 }
