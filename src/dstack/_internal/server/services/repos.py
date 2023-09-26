@@ -7,7 +7,7 @@ from fastapi import UploadFile
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError
 from dstack._internal.core.models.repos import (
     AnyRepoHead,
     AnyRepoInfo,
@@ -135,7 +135,7 @@ async def upload_code(
 ):
     repo = await get_repo_model(session=session, project=project, repo_id=repo_id)
     if repo is None:
-        raise ServerClientError(f"Repo {repo_id} does not exist")
+        raise RepoDoesNotExistError(repo_id)
     code_hash = file.filename
     code = await get_code_model(
         session=session,

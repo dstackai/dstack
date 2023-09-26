@@ -7,7 +7,7 @@ from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.utils.common as common_utils
-from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError
 from dstack._internal.core.models.runs import (
     Job,
     JobPlan,
@@ -19,24 +19,55 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
 from dstack._internal.server.services import backends as backends_services
-from dstack._internal.server.services import repos
+from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     job_model_to_job_submission,
     stop_job,
 )
+from dstack._internal.server.services.projects import (
+    get_project_model_by_name,
+    list_user_project_models,
+)
 from dstack._internal.utils.random_names import generate_name
 
 
-async def list_runs(
+async def list_user_runs(
+    session: AsyncSession,
+    user: UserModel,
+    project_name: Optional[str],
+    repo_id: Optional[str],
+) -> List[Run]:
+    projects = await list_user_project_models(session=session, user=user)
+    if project_name:
+        projects = [p for p in projects if p.name == project_name]
+    runs = []
+    for project in projects:
+        project_runs = await list_project_runs(
+            session=session,
+            project=project,
+            repo_id=repo_id,
+        )
+        runs.extend(project_runs)
+    return sorted(runs, key=lambda r: r.submitted_at, reverse=True)
+
+
+async def list_project_runs(
     session: AsyncSession,
     project: ProjectModel,
+    repo_id: Optional[str],
 ) -> List[Run]:
-    res = await session.execute(
-        select(RunModel).where(
-            RunModel.project_id == project.id,
+    filters = [RunModel.project_id == project.id]
+    if repo_id is not None:
+        repo = await repos_services.get_repo_model(
+            session=session,
+            project=project,
+            repo_id=repo_id,
         )
-    )
+        if repo is None:
+            raise RepoDoesNotExistError(repo_id)
+        filters.append(RunModel.repo_id == repo.id)
+    res = await session.execute(select(RunModel).where(*filters))
     run_models = res.scalars().all()
     return [run_model_to_run(r) for r in run_models]
 
@@ -89,13 +120,13 @@ async def submit_run(
     project: ProjectModel,
     run_spec: RunSpec,
 ) -> Run:
-    repo = await repos.get_repo_model(
+    repo = await repos_services.get_repo_model(
         session=session,
         project=project,
         repo_id=run_spec.repo_id,
     )
     if repo is None:
-        raise ServerClientError(f"Repo {run_spec.repo_id} does not exist")
+        raise RepoDoesNotExistError(run_spec.repo_id)
     if run_spec.run_name is None:
         run_spec.run_name = await _generate_run_name(
             session=session,

@@ -38,9 +38,13 @@ def raise_bad_request(details: List[Dict]):
 
 
 def raise_server_client_error(error: ServerClientError):
+    raise_bad_request(get_server_client_error_details(error))
+
+
+def get_server_client_error_details(error: ServerClientError) -> List[List[str]]:
     if len(error.fields) == 0:
-        raise_bad_request([error_detail(msg=error.msg, code=error.code)])
+        return [error_detail(msg=error.msg, code=error.code)]
     details = []
     for field_path in error.fields:
         details.append(error_detail(msg=error.msg, code=error.code, fields=field_path))
-    raise_bad_request(details)
+    return details

@@ -31,10 +31,7 @@ async def get_backend_config_values(
     body: AnyConfigInfoWithCredsPartial,
     user: UserModel = Depends(Authenticated()),
 ) -> AnyConfigValues:
-    try:
-        return await backends.get_backend_config_values(config=body)
-    except (BackendNotAvailable, BackendInvalidCredentialsError) as e:
-        raise_server_client_error(e)
+    return await backends.get_backend_config_values(config=body)
 
 
 @project_router.post("/create")
@@ -44,10 +41,7 @@ async def create_backend(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> AnyConfigInfoWithCreds:
     _, project = user_project
-    try:
-        return await backends.create_backend(session=session, project=project, config=body)
-    except (BackendNotAvailable, BackendInvalidCredentialsError) as e:
-        raise_server_client_error(e)
+    return await backends.create_backend(session=session, project=project, config=body)
 
 
 @project_router.post("/update")
@@ -57,10 +51,7 @@ async def update_backend(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> AnyConfigInfoWithCreds:
     _, project = user_project
-    try:
-        return await backends.update_backend(session=session, project=project, config=body)
-    except (BackendNotAvailable, BackendInvalidCredentialsError) as e:
-        raise_server_client_error(e)
+    return await backends.update_backend(session=session, project=project, config=body)
 
 
 @project_router.post("/delete")
@@ -81,11 +72,7 @@ async def get_backend_config_info(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> AnyConfigInfoWithCreds:
     _, project = user_project
-    try:
-        config_info = await backends.get_config_info(project=project, backend_type=backend_name)
-    except BackendNotAvailable as e:
-        raise_server_client_error(e)
-
+    config_info = await backends.get_config_info(project=project, backend_type=backend_name)
     if config_info is None:
         raise_not_found()
     return config_info

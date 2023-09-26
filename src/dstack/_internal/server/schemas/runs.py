@@ -1,8 +1,13 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
 from dstack._internal.core.models.runs import RunSpec
+
+
+class ListRunsRequest(BaseModel):
+    project_name: Optional[str]
+    repo_id: Optional[str]
 
 
 class GetRunRequest(BaseModel):

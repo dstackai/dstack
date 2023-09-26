@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,49 +10,56 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
     DeleteRunsRequest,
     GetRunRequest,
+    ListRunsRequest,
     StopRunsRequest,
     SubmitRunRequest,
 )
-from dstack._internal.server.security.permissions import ProjectMember
+from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
 from dstack._internal.server.utils.routers import raise_not_found, raise_server_client_error
 
-router = APIRouter(
+root_router = APIRouter(
+    prefix="/api/runs",
+    tags=["runs"],
+)
+project_router = APIRouter(
     prefix="/api/project/{project_name}/runs",
     tags=["runs"],
 )
 
 
-@router.post("/list")
+@root_router.post("/list")
 async def list_runs(
+    body: ListRunsRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    user: UserModel = Depends(Authenticated()),
 ) -> List[Run]:
-    _, project = user_project
-    return await runs.list_runs(session=session, project=project)
+    return await runs.list_user_runs(
+        session=session,
+        user=user,
+        project_name=body.project_name,
+        repo_id=body.repo_id,
+    )
 
 
-@router.post("/get")
+@project_router.post("/get")
 async def get_run(
     body: GetRunRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Run:
     _, project = user_project
-    try:
-        run = await runs.get_run(
-            session=session,
-            project=project,
-            run_name=body.run_name,
-        )
-    except ServerClientError as e:
-        raise_server_client_error(e)
+    run = await runs.get_run(
+        session=session,
+        project=project,
+        run_name=body.run_name,
+    )
     if run is None:
         raise_not_found()
     return run
 
 
-@router.post("/get_plan")
+@project_router.post("/get_plan")
 async def get_run_plan(
     body: SubmitRunRequest,
     session: AsyncSession = Depends(get_session),
@@ -68,25 +75,22 @@ async def get_run_plan(
     return run_plan
 
 
-@router.post("/submit")
+@project_router.post("/submit")
 async def submit_run(
     body: SubmitRunRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Run:
     user, project = user_project
-    try:
-        return await runs.submit_run(
-            session=session,
-            user=user,
-            project=project,
-            run_spec=body.run_spec,
-        )
-    except ServerClientError as e:
-        raise_server_client_error(e)
+    return await runs.submit_run(
+        session=session,
+        user=user,
+        project=project,
+        run_spec=body.run_spec,
+    )
 
 
-@router.post("/stop")
+@project_router.post("/stop")
 async def stop_runs(
     body: StopRunsRequest,
     session: AsyncSession = Depends(get_session),
@@ -101,14 +105,11 @@ async def stop_runs(
     )
 
 
-@router.post("/delete")
+@project_router.post("/delete")
 async def delete_runs(
     body: DeleteRunsRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
     _, project = user_project
-    try:
-        await runs.delete_runs(session=session, project=project, runs_names=body.runs_names)
-    except ServerClientError as e:
-        raise_server_client_error(e)
+    await runs.delete_runs(session=session, project=project, runs_names=body.runs_names)

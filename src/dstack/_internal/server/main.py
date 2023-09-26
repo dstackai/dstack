@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 
 import dstack.version
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.services.configs import create_default_project_config
 from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_session, get_session_ctx, migrate
@@ -14,6 +16,7 @@ from dstack._internal.server.services.projects import (
 from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import SERVER_URL
 from dstack._internal.server.utils.logging import configure_logging
+from dstack._internal.server.utils.routers import get_server_client_error_details
 
 
 @asynccontextmanager
@@ -40,6 +43,15 @@ app.include_router(projects.router)
 app.include_router(backends.root_router)
 app.include_router(backends.project_router)
 app.include_router(repos.router)
-app.include_router(runs.router)
+app.include_router(runs.root_router)
+app.include_router(runs.project_router)
 app.include_router(logs.router)
 app.include_router(secrets.router)
+
+
+@app.exception_handler(ServerClientError)
+async def server_client_error_handler(request: Request, exc: ServerClientError):
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": get_server_client_error_details(exc)},
+    )

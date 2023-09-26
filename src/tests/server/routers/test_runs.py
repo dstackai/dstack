@@ -310,14 +310,9 @@ def get_dev_env_run_dict(
 
 class TestListRuns:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
-        user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
-        response = client.post(
-            f"/api/project/{project.name}/runs/list",
-            headers=get_auth_headers(user.token),
-        )
-        assert response.status_code == 403
+    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
+        response = client.post(f"/api/runs/list")
+        assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
     async def test_lists_runs(self, test_db, session: AsyncSession):
@@ -347,10 +342,11 @@ class TestListRuns:
         )
         job_spec = JobSpec.parse_raw(job.job_spec_data)
         response = client.post(
-            f"/api/project/{project.name}/runs/list",
+            f"/api/runs/list",
             headers=get_auth_headers(user.token),
+            json={},
         )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.json()
         assert response.json() == [
             {
                 "id": str(run.id),

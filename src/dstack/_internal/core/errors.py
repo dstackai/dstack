@@ -22,6 +22,7 @@ class ServerClientErrorCode(str, enum.Enum):
     UNSPECIFIED_ERROR = "error"
     INVALID_CREDENTIALS = "invalid_credentials"
     BACKEND_NOT_AVAILABLE = "backend_not_available"
+    REPO_DOES_NOT_EXIST = "repo_does_not_exist"
 
 
 class ServerClientError(ServerError, ClientError):
@@ -44,6 +45,13 @@ class BackendInvalidCredentialsError(ServerClientError):
 class BackendNotAvailable(ServerClientError):
     code: ServerClientErrorCode = ServerClientErrorCode.BACKEND_NOT_AVAILABLE
     msg = "Backend not available"
+
+
+class RepoDoesNotExistError(ServerClientError):
+    code: ServerClientErrorCode = ServerClientErrorCode.REPO_DOES_NOT_EXIST
+
+    def __init__(self, repo_id: str):
+        self.msg = f"Repo {repo_id} does not exist"
 
 
 class BackendError(DstackError):

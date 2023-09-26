@@ -44,7 +44,6 @@ class RunnerClient:
             repo_credentials=repo_credentials,
         ).dict()
         resp = requests.post(self._url("/api/submit"), json=body)
-        print(resp.content)
         resp.raise_for_status()
 
     def upload_code(self, file: BinaryIO):
