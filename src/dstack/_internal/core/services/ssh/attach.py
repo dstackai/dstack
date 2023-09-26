@@ -26,7 +26,9 @@ class SSHAttach:
         self.ports = ports_lock.dict()
         self.run_name = run_name
         # TODO use ssh_port, jumphost, and controlpersist in config
-        self.tunnel = SSHTunnel(hostname, self.ports, id_rsa_path=id_rsa_path, user=user)
+        self.tunnel = SSHTunnel(
+            hostname, self.ports, id_rsa_path=id_rsa_path, user=user, ssh_port=ssh_port
+        )
         self.ssh_host = {
             "HostName": hostname,
             "User": user,

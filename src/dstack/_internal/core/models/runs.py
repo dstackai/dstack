@@ -122,6 +122,7 @@ class JobProvisioningData(BaseModel):
     hostname: str
     region: str
     price: float
+    username: str
     ssh_port: int  # could be different from 22 for some backends
     dockerized: bool  # True if JumpProxy is needed
 

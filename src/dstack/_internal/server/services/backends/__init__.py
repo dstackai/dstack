@@ -5,6 +5,7 @@ from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.base import Backend
+from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import BackendInvalidCredentialsError, BackendNotAvailable
 from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
@@ -20,6 +21,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import Job
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import Configurator
+from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -165,7 +167,10 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
 
 async def get_project_backends(project: ProjectModel) -> List[Backend]:
     backends_with_models = await get_project_backends_with_models(project)
-    return [b for _, b in backends_with_models]
+    backends = [b for _, b in backends_with_models]
+    if LOCAL_BACKEND_ENABLED:
+        backends.append(LocalBackend())
+    return backends
 
 
 async def get_project_backend_by_type(

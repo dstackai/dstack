@@ -165,6 +165,7 @@ class AWSCompute(Compute):
                 instance_id=instance.instance_id,
                 ip_address=instance.public_ip_address,
                 region=instance_offer.region,
+                username="ubuntu",
                 ssh_port=22,
                 dockerized=True,  # because `dstack-shim docker` is used
             )

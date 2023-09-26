@@ -93,6 +93,8 @@ async def get_run_plan(
     run_spec: RunSpec,
 ) -> RunPlan:
     backends = await backends_services.get_project_backends(project=project)
+    if run_spec.profile.backends is not None:
+        backends = [b for b in backends if b.TYPE in run_spec.profile.backends]
     run_spec.run_name = "dry-run"
     jobs = get_jobs_from_run_spec(run_spec)
     job_plans = []

@@ -101,6 +101,8 @@ async def _run_job(
     backends: List[Backend],
     project_ssh_public_key: str,
 ) -> Optional[JobProvisioningData]:
+    if run.run_spec.profile.backends is not None:
+        backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
     candidates = await backends_services.get_instance_offers(
         backends, job, exclude_not_available=True
     )
@@ -131,6 +133,7 @@ async def _run_job(
                 hostname=launched_instance_info.ip_address,
                 region=launched_instance_info.region,
                 price=offer.price,
+                username=launched_instance_info.username,
                 ssh_port=launched_instance_info.ssh_port,
                 dockerized=launched_instance_info.dockerized,
             )

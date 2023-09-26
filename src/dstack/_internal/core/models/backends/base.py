@@ -9,6 +9,7 @@ class BackendType(str, enum.Enum):
     AZURE = "azure"
     GCP = "gcp"
     LAMBDA = "lambda"
+    LOCAL = "local"
 
 
 class ConfigElementValue(BaseModel):

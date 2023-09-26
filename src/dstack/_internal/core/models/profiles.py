@@ -5,20 +5,12 @@ from typing import List, Optional, Union
 from pydantic import Field, confloat, root_validator, validator
 from typing_extensions import Annotated, Literal
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ForbidExtra
 
 DEFAULT_CPU = 2
 DEFAULT_MEM = "8GB"
 DEFAULT_RETRY_LIMIT = 3600
-
-
-BackendTypeLiteral = Union[
-    Literal["local"],
-    Literal["aws"],
-    Literal["azure"],
-    Literal["gcp"],
-    Literal["lambda"],
-]
 
 
 class SpotPolicy(str, Enum):
@@ -130,7 +122,7 @@ class ProfileRetryPolicy(ForbidExtra):
 
 class Profile(ForbidExtra):
     name: str
-    backends: Optional[List[BackendTypeLiteral]]
+    backends: Optional[List[BackendType]]
     resources: ProfileResources = ProfileResources()
     spot_policy: Annotated[
         Optional[SpotPolicy],

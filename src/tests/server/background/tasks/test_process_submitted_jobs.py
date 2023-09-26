@@ -82,6 +82,7 @@ class TestProcessSubmittedJobs:
                 instance_id="instance_id",
                 region="us",
                 ip_address="1.1.1.1",
+                username="ubuntu",
                 ssh_port=22,
                 dockerized=True,
             )

@@ -19,6 +19,7 @@ class SSHd:
     def get_setup_commands(self) -> List[str]:
         return [
             f'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
+            f'sed -i "s/PermitRootLogin yes/PermitRootLogin yes/g" /etc/ssh/sshd_config',
             f"mkdir -p /run/sshd ~/.ssh",
             f"chmod 700 ~/.ssh",
             f"touch ~/.ssh/authorized_keys",

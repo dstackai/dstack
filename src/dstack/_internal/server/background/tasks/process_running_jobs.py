@@ -109,6 +109,8 @@ def _process_provisioning_job(
     try:
         with ssh_tunnel.SSHTunnel(
             hostname=job_submission.job_provisioning_data.hostname,
+            ssh_port=job_submission.job_provisioning_data.ssh_port,
+            user=job_submission.job_provisioning_data.username,
             ports=ports,
             id_rsa=server_ssh_private_key.encode(),
         ):
@@ -146,6 +148,8 @@ def _process_running_job(
     ports = get_runner_ports()
     with ssh_tunnel.SSHTunnel(
         hostname=job_submission.job_provisioning_data.hostname,
+        ssh_port=job_submission.job_provisioning_data.ssh_port,
+        user=job_submission.job_provisioning_data.username,
         ports=ports,
         id_rsa=server_ssh_private_key.encode(),
     ):

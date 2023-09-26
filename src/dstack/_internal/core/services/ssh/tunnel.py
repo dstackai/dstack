@@ -101,7 +101,7 @@ class SSHTunnel:
         if b": Connection refused" in r.stderr:
             raise SSHConnectionRefusedError()
         if b": Permission denied (publickey)" in r.stderr:
-            raise SSHKeyError()
+            raise SSHKeyError(r.stderr)
         if b": Address already in use" in r.stderr:
             raise SSHPortInUseError()
         raise SSHError(r.stderr.decode())
