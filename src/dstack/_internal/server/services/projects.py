@@ -42,6 +42,11 @@ async def list_user_projects(
     return [project_model_to_project(p) for p in projects]
 
 
+async def list_projects(session: AsyncSession) -> List[Project]:
+    projects = await list_project_models(session=session)
+    return [project_model_to_project(p) for p in projects]
+
+
 async def get_project_by_name(
     session: AsyncSession,
     project_name: str,
@@ -142,6 +147,13 @@ async def list_user_project_models(
             MemberModel.user_id == user.id,
         )
     )
+    return res.scalars().all()
+
+
+async def list_project_models(
+    session: AsyncSession,
+) -> List[ProjectModel]:
+    res = await session.execute(select(ProjectModel))
     return res.scalars().all()
 
 

@@ -8,10 +8,14 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.runs import Job, JobStatus, JobSubmission, Run
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
-from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import CodeModel, JobModel, RepoModel, RunModel
-from dstack._internal.server.services.jobs import job_model_to_job_submission
+from dstack._internal.server.services.jobs import (
+    RUNNING_PROCESSING_JOBS_IDS,
+    RUNNING_PROCESSING_JOBS_LOCK,
+    get_runner_ports,
+    job_model_to_job_submission,
+)
 from dstack._internal.server.services.repos import get_code_model
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runs import run_model_to_run
@@ -22,21 +26,14 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-_PROCESSING_JOBS_LOCK = asyncio.Lock()
-_PROCESSING_JOBS_IDS = set()
-
-
-_REMOTE_RUNNER_PORT = 10999
-
-
 async def process_running_jobs():
     async with get_session_ctx() as session:
-        async with _PROCESSING_JOBS_LOCK:
+        async with RUNNING_PROCESSING_JOBS_LOCK:
             res = await session.execute(
                 select(JobModel)
                 .where(
                     JobModel.status.in_([JobStatus.PROVISIONING, JobStatus.RUNNING]),
-                    JobModel.id.not_in(_PROCESSING_JOBS_IDS),
+                    JobModel.id.not_in(RUNNING_PROCESSING_JOBS_IDS),
                 )
                 .order_by(JobModel.last_processed_at.desc())
                 .limit(1)  # TODO process multiple at once
@@ -45,13 +42,12 @@ async def process_running_jobs():
             if job_model is None:
                 return
 
-            _PROCESSING_JOBS_IDS.add(job_model.id)
+            RUNNING_PROCESSING_JOBS_IDS.add(job_model.id)
 
     try:
         await _process_job(job_id=job_model.id)
     finally:
-        async with _PROCESSING_JOBS_LOCK:
-            _PROCESSING_JOBS_IDS.remove(job_model.id)
+        RUNNING_PROCESSING_JOBS_IDS.remove(job_model.id)
 
 
 async def _process_job(job_id: UUID):
@@ -109,14 +105,14 @@ def _process_provisioning_job(
     code: bytes,
     server_ssh_private_key: str,
 ):
-    ports = _get_ports()
+    ports = get_runner_ports()
     try:
         with ssh_tunnel.SSHTunnel(
             hostname=job_submission.job_provisioning_data.hostname,
             ports=ports,
             id_rsa=server_ssh_private_key.encode(),
         ):
-            runner_client = client.RunnerClient(port=ports[_REMOTE_RUNNER_PORT])
+            runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
             alive = runner_client.healthcheck()
             if not alive:
                 logger.debug("Runner %s is not alive", job_model.job_name)
@@ -147,13 +143,13 @@ def _process_running_job(
     job_submission: JobSubmission,
     server_ssh_private_key: str,
 ):
-    ports = _get_ports()
+    ports = get_runner_ports()
     with ssh_tunnel.SSHTunnel(
         hostname=job_submission.job_provisioning_data.hostname,
         ports=ports,
         id_rsa=server_ssh_private_key.encode(),
     ):
-        runner_client = client.RunnerClient(port=ports[_REMOTE_RUNNER_PORT])
+        runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
         timestamp = 0
         if job_model.runner_timestamp is not None:
             timestamp = job_model.runner_timestamp
@@ -174,11 +170,3 @@ async def _get_job_code(session: AsyncSession, repo: RepoModel, code_hash: str) 
     if code_model is not None:
         return code_model.blob_hash
     return b""
-
-
-def _get_ports() -> Dict[int, int]:
-    ports_lock = PortsLock({_REMOTE_RUNNER_PORT: 0})
-    ports_lock.acquire()
-    ports = ports_lock.dict()
-    ports_lock.release()
-    return ports

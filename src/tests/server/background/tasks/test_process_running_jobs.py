@@ -1,12 +1,12 @@
 import json
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
-from uuid import UUID
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceType, Resources
 from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
@@ -17,12 +17,13 @@ from tests.server.common import create_job, create_project, create_repo, create_
 
 def get_job_provisioning_data() -> JobProvisioningData:
     return JobProvisioningData(
-        hostname="127.0.0.4",
+        backend=BackendType.AWS,
         instance_type=InstanceType(
             name="instance",
             resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
         ),
         instance_id="instance_id",
+        hostname="127.0.0.4",
         region="us-east-1",
         price=10.5,
     )

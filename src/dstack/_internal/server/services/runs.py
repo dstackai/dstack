@@ -23,6 +23,7 @@ from dstack._internal.server.services import repos
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     job_model_to_job_submission,
+    stop_job,
 )
 from dstack._internal.utils.random_names import generate_name
 
@@ -144,16 +145,23 @@ async def stop_runs(
     new_status = JobStatus.TERMINATED
     if abort:
         new_status = JobStatus.ABORTED
+
     # TODO stop instances
-    await session.execute(
-        update(JobModel)
-        .where(
+    res = await session.execute(
+        select(JobModel).where(
             JobModel.project_id == project.id,
             JobModel.run_name.in_(runs_names),
             JobModel.status.not_in(JobStatus.finished_statuses()),
         )
-        .values(status=new_status)
     )
+    job_models = res.scalars().all()
+    for job_model in job_models:
+        await stop_job(
+            session=session,
+            project=project,
+            job_model=job_model,
+            new_status=new_status,
+        )
 
 
 async def delete_runs(

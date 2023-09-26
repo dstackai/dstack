@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 from pydantic import UUID4, BaseModel, Field
 from typing_extensions import Annotated
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration, RegistryAuth
 from dstack._internal.core.models.instances import InstanceCandidate, InstanceType
 from dstack._internal.core.models.profiles import Profile, SpotPolicy
@@ -115,9 +116,10 @@ class JobSpec(BaseModel):
 
 
 class JobProvisioningData(BaseModel):
-    hostname: str
+    backend: BackendType
     instance_type: InstanceType
     instance_id: str
+    hostname: str
     region: str
     price: float
 

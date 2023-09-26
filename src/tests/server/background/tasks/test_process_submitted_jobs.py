@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -65,6 +66,7 @@ class TestProcessSubmittedJobs:
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock = Mock()
             m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = [
                 InstanceOfferWithAvailability(
                     instance=InstanceType(

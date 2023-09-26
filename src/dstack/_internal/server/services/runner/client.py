@@ -10,6 +10,8 @@ from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.runs import JobSpec, RunSpec
 from dstack._internal.server.schemas.runner import PullResponse, SubmitBody
 
+REMOTE_RUNNER_PORT = 10999
+
 
 class RunnerClient:
     def __init__(

@@ -168,6 +168,16 @@ async def get_project_backends(project: ProjectModel) -> List[Backend]:
     return [b for _, b in backends_with_models]
 
 
+async def get_project_backend_by_type(
+    project: ProjectModel, backend_type: BackendType
+) -> Optional[Backend]:
+    backends = await get_project_backends(project=project)
+    for backend in backends:
+        if backend.TYPE == backend_type:
+            return backend
+    return None
+
+
 def clear_backend_cache(project_name: str):
     if project_name in _BACKENDS_CACHE:
         del _BACKENDS_CACHE[project_name]

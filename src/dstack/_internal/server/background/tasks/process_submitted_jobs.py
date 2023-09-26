@@ -19,6 +19,10 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.jobs import (
+    SUBMITTED_PROCESSING_JOBS_IDS,
+    SUBMITTED_PROCESSING_JOBS_LOCK,
+)
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
@@ -27,18 +31,14 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-_PROCESSING_JOBS_LOCK = asyncio.Lock()
-_PROCESSING_JOBS_IDS = set()
-
-
 async def process_submitted_jobs():
     async with get_session_ctx() as session:
-        async with _PROCESSING_JOBS_LOCK:
+        async with SUBMITTED_PROCESSING_JOBS_LOCK:
             res = await session.execute(
                 select(JobModel)
                 .where(
                     JobModel.status == JobStatus.SUBMITTED,
-                    JobModel.id.not_in(_PROCESSING_JOBS_IDS),
+                    JobModel.id.not_in(SUBMITTED_PROCESSING_JOBS_IDS),
                 )
                 .limit(1)  # TODO process multiple at once
             )
@@ -46,13 +46,12 @@ async def process_submitted_jobs():
             if job_model is None:
                 return
 
-            _PROCESSING_JOBS_IDS.add(job_model.id)
+            SUBMITTED_PROCESSING_JOBS_IDS.add(job_model.id)
 
     try:
         await _process_job(job_id=job_model.id)
     finally:
-        async with _PROCESSING_JOBS_LOCK:
-            _PROCESSING_JOBS_IDS.remove(job_model.id)
+        SUBMITTED_PROCESSING_JOBS_IDS.remove(job_model.id)
 
 
 async def _process_job(job_id: UUID):
@@ -126,9 +125,10 @@ async def _run_job(
             continue
         else:
             return JobProvisioningData(
-                hostname=launched_instance_info.ip_address,
+                backend=backend.TYPE,
                 instance_type=offer.instance,
                 instance_id=launched_instance_info.instance_id,
+                hostname=launched_instance_info.ip_address,
                 region=launched_instance_info.region,
                 price=offer.price,
             )
