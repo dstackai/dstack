@@ -131,6 +131,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		}
 
 		// todo fail reason?
+		log.Error(ctx, "Exec failed", "err", err)
 		ex.SetJobState(ctx, states.Failed)
 	}
 
@@ -183,6 +184,8 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		return gerrors.Wrap(err)
 	}
 	cmd.Stderr = cmd.Stdout // merge stderr into stdout
+
+	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
 
 	if err := cmd.Start(); err != nil {
 		return gerrors.Wrap(err)

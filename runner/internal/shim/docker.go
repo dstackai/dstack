@@ -46,11 +46,11 @@ func RunDocker(ctx context.Context, config DockerConfig) error {
 		log.Println("Deleting container")
 		_ = config.DeleteContainer(ctx, client, containerID)
 	}()
-	log.Println("Running container")
+	log.Printf("Running container, id=%s\n", containerID)
 	if err = config.RunContainer(ctx, client, containerID); err != nil {
 		return gerrors.Wrap(err)
 	}
-	log.Println("Container finished")
+	log.Println("Container finished successfully")
 	return nil
 }
 

@@ -20,6 +20,7 @@ from dstack._internal.server.models import JobModel, ProjectModel
 from dstack._internal.server.services.backends import get_project_backend_by_type
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
+from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.utils.common import run_async
 
@@ -120,6 +121,8 @@ def _get_job_configurator(run_spec: RunSpec) -> JobConfigurator:
 
 _job_configurator_classes = [
     DevEnvironmentJobConfigurator,
+    TaskJobConfigurator,
+    # ServiceJobConfigurator,
 ]
 
 _configuration_type_to_configurator_class_map = {c.TYPE: c for c in _job_configurator_classes}
