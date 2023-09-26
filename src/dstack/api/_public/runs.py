@@ -106,13 +106,14 @@ class Run(ABC):
 
             if self._ports_lock is None:
                 self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
-            self._ssh_attach = SSHAttach(  # TODO jumphost
-                hostname=self.hostname,
-                ssh_port=self._run.jobs[0].job_submissions[-1].job_provisioning_data.ssh_port,
-                user=self._run.jobs[0].job_submissions[-1].job_provisioning_data.username,
-                ports_lock=self._ports_lock,
-                id_rsa_path=self._ssh_identity_file,
-                run_name=self.name,
+            provisioning_data = self._run.jobs[0].job_submissions[-1].job_provisioning_data
+            self._ssh_attach = SSHAttach(
+                self.hostname,
+                self._ports_lock,
+                self._ssh_identity_file,
+                self.name,
+                ssh_port=provisioning_data.ssh_port,
+                dockerized=provisioning_data.dockerized,
             )
             self._ssh_attach.attach()
             self._ports_lock = None

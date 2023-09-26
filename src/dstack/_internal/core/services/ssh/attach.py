@@ -20,30 +20,46 @@ class SSHAttach:
         run_name: str,
         user: str = "ubuntu",
         ssh_port: int = 22,
+        dockerized: bool = False,
     ):
-        # TODO jumphost configuration
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
         self.run_name = run_name
-        # TODO use ssh_port, jumphost, and controlpersist in config
         self.tunnel = SSHTunnel(
-            hostname, self.ports, id_rsa_path=id_rsa_path, user=user, ssh_port=ssh_port
+            run_name, self.ports, id_rsa_path=id_rsa_path, user=None, options={}
         )
-        self.ssh_host = {
+        self.host_config = {
             "HostName": hostname,
+            "Port": ssh_port,
             "User": user,
             "IdentityFile": id_rsa_path,
             "StrictHostKeyChecking": "no",
             "UserKnownHostsFile": "/dev/null",
-            "ControlPath": self.tunnel.control_sock_path,
-            "ControlMaster": "auto",
-            "ControlPersist": "yes",
         }
+        if dockerized:
+            self.container_config = {
+                "HostName": "localhost",
+                "Port": 10022,
+                "User": "root",
+                "IdentityFile": id_rsa_path,
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+                "ControlPath": self.tunnel.control_sock_path,
+                "ControlMaster": "auto",
+                "ControlPersist": "yes",
+                "ProxyJump": f"{run_name}-host",
+            }
+        else:
+            self.container_config = None
         self.ssh_config_path = str(ConfigManager().dstack_ssh_config_path)
 
     def attach(self):
         include_ssh_config(self.ssh_config_path)
-        ssh_config_add_host(self.ssh_config_path, self.run_name, self.ssh_host)
+        if self.container_config is None:
+            ssh_config_add_host(self.ssh_config_path, self.run_name, self.host_config)
+        else:
+            ssh_config_add_host(self.ssh_config_path, f"{self.run_name}-host", self.host_config)
+            ssh_config_add_host(self.ssh_config_path, self.run_name, self.container_config)
 
         max_retries = 10
         self._ports_lock.release()
@@ -60,6 +76,7 @@ class SSHAttach:
 
     def detach(self):
         self.tunnel.close()
+        ssh_config_remove_host(self.ssh_config_path, f"{self.run_name}-host")
         ssh_config_remove_host(self.ssh_config_path, self.run_name)
 
     def __enter__(self):

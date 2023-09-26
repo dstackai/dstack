@@ -37,9 +37,10 @@ class SSHTunnel:
         ports: Dict[int, int],
         *,
         user: Optional[str] = "ubuntu",
-        ssh_port: int = 22,
+        ssh_port: Optional[int] = None,
         id_rsa: Optional[bytes] = None,
         id_rsa_path: Optional[PathLike] = None,
+        control_sock_path: Optional[PathLike] = None,
         options: Optional[Dict[str, str]] = None,
     ):
         """
@@ -51,9 +52,6 @@ class SSHTunnel:
             raise ValueError("One of id_rsa and id_rsa_path must be specified")
 
         self.temp_dir = tempfile.TemporaryDirectory(prefix="dstack-")
-        # socket path must be shorter than 104 chars
-        self.control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
-        self.ssh_port = ssh_port
         if user is None:
             self.host = hostname
         else:
@@ -70,22 +68,20 @@ class SSHTunnel:
                 "UserKnownHostsFile": "/dev/null",
                 "ExitOnForwardFailure": "yes",
                 "ConnectTimeout": "1",
-                "ControlMaster": "auto",
-                "ControlPath": self.control_sock_path,
             }
         else:
             self.options = options
+        if ssh_port is not None:
+            self.options["Port"] = str(ssh_port)
+        if control_sock_path is None:
+            self.control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
+        else:
+            self.control_sock_path = str(control_sock_path)
+        self.options["ControlMaster"] = "auto"
+        self.options["ControlPath"] = self.control_sock_path
 
     def open(self):
-        command = [
-            "ssh",
-            "-f",  # background
-            "-N",  # no exec
-            "-i",
-            self.id_rsa_path,
-            "-p",
-            str(self.ssh_port),
-        ]
+        command = ["ssh", "-f", "-N", "-i", self.id_rsa_path]
         for k, v in self.options.items():
             command += ["-o", f"{k}={v}"]
         for port_remote, port_local in self.ports.items():
