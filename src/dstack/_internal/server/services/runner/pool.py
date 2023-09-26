@@ -44,7 +44,7 @@ class RunnerConnectionPool:
         async with self._lock:
             port = self._ports.pop(key)  # raises KeyError if not found
         tunnel = self._tunnels.pop(port)
-        logger.info(f"Closing SSH connection to {tunnel.hostname}")
+        logger.info(f"Closing SSH connection to {tunnel.host}")
         await run_async(tunnel.close)
 
     def _allocate_port(self) -> int:

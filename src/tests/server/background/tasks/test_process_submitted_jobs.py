@@ -82,6 +82,8 @@ class TestProcessSubmittedJobs:
                 instance_id="instance_id",
                 region="us",
                 ip_address="1.1.1.1",
+                ssh_port=22,
+                dockerized=True,
             )
             await process_submitted_jobs()
             m.assert_called_once()

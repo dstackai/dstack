@@ -106,7 +106,7 @@ class Run(ABC):
 
             if self._ports_lock is None:
                 self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
-            self._ssh_attach = SSHAttach(
+            self._ssh_attach = SSHAttach(  # TODO jumphost
                 self.hostname, self._ports_lock, self._ssh_identity_file, self.name
             )
             self._ssh_attach.attach()
@@ -154,8 +154,8 @@ class SubmittedRun(Run):
 
             ws = WebSocketApp(
                 f"ws://localhost:{self.ports[10999]}/logs_ws",
-                on_open=lambda _: logging.debug("WebSocket logs are connected"),
-                on_close=lambda _, __, ___: logging.debug("WebSocket logs are disconnected"),
+                on_open=lambda _: logger.debug("WebSocket logs are connected"),
+                on_close=lambda _, __, ___: logger.debug("WebSocket logs are disconnected"),
                 on_message=lambda _, message: queue.put(message),
             )
             threading.Thread(target=ws_thread).start()

@@ -36,9 +36,11 @@ class SSHTunnel:
         hostname: str,
         ports: Dict[int, int],
         *,
-        user: str = "ubuntu",
+        user: Optional[str] = "ubuntu",
+        ssh_port: int = 22,
         id_rsa: Optional[bytes] = None,
         id_rsa_path: Optional[PathLike] = None,
+        options: Optional[Dict[str, str]] = None,
     ):
         """
         :param ports: Mapping { remote port -> local port }
@@ -51,37 +53,44 @@ class SSHTunnel:
         self.temp_dir = tempfile.TemporaryDirectory(prefix="dstack-")
         # socket path must be shorter than 104 chars
         self.control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
-        self.user = user
-        self.hostname = hostname
+        self.ssh_port = ssh_port
+        if user is None:
+            self.host = hostname
+        else:
+            self.host = f"{user}@{hostname}"
         self.ports = ports
         self.id_rsa_path = id_rsa_path
         if id_rsa is not None:
             self.id_rsa_path = os.path.join(self.temp_dir.name, "id_rsa")
             with open(self.id_rsa_path, "wb", opener=_key_opener) as f:
                 f.write(id_rsa)
+        if options is None:
+            self.options = {
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+                "ExitOnForwardFailure": "yes",
+                "ConnectTimeout": "1",
+                "ControlMaster": "auto",
+                "ControlPath": self.control_sock_path,
+            }
+        else:
+            self.options = options
 
     def open(self):
         command = [
             "ssh",
-            "-f",
-            "-N",
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            "-o",
-            "ExitOnForwardFailure=yes",
-            "-o",
-            "ConnectTimeout=1",
-            "-M",
-            "-S",
-            self.control_sock_path,
+            "-f",  # background
+            "-N",  # no exec
             "-i",
             self.id_rsa_path,
+            "-p",
+            str(self.ssh_port),
         ]
+        for k, v in self.options.items():
+            command += ["-o", f"{k}={v}"]
         for port_remote, port_local in self.ports.items():
             command += ["-L", f"{port_local}:localhost:{port_remote}"]
-        command += [f"{self.user}@{self.hostname}"]
+        command += [self.host]
 
         logger.debug("Starting SSH tunnel: %s", command)
         r = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -98,7 +107,7 @@ class SSHTunnel:
         raise SSHError(r.stderr.decode())
 
     def close(self):
-        command = ["ssh", "-S", self.control_sock_path, "-O", "exit", self.hostname]
+        command = ["ssh", "-S", self.control_sock_path, "-O", "exit", self.host]
         subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     def __enter__(self):

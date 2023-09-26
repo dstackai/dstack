@@ -131,5 +131,7 @@ async def _run_job(
                 hostname=launched_instance_info.ip_address,
                 region=launched_instance_info.region,
                 price=offer.price,
+                ssh_port=launched_instance_info.ssh_port,
+                dockerized=launched_instance_info.dockerized,
             )
     return None

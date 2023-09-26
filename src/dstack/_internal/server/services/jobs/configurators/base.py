@@ -75,7 +75,7 @@ class JobConfigurator(ABC):
         if self.run_spec.configuration.entrypoint is not None:
             return shlex.split(self.run_spec.configuration.entrypoint)
         if self.run_spec.configuration.image is None:  # dstackai/base
-            return ["/bin/bash", "-c"]  # TODO -i
+            return ["/bin/bash", "-i", "-c"]
         if self._commands():  # custom docker image with commands
             return ["/bin/sh", "-i", "-c"]
         return None

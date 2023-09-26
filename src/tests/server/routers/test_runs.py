@@ -83,8 +83,16 @@ def get_dev_env_run_plan_dict(
                 "job_spec": {
                     "app_specs": [],
                     "commands": [
-                        "/usr/sbin/sshd -p 10022 " "-o " "PermitUserEnvironment=yes",
-                        "cat",
+                        '(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"',
+                        "echo ''",
+                        "echo To open in VS Code Desktop, use " "link below:",
+                        "echo ''",
+                        "echo '  " "vscode://vscode-remote/ssh-remote+dry-run/workflow'",
+                        "echo ''",
+                        "echo 'To connect via SSH, use: `ssh dry-run`'",
+                        "echo ''",
+                        "echo -n 'To exit, press Ctrl+C.'",
+                        "tail -f /dev/null",
                     ],
                     "entrypoint": ["/bin/bash", "-i", "-c"],
                     "env": {},
@@ -104,58 +112,7 @@ def get_dev_env_run_plan_dict(
                         "spot": True,
                     },
                     "retry_policy": {"limit": None, "retry": False},
-                    "setup": [
-                        "sed -i "
-                        '"s/.*PasswordAuthentication.*/PasswordAuthentication '
-                        'no/g" /etc/ssh/sshd_config',
-                        "mkdir -p /run/sshd ~/.ssh",
-                        "chmod 700 ~/.ssh",
-                        "touch ~/.ssh/authorized_keys",
-                        "chmod 600 " "~/.ssh/authorized_keys",
-                        "rm -rf /etc/ssh/ssh_host_*",
-                        'echo "ssh_key" >> ' "~/.ssh/authorized_keys",
-                        "env >> ~/.ssh/environment",
-                        'echo "export PATH=$PATH" >> ' "~/.profile",
-                        "ssh-keygen -A > /dev/null",
-                        "if [ ! -d "
-                        '~/.vscode-server/bin/"1" ]; '
-                        "then if [ $(uname -m) = "
-                        '"aarch64" ]; then '
-                        'arch="arm64"; else '
-                        'arch="x64"; fi && mkdir -p '
-                        "/tmp && wget -q "
-                        "--show-progress "
-                        '"https://update.code.visualstudio.com/commit:1/server-linux-$arch/stable" '
-                        "-O "
-                        '"/tmp/vscode-server-linux-$arch.tar.gz" '
-                        "&& mkdir -vp "
-                        '~/.vscode-server/bin/"1" && '
-                        "tar --no-same-owner -xz "
-                        "--strip-components=1 -C "
-                        '~/.vscode-server/bin/"1" -f '
-                        '"/tmp/vscode-server-linux-$arch.tar.gz" '
-                        "&& rm "
-                        '"/tmp/vscode-server-linux-$arch.tar.gz" '
-                        "&& "
-                        'PATH="$PATH":~/.vscode-server/bin/"1"/bin '
-                        "code-server "
-                        "--install-extension "
-                        '"ms-python.python" '
-                        "--install-extension "
-                        '"ms-toolsai.jupyter"; fi',
-                        "(pip install -q "
-                        "--no-cache-dir ipykernel 2> "
-                        '/dev/null) || echo "no pip, '
-                        'ipykernel was not installed"',
-                        "echo ''",
-                        "echo To open in VS Code " "Desktop, use link below:",
-                        "echo ''",
-                        f"echo '  vscode://vscode-remote/ssh-remote+{run_name}/workflow'",
-                        "echo ''",
-                        f"echo 'To connect via SSH, use: `ssh {run_name}`'",
-                        "echo ''",
-                        "echo -n 'To exit, press " "Ctrl+C.'",
-                    ],
+                    "setup": [],
                     "working_dir": ".",
                 },
                 "candidates": [json.loads(c.json()) for c in candidates],
@@ -218,8 +175,16 @@ def get_dev_env_run_dict(
                 "job_spec": {
                     "app_specs": [],
                     "commands": [
-                        "/usr/sbin/sshd -p 10022 " "-o " "PermitUserEnvironment=yes",
-                        "cat",
+                        '(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"',
+                        "echo ''",
+                        "echo To open in VS Code Desktop, use " "link below:",
+                        "echo ''",
+                        "echo '  " "vscode://vscode-remote/ssh-remote+test-run/workflow'",
+                        "echo ''",
+                        "echo 'To connect via SSH, use: `ssh test-run`'",
+                        "echo ''",
+                        "echo -n 'To exit, press Ctrl+C.'",
+                        "tail -f /dev/null",
                     ],
                     "entrypoint": ["/bin/bash", "-i", "-c"],
                     "env": {},
@@ -239,58 +204,7 @@ def get_dev_env_run_dict(
                         "spot": True,
                     },
                     "retry_policy": {"limit": None, "retry": False},
-                    "setup": [
-                        "sed -i "
-                        '"s/.*PasswordAuthentication.*/PasswordAuthentication '
-                        'no/g" /etc/ssh/sshd_config',
-                        "mkdir -p /run/sshd ~/.ssh",
-                        "chmod 700 ~/.ssh",
-                        "touch ~/.ssh/authorized_keys",
-                        "chmod 600 " "~/.ssh/authorized_keys",
-                        "rm -rf /etc/ssh/ssh_host_*",
-                        'echo "ssh_key" >> ' "~/.ssh/authorized_keys",
-                        "env >> ~/.ssh/environment",
-                        'echo "export PATH=$PATH" >> ' "~/.profile",
-                        "ssh-keygen -A > /dev/null",
-                        "if [ ! -d "
-                        '~/.vscode-server/bin/"1" ]; '
-                        "then if [ $(uname -m) = "
-                        '"aarch64" ]; then '
-                        'arch="arm64"; else '
-                        'arch="x64"; fi && mkdir -p '
-                        "/tmp && wget -q "
-                        "--show-progress "
-                        '"https://update.code.visualstudio.com/commit:1/server-linux-$arch/stable" '
-                        "-O "
-                        '"/tmp/vscode-server-linux-$arch.tar.gz" '
-                        "&& mkdir -vp "
-                        '~/.vscode-server/bin/"1" && '
-                        "tar --no-same-owner -xz "
-                        "--strip-components=1 -C "
-                        '~/.vscode-server/bin/"1" -f '
-                        '"/tmp/vscode-server-linux-$arch.tar.gz" '
-                        "&& rm "
-                        '"/tmp/vscode-server-linux-$arch.tar.gz" '
-                        "&& "
-                        'PATH="$PATH":~/.vscode-server/bin/"1"/bin '
-                        "code-server "
-                        "--install-extension "
-                        '"ms-python.python" '
-                        "--install-extension "
-                        '"ms-toolsai.jupyter"; fi',
-                        "(pip install -q "
-                        "--no-cache-dir ipykernel 2> "
-                        '/dev/null) || echo "no pip, '
-                        'ipykernel was not installed"',
-                        "echo ''",
-                        "echo To open in VS Code " "Desktop, use link below:",
-                        "echo ''",
-                        f"echo '  vscode://vscode-remote/ssh-remote+{run_name}/workflow'",
-                        "echo ''",
-                        f"echo 'To connect via SSH, use: `ssh {run_name}`'",
-                        "echo ''",
-                        "echo -n 'To exit, press " "Ctrl+C.'",
-                    ],
+                    "setup": [],
                     "working_dir": ".",
                 },
                 "job_submissions": [

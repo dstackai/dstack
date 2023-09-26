@@ -26,6 +26,8 @@ def get_job_provisioning_data() -> JobProvisioningData:
         hostname="127.0.0.4",
         region="us-east-1",
         price=10.5,
+        ssh_port=22,
+        dockerized=True,
     )
 
 
