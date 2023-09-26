@@ -108,11 +108,12 @@ class Run(ABC):
                 self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
             provisioning_data = self._run.jobs[0].job_submissions[-1].job_provisioning_data
             self._ssh_attach = SSHAttach(
-                self.hostname,
-                self._ports_lock,
-                self._ssh_identity_file,
-                self.name,
+                hostname=self.hostname,
                 ssh_port=provisioning_data.ssh_port,
+                user=provisioning_data.username,
+                id_rsa_path=self._ssh_identity_file,
+                ports_lock=self._ports_lock,
+                run_name=self.name,
                 dockerized=provisioning_data.dockerized,
             )
             self._ssh_attach.attach()

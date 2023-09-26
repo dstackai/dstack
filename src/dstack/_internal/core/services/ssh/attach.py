@@ -15,12 +15,12 @@ class SSHAttach:
     def __init__(
         self,
         hostname: str,
-        ports_lock: PortsLock,
+        ssh_port: int,
+        user: str,
         id_rsa_path: PathLike,
+        ports_lock: PortsLock,
         run_name: str,
-        user: str = "ubuntu",
-        ssh_port: int = 22,
-        dockerized: bool = False,
+        dockerized: bool,
     ):
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
