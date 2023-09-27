@@ -74,14 +74,14 @@ async def delete_projects(
     user: UserModel,
     projects_names: List[str],
 ):
-    projects = await list_user_project_models(session=session, user=user)
+    user_projects = await list_user_project_models(session=session, user=user)
+    user_project_names = [p.name for p in user_projects]
+    for project_name in projects_names:
+        if project_name not in user_project_names:
+            raise ForbiddenError()
     if user.global_role != GlobalRole.ADMIN:
-        for p in projects:
-            for m in p.members:
-                if user.id == m.user_id:
-                    if m.project_role == ProjectRole.ADMIN:
-                        break
-            else:
+        for project in user_projects:
+            if not _is_project_admin(user=user, project=project):
                 raise ForbiddenError()
     await session.execute(delete(ProjectModel).where(ProjectModel.name.in_(projects_names)))
 
@@ -204,3 +204,14 @@ def project_model_to_project(project_model: ProjectModel) -> Project:
         backends=backends,
         members=members,
     )
+
+
+def _is_project_admin(
+    user: UserModel,
+    project: ProjectModel,
+) -> bool:
+    for m in project.members:
+        if user.id == m.user_id:
+            if m.project_role == ProjectRole.ADMIN:
+                return True
+    return False

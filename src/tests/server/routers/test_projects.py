@@ -145,6 +145,19 @@ class TestDeleteProject:
         res = await session.execute(select(ProjectModel))
         assert len(res.all()) == 2
 
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, name="project")
+        response = client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project.name]},
+        )
+        assert response.status_code == 403
+        res = await session.execute(select(ProjectModel))
+        assert len(res.all()) == 1
+
 
 class TestGetProject:
     def test_returns_40x_if_not_authenticated(self):
