@@ -47,10 +47,9 @@ class RetryPolicy(BaseModel):
 
 class JobErrorCode(str, Enum):
     # Set by the server
-    NO_INSTANCE_MATCHING_REQUIREMENTS = "no_instance_matching_requirements"
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
-    INSTANCE_TERMINATED = "instance_terminated"
+    WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"
@@ -134,6 +133,10 @@ class JobSubmission(BaseModel):
     error_code: Optional[JobErrorCode]
     job_provisioning_data: Optional[JobProvisioningData]
 
+    @property
+    def age(self):
+        return common_utils.get_current_datetime() - self.submitted_at
+
 
 class Job(BaseModel):
     job_spec: JobSpec
@@ -142,11 +145,8 @@ class Job(BaseModel):
     def is_retry_active(self):
         return self.job_spec.retry_policy.retry and (
             self.job_spec.retry_policy.limit is None
-            or self.get_age() < timedelta(seconds=self.job_spec.retry_policy.limit)
+            or self.job_submissions[0].age < timedelta(seconds=self.job_spec.retry_policy.limit)
         )
-
-    def get_age(self):
-        return common_utils.get_current_datetime() - self.job_submissions[0].submitted_at
 
 
 class RunSpec(BaseModel):

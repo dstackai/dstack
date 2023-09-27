@@ -43,7 +43,12 @@ class RunCommand(BaseCommand):
             help="Do not ask for plan confirmation",
             action="store_true",
         )
-        # TODO --backend
+        self._parser.add_argument(
+            "--backend",
+            action="append",
+            dest="backends",
+            help="The backends that will be tried for provisioning",
+        )
 
     def _command(self, args: argparse.Namespace):
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -54,9 +59,12 @@ class RunCommand(BaseCommand):
                 Path.cwd(), args.working_dir, args.configuration_file
             )
             profile = load_profile(Path.cwd(), args.profile)
+            backends = profile.backends
+            if args.backends:
+                backends = args.backends
             run_plan = api.runs.get_plan(
                 configuration_path=configuration_path,
-                backends=profile.backends,  # TODO args
+                backends=backends,
                 resources=profile.resources,
                 spot_policy=profile.spot_policy,
                 retry_policy=profile.retry_policy,

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
 
@@ -27,6 +28,9 @@ from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+RUNNER_TIMEOUT_INTERVAL = timedelta(seconds=300)
 
 
 async def process_running_jobs():
@@ -124,9 +128,14 @@ def _process_provisioning_job(
             runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
             alive = runner_client.healthcheck()
             if not alive:
-                logger.debug("Runner %s is not alive", job_model.job_name)
-                # TODO if runner never becomes alive?
-                # Fail after a deadline?
+                logger.debug("Runner for job %s is not available yet", job_model.job_name)
+                if job_submission.age > RUNNER_TIMEOUT_INTERVAL:
+                    logger.warning(
+                        "Job %s failed because runner has not become available in time.",
+                        job_model.job_name,
+                    )
+                    job_model.status = JobStatus.FAILED
+                    job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
                 return
             logger.debug("Submitting job %s...", job_model.job_name)
             runner_client.submit_job(
@@ -142,7 +151,7 @@ def _process_provisioning_job(
             job_model.status = JobStatus.RUNNING
             logger.debug("Job %s is running", job_model.job_name)
     except (ssh_tunnel.SSHConnectionRefusedError, ssh_tunnel.SSHTimeoutError):
-        pass
+        logger.debug("Cannot establish ssh connection to job %s instance", job_model.job_name)
 
 
 def _process_running_job(
