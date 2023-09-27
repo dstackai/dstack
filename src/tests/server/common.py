@@ -132,6 +132,24 @@ async def create_repo(
     return repo
 
 
+def get_run_spec(
+    run_name: str,
+    repo_id: str,
+    profile: Optional[Profile] = Profile(name="default"),
+) -> RunSpec:
+    return RunSpec(
+        run_name=run_name,
+        repo_id=repo_id,
+        repo_data=LocalRunRepoData(repo_dir="/"),
+        repo_code_hash=None,
+        working_dir=".",
+        configuration_path="dstack.yaml",
+        configuration=DevEnvironmentConfiguration(ide="vscode"),
+        profile=profile,
+        ssh_key_pub="",
+    )
+
+
 async def create_run(
     session: AsyncSession,
     project: ProjectModel,
@@ -143,16 +161,9 @@ async def create_run(
     run_spec: Optional[RunSpec] = None,
 ) -> RunModel:
     if run_spec is None:
-        run_spec = RunSpec(
+        run_spec = get_run_spec(
             run_name=run_name,
             repo_id=repo.name,
-            repo_data=LocalRunRepoData(repo_dir="/"),
-            repo_code_hash=None,
-            working_dir=".",
-            configuration_path="dstack.yaml",
-            configuration=DevEnvironmentConfiguration(ide="vscode"),
-            profile=Profile(name="default"),
-            ssh_key_pub="",
         )
     run = RunModel(
         project_id=project.id,

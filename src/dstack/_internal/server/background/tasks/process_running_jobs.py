@@ -1,12 +1,12 @@
 import asyncio
-from typing import Dict
+from typing import Dict, Optional
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.models.runs import Job, JobStatus, JobSubmission, Run
+from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, JobSubmission, Run
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import CodeModel, JobModel, RepoModel, RunModel
@@ -18,7 +18,10 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.repos import get_code_model
 from dstack._internal.server.services.runner import client
-from dstack._internal.server.services.runs import run_model_to_run
+from dstack._internal.server.services.runs import (
+    create_job_model_for_new_submission,
+    run_model_to_run,
+)
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
@@ -52,18 +55,19 @@ async def process_running_jobs():
 
 async def _process_job(job_id: UUID):
     async with get_session_ctx() as session:
-        res = await session.execute(
-            select(JobModel)
-            .where(JobModel.id == job_id)
-            .options(joinedload(JobModel.run).joinedload(RunModel.project))
-            .options(joinedload(JobModel.run).joinedload(RunModel.user))
-            .options(joinedload(JobModel.run).joinedload(RunModel.repo))
-        )
+        res = await session.execute(select(JobModel).where(JobModel.id == job_id))
         job_model = res.scalar_one()
-        run_model = job_model.run
+        res = await session.execute(
+            select(RunModel)
+            .where(RunModel.id == job_model.run_id)
+            .options(joinedload(RunModel.project))
+            .options(joinedload(RunModel.user))
+            .options(joinedload(RunModel.repo))
+        )
+        run_model = res.scalar()
         repo_model = run_model.repo
         project = run_model.project
-        run = run_model_to_run(run_model, include_job_submissions=False)
+        run = run_model_to_run(run_model)
         job = run.jobs[job_model.job_num]
         job_submission = job_model_to_job_submission(job_model)
         server_ssh_private_key = project.ssh_private_key
@@ -85,14 +89,17 @@ async def _process_job(job_id: UUID):
             )
         else:
             logger.debug("Polling running job %s", job_model.job_name)
-            await run_async(
+            new_job_model = await run_async(
                 _process_running_job,
+                run_model,
                 job_model,
                 run,
                 job,
                 job_submission,
                 server_ssh_private_key,
             )
+            if new_job_model is not None:
+                session.add(new_job_model)
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
 
@@ -139,34 +146,51 @@ def _process_provisioning_job(
 
 
 def _process_running_job(
+    run_model: RunModel,
     job_model: JobModel,
     run: Run,
     job: Job,
     job_submission: JobSubmission,
     server_ssh_private_key: str,
-):
+) -> Optional[JobModel]:
+    """Polls the runner for job updates and updates `job_model`.
+
+    :return: JobModel for new submission if re-submission is required (e.g. interrupted spot).
+    """
     ports = get_runner_ports()
-    with ssh_tunnel.RunnerTunnel(
-        hostname=job_submission.job_provisioning_data.hostname,
-        ssh_port=job_submission.job_provisioning_data.ssh_port,
-        user=job_submission.job_provisioning_data.username,
-        ports=ports,
-        id_rsa=server_ssh_private_key,
-    ):
-        runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
-        timestamp = 0
-        if job_model.runner_timestamp is not None:
-            timestamp = job_model.runner_timestamp
-        resp = runner_client.pull(timestamp)
-        job_model.runner_timestamp = resp.last_updated
-        if len(resp.job_states) == 0:
-            logger.debug("Got 0 job %s states", job_model.job_name)
-            return
-        last_job_state = resp.job_states[-1]
-        job_model.status = last_job_state.state
-        logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
-        # TODO Write logs
-        # TODO If retry is active, update job status to PENDING.
+    try:
+        with ssh_tunnel.RunnerTunnel(
+            hostname=job_submission.job_provisioning_data.hostname,
+            ssh_port=job_submission.job_provisioning_data.ssh_port,
+            user=job_submission.job_provisioning_data.username,
+            ports=get_runner_ports(),
+            id_rsa=server_ssh_private_key,
+        ):
+            runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
+            timestamp = 0
+            if job_model.runner_timestamp is not None:
+                timestamp = job_model.runner_timestamp
+            resp = runner_client.pull(timestamp)
+            job_model.runner_timestamp = resp.last_updated
+            if len(resp.job_states) == 0:
+                logger.debug("Got 0 job %s states", job_model.job_name)
+                return
+            last_job_state = resp.job_states[-1]
+            job_model.status = last_job_state.state
+            logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
+            # TODO Write logs
+    except ssh_tunnel.SSHError:
+        job_model.status = JobStatus.FAILED
+        job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
+        if job.is_retry_active():
+            if job_submission.job_provisioning_data.instance_type.resources.spot:
+                new_job_model = create_job_model_for_new_submission(
+                    run_model=run_model,
+                    job=job,
+                    status=JobStatus.PENDING,
+                )
+                return new_job_model
+    return None
 
 
 async def _get_job_code(session: AsyncSession, repo: RepoModel, code_hash: str) -> bytes:

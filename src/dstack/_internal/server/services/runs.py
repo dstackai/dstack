@@ -25,10 +25,7 @@ from dstack._internal.server.services.jobs import (
     job_model_to_job_submission,
     stop_job,
 )
-from dstack._internal.server.services.projects import (
-    get_project_model_by_name,
-    list_user_project_models,
-)
+from dstack._internal.server.services.projects import list_user_project_models
 from dstack._internal.utils.random_names import generate_name
 
 
@@ -136,8 +133,8 @@ async def submit_run(
         )
     run_model = RunModel(
         id=uuid.uuid4(),
-        project=project,
-        repo=repo,
+        project_id=project.id,
+        repo_id=repo.id,
         user=user,
         run_name=run_spec.run_name,
         submitted_at=common_utils.get_current_datetime(),
@@ -147,26 +144,39 @@ async def submit_run(
     session.add(run_model)
     jobs = get_jobs_from_run_spec(run_spec)
     for job in jobs:
-        job_model = JobModel(
-            id=uuid.uuid4(),
-            project_id=project.id,
-            run_id=run_model.id,
-            run_name=run_spec.run_name,
-            job_num=job.job_spec.job_num,
-            job_name=job.job_spec.job_name,
-            submission_num=0,
-            submitted_at=run_model.submitted_at,
-            last_processed_at=run_model.submitted_at,
+        job_model = create_job_model_for_new_submission(
+            run_model=run_model,
+            job=job,
             status=JobStatus.SUBMITTED,
-            error_code=None,
-            job_spec_data=job.job_spec.json(),
-            job_provisioning_data=None,
         )
         session.add(job_model)
     await session.commit()
     await session.refresh(run_model)
     run = run_model_to_run(run_model)
     return run
+
+
+def create_job_model_for_new_submission(
+    run_model: RunModel,
+    job: Job,
+    status: JobStatus,
+) -> JobModel:
+    now = common_utils.get_current_datetime()
+    return JobModel(
+        id=uuid.uuid4(),
+        project_id=run_model.project_id,
+        run_id=run_model.id,
+        run_name=run_model.run_name,
+        job_num=job.job_spec.job_num,
+        job_name=job.job_spec.job_name,
+        submission_num=len(job.job_submissions),
+        submitted_at=now,
+        last_processed_at=now,
+        status=status,
+        error_code=None,
+        job_spec_data=job.job_spec.json(),
+        job_provisioning_data=None,
+    )
 
 
 async def stop_runs(

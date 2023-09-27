@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict, List, Optional
 
@@ -10,6 +10,7 @@ from dstack._internal.core.models.configurations import AnyRunConfiguration, Reg
 from dstack._internal.core.models.instances import InstanceCandidate, InstanceType
 from dstack._internal.core.models.profiles import Profile, SpotPolicy
 from dstack._internal.core.models.repos import AnyRunRepoData
+from dstack._internal.utils import common as common_utils
 
 
 class AppSpec(BaseModel):
@@ -137,6 +138,15 @@ class JobSubmission(BaseModel):
 class Job(BaseModel):
     job_spec: JobSpec
     job_submissions: List[JobSubmission]
+
+    def is_retry_active(self):
+        return self.job_spec.retry_policy.retry and (
+            self.job_spec.retry_policy.limit is None
+            or self.get_age() < timedelta(seconds=self.job_spec.retry_policy.limit)
+        )
+
+    def get_age(self):
+        return common_utils.get_current_datetime() - self.job_submissions[0].submitted_at
 
 
 class RunSpec(BaseModel):

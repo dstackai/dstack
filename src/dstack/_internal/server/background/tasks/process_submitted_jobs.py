@@ -56,12 +56,7 @@ async def process_submitted_jobs():
 
 async def _process_job(job_id: UUID):
     async with get_session_ctx() as session:
-        res = await session.execute(
-            select(JobModel)
-            .where(JobModel.id == job_id)
-            .options(joinedload(JobModel.run).joinedload(RunModel.project))
-            .options(joinedload(JobModel.run).joinedload(RunModel.user))
-        )
+        res = await session.execute(select(JobModel).where(JobModel.id == job_id))
         job_model = res.scalar_one()
         await _process_submitted_job(
             session=session,
@@ -71,9 +66,15 @@ async def _process_job(job_id: UUID):
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     logger.debug("Provisioning job %s", job_model.job_name)
-    run_model = job_model.run
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == job_model.run_id)
+        .options(joinedload(RunModel.project))
+        .options(joinedload(RunModel.user))
+    )
+    run_model = res.scalar()
     project_model = run_model.project
-    run = run_model_to_run(run_model, include_job_submissions=False)
+    run = run_model_to_run(run_model)
     job = run.jobs[job_model.job_num]
     backends = await backends_services.get_project_backends(project=run_model.project)
     job_provisioning_data = await _run_job(
@@ -87,10 +88,13 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
     else:
-        # TODO resubmit
         logger.debug("Provisioning job %s failed", job_model.job_name)
-        job_model.status = JobStatus.FAILED
-        job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        if job.is_retry_active():
+            logger.debug("Retry is enabled. Transitioning job %s to pending.", job_model.job_name)
+            job_model.status = JobStatus.PENDING
+        else:
+            job_model.status = JobStatus.FAILED
+            job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
 
