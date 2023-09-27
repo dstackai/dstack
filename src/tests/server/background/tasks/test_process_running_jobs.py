@@ -54,13 +54,17 @@ class TestProcessRunningJobs:
             session=session,
             run=run,
             status=JobStatus.PROVISIONING,
+            submitted_at=datetime(2023, 1, 2, 5, 12, 30, 5, tzinfo=timezone.utc),
             job_provisioning_data=job_provisioning_data,
         )
         with patch(
             "dstack._internal.core.services.ssh.tunnel.RunnerTunnel"
         ) as RunnerTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock:
+        ) as RunnerClientMock, patch(
+            "dstack._internal.utils.common.get_current_datetime"
+        ) as datetime_mock:
+            datetime_mock.return_value = datetime(2023, 1, 2, 5, 12, 30, 10, tzinfo=timezone.utc)
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.healthcheck = Mock()
             runner_client_mock.healthcheck.return_value = False
