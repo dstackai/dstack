@@ -36,6 +36,10 @@ class Compute(ABC):
         pass
 
     def create_gateway(
-        self, instance_name: str, ssh_key_pub: str, region: str
+        self,
+        instance_name: str,
+        ssh_key_pub: str,
+        region: str,
+        project_id: str,
     ) -> LaunchedGatewayInfo:
         raise NotImplementedError()

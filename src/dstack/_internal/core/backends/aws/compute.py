@@ -6,6 +6,7 @@ import botocore.client
 import botocore.exceptions
 
 import dstack._internal.core.backends.aws.resources as aws_resources
+import dstack.version as version
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base.compute import Compute
 from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
@@ -15,6 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceState,
+    LaunchedGatewayInfo,
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
@@ -115,43 +117,29 @@ class AWSCompute(Compute):
             {"Key": "owner", "Value": "dstack"},
             {"Key": "dstack_project", "Value": project_id},
             {"Key": "dstack_user", "Value": run.user},
-            {"Key": "dstack_run", "Value": run.id.hex},
         ]
         try:
             response = ec2.create_instances(
-                BlockDeviceMappings=[
-                    {
-                        "DeviceName": "/dev/sda1",
-                        "Ebs": {
-                            "VolumeSize": 100,  # TODO run.run_spec.profile.resources.disk_size
-                            "VolumeType": "gp2",
-                        },
-                    }
-                ],
-                ImageId=aws_resources.get_image_id(
-                    ec2_client, len(instance_offer.instance.resources.gpus) > 0
-                ),
-                InstanceType=instance_offer.instance.name,
-                MinCount=1,
-                MaxCount=1,
-                IamInstanceProfile={
-                    "Arn": aws_resources.create_iam_instance_profile(iam_client, project_id),
-                },
-                UserData=aws_resources.get_user_data(
-                    image_name=job.job_spec.image_name,
-                    authorized_keys=[
-                        run.run_spec.ssh_key_pub.strip(),
-                        project_ssh_public_key.strip(),
-                    ],
-                ),
-                TagSpecifications=[
-                    {
-                        "ResourceType": "instance",
-                        "Tags": tags,
-                    },
-                ],
-                SecurityGroupIds=[aws_resources.create_security_group(ec2_client, project_id)],
-                **aws_resources.get_spot_options(instance_offer.instance.resources.spot),
+                **aws_resources.create_instances_struct(
+                    disk_size=100,  # TODO run.run_spec.profile.resources.disk_size
+                    image_id=aws_resources.get_image_id(
+                        ec2_client, len(instance_offer.instance.resources.gpus) > 0
+                    ),
+                    instance_type=instance_offer.instance.name,
+                    iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
+                        iam_client, project_id
+                    ),
+                    user_data=aws_resources.get_user_data(
+                        image_name=job.job_spec.image_name,
+                        authorized_keys=[
+                            run.run_spec.ssh_key_pub.strip(),
+                            project_ssh_public_key.strip(),
+                        ],
+                    ),
+                    tags=tags,
+                    security_group_id=aws_resources.create_security_group(ec2_client, project_id),
+                    spot=instance_offer.instance.resources.spot,
+                )
             )
             instance = response[0]
             instance.wait_until_running()
@@ -173,6 +161,45 @@ class AWSCompute(Compute):
             if e.response["Error"]["Code"] == "InsufficientInstanceCapacity":
                 raise NoCapacityError()
             raise e
+
+    def create_gateway(
+        self,
+        instance_name: str,
+        ssh_key_pub: str,
+        region: str,
+        project_id: str,
+    ) -> LaunchedGatewayInfo:
+        ec2 = self.session.resource("ec2", region_name=region)
+        ec2_client = self.session.client("ec2", region_name=region)
+        tags = [
+            {"Key": "Name", "Value": instance_name},
+            {"Key": "owner", "Value": "dstack"},
+            {"Key": "dstack_project", "Value": project_id},
+        ]
+        if version.__version__ is not None:
+            tags.append({"Key": "dstack_version", "Value": version.__version__})
+        response = ec2.create_instances(
+            **aws_resources.create_instances_struct(
+                disk_size=10,
+                image_id=aws_resources.get_gateway_image_id(ec2_client),
+                instance_type="t2.micro",
+                iam_instance_profile_arn=None,
+                user_data=aws_resources.get_gateway_user_data(ssh_key_pub),
+                tags=tags,
+                security_group_id=aws_resources.create_gateway_security_group(
+                    ec2_client, project_id
+                ),
+                spot=False,
+            )
+        )
+        instance = response[0]
+        instance.wait_until_running()
+        instance.reload()  # populate instance.public_ip_address
+
+        return LaunchedGatewayInfo(
+            instance_id=instance.instance_id,
+            ip_address=instance.public_ip_address,
+        )
 
 
 def _has_quota(quotas: Dict[str, float], instance_name: str) -> bool:

@@ -67,7 +67,11 @@ async def create_gateway(
     await session.commit()
     try:
         info = await run_async(
-            backend.compute().create_gateway, name, project.ssh_public_key, region
+            backend.compute().create_gateway,
+            name,
+            project.ssh_public_key,
+            region,
+            project.name,
         )
         await session.execute(
             update(GatewayModel)

@@ -57,10 +57,10 @@ class SSHTunnel:
             command += ["-L", f"{port_local}:localhost:{port_remote}"]
         command += [self.host]
 
-        logger.debug("Starting SSH tunnel: %s", command)
         r = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if r.returncode == 0:
             return
+        logger.debug("SSH tunnel failed: %s", r.stderr)
         if b": Operation timed out" in r.stderr:
             raise SSHTimeoutError()
         if b": Connection refused" in r.stderr:
@@ -117,7 +117,7 @@ class RunnerTunnel(SSHTunnel):
                 "UserKnownHostsFile": "/dev/null",
                 "ExitOnForwardFailure": "yes",
                 "ConnectTimeout": "1",
-                "ControlPersist": f"{disconnect_delay}s",
+                # "ControlPersist": f"{disconnect_delay}s",
                 "Port": ssh_port,
             },
         )

@@ -6,12 +6,7 @@ import yaml
 import dstack.version as version
 
 
-def get_cloud_config(commands: List[List[str]], authorized_keys: List[str], **kwargs) -> str:
-    config = {
-        "runcmd": commands,
-        "ssh_authorized_keys": authorized_keys,
-        **kwargs,
-    }
+def get_cloud_config(**config) -> str:
     return "#cloud-config\n" + yaml.dump(config, default_flow_style=False)
 
 
