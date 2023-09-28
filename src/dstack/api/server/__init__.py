@@ -3,6 +3,7 @@ from typing import Optional, Union
 import requests
 
 from dstack.api.server._backends import BackendsAPIClient
+from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
 from dstack.api.server._repos import ReposAPIClient
@@ -48,6 +49,10 @@ class APIClient:
     @property
     def secrets(self) -> SecretsAPIClient:
         return SecretsAPIClient(self._request)
+
+    @property
+    def gateways(self) -> GatewaysAPIClient:
+        return GatewaysAPIClient(self._request)
 
     def _request(
         self, path: str, body: Optional[str] = None, raise_for_status: bool = True, **kwargs
