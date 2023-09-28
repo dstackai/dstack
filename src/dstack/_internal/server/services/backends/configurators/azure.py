@@ -1,3 +1,5 @@
+from dstack._internal.core.backends.azure import AzureBackend
+from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.models.backends.azure import (
     AnyAzureConfigInfo,
     AzureConfigInfo,

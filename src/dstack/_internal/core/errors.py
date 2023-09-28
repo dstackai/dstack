@@ -62,6 +62,10 @@ class BackendError(DstackError):
     pass
 
 
+class BackendAuthError(BackendError):
+    pass
+
+
 class ComputeError(BackendError):
     pass
 
