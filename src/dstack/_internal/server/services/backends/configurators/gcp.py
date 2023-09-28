@@ -3,9 +3,10 @@ from typing import List
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.gcp import GCPBackend, auth
 from dstack._internal.core.backends.gcp.config import GCPConfig
-from dstack._internal.core.errors import BackendAuthError
+from dstack._internal.core.errors import BackendAuthError, ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
+    ConfigElement,
     ConfigElementValue,
     ConfigMultiElement,
 )
@@ -116,13 +117,18 @@ class GCPConfigurator(Configurator):
         if config.creds is None:
             return config_values
         try:
-            credentials = auth.authenticate(creds=config.creds)
+            credentials, project_id = auth.authenticate(creds=config.creds)
         except BackendAuthError:
             raise_invalid_credentials_error(
                 fields=[
                     ["creds", "data"],
                 ]
             )
+        if config.project_id is None:
+            return config_values
+        if config.project_id != project_id:
+            raise ServerClientError(msg="Wrong project_id", fields=[["project_id"]])
+        config_values.project_id = self._get_project_id_element(selected=project_id)
         config_values.regions = self._get_regions_element(
             selected=config.regions or [DEFAULT_REGION]
         )
@@ -143,7 +149,7 @@ class GCPConfigurator(Configurator):
         creds = GCPCreds.parse_raw(model.auth).__root__
         if include_creds:
             return GCPConfigInfoWithCreds(
-                regions=config.regions,
+                **config.dict(),
                 creds=creds,
             )
         return config
@@ -152,6 +158,14 @@ class GCPConfigurator(Configurator):
         config_info = self.get_config_info(model=model, include_creds=True)
         config = GCPConfig.parse_obj(config_info)
         return GCPBackend(config=config)
+
+    def _get_project_id_element(
+        self,
+        selected: str,
+    ) -> ConfigElement:
+        element = ConfigElement(selected=selected)
+        element.values.append(ConfigElementValue(value=selected, label=selected))
+        return element
 
     def _get_regions_element(
         self,

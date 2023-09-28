@@ -85,7 +85,7 @@ class AWSConfigurator(ABC):
         creds = AWSCreds.parse_raw(model.auth).__root__
         if include_creds:
             return AWSConfigInfoWithCreds(
-                regions=config.regions,
+                **config.dict(),
                 creds=creds,
             )
         return config

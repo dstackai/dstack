@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import BackendModel
@@ -20,12 +21,12 @@ class TestListBackendTypes:
     def test_returns_backend_types(self):
         response = client.post("/api/backends/list_types")
         assert response.status_code == 200, response.json()
-        assert response.json() == ["aws"]
+        assert response.json() == ["aws", "gcp"]
 
 
-class TestGetBackendConfigValues:
+class TestGetBackendConfigValuesAWS:
     @pytest.mark.asyncio
-    async def test_aws_returns_initial_config(self, test_db, session: AsyncSession):
+    async def test_returns_initial_config(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {"type": "aws"}
         response = client.post(
@@ -41,7 +42,7 @@ class TestGetBackendConfigValues:
         }
 
     @pytest.mark.asyncio
-    async def test_aws_returns_invalid_credentials(self, test_db, session: AsyncSession):
+    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "aws",
@@ -78,7 +79,7 @@ class TestGetBackendConfigValues:
         }
 
     @pytest.mark.asyncio
-    async def test_aws_returns_config_on_credentials(self, test_db, session: AsyncSession):
+    async def test_returns_config_on_credentials(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "aws",
@@ -118,6 +119,136 @@ class TestGetBackendConfigValues:
         }
 
 
+class TestGetBackendConfigValuesGCP:
+    @pytest.mark.asyncio
+    async def test_returns_initial_config(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {"type": "gcp"}
+        response = client.post(
+            "/api/backends/config_values",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "type": "gcp",
+            "default_creds": False,
+            "project_id": None,
+            "regions": None,
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {
+            "type": "gcp",
+            "creds": {
+                "type": "service_account",
+                "filename": "1234",
+                "data": "1234",
+            },
+        }
+        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
+            m.side_effect = BackendAuthError()
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            m.assert_called()
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [
+                {
+                    "code": "invalid_credentials",
+                    "msg": "Invalid credentials",
+                    "fields": ["creds", "data"],
+                },
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_config_on_credentials(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {
+            "type": "gcp",
+            "creds": {
+                "type": "service_account",
+                "filename": "1234",
+                "data": "1234",
+            },
+            "project_id": "test_project",
+        }
+        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
+            m.return_value = None, "test_project"
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            m.assert_called()
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "type": "gcp",
+            "default_creds": False,
+            "project_id": {
+                "selected": "test_project",
+                "values": [
+                    {
+                        "value": "test_project",
+                        "label": "test_project",
+                    }
+                ],
+            },
+            "regions": {
+                "selected": ["us-east1"],
+                "values": [
+                    {
+                        "value": "northamerica-northeast1",
+                        "label": "northamerica-northeast1",
+                    },
+                    {
+                        "value": "northamerica-northeast2",
+                        "label": "northamerica-northeast2",
+                    },
+                    {"value": "us-central1", "label": "us-central1"},
+                    {"value": "us-east1", "label": "us-east1"},
+                    {"value": "us-east4", "label": "us-east4"},
+                    {"value": "us-east5", "label": "us-east5"},
+                    {"value": "us-south1", "label": "us-south1"},
+                    {"value": "us-west1", "label": "us-west1"},
+                    {"value": "us-west2", "label": "us-west2"},
+                    {"value": "us-west3", "label": "us-west3"},
+                    {"value": "us-west4", "label": "us-west4"},
+                    {"value": "southamerica-east1", "label": "southamerica-east1"},
+                    {"value": "southamerica-west1", "label": "southamerica-west1"},
+                    {"value": "europe-central2", "label": "europe-central2"},
+                    {"value": "europe-north1", "label": "europe-north1"},
+                    {"value": "europe-southwest1", "label": "europe-southwest1"},
+                    {"value": "europe-west1", "label": "europe-west1"},
+                    {"value": "europe-west2", "label": "europe-west2"},
+                    {"value": "europe-west3", "label": "europe-west3"},
+                    {"value": "europe-west4", "label": "europe-west4"},
+                    {"value": "europe-west6", "label": "europe-west6"},
+                    {"value": "europe-west8", "label": "europe-west8"},
+                    {"value": "europe-west9", "label": "europe-west9"},
+                    {"value": "asia-east1", "label": "asia-east1"},
+                    {"value": "asia-east2", "label": "asia-east2"},
+                    {"value": "asia-northeast1", "label": "asia-northeast1"},
+                    {"value": "asia-northeast2", "label": "asia-northeast2"},
+                    {"value": "asia-northeast3", "label": "asia-northeast3"},
+                    {"value": "asia-south1", "label": "asia-south1"},
+                    {"value": "asia-south2", "label": "asia-south2"},
+                    {"value": "asia-southeast1", "label": "asia-southeast1"},
+                    {"value": "asia-southeast2", "label": "asia-southeast2"},
+                    {"value": "me-west1", "label": "me-west1"},
+                    {"value": "australia-southeast1", "label": "australia-southeast1"},
+                    {"value": "australia-southeast2", "label": "australia-southeast2"},
+                ],
+            },
+        }
+
+
 class TestCreateBackend:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
@@ -134,7 +265,7 @@ class TestCreateBackend:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_aws_creates_backend(self, test_db, session: AsyncSession):
+    async def test_creates_aws_backend(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session)
         await add_project_member(
@@ -156,6 +287,72 @@ class TestCreateBackend:
                 json=body,
             )
         assert response.status_code == 200, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.asyncio
+    async def test_creates_gcp_backend(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        body = {
+            "type": "gcp",
+            "creds": {
+                "type": "service_account",
+                "filename": "1234",
+                "data": "1234",
+            },
+            "project_id": "test_project",
+            "regions": ["us-east1"],
+        }
+        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
+            m.return_value = None, "test_project"
+            response = client.post(
+                f"/api/project/{project.name}/backends/create",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.asyncio
+    async def test_returns_400_if_backend_exists(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        body = {
+            "type": "gcp",
+            "creds": {
+                "type": "service_account",
+                "filename": "1234",
+                "data": "1234",
+            },
+            "project_id": "test_project",
+            "regions": ["us-east1"],
+        }
+        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
+            m.return_value = None, "test_project"
+            response = client.post(
+                f"/api/project/{project.name}/backends/create",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
+            m.return_value = None, "test_project"
+            response = client.post(
+                f"/api/project/{project.name}/backends/create",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 400, response.json()
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
 

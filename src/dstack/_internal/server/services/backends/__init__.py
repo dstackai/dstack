@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.local import LocalBackend
-from dstack._internal.core.errors import BackendInvalidCredentialsError, BackendNotAvailable
+from dstack._internal.core.errors import (
+    BackendInvalidCredentialsError,
+    BackendNotAvailable,
+    ResourceExistsError,
+)
 from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
     AnyConfigInfoWithCredsPartial,
@@ -33,6 +37,13 @@ try:
     from dstack._internal.server.services.backends.configurators.aws import AWSConfigurator
 
     _CONFIGURATOR_CLASSES.append(AWSConfigurator)
+except ImportError:
+    pass
+
+try:
+    from dstack._internal.server.services.backends.configurators.gcp import GCPConfigurator
+
+    _CONFIGURATOR_CLASSES.append(GCPConfigurator)
 except ImportError:
     pass
 
@@ -72,6 +83,9 @@ async def create_backend(
     configurator = get_configurator(config.type)
     if configurator is None:
         raise BackendNotAvailable()
+    backend = await get_project_backend_by_type(project=project, backend_type=configurator.TYPE)
+    if backend is not None:
+        raise ResourceExistsError()
     await run_async(configurator.get_config_values, config)
     backend = configurator.create_backend(project=project, config=config)
     session.add(backend)

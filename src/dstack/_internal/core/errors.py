@@ -24,6 +24,7 @@ class ClientError(DstackError):
 
 class ServerClientErrorCode(str, enum.Enum):
     UNSPECIFIED_ERROR = "error"
+    RESOURCE_EXISTS = "resource_exists"
     INVALID_CREDENTIALS = "invalid_credentials"
     BACKEND_NOT_AVAILABLE = "backend_not_available"
     REPO_DOES_NOT_EXIST = "repo_does_not_exist"
@@ -39,6 +40,11 @@ class ServerClientError(ServerError, ClientError):
             self.msg = msg
         if fields is not None:
             self.fields = fields
+
+
+class ResourceExistsError(ServerClientError):
+    code: ServerClientErrorCode = ServerClientErrorCode.RESOURCE_EXISTS
+    msg = "Resource exists"
 
 
 class BackendInvalidCredentialsError(ServerClientError):
