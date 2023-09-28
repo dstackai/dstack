@@ -1,5 +1,5 @@
 import enum
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -15,6 +15,11 @@ class BackendType(str, enum.Enum):
 class ConfigElementValue(BaseModel):
     value: str
     label: str
+
+
+class ConfigElement(BaseModel):
+    selected: Optional[str] = None
+    values: List[ConfigElementValue] = []
 
 
 class ConfigMultiElement(BaseModel):

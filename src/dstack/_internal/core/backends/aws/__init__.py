@@ -7,7 +7,7 @@ from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import BackendType
 
 
-class AwsBackend(Backend):
+class AWSBackend(Backend):
     TYPE: BackendType = BackendType.AWS
 
     def __init__(self, config: AWSConfig):

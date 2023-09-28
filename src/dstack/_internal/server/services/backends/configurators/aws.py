@@ -5,7 +5,7 @@ import boto3.session
 import botocore.exceptions
 from boto3.session import Session
 
-from dstack._internal.core.backends.aws import AwsBackend
+from dstack._internal.core.backends.aws import AWSBackend
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.models.backends.aws import (
@@ -92,8 +92,8 @@ class AWSConfigurator(ABC):
 
     def get_backend(self, model: BackendModel) -> Backend:
         config_info = self.get_config_info(model=model, include_creds=True)
-        config = AWSConfig(regions=config_info.regions, creds=config_info.creds)
-        return AwsBackend(config=config)
+        config = AWSConfig.parse_obj(config_info)
+        return AWSBackend(config=config)
 
     def _valid_credentials(self, session: Session) -> bool:
         sts = session.client("sts")
