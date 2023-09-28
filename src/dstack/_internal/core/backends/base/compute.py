@@ -4,6 +4,7 @@ from typing import List, Optional
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceState,
+    LaunchedGatewayInfo,
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
@@ -34,11 +35,7 @@ class Compute(ABC):
     ) -> LaunchedInstanceInfo:
         pass
 
-    # TODO
-    # def create_gateway(
-    #     self,
-    #     instance_name: str,
-    #     ssh_key_pub: str,
-    #     region: str
-    # ) -> GatewayHead:
-    #     raise NotImplementedError()
+    def create_gateway(
+        self, instance_name: str, ssh_key_pub: str, region: str
+    ) -> LaunchedGatewayInfo:
+        raise NotImplementedError()

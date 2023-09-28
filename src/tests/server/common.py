@@ -23,6 +23,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
     BackendModel,
+    GatewayModel,
     JobModel,
     ProjectModel,
     RepoModel,
@@ -210,3 +211,27 @@ async def create_job(
     session.add(job)
     await session.commit()
     return job
+
+
+async def create_gateway(
+    session: AsyncSession,
+    project_id: UUID,
+    backend_id: UUID,
+    name: str = "test_gateway",
+    ip_address: Optional[str] = "1.1.1.1",
+    region: str = "us",
+    instance_id: Optional[str] = "i-1234567890",
+    wildcard_domain: Optional[str] = None,
+) -> GatewayModel:
+    async with session.begin():
+        gateway = GatewayModel(
+            project_id=project_id,
+            backend_id=backend_id,
+            name=name,
+            ip_address=ip_address,
+            region=region,
+            instance_id=instance_id,
+            wildcard_domain=wildcard_domain,
+        )
+        session.add(gateway)
+    return gateway

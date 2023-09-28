@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from sqlalchemy import (
     BLOB,
+    Boolean,
     DateTime,
     Enum,
     ForeignKey,
@@ -62,6 +63,13 @@ class ProjectModel(BaseModel):
         back_populates="project", lazy="selectin"
     )
 
+    default_gateway_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("gateways.id", use_alter=True, ondelete="SET NULL"), nullable=True
+    )
+    default_gateway: Mapped["GatewayModel"] = relationship(
+        foreign_keys=[default_gateway_id], lazy="selectin"
+    )
+
 
 class MemberModel(BaseModel):
     __tablename__ = "members"
@@ -88,6 +96,8 @@ class BackendModel(BaseModel):
 
     config: Mapped[str] = mapped_column(String(2000))
     auth: Mapped[str] = mapped_column(String(2000))
+
+    gateways: Mapped[List["GatewayModel"]] = relationship(back_populates="backend")
 
 
 class RepoModel(BaseModel):
@@ -160,3 +170,24 @@ class JobModel(BaseModel):
     job_spec_data: Mapped[str] = mapped_column(String(4000))
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
     runner_timestamp: Mapped[Optional[int]] = mapped_column(Integer)
+
+
+class GatewayModel(BaseModel):
+    __tablename__ = "gateways"
+
+    id: Mapped[UUIDType] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    ip_address: Mapped[str] = mapped_column(String(100))
+    instance_id: Mapped[str] = mapped_column(String(100))
+    region: Mapped[str] = mapped_column(String(100))
+    wildcard_domain: Mapped[str] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+
+    project_id: Mapped[UUIDType] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+    backend_id: Mapped[UUIDType] = mapped_column(ForeignKey("backends.id", ondelete="CASCADE"))
+    backend: Mapped["BackendModel"] = relationship(lazy="selectin")
+
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_gateways_project_id_name"),)

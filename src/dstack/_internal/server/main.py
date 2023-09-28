@@ -8,7 +8,16 @@ from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.services.configs import create_default_project_config
 from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_session, get_session_ctx, migrate
-from dstack._internal.server.routers import backends, logs, projects, repos, runs, secrets, users
+from dstack._internal.server.routers import (
+    backends,
+    gateways,
+    logs,
+    projects,
+    repos,
+    runs,
+    secrets,
+    users,
+)
 from dstack._internal.server.services.projects import (
     DEFAULT_PROJECT_NAME,
     get_or_create_default_project,
@@ -47,6 +56,7 @@ app.include_router(runs.root_router)
 app.include_router(runs.project_router)
 app.include_router(logs.router)
 app.include_router(secrets.router)
+app.include_router(gateways.router)
 
 
 @app.exception_handler(ServerClientError)

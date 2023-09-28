@@ -60,3 +60,8 @@ class InstanceOfferWithAvailability(InstanceOffer):
 
 class InstanceCandidate(InstanceOfferWithAvailability):
     backend: BackendType
+
+
+class LaunchedGatewayInfo(BaseModel):
+    instance_id: str
+    ip_address: str
