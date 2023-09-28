@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import dstack._internal.core.models.gateways as models
 import dstack._internal.server.schemas.gateways as schemas
 import dstack._internal.server.services.gateways as gateways
+from dstack._internal.core.errors import NotFoundError
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
@@ -43,14 +44,16 @@ async def create_gateway(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> models.Gateway:
     _, project = user_project
-    gateway = await gateways.create_gateway(
-        session=session,
-        project=project,
-        name=body.name,
-        backend_type=body.backend_type,
-        region=body.region,
-    )
-    return gateway
+    try:
+        return await gateways.create_gateway(
+            session=session,
+            project=project,
+            name=body.name,
+            backend_type=body.backend_type,
+            region=body.region,
+        )
+    except NotFoundError:
+        raise_not_found()
 
 
 @router.post("/delete")
@@ -70,7 +73,10 @@ async def set_default_gateway(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     _, project = user_project
-    await gateways.set_default_gateway(session=session, project=project, name=body.name)
+    try:
+        await gateways.set_default_gateway(session=session, project=project, name=body.name)
+    except NotFoundError:
+        raise_not_found()
 
 
 @router.post("/set_wildcard_domain")
@@ -80,6 +86,9 @@ async def set_gateway_wildcard_domain(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> models.Gateway:
     _, project = user_project
-    return await gateways.set_gateway_wildcard_domain(
-        session=session, project=project, name=body.name, wildcard_domain=body.wildcard_domain
-    )
+    try:
+        return await gateways.set_gateway_wildcard_domain(
+            session=session, project=project, name=body.name, wildcard_domain=body.wildcard_domain
+        )
+    except NotFoundError:
+        raise_not_found()

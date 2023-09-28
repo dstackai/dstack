@@ -14,6 +14,10 @@ class ForbiddenError(ServerError):
     pass
 
 
+class NotFoundError(ServerError):
+    pass
+
+
 class ClientError(DstackError):
     pass
 

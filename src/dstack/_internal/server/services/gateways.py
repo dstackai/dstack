@@ -4,7 +4,8 @@ from typing import List, Optional, Sequence
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import DstackError
+import dstack._internal.utils.random_names as random_names
+from dstack._internal.core.errors import DstackError, NotFoundError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.server.models import GatewayModel, ProjectModel
@@ -32,7 +33,7 @@ async def get_gateway_by_name(
 async def get_project_default_gateway(
     session: AsyncSession, project: ProjectModel
 ) -> Optional[Gateway]:
-    gateway = project.default_gateway
+    gateway: Optional[GatewayModel] = project.default_gateway
     if gateway is None:
         return None
     return gateway_model_to_gateway(gateway)
@@ -49,9 +50,10 @@ async def create_gateway(
         if backend_model.type == backend_type:
             break
     else:
-        raise DstackError("Backend is not configured in the project")  # TODO
+        raise NotFoundError()
+
     if name is None:
-        raise NotImplemented()  # TODO
+        name = await generate_gateway_name(session=session, project=project)
 
     gateway = GatewayModel(  # reserve name
         name=name,
@@ -134,14 +136,14 @@ async def set_gateway_wildcard_domain(
     )
     gateway = res.scalar()
     if gateway is None:
-        raise DstackError("Gateway not found")  # TODO
+        raise NotFoundError()
     return gateway_model_to_gateway(gateway)
 
 
 async def set_default_gateway(session: AsyncSession, project: ProjectModel, name: str):
     gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
     if gateway is None:
-        raise DstackError("Gateway not found")  # TODO
+        raise NotFoundError()
     await session.execute(
         update(ProjectModel)
         .where(
@@ -170,6 +172,15 @@ async def get_project_gateway_model_by_name(
         )
     )
     return res.scalar()
+
+
+async def generate_gateway_name(session: AsyncSession, project: ProjectModel) -> str:
+    gateways = await list_project_gateway_models(session=session, project=project)
+    names = {g.name for g in gateways}
+    while True:
+        name = random_names.generate_name()
+        if name not in names:
+            return name
 
 
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:

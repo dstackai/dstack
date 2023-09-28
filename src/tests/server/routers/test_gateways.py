@@ -84,6 +84,20 @@ class TestListAndGetGateways:
             "wildcard_domain": gateway.wildcard_domain,
         }
 
+    @pytest.mark.asyncio
+    async def test_get_missing(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        response = client.post(
+            f"/api/project/{project.name}/gateways/get",
+            json={"name": "missing"},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 404
+
 
 class TestCreateGateway:
     @pytest.mark.asyncio
@@ -137,6 +151,45 @@ class TestCreateGateway:
         }
 
     @pytest.mark.asyncio
+    async def test_create_gateway_without_name(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(session, project.id)
+        with patch(
+            "dstack._internal.server.services.gateways.get_project_backends_with_models"
+        ) as m, patch("dstack._internal.server.services.gateways.random_names.generate_name") as g:
+            g.return_value = "random-name"
+            aws = Mock()
+            m.return_value = [(backend, aws)]
+            aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
+                instance_id="i-1234567890",
+                ip_address="2.2.2.2",
+            )
+
+            response = client.post(
+                f"/api/project/{project.name}/gateways/create",
+                json={"name": None, "backend_type": "aws", "region": "us"},
+                headers=get_auth_headers(user.token),
+            )
+            g.assert_called_once()
+            m.assert_called_once()
+            aws.compute.return_value.create_gateway.assert_called_once()
+        assert response.status_code == 200
+        assert response.json() == {
+            "name": "random-name",
+            "backend": "aws",
+            "region": "us",
+            "instance_id": "i-1234567890",
+            "ip_address": "2.2.2.2",
+            "wildcard_domain": None,
+            "default": False,
+            "created_at": response.json()["created_at"],
+        }
+
+    @pytest.mark.asyncio
     async def test_rollback_gateway_on_fail(self, test_db, session: AsyncSession):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -165,6 +218,20 @@ class TestCreateGateway:
         )
         assert response.status_code == 200
         assert response.json() == []
+
+    @pytest.mark.asyncio
+    async def test_create_gateway_missing_backend(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        response = client.post(
+            f"/api/project/{project.name}/gateways/create",
+            json={"name": "test", "backend_type": "aws", "region": "us"},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 404
 
 
 class TestDefaultGateway:
@@ -238,6 +305,20 @@ class TestDefaultGateway:
             "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
         }
+
+    @pytest.mark.asyncio
+    async def test_set_default_gateway_missing(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        response = client.post(
+            f"/api/project/{project.name}/gateways/set_default",
+            json={"name": "missing"},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 404
 
 
 class TestDeleteGateway:
@@ -343,3 +424,17 @@ class TestUpdateGateway:
             "region": gateway.region,
             "wildcard_domain": "test.com",
         }
+
+    @pytest.mark.asyncio
+    async def test_set_wildcard_domain_missing(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        response = client.post(
+            f"/api/project/{project.name}/gateways/set_wildcard_domain",
+            json={"name": "missing", "wildcard_domain": "test.com"},
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 404
