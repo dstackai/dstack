@@ -21,7 +21,7 @@ class TestListBackendTypes:
     def test_returns_backend_types(self):
         response = client.post("/api/backends/list_types")
         assert response.status_code == 200, response.json()
-        assert response.json() == ["aws", "gcp"]
+        assert response.json() == ["aws", "gcp", "lambda"]
 
 
 class TestGetBackendConfigValuesAWS:
@@ -79,7 +79,7 @@ class TestGetBackendConfigValuesAWS:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_config_on_credentials(self, test_db, session: AsyncSession):
+    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "aws",
@@ -168,7 +168,7 @@ class TestGetBackendConfigValuesGCP:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_config_on_credentials(self, test_db, session: AsyncSession):
+    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "gcp",
@@ -249,6 +249,95 @@ class TestGetBackendConfigValuesGCP:
         }
 
 
+class TestGetBackendConfigValuesLambda:
+    @pytest.mark.asyncio
+    async def test_returns_initial_config(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {"type": "lambda"}
+        response = client.post(
+            "/api/backends/config_values",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "type": "lambda",
+            "regions": None,
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {
+            "type": "lambda",
+            "creds": {
+                "type": "api_key",
+                "api_key": "1234",
+            },
+        }
+        with patch("dstack._internal.core.backends.lambdalabs.api_client.LambdaAPIClient") as m:
+            m.return_value.validate_api_key.return_value = False
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            m.return_value.validate_api_key.assert_called()
+        assert response.status_code == 400, response.json()
+        assert response.json() == {
+            "detail": [
+                {
+                    "code": "invalid_credentials",
+                    "msg": "Invalid credentials",
+                    "fields": ["creds", "api_key"],
+                },
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {
+            "type": "lambda",
+            "creds": {
+                "type": "api_key",
+                "api_key": "1234",
+            },
+        }
+        with patch("dstack._internal.core.backends.lambdalabs.api_client.LambdaAPIClient") as m:
+            m.return_value.validate_api_key.return_value = True
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            m.return_value.validate_api_key.assert_called()
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "type": "lambda",
+            "regions": {
+                "selected": ["us-east-1"],
+                "values": [
+                    {"value": "us-south-1", "label": "us-south-1"},
+                    {"value": "us-west-2", "label": "us-west-2"},
+                    {"value": "us-west-1", "label": "us-west-1"},
+                    {"value": "us-midwest-1", "label": "us-midwest-1"},
+                    {"value": "us-west-3", "label": "us-west-3"},
+                    {"value": "us-east-1", "label": "us-east-1"},
+                    {
+                        "value": "australia-southeast-1",
+                        "label": "australia-southeast-1",
+                    },
+                    {"value": "europe-central-1", "label": "europe-central-1"},
+                    {"value": "asia-south-1", "label": "asia-south-1"},
+                    {"value": "me-west-1", "label": "me-west-1"},
+                    {"value": "europe-south-1", "label": "europe-south-1"},
+                    {"value": "asia-northeast-1", "label": "asia-northeast-1"},
+                ],
+            },
+        }
+
+
 class TestCreateBackend:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
@@ -314,6 +403,33 @@ class TestCreateBackend:
                 headers=get_auth_headers(user.token),
                 json=body,
             )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.asyncio
+    async def test_creates_lambda_backend(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        body = {
+            "type": "lambda",
+            "creds": {
+                "type": "api_key",
+                "api_key": "1234",
+            },
+            "regions": ["asd"],
+        }
+        with patch("dstack._internal.core.backends.lambdalabs.api_client.LambdaAPIClient") as m:
+            m.return_value.validate_api_key.return_value = True
+            response = client.post(
+                f"/api/project/{project.name}/backends/create",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            m.return_value.validate_api_key.assert_called()
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1

@@ -47,6 +47,15 @@ try:
 except ImportError:
     pass
 
+try:
+    from dstack._internal.server.services.backends.configurators.lambdalabs import (
+        LambdaConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(LambdaConfigurator)
+except ImportError:
+    pass
+
 
 _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP = {c.TYPE: c for c in _CONFIGURATOR_CLASSES}
 
