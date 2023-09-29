@@ -41,6 +41,13 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.server.services.backends.configurators.azure import AzureConfigurator
+
+    _CONFIGURATOR_CLASSES.append(AzureConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.server.services.backends.configurators.gcp import GCPConfigurator
 
     _CONFIGURATOR_CLASSES.append(GCPConfigurator)

@@ -1,5 +1,5 @@
 import json
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import botocore.exceptions
 import pytest
@@ -21,7 +21,7 @@ class TestListBackendTypes:
     def test_returns_backend_types(self):
         response = client.post("/api/backends/list_types")
         assert response.status_code == 200, response.json()
-        assert response.json() == ["aws", "gcp", "lambda"]
+        assert response.json() == ["aws", "azure", "gcp", "lambda"]
 
 
 class TestGetBackendConfigValuesAWS:
@@ -114,6 +114,143 @@ class TestGetBackendConfigValuesAWS:
                     {"label": "eu-west-2", "value": "eu-west-2"},
                     {"label": "eu-west-3", "value": "eu-west-3"},
                     {"label": "eu-north-1", "value": "eu-north-1"},
+                ],
+            },
+        }
+
+
+class TestGetBackendConfigValuesAzure:
+    @pytest.mark.asyncio
+    async def test_returns_initial_config(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {"type": "azure"}
+        response = client.post(
+            "/api/backends/config_values",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "type": "azure",
+            "default_creds": False,
+            "tenant_id": None,
+            "subscription_id": None,
+            "locations": None,
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {
+            "type": "azure",
+            "creds": {
+                "type": "client",
+                "tenant_id": "1234",
+                "client_id": "1234",
+                "client_secret": "1234",
+            },
+        }
+        with patch("dstack._internal.core.backends.azure.auth.authenticate") as m:
+            m.side_effect = BackendAuthError()
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            m.assert_called()
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [
+                {
+                    "code": "invalid_credentials",
+                    "msg": "Invalid credentials",
+                    "fields": ["creds", "tenant_id"],
+                },
+                {
+                    "code": "invalid_credentials",
+                    "msg": "Invalid credentials",
+                    "fields": ["creds", "client_id"],
+                },
+                {
+                    "code": "invalid_credentials",
+                    "msg": "Invalid credentials",
+                    "fields": ["creds", "client_secret"],
+                },
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {
+            "type": "azure",
+            "creds": {
+                "type": "client",
+                "tenant_id": "test_tenant",
+                "client_id": "1234",
+                "client_secret": "1234",
+            },
+        }
+        with patch(
+            "dstack._internal.core.backends.azure.auth.authenticate"
+        ) as authenticate_mock, patch(
+            "azure.mgmt.subscription.SubscriptionClient"
+        ) as SubscriptionClientMock:
+            authenticate_mock.return_value = None, "test_tenant"
+            client_mock = SubscriptionClientMock.return_value
+            tenant_mock = Mock()
+            tenant_mock.tenant_id = "test_tenant"
+            client_mock.tenants.list.return_value = [tenant_mock]
+            subscription_mock = Mock()
+            subscription_mock.subscription_id = "test_subscription"
+            subscription_mock.display_name = "Subscription"
+            client_mock.subscriptions.list.return_value = [subscription_mock]
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200
+        assert response.json() == {
+            "type": "azure",
+            "default_creds": False,
+            "tenant_id": {
+                "selected": "test_tenant",
+                "values": [
+                    {
+                        "value": "test_tenant",
+                        "label": "test_tenant",
+                    }
+                ],
+            },
+            "subscription_id": {
+                "selected": "test_subscription",
+                "values": [
+                    {
+                        "value": "test_subscription",
+                        "label": "Subscription (test_subscription)",
+                    }
+                ],
+            },
+            "locations": {
+                "selected": ["eastus"],
+                "values": [
+                    {"value": "centralus", "label": "centralus"},
+                    {"value": "eastus", "label": "eastus"},
+                    {"value": "eastus2", "label": "eastus2"},
+                    {"value": "southcentralus", "label": "southcentralus"},
+                    {"value": "westus2", "label": "westus2"},
+                    {"value": "westus3", "label": "westus3"},
+                    {"value": "canadacentral", "label": "canadacentral"},
+                    {"value": "francecentral", "label": "francecentral"},
+                    {"value": "germanywestcentral", "label": "germanywestcentral"},
+                    {"value": "northeurope", "label": "northeurope"},
+                    {"value": "swedencentral", "label": "swedencentral"},
+                    {"value": "uksouth", "label": "uksouth"},
+                    {"value": "westeurope", "label": "westeurope"},
+                    {"value": "southeastasia", "label": "southeastasia"},
+                    {"value": "eastasia", "label": "eastasia"},
+                    {"value": "brazilsouth", "label": "brazilsouth"},
                 ],
             },
         }
@@ -430,6 +567,56 @@ class TestCreateBackend:
                 json=body,
             )
             m.return_value.validate_api_key.assert_called()
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.asyncio
+    async def test_create_azure_backend(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        body = {
+            "type": "azure",
+            "creds": {
+                "type": "client",
+                "tenant_id": "test_tenant",
+                "client_id": "1234",
+                "client_secret": "1234",
+            },
+            "tenant_id": "test_tenant",
+            "subscription_id": "test_subscription",
+            "locations": ["eastus"],
+        }
+        with patch(
+            "dstack._internal.core.backends.azure.auth.authenticate"
+        ) as authenticate_mock, patch(
+            "azure.mgmt.subscription.SubscriptionClient"
+        ) as SubscriptionClientMock, patch(
+            "azure.mgmt.resource.ResourceManagementClient"
+        ) as ResourceManagementClient:
+            authenticate_mock.return_value = None, "test_tenant"
+            subscription_client_mock = SubscriptionClientMock.return_value
+            tenant_mock = Mock()
+            tenant_mock.tenant_id = "test_tenant"
+            subscription_client_mock.tenants.list.return_value = [tenant_mock]
+            subscription_mock = Mock()
+            subscription_mock.subscription_id = "test_subscription"
+            subscription_mock.display_name = "Subscription"
+            subscription_client_mock.subscriptions.list.return_value = [subscription_mock]
+            resource_client_mock = ResourceManagementClient.return_value
+            resource_group_mock = Mock()
+            resource_group_mock.name = "test_resource_group"
+            resource_client_mock.resource_groups.create_or_update.return_value = (
+                resource_group_mock
+            )
+            response = client.post(
+                f"/api/project/{project.name}/backends/create",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1

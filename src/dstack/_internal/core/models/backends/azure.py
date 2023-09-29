@@ -15,6 +15,7 @@ class AzureConfigInfo(BaseModel):
 
 class AzureClientCreds(BaseModel):
     type: Literal["client"] = "client"
+    tenant_id: str
     client_id: str
     client_secret: str
 
@@ -51,3 +52,7 @@ class AzureConfigValues(BaseModel):
     tenant_id: Optional[ConfigElement]
     subscription_id: Optional[ConfigElement]
     locations: Optional[ConfigMultiElement]
+
+
+class AzureStoredConfig(AzureConfigInfo):
+    resource_group: str
