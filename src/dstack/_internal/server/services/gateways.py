@@ -219,7 +219,7 @@ async def register_service_jobs(session: AsyncSession, project: ProjectModel, jo
             job.job_spec.gateway.hostname = f"{job.job_spec.job_name}.{domain}"
         else:
             job.job_spec.gateway.secure = False
-            job.job_spec.gateway.public_port = 80
+            # use provided public port
             job.job_spec.gateway.hostname = gateway.ip_address
     await run_async(
         configure_gateway_over_ssh,

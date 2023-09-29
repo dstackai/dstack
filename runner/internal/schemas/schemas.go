@@ -70,11 +70,13 @@ type Configuration struct {
 }
 
 type Gateway struct {
-	Hostname    string `json:"hostname"`
+	GatewayName string `json:"gateway_name"`
 	ServicePort int    `json:"service_port"`
-	PublicPort  int    `json:"public_port"`
-	SshKey      string `json:"ssh_key"`
+	SSHKey      string `json:"ssh_key"`
 	SockPath    string `json:"sock_path"`
+	Hostname    string `json:"hostname"`
+	PublicPort  int    `json:"public_port"`
+	Secure      bool   `json:"secure"`
 }
 
 func (d *RepoData) FormatURL(format string) string {
