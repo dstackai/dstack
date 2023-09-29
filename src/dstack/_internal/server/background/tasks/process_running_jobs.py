@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+import dstack._internal.core.errors
 from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, JobSubmission, Run
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
 from dstack._internal.server.db import get_session_ctx
@@ -188,7 +189,7 @@ def _process_running_job(
             job_model.status = last_job_state.state
             logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
             # TODO Write logs
-    except ssh_tunnel.SSHError:
+    except dstack._internal.core.errors.SSHError:
         job_model.status = JobStatus.FAILED
         job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
         if job.is_retry_active():

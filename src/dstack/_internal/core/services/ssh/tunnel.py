@@ -3,15 +3,11 @@ import subprocess
 import tempfile
 from typing import Dict, Optional
 
-from dstack._internal.core.errors import DstackError
+from dstack._internal.core.errors import SSHError
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 
 logger = get_logger(__name__)
-
-
-class SSHError(DstackError):
-    pass
 
 
 class SSHTimeoutError(SSHError):

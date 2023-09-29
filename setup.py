@@ -189,8 +189,7 @@ setup(
     package_dir={"": "src"},
     packages=find_packages("src"),
     package_data={
-        "dstack._internal": [
-            "schemas/*.json",
+        "dstack._internal.server": [
             "scripts/*.sh",
             "scripts/*.py",
         ],

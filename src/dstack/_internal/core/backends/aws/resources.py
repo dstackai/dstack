@@ -299,4 +299,11 @@ def get_gateway_user_data(authorized_key: str) -> str:
         snap={"commands": [["install", "--classic", "certbot"]]},
         runcmd=[["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"]],
         ssh_authorized_keys=[authorized_key],
+        users=[
+            "default",
+            {
+                "name": "www-data",
+                "ssh_authorized_keys": [authorized_key],
+            },
+        ],
     )

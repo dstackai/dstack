@@ -1,8 +1,9 @@
 import time
 
+from dstack._internal.core.errors import SSHError
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh.ports import PortsLock
-from dstack._internal.core.services.ssh.tunnel import ClientTunnel, SSHError
+from dstack._internal.core.services.ssh.tunnel import ClientTunnel
 from dstack._internal.utils.path import PathLike
 from dstack._internal.utils.ssh import (
     include_ssh_config,

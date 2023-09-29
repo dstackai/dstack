@@ -6,6 +6,7 @@ from typing import List, Optional
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError
 from dstack._internal.core.models.runs import (
@@ -143,6 +144,8 @@ async def submit_run(
     )
     session.add(run_model)
     jobs = get_jobs_from_run_spec(run_spec)
+    if run_spec.configuration.type == "service":
+        await gateways.register_service_jobs(session, project, jobs)
     for job in jobs:
         job_model = create_job_model_for_new_submission(
             run_model=run_model,

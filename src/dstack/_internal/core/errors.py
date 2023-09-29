@@ -90,3 +90,7 @@ class CLIError(DstackError):
 
 class ConfigurationError(DstackError):
     pass
+
+
+class SSHError(DstackError):
+    pass

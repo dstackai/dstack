@@ -89,12 +89,12 @@ class Requirements(BaseModel):
 
 class Gateway(BaseModel):
     gateway_name: Optional[str]
-    hostname: Optional[str]
     service_port: int
-    public_port: int = 80
-    secure: bool = False
     ssh_key: Optional[str]
     sock_path: Optional[str]
+    hostname: Optional[str]
+    public_port: int = 80
+    secure: bool = False
 
 
 class JobSpec(BaseModel):
