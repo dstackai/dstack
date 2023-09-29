@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 import uuid
 from datetime import timezone
 from typing import List, Optional
@@ -12,6 +13,7 @@ from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientErro
 from dstack._internal.core.models.runs import (
     Job,
     JobPlan,
+    JobSpec,
     JobStatus,
     JobSubmission,
     Run,
@@ -235,13 +237,19 @@ async def delete_runs(
 
 
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:
+    jobs = []
+    # JobSpec from JobConfigurator doesn't have gateway information for `service` type
+    run_jobs = sorted(run_model.jobs, key=lambda j: (j.job_num, j.submission_num))
+    for job_num, job_submissions in itertools.groupby(run_jobs):
+        job_spec = None
+        submissions = []
+        for job_model in job_submissions:
+            if job_spec is None:
+                job_spec = JobSpec.parse_raw(job_model.job_spec_data)
+            if include_job_submissions:
+                submissions.append(job_model_to_job_submission(job_model))
+        jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
     run_spec = RunSpec.parse_raw(run_model.run_spec)
-    jobs = get_jobs_from_run_spec(run_spec)
-    if include_job_submissions:
-        for job_model in run_model.jobs:
-            job = jobs[job_model.job_num]
-            job_submission = job_model_to_job_submission(job_model)
-            job.job_submissions.append(job_submission)
     run = Run(
         id=run_model.id,
         project_name=run_model.project.name,
