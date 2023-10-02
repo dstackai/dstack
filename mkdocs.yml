@@ -73,7 +73,8 @@ plugins:
         'docs/quick-start.md': 'docs/index.md'
         'docs/installation/index.md': 'docs/index.md'
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion-xl.md'
-        'docs/guides/projects.md': 'docs/projects.md'
+        'docs/guides/projects.md': 'docs/guides/clouds.md'
+        'examples/python-api.md': 'examples/deploy-python.md'
   - typeset
 
 # Extensions
@@ -123,13 +124,13 @@ extra:
   social:
     - icon: /fontawesome/brands/github
       link: https://github.com/dstackai/dstack
-    - icon: /fontawesome/brands/python
-      link: https://pypi.org/project/dstack
+#    - icon: /fontawesome/brands/python
+#      link: https://pypi.org/project/dstack
     - icon: /fontawesome/brands/docker
       link: https://hub.docker.com/r/dstackai/dstack
     - icon: /fontawesome/brands/discord
       link: https://discord.gg/u8SmfwPpMd
-    - icon: /fontawesome/brands/twitter
+    - icon: /simple/x
       link: https://twitter.com/dstackai
   status:
     new: Recently added
@@ -180,7 +181,7 @@ nav:
     - examples/index.md
     - Examples:
       - RAG with Llama Index and Weaviate: examples/llama-index-weaviate.md
-      - Deploying LLMs using Python API: examples/python-api.md
+      - Deploying LLMs using Python API: examples/deploy-python.md
       - Fine-tuning Llama 2 using QLoRA: examples/finetuning-llama-2.md
       - Deploying LLMs using TGI: examples/text-generation-inference.md
       - Deploying SDXL using FastAPI: examples/stable-diffusion-xl.md

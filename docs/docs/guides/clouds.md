@@ -49,16 +49,16 @@ Configuring backends involves providing cloud credentials, and specifying storag
 <div class="grid cards" markdown>
 - [**AWS**
    Learn how to set up an Amazon Web Services backend.
-  ](../../reference/backends/aws/)
+  ](../reference/backends/aws.md)
 - [**GCP**
-   Learn how to set up a Google Cloud backend.
-  ](../../reference/backends/gcp/)
+Learn how to set up a Google Cloud backend.
+  ](../reference/backends/gcp.md)
 - [**Azure**
    Learn how to set up an Microsoft Azure backend.
-  ](../../reference/backends/azure/)
+  ](../reference/backends/azure.md)
 - [**Lambda**
    Learn how to set up a Lambda Cloud backend.
-  ](../../reference/backends/lambda/)
+  ](../reference/backends/lambda.md)
 
 </div>
 

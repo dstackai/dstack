@@ -616,6 +616,10 @@ body {
         width: 26px;
         text-align: center;
     }
+
+    .md-nav--lifted > .md-nav__list > .md-nav__item > [for] {
+        display: none;
+    }
 }
 
 .md-sidebar--primary .md-nav__link {

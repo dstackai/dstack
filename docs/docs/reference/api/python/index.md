@@ -5,7 +5,7 @@ The Python API allows for programmatically running tasks and services across con
 #### Installation
 
 Before you can use `dstack` Python API, ensure you have installed the `dstack` package, 
-started a `dstack` server with [configured clouds](../../docs/docs/guides/clouds.md).
+started a `dstack` server with [configured clouds](../../../guides/clouds.md).
     
 ```shell
 pip install "dstack[all]==0.11.3rc1"
