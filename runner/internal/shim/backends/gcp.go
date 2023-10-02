@@ -1,15 +1,19 @@
 package backends
 
 import (
+	compute "cloud.google.com/go/compute/apiv1"
+	"cloud.google.com/go/compute/apiv1/computepb"
 	"context"
 	"fmt"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"io"
 	"net/http"
+	"strings"
 )
 
 type GCPBackend struct {
 	instanceName string
+	project      string
 	zone         string
 }
 
@@ -22,22 +26,30 @@ func NewGCPBackend(ctx context.Context) (Backend, error) {
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	zone, err := getGCPMetadata(ctx, "/instance/zone")
+	projectZone, err := getGCPMetadata(ctx, "/instance/zone")
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
+	// Parse `projects/<project-id>/zones/<projectZone>`
+	parts := strings.Split(projectZone, "/")
 	return &GCPBackend{
 		instanceName: instanceName,
-		zone:         zone,
+		project:      parts[1],
+		zone:         parts[3],
 	}, nil
 }
 
 func (b *GCPBackend) Terminate(ctx context.Context) error {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("https://compute.googleapis.com/compute/v1/%s/instances/%s", b.zone, b.instanceName), nil)
+	instancesClient, err := compute.NewInstancesRESTClient(ctx)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return nil
 	}
-	_, err = http.DefaultClient.Do(req.WithContext(ctx))
+	req := &computepb.DeleteInstanceRequest{
+		Instance: b.instanceName,
+		Project:  b.project,
+		Zone:     b.zone,
+	}
+	_, err = instancesClient.Delete(ctx, req)
 	return gerrors.Wrap(err)
 }
 
