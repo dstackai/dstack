@@ -4,10 +4,10 @@ from typing import Callable, Dict, List, Optional, Tuple
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
 
+import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack._internal.core.backends.base.compute import Compute, get_user_data
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.gcp.auth import authenticate
 from dstack._internal.core.backends.gcp.config import GCPConfig
 from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
 from dstack._internal.core.models.backends.base import BackendType
@@ -25,7 +25,7 @@ from dstack._internal.core.models.runs import Job, Requirements, Run
 class GCPCompute(Compute):
     def __init__(self, config: GCPConfig):
         self.config = config
-        self.credentials, self.project_id = authenticate(config.creds)
+        self.credentials, self.project_id = auth.authenticate(config.creds)
         self.instances_client = compute_v1.InstancesClient(credentials=self.credentials)
         self.firewalls_client = compute_v1.FirewallsClient(credentials=self.credentials)
         self.regions_client = compute_v1.RegionsClient(credentials=self.credentials)
