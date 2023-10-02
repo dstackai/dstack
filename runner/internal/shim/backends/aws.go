@@ -31,11 +31,11 @@ func NewAWSBackend(ctx context.Context) (Backend, error) {
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	lifecycle, err := getMetadata(ctx, client, "instance-life-cycle")
+	lifecycle, err := getAWSMetadata(ctx, client, "instance-life-cycle")
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	instanceId, err := getMetadata(ctx, client, "instance-id")
+	instanceId, err := getAWSMetadata(ctx, client, "instance-id")
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
@@ -59,7 +59,7 @@ func (b *AWSBackend) Terminate(ctx context.Context) error {
 	return gerrors.Wrap(err)
 }
 
-func getMetadata(ctx context.Context, client *imds.Client, path string) (string, error) {
+func getAWSMetadata(ctx context.Context, client *imds.Client, path string) (string, error) {
 	resp, err := client.GetMetadata(ctx, &imds.GetMetadataInput{
 		Path: path,
 	})
