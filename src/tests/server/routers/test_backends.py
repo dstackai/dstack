@@ -596,7 +596,13 @@ class TestCreateBackend:
             "azure.mgmt.subscription.SubscriptionClient"
         ) as SubscriptionClientMock, patch(
             "azure.mgmt.resource.ResourceManagementClient"
-        ) as ResourceManagementClient:
+        ) as ResourceManagementClientMock, patch(
+            "azure.mgmt.msi.ManagedServiceIdentityClient"
+        ) as ManagedServiceIdentityClientMock, patch(
+            "azure.mgmt.authorization.AuthorizationManagementClient"
+        ) as AuthorizationManagementClientMock, patch(
+            "azure.mgmt.network.NetworkManagementClient"
+        ) as NetworkManagementClientMock:
             authenticate_mock.return_value = None, "test_tenant"
             subscription_client_mock = SubscriptionClientMock.return_value
             tenant_mock = Mock()
@@ -606,17 +612,27 @@ class TestCreateBackend:
             subscription_mock.subscription_id = "test_subscription"
             subscription_mock.display_name = "Subscription"
             subscription_client_mock.subscriptions.list.return_value = [subscription_mock]
-            resource_client_mock = ResourceManagementClient.return_value
+            resource_client_mock = ResourceManagementClientMock.return_value
             resource_group_mock = Mock()
             resource_group_mock.name = "test_resource_group"
             resource_client_mock.resource_groups.create_or_update.return_value = (
                 resource_group_mock
             )
+            msi_client_mock = ManagedServiceIdentityClientMock.return_value
+            identity_mock = Mock()
+            identity_mock.principal_id = "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"
+            msi_client_mock.user_assigned_identities.create_or_update.return_value = identity_mock
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
+            authenticate_mock.assert_called()
+            SubscriptionClientMock.assert_called()
+            ResourceManagementClientMock.assert_called()
+            ManagedServiceIdentityClientMock.assert_called()
+            AuthorizationManagementClientMock.assert_called()
+            NetworkManagementClientMock.assert_called()
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
