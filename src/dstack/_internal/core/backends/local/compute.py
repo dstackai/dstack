@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
+from dstack._internal.core.backends.base.cloudinit import get_dstack_runner_version
 from dstack._internal.core.backends.base.compute import Compute
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -11,7 +12,6 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
-from dstack._internal.server.utils.cloudinit import get_dstack_runner_version
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)

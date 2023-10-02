@@ -8,9 +8,14 @@ import botocore.exceptions
 import dstack._internal.core.backends.aws.resources as aws_resources
 import dstack.version as version
 from dstack._internal.core.backends.aws.config import AWSConfig
-from dstack._internal.core.backends.base.compute import Compute
+from dstack._internal.core.backends.base.compute import (
+    Compute,
+    get_gateway_user_data,
+    get_user_data,
+)
 from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOffer,
@@ -129,7 +134,8 @@ class AWSCompute(Compute):
                     iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
                         iam_client, project_id
                     ),
-                    user_data=aws_resources.get_user_data(
+                    user_data=get_user_data(
+                        backend=BackendType.AWS,
                         image_name=job.job_spec.image_name,
                         authorized_keys=[
                             run.run_spec.ssh_key_pub.strip(),
@@ -184,7 +190,7 @@ class AWSCompute(Compute):
                 image_id=aws_resources.get_gateway_image_id(ec2_client),
                 instance_type="t2.micro",
                 iam_instance_profile_arn=None,
-                user_data=aws_resources.get_gateway_user_data(ssh_key_pub),
+                user_data=get_gateway_user_data(ssh_key_pub),
                 tags=tags,
                 security_group_id=aws_resources.create_gateway_security_group(
                     ec2_client, project_id

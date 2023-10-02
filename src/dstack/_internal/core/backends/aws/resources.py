@@ -4,7 +4,6 @@ from typing import Any, Dict, List, Optional
 import botocore.client
 import botocore.exceptions
 
-import dstack._internal.server.utils.cloudinit as cloudinit
 import dstack.version as version
 from dstack._internal.core.errors import ResourceNotFoundError
 
@@ -160,26 +159,6 @@ def create_security_group(ec2_client: botocore.client.BaseClient, project_id: st
     return group_id
 
 
-def get_user_data(image_name: str, authorized_keys: List[str]) -> str:
-    build = cloudinit.get_dstack_runner_version()
-    env = {
-        "DSTACK_BACKEND": "aws",
-        "DSTACK_RUNNER_LOG_LEVEL": "6",
-        "DSTACK_RUNNER_VERSION": build,
-        "DSTACK_IMAGE_NAME": image_name,
-        "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
-        "DSTACK_HOME": "/root/.dstack",
-    }
-    script = cloudinit.get_dstack_shim(build)
-    for k, v in env.items():
-        script += [f'export "{k}={v}"']
-    script += ["nohup dstack-shim --dev docker --keep-container >/root/shim.log 2>&1 &"]
-    return cloudinit.get_cloud_config(
-        runcmd=[["sh", "-c", " && ".join(script)]],
-        ssh_authorized_keys=authorized_keys,
-    )
-
-
 def create_instances_struct(
     disk_size: int,
     image_id: str,
@@ -290,20 +269,3 @@ def create_gateway_security_group(ec2_client: botocore.client.BaseClient, projec
         IpPermissions=[{"IpProtocol": "-1"}],
     )
     return group_id
-
-
-def get_gateway_user_data(authorized_key: str) -> str:
-    return cloudinit.get_cloud_config(
-        package_update=True,
-        packages=["nginx"],
-        snap={"commands": [["install", "--classic", "certbot"]]},
-        runcmd=[["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"]],
-        ssh_authorized_keys=[authorized_key],
-        users=[
-            "default",
-            {
-                "name": "www-data",
-                "ssh_authorized_keys": [authorized_key],
-            },
-        ],
-    )

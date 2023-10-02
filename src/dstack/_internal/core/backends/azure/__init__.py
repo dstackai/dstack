@@ -1,3 +1,4 @@
+from dstack._internal.core.backends.azure import auth
 from dstack._internal.core.backends.azure.compute import AzureCompute
 from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.base import Backend
@@ -9,8 +10,11 @@ class AzureBackend(Backend):
 
     def __init__(self, config: AzureConfig):
         self.config = config
-        self._compute = AzureCompute(self.config)
-        # self._check_credentials()
+        self.credential, _ = auth.authenticate()
+        self._compute = AzureCompute(
+            config=self.config,
+            credential=self.credential,
+        )
 
     def compute(self) -> AzureCompute:
         return self._compute
