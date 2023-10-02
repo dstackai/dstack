@@ -17,9 +17,9 @@ def authenticate(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
     """
     if isinstance(creds, GCPServiceAccountCreds):
         try:
-            service_acccount_info = json.loads(creds.data)
+            service_account_info = json.loads(creds.data)
             credentials = service_account.Credentials.from_service_account_info(
-                service_acccount_info
+                service_account_info
             )
         except Exception:
             raise BackendAuthError()
