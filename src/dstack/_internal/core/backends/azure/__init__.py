@@ -10,7 +10,7 @@ class AzureBackend(Backend):
 
     def __init__(self, config: AzureConfig):
         self.config = config
-        self.credential, _ = auth.authenticate()
+        self.credential, _ = auth.authenticate(self.config.creds)
         self._compute = AzureCompute(
             config=self.config,
             credential=self.credential,

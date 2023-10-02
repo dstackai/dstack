@@ -1,5 +1,5 @@
 def get_resource_name_from_resource_id(resource_id: str) -> str:
-    return resource_id.rsplit("/")[0]
+    return resource_id.split("/")[-1]
 
 
 def get_resource_group_id(subscription_id: str, resource_group: str) -> str:

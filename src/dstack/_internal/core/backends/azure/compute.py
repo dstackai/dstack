@@ -1,8 +1,9 @@
 import base64
+import re
 from typing import List, Optional
 
 from azure.core.credentials import TokenCredential
-from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+from azure.core.exceptions import ResourceExistsError
 from azure.mgmt import compute as compute_mgmt
 from azure.mgmt import network as network_mgmt
 from azure.mgmt.compute.models import (
@@ -34,9 +35,12 @@ from dstack import version
 from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.base.compute import Compute, get_user_data
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceState,
     LaunchedInstanceInfo,
@@ -52,16 +56,27 @@ class AzureCompute(Compute):
         self.config = config
         self.credential = credential
         self._compute_client = compute_mgmt.ComputeManagementClient(
-            credential=credential, subscription_id=self.azure_config.subscription_id
+            credential=credential, subscription_id=config.subscription_id
         )
         self._network_client = network_mgmt.NetworkManagementClient(
-            credential=credential, subscription_id=self.azure_config.subscription_id
+            credential=credential, subscription_id=config.subscription_id
         )
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
-        pass
+        offers = get_catalog_offers(
+            provider=BackendType.AZURE.value,
+            locations=set(self.config.locations),
+            requirements=requirements,
+            extra_filter=_supported_instances,
+        )
+        offers_with_availability = _get_offers_with_availability(
+            compute_client=self._compute_client,
+            config_locations=self.config.locations,
+            offers=offers,
+        )
+        return offers_with_availability
 
     def run_job(
         self,
@@ -77,6 +92,10 @@ class AzureCompute(Compute):
             "spot" if instance_offer.instance.resources.spot else "",
             location,
         )
+        ssh_pub_keys = [
+            run.run_spec.ssh_key_pub.strip(),
+            project_ssh_public_key.strip(),
+        ]
         try:
             vm = _launch_instance(
                 compute_client=self._compute_client,
@@ -108,12 +127,9 @@ class AzureCompute(Compute):
                 user_data=get_user_data(
                     backend=BackendType.AZURE,
                     image_name=job.job_spec.image_name,
-                    authorized_keys=[
-                        run.run_spec.ssh_key_pub.strip(),
-                        project_ssh_public_key.strip(),
-                    ],
+                    authorized_keys=ssh_pub_keys,
                 ),
-                ssh_pub_key=job.ssh_key_pub,
+                ssh_pub_keys=ssh_pub_keys,
                 spot=instance_offer.instance.resources.spot,
             )
             logger.info("Request succeeded")
@@ -136,7 +152,74 @@ class AzureCompute(Compute):
         raise NoCapacityError()
 
     def terminate_instance(self, instance_id: str, region: str):
-        pass
+        _terminate_instance(
+            compute_client=self._compute_client,
+            resource_group=self.config.resource_group,
+            instance_name=instance_id,
+        )
+
+
+_SUPPORTED_VM_SERIES_PATTERNS = [
+    r"D(\d+)s_v3",  # Dsv3-series
+    r"E(\d+)i?s_v4",  # Esv4-series
+    r"E(\d+)-(\d+)s_v4",  # Esv4-series (constrained vCPU)
+    r"NC(\d+)s_v3",  # NCv3-series [V100 16GB]
+    r"NC(\d+)as_T4_v3",  # NCasT4_v3-series [T4]
+    r"ND(\d+)rs_v2",  # NDv2-series [8xV100 32GB]
+    r"NV(\d+)adm?s_A10_v5",  # NVadsA10 v5-series [A10]
+    r"NC(\d+)ads_A100_v4",  # NC A100 v4-series [A100 80GB]
+    r"ND(\d+)asr_v4",  # ND A100 v4-series [8xA100 40GB]
+    r"ND(\d+)amsr_A100_v4",  # NDm A100 v4-series [8xA100 80GB]
+]
+_SUPPORTED_VM_SERIES_PATTERN = (
+    "^Standard_(" + "|".join(f"({s})" for s in _SUPPORTED_VM_SERIES_PATTERNS) + ")$"
+)
+
+
+def _supported_instances(offer: InstanceOffer) -> bool:
+    m = re.match(_SUPPORTED_VM_SERIES_PATTERN, offer.instance.name)
+    return m is not None
+
+
+def _get_offers_with_availability(
+    compute_client: compute_mgmt.ComputeManagementClient,
+    config_locations: List[str],
+    offers: List[InstanceOffer],
+) -> List[InstanceOfferWithAvailability]:
+    availability_offers = {}
+    locations = set()
+
+    for offer in offers:
+        location = offer.region
+        if location not in config_locations:
+            continue
+        locations.add(location)
+        instance_name = offer.instance.name
+        spot = offer.instance.resources.spot
+        availability_offers[(instance_name, location, spot)] = InstanceOfferWithAvailability(
+            **offer.dict(), availability=InstanceAvailability.NO_QUOTA
+        )
+
+    for location in locations:
+        resources = compute_client.resource_skus.list(filter=f"location eq '{location}'")
+        for resource in resources:
+            if resource.resource_type != "virtualMachines" or not _vm_type_available(resource):
+                continue
+            for spot in (True, False):
+                key = (resource.name, location, spot)
+                if key in availability_offers:
+                    availability_offers[key].availability = InstanceAvailability.UNKNOWN
+    return list(availability_offers.values())
+
+
+def _vm_type_available(vm_resource: ResourceSku) -> bool:
+    if len(vm_resource.restrictions) == 0:
+        return True
+    # If a VM type is restricted in "Zone", it is still available in other zone.
+    # Otherwise the restriction type is "Location"
+    if vm_resource.restrictions[0].type == "Zone":
+        return True
+    return False
 
 
 def _get_image_ref(
@@ -169,7 +252,7 @@ def _launch_instance(
     vm_size: str,
     instance_name: str,
     user_data: str,
-    ssh_pub_key: str,
+    ssh_pub_keys: List[str],
     spot: bool,
 ) -> VirtualMachine:
     try:
@@ -200,6 +283,7 @@ def _launch_instance(
                                     path="/home/ubuntu/.ssh/authorized_keys",
                                     key_data=ssh_pub_key,
                                 )
+                                for ssh_pub_key in ssh_pub_keys
                             ]
                         )
                     ),
@@ -262,7 +346,24 @@ def _get_vm_public_ip(
     resource_group: str,
     vm: VirtualMachine,
 ) -> str:
-    nic_id = vm.network_profile.network_interfaces[0]
+    nic_id = vm.network_profile.network_interfaces[0].id
     nic_name = azure_utils.get_resource_name_from_resource_id(nic_id)
-    nic = network_client.network_interfaces.get(resource_group, nic_name)
-    return nic.ip_configurations[0].public_ip_address.ip_address
+    nic = network_client.network_interfaces.get(
+        resource_group_name=resource_group,
+        network_interface_name=nic_name,
+    )
+    public_ip_id = nic.ip_configurations[0].public_ip_address.id
+    public_ip_name = azure_utils.get_resource_name_from_resource_id(public_ip_id)
+    public_ip = network_client.public_ip_addresses.get(resource_group, public_ip_name)
+    return public_ip.ip_address
+
+
+def _terminate_instance(
+    compute_client: compute_mgmt.ComputeManagementClient,
+    resource_group: str,
+    instance_name: str,
+):
+    compute_client.virtual_machines.begin_delete(
+        resource_group_name=resource_group,
+        vm_name=instance_name,
+    )

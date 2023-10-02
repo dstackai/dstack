@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from dstack._internal.core.backends.base.cloudinit import get_dstack_runner_version
-from dstack._internal.core.backends.base.compute import Compute
+from dstack._internal.core.backends.base.compute import Compute, get_dstack_runner_version
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,

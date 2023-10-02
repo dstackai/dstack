@@ -1,14 +1,33 @@
 from typing import Callable, List, Optional, Set
 
-from dstack._internal.core.models.instances import Gpu, InstanceOffer, InstanceType, Resources
-from dstack._internal.core.models.runs import Requirements
-from dstack._internal.server.utils import catalog
-from dstack._internal.server.utils.catalog import (  # TODO replace with gpuhunt.CatalogItem
+from dstack._internal.core.backends.base import catalog
+from dstack._internal.core.backends.base.catalog import (  # TODO replace with gpuhunt.CatalogItem
     CatalogItem,
 )
+from dstack._internal.core.models.instances import Gpu, InstanceOffer, InstanceType, Resources
+from dstack._internal.core.models.runs import Requirements
 
 
-def catalog_item_to_offer(item: CatalogItem) -> InstanceOffer:
+def get_catalog_offers(
+    provider: str,
+    locations: Optional[Set[str]] = None,
+    requirements: Optional[Requirements] = None,
+    extra_filter: Optional[Callable[[InstanceOffer], bool]] = None,
+) -> List[InstanceOffer]:
+    offers = []
+    for item in catalog.query(provider=provider):
+        if locations is not None and item.location not in locations:
+            continue
+        offer = _catalog_item_to_offer(item)
+        if not _satisfies_requirements(offer, requirements):
+            continue
+        if extra_filter is not None and not extra_filter(offer):
+            continue
+        offers.append(offer)
+    return offers
+
+
+def _catalog_item_to_offer(item: CatalogItem) -> InstanceOffer:
     gpus = []
     if item.gpu_count > 0:
         gpus = [Gpu(name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024))] * item.gpu_count
@@ -27,26 +46,7 @@ def catalog_item_to_offer(item: CatalogItem) -> InstanceOffer:
     )
 
 
-def get_catalog_offers(
-    provider: str,
-    locations: Optional[Set[str]] = None,
-    requirements: Optional[Requirements] = None,
-    extra_filter: Optional[Callable[[InstanceOffer], bool]] = None,
-) -> List[InstanceOffer]:
-    offers = []
-    for item in catalog.query(provider=provider):
-        if locations is not None and item.location not in locations:
-            continue
-        offer = catalog_item_to_offer(item)
-        if not satisfies_requirements(offer, requirements):
-            continue
-        if extra_filter is not None and not extra_filter(offer):
-            continue
-        offers.append(offer)
-    return offers
-
-
-def satisfies_requirements(offer: InstanceOffer, req: Optional[Requirements]) -> bool:
+def _satisfies_requirements(offer: InstanceOffer, req: Optional[Requirements]) -> bool:
     res = offer.instance.resources
     if req is None:
         return True

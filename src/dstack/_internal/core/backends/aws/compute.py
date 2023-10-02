@@ -13,6 +13,7 @@ from dstack._internal.core.backends.base.compute import (
     get_gateway_user_data,
     get_user_data,
 )
+from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
@@ -25,7 +26,6 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
-from dstack._internal.server.services.offers import get_catalog_offers
 
 
 class AWSCompute(Compute):
@@ -43,7 +43,10 @@ class AWSCompute(Compute):
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
-            "aws", set(self.config.regions), requirements, extra_filter=_supported_instances
+            provider="aws",
+            locations=set(self.config.regions),
+            requirements=requirements,
+            extra_filter=_supported_instances,
         )
         regions = set(i.region for i in offers)
 
