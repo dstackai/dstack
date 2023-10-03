@@ -118,13 +118,13 @@ class RunnerTunnel(SSHTunnel):
             },
         )
 
-    def close(self):
-        # cancel forwarding without closing the connection
-        command = ["ssh", "-S", self.control_sock_path, "-O", "cancel"]
-        for port_remote, port_local in self.ports.items():
-            command += ["-L", f"{port_local}:localhost:{port_remote}"]
-        command += [self.host]
-        subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # def close(self):
+    #     # cancel forwarding without closing the connection
+    #     command = ["ssh", "-S", self.control_sock_path, "-O", "cancel"]
+    #     for port_remote, port_local in self.ports.items():
+    #         command += ["-L", f"{port_local}:localhost:{port_remote}"]
+    #     command += [self.host]
+    #     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 class ClientTunnel(SSHTunnel):

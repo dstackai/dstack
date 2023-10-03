@@ -1,4 +1,6 @@
 import asyncio
+import socket
+from contextlib import closing
 from datetime import timezone
 from typing import Dict, List
 
@@ -24,6 +26,9 @@ from dstack._internal.server.services.jobs.configurators.service import ServiceJ
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # TODO Make locks per project
 SUBMITTED_PROCESSING_JOBS_LOCK = asyncio.Lock()
@@ -68,7 +73,7 @@ async def stop_job(
     if job_model.status.is_finished():
         return
     async with SUBMITTED_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_LOCK:
-        # If the job provisioniong is in progress, we have to wait until it's done.
+        # If the job provisioning is in progress, we have to wait until it's done.
         # We can also consider returning an error when stopping a provisioning job.
         while (
             job_model.id in SUBMITTED_PROCESSING_JOBS_IDS
@@ -85,6 +90,9 @@ async def stop_job(
             backend = await get_project_backend_by_type(
                 project=project,
                 backend_type=job_submission.job_provisioning_data.backend,
+            )
+            logger.debug(
+                "Terminating runner instance %s", job_submission.job_provisioning_data.hostname
             )
             await run_async(
                 backend.compute().terminate_instance,
@@ -107,11 +115,10 @@ async def stop_job(
 
 
 def get_runner_ports() -> Dict[int, int]:
-    ports_lock = PortsLock({client.REMOTE_RUNNER_PORT: 0})
-    ports_lock.acquire()
-    ports = ports_lock.dict()
-    ports_lock.release()
-    return ports
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(("localhost", 0))  # Bind to a free port provided by the host
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return {client.REMOTE_RUNNER_PORT: s.getsockname()[1]}
 
 
 def _get_job_configurator(run_spec: RunSpec) -> JobConfigurator:
@@ -142,4 +149,5 @@ def _stop_runner(
         id_rsa=server_ssh_private_key,
     ):
         runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
+        logger.debug("Stopping runner %s", job_submission.job_provisioning_data.hostname)
         runner_client.stop()

@@ -173,7 +173,7 @@ def _process_running_job(
             hostname=job_submission.job_provisioning_data.hostname,
             ssh_port=job_submission.job_provisioning_data.ssh_port,
             user=job_submission.job_provisioning_data.username,
-            ports=get_runner_ports(),
+            ports=ports,
             id_rsa=server_ssh_private_key,
         ):
             runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
