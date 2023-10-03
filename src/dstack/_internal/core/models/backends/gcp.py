@@ -48,3 +48,7 @@ class GCPConfigValues(BaseModel):
     default_creds: bool = False
     project_id: Optional[ConfigElement]
     regions: Optional[ConfigMultiElement]
+
+
+class GCPStoredConfig(GCPConfigInfo):
+    pass

@@ -1,3 +1,4 @@
+import json
 from typing import List
 
 from dstack._internal.core.backends.base import Backend
@@ -17,6 +18,7 @@ from dstack._internal.core.models.backends.gcp import (
     GCPConfigInfoWithCredsPartial,
     GCPConfigValues,
     GCPCreds,
+    GCPStoredConfig,
 )
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
@@ -140,24 +142,25 @@ class GCPConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=GCPConfigInfo.parse_obj(config).json(),
-            auth=GCPCreds.parse_obj(config.creds).__root__.json(),
+            config=GCPStoredConfig(**GCPConfigInfo.parse_obj(config).dict()).json(),
+            auth=GCPCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyGCPConfigInfo:
-        config = GCPConfigInfo.parse_raw(model.config)
-        creds = GCPCreds.parse_raw(model.auth).__root__
+        config = self._get_backend_config(model)
         if include_creds:
-            return GCPConfigInfoWithCreds(
-                **config.dict(),
-                creds=creds,
-            )
-        return config
+            return GCPConfigInfoWithCreds.parse_obj(config)
+        return GCPConfigInfo.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> GCPBackend:
-        config_info = self.get_config_info(model=model, include_creds=True)
-        config = GCPConfig.parse_obj(config_info)
+        config = self._get_backend_config(model)
         return GCPBackend(config=config)
+
+    def _get_backend_config(self, model: BackendModel) -> GCPConfig:
+        return GCPConfig(
+            **json.loads(model.config),
+            creds=GCPCreds.parse_raw(model.auth).__root__,
+        )
 
     def _get_project_id_element(
         self,

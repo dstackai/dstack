@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.config import BackendConfig
-from dstack._internal.core.models.backends import AWSConfigInfoWithCreds
+from dstack._internal.core.models.backends.aws import AnyAWSCreds, AWSStoredConfig
 
 
-class AWSConfig(AWSConfigInfoWithCreds, BackendConfig):
-    pass
+class AWSConfig(AWSStoredConfig, BackendConfig):
+    creds: AnyAWSCreds

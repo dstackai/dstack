@@ -45,3 +45,7 @@ class AWSConfigValues(BaseModel):
     type: Literal["aws"] = "aws"
     default_creds: bool = False
     regions: Optional[ConfigMultiElement]
+
+
+class AWSStoredConfig(AWSConfigInfo):
+    pass

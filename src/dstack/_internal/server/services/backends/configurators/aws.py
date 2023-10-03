@@ -1,3 +1,4 @@
+import json
 from abc import ABC
 from typing import List
 
@@ -15,6 +16,7 @@ from dstack._internal.core.models.backends.aws import (
     AWSConfigInfoWithCredsPartial,
     AWSConfigValues,
     AWSCreds,
+    AWSStoredConfig,
 )
 from dstack._internal.core.models.backends.base import (
     BackendType,
@@ -76,24 +78,25 @@ class AWSConfigurator(ABC):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=AWSConfigInfo.parse_obj(config).json(),
-            auth=AWSCreds.parse_obj(config.creds).__root__.json(),
+            config=AWSStoredConfig(**AWSConfigInfo.parse_obj(config).dict()).json(),
+            auth=AWSCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAWSConfigInfo:
-        config = AWSConfigInfo.parse_raw(model.config)
-        creds = AWSCreds.parse_raw(model.auth).__root__
+        config = self._get_backend_config(model)
         if include_creds:
-            return AWSConfigInfoWithCreds(
-                **config.dict(),
-                creds=creds,
-            )
-        return config
+            return AWSConfigInfoWithCreds.parse_obj(config)
+        return AWSConfigInfo.parse_obj(config)
 
-    def get_backend(self, model: BackendModel) -> Backend:
-        config_info = self.get_config_info(model=model, include_creds=True)
-        config = AWSConfig.parse_obj(config_info)
+    def get_backend(self, model: BackendModel) -> AWSBackend:
+        config = self._get_backend_config(model)
         return AWSBackend(config=config)
+
+    def _get_backend_config(self, model: BackendModel) -> AWSConfig:
+        return AWSConfig(
+            **json.loads(model.config),
+            creds=AWSCreds.parse_raw(model.auth).__root__,
+        )
 
     def _valid_credentials(self, session: Session) -> bool:
         sts = session.client("sts")

@@ -1,6 +1,6 @@
 from dstack._internal.core.backends.base.config import BackendConfig
-from dstack._internal.core.models.backends.gcp import GCPConfigInfoWithCreds
+from dstack._internal.core.models.backends.gcp import AnyGCPCreds, GCPStoredConfig
 
 
-class GCPConfig(GCPConfigInfoWithCreds, BackendConfig):
-    pass
+class GCPConfig(GCPStoredConfig, BackendConfig):
+    creds: AnyGCPCreds
