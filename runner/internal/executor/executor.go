@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
+	"github.com/creack/pty"
 	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/gateway"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
@@ -194,21 +195,17 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
 
-	// todo creack/pty
-	cmdReader, err := cmd.StdoutPipe()
+	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
+
+	ptmx, err := pty.Start(cmd)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	cmd.Stderr = cmd.Stdout // merge stderr into stdout
-
-	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
-
-	if err := cmd.Start(); err != nil {
-		return gerrors.Wrap(err)
-	}
+	defer func() { _ = ptmx.Close() }()
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
+
 	logger := io.MultiWriter(jobLogFile, ex.jobLogs)
-	if _, err := io.Copy(logger, cmdReader); err != nil {
+	if _, err := io.Copy(logger, ptmx); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return gerrors.Wrap(cmd.Wait())
