@@ -51,7 +51,7 @@ class RunCommand(BaseCommand):
         )
 
     def _command(self, args: argparse.Namespace):
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s")
 
         try:
             api = Client.from_config(Path.cwd(), args.project, init=False)
@@ -65,7 +65,7 @@ class RunCommand(BaseCommand):
             run_plan = api.runs.get_plan(
                 configuration_path=configuration_path,
                 backends=backends,
-                resources=profile.resources,
+                resources=profile.resources,  # pass profile piece by piece
                 spot_policy=profile.spot_policy,
                 retry_policy=profile.retry_policy,
                 max_duration=profile.max_duration,

@@ -10,11 +10,14 @@ from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.repos import load_repo
 from dstack._internal.utils.crypto import generate_rsa_key_pair
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack.api._public.backends import BackendCollection
 from dstack.api._public.repos import RepoCollection
 from dstack.api._public.runs import RunCollection
 from dstack.api.server import APIClient
+
+logger = get_logger("dstack.api")
 
 
 class Client:
@@ -76,6 +79,7 @@ class Client:
         """
         config = ConfigManager()
         if not init:
+            logger.debug("Loading repo config")
             repo_config = config.get_repo_config(repo_dir)
             if repo_config is None:
                 raise ConfigurationError(f"The repo is not initialized")
@@ -83,6 +87,7 @@ class Client:
             if ssh_identity_file is None:
                 ssh_identity_file = repo_config.ssh_key_path
         else:
+            logger.debug("Initializing repo")
             repo = LocalRepo(repo_dir=repo_dir)  # default
             if not local_repo:
                 try:

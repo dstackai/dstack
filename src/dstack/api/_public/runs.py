@@ -33,7 +33,7 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike, path_in_dir
 from dstack.api.server import APIClient
 
-logger = get_logger(__name__)
+logger = get_logger("dstack.api.runs")
 
 
 class Run(ABC):
@@ -84,12 +84,14 @@ class Run(ABC):
         Get up-to-date run info
         """
         self._run = self._api_client.runs.get(self._project, self._run.run_spec.run_name)
+        logger.debug("Refreshed run %s: %s", self.name, self.status)
 
     def stop(self, abort: bool = False):
         """
         Terminate the instance and detach
         """
         self._api_client.runs.stop(self._project, [self.name], abort)
+        logger.debug("%s run %s", "Aborted" if abort else "Stopped", self.name)
         self.detach()
 
     def attach(self) -> bool:
@@ -107,6 +109,12 @@ class Run(ABC):
             if self._ports_lock is None:
                 self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
             provisioning_data = self._run.jobs[0].job_submissions[-1].job_provisioning_data
+            logger.debug(
+                "Attaching to %s (%s: %s)",
+                self.name,
+                provisioning_data.hostname,
+                self._ports_lock.dict(),
+            )
             self._ssh_attach = SSHAttach(
                 hostname=self.hostname,
                 ssh_port=provisioning_data.ssh_port,
@@ -125,6 +133,7 @@ class Run(ABC):
         Stop the SSH tunnel to the instance and update SSH config
         """
         if self._ssh_attach is not None:
+            logger.debug("Detaching from %s", self.name)
             self._ssh_attach.detach()
             self._ssh_attach = None
 
@@ -155,13 +164,15 @@ class SubmittedRun(Run):
 
             def ws_thread():
                 try:
+                    logger.debug("Starting WebSocket logs for %s", self.name)
                     ws.run_forever()
                 finally:
+                    logger.debug("WebSocket logs are done for %s", self.name)
                     queue.put(_done)
 
             ws = WebSocketApp(
                 f"ws://localhost:{self.ports[10999]}/logs_ws",
-                on_open=lambda _: logger.debug("WebSocket logs are connected"),
+                on_open=lambda _: logger.debug("WebSocket logs are connected to %s", self.name),
                 on_close=lambda _, __, ___: logger.debug("WebSocket logs are disconnected"),
                 on_message=lambda _, message: queue.put(message),
             )
@@ -173,6 +184,7 @@ class SubmittedRun(Run):
                         break
                     yield item
             finally:
+                logger.debug("Closing WebSocket logs for %s", self.name)
                 ws.close()
         else:
             yield super().logs(start_time)
@@ -295,6 +307,7 @@ class RunCollection:
             profile=profile,
             ssh_key_pub=Path(self._ssh_identity_file + ".pub").read_text().strip(),
         )
+        logger.debug("Getting run plan")
         return self._api_client.runs.get_plan(self._project, run_spec)
 
     def exec_plan(self, run_plan: RunPlan, reserve_ports: bool = True) -> SubmittedRun:
@@ -315,6 +328,7 @@ class RunCollection:
             self._api_client.repos.upload_code(
                 self._project, self._repo.repo_id, run_plan.run_spec.repo_code_hash, fp
             )
+        logger.debug("Submitting run spec")
         run = self._api_client.runs.submit(self._project, run_plan.run_spec)
         return self._model_to_submitted_run(run, ports_lock)
 
@@ -362,4 +376,5 @@ def _reserve_ports(job_spec: JobSpec) -> PortsLock:
     ports = {10999: 0}  # Runner API
     for app in job_spec.app_specs:
         ports[app.port] = app.map_to_port or 0
+    logger.debug("Reserving ports: %s", ports)
     return PortsLock(ports).acquire()
