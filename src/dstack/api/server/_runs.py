@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import parse_obj_as
 
@@ -7,14 +7,16 @@ from dstack._internal.server.schemas.runs import (
     DeleteRunsRequest,
     GetRunPlanRequest,
     GetRunRequest,
+    ListRunsRequest,
     StopRunsRequest,
 )
 from dstack.api.server._group import APIClientGroup
 
 
 class RunsAPIClient(APIClientGroup):
-    def list(self, project_name: str) -> List[Run]:
-        resp = self._request(f"/api/project/{project_name}/runs/list")
+    def list(self, project_name: Optional[str], repo_id: Optional[str]) -> List[Run]:
+        body = ListRunsRequest(project_name=project_name, repo_id=repo_id)
+        resp = self._request(f"/api/runs/list", body=body.json())
         return parse_obj_as(List[Run], resp.json())
 
     def get(self, project_name: str, run_name: str) -> Run:

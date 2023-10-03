@@ -336,7 +336,7 @@ class RunCollection:
         List
         """
         # TODO support `all` key
-        runs = self._api_client.runs.list(self._project)
+        runs = self._api_client.runs.list(project_name=self._project, repo_id=None)
         return [self._model_to_run(run) for run in runs]
 
     def get(self, run_name: str) -> Optional[Run]:

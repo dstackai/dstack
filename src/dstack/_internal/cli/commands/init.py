@@ -1,20 +1,7 @@
 import argparse
 from pathlib import Path
-from typing import Optional
-
-import giturlparse
-from git import InvalidGitRepositoryError
 
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.core.errors import CLIError
-from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
-from dstack._internal.core.models.repos.base import RepoType
-from dstack._internal.core.services.configs import ConfigManager
-from dstack._internal.core.services.repos import (
-    InvalidRepoCredentialsError,
-    get_local_repo_credentials,
-)
-from dstack._internal.utils.crypto import generate_rsa_key_pair
 from dstack.api import Client
 
 

@@ -6,29 +6,28 @@ from pathlib import Path
 
 from rich.prompt import Confirm
 
-from dstack._internal.cli.commands import BaseCommand
+from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.utils.common import console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.services.configs.configuration import find_configuration_file
 from dstack._internal.core.services.configs.profile import load_profile
 from dstack._internal.utils.logging import get_logger
-from dstack.api import Client, RunStatus
 
 logger = get_logger(__name__)
 
 
-class RunCommand(BaseCommand):
+class RunCommand(APIBaseCommand):
     NAME = "run"
     DESCRIPTION = "Run .dstack.yml configuration"
 
     def _register(self):
+        super()._register()
         # TODO custom help action
         # self._parser.add_argument("-h", "--help", nargs="?", choices=("task", "dev-environment", "service"))
         self._parser.add_argument("working_dir")
         self._parser.add_argument("-f", "--file", type=Path, dest="configuration_file")
         self._parser.add_argument("--profile")  # TODO env var default
-        self._parser.add_argument("--project")  # TODO env var default
         self._parser.add_argument(
             "-n",
             "--name",
@@ -55,10 +54,10 @@ class RunCommand(BaseCommand):
         )
 
     def _command(self, args: argparse.Namespace):
+        super()._command(args)
         logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s")
 
         try:
-            api = Client.from_config(Path.cwd(), args.project, init=False)
             configuration_path = find_configuration_file(
                 Path.cwd(), args.working_dir, args.configuration_file
             )
@@ -66,7 +65,7 @@ class RunCommand(BaseCommand):
             backends = profile.backends
             if args.backends:
                 backends = args.backends
-            run_plan = api.runs.get_plan(
+            run_plan = self.api.runs.get_plan(
                 configuration_path=configuration_path,
                 backends=backends,
                 resources=profile.resources,  # pass profile piece by piece
@@ -86,7 +85,7 @@ class RunCommand(BaseCommand):
             return
 
         run_plan.run_spec.run_name = None  # TODO fix server behaviour
-        run = api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
+        run = self.api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
         logging.info(run.name)
         if args.detach:
             logging.info("Skip attach, exiting...")

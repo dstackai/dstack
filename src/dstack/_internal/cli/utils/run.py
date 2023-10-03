@@ -1,10 +1,12 @@
-from typing import Optional
+from typing import List, Optional
 
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.runs import RunPlan
+from dstack._internal.utils.common import pretty_date
+from dstack.api import Run
 
 
 def print_run_plan(run_plan: RunPlan, candidates_limit: int = 3):
@@ -101,6 +103,44 @@ def print_run_plan(run_plan: RunPlan, candidates_limit: int = 3):
     if len(job_plan.candidates) > 0:
         console.print(candidates)
         console.print()
+
+
+def print_runs_table(runs: List[Run], include_configuration: bool = False, verbose: bool = False):
+    table = Table(box=None)
+    table.add_column("RUN", style="bold", no_wrap=True)
+    if include_configuration:
+        table.add_column("CONFIGURATION", style="grey58")
+    table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("BACKEND", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("INSTANCE", no_wrap=True)
+    table.add_column("SPOT", no_wrap=True)
+    table.add_column("PRICE", no_wrap=True)
+    table.add_column("STATUS", no_wrap=True)
+    table.add_column("SUBMITTED", style="grey58", no_wrap=True)
+    if verbose:
+        table.add_column("ERROR", no_wrap=True)
+
+    for run in runs:
+        run = run._run  # TODO
+        job = run.jobs[0]  # TODO
+        provisioning = job.job_submissions[-1].job_provisioning_data  # TODO
+
+        renderables = [run.run_spec.run_name]
+        if include_configuration:
+            renderables.append(run.run_spec.configuration_path)
+        renderables += [
+            run.user,
+            provisioning.backend.value if provisioning else "",
+            provisioning.instance_type.name if provisioning else "",
+            ("yes" if provisioning.instance_type.resources.spot else "no") if provisioning else "",
+            f"{provisioning.price:.4}$" if provisioning else "",
+            run.status,
+            pretty_date(run.submitted_at.replace(tzinfo=None)),
+        ]
+        if verbose:
+            renderables.append("TODO")  # TODO
+        table.add_row(*renderables)
+    console.print(table)
 
 
 def pretty_format_resources(

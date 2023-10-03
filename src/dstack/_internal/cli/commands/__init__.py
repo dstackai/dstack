@@ -1,7 +1,10 @@
 import argparse
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import dstack._internal.core.services.api_client as api_client_service
+from dstack._internal.core.errors import CLIError, ConfigurationError
+from dstack.api import Client
 from dstack.api.server import APIClient
 
 
@@ -46,11 +49,13 @@ class BaseCommand(ABC):
 
 
 class APIBaseCommand(BaseCommand):
-    api_client: APIClient = None
-    project_name: str = None
+    api: Client = None
 
     def _register(self):
         self._parser.add_argument("--project")  # TODO env var default
 
     def _command(self, args: argparse.Namespace):
-        self.api_client, self.project_name = api_client_service.get_api_client(args.project)
+        try:
+            self.api = Client.from_config(Path.cwd(), args.project, init=False)
+        except ConfigurationError as e:
+            raise CLIError(str(e))
