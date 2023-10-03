@@ -1,6 +1,10 @@
 from typing import List, Optional
 
-from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.models.configurations import (
+    ConfigurationType,
+    DevEnvironmentConfiguration,
+    PortMapping,
+)
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import RetryPolicy, RunSpec
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
@@ -46,3 +50,6 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
 
     def _spot_policy(self) -> SpotPolicy:
         return self.run_spec.profile.spot_policy or SpotPolicy.ONDEMAND
+
+    def _ports(self) -> List[PortMapping]:
+        return self.run_spec.configuration.ports

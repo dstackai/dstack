@@ -1,8 +1,12 @@
 import errno
 import socket
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from dstack._internal.core.errors import DstackError
+from dstack._internal.core.models.configurations import PortMapping
+
+RESERVED_PORTS_START = 10000
+RESERVED_PORTS_END = 10999
 
 
 class PortUsedError(DstackError):
@@ -66,3 +70,9 @@ class PortsLock:
             if e.errno == errno.EADDRINUSE:
                 return None
             raise
+
+
+def filter_reserved_ports(ports: List[PortMapping]) -> List[PortMapping]:
+    return [
+        pm for pm in ports if not (RESERVED_PORTS_START <= pm.container_port <= RESERVED_PORTS_END)
+    ]

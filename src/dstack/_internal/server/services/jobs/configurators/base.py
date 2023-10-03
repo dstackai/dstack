@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 import dstack.version as version
 from dstack._internal.core.models.configurations import (
     ConfigurationType,
+    PortMapping,
     PythonVersion,
     RegistryAuth,
 )
@@ -19,6 +20,7 @@ from dstack._internal.core.models.runs import (
     RetryPolicy,
     RunSpec,
 )
+from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 
 
 class JobConfigurator(ABC):
@@ -61,6 +63,10 @@ class JobConfigurator(ABC):
     def _spot_policy(self) -> SpotPolicy:
         pass
 
+    @abstractmethod
+    def _ports(self) -> List[PortMapping]:
+        pass
+
     def _commands(self) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format
             entrypoint = shlex.split(self.run_spec.configuration.entrypoint)
@@ -76,8 +82,16 @@ class JobConfigurator(ABC):
         return entrypoint + commands
 
     def _app_specs(self) -> List[AppSpec]:
-        # TODO
-        return []
+        specs = []
+        for i, pm in enumerate(filter_reserved_ports(self._ports())):
+            specs.append(
+                AppSpec(
+                    port=pm.container_port,
+                    map_to_port=pm.local_port,
+                    app_name=f"app_{i}",
+                )
+            )
+        return specs
 
     def _entrypoint(self) -> Optional[List[str]]:
         if self.run_spec.configuration.entrypoint is not None:
