@@ -4,6 +4,7 @@ from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.ps import PsCommand
 from dstack._internal.cli.commands.run import RunCommand
 from dstack._internal.cli.commands.server import ServerCommand
+from dstack._internal.cli.commands.stop import StopCommand
 from dstack._internal.core.errors import CLIError
 from dstack.version import __version__ as version
 
@@ -21,6 +22,7 @@ def main():
     PsCommand.register(subparsers)
     RunCommand.register(subparsers)
     ServerCommand.register(subparsers)
+    StopCommand.register(subparsers)
 
     args, unknown_args = parser.parse_known_args()
     args.unknown = unknown_args
