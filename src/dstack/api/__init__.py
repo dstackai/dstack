@@ -2,4 +2,4 @@ from dstack._internal.core.models.configurations import ServiceConfiguration as 
 from dstack._internal.core.models.configurations import TaskConfiguration as Task
 from dstack.api._public import Client
 from dstack.api._public.backends import Backend
-from dstack.api._public.runs import Run, SubmittedRun
+from dstack.api._public.runs import Run, RunStatus, SubmittedRun

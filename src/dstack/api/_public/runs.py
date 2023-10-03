@@ -1,4 +1,4 @@
-import logging
+import queue
 import tempfile
 import threading
 import time
@@ -6,7 +6,6 @@ from abc import ABC
 from copy import copy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from queue import Queue
 from typing import Dict, Iterable, List, Optional, Union
 
 import requests
@@ -159,7 +158,7 @@ class SubmittedRun(Run):
 
     def logs(self, start_time: datetime = datetime.now() - timedelta(days=1)) -> Iterable[bytes]:
         if self._ssh_attach is not None:
-            queue = Queue()
+            q = queue.Queue()
             _done = object()
 
             def ws_thread():
@@ -168,18 +167,18 @@ class SubmittedRun(Run):
                     ws.run_forever()
                 finally:
                     logger.debug("WebSocket logs are done for %s", self.name)
-                    queue.put(_done)
+                    q.put(_done)
 
             ws = WebSocketApp(
                 f"ws://localhost:{self.ports[10999]}/logs_ws",
                 on_open=lambda _: logger.debug("WebSocket logs are connected to %s", self.name),
                 on_close=lambda _, __, ___: logger.debug("WebSocket logs are disconnected"),
-                on_message=lambda _, message: queue.put(message),
+                on_message=lambda _, message: q.put(message),
             )
             threading.Thread(target=ws_thread).start()
             try:
                 while True:
-                    item = queue.get()
+                    item = q.get()
                     if item is _done:
                         break
                     yield item

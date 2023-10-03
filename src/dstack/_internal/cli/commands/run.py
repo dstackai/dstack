@@ -1,6 +1,7 @@
 import argparse
 import logging
 import sys
+import time
 from pathlib import Path
 
 from rich.prompt import Confirm
@@ -11,7 +12,10 @@ from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.services.configs.configuration import find_configuration_file
 from dstack._internal.core.services.configs.profile import load_profile
-from dstack.api import Client
+from dstack._internal.utils.logging import get_logger
+from dstack.api import Client, RunStatus
+
+logger = get_logger(__name__)
 
 
 class RunCommand(BaseCommand):
@@ -85,26 +89,39 @@ class RunCommand(BaseCommand):
         run = api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
         logging.info(run.name)
         if args.detach:
-            logging.info("Detaching...")
+            logging.info("Skip attach, exiting...")
             return
 
-        stop_at_exit = True
+        abort_at_exit = True
         try:
             # TODO spinner
-            if not run.attach():
-                logging.info(run.status)
-                logging.info("Run is not running")
-                stop_at_exit = False
-                return
-            logging.info(run.ports)
-            for entry in run.logs():
-                sys.stdout.buffer.write(entry)
-                sys.stdout.buffer.flush()
+            if run.attach():
+                for entry in run.logs():
+                    sys.stdout.buffer.write(entry)
+                    sys.stdout.buffer.flush()
+            else:
+                logging.debug("Failed to attach, exiting...")
 
+            run.refresh()
+            if run.status.is_finished():
+                abort_at_exit = False
         except KeyboardInterrupt:
-            logging.info("Interrupted")  # TODO ask to stop or just detach
+            try:
+                if not Confirm.ask("Stop the run before detaching?"):
+                    logging.debug("Detaching...")
+                    abort_at_exit = False
+                    return
+                # Gently stop the run and wait for it to finish
+                logging.debug("Stopping...")
+                run.stop(abort=False)
+                while not run.status.is_finished():
+                    time.sleep(2)
+                    run.refresh()
+                abort_at_exit = False
+            except KeyboardInterrupt:
+                abort_at_exit = True
         finally:
             run.detach()
-            if stop_at_exit:
-                logging.info("Stopping...")
-                run.stop()
+            if abort_at_exit:
+                logging.debug("Aborting...")
+                run.stop(abort=True)
