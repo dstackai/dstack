@@ -4,6 +4,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"os"
 	"path/filepath"
+	rt "runtime"
 )
 
 func RunSubprocess(httpPort int, logLevel int, runnerVersion string, useDev bool) error {
@@ -16,7 +17,7 @@ func RunSubprocess(httpPort int, logLevel int, runnerVersion string, useDev bool
 		return gerrors.Wrap(err)
 	}
 
-	err = downloadRunner(runnerVersion, useDev, runnerPath)
+	err = downloadRunner(runnerVersion, useDev, rt.GOOS, runnerPath)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}

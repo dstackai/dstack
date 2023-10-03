@@ -73,6 +73,12 @@ func main() {
 				Usage:       "Use stgn channel",
 				Destination: &runnerParams.UseDev,
 			},
+			&cli.PathFlag{
+				Name:        "runner-binary-path",
+				Usage:       "Path to runner's binary",
+				Destination: &runnerParams.RunnerBinaryPath,
+				EnvVars:     []string{"DSTACK_RUNNER_BINARY_PATH"},
+			},
 		},
 		Commands: []*cli.Command{
 			{
@@ -106,6 +112,13 @@ func main() {
 					},
 				},
 				Action: func(c *cli.Context) error {
+					if runnerParams.RunnerBinaryPath == "" {
+						if err := runnerParams.Download("linux"); err != nil {
+							return gerrors.Wrap(err)
+						}
+						defer func() { _ = os.Remove(runnerParams.RunnerBinaryPath) }()
+					}
+
 					log.Printf("Backend: %s\n", backendName)
 					runnerParams.TempDir = "/tmp/runner"
 					runnerParams.HomeDir = "/root"

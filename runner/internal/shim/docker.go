@@ -43,8 +43,8 @@ func RunDocker(ctx context.Context, config DockerConfig) error {
 		return gerrors.Wrap(err)
 	}
 	defer func() {
-		log.Println("Deleting container")
-		_ = config.DeleteContainer(ctx, client, containerID)
+		log.Println("Doing cleanup")
+		_ = config.Cleanup(ctx, client, containerID)
 	}()
 	log.Printf("Running container, id=%s\n", containerID)
 	if err = config.RunContainer(ctx, client, containerID); err != nil {
@@ -85,23 +85,29 @@ func (c *DockerParameters) CreateContainer(ctx context.Context, client docker.AP
 		return "", gerrors.Wrap(err)
 	}
 
+	runnerMount, err := c.Runner.GetDockerMount()
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+
 	commands := make([]string, 0)
 	commands = append(commands, c.runOpenSSHServer()...)
 	commands = append(commands, c.Runner.GetDockerCommands()...)
 
-	var mounts []mount.Mount = nil
+	var mounts = make([]mount.Mount, 0)
 	if c.DstackHome != "" {
 		mountPath := filepath.Join(c.DstackHome, "runners", time.Now().Format("20060102-150405"))
 		if err = os.MkdirAll(mountPath, 0755); err != nil {
 			return "", gerrors.Wrap(err)
 		}
-		mounts = []mount.Mount{
-			{
-				Type:   mount.TypeBind,
-				Source: mountPath,
-				Target: c.Runner.GetTempDir(),
-			},
-		}
+		mounts = append(mounts, mount.Mount{
+			Type:   mount.TypeBind,
+			Source: mountPath,
+			Target: c.Runner.GetTempDir(),
+		})
+	}
+	if runnerMount != nil {
+		mounts = append(mounts, *runnerMount)
 	}
 
 	containerConfig := &container.Config{
@@ -138,8 +144,9 @@ func (c *DockerParameters) RunContainer(ctx context.Context, client docker.APICl
 	return nil
 }
 
-func (c *DockerParameters) DeleteContainer(ctx context.Context, client docker.APIClient, containerID string) error {
+func (c *DockerParameters) Cleanup(ctx context.Context, client docker.APIClient, containerID string) error {
 	if !c.KeepContainer {
+		log.Println("Deleting container")
 		return gerrors.Wrap(client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true}))
 	}
 	return nil

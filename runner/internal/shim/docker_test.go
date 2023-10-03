@@ -2,6 +2,7 @@ package shim
 
 import (
 	"context"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -92,4 +93,8 @@ func (c *DummyRunnerConfig) GetDockerCommands() []string {
 
 func (c *DummyRunnerConfig) GetTempDir() string {
 	return "/tmp/runner"
+}
+
+func (c *DummyRunnerConfig) GetDockerMount() (*mount.Mount, error) {
+	return nil, nil
 }
