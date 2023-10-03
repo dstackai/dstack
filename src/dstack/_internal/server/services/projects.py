@@ -13,10 +13,9 @@ from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import get_configurator
+from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
-
-DEFAULT_PROJECT_NAME = "main"
 
 
 async def get_or_create_default_project(

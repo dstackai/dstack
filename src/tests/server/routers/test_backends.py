@@ -699,7 +699,7 @@ class TestUpdateBackend:
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         backend = await create_backend(
-            session=session, project_id=project.id, config={"regions": "us-west-1"}
+            session=session, project_id=project.id, config={"regions": ["us-west-1"]}
         )
         body = {
             "type": "aws",
@@ -719,6 +719,30 @@ class TestUpdateBackend:
         assert response.status_code == 200, response.json()
         await session.refresh(backend)
         assert json.loads(backend.config)["regions"] == ["us-east-1"]
+
+    @pytest.mark.asyncio
+    async def test_returns_400_if_backend_does_not_exist(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        body = {
+            "type": "aws",
+            "creds": {
+                "type": "access_key",
+                "access_key": "1234",
+                "secret_key": "1234",
+            },
+            "regions": ["us-east-1"],
+        }
+        with patch("boto3.session.Session"):
+            response = client.post(
+                f"/api/project/{project.name}/backends/update",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 400
 
 
 class TestDeleteBackends:

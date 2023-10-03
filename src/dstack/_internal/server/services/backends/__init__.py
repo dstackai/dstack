@@ -10,6 +10,7 @@ from dstack._internal.core.errors import (
     BackendInvalidCredentialsError,
     BackendNotAvailable,
     ResourceExistsError,
+    ServerClientError,
 )
 from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
@@ -118,6 +119,12 @@ async def update_backend(
     configurator = get_configurator(config.type)
     if configurator is None:
         raise BackendNotAvailable()
+    config_info = await get_config_info(
+        project=project,
+        backend_type=configurator.TYPE,
+    )
+    if config_info is None:
+        raise ServerClientError("Backend does not exist")
     await run_async(configurator.get_config_values, config)
     backend = configurator.create_backend(project=project, config=config)
     await session.execute(

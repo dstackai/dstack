@@ -18,12 +18,10 @@ from dstack._internal.server.routers import (
     secrets,
     users,
 )
-from dstack._internal.server.services.projects import (
-    DEFAULT_PROJECT_NAME,
-    get_or_create_default_project,
-)
+from dstack._internal.server.services.config import ServerConfigManager
+from dstack._internal.server.services.projects import get_or_create_default_project
 from dstack._internal.server.services.users import get_or_create_admin_user
-from dstack._internal.server.settings import SERVER_URL
+from dstack._internal.server.settings import DEFAULT_PROJECT_NAME, SERVER_URL
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import get_server_client_error_details
 
@@ -35,6 +33,8 @@ async def lifespan(app: FastAPI):
     async with get_session_ctx() as session:
         admin, _ = await get_or_create_admin_user(session=session)
         default_project, created = await get_or_create_default_project(session=session, user=admin)
+        server_config_manager = ServerConfigManager()
+        await server_config_manager.apply_config(session=session)
     create_default_project_config(
         project_name=DEFAULT_PROJECT_NAME, url=SERVER_URL, token=admin.token
     )
