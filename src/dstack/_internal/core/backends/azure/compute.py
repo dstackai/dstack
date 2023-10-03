@@ -67,7 +67,7 @@ class AzureCompute(Compute):
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             provider=BackendType.AZURE.value,
-            locations=set(self.config.locations),
+            locations=self.config.locations,
             requirements=requirements,
             extra_filter=_supported_instances,
         )

@@ -10,7 +10,7 @@ from dstack._internal.core.models.runs import Requirements
 
 def get_catalog_offers(
     provider: str,
-    locations: Optional[Set[str]] = None,
+    locations: Optional[List[str]] = None,
     requirements: Optional[Requirements] = None,
     extra_filter: Optional[Callable[[InstanceOffer], bool]] = None,
 ) -> List[InstanceOffer]:

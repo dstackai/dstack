@@ -1,6 +1,10 @@
 from dstack._internal.core.backends.base.config import BackendConfig
-from dstack._internal.core.models.backends.lambdalabs import LambdaConfigInfoWithCreds
+from dstack._internal.core.models.backends.lambdalabs import (
+    AnyLambdaCreds,
+    LambdaConfigInfoWithCreds,
+    LambdaStoredConfig,
+)
 
 
-class LambdaConfig(BackendConfig, LambdaConfigInfoWithCreds):
-    pass
+class LambdaConfig(LambdaStoredConfig, BackendConfig):
+    creds: AnyLambdaCreds

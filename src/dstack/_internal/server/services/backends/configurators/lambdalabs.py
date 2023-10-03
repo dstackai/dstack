@@ -1,3 +1,4 @@
+import json
 from typing import List
 
 from requests import HTTPError
@@ -18,6 +19,7 @@ from dstack._internal.core.models.backends.lambdalabs import (
     LambdaConfigInfoWithCredsPartial,
     LambdaConfigValues,
     LambdaCreds,
+    LambdaStoredConfig,
 )
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
@@ -62,24 +64,25 @@ class LambdaConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=LambdaConfigInfo.parse_obj(config).json(),
+            config=LambdaStoredConfig(**LambdaConfigInfo.parse_obj(config).dict()).json(),
             auth=LambdaCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyLambdaConfigInfo:
-        config = LambdaConfigInfo.parse_raw(model.config)
-        creds = LambdaCreds.parse_raw(model.auth).__root__
+        config = self._get_backend_config(model)
         if include_creds:
-            return LambdaConfigInfoWithCreds(
-                regions=config.regions,
-                creds=creds,
-            )
-        return config
+            return LambdaConfigInfoWithCreds.parse_obj(config)
+        return LambdaConfigInfo.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> LambdaBackend:
-        config_info = self.get_config_info(model=model, include_creds=True)
-        config = LambdaConfig.parse_obj(config_info)
+        config = self._get_backend_config(model)
         return LambdaBackend(config=config)
+
+    def _get_backend_config(self, model: BackendModel) -> LambdaConfig:
+        return LambdaConfig(
+            **json.loads(model.config),
+            creds=LambdaCreds.parse_raw(model.auth),
+        )
 
     def _validate_lambda_api_key(self, api_key: str):
         client = api_client.LambdaAPIClient(api_key=api_key)

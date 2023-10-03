@@ -38,3 +38,7 @@ class LambdaConfigInfoWithCredsPartial(BaseModel):
 class LambdaConfigValues(BaseModel):
     type: Literal["lambda"] = "lambda"
     regions: Optional[ConfigMultiElement]
+
+
+class LambdaStoredConfig(LambdaConfigInfo):
+    pass
