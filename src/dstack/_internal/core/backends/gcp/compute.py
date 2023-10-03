@@ -34,7 +34,7 @@ class GCPCompute(Compute):
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
-            provider="gcp",
+            provider=BackendType.GCP.value,
             requirements=requirements,
             extra_filter=_supported_instances_and_zones(self.config.regions),
         )
@@ -192,7 +192,7 @@ def _unique_instance_name(instance: InstanceType) -> str:
 
 def _get_instance_zones(instance_offer: InstanceOfferWithAvailability) -> List[str]:
     zones = []
-    for offer in get_catalog_offers(provider="gcp"):
+    for offer in get_catalog_offers(provider=BackendType.GCP.value):
         if _unique_instance_name(instance_offer.instance) != _unique_instance_name(offer.instance):
             continue
         if offer.region[:-2] != instance_offer.region:
