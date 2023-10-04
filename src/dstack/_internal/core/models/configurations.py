@@ -18,7 +18,6 @@ class ConfigurationType(str, Enum):
 
 
 class PythonVersion(str, Enum):
-    PY37 = "3.7"
     PY38 = "3.8"
     PY39 = "3.9"
     PY310 = "3.10"

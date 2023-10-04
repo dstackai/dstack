@@ -14,6 +14,7 @@
                     * `backends/` – backend-specific models such as configs used by the server
                 * `services/` – other business logic implemented on top of `models/`
             * `server/` – server source code
+                * `background/` – server background workers
                 * `migrations/` – alembic migrations
                 * `routers/` – API endpoints implementation, a thin wrapper around `services/`.
                 * `schemas/` – request/response-specific pydantic models. Other server models live in `dstack._internal.core.models`.
@@ -24,7 +25,6 @@
                     * `jobs/`
                         * `configurators/` – job configurators responsible for making `JobSpec` from `RunSpec`
                 * `utils/` – server-specific utils
-                * `workers/` – background workers
                 * `alembic.ini`
                 * `db.py` – db class and utils
                 * `main.py` – server entrypoint
