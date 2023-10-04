@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/creack/pty"
 	"github.com/dstackai/dstack/runner/consts/states"
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -205,7 +207,8 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 	defer func() { _ = cmd.Wait() }() // release resources if copy fails
 
 	logger := io.MultiWriter(jobLogFile, ex.jobLogs)
-	if _, err := io.Copy(logger, ptmx); err != nil {
+	_, err = io.Copy(logger, ptmx)
+	if err != nil && !isPtyError(err) {
 		return gerrors.Wrap(err)
 	}
 	return gerrors.Wrap(cmd.Wait())
@@ -257,4 +260,10 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 		}, nil
 	}
 	return nil, gerrors.Newf("unknown protocol %s", ex.repoCredentials.Protocol)
+}
+
+func isPtyError(err error) bool {
+	/* read /dev/ptmx: input/output error */
+	var e *os.PathError
+	return errors.As(err, &e) && e.Err == syscall.EIO
 }

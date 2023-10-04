@@ -120,7 +120,7 @@ jobs:
           go version
           go fmt $(go list ./... | grep -v /vendor/)
           go vet $(go list ./... | grep -v /vendor/)
-          script -e -c /bin/bash -c 'go test -race $(go list ./... | grep -v /vendor/)'
+          go test -race $(go list ./... | grep -v /vendor/)
 
   runner-compile:
     needs: [ runner-test ]
