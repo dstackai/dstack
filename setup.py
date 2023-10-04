@@ -2,10 +2,7 @@ import re
 import sys
 from pathlib import Path
 
-from setuptools import Command, find_packages, setup
-from setuptools.command.build_py import build_py
-from setuptools.command.develop import develop
-from setuptools.command.sdist import sdist
+from setuptools import find_packages, setup
 
 project_dir = Path(__file__).parent
 
@@ -101,22 +98,6 @@ GCP_DEPS = [
 LAMBDA_DEPS = AWS_DEPS
 
 ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS
-
-
-class BaseCommand(Command):
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def get_inputs(self):
-        return []
-
-    def get_outputs(self):
-        return []
 
 
 setup(

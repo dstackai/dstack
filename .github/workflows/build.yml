@@ -84,12 +84,6 @@ jobs:
           cp README.md src
           python setup.py sdist bdist_wheel -v
           python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*
-      - name: Install AWS
-        run:  pip install awscli
-      - name: Upload pip package to S3
-        run: |
-          VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
-          aws s3 cp dist/dstack-$VERSION-py3-none-any.whl s3://dstack-cli-downloads-stgn/dstack-$VERSION-py3-none-any.whl --acl public-read
 
   update-get-dstack:
     needs: [ testpypi-upload ]
