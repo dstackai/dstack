@@ -1,8 +1,8 @@
-from typing import Optional
+from typing import Dict, List, Optional, Type
 
 import requests
 
-from dstack._internal.core.errors import ClientError
+from dstack._internal.core.errors import ClientError, ServerClientError
 from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
@@ -69,6 +69,16 @@ class APIClient:
         if raise_for_status:
             if resp.status_code == 500:
                 raise ClientError("Unexpected dstack server error")
-            # TODO raise DstackError if any
+            if resp.status_code == 400:  # raise ServerClientError
+                detail: List[Dict] = resp.json()["detail"]
+                if len(detail) == 1 and detail[0]["code"] in _server_client_errors:
+                    kwargs = detail[0]
+                    code = kwargs.pop("code")
+                    raise _server_client_errors[code](**kwargs)
             resp.raise_for_status()
         return resp
+
+
+_server_client_errors: Dict[str, Type[ServerClientError]] = {
+    cls.code: cls for cls in ServerClientError.__subclasses__()
+}

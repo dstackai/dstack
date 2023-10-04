@@ -135,7 +135,7 @@ async def upload_code(
 ):
     repo = await get_repo_model(session=session, project=project, repo_id=repo_id)
     if repo is None:
-        raise RepoDoesNotExistError(repo_id)
+        raise RepoDoesNotExistError.with_id(repo_id)
     code_hash = file.filename
     code = await get_code_model(
         session=session,

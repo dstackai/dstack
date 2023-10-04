@@ -65,7 +65,7 @@ async def list_project_runs(
             repo_id=repo_id,
         )
         if repo is None:
-            raise RepoDoesNotExistError(repo_id)
+            raise RepoDoesNotExistError.with_id(repo_id)
         filters.append(RunModel.repo_id == repo.id)
     res = await session.execute(select(RunModel).where(*filters))
     run_models = res.scalars().all()
@@ -128,7 +128,7 @@ async def submit_run(
         repo_id=run_spec.repo_id,
     )
     if repo is None:
-        raise RepoDoesNotExistError(run_spec.repo_id)
+        raise RepoDoesNotExistError.with_id(run_spec.repo_id)
     if run_spec.run_name is None:
         run_spec.run_name = await _generate_run_name(
             session=session,

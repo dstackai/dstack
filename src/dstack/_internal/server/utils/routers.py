@@ -41,7 +41,7 @@ def raise_server_client_error(error: ServerClientError):
     raise_bad_request(get_server_client_error_details(error))
 
 
-def get_server_client_error_details(error: ServerClientError) -> List[List[str]]:
+def get_server_client_error_details(error: ServerClientError) -> List[Dict]:
     if len(error.fields) == 0:
         return [error_detail(msg=error.msg, code=error.code)]
     details = []

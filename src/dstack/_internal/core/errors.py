@@ -60,8 +60,9 @@ class BackendNotAvailable(ServerClientError):
 class RepoDoesNotExistError(ServerClientError):
     code: ServerClientErrorCode = ServerClientErrorCode.REPO_DOES_NOT_EXIST
 
-    def __init__(self, repo_id: str):
-        self.msg = f"Repo {repo_id} does not exist"
+    @staticmethod
+    def with_id(repo_id: str) -> "RepoDoesNotExistError":
+        return RepoDoesNotExistError(f"Repo {repo_id} does not exist")
 
 
 class BackendError(DstackError):
