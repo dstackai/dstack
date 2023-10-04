@@ -140,9 +140,7 @@ def get_ssh_keypair(key_path: Optional[PathLike], dstack_key_path: Path) -> str:
         private_key = pub_key.with_suffix("")
         if pub_key.exists() and private_key.exists():
             return str(private_key)
-        raise ConfigurationError(
-            f"Make sure valid keypair exists: {private_key}(.pub) and rerun `dstack init`"
-        )
+        raise ConfigurationError(f"Make sure valid keypair exists: {private_key}(.pub)")
 
     if not dstack_key_path.exists():
         generate_rsa_key_pair(private_key_path=dstack_key_path)

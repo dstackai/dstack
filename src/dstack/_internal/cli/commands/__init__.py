@@ -1,6 +1,9 @@
 import argparse
+import os
 from abc import ABC, abstractmethod
 from pathlib import Path
+
+from rich_argparse import RichHelpFormatter
 
 import dstack._internal.core.services.api_client as api_client_service
 from dstack._internal.core.errors import CLIError, ConfigurationError
@@ -24,7 +27,7 @@ class BaseCommand(ABC):
         parser: argparse.ArgumentParser = subparsers.add_parser(
             cls.NAME,
             add_help=False,
-            # todo Rich
+            formatter_class=RichHelpFormatter,
             **parser_kwargs,
         )
         command = cls(parser)
@@ -52,7 +55,12 @@ class APIBaseCommand(BaseCommand):
     api: Client = None
 
     def _register(self):
-        self._parser.add_argument("--project")  # TODO env var default
+        self._parser.add_argument(
+            "--project",
+            help="The name of the project",
+            metavar="NAME",
+            default=os.getenv("DSTACK_PROJECT"),
+        )
 
     def _command(self, args: argparse.Namespace):
         try:

@@ -1,7 +1,8 @@
-from typing import Optional, Union
+from typing import Optional
 
 import requests
 
+from dstack._internal.core.errors import ClientError
 from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
@@ -57,12 +58,17 @@ class APIClient:
     def _request(
         self, path: str, body: Optional[str] = None, raise_for_status: bool = True, **kwargs
     ) -> requests.Response:
-        # TODO logging
+        url = f"{self._base_url}/{path.lstrip('/')}"
         if body is not None:
             kwargs.setdefault("headers", {})["Content-Type"] = "application/json"
             kwargs["data"] = body
-        resp = self._s.post(f"{self._base_url}/{path.lstrip('/')}", **kwargs)
+        try:
+            resp = self._s.post(url, **kwargs)
+        except requests.exceptions.ConnectionError:
+            raise ClientError(f"Failed to connect to dstack server {self._base_url}")
         if raise_for_status:
+            if resp.status_code == 500:
+                raise ClientError("Unexpected dstack server error")
             # TODO raise DstackError if any
             resp.raise_for_status()
         return resp
