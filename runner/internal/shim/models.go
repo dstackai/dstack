@@ -23,8 +23,6 @@ type RunnerParameters struct {
 
 	HttpPort int // cli or env
 	LogLevel int // cli	or env
-
-	tempBinaryPath string
 }
 
 type DockerConfig interface {

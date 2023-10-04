@@ -24,7 +24,7 @@ func TestExecutor_WorkingDir(t *testing.T) {
 
 	err := ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, ex.workingDir+"\n", b.String())
+	assert.Equal(t, ex.workingDir+"\r\n", b.String())
 }
 
 func TestExecutor_HomeDir(t *testing.T) {
@@ -34,7 +34,7 @@ func TestExecutor_HomeDir(t *testing.T) {
 
 	err := ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, ex.homeDir+"\n", b.String())
+	assert.Equal(t, ex.homeDir+"\r\n", b.String())
 }
 
 func TestExecutor_NonZeroExit(t *testing.T) {
@@ -76,7 +76,7 @@ func TestExecutor_LocalRepo(t *testing.T) {
 
 	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	assert.Equal(t, "bar\n", b.String())
+	assert.Equal(t, "bar\r\n", b.String())
 }
 
 func TestExecutor_Recover(t *testing.T) {
@@ -132,7 +132,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 
 	err = ex.execJob(context.TODO(), io.Writer(&b))
 	assert.NoError(t, err)
-	expected := fmt.Sprintf("%s\n%s\n%s\n", ex.run.RepoData.RepoHash, ex.run.RepoData.RepoConfigName, ex.run.RepoData.RepoConfigEmail)
+	expected := fmt.Sprintf("%s\r\n%s\r\n%s\r\n", ex.run.RepoData.RepoHash, ex.run.RepoData.RepoConfigName, ex.run.RepoData.RepoConfigEmail)
 	assert.Equal(t, expected, b.String())
 }
 
