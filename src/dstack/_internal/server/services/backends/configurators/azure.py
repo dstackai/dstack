@@ -29,6 +29,7 @@ from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.errors import BackendAuthError, ServerClientError
 from dstack._internal.core.models.backends.azure import (
     AnyAzureConfigInfo,
+    AzureClientCreds,
     AzureConfigInfo,
     AzureConfigInfoWithCreds,
     AzureConfigInfoWithCredsPartial,
@@ -75,19 +76,22 @@ class AzureConfigurator(Configurator):
 
     def get_config_values(self, config: AzureConfigInfoWithCredsPartial) -> AzureConfigValues:
         config_values = AzureConfigValues()
-        config_values.default_creds = False
+        config_values.default_creds = auth.default_creds_available()
         if config.creds is None:
             return config_values
         try:
             credential, creds_tenant_id = auth.authenticate(config.creds)
         except BackendAuthError:
-            raise_invalid_credentials_error(
-                fields=[
-                    ["creds", "tenant_id"],
-                    ["creds", "client_id"],
-                    ["creds", "client_secret"],
-                ]
-            )
+            if isinstance(config.creds, AzureClientCreds):
+                raise_invalid_credentials_error(
+                    fields=[
+                        ["creds", "tenant_id"],
+                        ["creds", "client_id"],
+                        ["creds", "client_secret"],
+                    ]
+                )
+            else:
+                raise_invalid_credentials_error(fields=[["creds"]])
         config_values.tenant_id = self._get_tenant_id_element(
             credential=credential,
             selected=config.tenant_id or creds_tenant_id,

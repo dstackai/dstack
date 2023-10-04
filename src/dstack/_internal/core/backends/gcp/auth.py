@@ -4,10 +4,15 @@ from typing import Optional, Tuple
 import google.auth
 from google.auth.credentials import Credentials
 from google.auth.exceptions import DefaultCredentialsError
+from google.cloud import storage
 from google.oauth2 import service_account
 
 from dstack._internal.core.errors import BackendAuthError
-from dstack._internal.core.models.backends.gcp import AnyGCPCreds, GCPServiceAccountCreds
+from dstack._internal.core.models.backends.gcp import (
+    AnyGCPCreds,
+    GCPDefaultCreds,
+    GCPServiceAccountCreds,
+)
 
 
 def authenticate(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
@@ -15,6 +20,12 @@ def authenticate(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
     :raises BackendAuthError:
     :return: GCP credentials and project_id
     """
+    credentials, project_id = get_credentials(creds)
+    validate_credentials(credentials)
+    return credentials, project_id
+
+
+def get_credentials(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
     if isinstance(creds, GCPServiceAccountCreds):
         try:
             service_account_info = json.loads(creds.data)
@@ -31,3 +42,19 @@ def authenticate(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
         raise BackendAuthError()
 
     return default_credentials, project_id
+
+
+def validate_credentials(credentials: Credentials):
+    try:
+        storage_client = storage.Client(credentials=credentials)
+        storage_client.list_buckets(max_results=1)
+    except Exception:
+        raise BackendAuthError()
+
+
+def default_creds_available() -> bool:
+    try:
+        authenticate(GCPDefaultCreds())
+    except BackendAuthError:
+        return False
+    return True

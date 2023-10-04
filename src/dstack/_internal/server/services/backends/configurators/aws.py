@@ -2,15 +2,11 @@ import json
 from abc import ABC
 from typing import List
 
-import boto3.session
-import botocore.exceptions
-from boto3.session import Session
-
-from dstack._internal.core.backends.aws import AWSBackend
+from dstack._internal.core.backends.aws import AWSBackend, auth
 from dstack._internal.core.backends.aws.config import AWSConfig
-from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.models.backends.aws import (
     AnyAWSConfigInfo,
+    AWSAccessKeyCreds,
     AWSConfigInfo,
     AWSConfigInfoWithCreds,
     AWSConfigInfoWithCredsPartial,
@@ -50,23 +46,22 @@ class AWSConfigurator(ABC):
 
     def get_config_values(self, config: AWSConfigInfoWithCredsPartial) -> AWSConfigValues:
         config_values = AWSConfigValues()
-        # TODO support default credentials
-        config_values.default_creds = False
+        config_values.default_creds = auth.default_creds_available()
         if config.creds is None:
             return config_values
 
-        session = boto3.session.Session(
-            region_name=DEFAULT_REGION,
-            aws_access_key_id=config.creds.access_key,
-            aws_secret_access_key=config.creds.secret_key,
-        )
-        if not self._valid_credentials(session=session):
-            raise_invalid_credentials_error(
-                fields=[
-                    ["creds", "access_key"],
-                    ["creds", "secret_key"],
-                ]
-            )
+        try:
+            auth.authenticate(creds=config.creds, region=DEFAULT_REGION)
+        except:
+            if isinstance(config.creds, AWSAccessKeyCreds):
+                raise_invalid_credentials_error(
+                    fields=[
+                        ["creds", "access_key"],
+                        ["creds", "secret_key"],
+                    ]
+                )
+            else:
+                raise_invalid_credentials_error(fields=[["creds"]])
         config_values.regions = self._get_regions_element(
             selected=config.regions or [DEFAULT_REGION]
         )
@@ -97,14 +92,6 @@ class AWSConfigurator(ABC):
             **json.loads(model.config),
             creds=AWSCreds.parse_raw(model.auth).__root__,
         )
-
-    def _valid_credentials(self, session: Session) -> bool:
-        sts = session.client("sts")
-        try:
-            sts.get_caller_identity()
-        except (botocore.exceptions.ClientError, botocore.exceptions.NoCredentialsError):
-            return False
-        return True
 
     def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
         element = ConfigMultiElement(selected=selected)

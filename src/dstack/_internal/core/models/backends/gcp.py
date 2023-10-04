@@ -51,4 +51,4 @@ class GCPConfigValues(BaseModel):
 
 
 class GCPStoredConfig(GCPConfigInfo):
-    pass
+    service_account_email: str

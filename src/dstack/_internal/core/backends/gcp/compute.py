@@ -114,8 +114,7 @@ class GCPCompute(Compute):
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,
                 zone=zone,
-                # TODO support default creds
-                service_account=self.credentials.service_account_email,
+                service_account=self.config.service_account_email,
             )
             try:
                 operation = self.instances_client.insert(request=request)

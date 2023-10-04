@@ -29,11 +29,16 @@ class TestGetBackendConfigValuesAWS:
     async def test_returns_initial_config(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {"type": "aws"}
-        response = client.post(
-            "/api/backends/config_values",
-            headers=get_auth_headers(user.token),
-            json=body,
-        )
+        with patch(
+            "dstack._internal.core.backends.aws.auth.default_creds_available"
+        ) as default_creds_available_mock:
+            default_creds_available_mock.return_value = False
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            default_creds_available_mock.assert_called()
         assert response.status_code == 200, response.json()
         assert response.json() == {
             "type": "aws",
@@ -52,16 +57,19 @@ class TestGetBackendConfigValuesAWS:
                 "secret_key": "1234",
             },
         }
-        with patch("boto3.session.Session") as session_mock:
-            session_mock.return_value.client.return_value.get_caller_identity.side_effect = (
-                botocore.exceptions.ClientError({}, "")
-            )
+        with patch(
+            "dstack._internal.core.backends.aws.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.aws.auth.authenticate"
+        ) as authenticate_mock:
+            authenticate_mock.side_effect = BackendAuthError()
             response = client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
-            session_mock.assert_called()
+            default_creds_available_mock.assert_called()
+            authenticate_mock.assert_called()
         assert response.status_code == 400
         assert response.json() == {
             "detail": [
@@ -89,17 +97,23 @@ class TestGetBackendConfigValuesAWS:
                 "secret_key": "1234",
             },
         }
-        with patch("boto3.session.Session") as session_mock:
+        with patch(
+            "dstack._internal.core.backends.aws.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.aws.auth.authenticate"
+        ) as authenticate_mock:
+            default_creds_available_mock.return_value = True
             response = client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
-            session_mock.assert_called()
+            default_creds_available_mock.assert_called()
+            authenticate_mock.assert_called()
         assert response.status_code == 200, response.json()
         assert response.json() == {
             "type": "aws",
-            "default_creds": False,
+            "default_creds": True,
             "regions": {
                 "selected": ["us-east-1"],
                 "values": [
@@ -124,11 +138,16 @@ class TestGetBackendConfigValuesAzure:
     async def test_returns_initial_config(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {"type": "azure"}
-        response = client.post(
-            "/api/backends/config_values",
-            headers=get_auth_headers(user.token),
-            json=body,
-        )
+        with patch(
+            "dstack._internal.core.backends.azure.auth.default_creds_available"
+        ) as default_creds_available_mock:
+            default_creds_available_mock.return_value = False
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            default_creds_available_mock.assert_called()
         assert response.status_code == 200, response.json()
         assert response.json() == {
             "type": "azure",
@@ -150,14 +169,20 @@ class TestGetBackendConfigValuesAzure:
                 "client_secret": "1234",
             },
         }
-        with patch("dstack._internal.core.backends.azure.auth.authenticate") as m:
-            m.side_effect = BackendAuthError()
+        with patch(
+            "dstack._internal.core.backends.azure.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.azure.auth.authenticate"
+        ) as authenticate_mock:
+            default_creds_available_mock.return_value = False
+            authenticate_mock.side_effect = BackendAuthError()
             response = client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
-            m.assert_called()
+            default_creds_available_mock.assert_called()
+            authenticate_mock.assert_called()
         assert response.status_code == 400
         assert response.json() == {
             "detail": [
@@ -192,10 +217,13 @@ class TestGetBackendConfigValuesAzure:
             },
         }
         with patch(
+            "dstack._internal.core.backends.azure.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.azure.auth.authenticate"
         ) as authenticate_mock, patch(
             "azure.mgmt.subscription.SubscriptionClient"
         ) as SubscriptionClientMock:
+            default_creds_available_mock.return_value = False
             authenticate_mock.return_value = None, "test_tenant"
             client_mock = SubscriptionClientMock.return_value
             tenant_mock = Mock()
@@ -261,15 +289,17 @@ class TestGetBackendConfigValuesGCP:
     async def test_returns_initial_config(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {"type": "gcp"}
-        response = client.post(
-            "/api/backends/config_values",
-            headers=get_auth_headers(user.token),
-            json=body,
-        )
+        with patch("dstack._internal.core.backends.gcp.auth.default_creds_available") as m:
+            m.return_value = True
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
         assert response.status_code == 200, response.json()
         assert response.json() == {
             "type": "gcp",
-            "default_creds": False,
+            "default_creds": True,
             "project_id": None,
             "regions": None,
         }
@@ -285,14 +315,19 @@ class TestGetBackendConfigValuesGCP:
                 "data": "1234",
             },
         }
-        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
-            m.side_effect = BackendAuthError()
+        with patch(
+            "dstack._internal.core.backends.gcp.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.gcp.auth.authenticate"
+        ) as authenticate_mock:
+            default_creds_available_mock.return_value = False
+            authenticate_mock.side_effect = BackendAuthError()
             response = client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
-            m.assert_called()
+            authenticate_mock.assert_called()
         assert response.status_code == 400
         assert response.json() == {
             "detail": [
@@ -316,14 +351,19 @@ class TestGetBackendConfigValuesGCP:
             },
             "project_id": "test_project",
         }
-        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
-            m.return_value = None, "test_project"
+        with patch(
+            "dstack._internal.core.backends.gcp.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.gcp.auth.authenticate"
+        ) as authenticate_mock:
+            default_creds_available_mock.return_value = False
+            authenticate_mock.return_value = None, "test_project"
             response = client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
             )
-            m.assert_called()
+            authenticate_mock.assert_called()
         assert response.status_code == 200, response.json()
         assert response.json() == {
             "type": "gcp",
@@ -506,7 +546,12 @@ class TestCreateBackend:
             },
             "regions": ["us-west-1"],
         }
-        with patch("boto3.session.Session"):
+        with patch(
+            "dstack._internal.core.backends.aws.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.aws.auth.authenticate"
+        ) as authenticate_mock:
+            default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
@@ -533,8 +578,15 @@ class TestCreateBackend:
             "project_id": "test_project",
             "regions": ["us-east1"],
         }
-        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
-            m.return_value = None, "test_project"
+        with patch(
+            "dstack._internal.core.backends.gcp.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.gcp.auth.authenticate"
+        ) as authenticate_mock:
+            default_creds_available_mock.return_value = False
+            credentials_mock = Mock()
+            credentials_mock.service_account_email = "test"
+            authenticate_mock.return_value = credentials_mock, "test_project"
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
@@ -645,17 +697,20 @@ class TestCreateBackend:
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         body = {
-            "type": "gcp",
+            "type": "aws",
             "creds": {
-                "type": "service_account",
-                "filename": "1234",
-                "data": "1234",
+                "type": "access_key",
+                "access_key": "1234",
+                "secret_key": "1234",
             },
-            "project_id": "test_project",
-            "regions": ["us-east1"],
+            "regions": ["us-west-1"],
         }
-        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
-            m.return_value = None, "test_project"
+        with patch(
+            "dstack._internal.core.backends.aws.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.aws.auth.authenticate"
+        ) as authenticate_mock:
+            default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
@@ -664,8 +719,12 @@ class TestCreateBackend:
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
-        with patch("dstack._internal.core.backends.gcp.auth.authenticate") as m:
-            m.return_value = None, "test_project"
+        with patch(
+            "dstack._internal.core.backends.aws.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.aws.auth.authenticate"
+        ) as authenticate_mock:
+            default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
@@ -710,7 +769,12 @@ class TestUpdateBackend:
             },
             "regions": ["us-east-1"],
         }
-        with patch("boto3.session.Session"):
+        with patch(
+            "dstack._internal.core.backends.aws.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.aws.auth.authenticate"
+        ) as authenticate_mock:
+            default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/update",
                 headers=get_auth_headers(user.token),
@@ -736,12 +800,11 @@ class TestUpdateBackend:
             },
             "regions": ["us-east-1"],
         }
-        with patch("boto3.session.Session"):
-            response = client.post(
-                f"/api/project/{project.name}/backends/update",
-                headers=get_auth_headers(user.token),
-                json=body,
-            )
+        response = client.post(
+            f"/api/project/{project.name}/backends/update",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
         assert response.status_code == 400
 
 
