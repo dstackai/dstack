@@ -1,6 +1,0 @@
-black~=22.0
-pre-commit
-isort~=5.0
-httpx>=0.23
-pytest~=7.2
-pytest-asyncio>=0.21
