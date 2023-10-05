@@ -3,7 +3,6 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 from filelock import FileLock
 from paramiko.config import SSHConfig
@@ -53,7 +52,17 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
                 f.write(include + content)
 
 
-def update_ssh_config(path: PathLike, host: str, options: Optional[dict] = None):
+def ssh_config_add_host(path: PathLike, host: str, options: dict):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    with FileLock(str(path) + ".lock"):
+        with open(path, "a") as f:
+            f.write(f"Host {host}\n")
+            for k, v in options.items():
+                f.write(f"    {k} {v}\n")
+            f.flush()
+
+
+def ssh_config_remove_host(path: PathLike, host: str):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with FileLock(str(path) + ".lock"):
         copy_mode = True
@@ -67,13 +76,4 @@ def update_ssh_config(path: PathLike, host: str, options: Optional[dict] = None)
                     if copy_mode:
                         content += line
         with open(path, "w") as f:
-            f.write(f"{content}")
-            if options:
-                f.write(f"Host {host}\n")
-                for k, v in options.items():
-                    f.write(f"    {k} {v}\n")
-            f.flush()
-
-
-if __name__ == "__main__":
-    update_ssh_config("~/.test.txt", "test1", {"A": "a", "B": "b"})
+            f.write(content)
