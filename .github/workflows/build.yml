@@ -59,7 +59,7 @@ jobs:
           pytest src/tests
 
   testpypi-upload:
-    # needs: [ python-test ]
+    needs: [ python-test ]
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

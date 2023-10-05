@@ -8,6 +8,5 @@ dist/
 
 .idea/
 
-/cli/dstack/_internal/hub/statics/
 /runner/cmd/shim/shim
 /runner/cmd/runner/runner
