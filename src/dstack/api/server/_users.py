@@ -3,9 +3,9 @@ from typing import List
 from pydantic import parse_obj_as
 
 from dstack._internal.core.models.users import GlobalRole, User, UserWithCreds
-from dstack._internal.server.schemas.schemas import GetUserRequest
 from dstack._internal.server.schemas.users import (
     CreateUserRequest,
+    GetUserRequest,
     RefreshTokenRequest,
     UpdateUserRequest,
 )

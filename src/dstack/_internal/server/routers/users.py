@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.users import User, UserWithCreds
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import UserModel
-from dstack._internal.server.schemas.schemas import GetUserRequest
 from dstack._internal.server.schemas.users import (
     CreateUserRequest,
+    GetUserRequest,
     RefreshTokenRequest,
     UpdateUserRequest,
 )

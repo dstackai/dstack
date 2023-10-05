@@ -6,6 +6,7 @@ dist/
 /venv/
 /.cache/
 .pytest_cache/
+.coverage
 
 .idea/
 
