@@ -1,12 +1,11 @@
 # Services
 
-A service is an application that is accessible through a public endpoint.
-
-Using `dstack`, you can define such a service through a configuration file and run it on the
-configured clouds that offer the best price and availability.
+A service in `dstack` is a web app accessible through a public endpoint. When running a web app as a service,
+`dstack` automatically creates a public endpoint, enabling you to use your domain and HTTPS.
 
 !!! info "NOTE:"
-    Before running a service, ensure that you have configured a [gateway](clouds.md#configuring-gateways).
+    Services are ideal for deploying wep apps (e.g., LLMs) for production purposes.
+    If you intend to run a web app for development purposes, please refer to [tasks](tasks.md).
 
 ## Define a configuration
 
@@ -94,6 +93,9 @@ For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstac
 
 ## Run the configuration
 
+!!! info "Gateway"
+    Before running a service, ensure that you have configured a [gateway](clouds.md#configure-gateways).
+
 To run a service, use the `dstack run` command followed by the path to the directory you want to use as the
 working directory.
 
@@ -117,14 +119,14 @@ Serving HTTP on https://yellow-cat-1.mydomain.com ...
 
 This command deploys the service, and forwards the traffic to the gateway's endpoint.
 
-!!! info "Endoint URL"
-    If you've configured a [wildcard domain](clouds.md#configuring-gateways) for the gateway, 
+!!! info "Wildcard domain"
+    If you've configured a [wildcard domain](clouds.md#configure-gateways) for the gateway, 
     `dstack` enables HTTPS automatically and serves the service at 
     `https://<run name>.<your domain name>`.
 
     If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command. 
 
-### Requesting resources
+### Request resources
 
 You can request resources using the [`--gpu`](../reference/cli/run.md#GPU) 
 and [`--memory`](../reference/cli/run.md#MEMORY) arguments with `dstack run`, 

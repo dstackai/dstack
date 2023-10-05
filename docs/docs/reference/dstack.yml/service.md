@@ -11,12 +11,12 @@ A service is an application that is accessible through a public endpoint.
 
 ## Runtime properties:
 
-- `commands` - The list of commands to be executed every restart of the environment.
+- `commands` - The list of commands to be executed.
 - `port` - The exposed port or mapping. Allowed formats:
     - `8000` - expose port `8000` at gateway's port `80` (or `443` if a wildcard domain is configured for the gateway).
     - `3333:8000` - expose port `8000` at gateway's port `3333`.
 -  <a href="#env"><code id="env">env</code></a> - (Optional) The list or mapping of environment variables. Interpolation `PATH=/bin/my:$PATH` is supported. 
-- `python` - (Optional) The preinstalled major python version (from `3.7` to `3.11`). Mutually exclusive with `image` property.
+- `python` - (Optional) The pre-installed major python version (from `3.7` to `3.11`). Mutually exclusive with `image` property.
 - `setup` - (Optional) The list of commands to be executed once for the environment.
 
 ## Custom docker image properties:

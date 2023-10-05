@@ -96,12 +96,12 @@ Other improvements in this release:
 - Deletion of repositories is now possible through the UI. 
 - When running a dev environment from a Git repo, you can now pull and push changes directly from the dev environment,
   with `dstack` correctly configuring your Git credentials.
-- The newly added Python API for working with artifacts is now documented [here](../../docs/reference/api/python.md).
+- The newly added Python API for working with artifacts is now documented [here](../../docs/reference/api/python/index.md).
 
-The [documentation](../../docs) and [examples](https://github.com/dstackai/dstack-examples/blob/main/README.md)
+The [documentation](../../docs/index.md) and [examples](../../examples/index.md)
 are updated to reflect the changes.
 
 !!! info "Give it a try and share feedback"
     Go ahead, and install the update, give it a spin, and share your feedback in
-    our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+    our [Discord community](https://discord.gg/u8SmfwPpMd).
 

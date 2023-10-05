@@ -3,7 +3,8 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source toolkit for running LLM workloads across any clouds.
+  dstack is an open-source framework for orchestration GPU workloads and development 
+  of generative AI models across multiple clouds.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -72,7 +73,8 @@ plugins:
         'docs/quick-start.md': 'docs/index.md'
         'docs/installation/index.md': 'docs/index.md'
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion-xl.md'
-        'docs/guides/projects.md': 'docs/projects.md'
+        'docs/guides/projects.md': 'docs/guides/clouds.md'
+        'examples/python-api.md': 'examples/deploy-python.md'
   - typeset
 
 # Extensions
@@ -122,13 +124,13 @@ extra:
   social:
     - icon: /fontawesome/brands/github
       link: https://github.com/dstackai/dstack
-    - icon: /fontawesome/brands/python
-      link: https://pypi.org/project/dstack
+#    - icon: /fontawesome/brands/python
+#      link: https://pypi.org/project/dstack
     - icon: /fontawesome/brands/docker
       link: https://hub.docker.com/r/dstackai/dstack
-    - icon: /fontawesome/brands/slack
-      link: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
-    - icon: /fontawesome/brands/twitter
+    - icon: /fontawesome/brands/discord
+      link: https://discord.gg/u8SmfwPpMd
+    - icon: /simple/x
       link: https://twitter.com/dstackai
   status:
     new: Recently added
@@ -149,11 +151,6 @@ nav:
           - Services: docs/guides/services.md
 #          - Artifacts: docs/guides/artifacts.md
       - Reference:
-          - .dstack.yml:
-              - "type: dev-environment": docs/reference/dstack.yml/dev-environment.md
-              - "type: task": docs/reference/dstack.yml/task.md
-              - "type: service": docs/reference/dstack.yml/service.md
-          - profiles.yml: docs/reference/profiles.yml.md
           - CLI:
               - dstack run: docs/reference/cli/run.md
               - dstack init: docs/reference/cli/init.md
@@ -169,22 +166,27 @@ nav:
               - dstack prune: docs/reference/cli/prune.md
               - dstack build: docs/reference/cli/build.md
               - dstack gateway: docs/reference/cli/gateway.md
-          - API:
-              - Python: docs/reference/api/python.md
+          - Python API: docs/reference/api/python/index.md
+          - .dstack.yml:
+              - "type: dev-environment": docs/reference/dstack.yml/dev-environment.md
+              - "type: task": docs/reference/dstack.yml/task.md
+              - "type: service": docs/reference/dstack.yml/service.md
+          - profiles.yml: docs/reference/profiles.yml.md
           - Backends:
-              - AWS: docs/reference/backends/aws.md
-              - GCP: docs/reference/backends/gcp.md
-              - Azure: docs/reference/backends/azure.md
-              - Lambda: docs/reference/backends/lambda.md
+            - AWS: docs/reference/backends/aws.md
+            - GCP: docs/reference/backends/gcp.md
+            - Azure: docs/reference/backends/azure.md
+            - Lambda: docs/reference/backends/lambda.md
   - Examples:
     - examples/index.md
     - Examples:
-      - Fine-tuning Llama 2: examples/finetuning-llama-2.md
-      - Serving LLMs with TGI: examples/text-generation-inference.md
-      - Serving SDXL with FastAPI: examples/stable-diffusion-xl.md
-      - Serving LLMs with vLLM: examples/vllm.md
-      - LLM as Chatbot: examples/llmchat.md
+      - RAG with Llama Index and Weaviate: examples/llama-index-weaviate.md
+      - Deploying LLMs using Python API: examples/deploy-python.md
+      - Fine-tuning Llama 2 using QLoRA: examples/finetuning-llama-2.md
+      - Deploying LLMs using TGI: examples/text-generation-inference.md
+      - Deploying SDXL using FastAPI: examples/stable-diffusion-xl.md
+      - Deploying LLMs using vLLM: examples/vllm.md
   - Blog:
       - blog/index.md
-  - Slack: https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ
+  - Discord: https://discord.gg/u8SmfwPpMd
   - Twitter: https://twitter.com/dstackai/

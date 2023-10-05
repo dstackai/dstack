@@ -11,13 +11,13 @@ The task allows to run commands non-interactively: from fine-tuning to serving.
 
 ## Runtime properties:
 
-- `commands` - The list of commands to be executed every restart of the environment.
+- `commands` - The list of commands to be executed.
 - `env` - (Optional) The list or mapping of environment variables. Interpolation `PATH=/bin/my:$PATH` is supported. 
 - `ports` - (Optional) The list of exposed ports or mappings. Allowed formats:
     - `8000` - expose port `8000` and run the ssh tunnel locally on the same port.
     - `3333:8000` - expose port `8000` and run ssh tunnel locally on port `3333`.
     - `*:8000` - expose port `8000` and run the ssh tunnel locally on the first available port starting from `8000`.
-- `python` - (Optional) The preinstalled major python version (from `3.7` to `3.11`). Mutually exclusive with `image` property.
+- `python` - (Optional) The pre-installed major python version (from `3.7` to `3.11`). Mutually exclusive with `image` property.
 - `setup` - (Optional) The list of commands to be executed once for the environment.
 
 ## Custom docker image properties:
@@ -29,7 +29,7 @@ The task allows to run commands non-interactively: from fine-tuning to serving.
     - `password` - The password or token. Supports secrets interpolation `${{ secrets.GHCR_TOKEN }}`.
 - `home_dir` - (Optional) The home directory inside the container. Defaults to `/root`.
 
-## Optimization properties:
+## Experimental features:
 
 - `cache` - (Optional) The list of directories to cache between the environment restarts. Both absolute and relative paths are supported.
 - `build` - (Optional) The list of commands to run during the build stage. You must call `dstack build` first or use the flag `dstack run --build`.

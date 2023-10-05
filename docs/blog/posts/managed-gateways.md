@@ -62,10 +62,10 @@ allowing you to schedule tasks even if there is no required capacity at the mome
 <div class="termy">
 
 ```shell
-$ dstack run . -f text-generation-inference/serve.dstack.yml --gpu A100 --retry-limit 1h
+$ dstack run . -f llama-2/train.dstack.yml --gpu A100 --retry-limit 1h
 
  RUN           BACKEND  INSTANCE  SPOT  PRICE STATUS  SUBMITTED
- tasty-zebra-1 lambda   -         no    -     Pending now
+ tasty-zebra-1          -         auto  -     Pending now
  
 Waiting for capacity... To exit, press Ctrl+C.
 ```
@@ -88,4 +88,4 @@ $ dstack start
 
 !!! info "Feedback and support"
     Questions and requests for help are very much welcome in our 
-    [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+    [Discord server](https://discord.gg/u8SmfwPpMd).

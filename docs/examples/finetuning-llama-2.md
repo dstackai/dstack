@@ -1,4 +1,4 @@
-# Fine-tuning Llama 2
+# Fine-tuning Llama 2 using QLoRA
 
 The release of Llama 2 by Meta has caused quite a stir due to its impressive performance and its license that permits commercial use.
 Along with other advancements in the LLM toolchain, such as LangChain and vector databases, Llama 2 has vast potential

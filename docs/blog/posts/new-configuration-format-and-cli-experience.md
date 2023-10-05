@@ -160,10 +160,10 @@ Last but not least, here's a brief list of other improvements:
    configured on the machine where the server is running).
  * We've introduced a new Python API and UI for working with artifacts (more details to come later this week).
 
-The [documentation](../../docs) and [examples](https://github.com/dstackai/dstack-examples/blob/main/README.md)
+The [documentation](../../docs/index.md) and [examples](../../examples/index.md)
 are updated to reflect the changes.
 
 !!! info "Try the update and share feedback"
     Go ahead, and install the updated version, give it a spin, and share your feedback in
-    our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+    our [Discord community](https://discord.gg/u8SmfwPpMd).
 

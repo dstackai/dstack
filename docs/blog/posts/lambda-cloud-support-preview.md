@@ -70,9 +70,9 @@ ide: vscode
     You only need to install `cuda` if you intend to build a custom CUDA kernel. Otherwise, it is not necessary as the
     essential CUDA drivers are already pre-installed.
 
-The [documentation](../../docs) and [examples](https://github.com/dstackai/dstack-examples/blob/main/README.md)
+The [documentation](../../docs/index.md) and [examples](../../examples/index.md)
 are updated to reflect the changes.
 
 !!! info "Give it a try and share feedback"
     Go ahead, and install the update, give it a spin, and share your feedback in
-    our [Slack community](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+    our [Discord community](https://discord.gg/u8SmfwPpMd).

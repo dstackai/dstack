@@ -4,18 +4,16 @@ With `dstack`, you can run LLM workloads using compute resources from multiple c
 All you need to do is sign up with these providers, and then pass
 their credentials to `dstack`.
 
-## Why multiple clouds?
+??? info "Why multiple clouds?"
 
-<div class="grid cards" markdown>
-- <span>**GPU availability**
-   Because of high demand, it's easier to obtain GPU from various cloud providers through a single interface.</span>
-- <span>**GPU price**
-   Leverage smaller cloud services (e.g., Lambda Cloud) and spot instances across larger providers.</span>
-- <span>**No vendor lock-in**
-   An open-source and cloud-agnostic interface enables easy switching between cloud providers.</span>
-</div>
+    1. <span>**GPU availability**
+       Because of high demand, it's easier to obtain GPU from various cloud providers through a single interface.</span>
+    2. <span>**GPU price**
+       Leverage smaller cloud services (e.g., Lambda Cloud) and spot instances across larger providers.</span>
+    3. <span>**No vendor lock-in**
+       An open-source and cloud-agnostic interface enables easy switching between cloud providers.</span>
 
-## Creating cloud accounts
+## Create cloud accounts
 
 To use clouds with `dstack`, you need to first create an account with each cloud provider.
 
@@ -29,7 +27,7 @@ relevant issues in [our tracker](https://github.com/dstackai/dstack/issues).
     Startups can apply for extra credits, usually by reaching out directly to the provider in the case of smaller providers,
     or through a partner program (such as [NVIDIA Inception](https://www.nvidia.com/en-us/startups/)) for larger providers.
 
-??? info "Requesting GPU quotas"
+??? info "Request GPU quotas"
 
     Larger providers require you to request GPU quotas, essentially obtaining permission from their support
     team, prior to utilizing GPUs with your account. If planning to use GPU through credits, approval for the request might
@@ -40,7 +38,7 @@ relevant issues in [our tracker](https://github.com/dstackai/dstack/issues).
     To use spot instances with certain cloud providers (e.g. AWS), you should request quotes
     for such instances separately.
 
-## Configuring backends
+## Configure backends
 
 To use your cloud accounts with `dstack`, open the project settings and configure a backend for each cloud.
 
@@ -51,20 +49,20 @@ Configuring backends involves providing cloud credentials, and specifying storag
 <div class="grid cards" markdown>
 - [**AWS**
    Learn how to set up an Amazon Web Services backend.
-  ](../../reference/backends/aws/)
+  ](../reference/backends/aws.md)
 - [**GCP**
-   Learn how to set up a Google Cloud backend.
-  ](../../reference/backends/gcp/)
+Learn how to set up a Google Cloud backend.
+  ](../reference/backends/gcp.md)
 - [**Azure**
    Learn how to set up an Microsoft Azure backend.
-  ](../../reference/backends/azure/)
+  ](../reference/backends/azure.md)
 - [**Lambda**
    Learn how to set up a Lambda Cloud backend.
-  ](../../reference/backends/lambda/)
+  ](../reference/backends/lambda.md)
 
 </div>
 
-## Configuring gateways
+## Configure gateways
 
 If you intend to use [services](services.md) (e.g. to deploy public endpoints), you must also configure a gateway. 
 Configuring a backend involves selecting a backend and a region.
@@ -78,7 +76,7 @@ After the gateway is created (and assigned an external IP), set up an A record a
 
 Then, in the gateway's settings, specify the wildcard domain.
 
-## Requesting resources
+## Request resources
 
 You can request resources using the [`--gpu`](../reference/cli/run.md#GPU) 
 and [`--memory`](../reference/cli/run.md#MEMORY) arguments with `dstack run`, 

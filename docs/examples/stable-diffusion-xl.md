@@ -204,7 +204,7 @@ $ dstack run . -f stable-diffusion-xl/api.dstack.yml
 </div>
 
 !!! info "Endpoint URL"
-    If you've configured a [wildcard domain](clouds.md#configuring-gateways) for the gateway, 
+    If you've configured a [wildcard domain](../docs/guides/clouds.md#configuring-gateways) for the gateway, 
     `dstack` enables HTTPS automatically and serves the service at 
     `https://<run name>.<your domain name>`.
 

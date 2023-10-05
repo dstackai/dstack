@@ -9,58 +9,59 @@
 </h1>
 
 <h3 align="center">
-Run LLM workloads across any clouds
+Orchestrate GPU workloads across clouds
 </h3>
 
 <p align="center">
 <a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> •
 <a href="https://dstack.ai/examples" target="_blank"><b>Examples</b></a> •
 <a href="https://dstack.ai/blog" target="_blank"><b>Blog</b></a> •
-<a href="https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ" target="_blank"><b>Slack</b></a>
+<a href="https://discord.gg/u8SmfwPpMd" target="_blank"><b>Discord</b></a>
 </p>
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack?style=flat-square)](https://github.com/dstackai/dstack/commits/)
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source toolkit for running LLM workloads across any clouds, offering a
-cost-efficient and user-friendly interface for training, inference, and development.
+`dstack` is an open-source framework for orchestrating GPU workloads
+across multiple cloud GPU providers. It provides a simple cloud-agnostic interface for 
+development and deployment of generative AI models.
 
 ## Latest news ✨
 
-- [2023/08] [Fine-tuning with Llama 2](https://dstack.ai/examples/finetuning-llama-2) (Example)
-- [2023/08] [An early preview of services](https://dstack.ai/blog/2023/08/07/services-preview) (Release)
-- [2023/08] [Serving SDXL with FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
-- [2023/07] [Serving LLMS with TGI](https://dstack.ai/examples/text-generation-inference) (Example)
-- [2023/07] [Serving LLMS with vLLM](https://dstack.ai/examples/vllm) (Example)
+- [2023/09] [Deploying LLMs using Python API](https://dstack.ai/examples/python-api) (Example)
+- [2023/09] [Managed gateways](https://dstack.ai/blog/2023/09/01/managed-gateways) (Release)
+- [2023/08] [Fine-tuning Llama 2 using QLoRA](https://dstack.ai/examples/finetuning-llama-2) (Example)
+- [2023/08] [Deploying Stable Diffusion using FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
+- [2023/07] [Deploying LLMS using TGI](https://dstack.ai/examples/text-generation-inference) (Example)
+- [2023/07] [Deploying LLMS using vLLM](https://dstack.ai/examples/vllm) (Example)
 
 ## Installation
 
 To use `dstack`, install it with `pip`, and start the server.
 
 ```shell
-pip install "dstack[aws,gcp,azure,lambda]"
+pip install "dstack[all]" -U
 dstack start
 ```
-## Configure backends
+## Configure clouds
 
-Upon startup, the server sets up the default project called `main`. Prior to using `dstack`, you must log in to the
-UI, open the project's settings, and configure cloud backends 
-(e.g., [AWS](https://dstack.ai/docs/reference/backends/aws), [GCP](https://dstack.ai/docs/reference/backends/gcp), [Azure](https://dstack.ai/docs/reference/backends/azure), 
-[Lambda](https://dstack.ai/docs/reference/backends/lambda), etc.).
+Upon startup, the server sets up the default project called `main`.
+Prior to using `dstack`, make sure to [configure clouds](https://dstack.ai/docs/guides/clouds#configure-backends).
 
-## Define a configuration
+Once the server is up, you can orchestrate GPU workloads using
+either the CLI or Python API.
 
-A configuration is a YAML file that describes what you want to run.
+## Using CLI
 
-> **Note**
-> All configuration files must be named with the suffix `.dstack.yml`. For example,
-> you can name the configuration file `.dstack.yml` or `app.dstack.yml`. You can define
-> these configurations anywhere within your project.
+### Define a configuration
+
+The CLI allows you to define what you want to run as a YAML file and
+run it via the `dstack run` CLI command.
 
 Configurations can be of three types: `dev-environment`, `task`, and `service`.
 
-### Dev environments
+#### Dev environments
 
 A dev environment is a virtual machine with a pre-configured IDE.
 
@@ -75,7 +76,7 @@ setup: # (Optional) Executed once at the first startup
 ide: vscode
 ```
 
-### Tasks
+#### Tasks
 
 A task can be either a batch job, such as training or fine-tuning a model, or a web application.
 
@@ -92,10 +93,10 @@ commands:
   - python app.py
 ```
 
-While the task runs in the cloud, the CLI forwards traffic, allowing you to access the application from your local
-machine.
+While the task is running in the cloud, the CLI forwards its ports traffic to `localhost`
+for convenient access.
 
-### Services
+#### Services
 
 A service is an application that is accessible through a public endpoint.
 
@@ -110,28 +111,69 @@ commands:
 ```
 
 Once the service is up, `dstack` makes it accessible from the Internet through
-the [gateway](https://dstack.ai/docs/guides/services.md#configure-a-gateway-address).
+the [gateway](https://dstack.ai/docs/guides/clouds#configure-gateways).
 
-## CLI
+### Run a configuration
 
 To run a configuration, use the [`dstack run`](https://dstack.ai/docs/reference/cli/run.md) command followed by 
 working directory and the path to the configuration file.
 
 ```shell
-dstack run . -f serve.dstack.yml
+dstack run . -f text-generation-inference/serve.dstack.yml --gpu 80GB -y
+
+ RUN           BACKEND  INSTANCE              SPOT  PRICE STATUS    SUBMITTED
+ tasty-zebra-1 lambda   200GB, 1xA100 (80GB)  no    $1.1  Submitted now
+ 
+Privisioning...
+
+Serving on https://tasty-zebra-1.mydomain.com
 ```
 
-`dstack` automatically provisions cloud resources based in the 
-configured clouds that offer the best price and availability.
+## Using API
 
-For every run, you can specify hardware resources like memory and GPU, along with various run policies (e.g., maximum
-hourly price, use of spot instances, etc.).
+As an alternative to the CLI, you can run tasks and services programmatically 
+via [Python API](https://dstack.ai/docs/reference/api/python/).
 
-| Example                     | Description                                |
-|-----------------------------|--------------------------------------------|
-| `dstack run . --gpu A10`    | Use an instance with `NVIDIA A10` GPU      |
-| `dstack run . --gpu A100:8` | Use an instance with 8 `NVIDIA A100` GPUs  |
-| `dstack run . --gpu 24GB`   | Use an instance with a GPU that has `24GB` |
+```python
+import sys
+
+import dstack
+
+task = dstack.Task(
+    image="ghcr.io/huggingface/text-generation-inference:latest",
+    env={"MODEL_ID": "TheBloke/Llama-2-13B-chat-GPTQ"},
+    commands=[
+        "text-generation-launcher --trust-remote-code --quantize gptq",
+    ],
+    ports=["8080:80"],
+)
+resources = dstack.Resources(gpu=dstack.GPU(memory="20GB"))
+
+if __name__ == "__main__":
+    print("Initializing the client...")
+    client = dstack.Client.from_config(repo_dir="~/dstack-examples")
+
+    print("Submitting the run...")
+    run = client.runs.submit(configuration=task, resources=resources)
+
+    print(f"Run {run.name}: " + run.status())
+
+    print("Attaching to the run...")
+    run.attach()
+
+    # After the endpoint is up, http://127.0.0.1:8080/health will return 200 (OK).
+
+    try:
+        for log in run.logs():
+            sys.stdout.buffer.write(log)
+            sys.stdout.buffer.flush()
+
+    except KeyboardInterrupt:
+        print("Aborting the run...")
+        run.stop(abort=True)
+    finally:
+        run.detach()
+```
 
 ## More information
 
@@ -140,7 +182,7 @@ For additional information and examples, see the following links:
 - [Docs](https://dstack.ai/docs)
 - [Examples](https://dstack.ai/examples)
 - [Blog](https://dstack.ai/blog)
-- [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ)
+- [Discord](https://discord.gg/u8SmfwPpMd)
 
 ## Licence
 

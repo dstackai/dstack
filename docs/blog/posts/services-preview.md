@@ -81,4 +81,4 @@ This initial support for services is the first step towards providing multi-clou
 
     More details on how to use services can be found in a [dedicated guide](../../docs/guides/services.md) in our docs. 
     Questions and requests for help are
-    very much welcome in our [Slack chat](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+    very much welcome in our [Discord server](https://discord.gg/u8SmfwPpMd).

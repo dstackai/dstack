@@ -58,7 +58,7 @@ regions within a single project.
     while also remaining independent of any particular cloud vendor.
 
 We hope that the value of `dstack` will continue to grow as we expand our support for additional cloud GPU providers.
-If you're interested in a specific provider, please message us on [Slack](https://join.slack.com/t/dstackai/shared_invite/zt-xdnsytie-D4qU9BvJP8vkbkHXdi6clQ).
+If you're interested in a specific provider, please message us on [Discord](https://discord.gg/u8SmfwPpMd).
 
 ## Custom domains and HTTPS
 

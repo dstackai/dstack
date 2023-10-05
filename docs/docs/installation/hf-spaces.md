@@ -60,4 +60,4 @@ If you don't do that, `dstack` will generate it randomly and print it to the `Lo
 
 ## Configure clouds
 
-Prior to using `dstack`, make sure to [configure clouds](../guides/clouds.md#configuring-clouds-with-dstack).
+Prior to using `dstack`, make sure to [configure clouds](../guides/clouds.md#configure-backends).

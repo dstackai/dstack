@@ -5,7 +5,7 @@ from typing import Optional, Union
 import git
 import requests
 import yaml
-from git.exc import GitCommandError
+from git.exc import GitCommandError, InvalidGitRepositoryError
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.config import RepoConfig

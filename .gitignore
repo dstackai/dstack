@@ -5,6 +5,7 @@
 dist/
 /venv/
 /.cache/
+.pytest_cache/
 
 .idea/
 

@@ -1,10 +1,9 @@
 # Dev environments
 
-A dev environment is a cloud instance pre-configured with hardware resources, source code, an environment, and
-an IDE.
+A dev environment is a cloud instance pre-configured with an IDE.
 
-Using `dstack`, you can define such a dev environment through a configuration file and provision it on one of the
-configured clouds that offer the best price and availability.
+!!! info "NOTE:"
+    Dev environments are ideal when you want to interactively work with code using your favorite IDE.
 
 ## Define a configuration
 
