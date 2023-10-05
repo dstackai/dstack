@@ -12,7 +12,12 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import BackendModel
 from dstack._internal.server.services.projects import add_project_member
-from tests.server.common import create_backend, create_project, create_user, get_auth_headers
+from tests._internal.server.common import (
+    create_backend,
+    create_project,
+    create_user,
+    get_auth_headers,
+)
 
 client = TestClient(app)
 

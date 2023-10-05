@@ -12,7 +12,13 @@ from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.schemas.runner import JobStateEvent, PullResponse
-from tests.server.common import create_job, create_project, create_repo, create_run, create_user
+from tests._internal.server.common import (
+    create_job,
+    create_project,
+    create_repo,
+    create_run,
+    create_user,
+)
 
 
 def get_job_provisioning_data() -> JobProvisioningData:

@@ -17,7 +17,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
-from tests.server.common import (
+from tests._internal.server.common import (
     create_job,
     create_project,
     create_repo,

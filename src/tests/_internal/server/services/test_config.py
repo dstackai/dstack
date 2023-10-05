@@ -10,7 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel
 from dstack._internal.server.services.config import ServerConfigManager
-from tests.server.common import create_backend, create_project, create_user, get_auth_headers
+from tests._internal.server.common import (
+    create_backend,
+    create_project,
+    create_user,
+    get_auth_headers,
+)
 
 
 class TestServerConfigManager:

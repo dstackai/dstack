@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dstack._internal.server.main import app
-from tests.server.common import create_user, get_auth_headers
+from tests._internal.server.common import create_user, get_auth_headers
 
 client = TestClient(app)
 

@@ -2,56 +2,59 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 
 def get_dstack_dir() -> Path:
     return Path.joinpath(Path.home(), ".dstack")
 
 
-def pretty_date(time: Any = False):
+def get_current_datetime() -> datetime:
+    return datetime.now(tz=timezone.utc)
+
+
+def get_milliseconds_since_epoch() -> int:
+    return int(round(time.time() * 1000))
+
+
+def pretty_date(time: Union[datetime, int] = False) -> str:
     """
-    Get a datetime object or a int() Epoch timestamp and return a
+    Get a datetime object or an epoch timestamp and return a
     pretty string like 'an hour ago', 'Yesterday', '3 months ago',
     'just now', etc
     """
-    from datetime import datetime
-
-    now = datetime.now()
-    if type(time) is int:
-        diff = now - datetime.fromtimestamp(time)
-    elif isinstance(time, datetime):
-        diff = now - time
-    elif not time:
-        diff = now - now
-    second_diff = diff.seconds
-    day_diff = diff.days
-
-    if day_diff < 0:
+    if isinstance(time, int):
+        time = datetime.fromtimestamp(time, tz=timezone.utc)
+    now = get_current_datetime()
+    diff = now - time
+    if diff.days < 0:
         return ""
 
-    if day_diff == 0:
-        if second_diff < 10:
+    if diff.days == 0:
+        if diff.seconds < 10:
             return "now"
-        if second_diff < 60:
-            return str(second_diff) + " sec ago"
-        if second_diff < 120:
+        if diff.seconds < 60:
+            return str(diff.seconds) + " sec ago"
+        if diff.seconds < 120:
             return "1 min ago"
-        if second_diff < 3600:
-            return str(round(second_diff / 60)) + " mins ago"
-        if second_diff < 7200:
+        if diff.seconds < 3600:
+            return str(round(diff.seconds / 60)) + " mins ago"
+        if diff.seconds < 7200:
             return "1 hour ago"
-        if second_diff < 86400:
-            return str(round(second_diff / 3600)) + " hours ago"
-    if day_diff == 1:
+        if diff.seconds < 86400:
+            return str(round(diff.seconds / 3600)) + " hours ago"
+    if diff.days == 1:
         return "yesterday"
-    if day_diff < 7:
-        return str(day_diff) + " days ago"
-    if day_diff < 31:
-        return str(round(day_diff / 7)) + " weeks ago"
-    if day_diff < 365:
-        return str(round(day_diff / 30)) + " months ago"
-    return str(round(day_diff / 365)) + " years ago"
+    if diff.days < 7:
+        return str(diff.days) + " days ago"
+    if diff.days < 31:
+        return str(round(diff.days / 7)) + " weeks ago"
+    if diff.days < 365:
+        return str(round(diff.days / 30)) + " months ago"
+    years = round(diff.days / 365)
+    if years == 1:
+        return str(years) + " year ago"
+    return str(years) + " years ago"
 
 
 def since(timestamp: str) -> datetime:
@@ -92,30 +95,3 @@ def sizeof_fmt(num, suffix="B"):
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f%s%s" % (num, "Yi", suffix)
-
-
-def removeprefix(s: str, prefix: str) -> str:
-    if s.startswith(prefix):
-        return s[len(prefix) :]
-    return s
-
-
-def get_current_datetime() -> datetime:
-    return datetime.now(tz=timezone.utc)
-
-
-def get_milliseconds_since_epoch() -> int:
-    return int(round(time.time() * 1000))
-
-
-def timestamps_in_milliseconds_to_datetime(ts: int) -> datetime:
-    seconds = ts // 1000
-    milliseconds = ts % 1000
-    return datetime.fromtimestamp(seconds, tz=timezone.utc).replace(
-        microsecond=milliseconds * 1000
-    )
-
-
-def datetime_to_timestamp_in_milliseconds(dt: datetime) -> int:
-    milliseconds = dt.microsecond // 1000
-    return int(dt.timestamp()) * 1000 + milliseconds

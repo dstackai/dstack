@@ -6,7 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.background.tasks.process_pending_jobs import process_pending_jobs
-from tests.server.common import create_job, create_project, create_repo, create_run, create_user
+from tests._internal.server.common import (
+    create_job,
+    create_project,
+    create_repo,
+    create_run,
+    create_user,
+)
 
 
 class TestProcessPendingJobs:
