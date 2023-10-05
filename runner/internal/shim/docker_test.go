@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -18,13 +19,14 @@ func TestDocker_SSHServer(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	t.Parallel()
 
 	tempDir := t.TempDir()
 
 	dockerParams := &DockerParameters{
 		Runner:      &DummyRunnerConfig{dockerCommands: []string{"echo 1"}},
 		ImageName:   "ubuntu",
-		OpenSSHPort: 10022,
+		OpenSSHPort: nextPort(),
 		DstackHome:  tempDir + "/.dstack",
 	}
 
@@ -40,6 +42,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	t.Parallel()
 
 	tempDir := t.TempDir()
 	require.NoError(t, exec.Command("ssh-keygen", "-t", "rsa", "-b", "2048", "-f", tempDir+"/id_rsa", "-q", "-N", "").Run())
@@ -49,7 +52,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	dockerParams := &DockerParameters{
 		Runner:       &DummyRunnerConfig{dockerCommands: []string{"sleep 5"}},
 		ImageName:    "ubuntu",
-		OpenSSHPort:  10022,
+		OpenSSHPort:  nextPort(),
 		PublicSSHKey: string(publicBytes),
 		DstackHome:   tempDir + "/.dstack",
 	}
@@ -97,4 +100,10 @@ func (c *DummyRunnerConfig) GetTempDir() string {
 
 func (c *DummyRunnerConfig) GetDockerMount() (*mount.Mount, error) {
 	return nil, nil
+}
+
+var portNumber int32 = 10000
+
+func nextPort() int {
+	return int(atomic.AddInt32(&portNumber, 1))
 }
