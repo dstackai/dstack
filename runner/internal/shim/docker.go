@@ -156,7 +156,7 @@ func (c *DockerParameters) runOpenSSHServer() []string {
 	return []string{
 		// note: &> redirection doesn't work in /bin/sh
 		// check in sshd is here, install if not
-		"if ! command -v sshd >/dev/null 2>&1; then { apt-get update && apt-get install -y openssh-server; } || { yum -y install openssh-server; }; fi",
+		"if ! command -v sshd >/dev/null 2>&1; then { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server; } || { yum -y install openssh-server; }; fi",
 		// prohibit password authentication
 		"sed -i \"s/.*PasswordAuthentication.*/PasswordAuthentication no/g\" /etc/ssh/sshd_config",
 		// create ssh dirs and add public key
