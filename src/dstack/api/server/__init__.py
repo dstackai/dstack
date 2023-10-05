@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Type
 import requests
 
 from dstack._internal.core.errors import ClientError, ServerClientError
+from dstack._internal.utils.logging import get_logger
 from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
@@ -11,6 +12,8 @@ from dstack.api.server._repos import ReposAPIClient
 from dstack.api.server._runs import RunsAPIClient
 from dstack.api.server._secrets import SecretsAPIClient
 from dstack.api.server._users import UsersAPIClient
+
+logger = get_logger(__name__)
 
 
 class APIClient:
@@ -58,14 +61,17 @@ class APIClient:
     def _request(
         self, path: str, body: Optional[str] = None, raise_for_status: bool = True, **kwargs
     ) -> requests.Response:
-        url = f"{self._base_url}/{path.lstrip('/')}"
+        path = path.lstrip("/")
         if body is not None:
             kwargs.setdefault("headers", {})["Content-Type"] = "application/json"
             kwargs["data"] = body
+
+        logger.debug("POST /%s", path)
         try:
-            resp = self._s.post(url, **kwargs)
+            resp = self._s.post(f"{self._base_url}/{path}", **kwargs)
         except requests.exceptions.ConnectionError:
             raise ClientError(f"Failed to connect to dstack server {self._base_url}")
+
         if raise_for_status:
             if resp.status_code == 500:
                 raise ClientError("Unexpected dstack server error")

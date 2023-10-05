@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.cli.utils.common import cli_error, console
+from dstack._internal.cli.utils.common import cli_error, configure_logging, console
 from dstack._internal.core.errors import ConfigurationError
 from dstack.api import Client
 
@@ -13,6 +13,7 @@ class InitCommand(BaseCommand):
     DESCRIPTION = "Initialize the repo"
 
     def _command(self, args: argparse.Namespace):
+        configure_logging()
         try:
             Client.from_config(
                 Path.cwd(),

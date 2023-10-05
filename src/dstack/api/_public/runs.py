@@ -32,7 +32,7 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike, path_in_dir
 from dstack.api.server import APIClient
 
-logger = get_logger("dstack.api.runs")
+logger = get_logger(__name__)
 
 
 class Run(ABC):

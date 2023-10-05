@@ -17,7 +17,7 @@ from dstack.api._public.repos import RepoCollection
 from dstack.api._public.runs import RunCollection
 from dstack.api.server import APIClient
 
-logger = get_logger("dstack.api")
+logger = get_logger(__name__)
 
 
 class Client:

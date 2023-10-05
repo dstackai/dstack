@@ -1,8 +1,5 @@
 import argparse
-import logging
-import os
 
-from rich.logging import RichHandler
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.commands.init import InitCommand
@@ -16,13 +13,6 @@ from dstack.version import __version__ as version
 
 
 def main():
-    logging.basicConfig(
-        level=os.getenv("DSTACK_CLI_LOG_LEVEL", "CRITICAL"),
-        format="%(message)s",
-        datefmt="[%X]",
-        handlers=[RichHandler(console=console)],
-    )
-
     RichHelpFormatter.usage_markup = True
     RichHelpFormatter.styles["code"] = colors["code"]
     RichHelpFormatter.styles["argparse.args"] = colors["code"]

@@ -1,14 +1,11 @@
 import argparse
-import logging
 import os
 import sys
 import time
 from pathlib import Path
 
-from rich.prompt import Confirm
-
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack._internal.core.services.configs.configuration import find_configuration_file
@@ -71,8 +68,6 @@ class RunCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s")
-
         try:
             configuration_path = find_configuration_file(
                 Path.cwd(), args.working_dir, args.configuration_file
@@ -97,13 +92,12 @@ class RunCommand(APIBaseCommand):
             raise CLIError(str(e))
 
         print_run_plan(run_plan)
-        if not args.yes and not Confirm.ask("Continue?"):
+        if not args.yes and not confirm_ask("Continue?"):
             console.print("\nExiting...")
             return
 
         run_plan.run_spec.run_name = None  # TODO fix server behaviour
         run = self.api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
-        logging.info(run.name)
         if args.detach:
             console.print("Run submitted, detaching...")
             return
@@ -135,7 +129,7 @@ class RunCommand(APIBaseCommand):
                 abort_at_exit = False
         except KeyboardInterrupt:
             try:
-                if not Confirm.ask("\nStop the run before detaching?"):
+                if not confirm_ask("\nStop the run before detaching?"):
                     console.print("Detached")
                     abort_at_exit = False
                     return
