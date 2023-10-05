@@ -19,9 +19,9 @@
     ```
 4. Install dev dependencies:
     ```
-    pip install -r cli/requirements_dev.txt
+    pip install -r requirements_dev.txt
     ```
-5. Build the frontend:
+5. (Optional) Build the frontend:
     ```
     ./scripts/build_frontend.sh
     ```

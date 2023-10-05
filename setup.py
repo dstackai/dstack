@@ -1,19 +1,14 @@
 import re
 import sys
 from pathlib import Path
-from shutil import copytree
-from subprocess import check_call
 
-from setuptools import Command, find_packages, setup
-from setuptools.command.build_py import build_py
-from setuptools.command.develop import develop
-from setuptools.command.sdist import sdist
+from setuptools import find_packages, setup
 
 project_dir = Path(__file__).parent
 
 
 def get_version():
-    text = (project_dir / "cli" / "dstack" / "version.py").read_text()
+    text = (project_dir / "src" / "dstack" / "version.py").read_text()
     match = re.compile(r"__version__\s*=\s*\"?([^\n\"]+)\"?.*").match(text)
     if match:
         if match.group(1) != "None":
@@ -35,37 +30,36 @@ def get_long_description():
 BASE_DEPS = [
     "pyyaml",
     "requests",
-    "gitpython",
-    "tqdm",
-    "jsonschema",
+    "typing-extensions>=4.0.0",
+    "cryptography",
+    "packaging",
     "python-dateutil",
+    "gitpython",
+    "jsonschema",
     "paramiko",
     "git-url-parse",
+    "cursor",
     "rich",
     "rich-argparse",
+    "tqdm",
+    "simple-term-menu",
     "fastapi",
     "starlette>=0.26.0",
     "uvicorn",
     "pydantic<=1.10.10",
     "sqlalchemy[asyncio]>=2.0.0",
-    "websocket-client",
-    "cursor",
-    "simple-term-menu",
-    "py-cpuinfo",
-    "pygtail",
-    "packaging",
-    "aiosqlite",
-    "apscheduler",
+    "sqlalchemy_utils>=0.40.0",
     "alembic>=1.10.2",
-    "typing-extensions>=4.0.0",
-    "file-read-backwards>=3.0.0",
-    "psutil>=5.0.0",
-    "cryptography",
-    "grpcio>=1.50",  # indirect
-    "filelock",
+    "apscheduler",
+    "aiosqlite",
+    "aiohttp",
+    "websocket-client",
     "watchfiles",
+    "python-multipart",
+    "filelock",
     "docker>=6.0.0",
     "dnspython",
+    "grpcio>=1.50",  # indirect
 ]
 
 AWS_DEPS = [
@@ -106,97 +100,17 @@ LAMBDA_DEPS = AWS_DEPS
 ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS
 
 
-class BaseCommand(Command):
-    user_options = []
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def get_inputs(self):
-        return []
-
-    def get_outputs(self):
-        return []
-
-
-class NPM(BaseCommand):
-    user_options = []
-
-    hub_dir = project_dir / "hub"
-
-    node_modules_dir = hub_dir / "node_modules"
-
-    dist_dir = hub_dir / "dist"
-
-    def should_run(self):
-        # TODO: Check if build is up-to-date
-        return True
-
-    def run(self):
-        if not self.should_run():
-            print("Skipping `npm install` and `npm run build`")
-            return
-
-        print("Running `npm install`...")
-        check_call(
-            ["npm", "install"],
-            cwd=project_dir / "hub",
-            shell=False,
-        )
-        print("Running `npm run build`...")
-        check_call(
-            ["npm", "run", "build"],
-            cwd=project_dir / "hub",
-            shell=False,
-        )
-        print("Copying `hub/build` to `cli/dstack/_internal/hub/statics`...")
-        copytree("hub/build", "cli/dstack/_internal/hub/statics", dirs_exist_ok=True)
-
-
-def npm_first(cls, strict=True):
-    class _Command(cls):
-        def run(self):
-            try:
-                self.run_command("npm")
-            except Exception:
-                if strict:
-                    raise
-                else:
-                    pass
-            return super().run()
-
-    return _Command
-
-
-class CustomDevelopInstaller(develop):
-    def run(self):
-        if not self.uninstall:
-            self.distribution.run_command("npm")
-        super().run()
-
-
-is_repo = (project_dir / ".git").exists()
-
 setup(
     name="dstack",
     version=get_version(),
     author="Andrey Cheptsov",
     author_email="andrey@dstack.ai",
-    package_dir={"": "cli"},
-    packages=find_packages("cli"),
+    package_dir={"": "src"},
+    packages=find_packages("src"),
     package_data={
-        "dstack._internal": [
-            "schemas/*.json",
+        "dstack._internal.server": [
             "scripts/*.sh",
             "scripts/*.py",
-        ],
-        "dstack._internal.hub": [
-            "statics/*",
-            "statics/**/*",
-            "statics/**/**/*",
         ],
     },
     include_package_data=True,
@@ -212,7 +126,7 @@ setup(
     "models across multiple clouds.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     install_requires=BASE_DEPS,
     extras_require={
         "all": ALL_DEPS,
@@ -227,10 +141,4 @@ setup(
         "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
         "Programming Language :: Python :: 3",
     ],
-    cmdclass={
-        "build_py": npm_first(build_py, strict=is_repo),
-        "sdist": npm_first(sdist, strict=True),
-        "npm": NPM,
-        "develop": CustomDevelopInstaller,
-    },
 )

@@ -12,12 +12,15 @@ on:
       - 'master'
   workflow_dispatch:
 
+env:
+  BUILD_INCREMENT: 150
+
 jobs:
   python-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: 3.11
       - name: Run isort
@@ -25,82 +28,66 @@ jobs:
         with:
           isort-version: 5.12.0
           configuration: "--settings-file pyconfig.toml --check-only --diff"
-          sort-paths: "cli"
+          sort-paths: "src"
       - name: Run black
         uses: psf/black@stable
         with:
           options: "--config pyconfig.toml --check --verbose"
-          src: "./cli"
+          src: "./src"
           version: "~= 22.0"
 
-  cli-test-master:
+  python-test:
+    needs: [ python-lint ]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ macos-latest, ubuntu-latest, windows-latest ]
-        python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
-    defaults:
-      run:
-        working-directory: cli
+        python-version: [ 3.8, 3.9, "3.10", 3.11 ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install '.[all]'
           pip install -r requirements_dev.txt
       - name: Run pytest
         run: |
-          mkdir -p dstack/_internal/hub/statics
-          pytest tests/ --ignore=tests/integration/
+          pytest src/tests
 
-  cli-upload-master:
+  testpypi-upload:
+    needs: [ python-test ]
     runs-on: ubuntu-latest
-    needs:
-     - cli-test-master
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Python 3.9
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.9
-      - name: Set up Node 18
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r cli/requirements.txt
           pip install wheel twine
       - name: Upload pip package
         run: |
-          VERSION=$((${{ github.run_number }} + 150))
-          BASE_IMAGE=$(cat cli/dstack/version.py | grep base_image)
-          echo "__version__ = \"$VERSION\"" > cli/dstack/version.py
-          echo "__is_release__ = False" >> cli/dstack/version.py
-          echo $BASE_IMAGE >> cli/dstack/version.py
-          cp README.md cli
+          VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
+          BASE_IMAGE=$(cat src/dstack/version.py | grep base_image)
+          echo "__version__ = \"$VERSION\"" > src/dstack/version.py
+          echo "__is_release__ = False" >> src/dstack/version.py
+          echo $BASE_IMAGE >> src/dstack/version.py
+          cp README.md src
           python setup.py sdist bdist_wheel -v
           python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*
-      - name: Install AWS
-        run:  pip install awscli
-      - name: Upload pip package to S3
-        run: |
-          VERSION=$((${{ github.run_number }} + 150))
-          aws s3 cp dist/dstack-$VERSION-py3-none-any.whl s3://dstack-cli-downloads-stgn/dstack-$VERSION-py3-none-any.whl --acl public-read
 
-  update-get-dstack-master:
+  update-get-dstack:
+    needs: [ testpypi-upload ]
     runs-on: ubuntu-latest
-    needs:
-      - cli-upload-master
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -108,23 +95,10 @@ jobs:
       - name: Install AWS
         run: pip install awscli
       - run: |
-          VERSION=$((${{ github.run_number }} + 150))
+          VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
           echo $VERSION | aws s3 cp - s3://get-dstack/stgn-cli/latest-version --acl public-read
 
-  restart-hf-space-master:
-    runs-on: ubuntu-latest
-    needs:
-      - update-get-dstack-master
-    env:
-      HUGGING_FACE_HUB_TOKEN: ${{ secrets.HUGGING_FACE_HUB_TOKEN }}
-    steps:
-      - name: Restart the `dstack-stgn` Space
-        run: |
-          VERSION=$((${{ github.run_number }} + 150))
-          pip install huggingface_hub
-          python -c "from huggingface_hub import HfApi; hf_api = HfApi(); hf_api.add_space_secret('dstackai/dstack-stgn', 'DSTACK_VERSION', '$VERSION'); hf_api.pause_space('dstackai/dstack-stgn'); hf_api.restart_space('dstackai/dstack-stgn');"
-
-  runner-test-master:
+  runner-test:
     defaults:
       run:
         working-directory: runner
@@ -134,7 +108,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.19.10
+          go-version: 1.21.1
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
@@ -148,7 +122,8 @@ jobs:
           go vet $(go list ./... | grep -v /vendor/)
           go test -race $(go list ./... | grep -v /vendor/)
 
-  runner-compile-master:
+  runner-compile:
+    needs: [ runner-test ]
     defaults:
       run:
         working-directory: runner
@@ -159,7 +134,6 @@ jobs:
         include:
           - {goos: "linux", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
-          - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest"}
           - {goos: "darwin", goarch: "amd64", runson: "macos-latest"}
           - {goos: "darwin", goarch: "arm64", runson: "macos-latest"}
     runs-on: ubuntu-latest
@@ -168,98 +142,65 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.19.10
+          go-version: 1.21.1
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           ACTIONSOS: ${{ matrix.runson }}
+          CGO_ENABLED: 0
         run: |
-          VERSION=$((${{ github.run_number }} + 150))
-          go build -ldflags "-X '$REPO_NAME/runner/version.Version=$VERSION' -X '$REPO_NAME/runner/pkg/log.CloudLog=true' -extldflags '-static'" -o dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
-      - uses: actions/upload-artifact@v2
+          VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
+          go build -ldflags "-X '$REPO_NAME/runner/cmd/runner/version.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
+          go build -ldflags "-X '$REPO_NAME/runner/cmd/shim/version.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
+      - uses: actions/upload-artifact@v3
         with:
-          name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: dstack-runner
+          path: |
+            runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+            runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
 
-  runner-upload-master:
-    defaults:
-      run:
-        working-directory: runner
-    needs: [ runner-compile-master ]
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    strategy:
-      matrix:
-        include:
-          - {goos: "linux", goarch: "386", runson: "ubuntu-latest", platform: "x86", extension: ""}
-          - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ""}
-          - {goos: "windows", goarch: "amd64", runson: "ubuntu-latest", platform: "amd64", extension: ".exe"}
-          - {goos: "darwin", goarch: "amd64", runson: "macos-latest", platform: "amd64", extension: ""}
-          - {goos: "darwin", goarch: "arm64", runson: "macos-latest", platform: "arm64", extension: ""}
+  runner-upload:
+    needs: [ runner-compile ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
       - name: Install AWS
         run:  pip install awscli
       - name: Download Runner
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
-          name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: dstack-runner
           path: runner
       - name: Upload to S3
+        working-directory: runner
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          VERSION=$((${{ github.run_number }} + 150))
-          aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/$VERSION/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
-          aws s3 cp dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }} "s3://dstack-runner-downloads-stgn/latest/binaries/dstack-runner-${{ matrix.goos }}-${{ matrix.platform }}${{ matrix.extension }}" --acl public-read
+          VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
+          aws s3 cp . "s3://dstack-runner-downloads-stgn/$VERSION/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
+          aws s3 cp . "s3://dstack-runner-downloads-stgn/latest/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
 
-  generate-json-schema:
-    needs: [ cli-test-master ]
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install AWS
-        run: pip install awscli
-      - name: Install dstack
-        run: pip install .
-      - name: Generate json schema
-        run: |
-          python -c "from dstack._internal.core.configuration import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
-          python -c "from dstack._internal.core.profile import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
-      - name: Upload json schema to S3
-        run: |
-          VERSION=$((${{ github.run_number }} + 150))
-          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/configuration.json" --acl public-read
-          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/latest/schemas/configuration.json" --acl public-read
-          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/profiles.json" --acl public-read
-          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/latest/schemas/profiles.json" --acl public-read
-
-  # cli-integration-tests:
-  #   needs: [ runner-upload-master ]
-  #   runs-on: ${{ matrix.os }}
-  #   strategy:
-  #     matrix:
-  #       os: [ ubuntu-latest ]
-  #       python-version: [ 3.7, 3.8, 3.9, "3.10", 3.11 ]
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: Set up Python ${{ matrix.python-version }}
-  #       uses: actions/setup-python@v2
-  #       with:
-  #         python-version: ${{ matrix.python-version }}
-  #     - name: Install dependencies
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         pip install -e .
-  #         pip install -r cli/requirements_dev.txt
-  #     - name: Prepare hub
-  #       run: |
-  #         mkdir -p cli/dstack/_internal/hub/statics
-  #         touch cli/dstack/_internal/hub/statics/index.html
-  #     - name: Run pytest
-  #       run: |
-  #         pytest cli/tests/integration/
+#  generate-json-schema:
+#    needs: [ cli-test ]
+#    env:
+#      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: Install AWS
+#        run: pip install awscli
+#      - name: Install dstack
+#        run: pip install .
+#      - name: Generate json schema
+#        run: |
+#          python -c "from dstack._internal.core.configuration import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
+#          python -c "from dstack._internal.core.profile import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
+#      - name: Upload json schema to S3
+#        run: |
+#          VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
+#          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/configuration.json" --acl public-read
+#          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/latest/schemas/configuration.json" --acl public-read
+#          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/profiles.json" --acl public-read
+#          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/latest/schemas/profiles.json" --acl public-read

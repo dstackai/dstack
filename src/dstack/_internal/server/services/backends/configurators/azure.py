@@ -1,0 +1,427 @@
+import json
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Optional, Tuple
+from uuid import UUID, uuid5
+
+from azure.core.credentials import TokenCredential
+from azure.mgmt import authorization as autharization_mgmt
+from azure.mgmt import msi as msi_mgmt
+from azure.mgmt import network as network_mgmt
+from azure.mgmt import resource as resource_mgmt
+from azure.mgmt import subscription as subscription_mgmt
+from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
+from azure.mgmt.msi.models import Identity
+from azure.mgmt.network.models import (
+    AddressSpace,
+    NetworkSecurityGroup,
+    SecurityRule,
+    SecurityRuleAccess,
+    SecurityRuleDirection,
+    SecurityRuleProtocol,
+    Subnet,
+    VirtualNetwork,
+)
+from azure.mgmt.resource.resources.models import ResourceGroup
+
+from dstack._internal.core.backends.azure import AzureBackend, auth
+from dstack._internal.core.backends.azure import utils as azure_utils
+from dstack._internal.core.backends.azure.config import AzureConfig
+from dstack._internal.core.errors import BackendAuthError, ServerClientError
+from dstack._internal.core.models.backends.azure import (
+    AnyAzureConfigInfo,
+    AzureClientCreds,
+    AzureConfigInfo,
+    AzureConfigInfoWithCreds,
+    AzureConfigInfoWithCredsPartial,
+    AzureConfigValues,
+    AzureCreds,
+    AzureStoredConfig,
+)
+from dstack._internal.core.models.backends.base import (
+    BackendType,
+    ConfigElement,
+    ConfigElementValue,
+    ConfigMultiElement,
+)
+from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.services.backends.configurators.base import (
+    Configurator,
+    raise_invalid_credentials_error,
+)
+
+LOCATIONS = [
+    ("(US) Central US", "centralus"),
+    ("(US) East US, Virginia", "eastus"),
+    ("(US) East US 2, Virginia", "eastus2"),
+    ("(US) South Central US, Texas", "southcentralus"),
+    ("(US) West US 2, Washington", "westus2"),
+    ("(US) West US 3, Phoenix", "westus3"),
+    ("(Canada) Canada Central, Toronto", "canadacentral"),
+    ("(Europe) France Central, Paris", "francecentral"),
+    ("(Europe) Germany West Central, Frankfurt", "germanywestcentral"),
+    ("(Europe) North Europe, Ireland", "northeurope"),
+    ("(Europe) Sweden Central, Gävle", "swedencentral"),
+    ("(Europe) UK South, London", "uksouth"),
+    ("(Europe) West Europe", "westeurope"),
+    ("(Asia Pacific) Southeast Asia, Singapore", "southeastasia"),
+    ("(Asia Pacific) East Asia", "eastasia"),
+    ("(South America) Brazil South", "brazilsouth"),
+]
+LOCATION_VALUES = [l[1] for l in LOCATIONS]
+DEFAULT_LOCATION = "eastus"
+
+
+class AzureConfigurator(Configurator):
+    TYPE: BackendType = BackendType.AZURE
+
+    def get_config_values(self, config: AzureConfigInfoWithCredsPartial) -> AzureConfigValues:
+        config_values = AzureConfigValues()
+        config_values.default_creds = auth.default_creds_available()
+        if config.creds is None:
+            return config_values
+        try:
+            credential, creds_tenant_id = auth.authenticate(config.creds)
+        except BackendAuthError:
+            if isinstance(config.creds, AzureClientCreds):
+                raise_invalid_credentials_error(
+                    fields=[
+                        ["creds", "tenant_id"],
+                        ["creds", "client_id"],
+                        ["creds", "client_secret"],
+                    ]
+                )
+            else:
+                raise_invalid_credentials_error(fields=[["creds"]])
+        config_values.tenant_id = self._get_tenant_id_element(
+            credential=credential,
+            selected=config.tenant_id or creds_tenant_id,
+        )
+        if config_values.tenant_id.selected is None:
+            return config_values
+        config_values.subscription_id = self._get_subscription_id_element(
+            credential=credential,
+            selected=config.subscription_id,
+        )
+        if config_values.subscription_id.selected is None:
+            return config_values
+        config_values.locations = self._get_locations_element(
+            selected=config.locations or [DEFAULT_LOCATION]
+        )
+        return config_values
+
+    def create_backend(
+        self, project: ProjectModel, config: AzureConfigInfoWithCreds
+    ) -> BackendModel:
+        credential, _ = auth.authenticate(config.creds)
+        resource_group = self._create_resource_group(
+            credential=credential,
+            subscription_id=config.subscription_id,
+            location=DEFAULT_LOCATION,
+            project_name=project.name,
+        )
+        runner_principal_id = self._create_runner_managed_identity(
+            credential=credential,
+            subscription_id=config.subscription_id,
+            resource_group=resource_group,
+            location=DEFAULT_LOCATION,
+        )
+        self._grant_roles_to_runner_managed_identity(
+            credential=credential,
+            subscription_id=config.subscription_id,
+            resource_group=resource_group,
+            runner_principal_id=runner_principal_id,
+        )
+        self._create_network_resources(
+            credential=credential,
+            subscription_id=config.subscription_id,
+            resource_group=resource_group,
+            locations=config.locations,
+        )
+        return BackendModel(
+            project_id=project.id,
+            type=self.TYPE.value,
+            config=AzureStoredConfig(
+                **AzureConfigInfo.parse_obj(config).dict(),
+                resource_group=resource_group,
+            ).json(),
+            auth=AzureCreds.parse_obj(config.creds).__root__.json(),
+        )
+
+    def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAzureConfigInfo:
+        config = self._get_backend_config(model)
+        if include_creds:
+            return AzureConfigInfoWithCreds.parse_obj(config)
+        return AzureConfigInfo.parse_obj(config)
+
+    def get_backend(self, model: BackendModel) -> AzureBackend:
+        config = self._get_backend_config(model)
+        return AzureBackend(config=config)
+
+    def _get_backend_config(self, model: BackendModel) -> AzureConfig:
+        return AzureConfig(
+            **json.loads(model.config),
+            creds=AzureCreds.parse_raw(model.auth).__root__,
+        )
+
+    def _get_tenant_id_element(
+        self,
+        credential: auth.AzureCredential,
+        selected: Optional[str],
+    ) -> ConfigElement:
+        subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
+        element = ConfigElement(selected=selected)
+        tenant_ids = []
+        for tenant in subscription_client.tenants.list():
+            tenant_ids.append(tenant.tenant_id)
+            element.values.append(
+                ConfigElementValue(value=tenant.tenant_id, label=tenant.tenant_id)
+            )
+        if selected is not None and selected not in tenant_ids:
+            raise ServerClientError(
+                "Invalid tenant_id",
+                code="invalid_tenant_id",
+                fields=[["tenant_id"]],
+            )
+        if len(tenant_ids) == 1:
+            element.selected = tenant_ids[0]
+        return element
+
+    def _get_subscription_id_element(
+        self,
+        credential: auth.AzureCredential,
+        selected: Optional[str],
+    ) -> ConfigElement:
+        subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
+        element = ConfigElement(selected=selected)
+        subscription_ids = []
+        for subscription in subscription_client.subscriptions.list():
+            subscription_ids.append(subscription.subscription_id)
+            element.values.append(
+                ConfigElementValue(
+                    value=subscription.subscription_id,
+                    label=f"{subscription.display_name} ({subscription.subscription_id})",
+                )
+            )
+        if selected is not None and selected not in subscription_ids:
+            raise ServerClientError(
+                "Invalid subscription_id",
+                code="invalid_subscription_id",
+                fields=[["subscription_id"]],
+            )
+        if len(subscription_ids) == 1:
+            element.selected = subscription_ids[0]
+        if len(subscription_ids) == 0:
+            # Credentials without granted roles don't see any subscriptions
+            raise ServerClientError(
+                message="No Azure subscriptions found for provided credentials. Ensure the account has enough permissions.",
+                code="forbidden",
+            )
+        return element
+
+    def _get_locations_element(self, selected: List[str]) -> ConfigMultiElement:
+        element = ConfigMultiElement()
+        for l in LOCATION_VALUES:
+            element.values.append(ConfigElementValue(value=l, label=l))
+        element.selected = selected
+        return element
+
+    def _create_resource_group(
+        self,
+        credential: auth.AzureCredential,
+        subscription_id: str,
+        location: str,
+        project_name: str,
+    ) -> str:
+        resource_manager = ResourceManager(
+            credential=credential,
+            subscription_id=subscription_id,
+        )
+        return resource_manager.create_resource_group(
+            name=_get_resource_group_name(project_name),
+            location=location,
+        )
+
+    def _create_runner_managed_identity(
+        self,
+        credential: auth.AzureCredential,
+        subscription_id: str,
+        resource_group: str,
+        location: str,
+    ) -> str:
+        msi_manager = ManagedIdentityManager(
+            credential=credential,
+            subscription_id=subscription_id,
+        )
+        return msi_manager.create_managed_identity(
+            resource_group=resource_group,
+            location=location,
+            name=azure_utils.get_runner_managed_identity_name(resource_group),
+        )
+
+    def _grant_roles_to_runner_managed_identity(
+        self,
+        credential: auth.AzureCredential,
+        subscription_id: str,
+        resource_group: str,
+        runner_principal_id: str,
+    ) -> str:
+        roles_manager = RolesManager(credential=credential, subscription_id=subscription_id)
+        roles_manager.grant_vm_contributor_role(
+            resource_group=resource_group,
+            principal_id=runner_principal_id,
+        )
+
+    def _create_network_resources(
+        self,
+        credential: auth.AzureCredential,
+        subscription_id: str,
+        resource_group: str,
+        locations: List[str],
+    ):
+        def func(location: str):
+            network_manager = NetworkManager(
+                credential=credential, subscription_id=subscription_id
+            )
+            network_manager.create_virtual_network(
+                resource_group=resource_group,
+                location=location,
+                name=azure_utils.get_default_network_name(resource_group, location),
+                subnet_name=azure_utils.get_default_subnet_name(resource_group, location),
+            )
+            network_manager.create_network_security_group(
+                resource_group=resource_group,
+                location=location,
+                name=azure_utils.get_default_network_security_group_name(resource_group, location),
+            )
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            for location in locations:
+                executor.submit(func, location)
+
+
+class ResourceManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.resource_client = resource_mgmt.ResourceManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def create_resource_group(
+        self,
+        name: str,
+        location: str,
+    ) -> str:
+        resource_group: ResourceGroup = self.resource_client.resource_groups.create_or_update(
+            resource_group_name=name,
+            parameters=ResourceGroup(
+                location=location,
+            ),
+        )
+        return resource_group.name
+
+
+def _get_resource_group_name(project_name: str) -> str:
+    return f"dstack-{project_name}"
+
+
+class ManagedIdentityManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.msi_client = msi_mgmt.ManagedServiceIdentityClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def create_managed_identity(
+        self,
+        resource_group: str,
+        name: str,
+        location: str,
+    ) -> str:
+        identity: Identity = self.msi_client.user_assigned_identities.create_or_update(
+            resource_group_name=resource_group,
+            resource_name=name,
+            parameters=Identity(
+                location=location,
+            ),
+        )
+        return identity.principal_id
+
+
+class RolesManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.subscription_id = subscription_id
+        self.authorization_client = autharization_mgmt.AuthorizationManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def grant_vm_contributor_role(
+        self,
+        resource_group: str,
+        principal_id: str,
+        principal_type: str = "ServicePrincipal",
+    ):
+        self.authorization_client.role_assignments.create(
+            scope=azure_utils.get_resource_group_id(self.subscription_id, resource_group),
+            role_assignment_name=uuid5(UUID(principal_id), f"VM {resource_group} contributor"),
+            parameters=RoleAssignmentCreateParameters(
+                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#virtual-machine-contributor
+                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c",
+                principal_id=principal_id,
+                principal_type=principal_type,
+            ),
+        )
+
+
+class NetworkManager:
+    def __init__(self, credential: TokenCredential, subscription_id: str):
+        self.network_client = network_mgmt.NetworkManagementClient(
+            credential=credential, subscription_id=subscription_id
+        )
+
+    def create_virtual_network(
+        self,
+        resource_group: str,
+        name: str,
+        subnet_name: str,
+        location: str,
+    ) -> Tuple[str, str]:
+        network: VirtualNetwork = self.network_client.virtual_networks.begin_create_or_update(
+            resource_group_name=resource_group,
+            virtual_network_name=name,
+            parameters=VirtualNetwork(
+                location=location,
+                address_space=AddressSpace(address_prefixes=["10.0.0.0/16"]),
+                subnets=[
+                    Subnet(
+                        name=subnet_name,
+                        address_prefix="10.0.0.0/20",
+                    )
+                ],
+            ),
+        ).result()
+        return network.name, subnet_name
+
+    def create_network_security_group(
+        self,
+        resource_group: str,
+        location: str,
+        name: str,
+    ):
+        self.network_client.network_security_groups.begin_create_or_update(
+            resource_group_name=resource_group,
+            network_security_group_name=name,
+            parameters=NetworkSecurityGroup(
+                location=location,
+                security_rules=[
+                    SecurityRule(
+                        name="runner_ssh",
+                        protocol=SecurityRuleProtocol.TCP,
+                        source_address_prefix="Internet",
+                        source_port_range="*",
+                        destination_address_prefix="*",
+                        destination_port_range="22",
+                        access=SecurityRuleAccess.ALLOW,
+                        priority=100,
+                        direction=SecurityRuleDirection.INBOUND,
+                    ),
+                ],
+            ),
+        ).result()
