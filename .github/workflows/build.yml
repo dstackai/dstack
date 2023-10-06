@@ -41,7 +41,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ macos-latest, ubuntu-latest, windows-latest ]
+        os: [ macos-latest, ubuntu-latest]
         python-version: [ 3.8, 3.9, "3.10", 3.11 ]
     steps:
       - uses: actions/checkout@v3
@@ -58,35 +58,8 @@ jobs:
         run: |
           pytest src/tests
 
-  testpypi-upload:
-    needs: [ python-test ]
-    runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python 3.9
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.9
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install wheel twine
-      - name: Upload pip package
-        run: |
-          VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
-          BASE_IMAGE=$(cat src/dstack/version.py | grep base_image)
-          echo "__version__ = \"$VERSION\"" > src/dstack/version.py
-          echo "__is_release__ = False" >> src/dstack/version.py
-          echo $BASE_IMAGE >> src/dstack/version.py
-          cp README.md src
-          python setup.py sdist bdist_wheel -v
-          python -m twine upload --repository testpypi --username ${{ secrets.TESTPYPI_USERNAME }} --password ${{ secrets.TESTPYPI_PASSWORD }} dist/*
-
   update-get-dstack:
-    needs: [ testpypi-upload ]
+    needs: [ python-test ]
     runs-on: ubuntu-latest
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
