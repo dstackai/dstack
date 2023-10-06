@@ -121,7 +121,8 @@ class RunCommand(APIBaseCommand):
 
             if run.attach():
                 for entry in run.logs():
-                    console.print(entry.decode("utf-8"), markup=False, highlight=False, end="")
+                    sys.stdout.buffer.write(entry)
+                    sys.stdout.buffer.flush()
             else:
                 console.print("[error]Failed to attach, exiting...[/]")
 

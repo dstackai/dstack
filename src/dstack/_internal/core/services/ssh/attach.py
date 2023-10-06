@@ -5,11 +5,7 @@ from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.core.services.ssh.tunnel import ClientTunnel
 from dstack._internal.utils.path import PathLike
-from dstack._internal.utils.ssh import (
-    include_ssh_config,
-    ssh_config_add_host,
-    ssh_config_remove_host,
-)
+from dstack._internal.utils.ssh import include_ssh_config, update_ssh_config
 
 
 class SSHAttach:
@@ -55,10 +51,10 @@ class SSHAttach:
     def attach(self):
         include_ssh_config(self.ssh_config_path)
         if self.container_config is None:
-            ssh_config_add_host(self.ssh_config_path, self.run_name, self.host_config)
+            update_ssh_config(self.ssh_config_path, self.run_name, self.host_config)
         else:
-            ssh_config_add_host(self.ssh_config_path, f"{self.run_name}-host", self.host_config)
-            ssh_config_add_host(self.ssh_config_path, self.run_name, self.container_config)
+            update_ssh_config(self.ssh_config_path, f"{self.run_name}-host", self.host_config)
+            update_ssh_config(self.ssh_config_path, self.run_name, self.container_config)
 
         max_retries = 10
         self._ports_lock.release()
@@ -75,8 +71,8 @@ class SSHAttach:
 
     def detach(self):
         self.tunnel.close()
-        ssh_config_remove_host(self.ssh_config_path, f"{self.run_name}-host")
-        ssh_config_remove_host(self.ssh_config_path, self.run_name)
+        update_ssh_config(self.ssh_config_path, f"{self.run_name}-host", {})
+        update_ssh_config(self.ssh_config_path, self.run_name, {})
 
     def __enter__(self):
         self.attach()
