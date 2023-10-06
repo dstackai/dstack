@@ -17,6 +17,10 @@ class Configurator(ABC):
     TYPE: BackendType
 
     @abstractmethod
+    def get_default_configs(self) -> List[AnyConfigInfoWithCreds]:
+        pass
+
+    @abstractmethod
     def get_config_values(self, config: AnyConfigInfoWithCredsPartial) -> AnyConfigValues:
         pass
 

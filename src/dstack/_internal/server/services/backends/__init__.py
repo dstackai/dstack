@@ -75,7 +75,7 @@ def get_configurator(backend_type: BackendType) -> Optional[Configurator]:
     return configurator_class()
 
 
-def list_avaialble_backend_types() -> List[BackendType]:
+def list_available_backend_types() -> List[BackendType]:
     available_backend_types = []
     for configurator_class in _CONFIGURATOR_CLASSES:
         available_backend_types.append(configurator_class.TYPE)

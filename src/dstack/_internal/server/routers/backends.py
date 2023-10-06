@@ -23,7 +23,7 @@ project_router = APIRouter(prefix="/api/project/{project_name}/backends", tags=[
 
 @root_router.post("/list_types")
 async def list_backend_types() -> List[BackendType]:
-    return backends.list_avaialble_backend_types()
+    return backends.list_available_backend_types()
 
 
 @root_router.post("/config_values")

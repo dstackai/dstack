@@ -35,6 +35,7 @@ from dstack._internal.core.models.backends.azure import (
     AzureConfigInfoWithCredsPartial,
     AzureConfigValues,
     AzureCreds,
+    AzureDefaultCreds,
     AzureStoredConfig,
 )
 from dstack._internal.core.models.backends.base import (
@@ -68,11 +69,35 @@ LOCATIONS = [
     ("(South America) Brazil South", "brazilsouth"),
 ]
 LOCATION_VALUES = [l[1] for l in LOCATIONS]
-DEFAULT_LOCATION = "eastus"
+DEFAULT_LOCATIONS = LOCATION_VALUES
+MAIN_LOCATION = "eastus"
 
 
 class AzureConfigurator(Configurator):
     TYPE: BackendType = BackendType.AZURE
+
+    def get_default_configs(self) -> List[AzureConfigInfoWithCreds]:
+        if not auth.default_creds_available():
+            return []
+        try:
+            credential, _ = auth.authenticate(AzureDefaultCreds())
+        except BackendAuthError:
+            return []
+        tenant_id_element = self._get_tenant_id_element(credential=credential)
+        tenant_ids = [v.value for v in tenant_id_element.values]
+        subscription_id_element = self._get_subscription_id_element(credential=credential)
+        subscription_ids = [v.value for v in subscription_id_element.values]
+        configs = []
+        for tenant_id in tenant_ids:
+            for subscription_id in subscription_ids:
+                config = AzureConfigInfoWithCreds(
+                    tenant_id=tenant_id,
+                    subscription_id=subscription_id,
+                    locations=DEFAULT_LOCATIONS,
+                    creds=AzureDefaultCreds(),
+                )
+                configs.append(config)
+        return configs
 
     def get_config_values(self, config: AzureConfigInfoWithCredsPartial) -> AzureConfigValues:
         config_values = AzureConfigValues()
@@ -105,7 +130,7 @@ class AzureConfigurator(Configurator):
         if config_values.subscription_id.selected is None:
             return config_values
         config_values.locations = self._get_locations_element(
-            selected=config.locations or [DEFAULT_LOCATION]
+            selected=config.locations or DEFAULT_LOCATIONS
         )
         return config_values
 
@@ -116,14 +141,14 @@ class AzureConfigurator(Configurator):
         resource_group = self._create_resource_group(
             credential=credential,
             subscription_id=config.subscription_id,
-            location=DEFAULT_LOCATION,
+            location=MAIN_LOCATION,
             project_name=project.name,
         )
         runner_principal_id = self._create_runner_managed_identity(
             credential=credential,
             subscription_id=config.subscription_id,
             resource_group=resource_group,
-            location=DEFAULT_LOCATION,
+            location=MAIN_LOCATION,
         )
         self._grant_roles_to_runner_managed_identity(
             credential=credential,
@@ -166,7 +191,7 @@ class AzureConfigurator(Configurator):
     def _get_tenant_id_element(
         self,
         credential: auth.AzureCredential,
-        selected: Optional[str],
+        selected: Optional[str] = None,
     ) -> ConfigElement:
         subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
         element = ConfigElement(selected=selected)
@@ -189,7 +214,7 @@ class AzureConfigurator(Configurator):
     def _get_subscription_id_element(
         self,
         credential: auth.AzureCredential,
-        selected: Optional[str],
+        selected: Optional[str] = None,
     ) -> ConfigElement:
         subscription_client = subscription_mgmt.SubscriptionClient(credential=credential)
         element = ConfigElement(selected=selected)

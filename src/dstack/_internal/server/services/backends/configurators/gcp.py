@@ -22,6 +22,7 @@ from dstack._internal.core.models.backends.gcp import (
     GCPConfigInfoWithCredsPartial,
     GCPConfigValues,
     GCPCreds,
+    GCPDefaultCreds,
     GCPServiceAccountCreds,
     GCPStoredConfig,
 )
@@ -111,15 +112,34 @@ LOCATIONS = [
     },
 ]
 REGIONS = [r for l in LOCATIONS for r in l["regions"]]
-DEFAULT_REGION = "us-east1"
+DEFAULT_REGIONS = REGIONS
+MAIN_REGION = "us-east1"
 
 
 class GCPConfigurator(Configurator):
     TYPE: BackendType = BackendType.GCP
 
+    def get_default_configs(self) -> List[GCPConfigInfoWithCreds]:
+        if not auth.default_creds_available():
+            return []
+        try:
+            _, project_id = auth.authenticate(GCPDefaultCreds())
+        except BackendAuthError:
+            return []
+
+        if project_id is None:
+            return []
+
+        return [
+            GCPConfigInfoWithCreds(
+                project_id=project_id,
+                regions=DEFAULT_REGIONS,
+                creds=GCPDefaultCreds(),
+            )
+        ]
+
     def get_config_values(self, config: GCPConfigInfoWithCredsPartial) -> GCPConfigValues:
         config_values = GCPConfigValues()
-        # TODO support default credentials
         config_values.default_creds = auth.default_creds_available()
         if config.creds is None:
             return config_values
@@ -136,7 +156,7 @@ class GCPConfigurator(Configurator):
             raise ServerClientError(msg="Wrong project_id", fields=[["project_id"]])
         config_values.project_id = self._get_project_id_element(selected=project_id)
         config_values.regions = self._get_regions_element(
-            selected=config.regions or [DEFAULT_REGION]
+            selected=config.regions or DEFAULT_REGIONS
         )
         return config_values
 

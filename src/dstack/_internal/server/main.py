@@ -24,6 +24,7 @@ from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME, SERVER_URL
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import get_server_client_error_details
+from dstack._internal.utils.logging import get_logger
 
 
 @asynccontextmanager
@@ -32,9 +33,18 @@ async def lifespan(app: FastAPI):
     await migrate()
     async with get_session_ctx() as session:
         admin, _ = await get_or_create_admin_user(session=session)
-        default_project, created = await get_or_create_default_project(session=session, user=admin)
+        default_project, porject_created = await get_or_create_default_project(
+            session=session, user=admin
+        )
         server_config_manager = ServerConfigManager()
-        await server_config_manager.apply_config(session=session)
+        print("Reading project configurations from ~/.dstack/server/config.yaml...")
+        config_loaded = server_config_manager.load_config()
+        if not config_loaded:
+            print("No config was found. Initializing default configuration...")
+            await server_config_manager.init_config(session=session)
+        else:
+            print("Applying configuration...")
+            await server_config_manager.apply_config(session=session)
     create_default_project_config(
         project_name=DEFAULT_PROJECT_NAME, url=SERVER_URL, token=admin.token
     )

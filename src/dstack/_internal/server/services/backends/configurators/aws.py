@@ -1,9 +1,10 @@
 import json
 from abc import ABC
-from typing import List
+from typing import List, Optional
 
 from dstack._internal.core.backends.aws import AWSBackend, auth
 from dstack._internal.core.backends.aws.config import AWSConfig
+from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.backends.aws import (
     AnyAWSConfigInfo,
     AWSAccessKeyCreds,
@@ -12,6 +13,7 @@ from dstack._internal.core.models.backends.aws import (
     AWSConfigInfoWithCredsPartial,
     AWSConfigValues,
     AWSCreds,
+    AWSDefaultCreds,
     AWSStoredConfig,
 )
 from dstack._internal.core.models.backends.base import (
@@ -38,20 +40,34 @@ REGIONS = [
     ("Europe, Stockholm", "eu-north-1"),
 ]
 REGION_VALUES = [r[1] for r in REGIONS]
-DEFAULT_REGION = "us-east-1"
+DEFAULT_REGIONS = REGION_VALUES
+MAIN_REGION = "us-east-1"
 
 
 class AWSConfigurator(ABC):
     TYPE: BackendType = BackendType.AWS
+
+    def get_default_configs(self) -> List[AWSConfigInfoWithCreds]:
+        if not auth.default_creds_available():
+            return []
+        try:
+            auth.authenticate(creds=AWSDefaultCreds(), region=MAIN_REGION)
+        except BackendAuthError:
+            return []
+        return [
+            AWSConfigInfoWithCreds(
+                regions=DEFAULT_REGIONS,
+                creds=AWSDefaultCreds(),
+            )
+        ]
 
     def get_config_values(self, config: AWSConfigInfoWithCredsPartial) -> AWSConfigValues:
         config_values = AWSConfigValues()
         config_values.default_creds = auth.default_creds_available()
         if config.creds is None:
             return config_values
-
         try:
-            auth.authenticate(creds=config.creds, region=DEFAULT_REGION)
+            auth.authenticate(creds=config.creds, region=MAIN_REGION)
         except:
             if isinstance(config.creds, AWSAccessKeyCreds):
                 raise_invalid_credentials_error(
@@ -63,7 +79,7 @@ class AWSConfigurator(ABC):
             else:
                 raise_invalid_credentials_error(fields=[["creds"]])
         config_values.regions = self._get_regions_element(
-            selected=config.regions or [DEFAULT_REGION]
+            selected=config.regions or DEFAULT_REGIONS
         )
         return config_values
 
