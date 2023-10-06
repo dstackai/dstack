@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 import dstack.version
 from dstack._internal.core.errors import ServerClientError
@@ -65,3 +65,8 @@ async def server_client_error_handler(request: Request, exc: ServerClientError):
         status_code=status.HTTP_400_BAD_REQUEST,
         content={"detail": get_server_client_error_details(exc)},
     )
+
+
+@app.get("/")
+async def index():
+    return RedirectResponse("/api/docs")
