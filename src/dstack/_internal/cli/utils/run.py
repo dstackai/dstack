@@ -135,7 +135,7 @@ def print_runs_table(runs: List[Run], include_configuration: bool = False, verbo
             ("yes" if provisioning.instance_type.resources.spot else "no") if provisioning else "",
             f"{provisioning.price:.4}$" if provisioning else "",
             run.status,
-            pretty_date(run.submitted_at.replace(tzinfo=None)),
+            pretty_date(run.submitted_at),
         ]
         if verbose:
             renderables.append("TODO")  # TODO
