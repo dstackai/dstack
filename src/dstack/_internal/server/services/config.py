@@ -136,8 +136,16 @@ class ServerConfigManager:
         return ServerConfig.parse_obj(config_dict)
 
     def _save_config(self, config: ServerConfig):
+        def seq_representer(dumper, sequence):
+            flow_style = (
+                len(sequence) == 0 or isinstance(sequence[0], str) or isinstance(sequence[0], int)
+            )
+            return dumper.represent_sequence("tag:yaml.org,2002:seq", sequence, flow_style)
+
+        yaml.add_representer(list, seq_representer)
+
         with open(settings.SERVER_CONFIG_FILE_PATH, "w+") as f:
-            yaml.dump(config.dict(), f)
+            yaml.dump(config.dict(), f, sort_keys=False)
 
 
 async def apply_gateway_config(
