@@ -4,9 +4,8 @@ import yaml
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ConfigurationError, ResourceExistsError
+from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
-from dstack._internal.core.models.backends.azure import AzureConfigInfoWithCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel
@@ -42,8 +41,14 @@ class ServerConfigManager:
         return self.config is not None
 
     async def init_config(self, session: AsyncSession):
-        self.config = await self._init_config(session=session)
-        self._save_config(self.config)
+        self.config = await self._init_config(session=session, init_backends=True)
+        if self.config is not None:
+            self._save_config(self.config)
+
+    async def sync_config(self, session: AsyncSession):
+        self.config = await self._init_config(session=session, init_backends=False)
+        if self.config is not None:
+            self._save_config(self.config)
 
     async def apply_config(self, session: AsyncSession):
         for project_config in self.config.projects:
@@ -51,7 +56,9 @@ class ServerConfigManager:
                 session=session,
                 project_name=project_config.name,
             )
+            backends_to_delete = backends_services.list_available_backend_types()
             for config_info in project_config.backends:
+                backends_to_delete.remove(config_info.type)
                 current_config_info = await backends_services.get_config_info(
                     project=project,
                     backend_type=config_info.type,
@@ -69,22 +76,31 @@ class ServerConfigManager:
                         )
                 except Exception as e:
                     logger.warning("Failed to configure backend %s: %s", config_info.type, e)
+            await backends_services.delete_backends(
+                session=session, project=project, backends_types=backends_to_delete
+            )
             if project_config.gateway is not None:
                 await apply_gateway_config(session, project, project_config.gateway)
 
-    async def _init_config(self, session: AsyncSession) -> ServerConfig:
-        backends = []
+    async def _init_config(
+        self, session: AsyncSession, init_backends: bool
+    ) -> Optional[ServerConfig]:
         project = await projects_services.get_project_model_by_name(
             session=session,
             project_name=settings.DEFAULT_PROJECT_NAME,
         )
+        if project is None:
+            return None
+        # Force project reload to reflect updates when syncing
+        await session.refresh(project)
+        backends = []
         for backend_type in backends_services.list_available_backend_types():
             config_info = await backends_services.get_config_info(
                 project=project, backend_type=backend_type
             )
             if config_info is not None:
                 backends.append(config_info)
-        if len(backends) == 0:
+        if init_backends and len(backends) == 0:
             backends = await self._init_backends(session=session, project=project)
         return ServerConfig(
             projects=[ProjectConfig(name=settings.DEFAULT_PROJECT_NAME, backends=backends)]
@@ -146,3 +162,6 @@ async def apply_gateway_config(
         session, project, gateway.name, gateway_config.wildcard_domain
     )
     await gateways.set_default_gateway(session, project, gateway.name)
+
+
+server_config_manager = ServerConfigManager()

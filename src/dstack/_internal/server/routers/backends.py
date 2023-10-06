@@ -3,7 +3,6 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import BackendInvalidCredentialsError, BackendNotAvailable
 from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
     AnyConfigInfoWithCredsPartial,
@@ -13,9 +12,10 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.backends import DeleteBackendsRequest
-from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin, ProjectMember
+from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin
 from dstack._internal.server.services import backends
-from dstack._internal.server.utils.routers import raise_not_found, raise_server_client_error
+from dstack._internal.server.services.config import server_config_manager
+from dstack._internal.server.utils.routers import raise_not_found
 
 root_router = APIRouter(prefix="/api/backends", tags=["backends"])
 project_router = APIRouter(prefix="/api/project/{project_name}/backends", tags=["backends"])
@@ -41,7 +41,9 @@ async def create_backend(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> AnyConfigInfoWithCreds:
     _, project = user_project
-    return await backends.create_backend(session=session, project=project, config=body)
+    config = await backends.create_backend(session=session, project=project, config=body)
+    await server_config_manager.sync_config(session=session)
+    return config
 
 
 @project_router.post("/update")
@@ -51,7 +53,9 @@ async def update_backend(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> AnyConfigInfoWithCreds:
     _, project = user_project
-    return await backends.update_backend(session=session, project=project, config=body)
+    config = await backends.update_backend(session=session, project=project, config=body)
+    await server_config_manager.sync_config(session=session)
+    return config
 
 
 @project_router.post("/delete")
@@ -64,6 +68,7 @@ async def delete_backends(
     await backends.delete_backends(
         session=session, project=project, backends_types=body.backends_names
     )
+    await server_config_manager.sync_config(session=session)
 
 
 @project_router.post("/{backend_name}/config_info")
