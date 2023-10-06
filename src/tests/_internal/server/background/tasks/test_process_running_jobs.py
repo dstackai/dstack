@@ -1,5 +1,5 @@
-import json
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceType, Resources
 from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
+from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.schemas.runner import JobStateEvent, PullResponse
@@ -124,7 +125,7 @@ class TestProcessRunningJobs:
         assert job.status == JobStatus.RUNNING
 
     @pytest.mark.asyncio
-    async def test_updates_running_job(self, test_db, session: AsyncSession):
+    async def test_updates_running_job(self, test_db, session: AsyncSession, tmp_path: Path):
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(
@@ -148,7 +149,9 @@ class TestProcessRunningJobs:
             "dstack._internal.core.services.ssh.tunnel.RunnerTunnel"
         ) as RunnerTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock:
+        ) as RunnerClientMock, patch.object(
+            settings, "SERVER_DIR_PATH", tmp_path
+        ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull = Mock()
             runner_client_mock.pull.return_value = PullResponse(

@@ -14,7 +14,7 @@ class JobStateEvent(BaseModel):
 
 
 class LogEvent(BaseModel):
-    timestamp: int
+    timestamp: int  # nanoseconds
     message: bytes
 
     @validator("message", pre=True)
@@ -29,8 +29,6 @@ class PullResponse(BaseModel):
     job_logs: List[LogEvent]
     runner_logs: List[LogEvent]
     last_updated: int
-    # has_more: bool
-    # TODO job_result: object
 
 
 class SubmitBody(BaseModel):

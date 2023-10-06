@@ -12,6 +12,7 @@ from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, JobS
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import CodeModel, JobModel, RepoModel, RunModel
+from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -188,7 +189,13 @@ def _process_running_job(
             last_job_state = resp.job_states[-1]
             job_model.status = last_job_state.state
             logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
-            # TODO Write logs
+            logs_services.write_logs(
+                project=run_model.project,
+                run_name=run_model.run_name,
+                job_submission_id=job_model.id,
+                runner_logs=resp.runner_logs,
+                job_logs=resp.job_logs,
+            )
     except dstack._internal.core.errors.SSHError:
         job_model.status = JobStatus.FAILED
         job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY

@@ -14,7 +14,7 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.backends import DeleteBackendsRequest
 from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin
 from dstack._internal.server.services import backends
-from dstack._internal.server.services.config import server_config_manager
+from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.utils.routers import raise_not_found
 
 root_router = APIRouter(prefix="/api/backends", tags=["backends"])
@@ -42,7 +42,7 @@ async def create_backend(
 ) -> AnyConfigInfoWithCreds:
     _, project = user_project
     config = await backends.create_backend(session=session, project=project, config=body)
-    await server_config_manager.sync_config(session=session)
+    await ServerConfigManager().sync_config(session=session)
     return config
 
 
@@ -54,7 +54,7 @@ async def update_backend(
 ) -> AnyConfigInfoWithCreds:
     _, project = user_project
     config = await backends.update_backend(session=session, project=project, config=body)
-    await server_config_manager.sync_config(session=session)
+    await ServerConfigManager().sync_config(session=session)
     return config
 
 
@@ -68,7 +68,7 @@ async def delete_backends(
     await backends.delete_backends(
         session=session, project=project, backends_types=body.backends_names
     )
-    await server_config_manager.sync_config(session=session)
+    await ServerConfigManager().sync_config(session=session)
 
 
 @project_router.post("/{backend_name}/config_info")

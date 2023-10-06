@@ -11,7 +11,6 @@ class LogEventSource(str, Enum):
 
 
 class LogEvent(BaseModel):
-    id: str
     timestamp: datetime
     log_source: LogEventSource
     message: str
