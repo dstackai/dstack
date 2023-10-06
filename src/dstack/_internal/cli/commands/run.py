@@ -110,17 +110,18 @@ class RunCommand(APIBaseCommand):
                     RunStatus.PENDING,
                     RunStatus.PROVISIONING,
                 ):
-                    status.update(f"Launching [code]{run.name}[/] [secondary]({run.status})[/]")
+                    status.update(
+                        f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]"
+                    )
                     time.sleep(5)
                     run.refresh()
             console.print(
-                f"[code]{run.name}[/] provisioning completed [secondary]({run.status})[/]"
+                f"[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
             )
 
             if run.attach():
                 for entry in run.logs():
-                    sys.stdout.buffer.write(entry)
-                    sys.stdout.buffer.flush()
+                    console.print(entry.decode("utf-8"), markup=False, highlight=False, end="")
             else:
                 console.print("[error]Failed to attach, exiting...[/]")
 

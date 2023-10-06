@@ -26,6 +26,7 @@ from dstack._internal.core.models.runs import JobSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.core.models.runs import RunPlan, RunSpec
+from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.utils.logging import get_logger
@@ -176,12 +177,29 @@ class SubmittedRun(Run):
                 on_message=lambda _, message: q.put(message),
             )
             threading.Thread(target=ws_thread).start()
+
+            job_spec = self._run.jobs[0].job_spec
+            ports = self.ports
+            hostname = "127.0.0.1"
+            secure = False
+            if job_spec.gateway is not None:
+                ports = {**ports, job_spec.gateway.service_port: job_spec.gateway.public_port}
+                hostname = job_spec.gateway.hostname
+                secure = job_spec.gateway.secure
+            replace_urls = URLReplacer(
+                ports=ports,
+                app_specs=job_spec.app_specs,
+                hostname=hostname,
+                secure=secure,
+                ip_address=self.hostname,
+            )
+
             try:
                 while True:
                     item = q.get()
                     if item is _done:
                         break
-                    yield item
+                    yield replace_urls(item)
             finally:
                 logger.debug("Closing WebSocket logs for %s", self.name)
                 ws.close()
