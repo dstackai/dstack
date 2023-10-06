@@ -75,7 +75,9 @@ class ProfileGPU(ForbidExtra):
     _validate_mem = validator("memory", pre=True, allow_reuse=True)(parse_memory)
 
     @validator("name")
-    def _validate_name(cls, name: str):
+    def _validate_name(cls, name: Optional[str]) -> Optional[str]:
+        if name is None:
+            return None
         return name.upper()
 
 

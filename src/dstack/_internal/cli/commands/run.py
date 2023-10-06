@@ -5,6 +5,10 @@ import time
 from pathlib import Path
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.configurators.profile import (
+    apply_profile_args,
+    register_profile_args,
+)
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError
@@ -30,20 +34,14 @@ class RunCommand(APIBaseCommand):
             "--file",
             type=Path,
             metavar="FILE",
-            help="The path to the run configuration file. Defaults to [code]WORKING_DIR/.dstack.yml[/].",
+            help="The path to the run configuration file. Defaults to [code]WORKING_DIR/.dstack.yml[/]",
             dest="configuration_file",
-        )
-        self._parser.add_argument(
-            "--profile",
-            metavar="NAME",
-            help="The name of the profile",
-            default=os.getenv("DSTACK_PROFILE"),
         )
         self._parser.add_argument(
             "-n",
             "--name",
             dest="run_name",
-            help="The name of the run. If not specified, a random name is assigned.",
+            help="The name of the run. If not specified, a random name is assigned",
         )
         self._parser.add_argument(
             "-d",
@@ -57,14 +55,7 @@ class RunCommand(APIBaseCommand):
             help="Do not ask for plan confirmation",
             action="store_true",
         )
-        self._parser.add_argument(
-            "-b",
-            "--backend",
-            action="append",
-            metavar="NAME",
-            dest="backends",
-            help="The backends that will be tried for provisioning",
-        )
+        register_profile_args(self._parser)
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
@@ -73,13 +64,14 @@ class RunCommand(APIBaseCommand):
                 Path.cwd(), args.working_dir, args.configuration_file
             )
             profile = load_profile(Path.cwd(), args.profile)
-            backends = profile.backends
-            if args.backends:
-                backends = args.backends
+            apply_profile_args(args, profile)
+
+            # todo load configuration
+            # todo use CLI run configurator
             with console.status("Getting run plan..."):
                 run_plan = self.api.runs.get_plan(
                     configuration_path=configuration_path,
-                    backends=backends,
+                    backends=profile.backends,
                     resources=profile.resources,  # pass profile piece by piece
                     spot_policy=profile.spot_policy,
                     retry_policy=profile.retry_policy,

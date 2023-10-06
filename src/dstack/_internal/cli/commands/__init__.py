@@ -58,7 +58,7 @@ class APIBaseCommand(BaseCommand):
     def _register(self):
         self._parser.add_argument(
             "--project",
-            help="The name of the project",
+            help="The name of the project. Defaults to [code]$DSTACK_PROJECT[/]",
             metavar="NAME",
             default=os.getenv("DSTACK_PROJECT"),
         )
