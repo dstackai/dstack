@@ -1,3 +1,4 @@
+import time
 from typing import Dict, List, Optional, Type
 
 import requests
@@ -14,6 +15,10 @@ from dstack.api.server._secrets import SecretsAPIClient
 from dstack.api.server._users import UsersAPIClient
 
 logger = get_logger(__name__)
+
+
+_MAX_RETRIES = 3
+_RETRY_INTERVAL = 1
 
 
 class APIClient:
@@ -67,9 +72,14 @@ class APIClient:
             kwargs["data"] = body
 
         logger.debug("POST /%s", path)
-        try:
-            resp = self._s.post(f"{self._base_url}/{path}", **kwargs)
-        except requests.exceptions.ConnectionError:
+        for _ in range(_MAX_RETRIES):
+            try:
+                resp = self._s.post(f"{self._base_url}/{path}", **kwargs)
+                break
+            except requests.exceptions.ConnectionError as e:
+                logger.debug("Could not connect to server: %s", e)
+                time.sleep(_RETRY_INTERVAL)
+        else:
             raise ClientError(f"Failed to connect to dstack server {self._base_url}")
 
         if raise_for_status:
