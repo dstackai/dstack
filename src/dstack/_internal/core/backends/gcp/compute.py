@@ -67,7 +67,7 @@ class GCPCompute(Compute):
                 project=self.config.project_id, zone=region, instance=instance_id
             )
         except google.api_core.exceptions.NotFound:
-            raise ResourceNotFoundError()
+            pass
 
     def run_job(
         self,

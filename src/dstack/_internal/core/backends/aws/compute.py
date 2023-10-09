@@ -104,7 +104,7 @@ class AWSCompute(Compute):
             client.terminate_instances(InstanceIds=[instance_id])
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
-                raise ResourceNotFoundError()
+                pass
             else:
                 raise e
 
