@@ -60,7 +60,7 @@ def load_configuration(
             configuration_path = configuration_path.with_suffix(".yaml")
     else:
         configuration_path = repo_dir / configuration_file
-        if not path_in_dir(configuration_file, repo_dir):
+        if not path_in_dir(configuration_path, repo_dir):
             raise ConfigurationError(f"Configuration file is outside of the repo")
 
     try:

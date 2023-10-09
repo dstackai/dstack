@@ -2,6 +2,7 @@ import argparse
 
 from rich_argparse import RichHelpFormatter
 
+from dstack._internal.cli.commands.gateways import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogsCommand
 from dstack._internal.cli.commands.ps import PsCommand
@@ -45,6 +46,7 @@ def main():
     parser.set_defaults(func=lambda _: parser.print_help())
 
     subparsers = parser.add_subparsers(metavar="COMMAND")
+    GatewayCommand.register(subparsers)
     InitCommand.register(subparsers)
     LogsCommand.register(subparsers)
     PsCommand.register(subparsers)

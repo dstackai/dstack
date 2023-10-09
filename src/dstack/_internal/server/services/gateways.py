@@ -3,6 +3,7 @@ import json
 import shlex
 import subprocess
 import tempfile
+from datetime import timezone
 from typing import List, Optional, Sequence
 
 import pkg_resources
@@ -238,7 +239,7 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=gateway_model.project.default_gateway_id == gateway_model.id,
-        created_at=gateway_model.created_at,
+        created_at=gateway_model.created_at.replace(tzinfo=timezone.utc),
         backend=gateway_model.backend.type,
     )
 

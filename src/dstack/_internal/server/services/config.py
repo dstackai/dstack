@@ -4,13 +4,10 @@ import yaml
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.services import backends as backends_services
-from dstack._internal.server.services import gateways
 from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
@@ -18,17 +15,9 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class GatewayConfig(BaseModel):
-    name: str = settings.DEFAULT_GATEWAY_NAME
-    backend: BackendType
-    region: str
-    wildcard_domain: Optional[str]
-
-
 class ProjectConfig(BaseModel):
     name: str
     backends: List[AnyConfigInfoWithCreds]
-    gateway: Optional[GatewayConfig]
 
 
 class ServerConfig(BaseModel):
@@ -79,8 +68,6 @@ class ServerConfigManager:
             await backends_services.delete_backends(
                 session=session, project=project, backends_types=backends_to_delete
             )
-            if project_config.gateway is not None:
-                await apply_gateway_config(session, project, project_config.gateway)
 
     async def _init_config(
         self, session: AsyncSession, init_backends: bool
@@ -146,30 +133,6 @@ class ServerConfigManager:
 
         with open(settings.SERVER_CONFIG_FILE_PATH, "w+") as f:
             yaml.dump(config.dict(), f, sort_keys=False)
-
-
-async def apply_gateway_config(
-    session: AsyncSession, project: ProjectModel, gateway_config: GatewayConfig
-):
-    gateway = await gateways.get_gateway_by_name(session, project, gateway_config.name)
-    if gateway is None:
-        logger.info("Creating a new gateway from config.yaml")
-        gateway = await gateways.create_gateway(
-            session=session,
-            project=project,
-            name=gateway_config.name,
-            backend_type=gateway_config.backend,
-            region=gateway_config.region,
-        )
-    elif gateway.backend != gateway_config.backend:
-        raise ConfigurationError(
-            "Gateway backend cannot be changed. Delete the gateway or choose a new name."
-        )
-
-    await gateways.set_gateway_wildcard_domain(
-        session, project, gateway.name, gateway_config.wildcard_domain
-    )
-    await gateways.set_default_gateway(session, project, gateway.name)
 
 
 server_config_manager = ServerConfigManager()

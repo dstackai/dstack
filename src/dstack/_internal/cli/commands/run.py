@@ -8,7 +8,10 @@ from dstack._internal.cli.services.configurators.profile import (
     apply_profile_args,
     register_profile_args,
 )
-from dstack._internal.cli.services.configurators.run import run_configurators_mapping
+from dstack._internal.cli.services.configurators.run import (
+    BaseRunConfigurator,
+    run_configurators_mapping,
+)
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError
@@ -71,8 +74,11 @@ class RunCommand(APIBaseCommand):
         if args.help is not NOTSET:
             if args.help is not None:
                 run_configurators_mapping[ConfigurationType(args.help)].register(self._parser)
+            else:
+                BaseRunConfigurator.register(self._parser)
             self._parser.print_help()
             return
+
         super()._command(args)
         try:
             profile = load_profile(Path.cwd(), args.profile)
