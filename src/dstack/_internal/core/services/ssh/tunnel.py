@@ -65,6 +65,8 @@ class SSHTunnel:
             raise SSHKeyError(r.stderr)
         if b": Address already in use" in r.stderr:
             raise SSHPortInUseError()
+        # TODO: kex_exchange_identification: read: Connection reset by peer
+        # TODO: Connection timed out during banner exchange
         raise SSHError(r.stderr.decode())
 
     def close(self):

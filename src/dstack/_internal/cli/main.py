@@ -10,7 +10,10 @@ from dstack._internal.cli.commands.server import ServerCommand
 from dstack._internal.cli.commands.stop import StopCommand
 from dstack._internal.cli.utils.common import colors, console
 from dstack._internal.core.errors import ClientError, CLIError
+from dstack._internal.utils.logging import get_logger
 from dstack.version import __version__ as version
+
+logger = get_logger(__name__)
 
 
 def main():
@@ -55,6 +58,7 @@ def main():
         args.func(args)
     except (ClientError, CLIError) as e:
         console.print(f"[error]{e}[/]")
+        logger.debug(e, exc_info=True)
         exit(1)
 
 
