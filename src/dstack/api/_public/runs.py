@@ -17,6 +17,7 @@ from dstack._internal.core.models import configurations
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ServiceConfiguration as Service
 from dstack._internal.core.models.configurations import TaskConfiguration as Task
+from dstack._internal.core.models.logs import LogEvent
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.profiles import ProfileResources as Resources
 from dstack._internal.core.models.profiles import ProfileRetryPolicy as RetryPolicy
@@ -29,6 +30,7 @@ from dstack._internal.core.models.runs import RunPlan, RunSpec
 from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
+from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike, path_in_dir
 from dstack.api.server import APIClient
@@ -75,9 +77,28 @@ class Run(ABC):
         return self._run.jobs[0].job_submissions[-1].job_provisioning_data.hostname
 
     def logs(
-        self, start_time: datetime = (datetime.now(tz=timezone.utc) - timedelta(days=1))
+        self,
+        start_time: Optional[datetime] = None,
+        diagnose: bool = False,
     ) -> Iterable[bytes]:
-        raise NotImplemented()
+        next_start_time = start_time
+        while True:
+            resp = self._api_client.logs.poll(
+                project_name=self._project,
+                body=PollLogsRequest(
+                    run_name=self.name,
+                    job_submission_id=self._run.jobs[0].job_submissions[0].id,
+                    start_time=next_start_time,
+                    end_time=None,
+                    descending=False,
+                    diagnose=diagnose,
+                ),
+            )
+            if len(resp.logs) == 0:
+                return
+            for log in resp.logs:
+                yield log.message.encode()
+            next_start_time = resp.logs[-1].timestamp
 
     def refresh(self):
         """

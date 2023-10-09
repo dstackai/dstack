@@ -3,6 +3,7 @@ import argparse
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.commands.init import InitCommand
+from dstack._internal.cli.commands.logs import LogsCommand
 from dstack._internal.cli.commands.ps import PsCommand
 from dstack._internal.cli.commands.run import RunCommand
 from dstack._internal.cli.commands.server import ServerCommand
@@ -42,6 +43,7 @@ def main():
 
     subparsers = parser.add_subparsers(metavar="COMMAND")
     InitCommand.register(subparsers)
+    LogsCommand.register(subparsers)
     PsCommand.register(subparsers)
     RunCommand.register(subparsers)
     ServerCommand.register(subparsers)
