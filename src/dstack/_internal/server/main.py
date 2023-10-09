@@ -1,3 +1,4 @@
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
@@ -25,6 +26,8 @@ from dstack._internal.server.settings import DEFAULT_PROJECT_NAME, SERVER_URL
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import get_server_client_error_details
 from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -75,6 +78,17 @@ async def server_client_error_handler(request: Request, exc: ServerClientError):
         status_code=status.HTTP_400_BAD_REQUEST,
         content={"detail": get_server_client_error_details(exc)},
     )
+
+
+@app.middleware("http")
+async def log_request(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    logger.debug(
+        "Processed request %s %s in %s", request.method, request.url, f"{process_time:0.6f}s"
+    )
+    return response
 
 
 @app.get("/")
