@@ -14,7 +14,7 @@ from dstack._internal.cli.services.configurators.run import (
 )
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
-from dstack._internal.core.errors import CLIError, ConfigurationError
+from dstack._internal.core.errors import CLIError, ConfigurationError, ResourceExistsError
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
@@ -114,9 +114,12 @@ class RunCommand(APIBaseCommand):
             console.print("\nExiting...")
             return
 
-        run_plan.run_spec.run_name = None  # TODO fix server behaviour
-        with console.status("Submitting run..."):
-            run = self.api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
+        try:
+            with console.status("Submitting run..."):
+                run = self.api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
+        except ResourceExistsError as e:
+            raise CLIError(e.msg)
+
         if args.detach:
             console.print("Run submitted, detaching...")
             return

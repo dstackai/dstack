@@ -35,7 +35,9 @@ class GatewayCommand(APIBaseCommand):
             "--set-default", action="store_true", help="Set as default gateway for the project"
         )
         create_parser.add_argument("--name", help="Set a custom name for the gateway")
-        create_parser.add_argument("--wildcard-domain", help="Set wildcard domain for the gateway")
+        create_parser.add_argument(
+            "--wildcard-domain", help="Set wildcard domain for the gateway", required=True
+        )
 
         delete_parser = subparsers.add_parser(
             "delete", help="Delete a gateway", formatter_class=self._parser.formatter_class

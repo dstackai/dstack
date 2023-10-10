@@ -146,7 +146,7 @@ class TestCreateGateway:
             "instance_id": "i-1234567890",
             "ip_address": "2.2.2.2",
             "wildcard_domain": None,
-            "default": False,
+            "default": True,
             "created_at": response.json()["created_at"],
         }
 
@@ -185,7 +185,7 @@ class TestCreateGateway:
             "instance_id": "i-1234567890",
             "ip_address": "2.2.2.2",
             "wildcard_domain": None,
-            "default": False,
+            "default": True,
             "created_at": response.json()["created_at"],
         }
 

@@ -178,8 +178,12 @@ class SubmittedRun(Run):
         self._ports_lock = ports_lock
         self._ports: Optional[Dict[int, int]] = None
 
-    def logs(self, start_time: datetime = datetime.now() - timedelta(days=1)) -> Iterable[bytes]:
-        if self._ssh_attach is not None:
+    def logs(
+        self,
+        start_time: Optional[datetime] = None,
+        diagnose: bool = False,
+    ) -> Iterable[bytes]:
+        if diagnose is False and self._ssh_attach is not None:
             q = queue.Queue()
             _done = object()
 
@@ -225,7 +229,7 @@ class SubmittedRun(Run):
                 logger.debug("Closing WebSocket logs for %s", self.name)
                 ws.close()
         else:
-            yield super().logs(start_time)
+            yield from super().logs(start_time=start_time, diagnose=diagnose)
 
 
 class RunCollection:

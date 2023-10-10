@@ -73,6 +73,10 @@ async def create_gateway(
     )
     session.add(gateway)
     await session.commit()
+
+    if project.default_gateway is None:
+        await set_default_gateway(session=session, project=project, name=name)
+
     try:
         info = await run_async(
             backend.compute().create_gateway,
