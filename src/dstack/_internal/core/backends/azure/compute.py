@@ -123,7 +123,9 @@ class AzureCompute(Compute):
                     cuda=len(instance_offer.instance.resources.gpus) > 0,
                 ),
                 vm_size=instance_offer.instance.name,
-                instance_name=job.job_spec.job_name,
+                # instance_name includes region because Azure may create an instance resource
+                # even when provisioning fails.
+                instance_name=f"{job.job_spec.job_name}-{instance_offer.region}",
                 user_data=get_user_data(
                     backend=BackendType.AZURE,
                     image_name=job.job_spec.image_name,
