@@ -1,5 +1,4 @@
 import argparse
-import os
 import sys
 import time
 from pathlib import Path
@@ -9,25 +8,39 @@ from dstack._internal.cli.services.configurators.profile import (
     apply_profile_args,
     register_profile_args,
 )
+from dstack._internal.cli.services.configurators.run import (
+    BaseRunConfigurator,
+    run_configurators_mapping,
+)
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
-from dstack._internal.core.errors import CLIError, ConfigurationError
-from dstack._internal.core.services.configs.configuration import find_configuration_file
-from dstack._internal.core.services.configs.profile import load_profile
+from dstack._internal.core.errors import CLIError, ConfigurationError, ResourceExistsError
+from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
+from dstack.api.utils import load_configuration, load_profile
 
 logger = get_logger(__name__)
+NOTSET = object()
 
 
 class RunCommand(APIBaseCommand):
     NAME = "run"
     DESCRIPTION = "Run .dstack.yml configuration"
+    DEFAULT_HELP = False
 
     def _register(self):
         super()._register()
-        # TODO custom help action
-        # self._parser.add_argument("-h", "--help", nargs="?", choices=("task", "dev-environment", "service"))
+        self._parser.add_argument(
+            "-h",
+            "--help",
+            nargs="?",
+            type=ConfigurationType,
+            default=NOTSET,
+            help="Show this help message and exit. TYPE is one of [code]task[/], [code]dev-environment[/], [code]service[/]",
+            dest="help",
+            metavar="TYPE",
+        )
         self._parser.add_argument("working_dir")
         self._parser.add_argument(
             "-f",
@@ -58,18 +71,31 @@ class RunCommand(APIBaseCommand):
         register_profile_args(self._parser)
 
     def _command(self, args: argparse.Namespace):
+        if args.help is not NOTSET:
+            if args.help is not None:
+                run_configurators_mapping[ConfigurationType(args.help)].register(self._parser)
+            else:
+                BaseRunConfigurator.register(self._parser)
+            self._parser.print_help()
+            return
+
         super()._command(args)
         try:
-            configuration_path = find_configuration_file(
-                Path.cwd(), args.working_dir, args.configuration_file
-            )
             profile = load_profile(Path.cwd(), args.profile)
             apply_profile_args(args, profile)
 
-            # todo load configuration
-            # todo use CLI run configurator
+            configuration_path, conf = load_configuration(
+                Path.cwd(), args.working_dir, args.configuration_file
+            )
+            logger.debug("Configuration loaded: %s", configuration_path)
+            parser = argparse.ArgumentParser()
+            configurator = run_configurators_mapping[ConfigurationType(conf.type)]
+            configurator.register(parser)
+            configurator.apply(parser.parse_args(args.unknown), conf)
+
             with console.status("Getting run plan..."):
                 run_plan = self.api.runs.get_plan(
+                    configuration=conf,
                     configuration_path=configuration_path,
                     backends=profile.backends,
                     resources=profile.resources,  # pass profile piece by piece
@@ -88,8 +114,12 @@ class RunCommand(APIBaseCommand):
             console.print("\nExiting...")
             return
 
-        run_plan.run_spec.run_name = None  # TODO fix server behaviour
-        run = self.api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
+        try:
+            with console.status("Submitting run..."):
+                run = self.api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
+        except ResourceExistsError as e:
+            raise CLIError(e.msg)
+
         if args.detach:
             console.print("Run submitted, detaching...")
             return

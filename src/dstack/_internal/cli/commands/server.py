@@ -44,7 +44,7 @@ class ServerCommand(BaseCommand):
         os.environ["DSTACK_SERVER_LOG_LEVEL"] = args.log_level
         if args.token:
             os.environ["DSTACK_SERVER_ADMIN_TOKEN"] = args.token
-        uvicorn_log_level = os.getenv("DSTACK_SERVER_UVICORN_LOG_LEVEL", "error")
+        uvicorn_log_level = os.getenv("DSTACK_SERVER_UVICORN_LOG_LEVEL", "ERROR").lower()
         uvicorn.run(
             "dstack._internal.server.main:app",
             host=args.host,

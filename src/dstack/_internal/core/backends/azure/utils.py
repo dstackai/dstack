@@ -22,6 +22,10 @@ def get_default_network_security_group_name(resource_group: str, location: str) 
     return f"{resource_group}-{location}-default-security-group"
 
 
+def get_gateway_network_security_group_name(resource_group: str, location: str) -> str:
+    return f"{resource_group}-{location}-gateway-security-group"
+
+
 def get_managed_identity_id(
     subscription_id: str, resource_group: str, managed_identity: str
 ) -> str:

@@ -1,8 +1,9 @@
-import asyncio
+import time
 from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
 
+import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -11,13 +12,14 @@ import dstack._internal.core.errors
 from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, JobSubmission, Run
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import CodeModel, JobModel, RepoModel, RunModel
+from dstack._internal.server.models import JobModel, RepoModel, RunModel
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
     get_runner_ports,
     job_model_to_job_submission,
+    terminate_job_submission_instance,
 )
 from dstack._internal.server.services.repos import get_code_model
 from dstack._internal.server.services.runner import client
@@ -32,7 +34,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-RUNNER_TIMEOUT_INTERVAL = timedelta(seconds=300)
+RUNNER_TIMEOUT_INTERVAL = timedelta(seconds=600)
 
 
 async def process_running_jobs():
@@ -106,6 +108,13 @@ async def _process_job(job_id: UUID):
             )
             if new_job_model is not None:
                 session.add(new_job_model)
+            if job_model.error_code == JobErrorCode.INTERRUPTED_BY_NO_CAPACITY:
+                # JobErrorCode.INTERRUPTED_BY_NO_CAPACITY means that we could not connect to runner.
+                # The instance may still be running (e.g. network issue), so we force termination.
+                await terminate_job_submission_instance(
+                    project=project,
+                    job_submission=job_submission,
+                )
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
 
@@ -152,8 +161,12 @@ def _process_provisioning_job(
             runner_client.run_job()
             job_model.status = JobStatus.RUNNING
             logger.debug("Job %s is running", job_model.job_name)
-    except (ssh_tunnel.SSHConnectionRefusedError, ssh_tunnel.SSHTimeoutError):
+    except dstack._internal.core.errors.SSHError:
         logger.debug("Cannot establish ssh connection to job %s instance", job_model.job_name)
+
+
+_SSH_MAX_RETRY = 3
+_SSH_RETRY_INTERVAl = 1
 
 
 def _process_running_job(
@@ -169,34 +182,41 @@ def _process_running_job(
     :return: JobModel for new submission if re-submission is required (e.g. interrupted spot).
     """
     ports = get_runner_ports()
-    try:
-        with ssh_tunnel.RunnerTunnel(
-            hostname=job_submission.job_provisioning_data.hostname,
-            ssh_port=job_submission.job_provisioning_data.ssh_port,
-            user=job_submission.job_provisioning_data.username,
-            ports=ports,
-            id_rsa=server_ssh_private_key,
-        ):
-            runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
-            timestamp = 0
-            if job_model.runner_timestamp is not None:
-                timestamp = job_model.runner_timestamp
-            resp = runner_client.pull(timestamp)
-            job_model.runner_timestamp = resp.last_updated
-            if len(resp.job_states) == 0:
-                logger.debug("Got 0 job %s states", job_model.job_name)
-                return
-            last_job_state = resp.job_states[-1]
-            job_model.status = last_job_state.state
-            logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
-            logs_services.write_logs(
-                project=run_model.project,
-                run_name=run_model.run_name,
-                job_submission_id=job_model.id,
-                runner_logs=resp.runner_logs,
-                job_logs=resp.job_logs,
-            )
-    except dstack._internal.core.errors.SSHError:
+    for _ in range(_SSH_MAX_RETRY):
+        try:
+            with ssh_tunnel.RunnerTunnel(
+                hostname=job_submission.job_provisioning_data.hostname,
+                ssh_port=job_submission.job_provisioning_data.ssh_port,
+                user=job_submission.job_provisioning_data.username,
+                ports=ports,
+                id_rsa=server_ssh_private_key,
+            ):
+                runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
+                timestamp = 0
+                if job_model.runner_timestamp is not None:
+                    timestamp = job_model.runner_timestamp
+                resp = runner_client.pull(timestamp)
+                job_model.runner_timestamp = resp.last_updated
+                logs_services.write_logs(
+                    project=run_model.project,
+                    run_name=run_model.run_name,
+                    job_submission_id=job_model.id,
+                    runner_logs=resp.runner_logs,
+                    job_logs=resp.job_logs,
+                )
+                if len(resp.job_states) == 0:
+                    logger.debug("Job %s status not changed", job_model.job_name)
+                    return
+                last_job_state = resp.job_states[-1]
+                job_model.status = last_job_state.state
+                logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
+                break
+        except dstack._internal.core.errors.SSHError:
+            logger.debug("Cannot establish ssh connection to job %s instance", job_model.job_name)
+        except (requests.ConnectionError, requests.Timeout):
+            logger.debug("Failed to connect to job %s runner", job_model.job_name)
+        time.sleep(_SSH_RETRY_INTERVAl)
+    else:
         job_model.status = JobStatus.FAILED
         job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
         if job.is_retry_active():

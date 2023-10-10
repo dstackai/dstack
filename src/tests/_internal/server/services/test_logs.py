@@ -36,6 +36,6 @@ class TestWriteLogs:
             / "runner.log"
         )
         assert runner_log_path.read_text() == (
-            '{"timestamp": "2023-10-06T10:01:53.234234+00:00", "log_source": "stdout", "message": "Hello"}\n'
-            '{"timestamp": "2023-10-06T10:01:53.234235+00:00", "log_source": "stdout", "message": "World"}\n'
+            '{"timestamp": "2023-10-06T10:01:53.234234+00:00", "log_source": "stdout", "message": "SGVsbG8="}\n'
+            '{"timestamp": "2023-10-06T10:01:53.234235+00:00", "log_source": "stdout", "message": "V29ybGQ="}\n'
         )

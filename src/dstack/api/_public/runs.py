@@ -1,3 +1,4 @@
+import base64
 import queue
 import tempfile
 import threading
@@ -9,12 +10,11 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
 import requests
-import yaml
 from websocket import WebSocketApp
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models import configurations
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.configurations import ServiceConfiguration as Service
 from dstack._internal.core.models.configurations import TaskConfiguration as Task
 from dstack._internal.core.models.logs import LogEvent
@@ -97,7 +97,7 @@ class Run(ABC):
             if len(resp.logs) == 0:
                 return
             for log in resp.logs:
-                yield log.message.encode()
+                yield base64.b64decode(log.message)
             next_start_time = resp.logs[-1].timestamp
 
     def refresh(self):
@@ -178,8 +178,12 @@ class SubmittedRun(Run):
         self._ports_lock = ports_lock
         self._ports: Optional[Dict[int, int]] = None
 
-    def logs(self, start_time: datetime = datetime.now() - timedelta(days=1)) -> Iterable[bytes]:
-        if self._ssh_attach is not None:
+    def logs(
+        self,
+        start_time: Optional[datetime] = None,
+        diagnose: bool = False,
+    ) -> Iterable[bytes]:
+        if diagnose is False and self._ssh_attach is not None:
             q = queue.Queue()
             _done = object()
 
@@ -225,7 +229,7 @@ class SubmittedRun(Run):
                 logger.debug("Closing WebSocket logs for %s", self.name)
                 ws.close()
         else:
-            yield super().logs(start_time)
+            yield from super().logs(start_time=start_time, diagnose=diagnose)
 
 
 class RunCollection:
@@ -245,8 +249,8 @@ class RunCollection:
 
     def submit(
         self,
-        configuration: Optional[Union[Task, Service]] = None,
-        configuration_path: Optional[PathLike] = None,
+        configuration: AnyRunConfiguration,
+        configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
         resources: Optional[Resources] = None,
         spot_policy: Optional[SpotPolicy] = None,
@@ -288,8 +292,8 @@ class RunCollection:
 
     def get_plan(
         self,
-        configuration: Optional[Union[Task, Service]] = None,
-        configuration_path: Optional[PathLike] = None,
+        configuration: AnyRunConfiguration,
+        configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
         resources: Optional[Resources] = None,
         spot_policy: Optional[SpotPolicy] = None,
@@ -302,28 +306,12 @@ class RunCollection:
         """
         Get run plan. Same arguments as `submit`
         """
-        if configuration is None and configuration_path is None:
-            raise ConfigurationError(
-                "Either configuration or configuration_path must be specified"
-            )
-        if configuration is not None and configuration_path is not None:
-            raise ConfigurationError(
-                "Either configuration or configuration_path must be specified, not both"
-            )
-
         working_dir = self._repo_dir / (working_dir or ".")
         if not path_in_dir(working_dir, self._repo_dir):
             raise ConfigurationError("Working directory is outside of the repo")
 
         if configuration_path is None:
             configuration_path = "(python)"
-        else:
-            configuration_path = self._repo_dir / configuration_path
-            if not path_in_dir(configuration_path, self._repo_dir):
-                raise ConfigurationError("Configuration path is outside of the repo")
-            with open(configuration_path, "r") as f:
-                configuration = configurations.parse(yaml.safe_load(f))
-            configuration_path = str(configuration_path.relative_to(self._repo_dir))
 
         profile = Profile(
             name="(python)",
@@ -340,7 +328,7 @@ class RunCollection:
             repo_data=self._repo.run_repo_data,
             repo_code_hash=None,  # upload code before submit
             working_dir=str(working_dir.relative_to(self._repo_dir)),
-            configuration_path=str(configuration_path),
+            configuration_path=configuration_path,
             configuration=configuration,
             profile=profile,
             ssh_key_pub=Path(self._ssh_identity_file + ".pub").read_text().strip(),
@@ -372,10 +360,16 @@ class RunCollection:
 
     def list(self, all: bool = False) -> List[Run]:
         """
-        List
+        List runs
+        :param all: show all runs, by default, it only shows active runs or the recent finished
         """
-        # TODO support `all` key
         runs = self._api_client.runs.list(project_name=self._project, repo_id=None)
+        if not all:
+            active = [run for run in runs if not run.status.is_finished()]
+            if active:
+                runs = active
+            else:
+                runs = runs[:1]  # the most recent finished run
         return [self._model_to_run(run) for run in runs]
 
     def get(self, run_name: str) -> Optional[Run]:

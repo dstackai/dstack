@@ -3,10 +3,12 @@ package backends
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"net/http"
 )
 
 type AzureBackend struct {
@@ -20,7 +22,7 @@ func init() {
 }
 
 func NewAzureBackend(ctx context.Context) (Backend, error) {
-	metadata, err := getAzureMetadata(ctx)
+	metadata, err := getAzureMetadata(ctx, nil)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
@@ -32,7 +34,7 @@ func NewAzureBackend(ctx context.Context) (Backend, error) {
 }
 
 func (b *AzureBackend) Terminate(ctx context.Context) error {
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := azidentity.NewManagedIdentityCredential(nil)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -44,14 +46,27 @@ func (b *AzureBackend) Terminate(ctx context.Context) error {
 	return gerrors.Wrap(err)
 }
 
-type AzureInstanceMetadata struct {
+type AzureComputeInstanceMetadata struct {
 	SubscriptionId    string `json:"subscriptionId"`
 	ResourceGroupName string `json:"resourceGroupName"`
 	Name              string `json:"name"`
 }
 
-func getAzureMetadata(ctx context.Context) (*AzureInstanceMetadata, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://169.254.169.254/metadata/instance?api-version=2021-02-01", nil)
+type AzureInstanceMetadata struct {
+	Compute AzureComputeInstanceMetadata `json:"compute"`
+}
+
+func getAzureMetadata(ctx context.Context, url *string) (*AzureComputeInstanceMetadata, error) {
+	baseURL := "http://169.254.169.254"
+	if url != nil {
+		baseURL = *url
+	}
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		fmt.Sprintf("%s/metadata/instance?api-version=2021-02-01", baseURL),
+		nil,
+	)
 	if err != nil {
 		return nil, gerrors.Wrap(err)
 	}
@@ -65,5 +80,5 @@ func getAzureMetadata(ctx context.Context) (*AzureInstanceMetadata, error) {
 	if err = decoder.Decode(&metadata); err != nil {
 		return nil, gerrors.Wrap(err)
 	}
-	return &metadata, nil
+	return &metadata.Compute, nil
 }

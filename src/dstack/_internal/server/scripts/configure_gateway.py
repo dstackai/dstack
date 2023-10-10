@@ -70,6 +70,19 @@ def main():
                 "server_name": service["hostname"],
                 "listen": service["port"],
                 "location /": {
+                    # the first location is required, always fallback to the @-location
+                    "try_files": "/nonexistent @$http_upgrade",
+                },
+                "location @websocket": {
+                    "proxy_pass": f"http://{upstream}",
+                    "proxy_set_header X-Real-IP": "$remote_addr",
+                    "proxy_set_header Host": "$host",
+                    # web socket related headers
+                    "proxy_http_version": "1.1",
+                    "proxy_set_header Upgrade": "$http_upgrade",
+                    "proxy_set_header Connection": '"Upgrade"',
+                },
+                "location @": {
                     "proxy_pass": f"http://{upstream}",
                     "proxy_set_header X-Real-IP": "$remote_addr",
                     "proxy_set_header Host": "$host",

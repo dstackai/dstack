@@ -2,9 +2,6 @@ package shim
 
 import (
 	"context"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"os"
 	"os/exec"
 	"strconv"
@@ -12,6 +9,10 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/docker/docker/api/types/mount"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestDocker_SSHServer pulls ubuntu image (without sshd), installs openssh-server and exits

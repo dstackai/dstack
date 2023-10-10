@@ -222,17 +222,31 @@ class TestGetBackendConfigValuesAzure:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
-        user = await create_user(session=session, global_role=GlobalRole.USER)
-        body = {
-            "type": "azure",
-            "creds": {
-                "type": "client",
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {
+                "type": "azure",
+                "creds": {
+                    "type": "client",
+                    "client_id": "1234",
+                    "client_secret": "1234",
+                },
                 "tenant_id": "test_tenant",
-                "client_id": "1234",
-                "client_secret": "1234",
             },
-        }
+            {
+                "type": "azure",
+                "creds": {
+                    "type": "client",
+                    "tenant_id": "test_tenant",
+                    "client_id": "1234",
+                    "client_secret": "1234",
+                },
+            },
+        ],
+    )
+    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession, body):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
         with patch(
             "dstack._internal.core.backends.azure.auth.default_creds_available"
         ) as default_creds_available_mock, patch(

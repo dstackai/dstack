@@ -22,4 +22,5 @@ class LogsCommand(APIBaseCommand):
             raise CLIError(f"Run {args.run_name} not found")
         logs = run.logs(diagnose=args.diagnose)
         for log in logs:
-            sys.stdout.write(log.decode())
+            sys.stdout.buffer.write(log)
+        sys.stdout.buffer.flush()

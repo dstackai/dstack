@@ -65,3 +65,4 @@ class InstanceCandidate(InstanceOfferWithAvailability):
 class LaunchedGatewayInfo(BaseModel):
     instance_id: str
     ip_address: str
+    region: str

@@ -87,17 +87,9 @@ async def stop_job(
             and new_status == JobStatus.ABORTED
             or job_model.status == JobStatus.PROVISIONING
         ):
-            backend = await get_project_backend_by_type(
+            await terminate_job_submission_instance(
                 project=project,
-                backend_type=job_submission.job_provisioning_data.backend,
-            )
-            logger.debug(
-                "Terminating runner instance %s", job_submission.job_provisioning_data.hostname
-            )
-            await run_async(
-                backend.compute().terminate_instance,
-                job_submission.job_provisioning_data.instance_id,
-                job_submission.job_provisioning_data.region,
+                job_submission=job_submission,
             )
         elif job_model.status == JobStatus.RUNNING:
             await run_async(
@@ -112,6 +104,22 @@ async def stop_job(
             )
             .values(status=new_status)
         )
+
+
+async def terminate_job_submission_instance(
+    project: ProjectModel,
+    job_submission: JobSubmission,
+):
+    backend = await get_project_backend_by_type(
+        project=project,
+        backend_type=job_submission.job_provisioning_data.backend,
+    )
+    logger.debug("Terminating runner instance %s", job_submission.job_provisioning_data.hostname)
+    await run_async(
+        backend.compute().terminate_instance,
+        job_submission.job_provisioning_data.instance_id,
+        job_submission.job_provisioning_data.region,
+    )
 
 
 def get_runner_ports() -> Dict[int, int]:

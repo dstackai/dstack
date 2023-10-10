@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
-from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError
+from dstack._internal.core.errors import (
+    RepoDoesNotExistError,
+    ResourceExistsError,
+    ServerClientError,
+)
 from dstack._internal.core.models.runs import (
     Job,
     JobPlan,
@@ -95,21 +99,22 @@ async def get_run_plan(
     backends = await backends_services.get_project_backends(project=project)
     if run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run_spec.profile.backends]
-    run_spec.run_name = "dry-run"
+    run_name = run_spec.run_name  # preserve run_name
+    run_spec.run_name = "dry-run"  # will regenerate jobs on submission
     jobs = get_jobs_from_run_spec(run_spec)
     job_plans = []
-    job = jobs[0]
     for job in jobs:
         candidates = await backends_services.get_instance_candidates(
             backends=backends,
             job=job,
-            exclude_not_available=True,
+            exclude_not_available=False,
         )
         job_plan = JobPlan(
             job_spec=job.job_spec,
             candidates=candidates[:50],
         )
         job_plans.append(job_plan)
+    run_spec.run_name = run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name, user=user.name, run_spec=run_spec, job_plans=job_plans
     )
@@ -134,6 +139,8 @@ async def submit_run(
             session=session,
             project=project,
         )
+    elif await get_run(session, project, run_spec.run_name) is not None:
+        raise ResourceExistsError("Run name must be unique")
     run_model = RunModel(
         id=uuid.uuid4(),
         project_id=project.id,

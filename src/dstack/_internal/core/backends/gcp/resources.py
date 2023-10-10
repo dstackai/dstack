@@ -102,6 +102,10 @@ def get_image_id(cuda: bool) -> str:
     return f"projects/dstack/global/images/{image_name}"
 
 
+def get_gateway_image_id() -> str:
+    return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
+
+
 def create_runner_firewall_rules(
     firewalls_client: compute_v1.FirewallsClient,
     project_id: str,
@@ -121,6 +125,33 @@ def create_runner_firewall_rules(
     firewall_rule.description = "Allowing only SSH connections from Internet."
 
     firewall_rule.target_tags = [DSTACK_INSTANCE_TAG]
+
+    try:
+        operation = firewalls_client.insert(project=project_id, firewall_resource=firewall_rule)
+        wait_for_extended_operation(operation, "firewall rule creation")
+    except google.api_core.exceptions.Conflict:
+        pass
+
+
+def create_gateway_firewall_rules(
+    firewalls_client: compute_v1.FirewallsClient,
+    project_id: str,
+    network: str = "global/networks/default",
+):
+    firewall_rule = compute_v1.Firewall()
+    firewall_rule.name = "dstack-gateway-in-all-" + network.replace("/", "-")
+    firewall_rule.direction = "INGRESS"
+
+    allowed_ports = compute_v1.Allowed()
+    allowed_ports.I_p_protocol = "tcp"
+    allowed_ports.ports = ["0-65535"]
+
+    firewall_rule.allowed = [allowed_ports]
+    firewall_rule.source_ranges = ["0.0.0.0/0"]
+    firewall_rule.network = network
+    firewall_rule.description = "Allowing TCP traffic on all ports from Internet."
+
+    firewall_rule.target_tags = [DSTACK_GATEWAY_TAG]
 
     try:
         operation = firewalls_client.insert(project=project_id, firewall_resource=firewall_rule)

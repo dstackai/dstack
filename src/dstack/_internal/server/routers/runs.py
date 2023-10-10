@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.errors import ResourceExistsError
 from dstack._internal.core.models.runs import Run, RunPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -82,12 +82,15 @@ async def submit_run(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Run:
     user, project = user_project
-    return await runs.submit_run(
-        session=session,
-        user=user,
-        project=project,
-        run_spec=body.run_spec,
-    )
+    try:
+        return await runs.submit_run(
+            session=session,
+            user=user,
+            project=project,
+            run_spec=body.run_spec,
+        )
+    except ResourceExistsError as e:
+        raise_server_client_error(e)
 
 
 @project_router.post("/stop")

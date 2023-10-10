@@ -54,8 +54,10 @@ class RunnerClient:
         resp = requests.post(self._url("/api/run"))
         resp.raise_for_status()
 
-    def pull(self, timestamp: int) -> PullResponse:
-        resp = requests.get(self._url("/api/pull"), params={"timestamp": timestamp})
+    def pull(self, timestamp: int, timeout: int = 5) -> PullResponse:
+        resp = requests.get(
+            self._url("/api/pull"), params={"timestamp": timestamp}, timeout=timeout
+        )
         resp.raise_for_status()
         return PullResponse.parse_obj(resp.json())
 

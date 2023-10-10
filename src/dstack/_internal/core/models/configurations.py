@@ -2,9 +2,10 @@ import re
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, conint, constr, validator
+from pydantic import BaseModel, Field, ValidationError, conint, constr, validator
 from typing_extensions import Annotated, Literal
 
+from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import ForbidExtra
 
 CommandsList = List[str]
@@ -84,10 +85,12 @@ class BaseConfiguration(ForbidExtra):
         Union[List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$")], Dict[str, str]],
         Field(description="The mapping or the list of environment variables"),
     ] = {}
+    # deprecated
     build: Annotated[
         CommandsList, Field(description="The bash commands to run during build stage")
     ] = []
     setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
+    # not supported yet
     cache: Annotated[
         List[str], Field(description="The directories to be cached between configuration runs")
     ] = []
@@ -167,6 +170,9 @@ class RunConfiguration(BaseModel):
         schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
 
-def parse(data: dict) -> Union[DevEnvironmentConfiguration, TaskConfiguration]:
-    conf = RunConfiguration.parse_obj(data).__root__
+def parse(data: dict) -> AnyRunConfiguration:
+    try:
+        conf = RunConfiguration.parse_obj(data).__root__
+    except ValidationError as e:
+        raise ConfigurationError(e)
     return conf

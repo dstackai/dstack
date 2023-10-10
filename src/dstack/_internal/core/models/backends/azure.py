@@ -15,9 +15,10 @@ class AzureConfigInfo(BaseModel):
 
 class AzureClientCreds(BaseModel):
     type: Literal["client"] = "client"
-    tenant_id: str
     client_id: str
     client_secret: str
+    # if tenant_id is missing, it will be populated from config info
+    tenant_id: Optional[str]
 
 
 class AzureDefaultCreds(BaseModel):

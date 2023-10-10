@@ -42,6 +42,8 @@ class Client:
         :param ssh_identity_file: SSH keypair to access instances
         :param init: initialize the repo first
         """
+        self._client = api_client
+        self._project = project_name
         self._repos = RepoCollection(api_client, project_name, repo)
         self._backends = BackendCollection(api_client, project_name)
         self._runs = RunCollection(api_client, project_name, repo_dir, repo, ssh_identity_file)
@@ -126,6 +128,14 @@ class Client:
     @property
     def runs(self) -> RunCollection:
         return self._runs
+
+    @property
+    def client(self) -> APIClient:
+        return self._client
+
+    @property
+    def project(self) -> str:
+        return self._project
 
 
 def get_ssh_keypair(key_path: Optional[PathLike], dstack_key_path: Path) -> str:

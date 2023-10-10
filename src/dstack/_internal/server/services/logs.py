@@ -1,3 +1,4 @@
+import base64
 from pathlib import Path
 from typing import List
 from uuid import UUID
@@ -16,15 +17,26 @@ def write_logs(
     runner_logs: List[RunnerLogEvent],
     job_logs: List[RunnerLogEvent],
 ):
-    runner_log_file_path = _get_runner_log_file_path(
-        project_name=project.name,
-        run_name=run_name,
-        job_submission_id=job_submission_id,
-    )
-    _write_logs(
-        log_file_path=runner_log_file_path,
-        log_events=runner_logs,
-    )
+    if len(runner_logs) > 0:
+        runner_log_file_path = _get_runner_log_file_path(
+            project_name=project.name,
+            run_name=run_name,
+            job_submission_id=job_submission_id,
+        )
+        _write_logs(
+            log_file_path=runner_log_file_path,
+            log_events=runner_logs,
+        )
+    if len(job_logs) > 0:
+        job_log_file_path = _get_job_log_file_path(
+            project_name=project.name,
+            run_name=run_name,
+            job_submission_id=job_submission_id,
+        )
+        _write_logs(
+            log_file_path=job_log_file_path,
+            log_events=job_logs,
+        )
 
 
 def _write_logs(
@@ -73,7 +85,7 @@ def _runner_log_event_to_log_event(runner_log_event: RunnerLogEvent) -> LogEvent
     return LogEvent(
         timestamp=runner_log_event.timestamp,
         log_source=LogEventSource.STDOUT,
-        message=runner_log_event.message.decode(),
+        message=base64.b64encode(runner_log_event.message).decode(),
     )
 
 
