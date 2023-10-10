@@ -338,6 +338,11 @@ class AzureConfigurator(Configurator):
                 location=location,
                 name=azure_utils.get_default_network_security_group_name(resource_group, location),
             )
+            network_manager.create_gateway_network_security_group(
+                resource_group=resource_group,
+                location=location,
+                name=azure_utils.get_gateway_network_security_group_name(resource_group, location),
+            )
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             for location in locations:
@@ -467,6 +472,33 @@ class NetworkManager:
                         priority=100,
                         direction=SecurityRuleDirection.INBOUND,
                     ),
+                ],
+            ),
+        ).result()
+
+    def create_gateway_network_security_group(
+        self,
+        resource_group: str,
+        location: str,
+        name: str,
+    ):
+        self.network_client.network_security_groups.begin_create_or_update(
+            resource_group_name=resource_group,
+            network_security_group_name=name,
+            parameters=NetworkSecurityGroup(
+                location=location,
+                security_rules=[
+                    SecurityRule(
+                        name="gateway_all",
+                        protocol=SecurityRuleProtocol.TCP,
+                        source_address_prefix="Internet",
+                        source_port_range="*",
+                        destination_address_prefix="*",
+                        destination_port_range="0-65535",
+                        access=SecurityRuleAccess.ALLOW,
+                        priority=101,
+                        direction=SecurityRuleDirection.INBOUND,
+                    )
                 ],
             ),
         ).result()

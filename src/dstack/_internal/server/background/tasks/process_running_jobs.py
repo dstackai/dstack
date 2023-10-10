@@ -34,7 +34,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-RUNNER_TIMEOUT_INTERVAL = timedelta(seconds=300)
+RUNNER_TIMEOUT_INTERVAL = timedelta(seconds=600)
 
 
 async def process_running_jobs():

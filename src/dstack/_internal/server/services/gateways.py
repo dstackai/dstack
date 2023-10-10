@@ -11,7 +11,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.utils.random_names as random_names
-from dstack._internal.core.errors import DstackError, NotFoundError, SSHError
+from dstack._internal.core.errors import ConfigurationError, DstackError, NotFoundError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
@@ -22,6 +22,9 @@ from dstack._internal.server.services.backends import (
 )
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 async def list_project_gateways(session: AsyncSession, project: ProjectModel) -> List[Gateway]:
@@ -93,6 +96,7 @@ async def create_gateway(
             )
             .values(
                 ip_address=info.ip_address,
+                region=info.region,
                 instance_id=info.instance_id,
             )
         )
@@ -253,20 +257,19 @@ def configure_gateway_over_ssh(host: str, id_rsa: str, authorized_key: str, jobs
     id_rsa_file.write(id_rsa)
     id_rsa_file.flush()
 
-    payload = json.dumps(
-        {
-            "authorized_key": authorized_key,
-            "services": [
-                {
-                    "hostname": job.job_spec.gateway.hostname,
-                    "port": job.job_spec.gateway.public_port,
-                    "secure": job.job_spec.gateway.secure,
-                }
-                for job in jobs
-            ],
-        }
-    )
+    payload = {
+        "authorized_key": authorized_key,
+        "services": [
+            {
+                "hostname": job.job_spec.gateway.hostname,
+                "port": job.job_spec.gateway.public_port,
+                "secure": job.job_spec.gateway.secure,
+            }
+            for job in jobs
+        ],
+    }
 
+    logger.debug("Configuring %s gateway over SSH: %s", host, payload["services"])
     script_path = pkg_resources.resource_filename(
         "dstack._internal.server", "scripts/configure_gateway.py"
     )
@@ -280,11 +283,14 @@ def configure_gateway_over_ssh(host: str, id_rsa: str, authorized_key: str, jobs
             "-i",
             id_rsa_file.name,
             host,
-            f"sudo python3 - {shlex.quote(payload)}",
+            f"sudo python3 - {shlex.quote(json.dumps(payload))}",
         ]
         proc = subprocess.Popen(cmd, stdin=script, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()
     if proc.returncode != 0:
+        if b"Certbot failed:" in stderr:
+            # TODO pass error to the client
+            raise ConfigurationError("Certbot failed, check wildcard domain correctness")
         raise SSHError(stderr.decode())
 
     sockets = json.loads(stdout)

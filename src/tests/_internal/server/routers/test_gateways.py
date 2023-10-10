@@ -129,6 +129,7 @@ class TestCreateGateway:
             aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
                 instance_id="i-1234567890",
                 ip_address="2.2.2.2",
+                region="us",
             )
 
             response = client.post(
@@ -167,6 +168,7 @@ class TestCreateGateway:
             aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
                 instance_id="i-1234567890",
                 ip_address="2.2.2.2",
+                region="us",
             )
 
             response = client.post(

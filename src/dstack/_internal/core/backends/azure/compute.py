@@ -10,7 +10,6 @@ from azure.mgmt.compute.models import (
     DiskCreateOptionTypes,
     HardwareProfile,
     ImageReference,
-    InstanceViewStatus,
     LinuxConfiguration,
     ManagedDiskParameters,
     NetworkProfile,
@@ -34,7 +33,11 @@ from azure.mgmt.compute.models import (
 from dstack import version
 from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.config import AzureConfig
-from dstack._internal.core.backends.base.compute import Compute, get_user_data
+from dstack._internal.core.backends.base.compute import (
+    Compute,
+    get_gateway_user_data,
+    get_user_data,
+)
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
@@ -42,7 +45,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    InstanceState,
+    LaunchedGatewayInfo,
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
@@ -133,6 +136,8 @@ class AzureCompute(Compute):
                 ),
                 ssh_pub_keys=ssh_pub_keys,
                 spot=instance_offer.instance.resources.spot,
+                disk_size=100,
+                computer_name="runnervm",
             )
             logger.info("Request succeeded")
             public_ip = _get_vm_public_ip(
@@ -158,6 +163,53 @@ class AzureCompute(Compute):
             compute_client=self._compute_client,
             resource_group=self.config.resource_group,
             instance_name=instance_id,
+        )
+
+    def create_gateway(
+        self,
+        instance_name: str,
+        ssh_key_pub: str,
+        region: str,
+        project_id: str,
+    ) -> LaunchedGatewayInfo:
+        logger.info("Launching %s gateway instance in %s...", instance_name, region)
+        vm = _launch_instance(
+            compute_client=self._compute_client,
+            subscription_id=self.config.subscription_id,
+            location=region,
+            resource_group=self.config.resource_group,
+            network_security_group=azure_utils.get_gateway_network_security_group_name(
+                resource_group=self.config.resource_group,
+                location=region,
+            ),
+            network=azure_utils.get_default_network_name(
+                resource_group=self.config.resource_group,
+                location=region,
+            ),
+            subnet=azure_utils.get_default_subnet_name(
+                resource_group=self.config.resource_group,
+                location=region,
+            ),
+            managed_identity=None,
+            image_reference=_get_gateway_image_ref(),
+            vm_size="Standard_B1s",
+            instance_name=instance_name,
+            user_data=get_gateway_user_data(ssh_key_pub),
+            ssh_pub_keys=[ssh_key_pub],
+            spot=False,
+            disk_size=30,
+            computer_name="gatewayvm",
+        )
+        logger.info("Request succeeded")
+        public_ip = _get_vm_public_ip(
+            network_client=self._network_client,
+            resource_group=self.config.resource_group,
+            vm=vm,
+        )
+        return LaunchedGatewayInfo(
+            instance_id=vm.name,
+            ip_address=public_ip,
+            region=region,
         )
 
 
@@ -241,6 +293,15 @@ def _get_image_ref(
     return ImageReference(community_gallery_image_id=image.unique_id)
 
 
+def _get_gateway_image_ref() -> ImageReference:
+    return ImageReference(
+        publisher="canonical",
+        offer="0001-com-ubuntu-server-jammy",
+        sku="22_04-lts",
+        version="latest",
+    )
+
+
 def _launch_instance(
     compute_client: compute_mgmt.ComputeManagementClient,
     subscription_id: str,
@@ -249,13 +310,15 @@ def _launch_instance(
     network_security_group: str,
     network: str,
     subnet: str,
-    managed_identity: str,
+    managed_identity: Optional[str],
     image_reference: ImageReference,
     vm_size: str,
     instance_name: str,
     user_data: str,
     ssh_pub_keys: List[str],
     spot: bool,
+    disk_size: int,
+    computer_name: str,
 ) -> VirtualMachine:
     try:
         poller = compute_client.virtual_machines.begin_create_or_update(
@@ -271,12 +334,12 @@ def _launch_instance(
                         managed_disk=ManagedDiskParameters(
                             storage_account_type=StorageAccountTypes.STANDARD_SSD_LRS
                         ),
-                        disk_size_gb=100,
+                        disk_size_gb=disk_size,
                         delete_option="Delete",
                     ),
                 ),
                 os_profile=OSProfile(
-                    computer_name="runnervm",
+                    computer_name=computer_name,
                     admin_username="ubuntu",
                     linux_configuration=LinuxConfiguration(
                         ssh=SshConfiguration(
@@ -323,7 +386,9 @@ def _launch_instance(
                 ),
                 priority="Spot" if spot else "Regular",
                 eviction_policy="Delete" if spot else None,
-                identity=VirtualMachineIdentity(
+                identity=None
+                if managed_identity is None
+                else VirtualMachineIdentity(
                     type=ResourceIdentityType.USER_ASSIGNED,
                     user_assigned_identities={
                         azure_utils.get_managed_identity_id(

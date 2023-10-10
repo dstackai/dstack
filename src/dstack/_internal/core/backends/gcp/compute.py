@@ -6,7 +6,11 @@ import google.cloud.compute_v1 as compute_v1
 
 import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
-from dstack._internal.core.backends.base.compute import Compute, get_user_data
+from dstack._internal.core.backends.base.compute import (
+    Compute,
+    get_gateway_user_data,
+    get_user_data,
+)
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.gcp.config import GCPConfig
 from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
@@ -16,6 +20,7 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
+    LaunchedGatewayInfo,
     LaunchedInstanceInfo,
     Resources,
 )
@@ -137,6 +142,55 @@ class GCPCompute(Compute):
             )
         raise NoCapacityError()
 
+    def create_gateway(
+        self,
+        instance_name: str,
+        ssh_key_pub: str,
+        region: str,
+        project_id: str,
+    ) -> LaunchedGatewayInfo:
+        gcp_resources.create_gateway_firewall_rules(
+            firewalls_client=self.firewalls_client,
+            project_id=self.config.project_id,
+        )
+        # e2-micro is available in every zone
+        for i in self.regions_client.list(project=self.config.project_id):
+            if i.name == region:
+                zone = i.zones[0].split("/")[-1]
+                break
+        else:
+            raise ResourceNotFoundError()
+
+        request = compute_v1.InsertInstanceRequest()
+        request.zone = zone
+        request.project = self.config.project_id
+        request.instance_resource = gcp_resources.create_instance_struct(
+            disk_size=10,
+            image_id=gcp_resources.get_gateway_image_id(),
+            machine_type="e2-micro",
+            accelerators=[],
+            spot=False,
+            user_data=get_gateway_user_data(ssh_key_pub),
+            labels={
+                "owner": "dstack",
+                "dstack_project": project_id,
+            },
+            tags=[gcp_resources.DSTACK_GATEWAY_TAG],
+            instance_name=instance_name,
+            zone=zone,
+            service_account=None,
+        )
+        operation = self.instances_client.insert(request=request)
+        gcp_resources.wait_for_extended_operation(operation, "instance creation")
+        instance = self.instances_client.get(
+            project=self.config.project_id, zone=zone, instance=instance_name
+        )
+        return LaunchedGatewayInfo(
+            instance_id=instance_name,
+            region=zone,  # used for instance termination
+            ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
+        )
+
 
 def _supported_instances_and_zones(
     regions: List[str],
@@ -189,7 +243,7 @@ def _unique_instance_name(instance: InstanceType) -> str:
     return f"{name}-{gpu.name}-{gpu.memory_mib}"
 
 
-def _get_instance_zones(instance_offer: InstanceOfferWithAvailability) -> List[str]:
+def _get_instance_zones(instance_offer: InstanceOffer) -> List[str]:
     zones = []
     for offer in get_catalog_offers(provider=BackendType.GCP.value):
         if _unique_instance_name(instance_offer.instance) != _unique_instance_name(offer.instance):

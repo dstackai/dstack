@@ -14,7 +14,7 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
+from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -207,6 +207,7 @@ class AWSCompute(Compute):
 
         return LaunchedGatewayInfo(
             instance_id=instance.instance_id,
+            region=region,
             ip_address=instance.public_ip_address,
         )
 

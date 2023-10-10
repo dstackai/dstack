@@ -2,7 +2,7 @@ import argparse
 
 from rich_argparse import RichHelpFormatter
 
-from dstack._internal.cli.commands.gateways import GatewayCommand
+from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogsCommand
 from dstack._internal.cli.commands.ps import PsCommand
