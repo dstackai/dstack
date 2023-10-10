@@ -104,6 +104,8 @@ class AzureConfigurator(Configurator):
         config_values.default_creds = auth.default_creds_available()
         if config.creds is None:
             return config_values
+        if isinstance(config.creds, AzureClientCreds):
+            self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         try:
             credential, creds_tenant_id = auth.authenticate(config.creds)
         except BackendAuthError:
@@ -137,6 +139,8 @@ class AzureConfigurator(Configurator):
     def create_backend(
         self, project: ProjectModel, config: AzureConfigInfoWithCreds
     ) -> BackendModel:
+        if isinstance(config.creds, AzureClientCreds):
+            self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         credential, _ = auth.authenticate(config.creds)
         resource_group = self._create_resource_group(
             credential=credential,
@@ -187,6 +191,22 @@ class AzureConfigurator(Configurator):
             **json.loads(model.config),
             creds=AzureCreds.parse_raw(model.auth).__root__,
         )
+
+    def _set_client_creds_tenant_id(
+        self,
+        creds: AzureClientCreds,
+        tenant_id: Optional[str],
+    ):
+        if creds.tenant_id is not None:
+            return
+        if tenant_id is None:
+            raise_invalid_credentials_error(
+                fields=[
+                    ["creds", "tenant_id"],
+                    ["tenant_id"],
+                ]
+            )
+        creds.tenant_id = tenant_id
 
     def _get_tenant_id_element(
         self,
