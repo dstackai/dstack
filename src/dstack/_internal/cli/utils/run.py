@@ -105,7 +105,9 @@ def print_run_plan(run_plan: RunPlan, candidates_limit: int = 3):
         console.print()
 
 
-def print_runs_table(runs: List[Run], include_configuration: bool = False, verbose: bool = False):
+def generate_runs_table(
+    runs: List[Run], include_configuration: bool = False, verbose: bool = False
+) -> Table:
     table = Table(box=None)
     table.add_column("RUN", style="bold", no_wrap=True)
     if include_configuration:
@@ -140,7 +142,7 @@ def print_runs_table(runs: List[Run], include_configuration: bool = False, verbo
         if verbose:
             renderables.append("TODO")  # TODO
         table.add_row(*renderables)
-    console.print(table)
+    return table
 
 
 def pretty_format_resources(

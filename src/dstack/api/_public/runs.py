@@ -355,10 +355,16 @@ class RunCollection:
 
     def list(self, all: bool = False) -> List[Run]:
         """
-        List
+        List runs
+        :param all: show all runs, by default, it only shows active runs or the recent finished
         """
-        # TODO support `all` key
         runs = self._api_client.runs.list(project_name=self._project, repo_id=None)
+        if not all:
+            active = [run for run in runs if not run.status.is_finished()]
+            if active:
+                runs = active
+            else:
+                runs = runs[:1]  # the most recent finished run
         return [self._model_to_run(run) for run in runs]
 
     def get(self, run_name: str) -> Optional[Run]:
