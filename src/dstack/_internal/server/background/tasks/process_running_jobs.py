@@ -183,12 +183,6 @@ def _process_running_job(
                 timestamp = job_model.runner_timestamp
             resp = runner_client.pull(timestamp)
             job_model.runner_timestamp = resp.last_updated
-            if len(resp.job_states) == 0:
-                logger.debug("Got 0 job %s states", job_model.job_name)
-                return
-            last_job_state = resp.job_states[-1]
-            job_model.status = last_job_state.state
-            logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
             logs_services.write_logs(
                 project=run_model.project,
                 run_name=run_model.run_name,
@@ -196,6 +190,12 @@ def _process_running_job(
                 runner_logs=resp.runner_logs,
                 job_logs=resp.job_logs,
             )
+            if len(resp.job_states) == 0:
+                logger.debug("Job %s status not changed", job_model.job_name)
+                return
+            last_job_state = resp.job_states[-1]
+            job_model.status = last_job_state.state
+            logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
     except dstack._internal.core.errors.SSHError:
         job_model.status = JobStatus.FAILED
         job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY

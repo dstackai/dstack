@@ -1,3 +1,4 @@
+import base64
 import queue
 import tempfile
 import threading
@@ -96,7 +97,7 @@ class Run(ABC):
             if len(resp.logs) == 0:
                 return
             for log in resp.logs:
-                yield log.message.encode()
+                yield base64.b64decode(log.message)
             next_start_time = resp.logs[-1].timestamp
 
     def refresh(self):
