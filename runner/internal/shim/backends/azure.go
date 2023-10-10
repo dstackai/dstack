@@ -34,7 +34,7 @@ func NewAzureBackend(ctx context.Context) (Backend, error) {
 }
 
 func (b *AzureBackend) Terminate(ctx context.Context) error {
-	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	credential, err := azidentity.NewManagedIdentityCredential(nil)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
