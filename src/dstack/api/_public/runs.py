@@ -39,6 +39,15 @@ logger = get_logger(__name__)
 
 
 class Run(ABC):
+    """
+    Attributes:
+        name: run name
+        ports: ports mapping, if run is attached
+        backend: backend type
+        status: run status
+        hostname: instance hostname
+    """
+
     def __init__(
         self,
         api_client: APIClient,
@@ -81,6 +90,16 @@ class Run(ABC):
         start_time: Optional[datetime] = None,
         diagnose: bool = False,
     ) -> Iterable[bytes]:
+        """
+        Iterate through run's log messages
+
+        Args:
+            start_time: minimal log timestamp
+            diagnose: return runner logs if `True`
+
+        Yields:
+            log messages
+        """
         next_start_time = start_time
         while True:
             resp = self._api_client.logs.poll(
@@ -110,6 +129,9 @@ class Run(ABC):
     def stop(self, abort: bool = False):
         """
         Terminate the instance and detach
+
+        Args:
+            abort: gracefully stop the run if `False`
         """
         self._api_client.runs.stop(self._project, [self.name], abort)
         logger.debug("%s run %s", "Aborted" if abort else "Stopped", self.name)
@@ -233,6 +255,10 @@ class SubmittedRun(Run):
 
 
 class RunCollection:
+    """
+    Operations with runs
+    """
+
     def __init__(
         self,
         api_client: APIClient,
@@ -263,18 +289,22 @@ class RunCollection:
     ) -> SubmittedRun:
         """
         Submit a run
-        :param configuration: run configuration. Mutually exclusive with `configuration_path`
-        :param configuration_path: run configuration path, relative to `repo_dir`. Mutually exclusive with `configuration`
-        :param backends: list of allowed backend for provisioning
-        :param resources: minimal resources for provisioning
-        :param spot_policy: spot policy for provisioning
-        :param retry_policy: retry policy for interrupted jobs
-        :param max_duration: max instance running duration in seconds
-        :param max_price: max instance price in dollars per hour for provisioning
-        :param working_dir: working directory relative to `repo_dir`
-        :param run_name: desired run_name. Must be unique in the project
-        :param verify_ports: reserve local ports before submit
-        :return: submitted run
+
+        Args:
+            configuration: run configuration. Mutually exclusive with `configuration_path`
+            configuration_path: run configuration path, relative to `repo_dir`. Mutually exclusive with `configuration`
+            backends: list of allowed backend for provisioning
+            resources: minimal resources for provisioning
+            spot_policy: spot policy for provisioning
+            retry_policy: retry policy for interrupted jobs
+            max_duration: max instance running duration in seconds
+            max_price: max instance price in dollars per hour for provisioning
+            working_dir: working directory relative to `repo_dir`
+            run_name: desired run_name. Must be unique in the project
+            verify_ports: reserve local ports before submit
+
+        Returns:
+            submitted run
         """
         run_plan = self.get_plan(
             configuration=configuration,
@@ -305,6 +335,9 @@ class RunCollection:
     ) -> RunPlan:
         """
         Get run plan. Same arguments as `submit`
+
+        Returns:
+            run plan
         """
         working_dir = self._repo_dir / (working_dir or ".")
         if not path_in_dir(working_dir, self._repo_dir):
@@ -339,9 +372,13 @@ class RunCollection:
     def exec_plan(self, run_plan: RunPlan, reserve_ports: bool = True) -> SubmittedRun:
         """
         Execute run plan
-        :param run_plan: result of `get_plan` call
-        :param reserve_ports: reserve local ports before submit
-        :return: submitted run
+
+        Args:
+            run_plan: result of `get_plan` call
+            reserve_ports: reserve local ports before submit
+
+        Returns:
+            submitted run
         """
         ports_lock = None
         if reserve_ports:
@@ -361,7 +398,12 @@ class RunCollection:
     def list(self, all: bool = False) -> List[Run]:
         """
         List runs
-        :param all: show all runs, by default, it only shows active runs or the recent finished
+
+        Args:
+            all: show all runs (active and finished) if `True`
+
+        Returns:
+            list of runs
         """
         runs = self._api_client.runs.list(project_name=self._project, repo_id=None)
         if not all:
@@ -375,6 +417,12 @@ class RunCollection:
     def get(self, run_name: str) -> Optional[Run]:
         """
         Get run by run name
+
+        Args:
+            run_name: run name
+
+        Returns:
+            run or `None` if not found
         """
         try:
             run = self._api_client.runs.get(self._project, run_name)

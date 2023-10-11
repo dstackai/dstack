@@ -14,6 +14,10 @@ from dstack.api.server import APIClient
 
 
 class RepoCollection:
+    """
+    Operations with repos
+    """
+
     def __init__(self, api_client: APIClient, project: str, repo: Union[RemoteRepo, LocalRepo]):
         self._api_client = api_client
         self._project = project
@@ -25,9 +29,11 @@ class RepoCollection:
         oauth_token: Optional[str] = None,
     ):
         """
-        Loads credentials and initializes the remote repo in the project
-        :param git_identity_file: SSH private key to access the remote repo
-        :param oauth_token: GitHub OAuth token to access the remote repo
+        Upload credentials and initializes the remote repo in the project
+
+        Args:
+            git_identity_file: SSH private key to access the remote repo
+            oauth_token: GitHub OAuth token to access the remote repo
         """
         creds = None
         if isinstance(self._repo, RemoteRepo):
@@ -47,6 +53,9 @@ class RepoCollection:
     def is_initialized(self) -> bool:
         """
         Checks if the remote repo is initialized in the project
+
+        Returns:
+            repo is initialized
         """
         try:
             self._api_client.repos.get(self._project, self._repo.repo_id, include_creds=False)

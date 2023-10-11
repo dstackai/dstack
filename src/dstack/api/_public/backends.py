@@ -1,3 +1,5 @@
+from typing import List
+
 from dstack._internal.core.models.backends import BackendInfo
 from dstack.api.server import APIClient
 
@@ -19,13 +21,20 @@ class Backend:
 
 
 class BackendCollection:
+    """
+    Operations with backends
+    """
+
     def __init__(self, api_client: APIClient, project: str):
         self._api_client = api_client
         self._project = project
 
-    def list(self):
+    def list(self) -> List[Backend]:
         """
-        Lists available backends in the project
+        List available backends in the project
+
+        Returns:
+            backends
         """
         return [
             Backend(self._api_client, backend_info)

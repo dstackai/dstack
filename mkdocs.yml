@@ -79,6 +79,12 @@ plugins:
   - gen-files:
       scripts:  # always relative to mkdocs.yml
         - scripts/docs/gen_cli_reference.py
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: false
 
 # Extensions
 markdown_extensions:
@@ -162,7 +168,10 @@ nav:
               - dstack logs: docs/reference/cli/logs.md
               - dstack stop: docs/reference/cli/stop.md
               - dstack gateway: docs/reference/cli/gateway.md
-          - Python API: docs/reference/api/python/index.md
+          - Python API:
+              - Overview: docs/reference/api/python/index.md
+              - Reference: docs/reference/api/python/reference.md
+              - Server: docs/reference/api/python/server.md
           - .dstack.yml:
               - "type: dev-environment": docs/reference/dstack.yml/dev-environment.md
               - "type: task": docs/reference/dstack.yml/task.md
