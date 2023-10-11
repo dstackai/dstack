@@ -12,22 +12,6 @@ class InitCommand(BaseCommand):
     NAME = "init"
     DESCRIPTION = "Initialize the repo"
 
-    def _command(self, args: argparse.Namespace):
-        configure_logging()
-        try:
-            Client.from_config(
-                Path.cwd(),
-                args.project,
-                git_identity_file=args.git_identity_file,
-                oauth_token=args.gh_token,
-                ssh_identity_file=args.ssh_identity_file,
-                local_repo=args.local,
-                init=True,
-            )
-        except ConfigurationError as e:
-            raise cli_error(e)
-        console.print("OK")
-
     def _register(self):
         self._parser.add_argument(
             "--project",
@@ -61,3 +45,19 @@ class InitCommand(BaseCommand):
             action="store_true",
             help="Do not use git",
         )
+
+    def _command(self, args: argparse.Namespace):
+        configure_logging()
+        try:
+            Client.from_config(
+                Path.cwd(),
+                args.project,
+                git_identity_file=args.git_identity_file,
+                oauth_token=args.gh_token,
+                ssh_identity_file=args.ssh_identity_file,
+                local_repo=args.local,
+                init=True,
+            )
+        except ConfigurationError as e:
+            raise cli_error(e)
+        console.print("OK")
