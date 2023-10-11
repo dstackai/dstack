@@ -46,7 +46,7 @@ async def process_running_jobs():
                     JobModel.status.in_([JobStatus.PROVISIONING, JobStatus.RUNNING]),
                     JobModel.id.not_in(RUNNING_PROCESSING_JOBS_IDS),
                 )
-                .order_by(JobModel.last_processed_at.desc())
+                .order_by(JobModel.last_processed_at.asc())
                 .limit(1)  # TODO process multiple at once
             )
             job_model = res.scalar()
