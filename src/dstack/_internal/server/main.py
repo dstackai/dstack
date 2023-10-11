@@ -52,9 +52,9 @@ async def lifespan(app: FastAPI):
         project_name=DEFAULT_PROJECT_NAME, url=SERVER_URL, token=admin.token
     )
     scheduler = start_background_tasks()
-    url = f"{SERVER_URL}?token={admin.token}"
     dstack_version = dstack.version.__version__ if dstack.version.__version__ else "(no version)"
-    print(f"\nThe dstack server {dstack_version} is running at:\n{url}")
+    print(f"\nThe dstack server {dstack_version} is running at {SERVER_URL}.")
+    print(f"The admin user token is '{admin.token}'.")
     yield
     scheduler.shutdown()
 
