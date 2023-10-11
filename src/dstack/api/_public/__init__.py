@@ -21,6 +21,17 @@ logger = get_logger(__name__)
 
 
 class Client:
+    """
+    High-level API client for interacting with dstack server
+
+    Attributes:
+        repos: operations with repos
+        backends: operations with backends
+        runs: operations with runs
+        client: low-level server API client
+        project: project name
+    """
+
     def __init__(
         self,
         api_client: APIClient,
@@ -33,14 +44,15 @@ class Client:
         init: bool = True,
     ):
         """
-        :param api_client: low-level server API client
-        :param project_name: project name used for runs
-        :param repo_dir: path to the repo
-        :param repo: repo used for runs
-        :param git_identity_file: private SSH key to access remote repo, used only if `init` is True
-        :param oauth_token: GitHub OAuth token to access remote repo, used only if `init` is True
-        :param ssh_identity_file: SSH keypair to access instances
-        :param init: initialize the repo first
+        Args:
+            api_client: low-level server API client
+            project_name: project name used for runs
+            repo_dir: path to the repo
+            repo: repo used for runs
+            git_identity_file: private SSH key to access remote repo, used only if `init` is True
+            oauth_token: GitHub OAuth token to access remote repo, used only if `init` is True
+            ssh_identity_file: SSH keypair to access instances
+            init: initialize the repo first
         """
         self._client = api_client
         self._project = project_name
@@ -67,17 +79,21 @@ class Client:
         init: bool = True,
     ) -> "Client":
         """
-        Creates a Client using global config ~/.dstack/config.yaml
-        :param repo_dir: path to the repo
-        :param project_name: name of the project, required if `server_url` and `user_token` are specified
-        :param server_url: dstack server url, e.g. http://localhost:3000/
-        :param user_token: dstack user token
-        :param git_identity_file: path to a private SSH key to access remote repo
-        :param oauth_token: GitHub OAuth token to access remote repo
-        :param ssh_identity_file: SSH keypair to access instances
-        :param local_repo: load repo as local, has an effect only if `init` is True
-        :param init: initialize the repo first
-        :return: dstack Client
+        Creates a Client using global config `~/.dstack/config.yaml`
+
+        Args:
+            repo_dir: path to the repo
+            project_name: name of the project, required if `server_url` and `user_token` are specified
+            server_url: dstack server url, e.g. `http://localhost:3000/`
+            user_token: dstack user token
+            git_identity_file: path to a private SSH key to access remote repo
+            oauth_token: GitHub OAuth token to access remote repo
+            ssh_identity_file: SSH keypair to access instances
+            local_repo: load repo as local, has an effect only if `init` is True
+            init: initialize the repo first
+
+        Returns:
+            dstack Client
         """
         config = ConfigManager()
         if not init:
