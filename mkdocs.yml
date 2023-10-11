@@ -76,6 +76,9 @@ plugins:
         'docs/guides/projects.md': 'docs/guides/clouds.md'
         'examples/python-api.md': 'examples/deploy-python.md'
   - typeset
+  - gen-files:
+      scripts:  # always relative to mkdocs.yml
+        - scripts/docs/gen_cli_reference.py
 
 # Extensions
 markdown_extensions:
@@ -154,17 +157,10 @@ nav:
           - CLI:
               - dstack run: docs/reference/cli/run.md
               - dstack init: docs/reference/cli/init.md
-              - dstack start: docs/reference/cli/start.md
-              - dstack config: docs/reference/cli/config.md
+              - dstack server: docs/reference/cli/server.md
               - dstack ps: docs/reference/cli/ps.md
-              - dstack ls: docs/reference/cli/ls.md
               - dstack logs: docs/reference/cli/logs.md
               - dstack stop: docs/reference/cli/stop.md
-              - dstack rm: docs/reference/cli/rm.md
-              - dstack tags: docs/reference/cli/tags.md
-              - dstack secrets: docs/reference/cli/secrets.md
-              - dstack prune: docs/reference/cli/prune.md
-              - dstack build: docs/reference/cli/build.md
               - dstack gateway: docs/reference/cli/gateway.md
           - Python API: docs/reference/api/python/index.md
           - .dstack.yml:

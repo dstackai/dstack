@@ -14,16 +14,7 @@ default, it generates its own key. You can override this key by using the argume
 
 ```shell
 $ dstack init --help
-Usage: dstack init [-h] [--project PROJECT] [-t OAUTH_TOKEN] [--git-identity SSH_PRIVATE_KEY] [--ssh-identity SSH_PRIVATE_KEY]
-
-Options:
-  --project PROJECT     The project to execute the command for
-  -t, --token OAUTH_TOKEN
-                        An authentication token for Git
-  --git-identity SSH_PRIVATE_KEY
-                        A path to the private SSH key file for non-public repositories
-  --ssh-identity SSH_PRIVATE_KEY
-                        A path to the private SSH key file for SSH port forwarding
+#GENERATE#
 ```
 
 </div>

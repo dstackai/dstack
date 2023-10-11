@@ -7,13 +7,8 @@ This command starts the Hub server. The Hub is required to run workflows.
 <div class="termy">
 
 ```shell
-$ dstack start --help
-Usage: dstack start [-h] [--host HOST] [-p PORT] [-l LOG-LEVEL] [--token TOKEN]
-
-Options:
-  --host HOST           Bind socket to this host. Defaults to 127.0.0.1
-  -p, --port PORT       Bind socket to this port. Defaults to 3000.
-  --token TOKEN         The personal access token of the admin user. Is generated randomly by default.
+$ dstack server --help
+#GENERATE#
 ```
 
 </div>

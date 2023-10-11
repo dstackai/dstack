@@ -14,7 +14,8 @@ The `dstack gateway list` command displays the names and addresses of the gatewa
 <div class="termy">
 
 ```shell
-$ dstack gateway list
+$ dstack gateway list --help
+#GENERATE#
 ```
 
 </div>
@@ -28,13 +29,8 @@ The `dstack gateway create` command creates a new gateway instance in the projec
 <div class="termy">
 
 ```shell
-$ dstack gateway create --help     
-Usage: dstack gateway create [-h] [--project PROJECT]
-
-Optional Arguments:
-  -h, --help         show this help message and exit
-  --project PROJECT  The name of the project
-  --backend {aws,gcp,azure}
+$ dstack gateway create --help
+#GENERATE#
 ```
 
 </div>
@@ -55,17 +51,9 @@ The `dstack gateway delete` command deletes the specified gateway.
 
 <div class="termy">
 
-```shell    
+```shell
 $ dstack gateway delete --help
-Usage: dstack gateway delete [-h] [--project PROJECT] [-y] NAME
-
-Positional Arguments:
-  NAME               The name of the gateway
-
-Optional Arguments:
-  -h, --help         show this help message and exit
-  --project PROJECT  The name of the project
-  -y, --yes          Don't ask for confirmation
+#GENERATE#
 ```
 
 </div>
@@ -80,3 +68,19 @@ The following arguments are optional:
 
 - `--project PROJECT` - (Optional) The name of the project to execute the command for
 - `-y`, `--yes` – (Optional) Don't ask for confirmation
+
+
+## dstack gateway update
+
+The `dstack gateway update` command updates the specified gateway.
+
+### Usage
+
+<div class="termy">
+
+```shell
+$ dstack gateway update --help
+#GENERATE#
+```
+
+</div>

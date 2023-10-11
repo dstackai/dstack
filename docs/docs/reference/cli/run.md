@@ -7,20 +7,8 @@ This command runs a given configuration.
 <div class="termy">
 
 ```shell
-$ dstack run --help
-Usage: dstack run WORKING_DIR [-f CONFIGURATION_FILE] [-n RUN_NAME]
-                  [-e ENV ...]
-                  [-p PORT ...]
-                  [--gpu GPU] [--memory MEMORY] [--shm-size SHM_SIZE]
-                  [--spot-auto | --spot | --on-demand] 
-                  [--no-retry | --retry-limit RETRY]
-                  [--max-price MAX_PRICE]
-                  [--backend BACKEND_TYPE ...]
-                  [--profile PROFILE_NAME] [--project PROJECT_NAME]
-                  [--reload] 
-                  [-d]
-                  [-y]
-                  [ARGS ...]
+$ dstack run . --help
+#GENERATE#
 ```
 
 </div>

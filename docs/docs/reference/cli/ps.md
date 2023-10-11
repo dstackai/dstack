@@ -8,16 +8,7 @@ This command shows status of runs within the current repository.
 
 ```shell
 $ dstack ps --help
-Usage: dstack ps [-h] [--project PROJECT] [-a] [-v] [-w] [RUN]
-
-Positional Arguments:
-  RUN                The name of the run
-
-Options:
-  --project PROJECT  The name of the project to execute the command for
-  -a, --all          Show all runs. By default, it only shows unfinished runs or the last finished.
-  -v, --verbose      Show more information about runs
-  -w, --watch        Watch statuses of runs in realtime
+#GENERATE#
 ```
 
 </div>
