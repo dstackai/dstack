@@ -20,7 +20,6 @@ from dstack._internal.core.models.configurations import TaskConfiguration as Tas
 from dstack._internal.core.models.logs import LogEvent
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.profiles import ProfileResources as Resources
-from dstack._internal.core.models.profiles import ProfileRetryPolicy
 from dstack._internal.core.models.profiles import ProfileRetryPolicy as RetryPolicy
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
@@ -313,7 +312,7 @@ class RunCollection:
             backends=backends,
             resources=resources,
             spot_policy=spot_policy,
-            retry_policy=retry_policy or ProfileRetryPolicy(),
+            retry_policy=retry_policy,
             max_duration=max_duration,
             max_price=max_price,
             working_dir=working_dir,

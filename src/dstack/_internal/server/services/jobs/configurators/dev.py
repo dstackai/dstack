@@ -5,7 +5,7 @@ from dstack._internal.core.models.configurations import (
     DevEnvironmentConfiguration,
     PortMapping,
 )
-from dstack._internal.core.models.profiles import SpotPolicy
+from dstack._internal.core.models.profiles import ProfileRetryPolicy, SpotPolicy
 from dstack._internal.core.models.runs import RetryPolicy, RunSpec
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.services.jobs.configurators.extensions.vscode import VSCodeDesktop
@@ -46,7 +46,7 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         return DEFAULT_MAX_DURATION_SECONDS
 
     def _retry_policy(self) -> RetryPolicy:
-        return RetryPolicy.parse_obj(self.run_spec.profile.retry_policy)
+        return RetryPolicy.parse_obj(self.run_spec.profile.retry_policy or ProfileRetryPolicy())
 
     def _spot_policy(self) -> SpotPolicy:
         return self.run_spec.profile.spot_policy or SpotPolicy.ONDEMAND
