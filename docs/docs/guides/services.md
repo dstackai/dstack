@@ -1,143 +1,101 @@
 # Services
 
-A service in `dstack` is a web app accessible through a public endpoint. When running a web app as a service,
-`dstack` automatically creates a public endpoint, enabling you to use your domain and HTTPS.
+A service is a web app accessible from the Internet. It is ideal for deploying wep apps 
+for production purposes.
 
-!!! info "NOTE:"
-    Services are ideal for deploying wep apps (e.g., LLMs) for production purposes.
-    If you intend to run a web app for development purposes, please refer to [tasks](tasks.md).
+## Using the CLI
 
-## Define a configuration
+### Set up a gateway
 
-To configure a service, create its configuration file. It can be defined
-in any folder but must be named with a suffix `.dstack.yml`.
+Before you can run a service, you need to set up a gateway. To do that, you'll need your own domain.
 
-<div editor-title="serve.dstack.yml"> 
+#### Create a gateway
+
+For example, if your domain is `example.com`, go ahead and run the 
+`dstack gateway create` command:
+
+<div class="termy">
+   
+```shell
+$ dstack gateway create --domain example.com --region eu-west-1 --backend aws
+
+Creating gateway...
+---> 100%
+
+ BACKEND  REGION     NAME          ADDRESS        DOMAIN       DEFAULT
+ aws      eu-west-1  sour-fireant  52.148.254.14  example.com  ✓
+```
+
+</div>
+
+Afterward, in your domain's DNS settings, add an `A` DNS record for `*.example.com` 
+pointing to the IP address of the gateway.
+
+The gateway will take care of everything to make services available
+from the Internet.
+For instance, running a service will make it available at 
+`https://<run-name>.example.com`.
+
+### Define a configuration
+
+To run a service via the CLI, first create its configuration file. 
+The configuration file name must end with `.dstack.yml` (e.g., `.dstack.yml` or `dev.dstack.yml` are both acceptable).
+
+<div editor-title="service.dstack.yml"> 
 
 ```yaml
 type: service
 
-port: 7860
+image: ghcr.io/huggingface/text-generation-inference:latest
 
-python: "3.11" # (Optional) If not specified, your local version is used.
+env: 
+  - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ 
+
+port: 80
 
 commands:
-  - pip install -r requirements
-  - python app.py
+  - text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code
 ```
 
 </div>
 
-### Configure the environment
+By default, `dstack` uses its own Docker images to run dev environments, 
+which are pre-configured with Python, Conda, and essential CUDA drivers.
 
-By default, `dstack` uses its own Docker images to run services, which are pre-configured with Python, Conda, and essential CUDA drivers.
+!!! info "Configuration options"
+    Configuration file allows you to specify a custom Docker image, ports, environment variables, and many other 
+    options.
+    For more details, refer to the [Reference](../reference/dstack.yml/service.md).
 
-You can install packages using `pip` and `conda` executables from `commands`.
+### Run the configuration
 
-??? info "Docker image"
-    If you prefer to use your custom Docker image, use the `image` property in the configuration.
+The `dstack run` command requires the working directory path, and optionally, the `-f`
+argument pointing to the configuration file.
 
-    <div editor-title="serve.dstack.yml">
-
-    ```yaml
-    type: service
-
-    port: 7860
-    
-    image: nvcr.io/nvidia/pytorch:22.12-py3
-    
-    commands:
-      - pip install -r requirements.txt
-      - python app.py
-    ```
-
-    </div>
-
-??? info "Build command (experimental)" 
-
-    In case you'd like to pre-build the environment rather than install packaged on every run,
-    you can use the `build` property. Here's an example:
-    
-    <div editor-title="serve.dstack.yml"> 
-    
-    ```yaml
-    type: service
-
-    port: 7860
-
-    python: "3.11" # (Optional) If not specified, your local version is used.
-    
-    build:
-      - pip install -r requirements.txt
-    
-    commands:
-      - python app.py
-    ```
-    
-    </div>
-
-    In this case, you have to pass `--build` to `dstack run`.
-
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . -f serve.dstack.yml --build
-    ```
-    
-    </div>
-
-    If there is no pre-built image, the `dstack run` command will build it and upload it to the storage. If the pre-built
-    image is already available, the `dstack run` command will reuse it.
-
-For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml/service.md).
-
-## Run the configuration
-
-!!! info "Gateway"
-    Before running a service, ensure that you have configured a [gateway](clouds.md#configure-gateways).
-
-To run a service, use the `dstack run` command followed by the path to the directory you want to use as the
-working directory.
-
-If the configuration file is named other than `.dstack.yml`, pass its path via the `-f` argument.
+If the `-f` argument is not specified, `dstack` looks for the default configuration (`.dstack.yml`) in the working directory.
 
 <div class="termy">
 
 ```shell
-$ dstack run . -f serve.dstack.yml
+$ dstack run . -f service.dstack.yml --gpu A100
 
- RUN           CONFIGURATION     BACKEND  RESOURCES        SPOT  PRICE
- yellow-cat-1  serve.dstack.yml  aws      5xCPUs, 15987MB  yes  $0.0547  
+ RUN           CONFIGURATION       BACKEND  RESOURCES        SPOT  PRICE
+ yellow-cat-1  service.dstack.yml  aws      5xCPUs, 15987MB  yes   $0.0547  
 
 Provisioning...
 ---> 100%
 
-Serving HTTP on https://yellow-cat-1.mydomain.com ...
+Serving HTTP on https://yellow-cat-1.example.com ...
 ```
 
 </div>
 
-This command deploys the service, and forwards the traffic to the gateway's endpoint.
+#### Request resources
 
-!!! info "Wildcard domain"
-    If you've configured a [wildcard domain](clouds.md#configure-gateways) for the gateway, 
-    `dstack` enables HTTPS automatically and serves the service at 
-    `https://<run name>.<your domain name>`.
+The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
+`--memory` to request memory (e.g. `--memory 128GB`),
+and many other options (incl. spot instances, max price, max duration, etc.).
 
-    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command. 
+For more details on the `dstack run` command, refer to the [Reference](../reference/cli/run.md).
 
-### Request resources
-
-You can request resources using the [`--gpu`](../reference/cli/run.md#GPU) 
-and [`--memory`](../reference/cli/run.md#MEMORY) arguments with `dstack run`, 
-or through [`resources`](../reference/profiles.yml.md#RESOURCES) with `.dstack/profiles.yml`.
-
-Both the [`dstack run`](../reference/cli/run.md) command and [`.dstack/profiles.yml`](../reference/profiles.yml.md)
-support various other options, including requesting spot instances, defining the maximum run duration or price, and
-more.
-
-!!! info "Automatic instance discovery"
-    `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
-    price and availability.
-
-For more details on the run command, refer to [`dstack run`](../reference/cli/run.md).
+[//]: # (TODO: Example)

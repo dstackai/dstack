@@ -34,7 +34,7 @@ class GatewayCommand(APIBaseCommand):
         )
         create_parser.add_argument("--name", help="Set a custom name for the gateway")
         create_parser.add_argument(
-            "--wildcard-domain", help="Set wildcard domain for the gateway", required=True
+            "--domain", help="Set the domain for the gateway", required=True
         )
 
         delete_parser = subparsers.add_parser(
@@ -52,9 +52,9 @@ class GatewayCommand(APIBaseCommand):
         update_parser.set_defaults(subfunc=self._update)
         update_parser.add_argument("name", help="The name of the gateway")
         update_parser.add_argument(
-            "--set-default", action="store_true", help="Set as default gateway for the project"
+            "--set-default", action="store_true", help="Set it the default gateway for the project"
         )
-        update_parser.add_argument("--wildcard-domain", help="Set wildcard domain for the gateway")
+        update_parser.add_argument("--domain", help="Set the domain for the gateway")
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
@@ -72,9 +72,9 @@ class GatewayCommand(APIBaseCommand):
             )
             if args.set_default:
                 self.api.client.gateways.set_default(self.api.project, gateway.name)
-            if args.wildcard_domain:
+            if args.domain:
                 self.api.client.gateways.set_wildcard_domain(
-                    self.api.project, gateway.name, args.wildcard_domain
+                    self.api.project, gateway.name, args.domain
                 )
         gateway = self.api.client.gateways.get(self.api.project, gateway.name)
         print_gateways_table([gateway])
@@ -94,9 +94,9 @@ class GatewayCommand(APIBaseCommand):
         with console.status("Updating gateway..."):
             if args.set_default:
                 self.api.client.gateways.set_default(self.api.project, args.name)
-            if args.wildcard_domain:
+            if args.domain:
                 self.api.client.gateways.set_wildcard_domain(
-                    self.api.project, args.name, args.wildcard_domain
+                    self.api.project, args.name, args.domain
                 )
         gateway = self.api.client.gateways.get(self.api.project, args.name)
         print_gateways_table([gateway])

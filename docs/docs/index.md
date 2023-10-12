@@ -1,35 +1,94 @@
 # Quickstart
 
-`dstack` is an open-source framework for orchestrating GPU workloads
-across multiple cloud GPU providers. It provides a simple cloud-agnostic interface for 
-development and deployment of generative AI models.
+`dstack` is an open-source toolkit for training, fine-tuning, and deployment of 
+generative AI models across various cloud providers. (1)
+{ .annotate } 
 
-## Installation
+1. You can use various cloud accounts (e.g., AWS, GCP, Azure, Lambda Cloud) by configuring 
+   their credentials. The framework can optimize costs by running workloads across multiple 
+   regions and cloud accounts.
 
-To use `dstack`, install it with `pip`, and start the server.
+## Set up the server
+
+Before using `dstack` through CLI or API, set up a `dstack` server. 
+
+[//]: # (&#40;1&#41;)
+[//]: # ({ .annotate } )
+
+[//]: # (1.  The server manages your workloads' state and orchestrates them across configured cloud providers.)
+
+### Install the server
+
+The easiest way to install the server, is via `pip`:
 
 <div class="termy">
 
 ```shell
 $ pip install "dstack[all]" -U
-$ dstack start
-
-The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
 ```
 
 </div>
 
-!!! info "Configure clouds"
-    Upon startup, the server sets up the default project called `main`.
-    Prior to using `dstack`, make sure to [configure clouds](guides/clouds.md#configure-backends).
+### Configure clouds
 
-Once the server is up, you can orchestrate LLM workloads using either the CLI or the Python API.
+Next, configure clouds via `~/.dstack/server/config.yml`. For format details, refer
+to [Reference](reference/server/config.yml.md).
 
-## Using CLI
+Example:
 
-### Initialize the repo
+<div editor-title=".dstack/server/config.yml"> 
 
-To use `dstack` for your project, make sure to first run the [`dstack init`](reference/cli/init.md) command in the root folder of the project.
+```yaml
+projects:
+- name: main
+  backends:
+  - type: aws
+    regions: [us-east-1, eu-west-1]
+    creds:
+      access_key: ...
+      secret_key: ...
+```
+
+</div>
+
+[//]: # (!!! info "AWS, GCP, and Azure")
+[//]: # (    If `~/.dstack/server/config.yml` doesn't exist but you default AWS, GCP, or )
+[//]: # (    Azure credentials are configured on your machine, `dstack` will create the file automatically.)
+
+### Start the server
+
+To start the server, use the `dstack server` command:
+
+<div class="termy">
+
+```shell
+$ dstack server
+
+Applying configuration...
+---> 100%
+
+The server is running at http://127.0.0.1:3000/
+```
+
+</div>
+
+[//]: # (TODO: Add a link to the Docker image)
+
+## Using the CLI
+
+The CLI allows running dev environments, tasks, and services, provided they are defined via YAML configuration files.
+
+[//]: # (TODO: Mention how to configure the CLI)
+
+### Init the repo
+
+Before using the CLI in a folder, run [`dstack init`](reference/cli/init.md) inside it. (1)
+{ .annotate } 
+
+1.  When running dev environments, tasks, and services, `dstack` auto-uploads code from this folder to the cloud, including
+uncommitted local changes. 
+
+    To exclude files, list them in `.gitignore` (respected even if the folder isn't a Git repo).
 
 <div class="termy">
 
@@ -40,15 +99,17 @@ $ dstack init
 
 </div>
 
-### Define a configuration
+[//]: # (TODO: Optionally, mention Git credentials)
 
-The CLI allows you to define what you want to run as a YAMl file and run it via the `dstack run` CLI command.
+### Define the configuration
 
-Configurations can be of three types: `dev-environment`, `task`, and `service`.
+Configuration file names must end with `.dstack.yml` (e.g., `.dstack.yml` or `train.dstack.yml` are both acceptable).
 
 #### Dev environments
 
-A dev environment is a virtual machine pre-configured an IDE.
+A dev environment is a cloud instance pre-configured with an IDE.
+
+Example:
 
 <div editor-title=".dstack.yml"> 
 
@@ -57,21 +118,22 @@ type: dev-environment
 
 python: "3.11" # (Optional) If not specified, your local version is used
 
-setup: # (Optional) Executed once at the first startup
-  - pip install -r requirements.txt
-
 ide: vscode
 ```
 
 </div>
 
-Once it's live, you can open it in your local VS Code by clicking the provided URL in the output.
+After running it, `dstack` provides a URL to open the dev environment in your desktop VS Code.
+
+[//]: # (TODO: Add a link to learn more about dev environments)
 
 #### Tasks
 
-A task can be any script that you may want to run on demand: a batch job, or a web application.
+A task can be a batch job or a web app.
 
-<div editor-title="serve.dstack.yml"> 
+Example:
+
+<div editor-title="train.dstack.yml"> 
 
 ```yaml
 type: task
@@ -79,150 +141,158 @@ type: task
 python: "3.11" # (Optional) If not specified, your local version is used
 
 ports:
-  - 7860
+  - 6006
 
 commands:
   - pip install -r requirements.txt
-  - python app.py
+  - tensorboard --logdir ./logs &
+  - python train.py
 ```
 
 </div>
 
-While the task is running in the cloud, the CLI forwards its ports traffic to `localhost`
-for convenient access.
+??? info "Port forwarding"
+    If you run a task, `dstack` forwards the configured ports to `localhost`.
+    
+    You can override the local port, for instance, by replacing `6006` with `"8080:6006"`. This will forward port `6006` 
+    to `localhost:8080`.
+
+[//]: # (TODO: Add a link to learn more about tasks)
 
 #### Services
 
-A service is an application that is accessible through a public endpoint.
+A service is a web app accessible from the Internet.
 
-<div editor-title="deploy.dstack.yml"> 
+Example:
+
+<div editor-title="service.dstack.yml"> 
 
 ```yaml
 type: service
 
-python: "3.11" # (Optional) If not specified, your local version is used
+image: ghcr.io/huggingface/text-generation-inference:latest
 
-port: 7860
+env: 
+  - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ 
+
+port: 80
 
 commands:
-  - pip install -r requirements.txt
-  - python app.py
+  - text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code
 ```
 
 </div>
 
-Once the service is up, `dstack` makes it accessible from the Internet through
-the [gateway](guides/clouds.md#configure-gateways).
+!!! info "Gateway"
+    Before you can run a service, you have to set up a [gateway](guides/services.md#set-up-a-gateway).
 
-For more details on the file syntax, refer to [`.dstack.yml`](../docs/reference/dstack.yml/index.md).
+Running a service will make it available at `https://<run-name>.<your-domain>` using the
+domain configured for the gateway.  
+
+!!! info "Configuration options"
+    Configuration files allow you to specify a custom Docker image, environment variables, and many other 
+    options.
+    For more details, refer to the [Reference](reference/dstack.yml/index.md).
+
+[//]: # (TODO: Add a link to learn more about services)
 
 ### Run the configuration
 
-#### Default configurations
-
-To run a configuration, you have to call the [`dstack run`](reference/cli/run.md) command and pass the path to the 
-directory which you want to use as a working directory when running the configuration.
+The `dstack run` command requires the working directory path, and optionally, the `-f`
+argument pointing to the configuration file.
 
 <div class="termy">
 
 ```shell
-$ dstack run . 
+$ dstack run . -f train.dstack.yml --gpu A100
 
- RUN          CONFIGURATION  BACKEND  RESOURCES        SPOT  PRICE
- fast-moth-1  .dstack.yml    aws      5xCPUs, 15987MB  yes   $0.0547
+ RUN            CONFIGURATION     BACKEND  RESOURCES        SPOT  PRICE
+ wet-mangust-7  train.dstack.yml  aws      5xCPUs, 15987MB  yes   $0.0547  
 
-
-Provisioning and starting SSH tunnel...
+Provisioning...
 ---> 100%
 
-To open in VS Code Desktop, use this link:
-  vscode://vscode-remote/ssh-remote+fast-moth-1/workflow
+TensorBoard 2.14.0 at http://127.0.0.1:6006/
+
+Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
+Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
+Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 ```
 
 </div>
 
-If you've not specified a specific configuration file, `dstack` will use the default configuration
-defined in the given directory (named `.dstack.yml`).
+If the `-f` argument is not specified, `dstack` looks for the default configuration (`.dstack.yml`) in the working directory.
 
-#### Non-default configurations
+#### Request resources
 
-If you want to run a non-default configuration, you have to specify the path to the configuration
-using the `-f` argument:
+The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
+`--memory` to request memory (e.g. `--memory 128GB`),
+and many other options (incl. spot instances, max price, max duration, retry policy, etc.).
 
-<div class="termy">
-
-```shell
-$ dstack run . -f serve.dstack.yml
-
- RUN             CONFIGURATION     BACKEND  RESOURCES        SPOT  PRICE
- old-lionfish-1  serve.dstack.yml  aws      5xCPUs, 15987MB  yes   $0.0547
-
-Provisioning and starting SSH tunnel...
----> 100%
-
-Launching in *reload mode* on: http://127.0.0.1:7860 (Press CTRL+C to quit)
-```
-
-</div>
-
-For more details on the run command, refer to [`dstack run`](reference/cli/run.md).
-
-#### Requesting resources
-
-You can request resources using the [`--gpu`](reference/cli/run.md#GPU) 
-and [`--memory`](reference/cli/run.md#MEMORY) arguments with `dstack run`, 
-or through [`resources`](reference/profiles.yml.md#RESOURCES) with `.dstack/profiles.yml`.
-
-Both the [`dstack run`](reference/cli/run.md) command and [`.dstack/profiles.yml`](reference/profiles.yml.md)
-support various other options, including requesting spot instances, defining the maximum run duration or price, and
-more.
-
-!!! info "Automatic instance discovery"
-    `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
-    price and availability.
+For more details on the `dstack run` command, refer to the [Reference](reference/cli/run.md).
 
 ## Using API
 
-As an alternative to the CLI, you can run tasks and services programmatically 
-via [Python API](../docs/reference/api/python/index.md).
+As an alternative to the CLI, you can run tasks and services and manage runs programmatically.
+
+### Create a client
+
+First, create an instance of `dstack.api.Client`:
 
 ```python
-import sys
+from dstack.api import Client, ClientError
 
-import dstack
+try:
+    client = Client.from_config(repo_dir=".")
+except ClientError:
+    print("Can't connect to the server")
+```
 
-task = dstack.Task(
+The `repo_dir` argument should point to the directory containing the files you want to reference in the task or service
+you're running.
+
+### Submit a run
+
+Here's an example of how to run a task:
+
+```python
+from dstack.api import Task, Resources, GPU
+
+task = Task(
     image="ghcr.io/huggingface/text-generation-inference:latest",
     env={"MODEL_ID": "TheBloke/Llama-2-13B-chat-GPTQ"},
     commands=[
         "text-generation-launcher --trust-remote-code --quantize gptq",
     ],
-    ports=["8080:80"],
+    ports=["80"],
 )
-resources = dstack.Resources(gpu=dstack.GPU(memory="20GB"))
 
-if __name__ == "__main__":
-    print("Initializing the client...")
-    client = dstack.Client.from_config(repo_dir="~/dstack-examples")
-
-    print("Submitting the run...")
-    run = client.runs.submit(configuration=task, resources=resources)
-
-    print(f"Run {run.name}: " + run.status())
-
-    print("Attaching to the run...")
-    run.attach()
-
-    # After the endpoint is up, http://127.0.0.1:8080/health will return 200 (OK).
-
-    try:
-        for log in run.logs():
-            sys.stdout.buffer.write(log)
-            sys.stdout.buffer.flush()
-
-    except KeyboardInterrupt:
-        print("Aborting the run...")
-        run.stop(abort=True)
-    finally:
-        run.detach()
+run = client.runs.submit(
+    run_name="my-awesome-run",
+    configuration=task,
+    resources=Resources(gpu=GPU(memory="24GB")),
+)
 ```
+
+To forward the configured ports to `localhost`, use the `attach` and `detach` methods on the run.
+
+```python
+try:
+    run.attach()
+    
+    # ...
+except KeyboardInterrupt:
+    run.stop(abort=True)
+finally:
+    run.detach()
+```
+
+You can override the local port, for instance, by replacing `"80"` with `"8080:80"`. This will forward port `80`
+to `localhost:8080`.
+
+[//]: # (The `stop` method on the run stops the run.)
+
+For more details on the API, make sure to check the [Reference](reference/api/python/index.md).
+
+[//]: # (## What's next?)
+[//]: # (TODO: Guides, examples, reference, Discord, etc)

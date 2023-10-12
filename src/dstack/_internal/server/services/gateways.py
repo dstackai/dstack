@@ -290,7 +290,7 @@ def configure_gateway_over_ssh(host: str, id_rsa: str, authorized_key: str, jobs
     if proc.returncode != 0:
         if b"Certbot failed:" in stderr:
             # TODO pass error to the client
-            raise ConfigurationError("Certbot failed, check wildcard domain correctness")
+            raise ConfigurationError("Certbot failed, ensure the domain is valid")
         raise SSHError(stderr.decode())
 
     sockets = json.loads(stdout)

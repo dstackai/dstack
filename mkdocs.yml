@@ -23,6 +23,7 @@ theme:
   icon:
     repo: custom/github
     edit: material/pencil
+    annotation: material/arrow-right-circle
   font:
     text: Source Sans Pro
     code: IBM Plex Mono
@@ -150,12 +151,11 @@ nav:
   - Docs:
       - Getting started:
           - Quickstart: docs/index.md
-          - Installation:
-              - pip: docs/installation/pip.md
-              - Docker: docs/installation/docker.md
-              - HF Spaces: docs/installation/hf-spaces.md
+#          - Installation:
+#              - pip: docs/installation/pip.md
+#              - Docker: docs/installation/docker.md
       - Guides:
-          - Clouds: docs/guides/clouds.md
+#          - Clouds: docs/guides/clouds.md
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
           - Services: docs/guides/services.md
@@ -169,20 +169,20 @@ nav:
               - dstack logs: docs/reference/cli/logs.md
               - dstack stop: docs/reference/cli/stop.md
               - dstack gateway: docs/reference/cli/gateway.md
-          - Python API:
-              - Overview: docs/reference/api/python/index.md
-              - Reference: docs/reference/api/python/reference.md
-              - Server: docs/reference/api/python/server.md
+          - Python API: docs/reference/api/python/index.md
+#              - Overview: docs/reference/api/python/index.md
+#              - Server: docs/reference/api/python/server.md
           - .dstack.yml:
-              - "type: dev-environment": docs/reference/dstack.yml/dev-environment.md
-              - "type: task": docs/reference/dstack.yml/task.md
-              - "type: service": docs/reference/dstack.yml/service.md
+              - dev-environment: docs/reference/dstack.yml/dev-environment.md
+              - task: docs/reference/dstack.yml/task.md
+              - service: docs/reference/dstack.yml/service.md
+          - "server/config.yml": docs/reference/server/config.yml.md
           - profiles.yml: docs/reference/profiles.yml.md
-          - Backends:
-            - AWS: docs/reference/backends/aws.md
-            - GCP: docs/reference/backends/gcp.md
-            - Azure: docs/reference/backends/azure.md
-            - Lambda: docs/reference/backends/lambda.md
+#          - Backends:
+#            - AWS: docs/reference/backends/aws.md
+#            - GCP: docs/reference/backends/gcp.md
+#            - Azure: docs/reference/backends/azure.md
+#            - Lambda: docs/reference/backends/lambda.md
   - Examples:
     - examples/index.md
     - Examples:
