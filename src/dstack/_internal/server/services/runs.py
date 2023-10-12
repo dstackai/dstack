@@ -140,7 +140,7 @@ async def submit_run(
             project=project,
         )
     elif await get_run(session, project, run_spec.run_name) is not None:
-        raise ResourceExistsError("Run name must be unique")
+        raise ResourceExistsError(f"Run name `{run_spec.run_name}` is already taken")
     run_model = RunModel(
         id=uuid.uuid4(),
         project_id=project.id,

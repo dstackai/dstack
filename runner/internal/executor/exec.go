@@ -2,14 +2,16 @@ package executor
 
 import (
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
 func makeEnv(homeDir string, mapping map[string]string, secrets map[string]string) []string {
 	// todo set job vars
-	list := make([]string, 0)
+	list := os.Environ()
 	for key, value := range mapping {
 		list = append(list, fmt.Sprintf("%s=%s", key, value))
 	}
