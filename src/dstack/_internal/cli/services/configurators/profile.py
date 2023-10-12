@@ -6,7 +6,6 @@ from typing import Dict
 from dstack._internal.core.models.profiles import (
     Profile,
     ProfileGPU,
-    ProfileRetryPolicy,
     SpotPolicy,
     parse_duration,
     parse_max_duration,
@@ -106,12 +105,8 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile):
         profile.spot_policy = args.spot_policy
 
     if args.retry_policy is not None:
-        if not profile.retry_policy:
-            profile.retry_policy = ProfileRetryPolicy()
         profile.retry_policy.retry = args.retry_policy
     elif args.retry_limit is not None:
-        if not profile.retry_policy:
-            profile.retry_policy = ProfileRetryPolicy()
         profile.retry_policy.retry = True
         profile.retry_policy.limit = args.retry_limit
 
