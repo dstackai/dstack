@@ -11,7 +11,7 @@
 }
 
 .tx-landing__hero_text h1 {
-    margin-bottom: 1.2rem;
+    margin-bottom: .75rem;
     font-weight: 800;
     font-size: 2.5em;
     letter-spacing: -3px;
@@ -28,7 +28,7 @@
 }
 
 .tx-landing__hero_text p {
-    font-size: 1rem;
+    font-size: 0.95rem;
 }
 
 .tx-landing__hero_buttons {
@@ -129,7 +129,7 @@
     }
 
     .tx-landing__hero_code > [data-termynal] {
-        max-width: 45rem;
+        max-width: 750px;
         margin-left: auto;
         margin-right: auto;
     }
@@ -412,7 +412,6 @@
     gap: 0.6rem;
 }
 
-.tx-footer__logo,
 .tx-footer__section-title {
     text-transform: uppercase;
     font-size: 0.9rem;
@@ -424,6 +423,7 @@
 
 .tx-footer__logo {
     transition: opacity .2s ease;
+    line-height: 24px;
 }
 
 .tx-footer__logo:hover {
