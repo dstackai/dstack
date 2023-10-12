@@ -151,7 +151,7 @@ jobs:
           echo "__version__ = \"$VERSION\"" > src/dstack/version.py
           echo "__is_release__ = True" >> src/dstack/version.py
           echo $BASE_IMAGE >> src/dstack/version.py
-          cp README.md cli
+          cp README.md src
           python setup.py sdist bdist_wheel -v
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*        
 
@@ -197,7 +197,7 @@ jobs:
           docker manifest push dstackai/dstack:latest
 
   generate-json-schema:
-    needs: [ python-test ]
+    needs: [ pypi-upload ]
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
