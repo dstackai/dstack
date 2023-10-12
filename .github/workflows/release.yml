@@ -82,10 +82,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - {goos: "linux", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
-          - {goos: "darwin", goarch: "amd64", runson: "macos-latest"}
-          - {goos: "darwin", goarch: "arm64", runson: "macos-latest"}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
