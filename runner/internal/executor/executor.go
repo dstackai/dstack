@@ -4,12 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/creack/pty"
-	"github.com/dstackai/dstack/runner/consts/states"
-	"github.com/dstackai/dstack/runner/internal/gateway"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"github.com/dstackai/dstack/runner/internal/log"
-	"github.com/dstackai/dstack/runner/internal/schemas"
 	"io"
 	"os"
 	"os/exec"
@@ -18,6 +12,13 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/creack/pty"
+	"github.com/dstackai/dstack/runner/consts/states"
+	"github.com/dstackai/dstack/runner/internal/gateway"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
 type RunExecutor struct {
@@ -152,6 +153,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 		// todo fail reason?
 		log.Error(ctx, "Exec failed", "err", err)
 		ex.SetJobState(ctx, states.Failed)
+		return gerrors.Wrap(err)
 	}
 
 	ex.SetJobState(ctx, states.Done)
