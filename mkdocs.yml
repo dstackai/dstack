@@ -79,6 +79,7 @@ plugins:
   - gen-files:
       scripts:  # always relative to mkdocs.yml
         - scripts/docs/gen_cli_reference.py
+        - scripts/docs/gen_schema_reference.py
   - mkdocstrings:
       handlers:
         python:

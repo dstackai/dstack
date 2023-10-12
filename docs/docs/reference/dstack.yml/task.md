@@ -62,3 +62,10 @@ commands:
 [//]: # (TODO: Add examples)
 
 [//]: # (TODO: Mention here or somewhere else of how it works. What base image is used, how ports are forwarded, etc.)
+
+## Schema reference
+
+#SCHEMA# dstack._internal.core.models.configurations.TaskConfiguration
+    overrides:
+      type:
+        required: true

@@ -13,6 +13,7 @@ from functools import cache
 import mkdocs_gen_files
 from mkdocs.structure.files import File
 
+FILE_PATTERN = "docs/reference/cli/*.md"
 logger = logging.getLogger("mkdocs.plugins.dstack.cli")
 
 disable_env = "DSTACK_DOCS_DISABLE_CLI_REFERENCE"
@@ -38,7 +39,7 @@ def sub_help(match: re.Match) -> str:
 
 file: File
 for file in mkdocs_gen_files.files:
-    if not fnmatch(file.src_uri, "docs/reference/cli/*.md"):
+    if not fnmatch(file.src_uri, FILE_PATTERN):
         continue
     logger.debug("Looking for CLI `dstack <options> --help` calls in %s", file.src_uri)
     with mkdocs_gen_files.open(file.src_uri, "r") as f:

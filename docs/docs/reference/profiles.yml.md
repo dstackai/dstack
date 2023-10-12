@@ -54,3 +54,20 @@ profiles:
     - <a href="#MAX_PRICE"><code id="MAX_PRICE">max_price</code></a> - (Optional) The maximum price per hour, in dollars. Example: `1.1` or `0.8`
     - <a href="#BACKENDS"><code id="BACKENDS">backends</code></a> - (Optional) Force using listed backends only. Possible values: `aws`, `azure`, `gcp`, `lambda`. If not specified, all configured backends are tried.
     - <a href="#DEFAULT"><code id="DEFAULT">default</code></a> - (Optional) If set to `true`, it will be activated by default
+
+## Schema reference
+
+#SCHEMA# dstack._internal.core.models.profiles.Profile
+    overrides:
+      max_price:
+        type: 'Optional[float]'
+
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileResources
+    overrides:
+      memory:
+        default: 8GB
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileGPU
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetryPolicy
