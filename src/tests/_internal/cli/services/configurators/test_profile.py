@@ -116,8 +116,8 @@ class TestProfileArgs:
 
     def test_retry(self):
         profile = Profile(name="test")
+        profile.retry_policy = ProfileRetryPolicy(retry=True)
         modified, _ = apply_args(profile, ["--retry"])
-        profile.retry_policy.retry = True
         assert profile.dict() == modified.dict()
 
     def test_no_retry(self):
@@ -129,8 +129,7 @@ class TestProfileArgs:
     def test_retry_limit(self):
         profile = Profile(name="test")
         modified, _ = apply_args(profile, ["--retry-limit", "1h"])
-        profile.retry_policy.retry = True
-        profile.retry_policy.limit = 3600
+        profile.retry_policy = ProfileRetryPolicy(retry=True, limit=3600)
         assert profile.dict() == modified.dict()
 
 

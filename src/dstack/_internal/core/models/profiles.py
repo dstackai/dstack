@@ -133,8 +133,8 @@ class Profile(ForbidExtra):
         ),
     ]
     retry_policy: Annotated[
-        ProfileRetryPolicy, Field(description="The policy for re-submitting the run")
-    ] = ProfileRetryPolicy()
+        Optional[ProfileRetryPolicy], Field(description="The policy for re-submitting the run")
+    ]
     max_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],
         Field(
