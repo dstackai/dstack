@@ -62,7 +62,7 @@ def get_user_data(backend: BackendType, image_name: str, authorized_keys: List[s
     script = get_dstack_shim(build)
     for k, v in env.items():
         script += [f'export "{k}={v}"']
-    script += ["nohup dstack-shim --dev docker --keep-container >/root/shim.log 2>&1 &"]
+    script += get_run_shim_script()
     return get_cloud_config(
         runcmd=[["sh", "-c", " && ".join(script)]],
         ssh_authorized_keys=authorized_keys,
@@ -88,6 +88,11 @@ def get_dstack_shim(build: str) -> List[str]:
         f'sudo curl --output /usr/local/bin/dstack-shim "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"',
         "sudo chmod +x /usr/local/bin/dstack-shim",
     ]
+
+
+def get_run_shim_script() -> List[str]:
+    dev_flag = "" if version.__is_release__ else "--dev"
+    return [f"nohup dstack-shim {dev_flag} docker --keep-container >/root/shim.log 2>&1 &"]
 
 
 def get_gateway_user_data(authorized_key: str) -> str:
