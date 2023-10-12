@@ -11,7 +11,12 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.utils.random_names as random_names
-from dstack._internal.core.errors import ConfigurationError, DstackError, NotFoundError, SSHError
+from dstack._internal.core.errors import (
+    GatewayError,
+    NotFoundError,
+    ResourceNotExistsError,
+    SSHError,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
@@ -209,11 +214,11 @@ async def register_service_jobs(session: AsyncSession, project: ProjectModel, jo
     if gateway_name is None:
         gateway = await get_project_default_gateway(session=session, project=project)
         if gateway is None:
-            raise DstackError("Default gateway is not set")
+            raise ResourceNotExistsError("Default gateway is not set")
     else:
         gateway = await get_gateway_by_name(session=session, project=project, name=gateway_name)
         if gateway is None:
-            raise NotFoundError("Gateway does not exist")
+            raise ResourceNotExistsError("Gateway does not exist")
 
     domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     private_bytes, public_bytes = generate_rsa_key_pair_bytes(
@@ -289,8 +294,7 @@ def configure_gateway_over_ssh(host: str, id_rsa: str, authorized_key: str, jobs
         stdout, stderr = proc.communicate()
     if proc.returncode != 0:
         if b"Certbot failed:" in stderr:
-            # TODO pass error to the client
-            raise ConfigurationError("Certbot failed, ensure the domain is valid")
+            raise GatewayError("Certbot failed, ensure the domain is valid")
         raise SSHError(stderr.decode())
 
     sockets = json.loads(stdout)
