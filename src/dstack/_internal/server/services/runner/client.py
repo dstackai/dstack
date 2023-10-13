@@ -43,7 +43,6 @@ class RunnerClient:
             secrets=secrets,
             repo_credentials=repo_credentials,
         )
-        print(body.json(indent=2))
         resp = requests.post(
             # use .json() to encode enums
             self._url("/api/submit"),
