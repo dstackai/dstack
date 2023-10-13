@@ -141,6 +141,9 @@ async def submit_run(
         )
     elif await get_run(session, project, run_spec.run_name) is not None:
         raise ResourceExistsError(f"Run name `{run_spec.run_name}` is already taken")
+    backends = await backends_services.get_project_backends(project)
+    if len(backends) == 0:
+        raise ServerClientError("No backends configured")
     run_model = RunModel(
         id=uuid.uuid4(),
         project_id=project.id,

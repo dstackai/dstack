@@ -112,3 +112,4 @@ class APIClient:
 _server_client_errors: Dict[str, Type[ServerClientError]] = {
     cls.code: cls for cls in ServerClientError.__subclasses__()
 }
+_server_client_errors[ServerClientError.code] = ServerClientError
