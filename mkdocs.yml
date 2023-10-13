@@ -155,16 +155,17 @@ nav:
 #              - pip: docs/installation/pip.md
 #              - Docker: docs/installation/docker.md
       - Guides:
-#          - Clouds: docs/guides/clouds.md
+          - Clouds: docs/guides/clouds.md
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
           - Services: docs/guides/services.md
 #          - Artifacts: docs/guides/artifacts.md
       - Reference:
           - CLI:
-              - dstack run: docs/reference/cli/run.md
-              - dstack init: docs/reference/cli/init.md
               - dstack server: docs/reference/cli/server.md
+              - dstack init: docs/reference/cli/init.md
+              - dstack config: docs/reference/cli/config.md
+              - dstack run: docs/reference/cli/run.md
               - dstack ps: docs/reference/cli/ps.md
               - dstack logs: docs/reference/cli/logs.md
               - dstack stop: docs/reference/cli/stop.md

@@ -31,29 +31,10 @@ $ pip install "dstack[all]" -U
 
 ### Configure clouds
 
-Next, configure clouds via `~/.dstack/server/config.yml`. For format details, refer
-to [Reference](reference/server/config.yml.md).
+If you have default AWS, GCP, or Azure credentials on your machine, `dstack` will pick them up automatically.
 
-Example:
-
-<div editor-title=".dstack/server/config.yml"> 
-
-```yaml
-projects:
-- name: main
-  backends:
-  - type: aws
-    regions: [us-east-1, eu-west-1]
-    creds:
-      access_key: ...
-      secret_key: ...
-```
-
-</div>
-
-[//]: # (!!! info "AWS, GCP, and Azure")
-[//]: # (    If `~/.dstack/server/config.yml` doesn't exist but you default AWS, GCP, or )
-[//]: # (    Azure credentials are configured on your machine, `dstack` will create the file automatically.)
+Otherwise, you need to manually specify the cloud credentials in `~/.dstack/server/config.yml`.
+For further cloud configuration details, refer to [Clouds](guides/clouds.md).
 
 ### Start the server
 
@@ -67,16 +48,23 @@ $ dstack server
 Applying configuration...
 ---> 100%
 
-The server is running at http://127.0.0.1:3000/
+The server is running at http://127.0.0.1:3000/.
+The admin token is bbae0f28-d3dd-4820-bf61-8f4bb40815da
 ```
 
 </div>
 
 [//]: # (TODO: Add a link to the Docker image)
 
-## Using the CLI
+??? info "~/.dstack/config.yml"
+    Both the CLI and API need to be configured with the server address, user token, and project name 
+    via `~/.dstack/config.yml`. 
 
-The CLI allows running dev environments, tasks, and services, provided they are defined via YAML configuration files.
+    The server automatically handles this setup at startup for the main project. 
+    To configure the CLI and API for different machines or projects,
+    use [`dstack config`](reference/cli/config.md).
+
+## Using the CLI
 
 [//]: # (TODO: Mention how to configure the CLI)
 
