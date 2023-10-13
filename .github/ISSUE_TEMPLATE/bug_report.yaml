@@ -41,17 +41,29 @@ body:
     id: what-happened
     attributes:
       label: What happened?
-      description: Provide the context, exact steps to reproduce, and the expected result.
+      description: Provide the context, the exact steps to reproduce the issue, and the expected behaviour.
     validations:
       required: true
   - type: textarea
-    id: logs
+    id: cli-logs
     attributes:
-      label: Relevant log output
+      label: CLI logs
       description: |
-        Paste the `dstack run` output and/or the run diagnostic logs.
-
-        You can get the run diagnostic logs with `dstack logs --diagnose <run_name>`.
+        Paste the output of `dstack run`. Try setting `DSTACK_CLI_LOG_LEVEL=debug` to get detailed logs.
+      render: shell
+  - type: textarea
+    id: server-logs
+    attributes:
+      label: Server logs
+      description: |
+        Paste the output of `dstack server`. Pass `--log-level=debug` to get debug logs.
+      render: shell
+  - type: textarea
+    id: runner-logs
+    attributes:
+      label: Runner logs
+      description: |
+        Paste the output of `dstack logs --diagnose <run_name>`.
       render: shell
   - type: textarea
     id: additional-information
@@ -60,4 +72,4 @@ body:
       description: |
         Any links, references or screenshots to have more context about the issue.
 
-        Tip: Attach a minimal sample project to reproduce the issue or provide further log files by clicking into this area to focus it and then dragging files in.
+        Tip: Provide further log files by clicking into this area and then dragging the files in.
