@@ -2,12 +2,13 @@ package executor
 
 import (
 	"context"
+	"os"
+
 	"github.com/codeclysm/extract/v3"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/repo"
-	"os"
 )
 
 // setupRepo must be called from Run
@@ -56,6 +57,8 @@ func (ex *RunExecutor) prepareGit(ctx context.Context) error {
 		default:
 			return gerrors.Newf("unsupported remote repo protocol: %s", ex.repoCredentials.Protocol)
 		}
+	} else {
+		log.Trace(ctx, "Credentials is empty")
 	}
 
 	log.Trace(ctx, "Checking out remote repo", "GIT URL", repoManager.URL())

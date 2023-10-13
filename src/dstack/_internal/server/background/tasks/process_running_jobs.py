@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 import dstack._internal.core.errors
+from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, JobSubmission, Run
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
 from dstack._internal.server.db import get_session_ctx
@@ -21,7 +22,7 @@ from dstack._internal.server.services.jobs import (
     job_model_to_job_submission,
     terminate_job_submission_instance,
 )
-from dstack._internal.server.services.repos import get_code_model
+from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runs import (
     create_job_model_for_new_submission,
@@ -81,6 +82,7 @@ async def _process_job(job_id: UUID):
         server_ssh_private_key = project.ssh_private_key
         if job_model.status == JobStatus.PROVISIONING:
             logger.debug("Polling provisioning job %s", job_model.job_name)
+            repo_head = repo_model_to_repo_head(repo_model, include_creds=True)
             code = await _get_job_code(
                 session=session,
                 repo=repo_model,
@@ -93,6 +95,7 @@ async def _process_job(job_id: UUID):
                 job,
                 job_submission,
                 code,
+                repo_head.repo_creds,
                 server_ssh_private_key,
             )
         else:
@@ -125,6 +128,7 @@ def _process_provisioning_job(
     job: Job,
     job_submission: JobSubmission,
     code: bytes,
+    repo_credentials: Optional[RemoteRepoCreds],
     server_ssh_private_key: str,
 ):
     ports = get_runner_ports()
@@ -149,11 +153,15 @@ def _process_provisioning_job(
                     job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
                 return
             logger.debug("Submitting job %s...", job_model.job_name)
+            logger.debug(
+                "Repo credentials: %s",
+                None if repo_credentials is None else repo_credentials.protocol.value,
+            )
             runner_client.submit_job(
                 run_spec=run.run_spec,
                 job_spec=job.job_spec,
                 secrets={},
-                repo_credentials=None,
+                repo_credentials=repo_credentials,
             )
             logger.debug("Uploading code %s...", job_model.job_name)
             runner_client.upload_code(code)

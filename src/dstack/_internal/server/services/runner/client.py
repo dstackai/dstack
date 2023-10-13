@@ -42,8 +42,14 @@ class RunnerClient:
             job_spec=job_spec,
             secrets=secrets,
             repo_credentials=repo_credentials,
-        ).dict()
-        resp = requests.post(self._url("/api/submit"), json=body)
+        )
+        print(body.json(indent=2))
+        resp = requests.post(
+            # use .json() to encode enums
+            self._url("/api/submit"),
+            data=body.json(),
+            headers={"Content-Type": "application/json"},
+        )
         resp.raise_for_status()
 
     def upload_code(self, file: Union[BinaryIO, bytes]):
