@@ -5,7 +5,7 @@ DSTACK_DIR_PATH = Path("~/.dstack/").expanduser()
 
 SERVER_DIR_PATH = DSTACK_DIR_PATH / "server"
 
-SERVER_CONFIG_FILE_PATH = SERVER_DIR_PATH / "config.yaml"
+SERVER_CONFIG_FILE_PATH = SERVER_DIR_PATH / "config.yml"
 
 SERVER_DATA_DIR_PATH = SERVER_DIR_PATH / "data"
 SERVER_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)

@@ -9,7 +9,7 @@ from tests._internal.cli.common import run_dstack_cli
 
 class TestConfig:
     def test_configures_project(self, capsys: CaptureFixture, tmp_path: Path):
-        cli_config_path = tmp_path / ".dstack" / "config.yaml"
+        cli_config_path = tmp_path / ".dstack" / "config.yml"
         with patch("dstack.api.server.APIClient") as APIClientMock:
             api_client_mock = APIClientMock.return_value
             api_client_mock.projects.get

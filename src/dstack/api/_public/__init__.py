@@ -79,7 +79,7 @@ class Client:
         init: bool = True,
     ) -> "Client":
         """
-        Creates a Client using global config `~/.dstack/config.yaml`
+        Creates a Client using global config `~/.dstack/config.yml`
 
         Args:
             repo_dir: path to the repo

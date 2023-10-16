@@ -4,16 +4,17 @@ from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigElement, ConfigMultiElement
+from dstack._internal.core.models.common import ForbidExtra
 
 
 class AzureConfigInfo(BaseModel):
     type: Literal["azure"] = "azure"
     tenant_id: str
     subscription_id: str
-    locations: List[str]
+    locations: Optional[List[str]] = None
 
 
-class AzureClientCreds(BaseModel):
+class AzureClientCreds(ForbidExtra):
     type: Literal["client"] = "client"
     client_id: str
     client_secret: str
@@ -21,7 +22,7 @@ class AzureClientCreds(BaseModel):
     tenant_id: Optional[str]
 
 
-class AzureDefaultCreds(BaseModel):
+class AzureDefaultCreds(ForbidExtra):
     type: Literal["default"] = "default"
 
 

@@ -4,20 +4,21 @@ from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
+from dstack._internal.core.models.common import ForbidExtra
 
 
 class AWSConfigInfo(BaseModel):
     type: Literal["aws"] = "aws"
-    regions: List[str]
+    regions: Optional[List[str]] = None
 
 
-class AWSAccessKeyCreds(BaseModel):
+class AWSAccessKeyCreds(ForbidExtra):
     type: Literal["access_key"] = "access_key"
     access_key: str
     secret_key: str
 
 
-class AWSDefaultCreds(BaseModel):
+class AWSDefaultCreds(ForbidExtra):
     type: Literal["default"] = "default"
 
 
