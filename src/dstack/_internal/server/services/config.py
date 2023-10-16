@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Annotated, List, Literal, Optional, Union
 
 import yaml
@@ -46,7 +47,7 @@ class GCPServiceAccountCreds(ForbidExtra):
         if "filename" not in values:
             raise ValueError()
         try:
-            with open(values["filename"]) as f:
+            with open(Path(values["filename"]).expanduser()) as f:
                 values["data"] = f.read()
         except OSError:
             raise ValueError(f"No such file {values['filename']}")
