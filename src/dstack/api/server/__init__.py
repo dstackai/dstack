@@ -22,10 +22,24 @@ _RETRY_INTERVAL = 1
 
 
 class APIClient:
+    """
+    Low-level API client for interacting with dstack server. Implements all API endpoints
+
+    Attributes:
+        users: operations with users
+        projects: operations with projects
+        backends: operations with backends
+        repos: operations with repos
+        runs: operations with runs
+        logs: operations with logs
+        gateways: operations with gateways
+    """
+
     def __init__(self, base_url: str, token: str):
         """
-        :param base_url: API endpoints prefix, e.g. http://127.0.0.1:3000/
-        :param token: API token
+        Args:
+            base_url: API endpoints prefix, e.g. `http://127.0.0.1:3000/`
+            token: API token
         """
         self._base_url = base_url.rstrip("/")
         self._s = requests.session()
@@ -98,3 +112,4 @@ class APIClient:
 _server_client_errors: Dict[str, Type[ServerClientError]] = {
     cls.code: cls for cls in ServerClientError.__subclasses__()
 }
+_server_client_errors[ServerClientError.code] = ServerClientError

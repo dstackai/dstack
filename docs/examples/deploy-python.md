@@ -9,13 +9,8 @@ version of Llama 2 to your cloud with a click of a button.
 
 ## Prerequisites
 
-Before you can use `dstack` Python API, ensure you have installed the `dstack` package, 
-started a `dstack` server with [configured clouds](../docs/guides/clouds.md).
-    
-```shell
-pip install "dstack[all]==0.11.3rc1"  
-dstack start
-```
+Before you can use `dstack` Python API, ensure you have  
+[set up the server](../docs/index.md#set-up-the-server).
 
 ## How does it work?
 
@@ -27,11 +22,11 @@ quite similar, except that it runs your workload in the cloud.
 To get started, create an instance of `dstack.Client` and use its methods to submit and manage runs.
 
 ```python
-import dstack
+from dstack.api import Client, ClientError
 
 try:
-    client = dstack.Client.from_config(repo_dir=".")
-except dstack.api.hub.errors.HubClientError as e:
+    client = Client.from_config(repo_dir=".")
+except ClientError as e:
     print(e)
 ```
 
@@ -47,7 +42,9 @@ In our example, we'll deploy an LLM as a task. To do this, we'll create a `dstac
 LLM should be run.
 
 ```python
-configuration = dstack.Task(
+from dstack.api import Task
+
+configuration = Task(
     image="ghcr.io/huggingface/text-generation-inference:latest",
     env={"MODEL_ID": model_id},
     commands=[
@@ -62,13 +59,14 @@ configuration = dstack.Task(
 Then, we'll need to specify the resources our LLM will require. To do this, we'll create a `dstack.Resources` instance:
 
 ```python
+from dstack.api import Resources, GPU
 
 if model_id == "TheBloke/Llama-2-13B-chat-GPTQ":
     gpu_memory = "20GB"
 elif model_id == "TheBloke/Llama-2-70B-chat-GPTQ":
     gpu_memory = "40GB"
 
-resources = dstack.Resources(gpu=dstack.GPU(memory=gpu_memory))
+resources = Resources(gpu=GPU(memory=gpu_memory))
 ```
 
 ### Submit the run

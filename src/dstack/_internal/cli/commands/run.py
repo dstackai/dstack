@@ -14,8 +14,9 @@ from dstack._internal.cli.services.configurators.run import (
 )
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
-from dstack._internal.core.errors import CLIError, ConfigurationError, ResourceExistsError
+from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
 from dstack.api.utils import load_configuration, load_profile
@@ -81,6 +82,11 @@ class RunCommand(APIBaseCommand):
 
         super()._command(args)
         try:
+            repo = self.api.repos.load(Path.cwd())
+            self.api.ssh_identity_file = (
+                ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
+            )
+
             profile = load_profile(Path.cwd(), args.profile)
             apply_profile_args(args, profile)
 
@@ -96,6 +102,7 @@ class RunCommand(APIBaseCommand):
             with console.status("Getting run plan..."):
                 run_plan = self.api.runs.get_plan(
                     configuration=conf,
+                    repo=repo,
                     configuration_path=configuration_path,
                     backends=profile.backends,
                     resources=profile.resources,  # pass profile piece by piece
@@ -116,8 +123,8 @@ class RunCommand(APIBaseCommand):
 
         try:
             with console.status("Submitting run..."):
-                run = self.api.runs.exec_plan(run_plan, reserve_ports=not args.detach)
-        except ResourceExistsError as e:
+                run = self.api.runs.exec_plan(run_plan, repo, reserve_ports=not args.detach)
+        except ServerClientError as e:
             raise CLIError(e.msg)
 
         if args.detach:

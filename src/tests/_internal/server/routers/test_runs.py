@@ -379,7 +379,10 @@ class TestSubmitRun:
         body = {"run_spec": run_dict["run_spec"]}
         with patch("uuid.uuid4") as uuid_mock, patch(
             "dstack._internal.utils.common.get_current_datetime"
-        ) as datetime_mock:
+        ) as datetime_mock, patch(
+            "dstack._internal.server.services.backends.get_project_backends"
+        ) as get_project_backends_mock:
+            get_project_backends_mock.return_value = [Mock()]
             uuid_mock.return_value = run_id
             datetime_mock.return_value = submitted_at
             response = client.post(
@@ -411,7 +414,10 @@ class TestSubmitRun:
             repo_id=repo.name,
         )
         body = {"run_spec": run_dict["run_spec"]}
-        with patch("uuid.uuid4") as uuid_mock:
+        with patch("uuid.uuid4") as uuid_mock, patch(
+            "dstack._internal.server.services.backends.get_project_backends"
+        ) as get_project_backends_mock:
+            get_project_backends_mock.return_value = [Mock()]
             uuid_mock.return_value = run_dict["id"]
             response = client.post(
                 f"/api/project/{project.name}/runs/submit",

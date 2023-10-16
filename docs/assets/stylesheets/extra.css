@@ -428,6 +428,20 @@ code .md-code__nav:hover .md-code__button {
     color: var(--md-default-fg-color--light)
 }
 
+.md-annotation:not([hidden]) {
+    line-height: 1.225;
+}
+
+.md-annotation__index {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.md-annotation__index:after {
+    background-color: rgba(0, 0, 0, 0.87);
+    transform: scale(0.9);
+}
+
 @media screen and (max-width: 44.9375em) {
     .md-typeset pre > code {
         border: none;

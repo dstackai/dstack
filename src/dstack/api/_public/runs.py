@@ -5,13 +5,14 @@ import threading
 import time
 from abc import ABC
 from copy import copy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
 import requests
 from websocket import WebSocketApp
 
+import dstack.api as api
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
@@ -23,6 +24,7 @@ from dstack._internal.core.models.profiles import ProfileResources as Resources
 from dstack._internal.core.models.profiles import ProfileRetryPolicy as RetryPolicy
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
+from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.runs import JobSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
 from dstack._internal.core.models.runs import Run as RunModel
@@ -39,11 +41,20 @@ logger = get_logger(__name__)
 
 
 class Run(ABC):
+    """
+    Attributes:
+        name: run name
+        ports: ports mapping, if run is attached
+        backend: backend type
+        status: run status
+        hostname: instance hostname
+    """
+
     def __init__(
         self,
         api_client: APIClient,
         project: str,
-        ssh_identity_file: PathLike,
+        ssh_identity_file: Optional[PathLike],
         run: RunModel,
     ):
         self._api_client = api_client
@@ -66,7 +77,7 @@ class Run(ABC):
     @property
     def backend(self) -> Optional[BackendType]:
         job = self._run.jobs[0]
-        return job.job_submissions[-1].job_provisioning_data.backend  # TODO fix model
+        return job.job_submissions[-1].job_provisioning_data.backend
 
     @property
     def status(self) -> RunStatus:
@@ -81,6 +92,16 @@ class Run(ABC):
         start_time: Optional[datetime] = None,
         diagnose: bool = False,
     ) -> Iterable[bytes]:
+        """
+        Iterate through run's log messages
+
+        Args:
+            start_time: minimal log timestamp
+            diagnose: return runner logs if `True`
+
+        Yields:
+            log messages
+        """
         next_start_time = start_time
         while True:
             resp = self._api_client.logs.poll(
@@ -110,15 +131,26 @@ class Run(ABC):
     def stop(self, abort: bool = False):
         """
         Terminate the instance and detach
+
+        Args:
+            abort: gracefully stop the run if `False`
         """
         self._api_client.runs.stop(self._project, [self.name], abort)
         logger.debug("%s run %s", "Aborted" if abort else "Stopped", self.name)
         self.detach()
 
-    def attach(self) -> bool:
+    def attach(
+        self,
+        ssh_identity_file: Optional[PathLike] = None,
+    ) -> bool:
         """
         Establish an SSH tunnel to the instance and update SSH config
         """
+        ssh_identity_file = ssh_identity_file or self._ssh_identity_file
+        if ssh_identity_file is None:
+            raise ConfigurationError("SSH identity file is required to attach to the run")
+        ssh_identity_file = str(ssh_identity_file)
+
         if self._ssh_attach is None:
             while self.status in (RunStatus.SUBMITTED, RunStatus.PENDING, RunStatus.PROVISIONING):
                 time.sleep(5)
@@ -130,6 +162,7 @@ class Run(ABC):
             if self._ports_lock is None:
                 self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
             provisioning_data = self._run.jobs[0].job_submissions[-1].job_provisioning_data
+
             logger.debug(
                 "Attaching to %s (%s: %s)",
                 self.name,
@@ -140,7 +173,7 @@ class Run(ABC):
                 hostname=self.hostname,
                 ssh_port=provisioning_data.ssh_port,
                 user=provisioning_data.username,
-                id_rsa_path=self._ssh_identity_file,
+                id_rsa_path=ssh_identity_file,
                 ports_lock=self._ports_lock,
                 run_name=self.name,
                 dockerized=provisioning_data.dockerized,
@@ -233,24 +266,25 @@ class SubmittedRun(Run):
 
 
 class RunCollection:
+    """
+    Operations with runs
+    """
+
     def __init__(
         self,
         api_client: APIClient,
         project: str,
-        repo_dir: PathLike,
-        repo: Union[RemoteRepo, LocalRepo],
-        ssh_identity_file: PathLike,
+        client: "api.Client",
     ):
         self._api_client = api_client
         self._project = project
-        self._repo_dir = Path(repo_dir)
-        self._repo = repo
-        self._ssh_identity_file = str(ssh_identity_file)
+        self._client = client
 
     def submit(
         self,
         configuration: AnyRunConfiguration,
         configuration_path: Optional[str] = None,
+        repo: Optional[Repo] = None,
         backends: Optional[List[BackendType]] = None,
         resources: Optional[Resources] = None,
         spot_policy: Optional[SpotPolicy] = None,
@@ -259,25 +293,37 @@ class RunCollection:
         max_price: Optional[float] = None,
         working_dir: Optional[str] = None,
         run_name: Optional[str] = None,
-        verify_ports: bool = True,  # TODO rename to reserve_ports
+        reserve_ports: bool = True,
     ) -> SubmittedRun:
         """
         Submit a run
-        :param configuration: run configuration. Mutually exclusive with `configuration_path`
-        :param configuration_path: run configuration path, relative to `repo_dir`. Mutually exclusive with `configuration`
-        :param backends: list of allowed backend for provisioning
-        :param resources: minimal resources for provisioning
-        :param spot_policy: spot policy for provisioning
-        :param retry_policy: retry policy for interrupted jobs
-        :param max_duration: max instance running duration in seconds
-        :param max_price: max instance price in dollars per hour for provisioning
-        :param working_dir: working directory relative to `repo_dir`
-        :param run_name: desired run_name. Must be unique in the project
-        :param verify_ports: reserve local ports before submit
-        :return: submitted run
+
+        Args:
+            configuration: run configuration
+            configuration_path: run configuration path, relative to `repo_dir`
+            repo: repo to use for the run
+            backends: list of allowed backend for provisioning
+            resources: minimal resources for provisioning
+            spot_policy: spot policy for provisioning
+            retry_policy: retry policy for interrupted jobs
+            max_duration: max instance running duration in seconds
+            max_price: max instance price in dollars per hour for provisioning
+            working_dir: working directory relative to `repo_dir`
+            run_name: desired run_name. Must be unique in the project
+            reserve_ports: reserve local ports before submit
+
+        Returns:
+            submitted run
         """
+        if repo is None:
+            repo = configuration.get_repo()
+            if repo is None:
+                raise ConfigurationError("Repo is required for this type of configuration")
+            self._client.repos.init(repo)
+
         run_plan = self.get_plan(
             configuration=configuration,
+            repo=repo,
             configuration_path=configuration_path,
             backends=backends,
             resources=resources,
@@ -288,11 +334,12 @@ class RunCollection:
             working_dir=working_dir,
             run_name=run_name,
         )
-        return self.exec_plan(run_plan, reserve_ports=verify_ports)
+        return self.exec_plan(run_plan, repo, reserve_ports=reserve_ports)
 
     def get_plan(
         self,
         configuration: AnyRunConfiguration,
+        repo: Repo,
         configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
         resources: Optional[Resources] = None,
@@ -305,10 +352,17 @@ class RunCollection:
     ) -> RunPlan:
         """
         Get run plan. Same arguments as `submit`
+
+        Returns:
+            run plan
         """
-        working_dir = self._repo_dir / (working_dir or ".")
-        if not path_in_dir(working_dir, self._repo_dir):
-            raise ConfigurationError("Working directory is outside of the repo")
+        if working_dir is None:
+            working_dir = "."
+        elif repo.repo_dir is not None:
+            working_dir = Path(repo.repo_dir) / working_dir
+            if not path_in_dir(working_dir, repo.repo_dir):
+                raise ConfigurationError("Working directory is outside of the repo")
+            working_dir = working_dir.relative_to(repo.repo_dir).as_posix()
 
         if configuration_path is None:
             configuration_path = "(python)"
@@ -324,24 +378,34 @@ class RunCollection:
         )
         run_spec = RunSpec(
             run_name=run_name,
-            repo_id=self._repo.repo_id,
-            repo_data=self._repo.run_repo_data,
-            repo_code_hash=None,  # upload code before submit
-            working_dir=str(working_dir.relative_to(self._repo_dir)),
+            repo_id=repo.repo_id,
+            repo_data=repo.run_repo_data,
+            repo_code_hash=None,  # `exec_plan` will fill it
+            working_dir=working_dir,
             configuration_path=configuration_path,
             configuration=configuration,
             profile=profile,
-            ssh_key_pub=Path(self._ssh_identity_file + ".pub").read_text().strip(),
+            ssh_key_pub=Path(self._client.ssh_identity_file + ".pub").read_text().strip(),
         )
         logger.debug("Getting run plan")
         return self._api_client.runs.get_plan(self._project, run_spec)
 
-    def exec_plan(self, run_plan: RunPlan, reserve_ports: bool = True) -> SubmittedRun:
+    def exec_plan(
+        self,
+        run_plan: RunPlan,
+        repo: Repo,
+        reserve_ports: bool = True,
+    ) -> SubmittedRun:
         """
         Execute run plan
-        :param run_plan: result of `get_plan` call
-        :param reserve_ports: reserve local ports before submit
-        :return: submitted run
+
+        Args:
+            run_plan: result of `get_plan` call
+            repo: repo to use for the run
+            reserve_ports: reserve local ports before submit
+
+        Returns:
+            submitted run
         """
         ports_lock = None
         if reserve_ports:
@@ -349,10 +413,10 @@ class RunCollection:
             ports_lock = _reserve_ports(run_plan.job_plans[0].job_spec)
 
         with tempfile.TemporaryFile("w+b") as fp:
-            run_plan.run_spec.repo_code_hash = self._repo.write_code_file(fp)
+            run_plan.run_spec.repo_code_hash = repo.write_code_file(fp)
             fp.seek(0)
             self._api_client.repos.upload_code(
-                self._project, self._repo.repo_id, run_plan.run_spec.repo_code_hash, fp
+                self._project, repo.repo_id, run_plan.run_spec.repo_code_hash, fp
             )
         logger.debug("Submitting run spec")
         run = self._api_client.runs.submit(self._project, run_plan.run_spec)
@@ -361,7 +425,12 @@ class RunCollection:
     def list(self, all: bool = False) -> List[Run]:
         """
         List runs
-        :param all: show all runs, by default, it only shows active runs or the recent finished
+
+        Args:
+            all: show all runs (active and finished) if `True`
+
+        Returns:
+            list of runs
         """
         runs = self._api_client.runs.list(project_name=self._project, repo_id=None)
         if not all:
@@ -375,6 +444,12 @@ class RunCollection:
     def get(self, run_name: str) -> Optional[Run]:
         """
         Get run by run name
+
+        Args:
+            run_name: run name
+
+        Returns:
+            run or `None` if not found
         """
         try:
             run = self._api_client.runs.get(self._project, run_name)
@@ -388,7 +463,7 @@ class RunCollection:
         return Run(
             self._api_client,
             self._project,
-            self._ssh_identity_file,
+            self._client.ssh_identity_file,
             run,
         )
 
@@ -398,7 +473,7 @@ class RunCollection:
         return SubmittedRun(
             self._api_client,
             self._project,
-            self._ssh_identity_file,
+            self._client.ssh_identity_file,
             run,
             ports_lock,
         )

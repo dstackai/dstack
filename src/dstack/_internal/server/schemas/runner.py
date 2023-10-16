@@ -57,5 +57,5 @@ class SubmitBody(BaseModel):
             }
         ),
     ]
-    secrets: Optional[Dict[str, str]]
-    repo_credentials: Optional[RemoteRepoCreds]
+    secrets: Annotated[Optional[Dict[str, str]], Field(include=True)]
+    repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)]

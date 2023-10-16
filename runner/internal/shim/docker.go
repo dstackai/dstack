@@ -3,14 +3,6 @@ package shim
 import (
 	"context"
 	"fmt"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/mount"
-	docker "github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
-	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"io"
 	"log"
 	"os"
@@ -19,6 +11,15 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/mount"
+	docker "github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
+	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
 func RunDocker(ctx context.Context, config DockerConfig) error {
@@ -164,11 +165,14 @@ func (c *DockerParameters) runOpenSSHServer() []string {
 		"chmod 700 ~/.ssh",
 		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", c.PublicSSHKey),
 		"chmod 600 ~/.ssh/authorized_keys",
+		// preserve environment variables for SSH clients
+		"env >> ~/.ssh/environment",
+		"echo \"export PATH=$PATH\" >> ~/.profile",
 		// regenerate host keys
 		"rm -rf /etc/ssh/ssh_host_*",
 		"ssh-keygen -A > /dev/null",
 		// start sshd
-		fmt.Sprintf("/usr/sbin/sshd -p %d", c.OpenSSHPort),
+		fmt.Sprintf("/usr/sbin/sshd -p %d -o PermitUserEnvironment=yes", c.OpenSSHPort),
 	}
 }
 

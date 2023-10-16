@@ -25,9 +25,11 @@ class ClientError(DstackError):
 class ServerClientErrorCode(str, enum.Enum):
     UNSPECIFIED_ERROR = "error"
     RESOURCE_EXISTS = "resource_exists"
+    RESOURCE_NOT_EXISTS = "resource_not_exists"
     INVALID_CREDENTIALS = "invalid_credentials"
     BACKEND_NOT_AVAILABLE = "backend_not_available"
     REPO_DOES_NOT_EXIST = "repo_does_not_exist"
+    GATEWAY_ERROR = "gateway_error"
 
 
 class ServerClientError(ServerError, ClientError):
@@ -38,6 +40,7 @@ class ServerClientError(ServerError, ClientError):
     def __init__(self, msg: Optional[str] = None, fields: List[List[str]] = None):
         if msg is not None:
             self.msg = msg
+        super().__init__(self.msg)  # show the message in stacktrace
         if fields is not None:
             self.fields = fields
 
@@ -45,6 +48,11 @@ class ServerClientError(ServerError, ClientError):
 class ResourceExistsError(ServerClientError):
     code: ServerClientErrorCode = ServerClientErrorCode.RESOURCE_EXISTS
     msg = "Resource exists"
+
+
+class ResourceNotExistsError(ServerClientError):
+    code: ServerClientErrorCode = ServerClientErrorCode.RESOURCE_NOT_EXISTS
+    msg = "Resource not found"
 
 
 class BackendInvalidCredentialsError(ServerClientError):
@@ -63,6 +71,11 @@ class RepoDoesNotExistError(ServerClientError):
     @staticmethod
     def with_id(repo_id: str) -> "RepoDoesNotExistError":
         return RepoDoesNotExistError(f"Repo {repo_id} does not exist")
+
+
+class GatewayError(ServerClientError):
+    code: ServerClientErrorCode = ServerClientErrorCode.GATEWAY_ERROR
+    msg = "Gateway error"
 
 
 class BackendError(DstackError):

@@ -14,7 +14,7 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
     table.add_column("REGION")
     table.add_column("NAME")
     table.add_column("ADDRESS")
-    table.add_column("WILDCARD DOMAIN")
+    table.add_column("DOMAIN")
     table.add_column("DEFAULT")
     if verbose:
         table.add_column("INSTANCE ID")

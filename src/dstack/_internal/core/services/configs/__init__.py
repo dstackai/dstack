@@ -19,7 +19,7 @@ class ConfigManager:
 
     def __init__(self, dstack_dir: Optional[PathLike] = None):
         self.dstack_dir = Path(dstack_dir) if dstack_dir else get_dstack_dir()
-        self.config_filepath = self.dstack_dir / "config.yaml"
+        self.config_filepath = self.dstack_dir / "config.yml"
         self.dstack_ssh_dir.mkdir(parents=True, exist_ok=True)
         self.load()
 
@@ -121,7 +121,7 @@ def create_default_project_config(project_name: str, url: str, token: str):
         return
     if project_config.url != url or project_config.token != token:
         if Confirm.ask(
-            f"The default project in {config_manager.dstack_dir / 'config.yaml'} is outdated. "
+            f"The default project in {config_manager.dstack_dir / 'config.yml'} is outdated. "
             f"Update it?"
         ):
             config_manager.configure_project(name=project_name, url=url, token=token, default=True)

@@ -152,26 +152,26 @@ jobs:
           aws s3 cp . "s3://dstack-runner-downloads-stgn/$VERSION/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
           aws s3 cp . "s3://dstack-runner-downloads-stgn/latest/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
 
-#  generate-json-schema:
-#    needs: [ cli-test ]
-#    env:
-#      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v3
-#      - name: Install AWS
-#        run: pip install awscli
-#      - name: Install dstack
-#        run: pip install .
-#      - name: Generate json schema
-#        run: |
-#          python -c "from dstack._internal.core.configuration import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
-#          python -c "from dstack._internal.core.profile import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
-#      - name: Upload json schema to S3
-#        run: |
-#          VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
-#          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/configuration.json" --acl public-read
-#          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/latest/schemas/configuration.json" --acl public-read
-#          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/profiles.json" --acl public-read
-#          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/latest/schemas/profiles.json" --acl public-read
+  generate-json-schema:
+    needs: [ python-test ]
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install AWS
+        run: pip install awscli
+      - name: Install dstack
+        run: pip install .
+      - name: Generate json schema
+        run: |
+          python -c "from dstack._internal.core.models.configurations import RunConfiguration; print(RunConfiguration.schema_json(indent=2))" > configuration.json
+          python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
+      - name: Upload json schema to S3
+        run: |
+          VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
+          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/configuration.json" --acl public-read
+          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/latest/schemas/configuration.json" --acl public-read
+          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/profiles.json" --acl public-read
+          aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/latest/schemas/profiles.json" --acl public-read

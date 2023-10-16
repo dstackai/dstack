@@ -66,6 +66,6 @@ class APIBaseCommand(BaseCommand):
     def _command(self, args: argparse.Namespace):
         configure_logging()
         try:
-            self.api = Client.from_config(Path.cwd(), args.project, init=False)
+            self.api = Client.from_config(project_name=args.project)
         except ConfigurationError as e:
             raise CLIError(str(e))

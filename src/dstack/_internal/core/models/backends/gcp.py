@@ -4,21 +4,22 @@ from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigElement, ConfigMultiElement
+from dstack._internal.core.models.common import ForbidExtra
 
 
 class GCPConfigInfo(BaseModel):
     type: Literal["gcp"] = "gcp"
     project_id: str
-    regions: List[str]
+    regions: Optional[List[str]] = None
 
 
-class GCPServiceAccountCreds(BaseModel):
+class GCPServiceAccountCreds(ForbidExtra):
     type: Literal["service_account"] = "service_account"
     filename: str
     data: str
 
 
-class GCPDefaultCreds(BaseModel):
+class GCPDefaultCreds(ForbidExtra):
     type: Literal["default"] = "default"
 
 

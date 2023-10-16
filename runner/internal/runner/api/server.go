@@ -3,15 +3,16 @@ package api
 import (
 	"context"
 	"errors"
-	"github.com/dstackai/dstack/runner/internal/api"
-	"github.com/dstackai/dstack/runner/internal/executor"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"github.com/dstackai/dstack/runner/internal/log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/dstackai/dstack/runner/internal/api"
+	"github.com/dstackai/dstack/runner/internal/executor"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 type Server struct {
@@ -100,13 +101,14 @@ func (s *Server) Run() error {
 		{s.wsDoneCh, "/logs_ws"},
 	}
 	waitLogsDone := time.After(s.logsWaitDuration)
+loop:
 	for _, ch := range logsToWait {
 		select {
 		case <-ch.ch:
 			log.Info(context.TODO(), "Logs streaming finished", "endpoint", ch.name)
 		case <-waitLogsDone:
 			log.Error(context.TODO(), "Logs streaming didn't finish in time")
-			break
+			break loop // break the loop, not the select
 		}
 	}
 

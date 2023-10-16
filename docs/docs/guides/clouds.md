@@ -1,114 +1,259 @@
 # Clouds
 
-With `dstack`, you can run LLM workloads using compute resources from multiple cloud GPU providers. 
-All you need to do is sign up with these providers, and then pass
-their credentials to `dstack`.
+For every project, `dstack` allows you to configure multiple cloud accounts. 
 
-??? info "Why multiple clouds?"
+To configure your cloud account, provide their credentials and other settings via `~/.dstack/server/config.yml`.
 
-    1. <span>**GPU availability**
-       Because of high demand, it's easier to obtain GPU from various cloud providers through a single interface.</span>
-    2. <span>**GPU price**
-       Leverage smaller cloud services (e.g., Lambda Cloud) and spot instances across larger providers.</span>
-    3. <span>**No vendor lock-in**
-       An open-source and cloud-agnostic interface enables easy switching between cloud providers.</span>
+Example:
 
-## Create cloud accounts
+<div editor-title=".dstack/server/config.yml">
 
-To use clouds with `dstack`, you need to first create an account with each cloud provider.
-
-Currently, `dstack` supports [AWS](https://portal.aws.amazon.com/billing/signup), 
-[GCP](https://console.cloud.google.com/freetrial), 
-[Azure](https://azure.microsoft.com/en-us/free), and [Lambda](https://cloud.lambdalabs.com/sign-up). 
-To request support for more providers, please submit or upvote
-relevant issues in [our tracker](https://github.com/dstackai/dstack/issues).
-
-??? info "Applying for cloud credits"
-    Startups can apply for extra credits, usually by reaching out directly to the provider in the case of smaller providers,
-    or through a partner program (such as [NVIDIA Inception](https://www.nvidia.com/en-us/startups/)) for larger providers.
-
-??? info "Request GPU quotas"
-
-    Larger providers require you to request GPU quotas, essentially obtaining permission from their support
-    team, prior to utilizing GPUs with your account. If planning to use GPU through credits, approval for the request might
-    take extra time.
-    
-    Quotas need to be requested separately for each family of GPUs and for each region where GPU usage is intended.
-
-    To use spot instances with certain cloud providers (e.g. AWS), you should request quotes
-    for such instances separately.
-
-## Configure backends
-
-To use your cloud accounts with `dstack`, open the project settings and configure a backend for each cloud.
-
-![](../../assets/images/dstack-hub-view-project-empty.png){ width=800 }
-
-Configuring backends involves providing cloud credentials, and specifying storage.
-
-<div class="grid cards" markdown>
-- [**AWS**
-   Learn how to set up an Amazon Web Services backend.
-  ](../reference/backends/aws.md)
-- [**GCP**
-Learn how to set up a Google Cloud backend.
-  ](../reference/backends/gcp.md)
-- [**Azure**
-   Learn how to set up an Microsoft Azure backend.
-  ](../reference/backends/azure.md)
-- [**Lambda**
-   Learn how to set up a Lambda Cloud backend.
-  ](../reference/backends/lambda.md)
-
-</div>
-
-## Configure gateways
-
-If you intend to use [services](services.md) (e.g. to deploy public endpoints), you must also configure a gateway. 
-Configuring a backend involves selecting a backend and a region.
-
-![](../../assets/images/dstack-hub-edit-gateway.png){ width=800 }
-
-### Configure the wildcard domain
-
-After the gateway is created (and assigned an external IP), set up an A record at your DNS provider to map 
-`*.<your domain name>` to the gateway's IP.
-
-Then, in the gateway's settings, specify the wildcard domain.
-
-## Request resources
-
-You can request resources using the [`--gpu`](../reference/cli/run.md#GPU) 
-and [`--memory`](../reference/cli/run.md#MEMORY) arguments with `dstack run`, 
-or through [`resources`](../reference/profiles.yml.md#RESOURCES) with `.dstack/profiles.yml`.
-
-<div class="termy small">
-
-```shell
-$ dstack run . -f llama-2/train.dstack.yml --gpu A100
-
- Configuration       llama-2/train.dstack.yml
- Min resources       2xCPUs, 8GB, 1xA100
- Max price           no
- Spot policy         auto
- Max duration        72h
-
- #  BACKEND  RESOURCES                      SPOT  PRICE
- 2  lambda   30xCPUs, 200GB, 1xA100 (80GB)  yes   $1.1
- 3  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes   $1.20582
- 1  azure    24xCPUs, 220GB, 1xA100 (80GB)  yes   $1.6469
-    ...
-
-Continue? [y/n]:
+```yaml
+projects:
+- name: main
+  backends:
+  - type: aws
+    regions: [us-west-2, eu-west-1]
+    creds:
+      type: access_key
+      access_key: AIZKISCVKUKO5AAKLAEH
+      secret_key: QSbmpqJIUBn1V5U3pyM9S6lwwiu8/fOJ2dgfwFdW
 ```
 
 </div>
 
-!!! info "Automatic instance discovery"
-    Remember, you can't specify an instance type by name. Instead, ask for resources by GPU name or memory amount. 
-    `dstack` will automatically select the suitable instance type from a cloud provider and region with the best
-    price and availability.
+Each cloud account should be listed separately under the `backends` property for the respective project.
 
-Refer to [`dstack run`](../reference/cli/run.md) and [`.dstack/profiles.yml`](../reference/profiles.yml.md)
-for details on all supported options, including requesting spot instances, defining the maximum price and run duration,
-and more.
+!!! info "Default project"
+    The default project is `main`. The CLI and API are automatically configured to use it (through `~/.dstack/config.yml`).
+
+[//]: # (If you run the `dstack` server without creating `~/.dstack/server/config.yml`, `dstack` will attempt to automatically detect the)
+[//]: # (default credentials for AWS, GCP, and Azure and create the configuration.)
+
+## AWS
+
+[//]: # (TODO: Permissions)
+
+There are two ways to configure AWS: using an access key or using the default credentials.
+
+### Access key
+
+To create an access key, follow [this guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get). 
+
+Once you've downloaded the `.csv` file containing your IAM user's `Access key ID` and `Secret access key`,
+go ahead and configure the backend:
+
+<div editor-title=".dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: aws
+    regions: [us-west-2, eu-west-1]
+    creds:
+      type: access_key
+      access_key: KKAAUKLIZ5EHKICAOASV
+      secret_key: pn158lMqSBJiySwpQ9ubwmI6VUU3/W2fdJdFwfgO
+```
+
+</div>
+
+### Default credentials
+
+If you have default credentials set up (e.g. in `~/.aws/credentials`), configure the backend like this:
+
+<div editor-title=".dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: aws
+    regions: [us-west-2, eu-west-1]
+    creds:
+      type: default
+```
+
+</div>
+
+## Azure
+
+!!! info "Permission"
+    You must have the `Owner` permission for the Azure subscription.
+
+There are two ways to configure Azure: using a client secret or using the default credentials.
+
+### Client secret
+
+A client secret can be created using the Azure CLI: (1)
+{ .annotate } 
+
+1.  If you don't know your `subscription_id`, run 
+    ```shell
+    az account show --query "{subscription_id: id}"
+    ```  
+
+<div class="termy">
+
+```shell
+$ SUBSCRIPTION_ID=...
+$ az ad sp create-for-rbac --name dstack-app --role Owner --scopes /subscriptions/$SUBSCRIPTION_ID --query "{ tenant_id: tenant, client_id: appId, client_secret: password }"
+```
+
+</div>
+
+Once you have `tenant_id`, `client_id`, and `client_secret`, go ahead and configure the backend.
+
+Example:
+
+<div editor-title=".dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: azure
+    subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+    tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
+    regions: [eastus, westeurope]
+    creds:
+      type: client
+      client_id: acf3f73a-597b-46b6-98d9-748d75018ed0
+      client_secret: 1Kb8Q~o3Q2hdEvrul9yaj5DJDFkuL3RG7lger2VQ
+```
+
+</div>
+
+### Default credentials
+
+Another way to configure Azure is through default credentials.
+
+Obtain the `subscription_id` and `tenant_id` via the Azure CLI:
+
+<div class="termy">
+
+```shell
+$ az account show --query "{subscription_id: id, tenant_id: tenantId}"
+```
+
+</div>
+
+Then proceed to configure the backend:
+
+<div editor-title=".dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: azure
+    subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+    tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
+    regions: [eastus, westeurope]
+    creds:
+      type: default
+```
+
+</div>
+
+## GCP
+
+??? info "Enable APIs"
+    First, ensure the required APIs are enabled in your GCP `project_id`. (1)
+    { .annotate } 
+
+    1.  If you don't know your GCP `project_id`, run 
+        ```shell
+        gcloud projects list --format="json(projectId)"
+        ```  
+
+    ```
+    PROJECT_ID=...
+    gcloud config set project $PROJECT_ID
+    gcloud services enable cloudapis.googleapis.com
+    gcloud services enable compute.googleapis.com 
+    ```
+
+There are two ways to configure GCP: using a service account or using the default credentials.
+
+### Service account
+
+To create a service account, follow [this guide](https://cloud.google.com/iam/docs/service-accounts-create).
+Make sure to grant it the `Service Account User`, and `Compute Admin` roles.
+
+After setting up the service account [create a key](https://cloud.google.com/iam/docs/keys-create-delete) for it 
+and download the corresponding JSON file.
+
+Then go ahead and configure the backend by specifying the downloaded file path. (1) 
+{ .annotate }
+
+1.  If you don't know your GCP `project_id`, run 
+    ```shell
+    gcloud projects list --format="json(projectId)"
+    ```
+
+<div editor-title=".dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: gcp
+    project_id: gcp-project-id
+    regions: [us-east1, europe-west1]
+    creds:
+      type: service_account
+      filename: ~/Downloads/gcp-024ed630eab5.json
+```
+
+</div>
+
+### Default credentials
+
+Example: (1) 
+{ .annotate }
+
+1.  If you don't know your GCP `project_id`, run 
+    ```shell
+    gcloud projects list --format="json(projectId)"
+    ```
+
+<div editor-title=".dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: gcp
+    project_id: gcp-project-id
+    regions: [us-east1, europe-west1]
+    creds:
+      type: default
+```
+
+</div>
+
+## Lambda
+
+Log into your Lambda Cloud account, click API keys in the sidebar, and then click the `Generate API key`
+button to create a new API key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title=".dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: lambda
+    regions: [us-west-2, eu-west-1]
+    creds:
+      type: api_key
+      api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
+```
+
+</div>
+
+[//]: # (TODO: Make regions optional)

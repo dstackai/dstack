@@ -31,7 +31,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ macos-latest, ubuntu-latest, windows-latest ]
+        os: [ macos-latest, ubuntu-latest]
         python-version: [ 3.8, 3.9, "3.10", 3.11 ]
     steps:
       - uses: actions/checkout@v3
@@ -82,10 +82,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - {goos: "linux", goarch: "386", runson: "ubuntu-latest"}
           - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
-          - {goos: "darwin", goarch: "amd64", runson: "macos-latest"}
-          - {goos: "darwin", goarch: "arm64", runson: "macos-latest"}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -151,7 +148,7 @@ jobs:
           echo "__version__ = \"$VERSION\"" > src/dstack/version.py
           echo "__is_release__ = True" >> src/dstack/version.py
           echo $BASE_IMAGE >> src/dstack/version.py
-          cp README.md cli
+          cp README.md src
           python setup.py sdist bdist_wheel -v
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*        
 
@@ -197,7 +194,7 @@ jobs:
           docker manifest push dstackai/dstack:latest
 
   generate-json-schema:
-    needs: [ python-test ]
+    needs: [ pypi-upload ]
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -210,8 +207,8 @@ jobs:
         run: pip install .
       - name: Generate json schema
         run: |
-          python -c "from dstack._internal.core.configuration import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
-          python -c "from dstack._internal.core.profile import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
+          python -c "from dstack._internal.core.models.configurations import RunConfiguration; print(RunConfiguration.schema_json(indent=2))" > configuration.json
+          python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
       - name: Upload json schema to S3
         run: |
           VERSION=${GITHUB_REF#refs/tags/}

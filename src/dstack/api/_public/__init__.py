@@ -1,19 +1,12 @@
-from pathlib import Path
-from typing import Optional, Union
-
-from git import InvalidGitRepositoryError
+from typing import Optional
 
 import dstack._internal.core.services.api_client as api_client_service
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
-from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.services.configs import ConfigManager
-from dstack._internal.core.services.repos import load_repo
-from dstack._internal.utils.crypto import generate_rsa_key_pair
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack.api._public.backends import BackendCollection
-from dstack.api._public.repos import RepoCollection
+from dstack.api._public.repos import RepoCollection, get_ssh_keypair
 from dstack.api._public.runs import RunCollection
 from dstack.api.server import APIClient
 
@@ -21,85 +14,58 @@ logger = get_logger(__name__)
 
 
 class Client:
+    """
+    High-level API client for interacting with dstack server
+
+    Attributes:
+        repos: operations with repos
+        backends: operations with backends
+        runs: operations with runs
+        client: low-level server API client
+        project: project name
+    """
+
     def __init__(
         self,
         api_client: APIClient,
         project_name: str,
-        repo_dir: PathLike,
-        repo: Union[RemoteRepo, LocalRepo],
-        git_identity_file: Optional[PathLike] = None,
-        oauth_token: Optional[str] = None,
         ssh_identity_file: Optional[PathLike] = None,
-        init: bool = True,
     ):
         """
-        :param api_client: low-level server API client
-        :param project_name: project name used for runs
-        :param repo_dir: path to the repo
-        :param repo: repo used for runs
-        :param git_identity_file: private SSH key to access remote repo, used only if `init` is True
-        :param oauth_token: GitHub OAuth token to access remote repo, used only if `init` is True
-        :param ssh_identity_file: SSH keypair to access instances
-        :param init: initialize the repo first
+        Args:
+            api_client: low-level server API client
+            project_name: project name used for runs
+            ssh_identity_file: SSH keypair to access instances
         """
         self._client = api_client
         self._project = project_name
-        self._repos = RepoCollection(api_client, project_name, repo)
+        self._repos = RepoCollection(api_client, project_name)
         self._backends = BackendCollection(api_client, project_name)
-        self._runs = RunCollection(api_client, project_name, repo_dir, repo, ssh_identity_file)
-
-        if init:
-            self.repos.init(git_identity_file, oauth_token)
+        self._runs = RunCollection(api_client, project_name, self)
+        if ssh_identity_file:
+            self.ssh_identity_file = str(ssh_identity_file)
         else:
-            if not self.repos.is_initialized():
-                raise ConfigurationError(f"The repo is not initialized")
+            self.ssh_identity_file = get_ssh_keypair(None, ConfigManager().dstack_key_path)
 
     @staticmethod
     def from_config(
-        repo_dir: PathLike,
         project_name: Optional[str] = None,
         server_url: Optional[str] = None,
         user_token: Optional[str] = None,
-        git_identity_file: Optional[PathLike] = None,
-        oauth_token: Optional[str] = None,
         ssh_identity_file: Optional[PathLike] = None,
-        local_repo: bool = False,
-        init: bool = True,
     ) -> "Client":
         """
-        Creates a Client using global config ~/.dstack/config.yaml
-        :param repo_dir: path to the repo
-        :param project_name: name of the project, required if `server_url` and `user_token` are specified
-        :param server_url: dstack server url, e.g. http://localhost:3000/
-        :param user_token: dstack user token
-        :param git_identity_file: path to a private SSH key to access remote repo
-        :param oauth_token: GitHub OAuth token to access remote repo
-        :param ssh_identity_file: SSH keypair to access instances
-        :param local_repo: load repo as local, has an effect only if `init` is True
-        :param init: initialize the repo first
-        :return: dstack Client
+        Creates a Client using global config `~/.dstack/config.yml`
+
+        Args:
+            project_name: name of the project, required if `server_url` and `user_token` are specified
+            server_url: dstack server url, e.g. `http://localhost:3000/`
+            user_token: dstack user token
+            ssh_identity_file: SSH keypair to access instances
+
+        Returns:
+            dstack Client
         """
-        config = ConfigManager()
-        if not init:
-            logger.debug("Loading repo config")
-            repo_config = config.get_repo_config(repo_dir)
-            if repo_config is None:
-                raise ConfigurationError(f"The repo is not initialized")
-            repo = load_repo(repo_config)
-            if ssh_identity_file is None:
-                ssh_identity_file = repo_config.ssh_key_path
-        else:
-            logger.debug("Initializing repo")
-            repo = LocalRepo(repo_dir=repo_dir)  # default
-            if not local_repo:
-                try:
-                    repo = RemoteRepo(local_repo_dir=repo_dir)
-                except InvalidGitRepositoryError:
-                    pass  # use default
-            ssh_identity_file = get_ssh_keypair(ssh_identity_file, config.dstack_key_path)
-            config.save_repo_config(
-                repo_dir, repo.repo_id, RepoType(repo.run_repo_data.repo_type), ssh_identity_file
-            )
         if server_url is not None and user_token is not None:
             if project_name is None:
                 raise ConfigurationError(f"The project name is not specified")
@@ -107,14 +73,9 @@ class Client:
         else:
             api_client, project_name = api_client_service.get_api_client(project_name=project_name)
         return Client(
-            api_client,
-            project_name,
-            repo_dir,
-            repo,
-            git_identity_file,
-            oauth_token,
-            ssh_identity_file,
-            init,
+            api_client=api_client,
+            project_name=project_name,
+            ssh_identity_file=ssh_identity_file,
         )
 
     @property
@@ -136,22 +97,3 @@ class Client:
     @property
     def project(self) -> str:
         return self._project
-
-
-def get_ssh_keypair(key_path: Optional[PathLike], dstack_key_path: Path) -> str:
-    """Returns a path to the private key"""
-    if key_path is not None:
-        key_path = Path(key_path).expanduser().resolve()
-        pub_key = (
-            key_path
-            if key_path.suffix == ".pub"
-            else key_path.with_suffix(key_path.suffix + ".pub")
-        )
-        private_key = pub_key.with_suffix("")
-        if pub_key.exists() and private_key.exists():
-            return str(private_key)
-        raise ConfigurationError(f"Make sure valid keypair exists: {private_key}(.pub)")
-
-    if not dstack_key_path.exists():
-        generate_rsa_key_pair(private_key_path=dstack_key_path)
-    return str(dstack_key_path)
