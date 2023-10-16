@@ -25,7 +25,7 @@ class TestServerConfigManager:
         @pytest.mark.asyncio
         async def test_inits_backend(self, test_db, session: AsyncSession, tmp_path: Path):
             await create_project(session=session, name="main")
-            config_filepath = tmp_path / "config.yaml"
+            config_filepath = tmp_path / "config.yml"
             with patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath), patch(
                 "dstack._internal.server.services.backends.list_available_backend_types"
             ) as list_available_backend_types_mock, patch(
@@ -54,7 +54,7 @@ class TestServerConfigManager:
         @pytest.mark.asyncio
         async def test_creates_backend(self, test_db, session: AsyncSession, tmp_path: Path):
             await create_project(session=session, name="main")
-            config_filepath = tmp_path / "config.yaml"
+            config_filepath = tmp_path / "config.yml"
             config = {
                 "projects": [
                     {

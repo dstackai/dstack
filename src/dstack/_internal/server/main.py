@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
             session=session, user=admin
         )
         server_config_manager = ServerConfigManager()
-        print("Reading project configurations from ~/.dstack/server/config.yaml...")
+        print("Reading project configurations from ~/.dstack/server/config.yml...")
         config_loaded = server_config_manager.load_config()
         if not config_loaded:
             print("No config was found. Initializing default configuration...")
