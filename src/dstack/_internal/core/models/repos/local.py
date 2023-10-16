@@ -5,13 +5,13 @@ from typing import BinaryIO, Optional
 from pydantic import BaseModel
 from typing_extensions import Literal
 
-from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.ignore import GitIgnore
 from dstack._internal.utils.path import PathLike
 
 
-class LocalRepoInfo(BaseModel):
+class LocalRepoInfo(BaseRepoInfo):
     repo_type: Literal["local"] = "local"
     repo_dir: str
 
@@ -32,6 +32,8 @@ class LocalRepo(Repo):
         repo_dir: Optional[PathLike] = None,
         repo_data: Optional[LocalRunRepoData] = None,
     ):
+        self.repo_dir = repo_dir
+
         if repo_dir is not None:
             repo_data = LocalRunRepoData(repo_dir=str(repo_dir))
         elif repo_data is None:

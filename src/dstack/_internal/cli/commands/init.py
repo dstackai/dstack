@@ -5,6 +5,8 @@ from pathlib import Path
 from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.utils.common import cli_error, configure_logging, console
 from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.models.repos.base import RepoType
+from dstack._internal.core.services.configs import ConfigManager
 from dstack.api import Client
 
 
@@ -49,15 +51,23 @@ class InitCommand(BaseCommand):
     def _command(self, args: argparse.Namespace):
         configure_logging()
         try:
-            Client.from_config(
+            api = Client.from_config(
+                project_name=args.project, ssh_identity_file=args.ssh_identity_file
+            )
+            repo = api.repos.load(
                 Path.cwd(),
-                args.project,
+                local=args.local,
+                init=True,
                 git_identity_file=args.git_identity_file,
                 oauth_token=args.gh_token,
-                ssh_identity_file=args.ssh_identity_file,
-                local_repo=args.local,
-                init=True,
             )
+            if args.ssh_identity_file:
+                ConfigManager().save_repo_config(
+                    repo.repo_dir,
+                    repo.repo_id,
+                    RepoType(repo.run_repo_data.repo_type),
+                    args.ssh_identity_file,
+                )
         except ConfigurationError as e:
             raise cli_error(e)
         console.print("OK")

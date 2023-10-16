@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from dstack._internal.core.errors import DstackError
-from dstack._internal.core.models.repos.base import Repo, RepoProtocol
+from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo, RepoProtocol
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.path import PathLike
 from dstack._internal.utils.ssh import get_host_config
@@ -25,7 +25,7 @@ class RemoteRepoCreds(BaseModel):
     oauth_token: Optional[str]
 
 
-class RemoteRepoInfo(BaseModel):
+class RemoteRepoInfo(BaseRepoInfo):
     repo_type: Literal["remote"] = "remote"
     repo_host_name: str
     repo_port: Optional[int]
@@ -89,16 +89,11 @@ class RemoteRepo(Repo):
         repo_url: Optional[str] = None,
         repo_data: Optional[RemoteRunRepoData] = None,
     ):
-        """
-        >>> RemoteRepo(local_repo_dir=os.getcwd())
-        >>> RemoteRepo(repo_id="playground", repo_url="https://github.com/dstackai/dstack-playground.git")
-        """
-
-        self.local_repo_dir = local_repo_dir
+        self.repo_dir = local_repo_dir
         self.repo_url = repo_url
 
-        if self.local_repo_dir is not None:
-            repo = git.Repo(self.local_repo_dir)
+        if self.repo_dir is not None:
+            repo = git.Repo(self.repo_dir)
             tracking_branch = repo.active_branch.tracking_branch()
             if tracking_branch is None:
                 raise RepoError("No remote branch is configured")
