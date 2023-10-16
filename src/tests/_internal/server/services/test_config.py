@@ -11,7 +11,7 @@ from dstack._internal.core.models.backends.azure import AzureConfigInfoWithCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel
-from dstack._internal.server.services.config import ServerConfigManager
+from dstack._internal.server.services.config import AzureConfig, ServerConfigManager
 from tests._internal.server.common import (
     create_backend,
     create_project,
@@ -48,7 +48,12 @@ class TestServerConfigManager:
                 list_available_backend_types_mock.assert_called()
                 get_configurator_mock.assert_called()
                 create_backend_mock.assert_called()
-                assert manager.config.projects[0].backends[0] == default_config
+                assert manager.config.projects[0].backends[0] == AzureConfig(
+                    tenant_id="test_tenant",
+                    subscription_id="test_subscription",
+                    regions=["westeurope"],
+                    creds=AzureDefaultCreds(),
+                )
 
     class TestApplyConfig:
         @pytest.mark.asyncio

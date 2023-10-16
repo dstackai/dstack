@@ -86,6 +86,8 @@ class AWSConfigurator(ABC):
     def create_backend(
         self, project: ProjectModel, config: AWSConfigInfoWithCreds
     ) -> BackendModel:
+        if config.regions is None:
+            config.regions = DEFAULT_REGIONS
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,

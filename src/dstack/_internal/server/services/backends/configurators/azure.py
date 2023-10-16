@@ -139,6 +139,8 @@ class AzureConfigurator(Configurator):
     def create_backend(
         self, project: ProjectModel, config: AzureConfigInfoWithCreds
     ) -> BackendModel:
+        if config.locations is None:
+            config.locations = DEFAULT_LOCATIONS
         if isinstance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         credential, _ = auth.authenticate(config.creds)

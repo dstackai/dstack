@@ -64,6 +64,8 @@ class LambdaConfigurator(Configurator):
     def create_backend(
         self, project: ProjectModel, config: LambdaConfigInfoWithCreds
     ) -> BackendModel:
+        if config.regions is None:
+            config.regions = REGIONS
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,

@@ -4,14 +4,15 @@ from pydantic import BaseModel, Field
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
+from dstack._internal.core.models.common import ForbidExtra
 
 
 class LambdaConfigInfo(BaseModel):
     type: Literal["lambda"] = "lambda"
-    regions: List[str]
+    regions: Optional[List[str]] = None
 
 
-class LambdaAPIKeyCreds(BaseModel):
+class LambdaAPIKeyCreds(ForbidExtra):
     type: Literal["api_key"] = "api_key"
     api_key: str
 

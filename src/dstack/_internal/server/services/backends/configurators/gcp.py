@@ -163,6 +163,8 @@ class GCPConfigurator(Configurator):
     def create_backend(
         self, project: ProjectModel, config: GCPConfigInfoWithCreds
     ) -> BackendModel:
+        if config.regions is None:
+            config.regions = DEFAULT_REGIONS
         credentials, _ = auth.authenticate(creds=config.creds)
         service_account_email = getattr(credentials, "service_account_email", None)
         if service_account_email is None:
