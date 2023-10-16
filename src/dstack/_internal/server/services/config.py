@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import Annotated, List, Literal, Optional, Union
+from typing import List, Literal, Optional, Union
 
 import yaml
 from pydantic import BaseModel, Field, root_validator
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
 from dstack._internal.core.models.backends.aws import AnyAWSCreds
