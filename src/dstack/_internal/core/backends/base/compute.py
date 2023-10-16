@@ -29,6 +29,7 @@ class Compute(ABC):
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
         pass
 
@@ -50,6 +51,20 @@ class Compute(ABC):
 
 
 def get_user_data(backend: BackendType, image_name: str, authorized_keys: List[str]) -> str:
+    commands = get_shim_commands(
+        backend=backend,
+        image_name=image_name,
+        authorized_keys=authorized_keys,
+    )
+    return get_cloud_config(
+        runcmd=[["sh", "-c", " && ".join(commands)]],
+        ssh_authorized_keys=authorized_keys,
+    )
+
+
+def get_shim_commands(
+    backend: BackendType, image_name: str, authorized_keys: List[str]
+) -> List[str]:
     build = get_dstack_runner_version()
     env = {
         "DSTACK_BACKEND": backend.value,
@@ -59,14 +74,11 @@ def get_user_data(backend: BackendType, image_name: str, authorized_keys: List[s
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
         "DSTACK_HOME": "/root/.dstack",
     }
-    script = get_dstack_shim(build)
+    commands = get_dstack_shim(build)
     for k, v in env.items():
-        script += [f'export "{k}={v}"']
-    script += get_run_shim_script()
-    return get_cloud_config(
-        runcmd=[["sh", "-c", " && ".join(script)]],
-        ssh_authorized_keys=authorized_keys,
-    )
+        commands += [f'export "{k}={v}"']
+    commands += get_run_shim_script()
+    return commands
 
 
 def get_dstack_runner_version() -> str:

@@ -80,6 +80,7 @@ class GCPCompute(Compute):
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
         project_id = run.project_name
         instance_name = run.run_spec.run_name
