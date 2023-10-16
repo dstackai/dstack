@@ -7,6 +7,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.repos.base import Repo
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -112,6 +113,9 @@ class BaseConfiguration(ForbidExtra):
         if isinstance(v, list):
             return dict(pair.split(sep="=", maxsplit=1) for pair in v)
         return v
+
+    def get_repo(self) -> Optional[Repo]:
+        return None
 
 
 class BaseConfigurationWithPorts(BaseConfiguration):
