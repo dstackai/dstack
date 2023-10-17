@@ -24,7 +24,7 @@ jobs:
       - run: |
           pip install pillow cairosvg
           sudo apt-get install -y libcairo2-dev libfreetype6-dev libffi-dev libjpeg-dev libpng-dev libz-dev
-          pip install mkdocs-material pip install "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files mkdocstrings[python] --upgrade
+          pip install mkdocs-material "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files "mkdocstrings[python]" --upgrade
           pip install git+https://${{ secrets.GH_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
           mkdocs gh-deploy --config-file ../dstack/mkdocs.yml --force
         working-directory: ./dstackai.github.io

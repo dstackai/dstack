@@ -25,7 +25,7 @@ To get started, create an instance of `dstack.Client` and use its methods to sub
 from dstack.api import Client, ClientError
 
 try:
-    client = Client.from_config(repo_dir=".")
+    client = Client.from_config()
 except ClientError as e:
     print(e)
 ```
@@ -124,11 +124,17 @@ you can use the `runs.get()` method on `dstack.Client`.
 run = client.runs.get(run_name)
 ```
 
-The `status()` method on `dstack.Run` can always provide the status of the run.
+The `status` property on `dstack.Run` provides the status of the run.
 
 ```python
 if run:
-    print(run.status())
+    print(run.status)
+```
+
+To get the latest state of the run, you can use the `run.refresh()` method:
+
+```python
+run.refresh()
 ```
 
 ## Source code

@@ -60,7 +60,7 @@ The admin token is bbae0f28-d3dd-4820-bf61-8f4bb40815da
     Both the CLI and API need to be configured with the server address, user token, and project name 
     via `~/.dstack/config.yml`. 
 
-    The server automatically handles this setup at startup for the main project. 
+    The server automatically handles this setup at startup for the `main` project. 
     To configure the CLI and API for different machines or projects,
     use [`dstack config`](reference/cli/config.md).
 
@@ -231,13 +231,10 @@ First, create an instance of `dstack.api.Client`:
 from dstack.api import Client, ClientError
 
 try:
-    client = Client.from_config(repo_dir=".")
+    client = Client.from_config()
 except ClientError:
     print("Can't connect to the server")
 ```
-
-The `repo_dir` argument should point to the directory containing the files you want to reference in the task or service
-you're running.
 
 ### Submit a run
 
@@ -261,6 +258,8 @@ run = client.runs.submit(
     resources=Resources(gpu=GPU(memory="24GB")),
 )
 ```
+
+[//]: # (TODO: Explain how to mount a repo)
 
 To forward the configured ports to `localhost`, use the `attach` and `detach` methods on the run.
 
