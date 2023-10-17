@@ -89,7 +89,7 @@ func (ex *RunExecutor) prepareArchive(ctx context.Context) error {
 	}
 	defer func() { _ = file.Close() }()
 	log.Trace(ctx, "Extracting code archive", "src", ex.codePath, "dst", ex.workingDir)
-	if err := extract.Archive(ctx, file, ex.workingDir, nil); err != nil {
+	if err := extract.Tar(ctx, file, ex.workingDir, nil); err != nil {
 		return gerrors.Wrap(err)
 	}
 	return nil
