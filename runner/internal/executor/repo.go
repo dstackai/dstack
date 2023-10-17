@@ -24,7 +24,7 @@ func (ex *RunExecutor) setupRepo(ctx context.Context) error {
 		if err := ex.prepareGit(ctx); err != nil {
 			return gerrors.Wrap(err)
 		}
-	case "local":
+	case "local", "virtual":
 		log.Trace(ctx, "Extracting tar archive")
 		if err := ex.prepareArchive(ctx); err != nil {
 			return gerrors.Wrap(err)

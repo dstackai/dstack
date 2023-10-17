@@ -16,14 +16,10 @@ import dstack.api as api
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
-from dstack._internal.core.models.configurations import ServiceConfiguration as Service
-from dstack._internal.core.models.configurations import TaskConfiguration as Task
-from dstack._internal.core.models.logs import LogEvent
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.profiles import ProfileResources as Resources
 from dstack._internal.core.models.profiles import ProfileRetryPolicy as RetryPolicy
 from dstack._internal.core.models.profiles import SpotPolicy
-from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.runs import JobSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus

@@ -9,10 +9,11 @@ from dstack._internal.core.models.repos.remote import (
     RemoteRepoInfo,
     RemoteRunRepoData,
 )
+from dstack._internal.core.models.repos.virtual import VirtualRepoInfo, VirtualRunRepoData
 
-AnyRunRepoData = Union[RemoteRunRepoData, LocalRunRepoData]
+AnyRunRepoData = Union[RemoteRunRepoData, LocalRunRepoData, VirtualRunRepoData]
 
-AnyRepoInfo = Union[RemoteRepoInfo, LocalRepoInfo]
+AnyRepoInfo = Union[RemoteRepoInfo, LocalRepoInfo, VirtualRepoInfo]
 
 
 class RepoHead(BaseModel):
