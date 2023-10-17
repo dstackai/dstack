@@ -295,7 +295,13 @@ def configure_gateway_over_ssh(host: str, id_rsa: str, authorized_key: str, jobs
     if proc.returncode != 0:
         if b"Certbot failed:" in stderr:
             raise GatewayError("Certbot failed, ensure the domain is valid")
-        raise SSHError(stderr.decode())
+        if b"No such file or directory: 'certbot'" in stderr:
+            raise GatewayError(
+                "Certbot is not installed. Wait for gateway provisioning to finish."
+            )
+        raise GatewayError(
+            f"Error while connecting to gateway: {stderr.decode()}\nWait for gateway provisioning to finish."
+        )
 
     sockets = json.loads(stdout)
     for job, socket in zip(jobs, sockets):
