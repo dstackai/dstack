@@ -125,16 +125,17 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Orchestrate <span class="gradient">GPU workloads</span> across clouds</h1>
+                <h1>An easier way to <span class="gradient">train</span> and <span class="gradient">deploy</span>
+                    generative AI</h1>
 
                 <p>
-                    Enjoy a simple cloud-agnostic open-source framework for training, fine-tuning, inference, and development of generative AI models.
+                    Effortlessly train and deploy generative AI models with dstack, on your cloud or using our cloud GPU.
                 </p>
             </div>
 
             <div class="tx-landing__hero_buttons">
                 <div class="tx-landing__hero_button_container">
-                    <a href="/docs" class="md-button md-button-secondary">
+                    <a href="/docs" class="md-button md-button--primary">
                         Install open-source </a>
 
                     <div class="tx-landing__integrations">
@@ -146,21 +147,20 @@
                         </div>
 
                         <div class="tx-landing__integrations_text">
-                            or your own cloud
+                            Use your own cloud accounts
                         </div>
                     </div>
                 </div>
 
                 <div class="tx-landing__hero_button_container">
                     <a href="#"
-                       class="md-button md-button--primary"
+                       class="md-button md-button-secondary"
                        data-tally-open="w7K17R"
-                       data-tally-emoji-text="👋"
-                       data-tally-emoji-animation="wave"
                     >Request cloud GPU </a>
 
                     <div class="tx-landing__hero_button_placeholder">
-                        Managed service with GPU <br> out of the box
+                        Use our cloud GPU <br>
+                        A100 starts at $1.99, H100 starts at $4.12
                     </div>
                 </div>
             </div>
@@ -357,18 +357,19 @@
                 <div class="termy">
                     <pre class="highlight">
 $ pip install "dstack[all] -U"
-$ dstack start
+$ dstack server
 
 The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
                     </pre>
                 </div>
                 <p class="tx-landing__bottom_cta_text">
-                    <strong>Done!</strong> Configure clouds, and use the CLI or API to orchestrate GPU workloads.
+                    <strong>Done!</strong> Configure clouds, and use the CLI or API to train
+                    and deploy generative AI models.
                 </p>
 
-                <a href="/docs" class="md-button md-button-secondary">Install open-source </a>
+                <a href="/docs" class="md-button md-button--primary">Install open-source </a>
 
-                <a href="#" class="md-button md-button--primary" data-tally-open="w7K17R" data-tally-emoji-text="👋" data-tally-emoji-animation="wave">
+                <a href="#" class="md-button md-button-secondary" data-tally-open="w7K17R">
                     Request cloud GPU
                 </a>
             </div>
@@ -381,33 +382,32 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
     <footer class="tx-footer">
         <div class="md-main__inner md-grid">
             <div class="tx-footer__left-side">
-                <a href="/" class="tx-footer__logo">
-                    <img src="assets/images/logo.svg" width="82" height="19">
-                </a>
-
                 <div class="tx-footer__copyright">
-                    Copyright © 2023 <br /> dstack GmbH
+                    {% include "partials/copyright.html" %}
+                    {% if config.extra.social %}
+                        {% include "partials/social.html" %}
+                    {% endif %}
                 </div>
             </div>
 
             <div class="tx-footer__right-side">
                 <div class="tx-footer__section">
-                    <div class="tx-footer__section-title">Connect</div>
+                    <div class="tx-footer__section-title">Contact</div>
                     <a href="mailto:hello@dstack.ai" class="tx-footer__section-link">hello@dstack.ai</a>
-                    <a href="#" class="tx-footer__section-link">Open a chat</a>
                 </div>
 
                 <div class="tx-footer__section">
-                    <div class="tx-footer__section-title">Company</div>
-                    <a href="#" class="tx-footer__section-link">Imprint</a>
-                    <a href="#" class="tx-footer__section-link">Privacy policy</a>
-                    <a href="#" class="tx-footer__section-link">Terms of service</a>
+                    <div class="tx-footer__section-title">Resources</div>
+                    <a href="/docs" class="tx-footer__section-link">Docs</a>
+                    <a href="/examples" class="tx-footer__section-link">Examples</a>
+                    <a href="/blog" class="tx-footer__section-link">Blog</a>
                 </div>
 
                 <div class="tx-footer__section">
-                    <div class="tx-footer__section-title">Follow us</div>
-                    <a href="#" class="tx-footer__section-link">Twitter</a>
-                    <a href="#" class="tx-footer__section-link">LinkedIn</a>
+                    <div class="tx-footer__section-title">Community</div>
+                    <a href="https://github.com/dstackai/dstack" class="tx-footer__section-link">GitHub</a>
+                    <a href="https://discord.gg/u8SmfwPpMd" class="tx-footer__section-link">Discord</a>
+                    <a href="https://twitter.com/dstackai/" class="tx-footer__section-link">Twitter</a>
                 </div>
             </div>
         </div>
