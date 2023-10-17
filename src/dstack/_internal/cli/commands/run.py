@@ -121,6 +121,15 @@ class RunCommand(APIBaseCommand):
             console.print("\nExiting...")
             return
 
+        if args.run_name:
+            old_run = self.api.runs.get(run_name=args.run_name)
+            if old_run is not None:
+                if not args.yes and not confirm_ask(
+                    f"Run [code]{args.run_name}[/] already exist. Override the run?"
+                ):
+                    console.print("\nExiting...")
+                    return
+
         try:
             with console.status("Submitting run..."):
                 run = self.api.runs.exec_plan(run_plan, repo, reserve_ports=not args.detach)
