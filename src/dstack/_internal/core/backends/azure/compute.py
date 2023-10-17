@@ -87,6 +87,7 @@ class AzureCompute(Compute):
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
         location = instance_offer.region
         logger.info(

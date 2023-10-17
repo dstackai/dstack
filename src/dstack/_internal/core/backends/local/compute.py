@@ -44,6 +44,7 @@ class LocalCompute(Compute):
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
         authorized_keys = "\\n".join(
             [

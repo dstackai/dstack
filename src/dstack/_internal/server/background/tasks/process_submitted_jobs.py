@@ -82,6 +82,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job=job,
         backends=backends,
         project_ssh_public_key=project_model.ssh_public_key,
+        project_ssh_private_key=project_model.ssh_private_key,
     )
     if job_provisioning_data is not None:
         logger.debug("Provisioning job %s succeded", job_model.job_name)
@@ -104,6 +105,7 @@ async def _run_job(
     job: Job,
     backends: List[Backend],
     project_ssh_public_key: str,
+    project_ssh_private_key: str,
 ) -> Optional[JobProvisioningData]:
     if run.run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
@@ -125,6 +127,7 @@ async def _run_job(
                 job,
                 offer,
                 project_ssh_public_key,
+                project_ssh_private_key,
             )
         except BackendError as e:
             logger.debug("Instance launch failed: %s", e)

@@ -114,6 +114,7 @@ class AWSCompute(Compute):
         job: Job,
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
         project_id = run.project_name
         ec2 = self.session.resource("ec2", region_name=instance_offer.region)
