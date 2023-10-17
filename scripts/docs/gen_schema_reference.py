@@ -5,12 +5,11 @@ import importlib
 import logging
 import re
 from fnmatch import fnmatch
-from typing import Any, Dict, Optional, Type, Union
+from typing import Annotated, Any, Dict, Literal, Type, Union, get_args, get_origin
 
 import mkdocs_gen_files
 import yaml
 from mkdocs.structure.files import File
-from typing_extensions import Annotated, Literal, get_args, get_origin
 
 FILE_PATTERN = "docs/reference/*.md"
 logger = logging.getLogger("mkdocs.plugins.dstack.schema")
