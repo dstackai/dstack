@@ -5,6 +5,8 @@ import time
 from threading import Thread
 from typing import Dict, List, Optional, Tuple
 
+from pydantic import BaseModel
+
 from dstack._internal.core.backends.base.compute import Compute, get_shim_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.lambdalabs.api_client import LambdaAPIClient
@@ -17,6 +19,13 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+
+_SHIM_CONFIG_FILEPATH = "/home/ubuntu/.dstack/config.json"
+
+
+class _ShimConfig(BaseModel):
+    instance_id: str
+    api_key: str
 
 
 class LambdaCompute(Compute):
@@ -120,6 +129,7 @@ def _run_instance(
             "hostname": instance_info["ip"],
             "project_ssh_private_key": project_ssh_private_key,
             "user_ssh_public_key": user_ssh_public_key,
+            "config": _ShimConfig(instance_id=instance_id, api_key=api_client.api_key),
             "launch_command": launch_command,
         },
         daemon=True,
@@ -185,6 +195,7 @@ def _start_runner(
     hostname: str,
     project_ssh_private_key: str,
     user_ssh_public_key: str,
+    config: _ShimConfig,
     launch_command: str,
 ):
     _setup_instance(
@@ -195,15 +206,21 @@ def _start_runner(
     _launch_runner(
         hostname=hostname,
         ssh_private_key=project_ssh_private_key,
+        config=config,
         launch_command=launch_command,
     )
 
 
-def _setup_instance(hostname: str, ssh_private_key: str, user_ssh_public_key: str):
+def _setup_instance(
+    hostname: str,
+    ssh_private_key: str,
+    user_ssh_public_key: str,
+):
     # Lambda API allows specifying only one ssh key,
     # so we have to update authorized_keys manually to add the user key
     setup_commands = (
         f"echo '{user_ssh_public_key}' >> /home/ubuntu/.ssh/authorized_keys && "
+        "mkdir /home/ubuntu/.dstack && "
         "sudo apt-get update && "
         "sudo apt-get install -y --no-install-recommends nvidia-docker2 && "
         "sudo pkill -SIGHUP dockerd"
@@ -211,12 +228,38 @@ def _setup_instance(hostname: str, ssh_private_key: str, user_ssh_public_key: st
     _run_ssh_command(hostname=hostname, ssh_private_key=ssh_private_key, command=setup_commands)
 
 
-def _launch_runner(hostname: str, ssh_private_key: str, launch_command: str):
+def _launch_runner(
+    hostname: str,
+    ssh_private_key: str,
+    config: _ShimConfig,
+    launch_command: str,
+):
+    _upload_config(
+        hostname=hostname,
+        ssh_private_key=ssh_private_key,
+        config=config,
+    )
     _run_ssh_command(
         hostname=hostname,
         ssh_private_key=ssh_private_key,
         command=launch_command,
     )
+
+
+def _upload_config(
+    hostname: str,
+    ssh_private_key: str,
+    config: _ShimConfig,
+):
+    with tempfile.NamedTemporaryFile("w+", 0o600) as f:
+        f.write(config.json())
+        f.flush()
+        _run_scp_command(
+            hostname=hostname,
+            ssh_private_key=ssh_private_key,
+            source=f.name,
+            target=_SHIM_CONFIG_FILEPATH,
+        )
 
 
 def _run_ssh_command(hostname: str, ssh_private_key: str, command: str):
@@ -232,6 +275,25 @@ def _run_ssh_command(hostname: str, ssh_private_key: str, command: str):
                 f.name,
                 f"ubuntu@{hostname}",
                 command,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
+def _run_scp_command(hostname: str, ssh_private_key: str, source: str, target: str):
+    with tempfile.NamedTemporaryFile("w+", 0o600) as f:
+        f.write(ssh_private_key)
+        f.flush()
+        subprocess.run(
+            [
+                "scp",
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-i",
+                f.name,
+                source,
+                f"ubuntu@{hostname}:{target}",
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
