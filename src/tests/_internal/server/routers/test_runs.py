@@ -46,8 +46,6 @@ def get_dev_env_run_plan_dict(
         "user": username,
         "run_spec": {
             "configuration": {
-                "build": [],
-                "cache": [],
                 "entrypoint": None,
                 "env": {},
                 "home_dir": "/root",
@@ -140,8 +138,6 @@ def get_dev_env_run_dict(
         "status": "submitted",
         "run_spec": {
             "configuration": {
-                "build": [],
-                "cache": [],
                 "entrypoint": None,
                 "env": {},
                 "home_dir": "/root",

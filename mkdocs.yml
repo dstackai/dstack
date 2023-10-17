@@ -177,8 +177,8 @@ nav:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
               - task: docs/reference/dstack.yml/task.md
               - service: docs/reference/dstack.yml/service.md
-          - "server/config.yml": docs/reference/server/config.yml.md
           - profiles.yml: docs/reference/profiles.yml.md
+          - "server/config.yml": docs/reference/server/config.yml.md
 #          - Backends:
 #            - AWS: docs/reference/backends/aws.md
 #            - GCP: docs/reference/backends/gcp.md

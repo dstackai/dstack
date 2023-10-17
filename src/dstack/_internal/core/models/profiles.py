@@ -66,8 +66,14 @@ def parse_max_duration(v: Union[int, str]) -> int:
 
 
 class ProfileGPU(ForbidExtra):
-    name: Optional[str]
-    count: int = 1
+    name: Annotated[
+        Optional[str],
+        Field(description='The name of the GPU (e.g., "A100" or "H100")'),
+    ]
+    count: Annotated[
+        int,
+        Field(description="The minimum number of GPUs"),
+    ] = 1
     memory: Annotated[
         Optional[Union[int, str]],
         Field(description='The minimum size of GPU memory (e.g., "16GB")'),
@@ -82,10 +88,14 @@ class ProfileGPU(ForbidExtra):
 
 
 class ProfileResources(ForbidExtra):
-    gpu: Optional[Union[int, ProfileGPU]]
+    cpu: Annotated[int, Field(description="The minimum number of CPUs")] = DEFAULT_CPU
     memory: Annotated[
         Union[int, str], Field(description='The minimum size of RAM memory (e.g., "16GB")')
     ] = parse_memory(DEFAULT_MEM)
+    gpu: Annotated[
+        Optional[Union[int, ProfileGPU]],
+        Field(description="The minimum number of GPUs or a GPU spec"),
+    ]
     shm_size: Annotated[
         Optional[Union[int, str]],
         Field(
@@ -93,7 +103,6 @@ class ProfileResources(ForbidExtra):
             "e.g., dataloaders in PyTorch), you may need to configure this."
         ),
     ]
-    cpu: int = DEFAULT_CPU
     _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
 
     @validator("gpu", pre=True)
@@ -123,9 +132,20 @@ class ProfileRetryPolicy(ForbidExtra):
 
 
 class Profile(ForbidExtra):
-    name: str
-    backends: Optional[List[BackendType]]
-    resources: ProfileResources = ProfileResources()
+    name: Annotated[
+        str,
+        Field(
+            description="The name of the profile that can be passed as `--profile` to `dstack run`"
+        ),
+    ]
+    backends: Annotated[
+        Optional[List[BackendType]],
+        Field(description='The backends to consider for provisionig (e.g., "[aws, gcp]")'),
+    ]
+    resources: Annotated[
+        ProfileResources,
+        Field(description="The minimum resources of the instance to be provisioned"),
+    ] = ProfileResources()
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
@@ -138,13 +158,15 @@ class Profile(ForbidExtra):
     max_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],
         Field(
-            description="The maximum duration of a run (e.g., 2h, 1d, etc). After it elapses, the run is forced to stop"
+            description="The maximum duration of a run (e.g., 2h, 1d, etc). After it elapses, the run is forced to stop."
         ),
     ]
     max_price: Annotated[
         Optional[confloat(gt=0.0)], Field(description="The maximum price per hour, in dollars")
     ]
-    default: bool = False
+    default: Annotated[
+        bool, Field(description="If set to true, `dstack run` will use this profile by default.")
+    ] = False
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
