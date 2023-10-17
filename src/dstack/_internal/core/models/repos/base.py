@@ -4,6 +4,8 @@ from typing import BinaryIO, Optional
 
 from pydantic import BaseModel
 
+import dstack._internal.core.models.repos as repos
+
 
 class RepoType(str, Enum):
     REMOTE = "remote"
@@ -23,7 +25,7 @@ class BaseRepoInfo(BaseModel):
 class Repo(ABC):
     repo_id: str
     repo_dir: Optional[str]
-    run_repo_data: BaseRepoInfo
+    run_repo_data: "repos.AnyRunRepoData"
 
     @abstractmethod
     def write_code_file(self, fp: BinaryIO) -> str:
