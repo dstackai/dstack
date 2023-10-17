@@ -5,7 +5,7 @@ import importlib
 import logging
 import re
 from fnmatch import fnmatch
-from typing import Any, Dict, Type, Union
+from typing import Any, Dict, Optional, Type, Union
 
 import mkdocs_gen_files
 import yaml
@@ -20,11 +20,13 @@ def get_type(annotation: Type) -> str:
     if get_origin(annotation) is Annotated:
         return get_type(get_args(annotation)[0])
     if get_origin(annotation) is Union:
-        args = get_args(annotation)
-        if type(None) in args:
-            args = [arg for arg in args if arg is not type(None)]
-            return f"Optional[{get_type(args[-1])}]"
-        return get_type(args[-1])
+        # Optional is Union with None.
+        # We don't want to show Optional[A, None] but just Optional[A]
+        if annotation.__name__ == "Optional":
+            args = ",".join(get_type(arg) for arg in get_args(annotation)[:-1])
+        else:
+            args = ",".join(get_type(arg) for arg in get_args(annotation))
+        return f"{annotation.__name__}[{args}]"
     if get_origin(annotation) is Literal:
         return str(annotation).split(".", maxsplit=1)[-1]
     if get_origin(annotation) is list:
