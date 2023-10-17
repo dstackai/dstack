@@ -87,15 +87,7 @@ class BaseConfiguration(ForbidExtra):
         Union[List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$")], Dict[str, str]],
         Field(description="The mapping or the list of environment variables"),
     ] = {}
-    # deprecated
-    build: Annotated[
-        CommandsList, Field(description="The bash commands to run during build stage")
-    ] = []
     setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
-    # not supported yet
-    cache: Annotated[
-        List[str], Field(description="The directories to be cached between configuration runs")
-    ] = []
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
