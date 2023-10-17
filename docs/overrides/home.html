@@ -125,37 +125,49 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Orchestrate GPU workloads across clouds</h1>
+                <h1>Orchestrate <span class="gradient">GPU workloads</span> across clouds</h1>
+
                 <p>
-                    <strong>dstack</strong> is an open-source framework for orchestrating GPU workloads across
-                    various cloud providers.
+                    Enjoy a simple cloud-agnostic open-source framework for training, fine-tuning, inference, and development of generative AI models.
                 </p>
+            </div>
 
-                <p>It offers a simple cloud-agnostic interface for training, fine-tuning, inference, and development of
-                    generative AI models.</p>
+            <div class="tx-landing__hero_buttons">
+                <div class="tx-landing__hero_button_container">
+                    <a href="/docs" class="md-button md-button-secondary">
+                        Install open-source </a>
 
-                <a href="/docs" class="md-button md-button--primary">
-                    Get started</a>
+                    <div class="tx-landing__integrations">
+                        <div class="tx-landing__integrations_logos">
+                            <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
+                            <img class="logo-large" src="assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <img class="logo-large" src="assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <img class="logo-large" src="assets/images/lambda-logo.svg" title="Lambda Cloud">
+                        </div>
 
-                <a href="https://discord.gg/u8SmfwPpMd"
-                   target="_blank" class="md-button md-button-secondary discord">Join Discord</a>
+                        <div class="tx-landing__integrations_text">
+                            or your own cloud
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tx-landing__hero_button_container">
+                    <a href="#"
+                       class="md-button md-button--primary"
+                       data-tally-open="w7K17R"
+                       data-tally-emoji-text="👋"
+                       data-tally-emoji-animation="wave"
+                    >Request cloud GPU </a>
+
+                    <div class="tx-landing__hero_button_placeholder">
+                        Managed service with GPU <br> out of the box
+                    </div>
+                </div>
             </div>
 
             <div class="tx-landing__hero_code">
                 <div id="tx-landing__hero_code_terminal" data-termynal>
                 </div>
-            </div>
-        </div>
-
-        <div class="tx-landing__integrations">
-            <div class="tx-landing__integrations_text">
-                <h2>Use multiple cloud GPU providers</h2>
-            </div>
-            <div class="tx-landing__integrations_logos">
-                <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
-                <img class="logo-large" src="assets/images/gcp-logo.svg" title="Google Cloud Platform">
-                <img class="logo-large" src="assets/images/azure-logo.svg" title="Microsoft Azure">
-                <img class="logo-large" src="assets/images/lambda-logo.svg" title="Lambda Cloud">
             </div>
         </div>
 
@@ -354,13 +366,50 @@ The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b3
                     <strong>Done!</strong> Configure clouds, and use the CLI or API to orchestrate GPU workloads.
                 </p>
 
-                <a href="/docs" class="md-button md-button--primary">
-                    Get started</a>
+                <a href="/docs" class="md-button md-button-secondary">Install open-source </a>
 
-                <a href="https://discord.gg/u8SmfwPpMd"
-                   target="_blank" class="md-button md-button-secondary discord">Join Discord</a>
+                <a href="#" class="md-button md-button--primary" data-tally-open="w7K17R" data-tally-emoji-text="👋" data-tally-emoji-animation="wave">
+                    Request cloud GPU
+                </a>
             </div>
         </div>
     </div>
 </section>
+{% endblock %}
+
+{% block footer %}
+    <footer class="tx-footer">
+        <div class="md-main__inner md-grid">
+            <div class="tx-footer__left-side">
+                <a href="/" class="tx-footer__logo">
+                    <img src="assets/images/logo.svg" width="82" height="19">
+                </a>
+
+                <div class="tx-footer__copyright">
+                    Copyright © 2023 <br /> dstack GmbH
+                </div>
+            </div>
+
+            <div class="tx-footer__right-side">
+                <div class="tx-footer__section">
+                    <div class="tx-footer__section-title">Connect</div>
+                    <a href="mailto:hello@dstack.ai" class="tx-footer__section-link">hello@dstack.ai</a>
+                    <a href="#" class="tx-footer__section-link">Open a chat</a>
+                </div>
+
+                <div class="tx-footer__section">
+                    <div class="tx-footer__section-title">Company</div>
+                    <a href="#" class="tx-footer__section-link">Imprint</a>
+                    <a href="#" class="tx-footer__section-link">Privacy policy</a>
+                    <a href="#" class="tx-footer__section-link">Terms of service</a>
+                </div>
+
+                <div class="tx-footer__section">
+                    <div class="tx-footer__section-title">Follow us</div>
+                    <a href="#" class="tx-footer__section-link">Twitter</a>
+                    <a href="#" class="tx-footer__section-link">LinkedIn</a>
+                </div>
+            </div>
+        </div>
+    </footer>
 {% endblock %}

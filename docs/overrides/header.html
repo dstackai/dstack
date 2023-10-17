@@ -50,12 +50,11 @@
         {% set icon = config.theme.icon.search or "material/magnify" %}
         {% include ".icons/" ~ icon ~ ".svg" %}
       </label>
-      {% include "partials/search.html" %}
-    {% endif %}
-    {% if config.repo_url %}
-      <div class="md-header__source">
-        {% include "partials/source.html" %}
-      </div>
+    <div class="md-search"></div>
+    <div class="md-header__buttons">
+      <a href="#" class="md-button md-button-secondary">Download</a>
+      <a href="#" data-tally-open="w7K17R" data-tally-emoji-text="👋" data-tally-emoji-animation="wave" class="md-button md-button--primary">Cloud GPU</a>
+    </div>
     {% endif %}
   </nav>
   {% if "navigation.tabs.sticky" in features %}
