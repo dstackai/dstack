@@ -57,6 +57,7 @@ class TestProcessRunningJobs:
             user=user,
         )
         job_provisioning_data = get_job_provisioning_data()
+        job_provisioning_data.dockerized = False
         job = await create_job(
             session=session,
             run=run,
@@ -97,6 +98,7 @@ class TestProcessRunningJobs:
             user=user,
         )
         job_provisioning_data = get_job_provisioning_data()
+        job_provisioning_data.dockerized = False
         job = await create_job(
             session=session,
             run=run,
