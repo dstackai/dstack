@@ -23,7 +23,7 @@ and [Weaviate](https://weaviate.io/) vector database.
   embeddings through the [SentenceTransformers](https://www.sbert.net/) library.
 2. `dstack` allows us to configure cloud accounts (e.g. AWS, GCP, Azure, or Lambda Cloud), 
   and deploy LLMs (e.g. Llama 2) there. In this example, it employs [Text Generation Inference](https://github.com/huggingface/text-generation-inference)
-  to serve the LLM. Refer to [Deploying LLMs using TGI](text-generation-inference.md) and [Deploying LLMs via Python API](python-api.md).
+  to serve the LLM. Refer to [Deploying LLMs using TGI](text-generation-inference.md) and [Deploying LLMs via Python API](deploy-python.md).
 3. Llama Index allows us to prompt the LLM and automatically incorporates context from Weaviate. 
  
 ## Requirements
@@ -112,7 +112,7 @@ as a service (for production).
 For a detailed example on how to deploy an LLM as a service, check out
 [Deploying LLMs using TGI](text-generation-inference.md).
 
-Alternatively, for development purposes, you can also check out [Deploying LLMs using Python API](python-api.md). The example comes with a simple
+Alternatively, for development purposes, you can also check out [Deploying LLMs using Python API](deploy-python.md). The example comes with a simple
 Streamlit app that allows you to deploy an LLM as a task with just one click.
 
 ![llama-index-weaviate.md](images/python-api/dstack-python-api-streamlit-example.png)
@@ -127,7 +127,7 @@ In our example, using an LLM deployed with dstack via TGI, we'll use the `langch
 This wrapper requires the LLM's URL and other LLM parameters.
 
 !!! info "NOTE:"
-    If you've deployed the LLM using [Deploying LLMs using Python API](python-api.md),
+    If you've deployed the LLM using [Deploying LLMs using Python API](deploy-python.md),
     make sure to set the `TGI_ENDPOINT_URL` to `http://localhost:8080`.
 
 ```python

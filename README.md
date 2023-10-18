@@ -28,6 +28,7 @@ generative AI models across various cloud providers (e.g., AWS, GCP, Azure, Lamb
 
 ## Latest news ✨
 
+- [2023/10] [Simplified cloud setup, and refined API](https://dstack.ai/blog/2023/10/18/simplified-cloud-setup/) (Release)
 - [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/examples/llama-index-weaviate) (Example)
 - [2023/09] [Deploying LLMs using Python API](https://dstack.ai/examples/deploy-python) (Example)
 - [2023/08] [Fine-tuning Llama 2 using QLoRA](https://dstack.ai/examples/finetuning-llama-2) (Example)
