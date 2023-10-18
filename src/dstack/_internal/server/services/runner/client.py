@@ -34,8 +34,7 @@ class RunnerClient:
             resp = requests.get(self._url("/api/healthcheck"))
             resp.raise_for_status()
             return HealthcheckResponse.parse_obj(resp.json())
-        except requests.exceptions.RequestException as e:
-            print(e)
+        except requests.exceptions.RequestException:
             return None
 
     def submit_job(

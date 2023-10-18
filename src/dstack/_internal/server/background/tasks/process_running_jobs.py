@@ -297,7 +297,7 @@ def _process_job_shim_provisioning(
                     username=interpolate(registry_auth.username),
                     password=interpolate(registry_auth.password),
                 )
-            job_submission.status = JobStatus.PULLING
+            job_model.status = JobStatus.PULLING
             logger.debug("Job %s is pulling", job_model.job_name)
     except dstack._internal.core.errors.SSHError:
         logger.debug("Cannot establish ssh connection to job %s instance", job_model.job_name)

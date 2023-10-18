@@ -148,7 +148,12 @@ class Run(ABC):
         ssh_identity_file = str(ssh_identity_file)
 
         if self._ssh_attach is None:
-            while self.status in (RunStatus.SUBMITTED, RunStatus.PENDING, RunStatus.PROVISIONING):
+            while self.status in (
+                RunStatus.SUBMITTED,
+                RunStatus.PENDING,
+                RunStatus.PROVISIONING,
+                RunStatus.PULLING,
+            ):
                 time.sleep(5)
                 self.refresh()
             # If status is done, there is a chance we could read logs from websocket
