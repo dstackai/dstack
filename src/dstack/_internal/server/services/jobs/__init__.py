@@ -2,7 +2,7 @@ import asyncio
 import socket
 from contextlib import closing
 from datetime import timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -122,11 +122,19 @@ async def terminate_job_submission_instance(
     )
 
 
-def get_runner_ports() -> Dict[int, int]:
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(("localhost", 0))  # Bind to a free port provided by the host
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return {client.REMOTE_RUNNER_PORT: s.getsockname()[1]}
+def get_runner_ports(ports: Optional[List[int]] = None) -> Dict[int, int]:
+    ports = ports or [client.REMOTE_RUNNER_PORT]
+    sockets = []
+    try:
+        for port in ports:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(("localhost", 0))  # Bind to a free port provided by the host
+            sockets.append((port, s))
+        return {port: s.getsockname()[1] for port, s in sockets}
+    finally:
+        for _, s in sockets:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.close()
 
 
 def _get_job_configurator(run_spec: RunSpec) -> JobConfigurator:

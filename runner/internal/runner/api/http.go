@@ -2,20 +2,25 @@ package api
 
 import (
 	"context"
-	"github.com/dstackai/dstack/runner/internal/api"
-	"github.com/dstackai/dstack/runner/internal/executor"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"github.com/dstackai/dstack/runner/internal/log"
-	"github.com/dstackai/dstack/runner/internal/schemas"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/dstackai/dstack/runner/internal/api"
+	"github.com/dstackai/dstack/runner/internal/executor"
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
 func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	return nil, nil
+	s.executor.RLock()
+	defer s.executor.RUnlock()
+	return &schemas.HealthcheckResponse{
+		Service: "dstack-runner",
+	}, nil
 }
 
 func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {

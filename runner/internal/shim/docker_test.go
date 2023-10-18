@@ -22,20 +22,16 @@ func TestDocker_SSHServer(t *testing.T) {
 	}
 	t.Parallel()
 
-	tempDir := t.TempDir()
-
-	dockerParams := &DockerParameters{
-		Runner:      &DummyRunnerConfig{dockerCommands: []string{"echo 1"}},
-		ImageName:   "ubuntu",
-		OpenSSHPort: nextPort(),
-		DstackHome:  tempDir + "/.dstack",
+	params := &dockerParametersMock{
+		commands: []string{"echo 1"},
+		sshPort:  nextPort(),
 	}
 
 	timeout := 60 // seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	assert.NoError(t, RunDocker(ctx, dockerParams))
+	assert.NoError(t, RunDocker(ctx, params, &apiAdapterMock{}))
 }
 
 // TestDocker_SSHServerConnect pulls ubuntu image (without sshd), installs openssh-server and tries to connect via SSH
@@ -50,12 +46,10 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	publicBytes, err := os.ReadFile(tempDir + "/id_rsa.pub")
 	require.NoError(t, err)
 
-	dockerParams := &DockerParameters{
-		Runner:       &DummyRunnerConfig{dockerCommands: []string{"sleep 5"}},
-		ImageName:    "ubuntu",
-		OpenSSHPort:  nextPort(),
-		PublicSSHKey: string(publicBytes),
-		DstackHome:   tempDir + "/.dstack",
+	params := &dockerParametersMock{
+		commands:     []string{"sleep 5"},
+		sshPort:      nextPort(),
+		publicSSHKey: string(publicBytes),
 	}
 
 	timeout := 60 // seconds
@@ -66,7 +60,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		assert.NoError(t, RunDocker(ctx, dockerParams))
+		assert.NoError(t, RunDocker(ctx, params, &apiAdapterMock{}))
 	}()
 
 	for i := 0; i < timeout; i++ {
@@ -74,7 +68,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 			"-o", "StrictHostKeyChecking=no",
 			"-o", "UserKnownHostsFile=/dev/null",
 			"-i", tempDir+"/id_rsa",
-			"-p", strconv.Itoa(dockerParams.OpenSSHPort),
+			"-p", strconv.Itoa(params.sshPort),
 			"root@localhost", "whoami",
 		)
 		output, err := cmd.Output()
@@ -87,21 +81,50 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	wg.Wait()
 }
 
-type DummyRunnerConfig struct {
-	dockerCommands []string
+/* Mocks */
+
+type dockerParametersMock struct {
+	commands     []string
+	sshPort      int
+	publicSSHKey string
 }
 
-func (c *DummyRunnerConfig) GetDockerCommands() []string {
-	return c.dockerCommands
+func (c *dockerParametersMock) DockerImageName() string {
+	return "ubuntu"
 }
 
-func (c *DummyRunnerConfig) GetTempDir() string {
-	return "/tmp/runner"
+func (c *dockerParametersMock) DockerKeepContainer() bool {
+	return false
 }
 
-func (c *DummyRunnerConfig) GetDockerMount() (*mount.Mount, error) {
+func (c *dockerParametersMock) DockerShellCommands() []string {
+	commands := make([]string, 0)
+	commands = append(commands, getSSHShellCommands(c.sshPort, c.publicSSHKey)...)
+	commands = append(commands, c.commands...)
+	return commands
+}
+
+func (c *dockerParametersMock) DockerPorts() []int {
+	ports := make([]int, 0)
+	ports = append(ports, c.sshPort)
+	return ports
+}
+
+func (c *dockerParametersMock) DockerMounts() ([]mount.Mount, error) {
 	return nil, nil
 }
+
+type apiAdapterMock struct{}
+
+func (s *apiAdapterMock) GetRegistryAuth() <-chan string {
+	ch := make(chan string)
+	close(ch)
+	return ch
+}
+
+func (s *apiAdapterMock) SetState(string) {}
+
+/* Utilities */
 
 var portNumber int32 = 10000
 

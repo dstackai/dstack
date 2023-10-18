@@ -22,41 +22,42 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
-func RunDocker(ctx context.Context, config DockerConfig) error {
+func RunDocker(ctx context.Context, params DockerParameters, serverAPI APIAdapter) error {
 	client, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithAPIVersionNegotiation())
 	if err != nil {
 		return err
 	}
 
-	// todo run server & wait for credentials
-	// todo serve pulling status
-	//if config.WithAuth {
-	//	return gerrors.New("not implemented")
-	//}
+	log.Println("Waiting for registry auth")
+	registryAuth := <-serverAPI.GetRegistryAuth()
+	serverAPI.SetState(Pulling)
 
 	log.Println("Pulling image")
-	if err = config.PullImage(ctx, client); err != nil {
+	if err = pullImage(ctx, client, params.DockerImageName(), registryAuth); err != nil {
 		return gerrors.Wrap(err)
 	}
 	log.Println("Creating container")
-	containerID, err := config.CreateContainer(ctx, client)
+	containerID, err := createContainer(ctx, client, params)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	defer func() {
-		log.Println("Doing cleanup")
-		_ = config.Cleanup(ctx, client, containerID)
-	}()
+	if !params.DockerKeepContainer() {
+		defer func() {
+			log.Println("Deleting container")
+			_ = client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
+		}()
+	}
+
+	serverAPI.SetState(Running)
 	log.Printf("Running container, id=%s\n", containerID)
-	if err = config.RunContainer(ctx, client, containerID); err != nil {
+	if err = runContainer(ctx, client, containerID); err != nil {
 		return gerrors.Wrap(err)
 	}
 	log.Println("Container finished successfully")
 	return nil
 }
 
-func (c *DockerParameters) PullImage(ctx context.Context, client docker.APIClient) error {
-	imageName := c.ImageName
+func pullImage(ctx context.Context, client docker.APIClient, imageName string, registryAuth string) error {
 	if !strings.Contains(imageName, ":") {
 		imageName += ":latest"
 	}
@@ -70,7 +71,7 @@ func (c *DockerParameters) PullImage(ctx context.Context, client docker.APIClien
 		return nil
 	}
 
-	reader, err := client.ImagePull(ctx, imageName, types.ImagePullOptions{RegistryAuth: c.RegistryAuthBase64})
+	reader, err := client.ImagePull(ctx, imageName, types.ImagePullOptions{RegistryAuth: registryAuth}) // todo test registry auth
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -80,46 +81,26 @@ func (c *DockerParameters) PullImage(ctx context.Context, client docker.APIClien
 	return gerrors.Wrap(err)
 }
 
-func (c *DockerParameters) CreateContainer(ctx context.Context, client docker.APIClient) (string, error) {
+func createContainer(ctx context.Context, client docker.APIClient, params DockerParameters) (string, error) {
 	runtime, err := getRuntime(ctx, client)
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
 
-	runnerMount, err := c.Runner.GetDockerMount()
+	mounts, err := params.DockerMounts()
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
 
-	commands := make([]string, 0)
-	commands = append(commands, c.runOpenSSHServer()...)
-	commands = append(commands, c.Runner.GetDockerCommands()...)
-
-	var mounts = make([]mount.Mount, 0)
-	if c.DstackHome != "" {
-		mountPath := filepath.Join(c.DstackHome, "runners", time.Now().Format("20060102-150405"))
-		if err = os.MkdirAll(mountPath, 0755); err != nil {
-			return "", gerrors.Wrap(err)
-		}
-		mounts = append(mounts, mount.Mount{
-			Type:   mount.TypeBind,
-			Source: mountPath,
-			Target: c.Runner.GetTempDir(),
-		})
-	}
-	if runnerMount != nil {
-		mounts = append(mounts, *runnerMount)
-	}
-
 	containerConfig := &container.Config{
-		Image:        c.ImageName,
-		Cmd:          []string{strings.Join(commands, " && ")},
+		Image:        params.DockerImageName(),
+		Cmd:          []string{strings.Join(params.DockerShellCommands(), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
-		ExposedPorts: exposePorts(c.OpenSSHPort),
+		ExposedPorts: exposePorts(params.DockerPorts()...),
 	}
 	hostConfig := &container.HostConfig{
 		NetworkMode:     getNetworkMode(),
-		PortBindings:    bindPorts(c.OpenSSHPort),
+		PortBindings:    bindPorts(params.DockerPorts()...),
 		PublishAllPorts: true,
 		Sysctls:         map[string]string{},
 		Runtime:         runtime,
@@ -132,7 +113,7 @@ func (c *DockerParameters) CreateContainer(ctx context.Context, client docker.AP
 	return resp.ID, nil
 }
 
-func (c *DockerParameters) RunContainer(ctx context.Context, client docker.APIClient, containerID string) error {
+func runContainer(ctx context.Context, client docker.APIClient, containerID string) error {
 	if err := client.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
 		return gerrors.Wrap(err)
 	}
@@ -145,15 +126,7 @@ func (c *DockerParameters) RunContainer(ctx context.Context, client docker.APICl
 	return nil
 }
 
-func (c *DockerParameters) Cleanup(ctx context.Context, client docker.APIClient, containerID string) error {
-	if !c.KeepContainer {
-		log.Println("Deleting container")
-		return gerrors.Wrap(client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true}))
-	}
-	return nil
-}
-
-func (c *DockerParameters) runOpenSSHServer() []string {
+func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 	return []string{
 		// note: &> redirection doesn't work in /bin/sh
 		// check in sshd is here, install if not
@@ -163,7 +136,7 @@ func (c *DockerParameters) runOpenSSHServer() []string {
 		// create ssh dirs and add public key
 		"mkdir -p /run/sshd ~/.ssh",
 		"chmod 700 ~/.ssh",
-		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", c.PublicSSHKey),
+		fmt.Sprintf("echo '%s' > ~/.ssh/authorized_keys", publicSSHKey),
 		"chmod 600 ~/.ssh/authorized_keys",
 		// preserve environment variables for SSH clients
 		"env >> ~/.ssh/environment",
@@ -172,7 +145,7 @@ func (c *DockerParameters) runOpenSSHServer() []string {
 		"rm -rf /etc/ssh/ssh_host_*",
 		"ssh-keygen -A > /dev/null",
 		// start sshd
-		fmt.Sprintf("/usr/sbin/sshd -p %d -o PermitUserEnvironment=yes", c.OpenSSHPort),
+		fmt.Sprintf("/usr/sbin/sshd -p %d -o PermitUserEnvironment=yes", openSSHPort),
 	}
 }
 
@@ -216,4 +189,44 @@ func getRuntime(ctx context.Context, client docker.APIClient) (string, error) {
 		}
 	}
 	return info.DefaultRuntime, nil
+}
+
+/* DockerParameters interface implementation for CLIArgs */
+
+func (c *CLIArgs) DockerImageName() string {
+	return c.Docker.ImageName
+}
+
+func (c *CLIArgs) DockerKeepContainer() bool {
+	return c.Docker.KeepContainer
+}
+
+func (c *CLIArgs) DockerShellCommands() []string {
+	commands := getSSHShellCommands(c.Docker.SSHPort, c.Docker.PublicSSHKey)
+	commands = append(commands, fmt.Sprintf("%s %s", DstackRunnerBinaryName, strings.Join(c.getRunnerArgs(), " ")))
+	return commands
+}
+
+func (c *CLIArgs) DockerMounts() ([]mount.Mount, error) {
+	runnerTemp := filepath.Join(c.Shim.HomeDir, "runners", time.Now().Format("20060102-150405"))
+	if err := os.MkdirAll(runnerTemp, 0755); err != nil {
+		return nil, gerrors.Wrap(err)
+	}
+
+	return []mount.Mount{
+		{
+			Type:   mount.TypeBind,
+			Source: runnerTemp,
+			Target: c.Runner.TempDir,
+		},
+		{
+			Type:   mount.TypeBind,
+			Source: c.Runner.BinaryPath,
+			Target: DstackRunnerBinaryName,
+		},
+	}, nil
+}
+
+func (c *CLIArgs) DockerPorts() []int {
+	return []int{c.Runner.HTTPPort, c.Docker.SSHPort}
 }

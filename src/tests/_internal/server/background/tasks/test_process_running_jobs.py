@@ -12,7 +12,7 @@ from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.models import JobModel
-from dstack._internal.server.schemas.runner import JobStateEvent, PullResponse
+from dstack._internal.server.schemas.runner import HealthcheckResponse, JobStateEvent, PullResponse
 from tests._internal.server.common import (
     create_job,
     create_project,
@@ -74,7 +74,7 @@ class TestProcessRunningJobs:
             datetime_mock.return_value = datetime(2023, 1, 2, 5, 12, 30, 10, tzinfo=timezone.utc)
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.healthcheck = Mock()
-            runner_client_mock.healthcheck.return_value = False
+            runner_client_mock.healthcheck.return_value = None
             await process_running_jobs()
             RunnerTunnelMock.assert_called_once()
             runner_client_mock.healthcheck.assert_called_once()
@@ -110,7 +110,9 @@ class TestProcessRunningJobs:
         ) as RunnerClientMock:
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.healthcheck = Mock()
-            runner_client_mock.healthcheck.return_value = True
+            runner_client_mock.healthcheck.return_value = HealthcheckResponse(
+                service="dstack-runner"
+            )
             runner_client_mock.submit_job = Mock()
             runner_client_mock.upload_code = Mock()
             runner_client_mock.run_job = Mock()

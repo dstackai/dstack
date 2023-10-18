@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 import dstack._internal.core.errors
+from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, JobSubmission, Run
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
@@ -30,6 +31,7 @@ from dstack._internal.server.services.runs import (
 )
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
+from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -44,7 +46,9 @@ async def process_running_jobs():
             res = await session.execute(
                 select(JobModel)
                 .where(
-                    JobModel.status.in_([JobStatus.PROVISIONING, JobStatus.RUNNING]),
+                    JobModel.status.in_(
+                        [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
+                    ),
                     JobModel.id.not_in(RUNNING_PROCESSING_JOBS_IDS),
                 )
                 .order_by(JobModel.last_processed_at.asc())
@@ -80,9 +84,15 @@ async def _process_job(job_id: UUID):
         job = run.jobs[job_model.job_num]
         job_submission = job_model_to_job_submission(job_model)
         server_ssh_private_key = project.ssh_private_key
-        if job_model.status == JobStatus.PROVISIONING:
+        secrets = {}  # TODO secrets
+        repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
+
+        new_job_model = None
+        if (
+            job_model.status == JobStatus.PROVISIONING
+            and job_submission.job_provisioning_data.dockerized is False
+        ):
             logger.debug("Polling provisioning job %s", job_model.job_name)
-            repo_head = repo_model_to_repo_head(repo_model, include_creds=True)
             code = await _get_job_code(
                 session=session,
                 repo=repo_model,
@@ -95,7 +105,40 @@ async def _process_job(job_id: UUID):
                 job,
                 job_submission,
                 code,
-                repo_head.repo_creds,
+                secrets,
+                repo_creds,
+                server_ssh_private_key,
+            )
+        elif (
+            job_model.status == JobStatus.PROVISIONING
+            and job_submission.job_provisioning_data.dockerized is True
+        ):
+            logger.debug("Polling provisioning job with shim %s", job_model.job_name)
+            await run_async(
+                _process_job_shim_provisioning,
+                job_model,
+                job_submission,
+                job.job_spec.registry_auth,
+                secrets,
+                server_ssh_private_key,
+            )
+        elif job_model.status == JobStatus.PULLING:
+            logger.debug("Polling pulling job %s", job_model.job_name)
+            code = await _get_job_code(
+                session=session,
+                repo=repo_model,
+                code_hash=run.run_spec.repo_code_hash,
+            )
+            new_job_model = await run_async(
+                _process_job_shim_pulling,
+                run_model,
+                job_model,
+                run,
+                job,
+                job_submission,
+                code,
+                secrets,
+                repo_creds,
                 server_ssh_private_key,
             )
         else:
@@ -109,15 +152,16 @@ async def _process_job(job_id: UUID):
                 job_submission,
                 server_ssh_private_key,
             )
-            if new_job_model is not None:
-                session.add(new_job_model)
-            if job_model.error_code == JobErrorCode.INTERRUPTED_BY_NO_CAPACITY:
-                # JobErrorCode.INTERRUPTED_BY_NO_CAPACITY means that we could not connect to runner.
-                # The instance may still be running (e.g. network issue), so we force termination.
-                await terminate_job_submission_instance(
-                    project=project,
-                    job_submission=job_submission,
-                )
+
+        if new_job_model is not None:
+            session.add(new_job_model)
+        if job_model.error_code == JobErrorCode.INTERRUPTED_BY_NO_CAPACITY:
+            # JobErrorCode.INTERRUPTED_BY_NO_CAPACITY means that we could not connect to runner.
+            # The instance may still be running (e.g. network issue), so we force termination.
+            await terminate_job_submission_instance(
+                project=project,
+                job_submission=job_submission,
+            )
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
 
@@ -128,6 +172,7 @@ def _process_provisioning_job(
     job: Job,
     job_submission: JobSubmission,
     code: bytes,
+    secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
     server_ssh_private_key: str,
 ):
@@ -142,35 +187,22 @@ def _process_provisioning_job(
         ):
             runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
             alive = runner_client.healthcheck()
-            if not alive:
+            if alive is None:
                 logger.debug("Runner for job %s is not available yet", job_model.job_name)
-                if job_submission.age > RUNNER_TIMEOUT_INTERVAL:
-                    logger.warning(
-                        "Job %s failed because runner has not become available in time.",
-                        job_model.job_name,
-                    )
-                    job_model.status = JobStatus.FAILED
-                    job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
+                _job_is_not_available(job_model, job_submission)
                 return
-            logger.debug("Submitting job %s...", job_model.job_name)
-            logger.debug(
-                "Repo credentials: %s",
-                None if repo_credentials is None else repo_credentials.protocol.value,
-            )
-            runner_client.submit_job(
-                run_spec=run.run_spec,
-                job_spec=job.job_spec,
-                secrets={},
+            _submit_job_to_runner(
+                runner_client=runner_client,
+                run=run,
+                job_model=job_model,
+                job=job,
+                code=code,
+                secrets=secrets,
                 repo_credentials=repo_credentials,
             )
-            logger.debug("Uploading code %s...", job_model.job_name)
-            runner_client.upload_code(code)
-            logger.debug("Running job %s...", job_model.job_name)
-            runner_client.run_job()
-            job_model.status = JobStatus.RUNNING
-            logger.debug("Job %s is running", job_model.job_name)
     except dstack._internal.core.errors.SSHError:
         logger.debug("Cannot establish ssh connection to job %s instance", job_model.job_name)
+        _job_is_not_available(job_model, job_submission)
 
 
 _SSH_MAX_RETRY = 3
@@ -225,16 +257,7 @@ def _process_running_job(
             logger.debug("Failed to connect to job %s runner", job_model.job_name)
         time.sleep(_SSH_RETRY_INTERVAl)
     else:
-        job_model.status = JobStatus.FAILED
-        job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
-        if job.is_retry_active():
-            if job_submission.job_provisioning_data.instance_type.resources.spot:
-                new_job_model = create_job_model_for_new_submission(
-                    run_model=run_model,
-                    job=job,
-                    status=JobStatus.PENDING,
-                )
-                return new_job_model
+        return _resubmit_failed_job(run_model, job_model, job, job_submission)
     return None
 
 
@@ -243,3 +266,146 @@ async def _get_job_code(session: AsyncSession, repo: RepoModel, code_hash: str) 
     if code_model is not None:
         return code_model.blob
     return b""
+
+
+def _process_job_shim_provisioning(
+    job_model: JobModel,
+    job_submission: JobSubmission,
+    registry_auth: RegistryAuth,
+    secrets: Dict[str, str],
+    server_ssh_private_key: str,
+):
+    """Polls the shim until it is available and authenticates to the registry if needed"""
+    try:
+        with ssh_tunnel.RunnerTunnel(
+            hostname=job_submission.job_provisioning_data.hostname,
+            ssh_port=job_submission.job_provisioning_data.ssh_port,
+            user=job_submission.job_provisioning_data.username,
+            ports=get_runner_ports(ports=[client.REMOTE_SHIM_PORT]),
+            id_rsa=server_ssh_private_key,
+        ) as tun:
+            shim_client = client.ShimClient(port=tun.ports[client.REMOTE_SHIM_PORT])
+            alive = shim_client.healthcheck()
+            if alive is None:
+                logger.debug("Shim for job %s is not available yet", job_model.job_name)
+                _job_is_not_available(job_model, job_submission)
+                return
+            if registry_auth is not None:
+                logger.debug("Authenticating %s to the registry...", job_model.job_name)
+                interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
+                shim_client.registry_auth(
+                    username=interpolate(registry_auth.username),
+                    password=interpolate(registry_auth.password),
+                )
+            job_submission.status = JobStatus.PULLING
+            logger.debug("Job %s is pulling", job_model.job_name)
+    except dstack._internal.core.errors.SSHError:
+        logger.debug("Cannot establish ssh connection to job %s instance", job_model.job_name)
+        _job_is_not_available(job_model, job_submission)
+
+
+def _process_job_shim_pulling(
+    run_model: RunModel,
+    job_model: JobModel,
+    run: Run,
+    job: Job,
+    job_submission: JobSubmission,
+    code: bytes,
+    secrets: Dict[str, str],
+    repo_credentials: Optional[RemoteRepoCreds],
+    server_ssh_private_key: str,
+):
+    for _ in range(_SSH_MAX_RETRY):
+        try:
+            with ssh_tunnel.RunnerTunnel(
+                hostname=job_submission.job_provisioning_data.hostname,
+                ssh_port=job_submission.job_provisioning_data.ssh_port,
+                user=job_submission.job_provisioning_data.username,
+                ports=get_runner_ports(ports=[client.REMOTE_SHIM_PORT, client.REMOTE_RUNNER_PORT]),
+                id_rsa=server_ssh_private_key,
+            ) as tun:
+                shim_client = client.ShimClient(port=tun.ports[client.REMOTE_SHIM_PORT])
+                shim_client.pull()  # shim must not go down during pulling
+
+                runner_client = client.RunnerClient(port=tun.ports[client.REMOTE_RUNNER_PORT])
+                alive = runner_client.healthcheck()
+                if alive is None:
+                    break  # shim is alive, runner isn't = image is being pulled
+
+                _submit_job_to_runner(
+                    runner_client=runner_client,
+                    run=run,
+                    job_model=job_model,
+                    job=job,
+                    code=code,
+                    secrets=secrets,
+                    repo_credentials=repo_credentials,
+                )
+                break
+        except dstack._internal.core.errors.SSHError:
+            logger.debug("Cannot establish ssh connection to job %s instance", job_model.job_name)
+        except (requests.ConnectionError, requests.Timeout):
+            logger.debug("Failed to connect to job %s runner", job_model.job_name)
+        time.sleep(_SSH_RETRY_INTERVAl)
+    else:
+        return _resubmit_failed_job(run_model, job_model, job, job_submission)
+    return None
+
+
+# shared snippets
+
+
+def _submit_job_to_runner(
+    runner_client: client.RunnerClient,
+    run: Run,
+    job_model: JobModel,
+    job: Job,
+    code: bytes,
+    secrets: Dict[str, str],
+    repo_credentials: Optional[RemoteRepoCreds],
+):
+    logger.debug("Submitting job %s...", job_model.job_name)
+    logger.debug(
+        "Repo credentials: %s",
+        None if repo_credentials is None else repo_credentials.protocol.value,
+    )
+    runner_client.submit_job(
+        run_spec=run.run_spec,
+        job_spec=job.job_spec,
+        secrets=secrets,
+        repo_credentials=repo_credentials,
+    )
+    logger.debug("Uploading code %s...", job_model.job_name)
+    runner_client.upload_code(code)
+    logger.debug("Running job %s...", job_model.job_name)
+    runner_client.run_job()
+    job_model.status = JobStatus.RUNNING
+    logger.debug("Job %s is running", job_model.job_name)
+
+
+def _job_is_not_available(job_model: JobModel, job_submission: JobSubmission):
+    if job_submission.age > RUNNER_TIMEOUT_INTERVAL:
+        logger.warning(
+            "Job %s failed because runner has not become available in time.",
+            job_model.job_name,
+        )
+        job_model.status = JobStatus.FAILED
+        job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
+
+
+def _resubmit_failed_job(
+    run_model: RunModel,
+    job_model: JobModel,
+    job: Job,
+    job_submission: JobSubmission,
+) -> Optional[JobModel]:
+    job_model.status = JobStatus.FAILED
+    job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
+    if job.is_retry_active():
+        if job_submission.job_provisioning_data.instance_type.resources.spot:
+            new_job_model = create_job_model_for_new_submission(
+                run_model=run_model,
+                job=job,
+                status=JobStatus.PENDING,
+            )
+            return new_job_model

@@ -2,23 +2,22 @@ package main
 
 import (
 	"context"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"github.com/dstackai/dstack/runner/internal/shim"
-	"github.com/dstackai/dstack/runner/internal/shim/backends"
-	"github.com/urfave/cli/v2"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/internal/shim"
+	"github.com/dstackai/dstack/runner/internal/shim/api"
+	"github.com/dstackai/dstack/runner/internal/shim/backends"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {
 	var backendName string
-	var runnerParams shim.RunnerParameters
-	dockerParams := shim.DockerParameters{
-		Runner:      &runnerParams,
-		OpenSSHPort: 10022,
-	}
-	var dstackHome string
+	var args shim.CLIArgs
+	args.Docker.SSHPort = 10022
 
 	app := &cli.App{
 		Name:    "dstack-shim",
@@ -40,43 +39,51 @@ func main() {
 					return gerrors.Newf("unknown backend %s", s)
 				},
 			},
+			/* Shim Parameters */
 			&cli.PathFlag{
 				Name:        "home",
 				Usage:       "Dstack home directory",
-				Destination: &dstackHome,
+				Destination: &args.Shim.HomeDir,
 				EnvVars:     []string{"DSTACK_HOME"},
+			},
+			&cli.IntFlag{
+				Name:        "shim-http-port",
+				Usage:       "Set's shim's http port",
+				Value:       10998,
+				Destination: &args.Shim.HTTPPort,
+				EnvVars:     []string{"DSTACK_SHIM_HTTP_PORT"},
 			},
 			/* Runner Parameters */
 			&cli.IntFlag{
 				Name:        "runner-http-port",
 				Usage:       "Set runner's http port",
 				Value:       10999,
-				Destination: &runnerParams.HttpPort,
+				Destination: &args.Runner.HTTPPort,
 				EnvVars:     []string{"DSTACK_RUNNER_HTTP_PORT"},
 			},
 			&cli.IntFlag{
 				Name:        "runner-log-level",
 				Usage:       "Set runner's log level",
 				Value:       4,
-				Destination: &runnerParams.LogLevel,
+				Destination: &args.Runner.LogLevel,
 				EnvVars:     []string{"DSTACK_RUNNER_LOG_LEVEL"},
 			},
 			&cli.StringFlag{
 				Name:        "runner-version",
 				Usage:       "Set runner's version",
 				Value:       "latest",
-				Destination: &runnerParams.RunnerVersion,
+				Destination: &args.Runner.Version,
 				EnvVars:     []string{"DSTACK_RUNNER_VERSION"},
 			},
 			&cli.BoolFlag{
 				Name:        "dev",
 				Usage:       "Use stgn channel",
-				Destination: &runnerParams.UseDev,
+				Destination: &args.Runner.DevChannel,
 			},
 			&cli.PathFlag{
 				Name:        "runner-binary-path",
 				Usage:       "Path to runner's binary",
-				Destination: &runnerParams.RunnerBinaryPath,
+				Destination: &args.Runner.BinaryPath,
 				EnvVars:     []string{"DSTACK_RUNNER_BINARY_PATH"},
 			},
 		},
@@ -89,50 +96,50 @@ func main() {
 					&cli.BoolFlag{
 						Name:        "with-auth",
 						Usage:       "Waits for registry credentials",
-						Destination: &dockerParams.WithAuth,
+						Destination: &args.Docker.RegistryAuthRequired,
 					},
 					&cli.StringFlag{
 						Name:        "image",
 						Usage:       "Docker image name",
 						Required:    true,
-						Destination: &dockerParams.ImageName,
+						Destination: &args.Docker.ImageName,
 						EnvVars:     []string{"DSTACK_IMAGE_NAME"},
 					},
 					&cli.BoolFlag{
 						Name:        "keep-container",
 						Usage:       "Do not delete container on exit",
-						Destination: &dockerParams.KeepContainer,
+						Destination: &args.Docker.KeepContainer,
 					},
 					&cli.PathFlag{
 						Name:        "ssh-key",
 						Usage:       "Public SSH key",
 						Required:    true,
-						Destination: &dockerParams.PublicSSHKey,
+						Destination: &args.Docker.PublicSSHKey,
 						EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
 					},
 				},
 				Action: func(c *cli.Context) error {
-					if runnerParams.RunnerBinaryPath == "" {
-						if err := runnerParams.Download("linux"); err != nil {
+					if args.Runner.BinaryPath == "" {
+						if err := args.Download("linux"); err != nil {
 							return gerrors.Wrap(err)
 						}
-						defer func() { _ = os.Remove(runnerParams.RunnerBinaryPath) }()
+						defer func() { _ = os.Remove(args.Runner.BinaryPath) }()
 					}
 
 					log.Printf("Backend: %s\n", backendName)
-					runnerParams.TempDir = "/tmp/runner"
-					runnerParams.HomeDir = "/root"
-					runnerParams.WorkingDir = "/workflow"
-					log.Printf("Runner: %+v\n", runnerParams)
+					args.Runner.TempDir = "/tmp/runner"
+					args.Runner.HomeDir = "/root"
+					args.Runner.WorkingDir = "/workflow"
 
 					var err error
-					dockerParams.DstackHome, err = getDstackHome(dstackHome)
+					args.Shim.HomeDir, err = getDstackHome(args.Shim.HomeDir)
 					if err != nil {
 						return gerrors.Wrap(err)
 					}
-					log.Printf("Docker: %+v\n", dockerParams)
+					log.Printf("Docker: %+v\n", args)
 
-					return gerrors.Wrap(shim.RunDocker(context.TODO(), &dockerParams))
+					server := api.NewShimServer(fmt.Sprintf(":%d", args.Shim.HTTPPort), args.Docker.RegistryAuthRequired)
+					return gerrors.Wrap(server.RunDocker(context.TODO(), &args))
 				},
 			},
 			{
