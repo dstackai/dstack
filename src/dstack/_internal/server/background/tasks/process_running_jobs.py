@@ -1,26 +1,22 @@
 import functools
 import time
 from datetime import timedelta
-from typing import Callable, Dict, List, Optional
+from typing import Dict, Optional
 from uuid import UUID
 
-import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-import dstack._internal.core.errors
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
-from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, JobSubmission, Run
-from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
+from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, Run
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import JobModel, RepoModel, RunModel
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
-    get_runner_ports,
     job_model_to_job_submission,
     terminate_job_submission_instance,
 )
@@ -40,7 +36,6 @@ logger = get_logger(__name__)
 
 
 RUNNER_TIMEOUT_INTERVAL = timedelta(seconds=300)
-_SSH_MAX_RETRY = 3
 
 
 async def process_running_jobs():
@@ -183,7 +178,7 @@ async def _process_job(job_id: UUID):
         await session.commit()
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT])
+@runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT], retries=1)
 def _process_provisioning_no_shim(
     run: Run,
     job_model: JobModel,
@@ -220,7 +215,7 @@ def _process_provisioning_no_shim(
     return True
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT])
+@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)
 def _process_provisioning_with_shim(
     job_model: JobModel,
     secrets: Dict[str, str],
@@ -253,9 +248,7 @@ def _process_provisioning_with_shim(
     return True
 
 
-@runner_ssh_tunnel(
-    ports=[client.REMOTE_SHIM_PORT, client.REMOTE_RUNNER_PORT], retries=_SSH_MAX_RETRY
-)
+@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT, client.REMOTE_RUNNER_PORT])
 def _process_pulling_with_shim(
     run: Run,
     job_model: JobModel,
@@ -294,7 +287,7 @@ def _process_pulling_with_shim(
     return True
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT], retries=_SSH_MAX_RETRY)
+@runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT])
 def _process_running(
     run_model: RunModel,
     job_model: JobModel,
