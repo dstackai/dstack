@@ -206,7 +206,7 @@ def _process_provisioning_job(
 
 
 _SSH_MAX_RETRY = 3
-_SSH_RETRY_INTERVAl = 1
+_SSH_RETRY_INTERVAL = 1
 
 
 def _process_running_job(
@@ -255,7 +255,7 @@ def _process_running_job(
             logger.debug("Cannot establish ssh connection to job %s instance", job_model.job_name)
         except (requests.ConnectionError, requests.Timeout):
             logger.debug("Failed to connect to job %s runner", job_model.job_name)
-        time.sleep(_SSH_RETRY_INTERVAl)
+        time.sleep(_SSH_RETRY_INTERVAL)
     else:
         return _resubmit_failed_job(run_model, job_model, job, job_submission)
     return None
@@ -346,7 +346,7 @@ def _process_job_shim_pulling(
             logger.debug("Cannot establish ssh connection to job %s instance", job_model.job_name)
         except (requests.ConnectionError, requests.Timeout):
             logger.debug("Failed to connect to job %s runner", job_model.job_name)
-        time.sleep(_SSH_RETRY_INTERVAl)
+        time.sleep(_SSH_RETRY_INTERVAL)
     else:
         return _resubmit_failed_job(run_model, job_model, job, job_submission)
     return None
