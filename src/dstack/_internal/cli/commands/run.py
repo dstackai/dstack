@@ -147,6 +147,7 @@ class RunCommand(APIBaseCommand):
                     RunStatus.SUBMITTED,
                     RunStatus.PENDING,
                     RunStatus.PROVISIONING,
+                    RunStatus.PULLING,
                 ):
                     status.update(
                         f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]"

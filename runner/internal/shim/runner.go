@@ -2,8 +2,6 @@ package shim
 
 import (
 	"fmt"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"io"
 	"log"
 	"net/http"
@@ -11,6 +9,8 @@ import (
 	rt "runtime"
 	"strconv"
 	"strings"
+
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
 const (
@@ -20,26 +20,14 @@ const (
 	DstackRunnerBinaryName = "/usr/local/bin/dstack-runner"
 )
 
-func (c *RunnerParameters) GetDockerCommands() []string {
+func (c *CLIArgs) GetDockerCommands() []string {
 	return []string{
 		// start runner
 		fmt.Sprintf("%s %s", DstackRunnerBinaryName, strings.Join(c.getRunnerArgs(), " ")),
 	}
 }
 
-func (c *RunnerParameters) GetTempDir() string {
-	return c.TempDir
-}
-
-func (c *RunnerParameters) GetDockerMount() (*mount.Mount, error) {
-	return &mount.Mount{
-		Type:   mount.TypeBind,
-		Source: c.RunnerBinaryPath,
-		Target: DstackRunnerBinaryName,
-	}, nil
-}
-
-func (c *RunnerParameters) Download(osName string) error {
+func (c *CLIArgs) Download(osName string) error {
 	tempFile, err := os.CreateTemp("", "dstack-runner")
 	if err != nil {
 		return gerrors.Wrap(err)
@@ -47,18 +35,18 @@ func (c *RunnerParameters) Download(osName string) error {
 	if err = tempFile.Close(); err != nil {
 		return gerrors.Wrap(err)
 	}
-	c.RunnerBinaryPath = tempFile.Name()
-	return gerrors.Wrap(downloadRunner(c.RunnerVersion, c.UseDev, osName, c.RunnerBinaryPath))
+	c.Runner.BinaryPath = tempFile.Name()
+	return gerrors.Wrap(downloadRunner(c.Runner.Version, c.Runner.DevChannel, osName, c.Runner.BinaryPath))
 }
 
-func (c *RunnerParameters) getRunnerArgs() []string {
+func (c *CLIArgs) getRunnerArgs() []string {
 	return []string{
-		"--log-level", strconv.Itoa(c.LogLevel),
+		"--log-level", strconv.Itoa(c.Runner.LogLevel),
 		"start",
-		"--http-port", strconv.Itoa(c.HttpPort),
-		"--temp-dir", c.TempDir,
-		"--home-dir", c.HomeDir,
-		"--working-dir", c.WorkingDir,
+		"--http-port", strconv.Itoa(c.Runner.HTTPPort),
+		"--temp-dir", c.Runner.TempDir,
+		"--home-dir", c.Runner.HomeDir,
+		"--working-dir", c.Runner.WorkingDir,
 	}
 }
 

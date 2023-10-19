@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/urfave/cli/v2"
 	"log"
 	"os"
+
+	"github.com/urfave/cli/v2"
 )
 
 func App() {
@@ -37,7 +38,7 @@ func App() {
 					},
 					&cli.PathFlag{
 						Name:        "home-dir",
-						Usage:       "Home directory for credentials and $HOME",
+						Usage:       "HomeDir directory for credentials and $HOME",
 						Required:    true,
 						Destination: &paths.homeDir,
 					},

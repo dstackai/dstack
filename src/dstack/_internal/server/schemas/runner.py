@@ -59,3 +59,12 @@ class SubmitBody(BaseModel):
     ]
     secrets: Annotated[Optional[Dict[str, str]], Field(include=True)]
     repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)]
+
+
+class HealthcheckResponse(BaseModel):
+    service: str
+
+
+class RegistryAuthBody(BaseModel):
+    username: str
+    password: str

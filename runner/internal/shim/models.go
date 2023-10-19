@@ -1,48 +1,44 @@
 package shim
 
 import (
-	"context"
 	"github.com/docker/docker/api/types/mount"
-	docker "github.com/docker/docker/client"
 )
 
-type RunnerConfig interface {
-	GetDockerCommands() []string
-	GetDockerMount() (*mount.Mount, error)
-	GetTempDir() string
+type APIAdapter interface {
+	GetRegistryAuth() <-chan string
+	SetState(string)
 }
 
-type RunnerParameters struct {
-	RunnerVersion    string // cli or env
-	UseDev           bool   // cli
-	RunnerBinaryPath string // cli or env
-
-	TempDir    string
-	HomeDir    string
-	WorkingDir string
-
-	HttpPort int // cli or env
-	LogLevel int // cli	or env
+type DockerParameters interface {
+	DockerImageName() string
+	DockerKeepContainer() bool
+	DockerShellCommands() []string
+	DockerMounts() ([]mount.Mount, error)
+	DockerPorts() []int
 }
 
-type DockerConfig interface {
-	PullImage(context.Context, docker.APIClient) error
-	CreateContainer(context.Context, docker.APIClient) (string, error)
-	RunContainer(context.Context, docker.APIClient, string) error
-	Cleanup(context.Context, docker.APIClient, string) error
-}
+type CLIArgs struct {
+	Shim struct {
+		HTTPPort int
+		HomeDir  string
+	}
 
-type DockerParameters struct {
-	Runner RunnerConfig
+	Runner struct {
+		HTTPPort   int
+		LogLevel   int
+		Version    string
+		DevChannel bool
+		BinaryPath string
+		TempDir    string
+		HomeDir    string
+		WorkingDir string
+	}
 
-	ImageName string // cli or env
-	WithAuth  bool   // cli
-
-	PublicSSHKey string // cli or env
-	OpenSSHPort  int
-
-	RegistryAuthBase64 string
-	KeepContainer      bool // cli
-
-	DstackHome string // dstack home dir
+	Docker struct {
+		SSHPort              int
+		RegistryAuthRequired bool
+		ImageName            string
+		KeepContainer        bool
+		PublicSSHKey         string
+	}
 }

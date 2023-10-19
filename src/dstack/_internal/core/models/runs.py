@@ -25,6 +25,7 @@ class JobStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
     PROVISIONING = "provisioning"
+    PULLING = "pulling"
     RUNNING = "running"
     TERMINATING = "terminating"
     TERMINATED = "terminated"

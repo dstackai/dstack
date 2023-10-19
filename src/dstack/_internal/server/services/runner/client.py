@@ -8,8 +8,14 @@ import requests.exceptions
 
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.runs import JobSpec, RunSpec
-from dstack._internal.server.schemas.runner import PullResponse, SubmitBody
+from dstack._internal.server.schemas.runner import (
+    HealthcheckResponse,
+    PullResponse,
+    RegistryAuthBody,
+    SubmitBody,
+)
 
+REMOTE_SHIM_PORT = 10998
 REMOTE_RUNNER_PORT = 10999
 
 
@@ -23,12 +29,13 @@ class RunnerClient:
         self.hostname = hostname
         self.port = port
 
-    def healthcheck(self) -> bool:
+    def healthcheck(self) -> Optional[HealthcheckResponse]:
         try:
             resp = requests.get(self._url("/api/healthcheck"))
-            return resp.status_code == 200
-        except requests.exceptions.ConnectionError:
-            return False
+            resp.raise_for_status()
+            return HealthcheckResponse.parse_obj(resp.json())
+        except requests.exceptions.RequestException:
+            return None
 
     def submit_job(
         self,
@@ -68,6 +75,39 @@ class RunnerClient:
 
     def stop(self):
         resp = requests.post(self._url("/api/stop"))
+        resp.raise_for_status()
+
+    def _url(self, path: str) -> str:
+        return f"{'https' if self.secure else 'http'}://{self.hostname}:{self.port}/{path.lstrip('/')}"
+
+
+class ShimClient:
+    def __init__(
+        self,
+        port: int,
+        hostname: str = "localhost",
+    ):
+        self.secure = False
+        self.hostname = hostname
+        self.port = port
+
+    def healthcheck(self) -> Optional[HealthcheckResponse]:
+        try:
+            resp = requests.get(self._url("/api/healthcheck"))
+            resp.raise_for_status()
+            return HealthcheckResponse.parse_obj(resp.json())
+        except requests.exceptions.RequestException:
+            return None
+
+    def registry_auth(self, username: str, password: str):
+        resp = requests.post(
+            self._url("/api/registry_auth"),
+            json=RegistryAuthBody(username=username, password=password).dict(),
+        )
+        resp.raise_for_status()
+
+    def pull(self):  # TODO return
+        resp = requests.get(self._url("/api/pull"))
         resp.raise_for_status()
 
     def _url(self, path: str) -> str:

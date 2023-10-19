@@ -79,6 +79,10 @@ type Gateway struct {
 	Secure      bool   `json:"secure"`
 }
 
+type HealthcheckResponse struct {
+	Service string `json:"service"`
+}
+
 func (d *RepoData) FormatURL(format string) string {
 	host := d.RepoHostName
 	if d.RepoPort != 0 {

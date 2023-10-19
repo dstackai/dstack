@@ -148,6 +148,7 @@ class AWSCompute(Compute):
                             run.run_spec.ssh_key_pub.strip(),
                             project_ssh_public_key.strip(),
                         ],
+                        registry_auth_required=job.job_spec.registry_auth is not None,
                     ),
                     tags=tags,
                     security_group_id=aws_resources.create_security_group(ec2_client, project_id),
