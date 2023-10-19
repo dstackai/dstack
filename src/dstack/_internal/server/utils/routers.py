@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, Response, status
 
 from dstack._internal.core.errors import ServerClientError
 
@@ -48,3 +48,11 @@ def get_server_client_error_details(error: ServerClientError) -> List[Dict]:
     for field_path in error.fields:
         details.append(error_detail(msg=error.msg, code=error.code, fields=field_path))
     return details
+
+
+def request_size_exceeded(request: Request, limit: int) -> bool:
+    if "content-length" not in request.headers:
+        return True
+    content_length = int(request.headers["content-length"])
+    if content_length > limit:
+        return True
