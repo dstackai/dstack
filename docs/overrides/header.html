@@ -46,15 +46,11 @@
       {% include "partials/alternate.html" %}
     {% endif %}
     {% if "material/search" in config.plugins %}
-      <label class="md-header__button md-icon" for="__search">
-        {% set icon = config.theme.icon.search or "material/magnify" %}
-        {% include ".icons/" ~ icon ~ ".svg" %}
-      </label>
-      {% include "partials/search.html" %}
-    {% endif %}
-    {% if config.repo_url %}
-      <div class="md-header__source">
-        {% include "partials/source.html" %}
+      <div class="md-search"></div>
+
+      <div class="md-header__buttons">
+        <a href="/docs" class="md-button md-button--primary">Open-source</a>
+        <a href="#" data-tally-open="w7K17R" class="md-button md-button-secondary">Cloud GPU</a>
       </div>
     {% endif %}
   </nav>

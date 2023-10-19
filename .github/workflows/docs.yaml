@@ -10,9 +10,6 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: dstack
-      - name: Install dstack from sources
-        run: pip install -e .
-        working-directory: ./dstack
       - uses: actions/checkout@v2
         with:
           repository: dstackai/dstackai.github.io
@@ -21,10 +18,13 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: 3.x
+      - name: Install dstack from sources
+        run: pip install -e .
+        working-directory: ./dstack
       - run: |
           pip install pillow cairosvg
           sudo apt-get install -y libcairo2-dev libfreetype6-dev libffi-dev libjpeg-dev libpng-dev libz-dev
-          pip install mkdocs-material pip install "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files mkdocstrings[python] --upgrade
+          pip install mkdocs-material "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files "mkdocstrings[python]" --upgrade
           pip install git+https://${{ secrets.GH_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
           mkdocs gh-deploy --config-file ../dstack/mkdocs.yml --force
         working-directory: ./dstackai.github.io

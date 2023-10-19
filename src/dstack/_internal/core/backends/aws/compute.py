@@ -26,6 +26,9 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class AWSCompute(Compute):
@@ -169,9 +172,8 @@ class AWSCompute(Compute):
                 dockerized=True,  # because `dstack-shim docker` is used
             )
         except botocore.exceptions.ClientError as e:
-            if e.response["Error"]["Code"] == "InsufficientInstanceCapacity":
-                raise NoCapacityError()
-            raise e
+            logger.debug("Got botocore.exceptions.ClientError: %s", e)
+            raise NoCapacityError()
 
     def create_gateway(
         self,

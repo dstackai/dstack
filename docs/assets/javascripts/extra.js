@@ -135,9 +135,9 @@ function setupCustomCodeTitles() {
 }
 
 window.addEventListener("DOMContentLoaded", function() {
-    tabs = document.querySelector(".md-tabs")
-    header = document.querySelector(".md-header")
-    search = document.querySelector(".md-search")
+    let tabs = document.querySelector(".md-tabs")
+    let header = document.querySelector(".md-header")
+    let search = document.querySelector(".md-search")
     search.parentNode.insertBefore(tabs, search)
     header.classList.add("ready")
     setupTermynal()

@@ -1,8 +1,9 @@
 # Clouds
 
-For every project, `dstack` allows you to configure multiple cloud accounts. 
+For every project, `dstack` allows you to configure and use multiple cloud accounts. 
 
-To configure your cloud account, provide their credentials and other settings via `~/.dstack/server/config.yml`.
+To configure a cloud account, provide its credentials and other settings via `~/.dstack/server/config.yml`
+under the `backends` property of the respective project.
 
 Example:
 
@@ -13,7 +14,6 @@ projects:
 - name: main
   backends:
   - type: aws
-    regions: [us-west-2, eu-west-1]
     creds:
       type: access_key
       access_key: AIZKISCVKUKO5AAKLAEH
@@ -22,21 +22,21 @@ projects:
 
 </div>
 
-Each cloud account should be listed separately under the `backends` property for the respective project.
-
 !!! info "Default project"
     The default project is `main`. The CLI and API are automatically configured to use it (through `~/.dstack/config.yml`).
 
 [//]: # (If you run the `dstack` server without creating `~/.dstack/server/config.yml`, `dstack` will attempt to automatically detect the)
 [//]: # (default credentials for AWS, GCP, and Azure and create the configuration.)
 
-## AWS
+## Credentials
+
+### AWS
 
 [//]: # (TODO: Permissions)
 
 There are two ways to configure AWS: using an access key or using the default credentials.
 
-### Access key
+#### Access key
 
 To create an access key, follow [this guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get). 
 
@@ -50,7 +50,6 @@ projects:
 - name: main
   backends:
   - type: aws
-    regions: [us-west-2, eu-west-1]
     creds:
       type: access_key
       access_key: KKAAUKLIZ5EHKICAOASV
@@ -59,7 +58,7 @@ projects:
 
 </div>
 
-### Default credentials
+#### Default credentials
 
 If you have default credentials set up (e.g. in `~/.aws/credentials`), configure the backend like this:
 
@@ -70,21 +69,20 @@ projects:
 - name: main
   backends:
   - type: aws
-    regions: [us-west-2, eu-west-1]
     creds:
       type: default
 ```
 
 </div>
 
-## Azure
+### Azure
 
 !!! info "Permission"
     You must have the `Owner` permission for the Azure subscription.
 
 There are two ways to configure Azure: using a client secret or using the default credentials.
 
-### Client secret
+#### Client secret
 
 A client secret can be created using the Azure CLI: (1)
 { .annotate } 
@@ -116,7 +114,6 @@ projects:
   - type: azure
     subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
     tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
-    regions: [eastus, westeurope]
     creds:
       type: client
       client_id: acf3f73a-597b-46b6-98d9-748d75018ed0
@@ -125,7 +122,7 @@ projects:
 
 </div>
 
-### Default credentials
+#### Default credentials
 
 Another way to configure Azure is through default credentials.
 
@@ -150,14 +147,13 @@ projects:
   - type: azure
     subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
     tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
-    regions: [eastus, westeurope]
     creds:
       type: default
 ```
 
 </div>
 
-## GCP
+### GCP
 
 ??? info "Enable APIs"
     First, ensure the required APIs are enabled in your GCP `project_id`. (1)
@@ -177,7 +173,7 @@ projects:
 
 There are two ways to configure GCP: using a service account or using the default credentials.
 
-### Service account
+#### Service account
 
 To create a service account, follow [this guide](https://cloud.google.com/iam/docs/service-accounts-create).
 Make sure to grant it the `Service Account User`, and `Compute Admin` roles.
@@ -201,7 +197,6 @@ projects:
   backends:
   - type: gcp
     project_id: gcp-project-id
-    regions: [us-east1, europe-west1]
     creds:
       type: service_account
       filename: ~/Downloads/gcp-024ed630eab5.json
@@ -209,7 +204,7 @@ projects:
 
 </div>
 
-### Default credentials
+#### Default credentials
 
 Example: (1) 
 { .annotate }
@@ -227,14 +222,13 @@ projects:
   backends:
   - type: gcp
     project_id: gcp-project-id
-    regions: [us-east1, europe-west1]
     creds:
       type: default
 ```
 
 </div>
 
-## Lambda
+### Lambda
 
 Log into your Lambda Cloud account, click API keys in the sidebar, and then click the `Generate API key`
 button to create a new API key.
@@ -248,7 +242,6 @@ projects:
 - name: main
   backends:
   - type: lambda
-    regions: [us-west-2, eu-west-1]
     creds:
       type: api_key
       api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
@@ -256,4 +249,26 @@ projects:
 
 </div>
 
-[//]: # (TODO: Make regions optional)
+## Other settings
+
+In addition to credentials, each cloud optionally allows for region configuration.
+
+Example:
+
+<div editor-title=".dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: aws
+    regions: [us-west-2, eu-west-1]
+    creds:
+      type: access_key
+      access_key: AIZKISCVKUKO5AAKLAEH
+      secret_key: QSbmpqJIUBn1V5U3pyM9S6lwwiu8/fOJ2dgfwFdW
+```
+
+</div>
+
+If regions aren't specified, `dstack` will use all available regions.

@@ -1,8 +1,9 @@
 from typing import List, Tuple
 
-from fastapi import APIRouter, Depends, UploadFile
+from fastapi import APIRouter, Depends, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.repos import RepoHead, RepoHeadWithCreds
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -13,7 +14,7 @@ from dstack._internal.server.schemas.repos import (
 )
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import repos
-from dstack._internal.server.utils.routers import raise_not_found
+from dstack._internal.server.utils.routers import raise_not_found, request_size_exceeded
 
 router = APIRouter(prefix="/api/project/{project_name}/repos", tags=["repos"])
 
@@ -73,11 +74,14 @@ async def delete_repos(
 
 @router.post("/upload_code")
 async def upload_code(
+    request: Request,
     repo_id: str,
     file: UploadFile,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
+    if request_size_exceeded(request, limit=2 * 2**20):
+        raise ServerClientError("Repo diff size exceeds the limit of 2MB")
     _, project = user_project
     await repos.upload_code(
         session=session,

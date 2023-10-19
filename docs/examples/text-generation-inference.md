@@ -71,9 +71,8 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com \
 
 !!! info "Hugging Face Hub token"
 
-    To use a model with gated access, ensure configuring either the `HUGGING_FACE_HUB_TOKEN` secret
-    (using [`dstack secrets`](../docs/reference/cli/secrets.md#dstack-secrets-add)),
-    or environment variable (with [`--env`](../docs/reference/cli/run.md#ENV) in `dstack run` or 
+    To use a model with gated access, ensure configuring the `HUGGING_FACE_HUB_TOKEN` environment variable 
+    (with [`--env`](../docs/reference/cli/run.md#ENV) in `dstack run` or 
     using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
     
     <div class="termy">
@@ -113,29 +112,6 @@ A similar approach allows running the Llama 2 70B model on an `40GB` GPU (A100).
 
 To calculate the exact GPU memory required for a specific model with different quantization methods, you can use the
 [hf-accelerate/memory-model-usage](https://huggingface.co/spaces/hf-accelerate/model-memory-usage) Space.
-
-??? info "Dev environments"
-
-    Dev environments require the Docker image to have `openssh-server` pre-installed. 
-    While `dstack`'s default Docker images include it, the `ghcr.io/huggingface/text-generation-inference` Docker 
-    image lacks it. Therefore, ensure that you manually install `openssh-server` using the `build` property.
-    
-    <div editor-title="text-generation-inference/.dstack.yml">
-    
-    ```yaml
-    type: dev-environment
-    
-    image: ghcr.io/huggingface/text-generation-inference:latest
-    
-    build:
-      - apt-get update
-      - DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server
-      - rm -rf /var/lib/apt/lists/*
-    
-    ide: vscode
-    ```
-    
-    </div>
 
 !!! info "Source code"
     The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
