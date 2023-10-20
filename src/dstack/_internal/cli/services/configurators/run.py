@@ -1,12 +1,15 @@
 import argparse
 import re
-from typing import Dict, List, Tuple, Type
+import subprocess
+from typing import Dict, List, Optional, Tuple, Type
 
+from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import (
     BaseConfiguration,
     BaseConfigurationWithPorts,
     ConfigurationType,
+    DevEnvironmentConfiguration,
     PortMapping,
 )
 
@@ -61,6 +64,18 @@ class TaskRunConfigurator(RunWithPortsConfigurator):
 class DevEnvironmentRunConfigurator(RunWithPortsConfigurator):
     TYPE = ConfigurationType.DEV_ENVIRONMENT
 
+    @classmethod
+    def apply(cls, args: argparse.Namespace, conf: DevEnvironmentConfiguration):
+        super().apply(args, conf)
+        if conf.ide == "vscode" and conf.version is None:
+            conf.version = _detect_vscode_version()
+            if conf.version is None:
+                console.print(
+                    "[secondary]Unable to detect the VS Code version and pre-install extensions. "
+                    "Fix by opening [code]Command Palette[/code], executing [code]Shell Command: "
+                    "Install 'code' command in PATH[/code], and restarting terminal.[/]\n"
+                )
+
 
 class ServiceRunConfigurator(BaseRunConfigurator):
     TYPE = ConfigurationType.SERVICE
@@ -96,6 +111,16 @@ def unique_ports_constraint(ports: List[int]):
         if i in used_ports:
             raise ConfigurationError(f"Port {i} is already in use")
         used_ports.add(i)
+
+
+def _detect_vscode_version(exe: str = "code") -> Optional[str]:
+    try:
+        run = subprocess.run([exe, "--version"], capture_output=True)
+    except FileNotFoundError:
+        return None
+    if run.returncode == 0:
+        return run.stdout.decode().split("\n")[1].strip()
+    return None
 
 
 run_configurators_mapping: Dict[ConfigurationType, Type[BaseRunConfigurator]] = {

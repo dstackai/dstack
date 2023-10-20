@@ -129,6 +129,7 @@ class BaseConfigurationWithPorts(BaseConfiguration):
 class DevEnvironmentConfiguration(BaseConfigurationWithPorts):
     type: Literal["dev-environment"] = "dev-environment"
     ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
+    version: Annotated[Optional[str], Field(description="The version of the IDE")]
     init: Annotated[CommandsList, Field(description="The bash commands to run")] = []
 
 
