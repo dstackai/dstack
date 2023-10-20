@@ -1,10 +1,6 @@
 from typing import List, Optional
 
-from dstack._internal.core.models.configurations import (
-    ConfigurationType,
-    DevEnvironmentConfiguration,
-    PortMapping,
-)
+from dstack._internal.core.models.configurations import ConfigurationType, PortMapping
 from dstack._internal.core.models.profiles import ProfileRetryPolicy, SpotPolicy
 from dstack._internal.core.models.runs import RetryPolicy, RunSpec
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
@@ -12,7 +8,10 @@ from dstack._internal.server.services.jobs.configurators.extensions.vscode impor
 
 DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
 
-INSTALL_IPYKERNEL = f'(pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo "no pip, ipykernel was not installed"'
+INSTALL_IPYKERNEL = (
+    f"(echo pip install ipykernel... && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
+    f'echo "no pip, ipykernel was not installed"'
+)
 
 
 class DevEnvironmentJobConfigurator(JobConfigurator):
@@ -21,14 +20,14 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
     def __init__(self, run_spec: RunSpec):
         self.ide = VSCodeDesktop(
             run_name=run_spec.run_name,
-            version="1",  # TODO pass version
+            version=run_spec.configuration.version,
             extensions=["ms-python.python", "ms-toolsai.jupyter"],
         )
         super().__init__(run_spec)
 
     def _shell_commands(self) -> List[str]:
         commands = []
-        # commands += self.ide.get_install_if_not_found_commands()  # TODO fix version
+        commands += self.ide.get_install_commands()
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup
         commands.append("echo ''")

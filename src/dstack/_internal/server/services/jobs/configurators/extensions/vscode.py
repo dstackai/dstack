@@ -33,15 +33,6 @@ class VSCodeDesktop:
                 commands.append(f'PATH="$PATH":{target}/bin code-server {extensions}')
         return commands
 
-    def get_install_if_not_found_commands(self) -> List[str]:
-        commands = []
-        if self.version is not None:
-            install_commands = " && ".join(self.get_install_commands())
-            commands.append(
-                f'if [ ! -d ~/.vscode-server/bin/"{self.version}" ]; then {install_commands}; fi'
-            )
-        return commands
-
     def get_print_readme_commands(self) -> List[str]:
         return [
             f"echo To open in VS Code Desktop, use link below:",
