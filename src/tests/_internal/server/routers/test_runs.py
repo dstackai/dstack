@@ -50,6 +50,7 @@ def get_dev_env_run_plan_dict(
                 "env": {},
                 "home_dir": "/root",
                 "ide": "vscode",
+                "version": None,
                 "image": None,
                 "init": [],
                 "ports": [],
@@ -84,7 +85,8 @@ def get_dev_env_run_plan_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "(pip install -q --no-cache-dir "
+                        "(echo pip install ipykernel... && "
+                        "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
                         'pip, ipykernel was not installed" '
                         "&& echo '' && echo To open in VS "
@@ -142,6 +144,7 @@ def get_dev_env_run_dict(
                 "env": {},
                 "home_dir": "/root",
                 "ide": "vscode",
+                "version": None,
                 "image": None,
                 "init": [],
                 "ports": [],
@@ -176,7 +179,8 @@ def get_dev_env_run_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
-                        "(pip install -q --no-cache-dir "
+                        "(echo pip install ipykernel... && "
+                        "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
                         'pip, ipykernel was not installed" '
                         "&& echo '' && echo To open in VS "
