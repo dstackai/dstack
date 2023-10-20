@@ -46,7 +46,7 @@
 }
 
 .tx-landing__hero_button_placeholder {
-    color: #696F86;
+    color: #202128;
     font-size: 0.6rem;
     line-height: 21px;
     text-align: center;
@@ -164,7 +164,7 @@
     margin-top: 1.2rem;
     margin-bottom: 1.5rem;
     font-size: 22px;
-    font-weight: 300 !important;
+    font-weight: 400 !important;
     text-align: center;
     border-radius: 3px;
     border-color: transparent;
@@ -181,17 +181,23 @@
     font-size: 21px;
 }
 
+.tx-container .md-button.small {
+    min-width: 175px;
+    padding: 0.3em 1.5em;
+    font-size: 19px;
+}
+
 .md-header__buttons .md-button--primary,
 .tx-container .md-button--primary {
     background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
 }
 
 .md-header__buttons .md-button--primary {
-    font-weight: 400 !important;
+    font-weight: 500 !important;
 }
 
 .md-header__buttons .md-button-secondary {
-    font-weight: 400 !important;
+    font-weight: 500 !important;
 }
 
 .md-header__buttons .md-button-secondary,
@@ -253,7 +259,7 @@
 }
 
 .tx-landing__integrations_text {
-    color: #696F86;
+    color: #202128;
     font-size: 0.6rem;
     line-height: 16px;
     text-align: center;

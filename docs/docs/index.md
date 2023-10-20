@@ -29,6 +29,8 @@ $ pip install "dstack[all]" -U
 
 </div>
 
+Another way to install the server is through [Docker](https://hub.docker.com/r/dstackai/dstack).
+
 ### Configure clouds
 
 If you have default AWS, GCP, or Azure credentials on your machine, `dstack` will pick them up automatically.

@@ -199,7 +199,7 @@ projects:
     project_id: gcp-project-id
     creds:
       type: service_account
-      filename: ~/Downloads/gcp-024ed630eab5.json
+      filename: ~/.dstack/server/gcp-024ed630eab5.json
 ```
 
 </div>

@@ -1,5 +1,5 @@
 ---
-title: "dstack 0.12.0: Simplified cloud setup, and refined API"
+title: "dstack 0.12.0: Simplified cloud setup, refined API"
 date: 2023-10-18
 description: "The v0.12.0 update makes it much easier to configure clouds and enhances the Python API."
 slug: "simplified-cloud-setup"
