@@ -1,6 +1,8 @@
 import io
 import tarfile
-from typing import BinaryIO, Dict, Literal
+from importlib import resources as impresources
+from types import ModuleType
+from typing import BinaryIO, Dict, Literal, Union
 
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256
@@ -25,6 +27,11 @@ class VirtualRepo(Repo):
         self.repo_dir = None
         self.files: Dict[str, bytes] = {}
         self.run_repo_data = VirtualRunRepoData()
+
+    def add_file_from_package(self, package: Union[ModuleType, str], path: str):
+        req_file = impresources.files(package) / path
+        with req_file.open("rb") as f:
+            self.add_file(path, f.read())
 
     def add_file(self, path: str, content: bytes):
         self.files[resolve_relative_path(path).as_posix()] = content
