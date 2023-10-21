@@ -216,7 +216,11 @@ class SubmittedRun(Run):
         self,
         start_time: Optional[datetime] = None,
         diagnose: bool = False,
+        attach: bool = True,
+        ssh_identity_file: Optional[PathLike] = None,
     ) -> Iterable[bytes]:
+        if diagnose is False and self._ssh_attach is None and attach:
+            self.attach(ssh_identity_file)
         if diagnose is False and self._ssh_attach is not None:
             q = queue.Queue()
             _done = object()
