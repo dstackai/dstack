@@ -1,5 +1,3 @@
-import functools
-import time
 from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
@@ -8,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, Run
@@ -33,9 +32,6 @@ from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-RUNNER_TIMEOUT_INTERVAL = timedelta(seconds=600)
 
 
 async def process_running_jobs():
@@ -118,7 +114,9 @@ async def _process_job(job_id: UUID):
                     repo_creds,
                 )
             if not success:  # check timeout
-                if job_submission.age > RUNNER_TIMEOUT_INTERVAL:
+                if job_submission.age > _get_runner_timeout_interval(
+                    job_provisioning_data.backend
+                ):
                     logger.warning(
                         "Job %s failed because runner has not become available in time.",
                         job_model.job_name,
@@ -355,3 +353,9 @@ def _submit_job_to_runner(
     runner_client.run_job()
     job_model.status = JobStatus.RUNNING
     logger.debug("Job %s is running", job_model.job_name)
+
+
+def _get_runner_timeout_interval(backend_type: BackendType) -> timedelta:
+    if backend_type == BackendType.LAMBDA:
+        return timedelta(seconds=1200)
+    return timedelta(seconds=600)
