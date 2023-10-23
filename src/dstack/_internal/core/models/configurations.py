@@ -134,11 +134,35 @@ class DevEnvironmentConfiguration(BaseConfigurationWithPorts):
 
 
 class TaskConfiguration(BaseConfigurationWithPorts):
+    """
+        Attributes:
+            commands (List[str]): The bash commands to run
+            ports (List[PortMapping]): Port numbers/mapping to expose
+            env (Dict[str, str]): The mapping or the list of environment variables
+            image (Optional[str]): The name of the Docker image to run
+            python (Optional[str]): The major version of Python
+            entrypoint (Optional[str]): The Docker entrypoint
+            registry_auth (Optional[RegistryAuth]): Credentials for pulling a private container
+            home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
+    """
+
     type: Literal["task"] = "task"
     commands: Annotated[CommandsList, Field(description="The bash commands to run")]
 
 
 class ServiceConfiguration(BaseConfiguration):
+    """
+        Attributes:
+            commands (List[str]): The bash commands to run
+            port (PortMapping): The port, that application listens to or the mapping
+            env (Dict[str, str]): The mapping or the list of environment variables
+            image (Optional[str]): The name of the Docker image to run
+            python (Optional[str]): The major version of Python
+            entrypoint (Optional[str]): The Docker entrypoint
+            registry_auth (Optional[RegistryAuth]): Credentials for pulling a private container
+            home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
+    """
+
     type: Literal["service"] = "service"
     commands: Annotated[CommandsList, Field(description="The bash commands to run")]
     port: Annotated[

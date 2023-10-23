@@ -330,17 +330,30 @@
     /*-webkit-font-smoothing: auto;*/
 }
 
-.md-typeset :not(pre) > code {
+.md-typeset :not(pre) :is(h2,h3,h4) > code {
+    color: inherit;
+    background: inherit;
+    padding: 0;
+}
+
+h4.doc-heading {
+    font-size: inherit;
+}
+
+.md-typeset :not(pre, h2, h3, h4) > code {
     background-color: rgba(163, 68, 215, 0.05);
     /*border: 1px solid #dce0e6;*/
     border-radius: 2px;
     font-weight: 600;
-    font-size: 0.65rem;
     color: var(--md-primary-fg-color);
     text-align: center;
     padding: 4px;
     height: 16px;
     margin: 0 4px;
+}
+
+.md-typeset :not(td, pre, h2, h3, h4) > code {
+    font-size: 0.65rem;
 }
 
 .md-typeset :not(pre) > a code {
