@@ -15,45 +15,45 @@ class SFTFineTuningTaskRepo(VirtualRepo):
 
 class SFTFineTuningTask(TaskConfiguration):
     """
-        This task loads a given model from the Hugging Face hub and fine-tunes it on the provided dataset
-        (also from Hugging Face hub),
-        utilizing the SFT and QLoRA techniques. The final model is pushed
-        to Hugging Face hub.
+    This task loads a given model from the Hugging Face hub and fine-tunes it on the provided dataset
+    (also from Hugging Face hub),
+    utilizing the SFT and QLoRA techniques. The final model is pushed
+    to Hugging Face hub.
 
-        Args:
-            model_name: The model that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc.
-            dataset_name: The instruction dataset to use.
-            new_model_name: The name under which to push the fine-tuned model to the Hugging Face Hub.
-            report_to: Supported integrations include `"wandb"` and `"tensorboard"`.
-            env: The list of environment variables, which defaults to those of the current process.
-                It must include `"HUGGING_FACE_HUB_TOKEN"` and related variables required by the integration specified in
-                `report_to` (e.g., `"WANDB_API_KEY"`, `"WANDB_PROJECT"`, etc.)
-            per_device_train_batch_size: Batch size per GPU for training.
-            per_device_eval_batch_size: Batch size per GPU for evaluation.
-            gradient_accumulation_steps: Number of update steps to accumulate the gradients for.
-            learning_rate: Initial learning rate (AdamW optimizer).
-            max_grad_norm: Maximum gradient normal (gradient clipping).
-            weight_decay: Weight decay to apply to all layers except bias/LayerNorm weights.
-            lora_alpha: Alpha parameter for LoRA scaling.
-            lora_dropout: Dropout probability for LoRA layers.
-            lora_r: LoRA attention dimension.
-            max_seq_length: Maximum sequence length to use.
-            use_4bit: Activate 4bit precision base model loading.
-            use_nested_quant: Activate nested quantization for 4bit base models.
-            bnb_4bit_compute_dtype: Compute dtype for 4bit base models.
-            bnb_4bit_quant_type: Quantization type fp4 or nf4.
-            num_train_epochs: The number of training epochs for the reward model.
-            fp16: Enables fp16 training.
-            bf16: Enables bf16 training.
-            packing: Use packing dataset creating.
-            gradient_checkpointing: Enables gradient checkpointing.
-            optim: The optimizer to use.
-            lr_scheduler_type: Learning rate schedule. Constant a bit better than cosine, and has advantage for analysis
-            max_steps: How many optimizer update steps to take
-            warmup_ratio: Fraction of steps to do a warmup for
-            group_by_length: Group sequences into batches with same length. Saves memory and speeds up training considerably.
-            save_steps: Save checkpoint every X updates steps.
-            logging_steps: Log every X updates steps.
+    Args:
+        model_name: The model that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc.
+        dataset_name: The instruction dataset to use.
+        new_model_name: The name under which to push the fine-tuned model to the Hugging Face Hub.
+        report_to: Supported integrations include `"wandb"` and `"tensorboard"`.
+        env: The list of environment variables, which defaults to those of the current process.
+            It must include `"HUGGING_FACE_HUB_TOKEN"` and related variables required by the integration specified in
+            `report_to` (e.g., `"WANDB_API_KEY"`, `"WANDB_PROJECT"`, etc.)
+        per_device_train_batch_size: Batch size per GPU for training.
+        per_device_eval_batch_size: Batch size per GPU for evaluation.
+        gradient_accumulation_steps: Number of update steps to accumulate the gradients for.
+        learning_rate: Initial learning rate (AdamW optimizer).
+        max_grad_norm: Maximum gradient normal (gradient clipping).
+        weight_decay: Weight decay to apply to all layers except bias/LayerNorm weights.
+        lora_alpha: Alpha parameter for LoRA scaling.
+        lora_dropout: Dropout probability for LoRA layers.
+        lora_r: LoRA attention dimension.
+        max_seq_length: Maximum sequence length to use.
+        use_4bit: Activate 4bit precision base model loading.
+        use_nested_quant: Activate nested quantization for 4bit base models.
+        bnb_4bit_compute_dtype: Compute dtype for 4bit base models.
+        bnb_4bit_quant_type: Quantization type fp4 or nf4.
+        num_train_epochs: The number of training epochs for the reward model.
+        fp16: Enables fp16 training.
+        bf16: Enables bf16 training.
+        packing: Use packing dataset creating.
+        gradient_checkpointing: Enables gradient checkpointing.
+        optim: The optimizer to use.
+        lr_scheduler_type: Learning rate schedule. Constant a bit better than cosine, and has advantage for analysis
+        max_steps: How many optimizer update steps to take
+        warmup_ratio: Fraction of steps to do a warmup for
+        group_by_length: Group sequences into batches with same length. Saves memory and speeds up training considerably.
+        save_steps: Save checkpoint every X updates steps.
+        logging_steps: Log every X updates steps.
     """
 
     def __init__(
