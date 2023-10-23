@@ -159,6 +159,7 @@ nav:
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
           - Services: docs/guides/services.md
+          - Fine-tuning: docs/guides/fine-tuning.md
 #          - Artifacts: docs/guides/artifacts.md
       - Reference:
           - CLI:
