@@ -1,6 +1,8 @@
 import re
 from typing import Any, Dict, Optional
 
+from config import REPORT_TO_COMMANDS, REPORT_TO_PORTS
+
 from dstack._internal.core.models.configurations import TaskConfiguration
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack.api._public.huggingface.finetuning import sft
@@ -9,6 +11,7 @@ from dstack.api._public.huggingface.finetuning import sft
 class SFTFineTuningTaskRepo(VirtualRepo):
     def __init__(self, repo_id: str):
         super().__init__(repo_id)
+        self.add_file_from_package(package=sft, path="config.py")
         self.add_file_from_package(package=sft, path="requirements.txt")
         self.add_file_from_package(package=sft, path="train.py")
 
@@ -56,6 +59,8 @@ class SFTFineTuningTask(TaskConfiguration):
         logging_steps: Log every X updates steps.
     """
 
+    SUPPORTED_REPORT_TO = ["wandb", "tensorboard"]
+
     def __init__(
         self,
         model_name: str,
@@ -90,64 +95,106 @@ class SFTFineTuningTask(TaskConfiguration):
         save_steps: int = 0,
         logging_steps: int = 25,
     ):
-        args = " ".join(
-            [
-                SFTFineTuningTask._get_arg(t[0], t[1], t[2])
-                for t in [
-                    ("report_to", report_to, None),
-                    ("per_device_train_batch_size", per_device_train_batch_size, 4),
-                    ("per_device_eval_batch_size", per_device_eval_batch_size, 4),
-                    ("gradient_accumulation_steps", gradient_accumulation_steps, 1),
-                    ("learning_rate", learning_rate, 2e-4),
-                    ("max_grad_norm", max_grad_norm, 0.3),
-                    ("weight_decay", weight_decay, 0.001),
-                    ("lora_alpha", lora_alpha, 16),
-                    ("lora_dropout", lora_dropout, 0.1),
-                    ("lora_r", lora_r, 64),
-                    ("max_seq_length", max_seq_length, None),
-                    ("use_4bit", use_4bit, True),
-                    ("use_nested_quant", use_nested_quant, True),
-                    ("bnb_4bit_compute_dtype", bnb_4bit_compute_dtype, "float16"),
-                    ("bnb_4bit_quant_type", bnb_4bit_quant_type, "nf4"),
-                    ("num_train_epochs", num_train_epochs, 1),
-                    ("fp16", fp16, False),
-                    ("bf16", bf16, False),
-                    ("packing", packing, False),
-                    ("gradient_checkpointing", gradient_checkpointing, True),
-                    ("optim", optim, "paged_adamw_32bit"),
-                    ("lr_scheduler_type", lr_scheduler_type, "constant"),
-                    ("max_steps", max_steps, -1),
-                    ("warmup_ratio", warmup_ratio, 0.03),
-                    ("group_by_length", group_by_length, True),
-                    ("save_steps", save_steps, 0),
-                    ("logging_steps", logging_steps, 25),
-                ]
-            ]
+        self._validate_env_vars(env, report_to)
+        args = self._construct_args(
+            {
+                "report_to": (report_to, None),
+                "per_device_train_batch_size": (per_device_train_batch_size, 4),
+                "per_device_eval_batch_size": (per_device_eval_batch_size, 4),
+                "gradient_accumulation_steps": (gradient_accumulation_steps, 1),
+                "learning_rate": (learning_rate, 2e-4),
+                "max_grad_norm": (max_grad_norm, 0.3),
+                "weight_decay": (weight_decay, 0.001),
+                "lora_alpha": (lora_alpha, 16),
+                "lora_dropout": (lora_dropout, 0.1),
+                "lora_r": (lora_r, 64),
+                "max_seq_length": (max_seq_length, None),
+                "use_4bit": (use_4bit, True),
+                "use_nested_quant": (use_nested_quant, True),
+                "bnb_4bit_compute_dtype": (bnb_4bit_compute_dtype, "float16"),
+                "bnb_4bit_quant_type": (bnb_4bit_quant_type, "nf4"),
+                "num_train_epochs": (num_train_epochs, 1),
+                "fp16": (fp16, False),
+                "bf16": (bf16, False),
+                "packing": (packing, False),
+                "gradient_checkpointing": (gradient_checkpointing, True),
+                "optim": (optim, "paged_adamw_32bit"),
+                "lr_scheduler_type": (lr_scheduler_type, "constant"),
+                "max_steps": (max_steps, -1),
+                "warmup_ratio": (warmup_ratio, 0.03),
+                "group_by_length": (group_by_length, True),
+                "save_steps": (save_steps, 0),
+                "logging_steps": (logging_steps, 25),
+            }
         )
         # TODO: Support secrets
         # TODO: Support more integrations
         # Validating environment variables
-        _ = env["HUGGING_FACE_HUB_TOKEN"]
-        report_to_env = ""
-        if report_to == "wandb":
-            _ = env["WANDB_API_KEY"]
-            report_to_env += "WANDB_PROJECT=${WANDB_PROJECT:-$REPO_ID} WANDB_RUN_ID=$RUN_NAME"
+        report_to_env = self._setup_environment(report_to)
         python_command = re.sub(
             " +",
             " ",
             f"{report_to_env} HF_HUB_ENABLE_HF_TRANSFER=1 python train.py --model_name {model_name} --new_model_name {new_model_name or '$RUN_NAME'} --dataset_name {dataset_name} --merge_and_push {args}",
         ).strip()
-        pip_install_command = "pip install -r requirements.txt"
-        commands = [pip_install_command]
-        ports = []
-        if report_to == "wandb":
-            commands.append("pip install wandb")
-        if report_to == "tensorboard":
-            commands.append("pip install tensorboard")
-            commands.append("tensorboard --logdir results/runs &")
-            ports.append("6006")
+
+        commands = ["pip install -r requirements.txt"]
+        commands += REPORT_TO_COMMANDS.get(report_to, [])
         commands.append(python_command)
+
+        ports = REPORT_TO_PORTS.get(report_to, [])
         super().__init__(commands=commands, ports=ports, env=env)
+
+    def _validate_env_vars(self, env: Dict[str, str], report_to: str) -> None:
+        """
+        Validates the required environment variables based on the reporting tool.
+
+        Args:
+            env: The environment variables dictionary.
+            report_to: The reporting tool name.
+
+        Raises:
+            ValueError: If required environment variables are not provided.
+        """
+        required_vars = ["HUGGING_FACE_HUB_TOKEN"]
+        if report_to == "wandb":
+            required_vars.append("WANDB_API_KEY")
+
+        for var in required_vars:
+            if var not in env:
+                raise ValueError(f"{var} is required in environment variables.")
+
+        if report_to not in self.SUPPORTED_REPORT_TO:
+            raise ValueError(
+                f"Unsupported value for report_to: {report_to}. Supported values are: {', '.join(self.SUPPORTED_REPORT_TO)}"
+            )
+
+    def _setup_environment(self, report_to: str) -> str:
+        """
+        Sets up the environment variables based on the reporting tool.
+
+        Args:
+            report_to: The reporting tool name.
+
+        Returns:
+            A string containing the set environment variables.
+        """
+        if report_to == "wandb":
+            return "WANDB_PROJECT=${WANDB_PROJECT:-$REPO_ID} WANDB_RUN_ID=$RUN_NAME"
+        return ""
+
+    def _construct_args(self, arg_map: Dict[str, Any]) -> str:
+        """
+        Constructs the arguments string for the command.
+
+        Args:
+            arg_map: A dictionary containing argument names as keys and their values as values.
+
+        Returns:
+            A string containing the constructed arguments.
+        """
+        return " ".join(
+            [self._get_arg(name, value[0], value[1]) for name, value in arg_map.items()]
+        )
 
     @staticmethod
     def _get_arg(name, value: Any, default: Any) -> str:
