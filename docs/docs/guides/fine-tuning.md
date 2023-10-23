@@ -33,7 +33,7 @@ task = SFTFineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
                          dataset_name="peterschmidt85/samsum",
                          num_train_epochs=2,
                          env={
-                             "`HUGGING_FACE_HUB_TOKEN`": "...",
+                             "HUGGING_FACE_HUB_TOKEN": "...",
                          })
 ```
 
@@ -54,8 +54,10 @@ run = client.runs.submit(
 
 When submitting a task, you can configure resources, along with [many other options](../../docs/reference/api/python/index.md#dstack.api.RunCollection.submit).
 
-To track experiment metrics, specify `report_to` and related authentication environment variables. Currently, the API
-supports `"tensorboard"` and `"wandb"`:
+You can use the [methods](../../docs/reference/api/python/index.md#dstack.api.Client) on `client` to manage your runs, including getting a list of runs, stopping a given
+run, etc.
+
+To track experiment metrics, specify `report_to` and related authentication environment variables.
 
 ```python
 task = SFTFineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
@@ -69,9 +71,10 @@ task = SFTFineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
                          })
 ```
 
-[//]: # (TODO: Add W&B screenshot)
+Currently, the API supports `"tensorboard"` and `"wandb"`:
 
-You can use the [methods](../../docs/reference/api/python/index.md#dstack.api.Client) on `client` to manage your runs, including getting a list of runs, stopping a given
-run, etc.
+![](../../assets/images/dstack-finetuning-wandb.png){ width=800 }
 
 When the training is done, `dstack` pushes the final model to the Hugging Face hub.
+
+![](../../assets/images/dstack-finetuning-hf.png){ width=800 }
