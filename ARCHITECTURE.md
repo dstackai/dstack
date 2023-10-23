@@ -3,7 +3,7 @@
 
 ## Overview
 
-The `dstack` toolkit consists of five major components:
+The `dstack` platform consists of five major components:
 
 * the server
 * the Python API

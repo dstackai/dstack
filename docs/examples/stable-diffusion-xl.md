@@ -191,7 +191,7 @@ commands:
 ## Run the configuration
 
 !!! warning "NOTE:"
-    Before running a service, ensure that you have configured a [gateway](../docs/guides/clouds.md#configuring-gateways).
+    Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
 
 After the gateway is configured, go ahead run the service.
 
@@ -204,7 +204,7 @@ $ dstack run . -f stable-diffusion-xl/api.dstack.yml
 </div>
 
 !!! info "Endpoint URL"
-    If you've configured a [wildcard domain](../docs/guides/clouds.md#configuring-gateways) for the gateway, 
+    If you've configured a [wildcard domain](../docs/guides/services.md#set-up-a-gateway) for the gateway, 
     `dstack` enables HTTPS automatically and serves the service at 
     `https://<run name>.<your domain name>`.
 

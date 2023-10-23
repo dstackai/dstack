@@ -23,7 +23,7 @@ class SFTFineTuningTask(TaskConfiguration):
     Args:
         model_name: The model that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc.
         dataset_name: The instruction dataset to use.
-        new_model_name: The name under which to push the fine-tuned model to the Hugging Face Hub.
+        new_model_name: The name to use for pushing the fine-tuned model to the Hugging Face Hub. If unset, it defaults to the name of the run.
         report_to: Supported integrations include `"wandb"` and `"tensorboard"`.
         env: The list of environment variables, which defaults to those of the current process.
             It must include `"HUGGING_FACE_HUB_TOKEN"` and related variables required by the integration specified in
@@ -60,8 +60,8 @@ class SFTFineTuningTask(TaskConfiguration):
         self,
         model_name: str,
         dataset_name: str,
-        new_model_name: str,
         env: Dict[str, str],
+        new_model_name: Optional[str] = None,
         report_to: Optional[str] = None,
         per_device_train_batch_size: int = 4,
         per_device_eval_batch_size: int = 4,
@@ -128,13 +128,14 @@ class SFTFineTuningTask(TaskConfiguration):
         # TODO: Support more integrations
         # Validating environment variables
         _ = env["HUGGING_FACE_HUB_TOKEN"]
+        report_to_env = ""
         if report_to == "wandb":
             _ = env["WANDB_API_KEY"]
-            _ = env["WANDB_PROJECT"]
+            report_to_env += "WANDB_PROJECT=${WANDB_PROJECT:-$REPO_ID} WANDB_RUN_ID=$RUN_NAME"
         python_command = re.sub(
             " +",
             " ",
-            f"HF_HUB_ENABLE_HF_TRANSFER=1 python train.py --model_name {model_name} --new_model_name {new_model_name} --dataset_name {dataset_name} --merge_and_push {args}",
+            f"{report_to_env} HF_HUB_ENABLE_HF_TRANSFER=1 python train.py --model_name {model_name} --new_model_name {new_model_name or '$RUN_NAME'} --dataset_name {dataset_name} --merge_and_push {args}",
         ).strip()
         pip_install_command = "pip install -r requirements.txt"
         commands = [pip_install_command]
@@ -156,4 +157,4 @@ class SFTFineTuningTask(TaskConfiguration):
             return ""
 
     def get_repo(self) -> SFTFineTuningTaskRepo:
-        return SFTFineTuningTaskRepo(repo_id="dstack.api._public.huggingface.finetuning")
+        return SFTFineTuningTaskRepo(repo_id="dstack.api._public.huggingface.finetuning.sft")

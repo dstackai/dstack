@@ -1,11 +1,11 @@
 # Quickstart
 
-`dstack` is an open-source toolkit for training, fine-tuning, and deployment of 
+`dstack` is an open-source platform for training, fine-tuning, and deployment of 
 generative AI models across various cloud providers. (1)
 { .annotate } 
 
 1. You can use various cloud accounts (e.g., AWS, GCP, Azure, Lambda Cloud) by configuring 
-   their credentials. The framework can optimize costs by running workloads across multiple 
+   their credentials. The platform can optimize costs by running workloads across multiple 
    regions and cloud accounts.
 
 ## Set up the server
@@ -31,12 +31,12 @@ $ pip install "dstack[all]" -U
 
 Another way to install the server is through [Docker](https://hub.docker.com/r/dstackai/dstack).
 
-### Configure clouds
+### Configure the server
 
-If you have default AWS, GCP, or Azure credentials on your machine, `dstack` will pick them up automatically.
+If you have default AWS, GCP, or Azure credentials on your machine, the `dstack` server will pick them up automatically.
 
 Otherwise, you need to manually specify the cloud credentials in `~/.dstack/server/config.yml`.
-For further cloud configuration details, refer to [Clouds](guides/clouds.md).
+For further details, refer to [server configuration](configuration/server.md).
 
 ### Start the server
 

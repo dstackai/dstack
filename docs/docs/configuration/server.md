@@ -1,9 +1,12 @@
-# Clouds
+# Server configuration
 
-For every project, `dstack` allows you to configure and use multiple cloud accounts. 
+The `dstack` server manages your workloads' state and orchestrates them across configured cloud providers.
 
-To configure a cloud account, provide its credentials and other settings via `~/.dstack/server/config.yml`
-under the `backends` property of the respective project.
+For flexibility, the server allows you to configure multiple projects and users. Within each project, you can set up
+multiple cloud accounts.
+
+To configure a cloud account, specify its settings in `~/.dstack/server/config.yml` under the `backends` property 
+of the respective project.
 
 Example:
 
@@ -28,7 +31,7 @@ projects:
 [//]: # (If you run the `dstack` server without creating `~/.dstack/server/config.yml`, `dstack` will attempt to automatically detect the)
 [//]: # (default credentials for AWS, GCP, and Azure and create the configuration.)
 
-## Credentials
+## Cloud credentials
 
 ### AWS
 
@@ -249,7 +252,7 @@ projects:
 
 </div>
 
-## Other settings
+## Cloud regions
 
 In addition to credentials, each cloud optionally allows for region configuration.
 

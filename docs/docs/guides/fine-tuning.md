@@ -11,6 +11,8 @@ Hugging Face model with SFT or DPO techniques in your cloud with just one line o
     pip install "dstack[all]==0.12.1rc1"
     ```
 
+    Also, make sure you've configured clouds and started the server.
+
 First, you connect to the `dstack` server:
 
 ```python
@@ -29,7 +31,6 @@ from dstack.api.huggingface import SFTFineTuningTask
 
 task = SFTFineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
                          dataset_name="peterschmidt85/samsum",
-                         new_model_name="Llama-2-13b-samsum",
                          num_train_epochs=2,
                          env={
                              "`HUGGING_FACE_HUB_TOKEN`": "...",
@@ -45,16 +46,13 @@ And finally, submit the task:
 from dstack.api import Resources, GPU
 
 run = client.runs.submit(
-    run_name="Llama-2-13b-samsum",
+    run_name="Llama-2-13b-samsum", # (Optional) If unset, its chosen randomly
     configuration=task,
     resources=Resources(gpu=GPU(memory="24GB", count=4)),
 )
 ```
 
-`dstack` automatically provisions necessary resources in the configured cloud, does training, and pushes 
-the final model to the Hugging Face hub.
-
-## Integrations
+When submitting a task, you can configure resources, along with [many other options](../../docs/reference/api/python/index.md#dstack.api.RunCollection.submit).
 
 To track experiment metrics, specify `report_to` and related authentication environment variables. Currently, the API
 supports `"tensorboard"` and `"wandb"`:
@@ -62,7 +60,6 @@ supports `"tensorboard"` and `"wandb"`:
 ```python
 task = SFTFineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
                          dataset_name="peterschmidt85/samsum",
-                         new_model_name="Llama-2-13b-samsum",
                          num_train_epochs=2,
                          report_to="wandb",
                          env={
@@ -74,7 +71,7 @@ task = SFTFineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
 
 [//]: # (TODO: Add W&B screenshot)
 
-You can use the [methods](../../docs/reference/api/python/index.md#dstack.api.Client) on `dstack.api.Client` to manage your runs, including getting a list of runs, stopping a given
+You can use the [methods](../../docs/reference/api/python/index.md#dstack.api.Client) on `client` to manage your runs, including getting a list of runs, stopping a given
 run, etc.
 
-The `dstack.api.Client.runs.submit` allows for configuring resources as well as [many other options](../../docs/reference/api/python/index.md#dstack.api.RunCollection.submit).
+When the training is done, `dstack` pushes the final model to the Hugging Face hub.

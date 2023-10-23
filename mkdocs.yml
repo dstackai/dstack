@@ -74,8 +74,9 @@ plugins:
         'docs/quick-start.md': 'docs/index.md'
         'docs/installation/index.md': 'docs/index.md'
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion-xl.md'
-        'docs/guides/projects.md': 'docs/guides/clouds.md'
+        'docs/guides/projects.md': 'configuration/server.md'
         'examples/python-api.md': 'examples/deploy-python.md'
+        'guides/clouds.md': 'configuration/server.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -154,8 +155,9 @@ nav:
 #          - Installation:
 #              - pip: docs/installation/pip.md
 #              - Docker: docs/installation/docker.md
+          - Configuration:
+              - Server configuration: docs/configuration/server.md
       - Guides:
-          - Clouds: docs/guides/clouds.md
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
           - Services: docs/guides/services.md

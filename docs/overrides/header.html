@@ -47,12 +47,17 @@
     {% endif %}
     {% if "material/search" in config.plugins %}
       <div class="md-search"></div>
+    {% endif %}
 
-      <div class="md-header__buttons">
-        <a href="/docs" class="md-button md-button--primary">Open-source</a>
-        <a href="#" data-tally-open="w7K17R" class="md-button md-button-secondary">Cloud GPU</a>
+    {% if config.repo_url %}
+      <div class="md-header__source">
+        {% include "partials/source.html" %}
       </div>
     {% endif %}
+    <div class="md-header__buttons">
+      <!--<a href="/docs" class="md-button md-button&#45;&#45;primary">Open-source</a>-->
+      <a href="#" data-tally-open="w7K17R" class="md-button md-button--primary">Request cloud GPU</a>
+    </div>
   </nav>
   {% if "navigation.tabs.sticky" in features %}
     {% if "navigation.tabs" in features %}

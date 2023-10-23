@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Orchestrate GPU workloads across clouds
+Effortlessly train and deploy generative AI
 </h3>
 
 <p align="center">
@@ -23,7 +23,7 @@ Orchestrate GPU workloads across clouds
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source toolkit for training, fine-tuning, and deployment of 
+`dstack` is an open-source platform for training, fine-tuning, and deployment of 
 generative AI models across various cloud providers (e.g., AWS, GCP, Azure, Lambda Cloud, etc.)
 
 ## Latest news ✨
@@ -57,7 +57,7 @@ $ pip install "dstack[all]" -U
 If you have default AWS, GCP, or Azure credentials on your machine, `dstack` will pick them up automatically.
 
 Otherwise, you need to manually specify the cloud credentials in `~/.dstack/server/config.yml`.
-For further cloud configuration details, refer to [Clouds](https://dstack.ai/docs/guides/clouds.md).
+For further cloud configuration details, refer to [Clouds](https://dstack.ai/docs/configuration/server).
 
 ### Start the server
 

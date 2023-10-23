@@ -36,7 +36,7 @@ commands:
 ## Run the configuration
 
 !!! warning "Gateway"
-    Before running a service, ensure that you have configured a [gateway](../docs/guides/clouds.md#configuring-gateways).
+    Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
 
 <div class="termy">
 
@@ -47,7 +47,7 @@ $ dstack run . -f vllm/serve.dstack.yml --gpu 24GB
 </div>
 
 !!! info "Wildcard domain"
-    If you've configured a [wildcard domain](../docs/guides/clouds.md#configuring-gateways) for the gateway, 
+    If you've configured a [wildcard domain](../docs/guides/services.md#set-up-a-gateway) for the gateway, 
     `dstack` enables HTTPS automatically and serves the service at 
     `https://<run name>.<your domain name>`.
 

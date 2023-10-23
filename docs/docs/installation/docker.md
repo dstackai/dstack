@@ -14,7 +14,7 @@ $ docker run --name dstack -p &lt;port-on-host&gt;:3000 \
 
 !!! info "Configure clouds"
     Upon startup, the server sets up the default project called `main`.
-    Prior to using `dstack`, make sure to [configure clouds](../guides/clouds.md#configure-backends).
+    Prior to using `dstack`, make sure to [configure clouds](../configuration/server.md).
 
 ## Environment variables
 
