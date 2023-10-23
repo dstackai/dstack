@@ -9,14 +9,12 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
-func makeEnv(homeDir string, mapping map[string]string, secrets map[string]string) []string {
-	// todo set job vars
+func makeEnv(homeDir string, mappings ...map[string]string) []string {
 	list := os.Environ()
-	for key, value := range mapping {
-		list = append(list, fmt.Sprintf("%s=%s", key, value))
-	}
-	for key, value := range secrets {
-		list = append(list, fmt.Sprintf("%s=%s", key, value))
+	for _, mapping := range mappings {
+		for key, value := range mapping {
+			list = append(list, fmt.Sprintf("%s=%s", key, value))
+		}
 	}
 	list = append(list, fmt.Sprintf("HOME=%s", homeDir))
 	return list

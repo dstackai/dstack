@@ -185,13 +185,17 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 }
 
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
+	jobEnvs := map[string]string{
+		"RUN_NAME": ex.run.RunName,
+		"REPO_ID":  ex.run.RepoId,
+	}
 	workingDir, err := joinRelPath(ex.workingDir, ex.jobSpec.WorkingDir)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
-	cmd.Env = makeEnv(ex.homeDir, ex.jobSpec.Env, ex.secrets)
+	cmd.Env = makeEnv(ex.homeDir, jobEnvs, ex.jobSpec.Env, ex.secrets)
 	cmd.Dir = workingDir
 	cmd.Cancel = func() error {
 		// returns error on Windows
