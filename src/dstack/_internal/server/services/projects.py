@@ -1,9 +1,8 @@
 import uuid
-from typing import List, Optional, Tuple
+from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import ForbiddenError
 from dstack._internal.core.models.backends import BackendInfo
@@ -65,6 +64,8 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
         project_role=ProjectRole.ADMIN,
     )
     project = await get_project_model_by_name(session=session, project_name=project_name)
+    for func in _CREATE_PROJECT_HOOKS:
+        await func(session, project)
     return project_model_to_project(project)
 
 
@@ -203,6 +204,13 @@ def project_model_to_project(project_model: ProjectModel) -> Project:
         backends=backends,
         members=members,
     )
+
+
+_CREATE_PROJECT_HOOKS = []
+
+
+def register_create_project_hook(func: Callable[[AsyncSession, ProjectModel], Awaitable[None]]):
+    _CREATE_PROJECT_HOOKS.append(func)
 
 
 def _is_project_admin(

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 import dstack.version
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.services.configs import create_default_project_config
+from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_session, get_session_ctx, migrate
 from dstack._internal.server.routers import (
@@ -77,15 +78,16 @@ async def lifespan(app: FastAPI):
         default_project, porject_created = await get_or_create_default_project(
             session=session, user=admin
         )
-        server_config_manager = ServerConfigManager()
-        print("Reading project configurations from ~/.dstack/server/config.yml...")
-        config_loaded = server_config_manager.load_config()
-        if not config_loaded:
-            print("No config was found. Initializing default configuration...")
-            await server_config_manager.init_config(session=session)
-        else:
-            print("Applying configuration...")
-            await server_config_manager.apply_config(session=session)
+        if settings.SERVER_CONFIG_ENABLED:
+            server_config_manager = ServerConfigManager()
+            print("Reading project configurations from ~/.dstack/server/config.yml...")
+            config_loaded = server_config_manager.load_config()
+            if not config_loaded:
+                print("No config was found. Initializing default configuration...")
+                await server_config_manager.init_config(session=session)
+            else:
+                print("Applying configuration...")
+                await server_config_manager.apply_config(session=session)
     create_default_project_config(
         project_name=DEFAULT_PROJECT_NAME, url=SERVER_URL, token=admin.token
     )
@@ -93,14 +95,14 @@ async def lifespan(app: FastAPI):
     dstack_version = dstack.version.__version__ if dstack.version.__version__ else "(no version)"
     print(f"\nThe dstack server {dstack_version} is running at {SERVER_URL}.")
     print(f"The admin user token is '{admin.token}'.")
-    for func in _ON_STARTUP_FUNCS:
+    for func in _ON_STARTUP_HOOKS:
         await func(app)
     yield
     scheduler.shutdown()
 
 
-_ON_STARTUP_FUNCS = []
+_ON_STARTUP_HOOKS = []
 
 
-def register_on_startup_func(func: Callable[[FastAPI], None]):
-    _ON_STARTUP_FUNCS.append(func)
+def register_on_startup_hook(func: Callable[[FastAPI], None]):
+    _ON_STARTUP_HOOKS.append(func)

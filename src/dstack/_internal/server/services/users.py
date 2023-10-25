@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional, Tuple
+from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,6 +45,8 @@ async def create_user(session: AsyncSession, username: str, global_role: GlobalR
     user = UserModel(name=username, global_role=global_role, token=str(uuid.uuid4()))
     session.add(user)
     await session.commit()
+    for func in _CREATE_USER_HOOKS:
+        await func(session, user)
     return user
 
 
@@ -89,3 +91,10 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
         global_role=user_model.global_role,
         creds=UserTokenCreds(token=user_model.token),
     )
+
+
+_CREATE_USER_HOOKS = []
+
+
+def register_create_user_hook(func: Callable[[AsyncSession, UserModel], Awaitable[None]]):
+    _CREATE_USER_HOOKS.append(func)
