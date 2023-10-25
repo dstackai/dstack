@@ -11,7 +11,7 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import MemberModel, ProjectModel
 from dstack._internal.server.services.projects import add_project_member
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_backend,
     create_project,
     create_user,

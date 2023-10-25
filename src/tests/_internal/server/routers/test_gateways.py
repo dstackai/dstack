@@ -14,7 +14,7 @@ from dstack._internal.server.services.gateways import (
     get_project_default_gateway,
 )
 from dstack._internal.server.services.projects import add_project_member
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_backend,
     create_gateway,
     create_project,

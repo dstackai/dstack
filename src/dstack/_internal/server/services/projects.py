@@ -66,6 +66,7 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
     project = await get_project_model_by_name(session=session, project_name=project_name)
     for func in _CREATE_PROJECT_HOOKS:
         await func(session, project)
+    await session.refresh(project)  # a hook may change project
     return project_model_to_project(project)
 
 
