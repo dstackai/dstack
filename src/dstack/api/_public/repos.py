@@ -108,7 +108,9 @@ class RepoCollection:
             logger.debug("Loading repo config")
             repo_config = config.get_repo_config(repo_dir)
             if repo_config is None:
-                raise ConfigurationError(f"The repo is not initialized")
+                raise ConfigurationError(
+                    f"The repo is not initialized. Run `dstack init` to initialize the repo."
+                )
             repo = load_repo(repo_config)
         else:
             logger.debug("Initializing repo")

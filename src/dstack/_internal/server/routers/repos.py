@@ -81,7 +81,10 @@ async def upload_code(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
     if request_size_exceeded(request, limit=2 * 2**20):
-        raise ServerClientError("Repo diff size exceeds the limit of 2MB")
+        raise ServerClientError(
+            "Repo diff size exceeds the limit of 2MB. "
+            "Use .gitignore to exclude large files from the repo."
+        )
     _, project = user_project
     await repos.upload_code(
         session=session,

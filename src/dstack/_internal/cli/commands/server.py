@@ -31,8 +31,8 @@ class ServerCommand(BaseCommand):
             "-l",
             "--log-level",
             type=str,
-            help="Logging level for hub. Defaults to ERROR.",
-            default=os.getenv("DSTACK_SERVER_LOG_LEVEL", "ERROR"),
+            help="Server logging level. Defaults to WARNING.",
+            default=os.getenv("DSTACK_SERVER_LOG_LEVEL", "WARNING"),
         )
         self._parser.add_argument("--token", type=str, help="The admin user token")
 
