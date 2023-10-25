@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class BackendType(str, enum.Enum):
     AWS = "aws"
     AZURE = "azure"
+    DSTACK = "dstack"
     GCP = "gcp"
     LAMBDA = "lambda"
     LOCAL = "local"

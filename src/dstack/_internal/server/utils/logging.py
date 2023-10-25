@@ -3,6 +3,8 @@ import logging
 import os
 import sys
 
+from dstack._internal.server import settings
+
 
 class AsyncioCancelledErrorFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
@@ -23,6 +25,6 @@ def configure_logging():
     )
     handler.setFormatter(formatter)
     root_logger.addHandler(handler)
-    root_logger.setLevel(os.getenv("DSTACK_SERVER_ROOT_LOG_LEVEL", "ERROR").upper())
+    root_logger.setLevel(settings.ROOT_LOG_LEVEL)
     dstack_logger = logging.getLogger("dstack")
-    dstack_logger.setLevel(os.getenv("DSTACK_SERVER_LOG_LEVEL", "ERROR").upper())
+    dstack_logger.setLevel(settings.LOG_LEVEL)

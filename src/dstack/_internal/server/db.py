@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
+from dstack._internal.server import settings
 from dstack._internal.server.settings import DATABASE_URL
 
 
@@ -63,6 +64,6 @@ def session_decorator(func):
 
 def _run_alembic_upgrade(connection):
     alembic_cfg = config.Config()
-    alembic_cfg.set_main_option("script_location", "dstack._internal.server:migrations")
+    alembic_cfg.set_main_option("script_location", settings.ALEMBIC_MIGRATIONS_LOCATION)
     alembic_cfg.attributes["connection"] = connection
     command.upgrade(alembic_cfg, "head")

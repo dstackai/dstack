@@ -75,11 +75,16 @@ class LambdaConfig(ForbidExtra):
     creds: AnyLambdaCreds
 
 
+class DstackConfig(ForbidExtra):
+    type: Literal["dstack"] = "dstack"
+
+
 AnyBackendConfig = Union[
     AWSConfig,
     AzureConfig,
     GCPConfig,
     LambdaConfig,
+    DstackConfig,
 ]
 
 
