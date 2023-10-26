@@ -57,12 +57,16 @@ async def create_user(
 
 async def create_project(
     session: AsyncSession,
+    owner: Optional[UserModel] = None,
     name: str = "test_project",
     ssh_private_key: str = "",
     ssh_public_key: str = "",
 ) -> ProjectModel:
+    if owner is None:
+        owner = await create_user(session=session, name="test_owner")
     project = ProjectModel(
         name=name,
+        owner_id=owner.id,
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
     )

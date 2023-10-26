@@ -14,7 +14,7 @@ from dstack._internal.server.testing.common import create_project
 class TestWriteLogs:
     @pytest.mark.asyncio
     async def test_writes_logs(self, test_db, session: AsyncSession, tmp_path: Path):
-        project = await create_project(session)
+        project = await create_project(session=session)
         with patch.object(settings, "SERVER_DIR_PATH", tmp_path):
             write_logs(
                 project=project,

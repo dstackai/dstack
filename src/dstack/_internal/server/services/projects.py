@@ -4,7 +4,7 @@ from typing import Awaitable, Callable, List, Optional, Tuple
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ForbiddenError
+from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.models.backends import BackendInfo
 from dstack._internal.core.models.projects import Member, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -56,7 +56,12 @@ async def get_project_by_name(
 
 
 async def create_project(session: AsyncSession, user: UserModel, project_name: str) -> Project:
-    project = await create_project_model(session=session, project_name=project_name)
+    await _check_projects_quota(session=session, user=user)
+    project = await create_project_model(
+        session=session,
+        user=user,
+        project_name=project_name,
+    )
     await add_project_member(
         session=session,
         project=project,
@@ -64,8 +69,8 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
         project_role=ProjectRole.ADMIN,
     )
     project = await get_project_model_by_name(session=session, project_name=project_name)
-    for func in _CREATE_PROJECT_HOOKS:
-        await func(session, project)
+    for hook in _CREATE_PROJECT_HOOKS:
+        await hook(session, project)
     await session.refresh(project)  # a hook may change project
     return project_model_to_project(project)
 
@@ -166,12 +171,15 @@ async def get_project_model_by_name(
     return res.scalar()
 
 
-async def create_project_model(session: AsyncSession, project_name: str) -> ProjectModel:
+async def create_project_model(
+    session: AsyncSession, user: UserModel, project_name: str
+) -> ProjectModel:
     private_bytes, public_bytes = await run_async(
         generate_rsa_key_pair_bytes, f"{project_name}@dstack"
     )
     project = ProjectModel(
         id=uuid.uuid4(),
+        owner_id=user.id,
         name=project_name,
         ssh_private_key=private_bytes.decode(),
         ssh_public_key=public_bytes.decode(),
@@ -202,6 +210,7 @@ def project_model_to_project(project_model: ProjectModel) -> Project:
     return Project(
         project_id=project_model.id,
         project_name=project_model.name,
+        owner=users.user_model_to_user(project_model.owner),
         backends=backends,
         members=members,
     )
@@ -212,6 +221,13 @@ _CREATE_PROJECT_HOOKS = []
 
 def register_create_project_hook(func: Callable[[AsyncSession, ProjectModel], Awaitable[None]]):
     _CREATE_PROJECT_HOOKS.append(func)
+
+
+async def _check_projects_quota(session: AsyncSession, user: UserModel):
+    res = await session.execute(select(ProjectModel).where(ProjectModel.owner_id == user.id))
+    owned_projects = res.scalars().all()
+    if len(owned_projects) >= user.projects_quota:
+        raise ServerClientError("User project quota exceeded")
 
 
 def _is_project_admin(

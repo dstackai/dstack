@@ -18,8 +18,8 @@ from dstack._internal.server.testing.common import (
 class TestProcessPendingJobs:
     @pytest.mark.asyncio
     async def test_transitions_pending_jobs_to_submitted(self, test_db, session: AsyncSession):
-        project = await create_project(session=session)
         user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
         repo = await create_repo(
             session=session,
             project_id=project.id,
