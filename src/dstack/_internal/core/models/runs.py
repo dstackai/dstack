@@ -130,6 +130,7 @@ class JobSubmission(BaseModel):
     id: UUID4
     submission_num: int
     submitted_at: datetime
+    finished_at: Optional[datetime]
     status: JobStatus
     error_code: Optional[JobErrorCode]
     job_provisioning_data: Optional[JobProvisioningData]

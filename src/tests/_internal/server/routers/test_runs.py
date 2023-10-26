@@ -130,7 +130,8 @@ def get_dev_env_run_dict(
     username: str = "test_user",
     run_name: str = "run_name",
     repo_id: str = "test_repo",
-    submitted_at: str = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    submitted_at: str = "2023-01-02T03:04:00+00:00",
+    finished_at: str = "2023-01-02T03:04:00+00:00",
 ) -> Dict:
     return {
         "id": run_id,
@@ -216,6 +217,7 @@ def get_dev_env_run_dict(
                         "id": job_id,
                         "submission_num": 0,
                         "submitted_at": submitted_at,
+                        "finished_at": finished_at,
                         "status": "submitted",
                         "error_code": None,
                         "job_provisioning_data": None,
@@ -281,6 +283,7 @@ class TestListRuns:
                                 "id": str(job.id),
                                 "submission_num": 0,
                                 "submitted_at": "2023-01-02T03:04:00+00:00",
+                                "finished_at": None,
                                 "status": "submitted",
                                 "error_code": None,
                                 "job_provisioning_data": None,
@@ -373,6 +376,7 @@ class TestSubmitRun:
             project_name=project.name,
             username=user.name,
             submitted_at=submitted_at_formatted,
+            finished_at=None,
             run_name="test-run",
             repo_id=repo.name,
         )
