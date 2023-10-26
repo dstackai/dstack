@@ -49,21 +49,22 @@ class GCPCompute(Compute):
                 quotas[region.name][quota.metric] = quota.limit - quota.usage
         offers_with_availability: Dict[Tuple[str, str], InstanceOfferWithAvailability] = {}
         for offer in offers:
+            region = offer.region[:-2]  # strip zone
             key = (
                 _unique_instance_name(offer.instance),
-                offer.region[:-2],  # strip zone
+                region,
             )
             if key in offers_with_availability:
                 continue
             availability = InstanceAvailability.UNKNOWN
-            if not _has_gpu_quota(quotas[offer.region], offer.instance.resources):
+            if not _has_gpu_quota(quotas[region], offer.instance.resources):
                 availability = InstanceAvailability.NO_QUOTA
             # todo quotas: cpu, memory, global gpu
 
             offers_with_availability[key] = InstanceOfferWithAvailability(
                 **offer.dict(), availability=availability
             )
-            offers_with_availability[key].region = offer.region[:-2]  # strip zone
+            offers_with_availability[key].region = region
         return list(offers_with_availability.values())
 
     def terminate_instance(self, instance_id: str, region: str):
