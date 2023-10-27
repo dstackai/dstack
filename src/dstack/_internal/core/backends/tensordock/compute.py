@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+import requests
+
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import get_shim_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -81,4 +83,7 @@ class TensorDockCompute(Compute):
         )
 
     def terminate_instance(self, instance_id: str, region: str):
-        self.api_client.delete_single(instance_id)
+        try:
+            self.api_client.delete_single(instance_id)
+        except requests.HTTPError:
+            pass

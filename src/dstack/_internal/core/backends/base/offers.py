@@ -12,21 +12,22 @@ def get_catalog_offers(
     requirements: Optional[Requirements] = None,
     extra_filter: Optional[Callable[[InstanceOffer], bool]] = None,
 ) -> List[InstanceOffer]:
-    filters = dict(
-        provider=[provider],
-        min_cpu=requirements.cpus,
-        max_price=requirements.max_price,
-        spot=requirements.spot,
-    )
-    if requirements.memory_mib is not None:
-        filters["min_memory"] = requirements.memory_mib / 1024
-    if requirements.gpus is not None:
-        if requirements.gpus.name is not None:
-            filters["gpu_name"] = [requirements.gpus.name]
-        if requirements.gpus.memory_mib is not None:
-            filters["min_gpu_memory"] = requirements.gpus.memory_mib / 1024
-        if requirements.gpus.count is not None:
-            filters["min_gpu_count"] = requirements.gpus.count
+    filters = dict(provider=[provider])
+    if requirements is not None:
+        filters.update(
+            min_cpu=requirements.cpus,
+            max_price=requirements.max_price,
+            spot=requirements.spot,
+        )
+        if requirements.memory_mib is not None:
+            filters["min_memory"] = requirements.memory_mib / 1024
+        if requirements.gpus is not None:
+            if requirements.gpus.name is not None:
+                filters["gpu_name"] = [requirements.gpus.name]
+            if requirements.gpus.memory_mib is not None:
+                filters["min_gpu_memory"] = requirements.gpus.memory_mib / 1024
+            if requirements.gpus.count is not None:
+                filters["min_gpu_count"] = requirements.gpus.count
 
     offers = []
     for item in gpuhunt.query(**filters):
