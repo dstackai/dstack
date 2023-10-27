@@ -10,6 +10,7 @@ from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
 from dstack._internal.core.models.backends.aws import AnyAWSCreds
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
+from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.common import ForbidExtra
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel
@@ -75,11 +76,18 @@ class LambdaConfig(ForbidExtra):
     creds: AnyLambdaCreds
 
 
+class TensorDockConfig(ForbidExtra):
+    type: Literal["tensordock"] = "tensordock"
+    regions: Optional[List[str]] = None
+    creds: AnyTensorDockCreds
+
+
 AnyBackendConfig = Union[
     AWSConfig,
     AzureConfig,
     GCPConfig,
     LambdaConfig,
+    TensorDockConfig,
 ]
 
 

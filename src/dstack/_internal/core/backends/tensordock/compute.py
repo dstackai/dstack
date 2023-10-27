@@ -1,7 +1,11 @@
 from typing import List, Optional
 
 from dstack._internal.core.backends.base import Compute
+from dstack._internal.core.backends.base.compute import get_shim_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
+from dstack._internal.core.backends.tensordock.api_client import TensorDockAPIClient
+from dstack._internal.core.backends.tensordock.config import TensorDockConfig
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -11,11 +15,15 @@ from dstack._internal.core.models.runs import Job, Requirements, Run
 
 
 class TensorDockCompute(Compute):
+    def __init__(self, config: TensorDockConfig):
+        self.config = config
+        self.api_client = TensorDockAPIClient(config.creds.api_key, config.creds.api_token)
+
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
-            provider="tensordock",
+            provider=BackendType.TENSORDOCK.value,
             requirements=requirements,
         )
         offers = [
@@ -34,7 +42,43 @@ class TensorDockCompute(Compute):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
-        raise NotImplementedError()
+        commands = get_shim_commands(
+            backend=BackendType.LOCAL,  # TODO(egor-s): change to TENSORDOCK
+            image_name=job.job_spec.image_name,
+            authorized_keys=[
+                run.run_spec.ssh_key_pub.strip(),
+                project_ssh_public_key.strip(),
+            ],
+            registry_auth_required=job.job_spec.registry_auth is not None,
+        )
+        resp = self.api_client.deploy_single(
+            instance_name=job.job_spec.job_name,
+            instance=instance_offer.instance,
+            cloudinit={
+                "ssh_pwauth": False,  # disable password auth
+                "users": [
+                    "default",
+                    {
+                        "name": "user",
+                        "ssh_authorized_keys": [
+                            run.run_spec.ssh_key_pub.strip(),
+                            project_ssh_public_key.strip(),
+                        ],
+                    },
+                ],
+                "runcmd": [
+                    ["sh", "-c", " && ".join(commands)],
+                ],
+            },
+        )
+        return LaunchedInstanceInfo(
+            instance_id=resp["server"],
+            ip_address=resp["ip"],
+            region=instance_offer.region,
+            username="user",
+            ssh_port={v: k for k, v in resp["port_forwards"].items()}["22"],
+            dockerized=True,
+        )
 
     def terminate_instance(self, instance_id: str, region: str):
-        raise NotImplementedError()
+        self.api_client.delete_single(instance_id)
