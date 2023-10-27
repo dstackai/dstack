@@ -45,7 +45,7 @@ class TensorDockCompute(Compute):
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
         commands = get_shim_commands(
-            backend=BackendType.LOCAL,  # TODO(egor-s): change to TENSORDOCK
+            backend=BackendType.TENSORDOCK,
             image_name=job.job_spec.image_name,
             authorized_keys=[
                 run.run_spec.ssh_key_pub.strip(),
