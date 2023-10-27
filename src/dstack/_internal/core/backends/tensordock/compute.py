@@ -7,6 +7,7 @@ from dstack._internal.core.backends.base.compute import get_shim_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.tensordock.api_client import TensorDockAPIClient
 from dstack._internal.core.backends.tensordock.config import TensorDockConfig
+from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -53,26 +54,29 @@ class TensorDockCompute(Compute):
             ],
             registry_auth_required=job.job_spec.registry_auth is not None,
         )
-        resp = self.api_client.deploy_single(
-            instance_name=job.job_spec.job_name,
-            instance=instance_offer.instance,
-            cloudinit={
-                "ssh_pwauth": False,  # disable password auth
-                "users": [
-                    "default",
-                    {
-                        "name": "user",
-                        "ssh_authorized_keys": [
-                            run.run_spec.ssh_key_pub.strip(),
-                            project_ssh_public_key.strip(),
-                        ],
-                    },
-                ],
-                "runcmd": [
-                    ["sh", "-c", " && ".join(commands)],
-                ],
-            },
-        )
+        try:
+            resp = self.api_client.deploy_single(
+                instance_name=job.job_spec.job_name,
+                instance=instance_offer.instance,
+                cloudinit={
+                    "ssh_pwauth": False,  # disable password auth
+                    "users": [
+                        "default",
+                        {
+                            "name": "user",
+                            "ssh_authorized_keys": [
+                                run.run_spec.ssh_key_pub.strip(),
+                                project_ssh_public_key.strip(),
+                            ],
+                        },
+                    ],
+                    "runcmd": [
+                        ["sh", "-c", " && ".join(commands)],
+                    ],
+                },
+            )
+        except requests.HTTPError:
+            raise NoCapacityError()
         return LaunchedInstanceInfo(
             instance_id=resp["server"],
             ip_address=resp["ip"],
