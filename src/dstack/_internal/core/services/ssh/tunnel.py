@@ -134,12 +134,20 @@ class ClientTunnel(SSHTunnel):
     CLITunnel connects to the host from ssh config
     """
 
-    def __init__(self, host: str, ports: Dict[int, int], id_rsa_path: PathLike):
-        self.temp_dir = tempfile.TemporaryDirectory()
+    def __init__(
+        self,
+        host: str,
+        ports: Dict[int, int],
+        id_rsa_path: PathLike,
+        control_sock_path: Optional[str] = None,
+    ):
+        self.temp_dir = tempfile.TemporaryDirectory() if not control_sock_path else None
         super().__init__(
             host=host,
             id_rsa_path=id_rsa_path,
             ports=ports,
-            control_sock_path=os.path.join(self.temp_dir.name, "control.sock"),
+            control_sock_path=os.path.join(self.temp_dir.name, "control.sock")
+            if not control_sock_path
+            else control_sock_path,
             options={},
         )

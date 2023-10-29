@@ -83,6 +83,54 @@ class Run(ABC):
     def hostname(self) -> str:
         return self._run.jobs[0].job_submissions[-1].job_provisioning_data.hostname
 
+    def _attached_logs(
+        self,
+    ) -> Iterable[bytes]:
+        q = queue.Queue()
+        _done = object()
+
+        def ws_thread():
+            try:
+                logger.debug("Starting WebSocket logs for %s", self.name)
+                ws.run_forever()
+            finally:
+                logger.debug("WebSocket logs are done for %s", self.name)
+                q.put(_done)
+
+        ws = WebSocketApp(
+            f"ws://localhost:{self.ports[10999]}/logs_ws",
+            on_open=lambda _: logger.debug("WebSocket logs are connected to %s", self.name),
+            on_close=lambda _, __, ___: logger.debug("WebSocket logs are disconnected"),
+            on_message=lambda _, message: q.put(message),
+        )
+        threading.Thread(target=ws_thread).start()
+
+        job_spec = self._run.jobs[0].job_spec
+        ports = self.ports
+        hostname = "127.0.0.1"
+        secure = False
+        if job_spec.gateway is not None:
+            ports = {**ports, job_spec.gateway.service_port: job_spec.gateway.public_port}
+            hostname = job_spec.gateway.hostname
+            secure = job_spec.gateway.secure
+        replace_urls = URLReplacer(
+            ports=ports,
+            app_specs=job_spec.app_specs,
+            hostname=hostname,
+            secure=secure,
+            ip_address=self.hostname,
+        )
+
+        try:
+            while True:
+                item = q.get()
+                if item is _done:
+                    break
+                yield replace_urls(item)
+        finally:
+            logger.debug("Closing WebSocket logs for %s", self.name)
+            ws.close()
+
     def logs(
         self,
         start_time: Optional[datetime] = None,
@@ -98,24 +146,27 @@ class Run(ABC):
         Yields:
             log messages
         """
-        next_start_time = start_time
-        while True:
-            resp = self._api_client.logs.poll(
-                project_name=self._project,
-                body=PollLogsRequest(
-                    run_name=self.name,
-                    job_submission_id=self._run.jobs[0].job_submissions[0].id,
-                    start_time=next_start_time,
-                    end_time=None,
-                    descending=False,
-                    diagnose=diagnose,
-                ),
-            )
-            if len(resp.logs) == 0:
-                return
-            for log in resp.logs:
-                yield base64.b64decode(log.message)
-            next_start_time = resp.logs[-1].timestamp
+        if diagnose is False and self._ssh_attach is not None:
+            yield from self._attached_logs()
+        else:
+            next_start_time = start_time
+            while True:
+                resp = self._api_client.logs.poll(
+                    project_name=self._project,
+                    body=PollLogsRequest(
+                        run_name=self.name,
+                        job_submission_id=self._run.jobs[0].job_submissions[0].id,
+                        start_time=next_start_time,
+                        end_time=None,
+                        descending=False,
+                        diagnose=diagnose,
+                    ),
+                )
+                if len(resp.logs) == 0:
+                    return
+                for log in resp.logs:
+                    yield base64.b64decode(log.message)
+                next_start_time = resp.logs[-1].timestamp
 
     def refresh(self):
         """
@@ -141,6 +192,12 @@ class Run(ABC):
     ) -> bool:
         """
         Establish an SSH tunnel to the instance and update SSH config
+
+        Args:
+            ssh_identity_file: SSH keypair to access instances
+
+        Raises:
+            dstack.api.PortUsedError: If ports are in use or the run is attached by another process.
         """
         ssh_identity_file = ssh_identity_file or self._ssh_identity_file
         if ssh_identity_file is None:
@@ -160,16 +217,32 @@ class Run(ABC):
             if self.status.is_finished() and self.status != RunStatus.DONE:
                 return False
 
-            if self._ports_lock is None:
-                self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
             provisioning_data = self._run.jobs[0].job_submissions[-1].job_provisioning_data
 
-            logger.debug(
-                "Attaching to %s (%s: %s)",
-                self.name,
-                provisioning_data.hostname,
-                self._ports_lock.dict(),
+            control_sock_path_and_port_locks = SSHAttach.reuse_control_sock_path_and_port_locks(
+                run_name=self.name
             )
+
+            if control_sock_path_and_port_locks is None:
+                if self._ports_lock is None:
+                    self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
+
+                logger.debug(
+                    "Attaching to %s (%s: %s)",
+                    self.name,
+                    provisioning_data.hostname,
+                    self._ports_lock.dict(),
+                )
+            else:
+                self._ports_lock = control_sock_path_and_port_locks[1]
+
+                logger.debug(
+                    "Reusing the existing tunnel to %s (%s: %s)",
+                    self.name,
+                    provisioning_data.hostname,
+                    self._ports_lock.dict(),
+                )
+
             self._ssh_attach = SSHAttach(
                 hostname=self.hostname,
                 ssh_port=provisioning_data.ssh_port,
@@ -178,8 +251,12 @@ class Run(ABC):
                 ports_lock=self._ports_lock,
                 run_name=self.name,
                 dockerized=provisioning_data.dockerized,
+                control_sock_path=control_sock_path_and_port_locks[0]
+                if control_sock_path_and_port_locks
+                else None,
             )
-            self._ssh_attach.attach()
+            if not control_sock_path_and_port_locks:
+                self._ssh_attach.attach()
             self._ports_lock = None
         return True
 
@@ -211,63 +288,6 @@ class SubmittedRun(Run):
         super().__init__(api_client, project, ssh_identity_file, run)
         self._ports_lock = ports_lock
         self._ports: Optional[Dict[int, int]] = None
-
-    def logs(
-        self,
-        start_time: Optional[datetime] = None,
-        diagnose: bool = False,
-        attach: bool = True,
-        ssh_identity_file: Optional[PathLike] = None,
-    ) -> Iterable[bytes]:
-        if diagnose is False and self._ssh_attach is None and attach:
-            self.attach(ssh_identity_file)
-        if diagnose is False and self._ssh_attach is not None:
-            q = queue.Queue()
-            _done = object()
-
-            def ws_thread():
-                try:
-                    logger.debug("Starting WebSocket logs for %s", self.name)
-                    ws.run_forever()
-                finally:
-                    logger.debug("WebSocket logs are done for %s", self.name)
-                    q.put(_done)
-
-            ws = WebSocketApp(
-                f"ws://localhost:{self.ports[10999]}/logs_ws",
-                on_open=lambda _: logger.debug("WebSocket logs are connected to %s", self.name),
-                on_close=lambda _, __, ___: logger.debug("WebSocket logs are disconnected"),
-                on_message=lambda _, message: q.put(message),
-            )
-            threading.Thread(target=ws_thread).start()
-
-            job_spec = self._run.jobs[0].job_spec
-            ports = self.ports
-            hostname = "127.0.0.1"
-            secure = False
-            if job_spec.gateway is not None:
-                ports = {**ports, job_spec.gateway.service_port: job_spec.gateway.public_port}
-                hostname = job_spec.gateway.hostname
-                secure = job_spec.gateway.secure
-            replace_urls = URLReplacer(
-                ports=ports,
-                app_specs=job_spec.app_specs,
-                hostname=hostname,
-                secure=secure,
-                ip_address=self.hostname,
-            )
-
-            try:
-                while True:
-                    item = q.get()
-                    if item is _done:
-                        break
-                    yield replace_urls(item)
-            finally:
-                logger.debug("Closing WebSocket logs for %s", self.name)
-                ws.close()
-        else:
-            yield from super().logs(start_time=start_time, diagnose=diagnose)
 
 
 class RunCollection:
