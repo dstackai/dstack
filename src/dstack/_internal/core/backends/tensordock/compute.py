@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional
 
 import requests
@@ -72,6 +73,22 @@ class TensorDockCompute(Compute):
                     ],
                     "runcmd": [
                         ["sh", "-c", " && ".join(commands)],
+                    ],
+                    "write_files": [
+                        {
+                            "path": "/etc/docker/daemon.json",
+                            "content": json.dumps(
+                                {
+                                    "runtimes": {
+                                        "nvidia": {
+                                            "path": "nvidia-container-runtime",
+                                            "runtimeArgs": [],
+                                        }
+                                    },
+                                    "exec-opts": ["native.cgroupdriver=cgroupfs"],
+                                }
+                            ),
+                        }
                     ],
                 },
             )
