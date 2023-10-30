@@ -4,6 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.utils.common import pretty_resources
 
 
 class InstanceState(str, Enum):
@@ -25,6 +26,17 @@ class Resources(BaseModel):
     memory_mib: int
     gpus: List[Gpu]
     spot: bool
+
+    def pretty_format(self) -> str:
+        if not self.gpus:
+            return pretty_resources(cpus=self.cpus, memory=self.memory_mib)
+        return pretty_resources(
+            cpus=self.cpus,
+            memory=self.memory_mib,
+            gpu_count=len(self.gpus),
+            gpu_name=self.gpus[0].name,
+            gpu_memory=self.gpus[0].memory_mib,
+        )
 
 
 class InstanceType(BaseModel):

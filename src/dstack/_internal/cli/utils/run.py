@@ -1,11 +1,11 @@
-from typing import List
+from typing import List, Optional
 
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import console
-from dstack._internal.core.models.instances import InstanceAvailability
+from dstack._internal.core.models.instances import InstanceAvailability, InstanceType, Resources
 from dstack._internal.core.models.runs import RunPlan
-from dstack._internal.utils.common import pretty_date, pretty_resources
+from dstack._internal.utils.common import pretty_date
 from dstack.api import Run
 
 
@@ -62,14 +62,6 @@ def print_run_plan(run_plan: RunPlan, candidates_limit: int = 3):
 
     for i, c in enumerate(job_plan.candidates, start=1):
         r = c.instance.resources
-        resources = dict(cpus=r.cpus, memory=r.memory_mib)
-        if r.gpus:
-            resources.update(
-                gpu_count=len(r.gpus),
-                gpu_name=r.gpus[0].name,
-                gpu_memory=r.gpus[0].memory_mib,
-            )
-        resources = pretty_resources(**resources)
 
         availability = ""
         if c.availability in {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}:
@@ -79,7 +71,7 @@ def print_run_plan(run_plan: RunPlan, candidates_limit: int = 3):
             c.backend,
             c.region,
             c.instance.name,
-            resources,
+            r.pretty_format(),
             "yes" if r.spot else "no",
             f"${c.price:g}",
             availability,
@@ -104,7 +96,9 @@ def generate_runs_table(
         table.add_column("CONFIGURATION", style="grey58")
     table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
     table.add_column("BACKEND", style="grey58", no_wrap=True, max_width=16)
-    table.add_column("INSTANCE", no_wrap=True)
+    if verbose:
+        table.add_column("INSTANCE", no_wrap=True)
+    table.add_column("RESOURCES")
     table.add_column("SPOT", no_wrap=True)
     table.add_column("PRICE", no_wrap=True)
     table.add_column("STATUS", no_wrap=True)
@@ -123,7 +117,9 @@ def generate_runs_table(
         renderables += [
             run.user,
             provisioning.backend.value if provisioning else "",
-            provisioning.instance_type.name if provisioning else "",
+            *_render_instance_and_resources(
+                provisioning.instance_type if provisioning else None, verbose
+            ),
             ("yes" if provisioning.instance_type.resources.spot else "no") if provisioning else "",
             f"{provisioning.price:.4}$" if provisioning else "",
             run.status,
@@ -133,3 +129,11 @@ def generate_runs_table(
             renderables.append("TODO")  # TODO
         table.add_row(*renderables)
     return table
+
+
+def _render_instance_and_resources(instance: Optional[InstanceType], verbose: bool) -> List[str]:
+    if not instance:
+        return [""] if not verbose else ["", ""]
+    rows = [] if not verbose else [instance.name]
+    rows.append(instance.resources.pretty_format())
+    return rows
