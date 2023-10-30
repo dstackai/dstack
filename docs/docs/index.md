@@ -4,7 +4,7 @@
 generative AI models across various cloud providers. (1)
 { .annotate } 
 
-1. You can use various cloud accounts (e.g., AWS, GCP, Azure, Lambda Cloud) by configuring 
+1. You can use various cloud accounts (e.g., AWS, GCP, Azure, Lambda Cloud, etc.) by configuring 
    their credentials. The platform can optimize costs by running workloads across multiple 
    regions and cloud accounts.
 

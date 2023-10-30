@@ -252,9 +252,34 @@ projects:
 
 </div>
 
+### TensorDock
+
+Log into your TensorDock marketplace account, click API in the sidebar, and use the `Create an Authorization`
+section to create a new authorization key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title=".dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: tensordock
+    creds:
+      type: api_key
+      api_key: 248e621d-9317-7494-dc1557fa5825b-98b
+      api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
+```
+
+</div>
+
+!!! info "NOTE:"
+    The `tensordock` backend support is experimental and requires version `"dstack[all]==0.12.2rc1"`.
+
 ## Cloud regions
 
-In addition to credentials, each cloud optionally allows for region configuration.
+In addition to credentials, each cloud (except TensorDock) optionally allows for region configuration.
 
 Example:
 
