@@ -3,7 +3,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 from filelock import FileLock
 from paramiko.config import SSHConfig
@@ -51,6 +51,29 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
         if include not in content:
             with open(ssh_config_path, "w") as f:
                 f.write(include + content)
+
+
+def get_ssh_config(path: PathLike, host: str) -> Optional[Dict[str, str]]:
+    if os.path.exists(path):
+        config = {}
+        current_host = None
+
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+
+                if not line or line.startswith("#"):
+                    continue
+
+                if line.startswith("Host "):
+                    current_host = line.split(" ")[1]
+                    config[current_host] = {}
+                else:
+                    key, value = line.split(maxsplit=1)
+                    config[current_host][key] = value
+        return config.get(host)
+    else:
+        return None
 
 
 def update_ssh_config(path: PathLike, host: str, options: Dict[str, str]):
