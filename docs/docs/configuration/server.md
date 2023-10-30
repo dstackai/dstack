@@ -233,7 +233,7 @@ projects:
 
 ### Lambda
 
-Log into your Lambda Cloud account, click API keys in the sidebar, and then click the `Generate API key`
+Log into your [Lambda Cloud](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
 button to create a new API key.
 
 Then, go ahead and configure the backend:
@@ -254,7 +254,7 @@ projects:
 
 ### TensorDock
 
-Log into your TensorDock marketplace account, click API in the sidebar, and use the `Create an Authorization`
+Log into your [TensorDock](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
 section to create a new authorization key.
 
 Then, go ahead and configure the backend:
