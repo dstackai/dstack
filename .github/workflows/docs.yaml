@@ -17,7 +17,7 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
       - uses: actions/setup-python@v2
         with:
-          python-version: 3.x
+          python-version: 3.11
       - name: Install dstack from sources
         run: pip install -e .
         working-directory: ./dstack
