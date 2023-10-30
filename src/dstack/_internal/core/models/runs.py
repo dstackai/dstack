@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from pydantic import UUID4, BaseModel, Field
 from typing_extensions import Annotated
@@ -11,6 +11,7 @@ from dstack._internal.core.models.instances import InstanceCandidate, InstanceTy
 from dstack._internal.core.models.profiles import Profile, SpotPolicy
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.utils import common as common_utils
+from dstack._internal.utils.common import pretty_resources
 
 
 class AppSpec(BaseModel):
@@ -63,6 +64,8 @@ class GpusRequirements(BaseModel):
     count: Optional[int]
     memory_mib: Optional[int]
     name: Optional[str]
+    total_memory_mib: Optional[int]
+    compute_capability: Optional[Tuple[int, int]]
 
 
 class Requirements(BaseModel):
@@ -73,18 +76,22 @@ class Requirements(BaseModel):
     max_price: Optional[float]
     spot: Optional[bool]
 
-    def pretty_format(self):
-        res = ""
-        res += f"{self.cpus}xCPUs"
-        res += f", {self.memory_mib}MB"
+    def pretty_format(self, resources_only: bool = False):
+        resources = dict(cpus=self.cpus, memory=self.memory_mib)
         if self.gpus:
-            res += f", {self.gpus.count}x{self.gpus.name or 'GPU'}"
-            if self.gpus.memory_mib:
-                res += f" {self.gpus.memory_mib / 1024:g}GB"
-        if self.spot is not None:
-            res += f", {'spot' if self.spot else 'on-demand'}"
-        if self.max_price is not None:
-            res += f" under ${self.max_price:g} per hour"
+            resources.update(
+                gpu_name=self.gpus.name,
+                gpu_count=self.gpus.count,
+                gpu_memory=self.gpus.memory_mib,
+                total_gpu_memory=self.gpus.total_memory_mib,
+                compute_capability=self.gpus.compute_capability,
+            )
+        res = pretty_resources(**resources)
+        if not resources_only:
+            if self.spot is not None:
+                res += f", {'spot' if self.spot else 'on-demand'}"
+            if self.max_price is not None:
+                res += f" under ${self.max_price:g} per hour"
         return res
 
 

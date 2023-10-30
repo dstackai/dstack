@@ -2,7 +2,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Union
+from typing import Optional, Tuple, Union
 
 
 def get_dstack_dir() -> Path:
@@ -55,6 +55,52 @@ def pretty_date(time: Union[datetime, int] = False) -> str:
     if years == 1:
         return str(years) + " year ago"
     return str(years) + " years ago"
+
+
+def pretty_resources(
+    cpus: Optional[int] = None,
+    memory: Optional[int] = None,
+    gpu_count: Optional[int] = None,
+    gpu_name: Optional[str] = None,
+    gpu_memory: Optional[int] = None,
+    total_gpu_memory: Optional[float] = None,
+    compute_capability: Optional[Tuple[int, int]] = None,
+) -> str:
+    """
+    >>> pretty_resources(4, 16*1024)
+    '4xCPU, 16GB'
+    >>> pretty_resources(4, 16*1024, 1)
+    '4xCPU, 16GB, 1xGPU'
+    >>> pretty_resources(4, 16*1024, 1, 'A100')
+    '4xCPU, 16GB, 1xA100'
+    >>> pretty_resources(4, 16*1024, 1, 'A100', 40*1024)
+    '4xCPU, 16GB, 1xA100 (40GB)'
+    >>> pretty_resources(4, 16*1024, 1, total_gpu_memory=80*1024)
+    '4xCPU, 16GB, 1xGPU (total 80GB)'
+    >>> pretty_resources(4, 16*1024, 2, 'A100', 40*1024, 80*1024)
+    '4xCPU, 16GB, 2xA100 (40GB, total 80GB)'
+    >>> pretty_resources(gpu_count=1, compute_capability=(8, 0))
+    '1xGPU (8.0)'
+    """
+    parts = []
+    if cpus is not None:
+        parts.append(f"{cpus}xCPU")
+    if memory is not None:
+        parts.append(f"{memory / 1024:g}GB")
+    if gpu_count:
+        gpu_parts = []
+        if gpu_memory:
+            gpu_parts.append(f"{gpu_memory / 1024:g}GB")
+        if total_gpu_memory:
+            gpu_parts.append(f"total {total_gpu_memory / 1024:g}GB")
+        if compute_capability:
+            gpu_parts.append(f"%d.%d" % compute_capability)
+
+        gpu = f"{gpu_count}x{gpu_name or 'GPU'}"
+        if gpu_parts:
+            gpu += f" ({', '.join(gpu_parts)})"
+        parts.append(gpu)
+    return ", ".join(parts)
 
 
 def since(timestamp: str) -> datetime:

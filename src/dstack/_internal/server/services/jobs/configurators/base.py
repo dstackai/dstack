@@ -142,6 +142,8 @@ class JobConfigurator(ABC):
                 count=self.run_spec.profile.resources.gpu.count,
                 memory_mib=self.run_spec.profile.resources.gpu.memory,
                 name=self.run_spec.profile.resources.gpu.name,
+                total_memory_mib=self.run_spec.profile.resources.gpu.total_memory,
+                compute_capability=self.run_spec.profile.resources.gpu.compute_capability,
             )
         return r
 
