@@ -38,10 +38,7 @@ class LogsCommand(APIBaseCommand):
             if run.status.is_finished():
                 raise CLIError(f"Run {args.run_name} is finished")
             else:
-                try:
-                    run.attach(args.ssh_identity_file)
-                except PortUsedError:
-                    pass
+                run.attach(args.ssh_identity_file)
         logs = run.logs(diagnose=args.diagnose)
         try:
             for log in logs:
