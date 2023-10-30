@@ -28,6 +28,10 @@ def get_catalog_offers(
                 filters["min_gpu_memory"] = requirements.gpus.memory_mib / 1024
             if requirements.gpus.count is not None:
                 filters["min_gpu_count"] = requirements.gpus.count
+            if requirements.gpus.total_memory_mib is not None:
+                filters["min_total_gpu_memory"] = requirements.gpus.total_memory_mib / 1024
+            if requirements.gpus.compute_capability is not None:
+                filters["min_compute_capability"] = requirements.gpus.compute_capability
 
     offers = []
     for item in gpuhunt.query(**filters):

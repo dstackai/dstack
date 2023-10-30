@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from pydantic import Field, confloat, root_validator, validator
 from typing_extensions import Annotated, Literal
@@ -8,8 +8,6 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ForbidExtra
 
-DEFAULT_CPU = 2
-DEFAULT_MEM = "8GB"
 DEFAULT_RETRY_LIMIT = 3600
 
 
@@ -39,7 +37,7 @@ def parse_memory(v: Optional[Union[int, str]]) -> Optional[int]:
     return int(v)
 
 
-def parse_duration(v: Optional[Union[int, str]]) -> int:
+def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     if v is None:
         return None
     if isinstance(v, int):
@@ -76,9 +74,17 @@ class ProfileGPU(ForbidExtra):
     ] = 1
     memory: Annotated[
         Optional[Union[int, str]],
-        Field(description='The minimum size of GPU memory (e.g., "16GB")'),
+        Field(description='The minimum size of a single GPU memory (e.g., "16GB")'),
     ]
-    _validate_mem = validator("memory", pre=True, allow_reuse=True)(parse_memory)
+    total_memory: Annotated[
+        Optional[Union[int, str]],
+        Field(description='The minimum total size of all GPUs memory (e.g., "32GB")'),
+    ]
+    compute_capability: Annotated[
+        Optional[Union[float, str, Tuple[int, int]]],
+        Field(description="The minimum compute capability of the GPU (e.g., 7.5)"),
+    ]
+    _validate_mem = validator("memory", "total_memory", pre=True, allow_reuse=True)(parse_memory)
 
     @validator("name")
     def _validate_name(cls, name: Optional[str]) -> Optional[str]:
@@ -86,12 +92,26 @@ class ProfileGPU(ForbidExtra):
             return None
         return name.upper()
 
+    @validator("compute_capability", pre=True)
+    def _validate_cc(
+        cls, v: Optional[Union[float, str, Tuple[int, int]]]
+    ) -> Optional[Tuple[int, int]]:
+        if isinstance(v, float):
+            v = str(v)
+        if isinstance(v, str):
+            m = re.fullmatch(r"(\d+)\.(\d+)", v)
+            if not m:
+                raise ValueError(f"Invalid compute capability: {v}")
+            v = (int(m.group(1)), int(m.group(2)))
+        return v
+
 
 class ProfileResources(ForbidExtra):
-    cpu: Annotated[int, Field(description="The minimum number of CPUs")] = DEFAULT_CPU
+    cpu: Annotated[Optional[int], Field(description="The minimum number of CPUs")]
     memory: Annotated[
-        Union[int, str], Field(description='The minimum size of RAM memory (e.g., "16GB")')
-    ] = parse_memory(DEFAULT_MEM)
+        Optional[Union[int, str]],
+        Field(description='The minimum size of RAM memory (e.g., "16GB")'),
+    ]
     gpu: Annotated[
         Optional[Union[int, ProfileGPU]],
         Field(description="The minimum number of GPUs or a GPU spec"),
