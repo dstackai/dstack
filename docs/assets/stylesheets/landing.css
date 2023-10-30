@@ -172,7 +172,7 @@
 }
 
 .md-header__buttons .md-button {
-    font-size: 16px;
+    font-size: 19px;
 }
 
 .tx-container .md-button {
@@ -218,9 +218,9 @@
 }
 
 @media screen and (max-width: 76.1875em) {
-    .md-header .md-header__buttons {
+    /*.md-header .md-header__buttons {
         display: none;
-    }
+    }*/
 }
 
 .tx-landing__highlights {
@@ -270,7 +270,7 @@
     align-items: center;
     justify-content: center;
     gap: 14px;
-    padding: 12px 5px 10px;
+    padding: 10px 5px 3px;
 }
 
 .tx-landing__integrations .logo-xlarge {

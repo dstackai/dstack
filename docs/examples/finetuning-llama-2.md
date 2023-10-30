@@ -42,6 +42,8 @@ transformers==4.31.0
 trl==0.4.7
 scipy
 tensorboard
+sentencepiece
+hf-transfer
 ```
 
 </div>
@@ -201,37 +203,6 @@ if __name__ == "__main__":
         merge_and_push(args)
 ```
 
-## Define a profile
-
-The `llama-2-7b-chat-hf` model requires at least `14GB` in full precision (not counting the overhead). Considering that we
-plan to use the QLoRA and quantization techniques, an `NVIDIA T4` GPU may be sufficient.
-
-To inform `dstack` about the required resources, you need to 
-[define](../docs/reference/profiles.yml.md) a profile via the `.dstack/profiles.yaml` file within your project:
-
-<div editor-title=".dstack/profiles.yml"> 
-
-```yaml
-profiles:
-  - name: s-train
-    
-    resources:
-      memory: 24GB
-      gpu:
-        name: T4
-        
-    spot_policy: auto # (Optional) Use spot instances if available
-    
-    retry_policy: # (Optional) Wait for the capacity within 30 min
-      limit: 30min
-      
-    max_duration: 1d # (Optional) Do not run the task longer than 1 day
-      
-    default: true
-```
-
-</div>
-
 ## Define the configuration
 
 Here's the configuration that runs the training task via `dstack`:
@@ -245,6 +216,7 @@ type: task
 python: "3.11"
 
 env: 
+  - HF_HUB_ENABLE_HF_TRANSFER=1
   # (Required) Specify your Hugging Face token to publish the fine-tuned model
   - HUGGING_FACE_HUB_TOKEN=
 
@@ -267,7 +239,7 @@ Here's how you run it with `dstack`:
 <div class="termy">
 
 ```shell
-$ dstack run . -f llama-2/train.dstack.yml --num_train_epochs 10 
+$ dstack run . -f llama-2/train.dstack.yml --gpu 16GB --num_train_epochs 10
 
 Installing requirements...
 TensorBoard 2.14.0 at http://127.0.0.1:6006/ (Press CTRL+C to quit)
