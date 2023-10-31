@@ -17,6 +17,7 @@ def get_catalog_offers(
         filters.update(
             min_cpu=requirements.cpus,
             max_price=requirements.max_price,
+            min_disk_size=100,  # TODO(egor-s): take from requirements
             spot=requirements.spot,
         )
         if requirements.memory_mib is not None:
