@@ -3,8 +3,8 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source framework for orchestration GPU workloads and development 
-  of generative AI models across multiple clouds.
+  dstack is an open-source platform that simplifies generative AI training and deployment
+  across various cloud GPU providers.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -67,6 +67,9 @@ plugins:
         background_color: "black"
         color: "#FFFFFF"
         font_family: Roboto
+#      debug: true
+      cards_layout_dir: layouts
+      cards_layout: custom
   - search
   - redirects:
       redirect_maps:

@@ -24,7 +24,7 @@ the credentials but also set up a storage bucket for each cloud to store metadat
 
 Now, you can configure clouds for a project via `~/.dstack/server/config.yml`. Example:
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:

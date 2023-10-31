@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: Effortlessly train and deploy generative AI
+title: Orchestrate generative AI workloads with ease
 hide:
    - navigation
    - toc

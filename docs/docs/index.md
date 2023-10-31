@@ -1,7 +1,7 @@
 # Quickstart
 
-`dstack` is an open-source platform for training, fine-tuning, and deployment of 
-generative AI models across various cloud providers. (1)
+`dstack` is an open-source platform that simplifies generative AI training and deployment
+across various cloud GPU providers. (1)
 { .annotate } 
 
 1. You can use various cloud accounts (e.g., AWS, GCP, Azure, Lambda Cloud, etc.) by configuring 

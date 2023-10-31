@@ -10,7 +10,7 @@ of the respective project.
 
 Example:
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:
@@ -46,7 +46,7 @@ To create an access key, follow [this guide](https://docs.aws.amazon.com/cli/lat
 Once you've downloaded the `.csv` file containing your IAM user's `Access key ID` and `Secret access key`,
 go ahead and configure the backend:
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:
@@ -65,7 +65,7 @@ projects:
 
 If you have default credentials set up (e.g. in `~/.aws/credentials`), configure the backend like this:
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:
@@ -108,7 +108,7 @@ Once you have `tenant_id`, `client_id`, and `client_secret`, go ahead and config
 
 Example:
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:
@@ -141,7 +141,7 @@ $ az account show --query "{subscription_id: id, tenant_id: tenantId}"
 
 Then proceed to configure the backend:
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:
@@ -192,7 +192,7 @@ Then go ahead and configure the backend by specifying the downloaded file path. 
     gcloud projects list --format="json(projectId)"
     ```
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:
@@ -217,7 +217,7 @@ Example: (1)
     gcloud projects list --format="json(projectId)"
     ```
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:
@@ -238,7 +238,7 @@ button to create a new API key.
 
 Then, go ahead and configure the backend:
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:
@@ -259,7 +259,7 @@ section to create a new authorization key.
 
 Then, go ahead and configure the backend:
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:
@@ -275,7 +275,7 @@ projects:
 </div>
 
 !!! info "NOTE:"
-    The `tensordock` backend support is experimental and requires version `"dstack[all]==0.12.2rc1"`.
+    The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
 
 ## Cloud regions
 
@@ -283,7 +283,7 @@ In addition to credentials, each cloud (except TensorDock) optionally allows for
 
 Example:
 
-<div editor-title=".dstack/server/config.yml">
+<div editor-title="~/.dstack/server/config.yml">
 
 ```yaml
 projects:

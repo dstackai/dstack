@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Effortlessly train and deploy generative AI
+Orchestrate generative AI workloads with ease
 </h3>
 
 <p align="center">
@@ -23,19 +23,20 @@ Effortlessly train and deploy generative AI
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source platform for training, fine-tuning, and deployment of 
-generative AI models across various cloud providers (e.g., AWS, GCP, Azure, Lambda Cloud, etc.)
+`dstack` is an open-source platform that simplifies generative AI training and deployment
+across various cloud GPU providers (e.g., AWS, GCP, Azure, Lambda Cloud, etc.)
 
 ## Latest news ✨
 
+- [2023/10] [Use world's cheapest GPUs with TensorDock](https://dstack.ai/blog/2023/10/31/tensordock/) (Release)
 - [2023/10] [Fine-tuning API](https://dstack.ai/docs/guides/fine-tuning/) (Release)
 - [2023/10] [Simplified cloud setup, and refined API](https://dstack.ai/blog/2023/10/18/simplified-cloud-setup/) (Release)
 - [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/examples/llama-index-weaviate) (Example)
 - [2023/09] [Deploying LLMs using Python API](https://dstack.ai/examples/deploy-python) (Example)
 - [2023/08] [Fine-tuning Llama 2 using QLoRA](https://dstack.ai/examples/finetuning-llama-2) (Example)
 - [2023/08] [Deploying Stable Diffusion using FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
-- [2023/07] [Deploying LLMS using TGI](https://dstack.ai/examples/text-generation-inference) (Example)
-- [2023/07] [Deploying LLMS using vLLM](https://dstack.ai/examples/vllm) (Example)
+- [2023/07] [Deploying LLMs using TGI](https://dstack.ai/examples/text-generation-inference) (Example)
+- [2023/07] [Deploying LLMs using vLLM](https://dstack.ai/examples/vllm) (Example)
 
 ## Installation
 
