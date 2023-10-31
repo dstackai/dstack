@@ -118,7 +118,7 @@ async def set_project_members(
     usernames = [m.username for m in members]
     res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))
     users = res.scalars().all()
-    await clear_project_members(session=session, project=project, users=users)
+    await clear_project_members(session=session, project=project)
     for user, member in zip(users, members):
         await add_project_member(
             session=session,
@@ -133,14 +133,8 @@ async def set_project_members(
 async def clear_project_members(
     session: AsyncSession,
     project: ProjectModel,
-    users: List[UserModel],
 ):
-    users_ids = [u.id for u in users]
-    await session.execute(
-        delete(MemberModel).where(
-            MemberModel.project_id == project.id, MemberModel.user_id.in_(users_ids)
-        )
-    )
+    await session.execute(delete(MemberModel).where(MemberModel.project_id == project.id))
 
 
 async def list_user_project_models(
