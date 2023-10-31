@@ -50,7 +50,8 @@ class TensorDockAPIClient:
             "gpu_model": gpu_model,
             "vcpus": instance.resources.cpus,
             "ram": instance.resources.memory_mib // 1024,
-            "external_ports": "{%s}" % hostnode["networking"]["ports"][0],
+            "external_ports": "{%s}"
+            % max(hostnode["networking"]["ports"]),  # it's safer to use a higher port
             "internal_ports": "{22}",
             "hostnode": instance.name,
             "storage": 100,  # TODO(egor-s): take from instance.resources
