@@ -9,6 +9,7 @@ from dstack._internal.core.models.backends import (
     AnyConfigValues,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.server import settings
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.backends import DeleteBackendsRequest
@@ -42,7 +43,8 @@ async def create_backend(
 ) -> AnyConfigInfoWithCreds:
     _, project = user_project
     config = await backends.create_backend(session=session, project=project, config=body)
-    await ServerConfigManager().sync_config(session=session)
+    if settings.SERVER_CONFIG_ENABLED:
+        await ServerConfigManager().sync_config(session=session)
     return config
 
 
@@ -54,7 +56,8 @@ async def update_backend(
 ) -> AnyConfigInfoWithCreds:
     _, project = user_project
     config = await backends.update_backend(session=session, project=project, config=body)
-    await ServerConfigManager().sync_config(session=session)
+    if settings.SERVER_CONFIG_ENABLED:
+        await ServerConfigManager().sync_config(session=session)
     return config
 
 
@@ -68,7 +71,8 @@ async def delete_backends(
     await backends.delete_backends(
         session=session, project=project, backends_types=body.backends_names
     )
-    await ServerConfigManager().sync_config(session=session)
+    if settings.SERVER_CONFIG_ENABLED:
+        await ServerConfigManager().sync_config(session=session)
 
 
 @project_router.post("/{backend_name}/config_info")

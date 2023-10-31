@@ -9,7 +9,7 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server import settings
 from dstack._internal.server.main import app
 from dstack._internal.server.services.projects import add_project_member
-from tests._internal.server.common import create_project, create_user, get_auth_headers
+from dstack._internal.server.testing.common import create_project, create_user, get_auth_headers
 
 client = TestClient(app)
 
@@ -18,7 +18,7 @@ class TestPollLogs:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/logs/poll",
             headers=get_auth_headers(user.token),
@@ -28,7 +28,7 @@ class TestPollLogs:
     @pytest.mark.asyncio
     async def test_returns_logs(self, test_db, session: AsyncSession, tmp_path: Path):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )

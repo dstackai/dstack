@@ -12,7 +12,7 @@ from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.schemas.runner import HealthcheckResponse, JobStateEvent, PullResponse
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_job,
     create_project,
     create_repo,

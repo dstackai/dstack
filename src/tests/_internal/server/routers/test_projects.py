@@ -11,7 +11,7 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import MemberModel, ProjectModel
 from dstack._internal.server.services.projects import add_project_member
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_backend,
     create_project,
     create_user,
@@ -36,7 +36,7 @@ class TestListProjects:
     @pytest.mark.asyncio
     async def test_returns_projects(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -50,6 +50,11 @@ class TestListProjects:
             {
                 "project_id": str(project.id),
                 "project_name": project.name,
+                "owner": {
+                    "id": str(user.id),
+                    "username": user.name,
+                    "global_role": user.global_role,
+                },
                 "backends": [
                     {
                         "name": backend.type,
@@ -95,6 +100,11 @@ class TestCreateProject:
         assert response.json() == {
             "project_id": str(project_id),
             "project_name": project_name,
+            "owner": {
+                "id": str(user.id),
+                "username": user.name,
+                "global_role": user.global_role,
+            },
             "backends": [],
             "members": [
                 {
@@ -108,6 +118,28 @@ class TestCreateProject:
             ],
         }
 
+    @pytest.mark.asyncio
+    async def test_returns_400_if_user_project_quota_exceeded(
+        self, test_db, session: AsyncSession
+    ):
+        user = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
+        for i in range(3):
+            response = client.post(
+                "/api/projects/create",
+                headers=get_auth_headers(user.token),
+                json={"project_name": f"project{i}"},
+            )
+            assert response.status_code == 200, response.json()
+        response = client.post(
+            "/api/projects/create",
+            headers=get_auth_headers(user.token),
+            json={"project_name": f"project{i}"},
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [{"code": "error", "msg": "User project quota exceeded"}]
+        }
+
 
 class TestDeleteProject:
     def test_returns_40x_if_not_authenticated(self):
@@ -117,7 +149,7 @@ class TestDeleteProject:
     @pytest.mark.asyncio
     async def test_deletes_projects(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -132,9 +164,10 @@ class TestDeleteProject:
 
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_admin(self, test_db, session: AsyncSession):
+        owner = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project1 = await create_project(session=session, name="project1")
-        project2 = await create_project(session=session, name="project2")
+        project1 = await create_project(session=session, name="project1", owner=owner)
+        project2 = await create_project(session=session, name="project2", owner=owner)
         await add_project_member(
             session=session, project=project1, user=user, project_role=ProjectRole.ADMIN
         )
@@ -181,7 +214,7 @@ class TestGetProject:
     @pytest.mark.asyncio
     async def test_returns_project(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -193,6 +226,11 @@ class TestGetProject:
         assert response.json() == {
             "project_id": str(project.id),
             "project_name": project.name,
+            "owner": {
+                "id": str(user.id),
+                "username": user.name,
+                "global_role": user.global_role,
+            },
             "backends": [],
             "members": [
                 {

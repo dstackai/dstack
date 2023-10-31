@@ -22,7 +22,7 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.projects import add_project_member
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_job,
     create_project,
     create_repo,
@@ -130,7 +130,8 @@ def get_dev_env_run_dict(
     username: str = "test_user",
     run_name: str = "run_name",
     repo_id: str = "test_repo",
-    submitted_at: str = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    submitted_at: str = "2023-01-02T03:04:00+00:00",
+    finished_at: str = "2023-01-02T03:04:00+00:00",
 ) -> Dict:
     return {
         "id": run_id,
@@ -216,6 +217,7 @@ def get_dev_env_run_dict(
                         "id": job_id,
                         "submission_num": 0,
                         "submitted_at": submitted_at,
+                        "finished_at": finished_at,
                         "status": "submitted",
                         "error_code": None,
                         "job_provisioning_data": None,
@@ -235,7 +237,7 @@ class TestListRuns:
     @pytest.mark.asyncio
     async def test_lists_runs(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -281,6 +283,7 @@ class TestListRuns:
                                 "id": str(job.id),
                                 "submission_num": 0,
                                 "submitted_at": "2023-01-02T03:04:00+00:00",
+                                "finished_at": None,
                                 "status": "submitted",
                                 "error_code": None,
                                 "job_provisioning_data": None,
@@ -296,7 +299,7 @@ class TestGetRunPlan:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/runs/get_plan",
             headers=get_auth_headers(user.token),
@@ -306,7 +309,7 @@ class TestGetRunPlan:
     @pytest.mark.asyncio
     async def test_returns_run_plan(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -349,7 +352,7 @@ class TestSubmitRun:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/runs/submit",
             headers=get_auth_headers(user.token),
@@ -359,7 +362,7 @@ class TestSubmitRun:
     @pytest.mark.asyncio
     async def test_submits_run(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -373,6 +376,7 @@ class TestSubmitRun:
             project_name=project.name,
             username=user.name,
             submitted_at=submitted_at_formatted,
+            finished_at=None,
             run_name="test-run",
             repo_id=repo.name,
         )
@@ -402,7 +406,7 @@ class TestSubmitRun:
     @pytest.mark.asyncio
     async def test_submits_run_without_run_name(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -436,7 +440,7 @@ class TestSubmitRun:
     @pytest.mark.asyncio
     async def test_returns_400_if_repo_does_not_exist(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -458,7 +462,7 @@ class TestStopRuns:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/runs/stop",
             headers=get_auth_headers(user.token),
@@ -468,7 +472,7 @@ class TestStopRuns:
     @pytest.mark.asyncio
     async def test_terminates_submitted_run(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -530,7 +534,7 @@ class TestStopRuns:
     @pytest.mark.asyncio
     async def test_leaves_finished_runs_unchanged(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -563,7 +567,7 @@ class TestDeleteRuns:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/runs/delete",
             headers=get_auth_headers(user.token),
@@ -573,7 +577,7 @@ class TestDeleteRuns:
     @pytest.mark.asyncio
     async def test_deletes_runs(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -606,7 +610,7 @@ class TestDeleteRuns:
     @pytest.mark.asyncio
     async def test_returns_400_if_runs_active(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )

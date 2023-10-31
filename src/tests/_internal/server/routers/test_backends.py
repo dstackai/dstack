@@ -12,7 +12,7 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import BackendModel
 from dstack._internal.server.services.projects import add_project_member
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_backend,
     create_project,
     create_user,
@@ -603,7 +603,7 @@ class TestCreateBackend:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -617,7 +617,7 @@ class TestCreateBackend:
     @pytest.mark.asyncio
     async def test_creates_aws_backend(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -648,7 +648,7 @@ class TestCreateBackend:
     @pytest.mark.asyncio
     async def test_creates_gcp_backend(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -683,7 +683,7 @@ class TestCreateBackend:
     @pytest.mark.asyncio
     async def test_creates_lambda_backend(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -710,7 +710,7 @@ class TestCreateBackend:
     @pytest.mark.asyncio
     async def test_create_azure_backend(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -776,7 +776,7 @@ class TestCreateBackend:
     @pytest.mark.asyncio
     async def test_returns_400_if_backend_exists(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -823,7 +823,7 @@ class TestUpdateBackend:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -837,7 +837,7 @@ class TestUpdateBackend:
     @pytest.mark.asyncio
     async def test_updates_backend(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -871,7 +871,7 @@ class TestUpdateBackend:
     @pytest.mark.asyncio
     async def test_returns_400_if_backend_does_not_exist(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -896,7 +896,7 @@ class TestDeleteBackends:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -909,7 +909,7 @@ class TestDeleteBackends:
     @pytest.mark.asyncio
     async def test_deletes_backends(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -928,7 +928,7 @@ class TestGetConfigInfo:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         backend = await create_backend(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
@@ -942,7 +942,7 @@ class TestGetConfigInfo:
     @pytest.mark.asyncio
     async def test_returns_config_info(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         backend = await create_backend(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN

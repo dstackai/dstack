@@ -77,6 +77,10 @@ except ImportError:
 _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP = {c.TYPE: c for c in _CONFIGURATOR_CLASSES}
 
 
+def register_configurator(configurator: Configurator):
+    _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP[configurator.TYPE] = configurator
+
+
 def get_configurator(backend_type: BackendType) -> Optional[Configurator]:
     configurator_class = _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP.get(backend_type)
     if configurator_class is None:
@@ -86,7 +90,7 @@ def get_configurator(backend_type: BackendType) -> Optional[Configurator]:
 
 def list_available_backend_types() -> List[BackendType]:
     available_backend_types = []
-    for configurator_class in _CONFIGURATOR_CLASSES:
+    for configurator_class in _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP.values():
         available_backend_types.append(configurator_class.TYPE)
     return available_backend_types
 

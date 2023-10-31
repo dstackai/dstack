@@ -14,5 +14,6 @@ class Member(BaseModel):
 class Project(BaseModel):
     project_id: UUID4
     project_name: str
+    owner: User
     backends: List[BackendInfo]
     members: List[Member]

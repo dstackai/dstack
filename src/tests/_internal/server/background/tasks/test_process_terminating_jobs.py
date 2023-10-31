@@ -8,7 +8,7 @@ from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.background.tasks.process_terminating_jobs import (
     process_terminating_jobs,
 )
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_job,
     create_project,
     create_repo,

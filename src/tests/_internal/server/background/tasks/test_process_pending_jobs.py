@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.background.tasks.process_pending_jobs import process_pending_jobs
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_job,
     create_project,
     create_repo,
@@ -18,8 +18,8 @@ from tests._internal.server.common import (
 class TestProcessPendingJobs:
     @pytest.mark.asyncio
     async def test_transitions_pending_jobs_to_submitted(self, test_db, session: AsyncSession):
-        project = await create_project(session=session)
         user = await create_user(session=session)
+        project = await create_project(session=session, owner=user)
         repo = await create_repo(
             session=session,
             project_id=project.id,

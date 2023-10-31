@@ -46,6 +46,8 @@ class UserModel(BaseModel):
     token: Mapped[str] = mapped_column(String(200), unique=True)
     global_role: Mapped[GlobalRole] = mapped_column(Enum(GlobalRole))
 
+    projects_quota: Mapped[int] = mapped_column(Integer, default=3)
+
 
 class ProjectModel(BaseModel):
     __tablename__ = "projects"
@@ -54,6 +56,9 @@ class ProjectModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
+
+    owner_id: Mapped[UUIDType] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    owner: Mapped[UserModel] = relationship(lazy="joined")
     members: Mapped[List["MemberModel"]] = relationship(back_populates="project", lazy="selectin")
 
     ssh_private_key: Mapped[str] = mapped_column(Text)

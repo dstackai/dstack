@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Any, Union
 
 from pydantic import BaseModel
 
@@ -14,6 +14,7 @@ from dstack._internal.core.models.backends.azure import (
     AzureConfigInfoWithCredsPartial,
     AzureConfigValues,
 )
+from dstack._internal.core.models.backends.dstack import DstackConfigInfo, DstackConfigValues
 from dstack._internal.core.models.backends.gcp import (
     GCPConfigInfo,
     GCPConfigInfoWithCreds,
@@ -39,6 +40,7 @@ AnyConfigInfoWithoutCreds = Union[
     GCPConfigInfo,
     LambdaConfigInfo,
     TensorDockConfigInfo,
+    DstackConfigInfo,
 ]
 AnyConfigInfoWithCreds = Union[
     AWSConfigInfoWithCreds,
@@ -46,6 +48,7 @@ AnyConfigInfoWithCreds = Union[
     GCPConfigInfoWithCreds,
     LambdaConfigInfoWithCreds,
     TensorDockConfigInfoWithCreds,
+    DstackConfigInfo,
 ]
 AnyConfigInfoWithCredsPartial = Union[
     AWSConfigInfoWithCredsPartial,
@@ -53,6 +56,7 @@ AnyConfigInfoWithCredsPartial = Union[
     GCPConfigInfoWithCredsPartial,
     LambdaConfigInfoWithCredsPartial,
     TensorDockConfigInfoWithCredsPartial,
+    DstackConfigInfo,
 ]
 AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 
@@ -63,6 +67,7 @@ AnyConfigValues = Union[
     GCPConfigValues,
     LambdaConfigValues,
     TensorDockConfigValues,
+    DstackConfigValues,
 ]
 
 

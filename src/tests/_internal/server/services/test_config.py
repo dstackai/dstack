@@ -12,7 +12,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel
 from dstack._internal.server.services.config import AzureConfig, ServerConfigManager
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_backend,
     create_project,
     create_user,

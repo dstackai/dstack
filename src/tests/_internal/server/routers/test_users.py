@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.main import app
-from tests._internal.server.common import create_user, get_auth_headers
+from dstack._internal.server.testing.common import create_user, get_auth_headers
 
 client = TestClient(app)
 

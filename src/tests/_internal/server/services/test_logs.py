@@ -8,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.server import settings
 from dstack._internal.server.schemas.runner import LogEvent
 from dstack._internal.server.services.logs import write_logs
-from tests._internal.server.common import create_project
+from dstack._internal.server.testing.common import create_project
 
 
 class TestWriteLogs:
     @pytest.mark.asyncio
     async def test_writes_logs(self, test_db, session: AsyncSession, tmp_path: Path):
-        project = await create_project(session)
+        project = await create_project(session=session)
         with patch.object(settings, "SERVER_DIR_PATH", tmp_path):
             write_logs(
                 project=project,

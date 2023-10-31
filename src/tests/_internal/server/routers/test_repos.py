@@ -9,7 +9,7 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import CodeModel, RepoModel
 from dstack._internal.server.services.projects import add_project_member
-from tests._internal.server.common import (
+from dstack._internal.server.testing.common import (
     create_project,
     create_repo,
     create_user,
@@ -23,7 +23,7 @@ class TestListRepos:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/repos/list",
             headers=get_auth_headers(user.token),
@@ -33,7 +33,7 @@ class TestListRepos:
     @pytest.mark.asyncio
     async def test_returns_empty_list(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -47,7 +47,7 @@ class TestListRepos:
     @pytest.mark.asyncio
     async def test_returns_repos(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         repo = await create_repo(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
@@ -69,7 +69,7 @@ class TestGetRepo:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/repos/get",
             headers=get_auth_headers(user.token),
@@ -79,7 +79,7 @@ class TestGetRepo:
     @pytest.mark.asyncio
     async def test_returns_404_if_repo_does_not_exist(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -93,7 +93,7 @@ class TestGetRepo:
     @pytest.mark.asyncio
     async def test_returns_repo(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         repo = await create_repo(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
@@ -113,7 +113,7 @@ class TestGetRepo:
     @pytest.mark.asyncio
     async def test_returns_repo_with_creds(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         repo = await create_repo(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
@@ -135,7 +135,7 @@ class TestInitRepo:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/repos/init",
             headers=get_auth_headers(user.token),
@@ -145,7 +145,7 @@ class TestInitRepo:
     @pytest.mark.asyncio
     async def test_creates_remote_repo(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -179,7 +179,7 @@ class TestInitRepo:
     @pytest.mark.asyncio
     async def test_updates_remote_repo(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -233,7 +233,7 @@ class TestDeleteRepos:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/repos/delete",
             headers=get_auth_headers(user.token),
@@ -243,7 +243,7 @@ class TestDeleteRepos:
     @pytest.mark.asyncio
     async def test_deletes_repos(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
@@ -263,7 +263,7 @@ class TestUploadCode:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/repos/upload_code",
             headers=get_auth_headers(user.token),
@@ -274,7 +274,7 @@ class TestUploadCode:
     @pytest.mark.asyncio
     async def test_uploads_code(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session)
+        project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )

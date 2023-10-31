@@ -82,12 +82,17 @@ class TensorDockConfig(ForbidExtra):
     creds: AnyTensorDockCreds
 
 
+class DstackConfig(ForbidExtra):
+    type: Literal["dstack"] = "dstack"
+
+
 AnyBackendConfig = Union[
     AWSConfig,
     AzureConfig,
     GCPConfig,
     LambdaConfig,
     TensorDockConfig,
+    DstackConfig,
 ]
 
 
