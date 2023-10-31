@@ -2,6 +2,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import Callable
 
+import sentry_sdk
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
@@ -33,6 +34,14 @@ logger = get_logger(__name__)
 
 
 def create_app() -> FastAPI:
+
+    if settings.SENTRY_DSN is not None:
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.SERVER_ENVIRONMENT,
+            enable_tracing=True,
+        )
+
     app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
     app.include_router(users.router)
     app.include_router(projects.router)
