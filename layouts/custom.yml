@@ -1,3 +1,44 @@
+definitions:
+  # Site name
+  - &site_name >-
+    {{ config.site_name }}
+
+  # Page title
+  - &page_title >-
+    {%- if layout.title -%}
+      {{ layout.title }}
+    {%- else -%}
+      {{ page.meta.get("title", page.title) }}
+    {%- endif -%}
+
+  # Page title with site name
+  - &page_title_with_site_name >-
+    {%- if not page.is_homepage -%}
+      {{ page.meta.get("title", page.title) }} - {{ config.site_name }}
+    {%- else -%}
+      {{ page.meta.get("title", page.title) }}
+    {%- endif -%}
+
+  # Page description
+  - &page_description >-
+    {%- if layout.description -%}
+      {{ layout.description }}
+    {%- else -%}
+      {{ page.meta.get("description", config.site_description) | x }}
+    {%- endif -%}
+
+  # Logo
+  - &logo >-
+    {%- if layout.logo -%}
+      {{ layout.logo }}
+    {%- elif config.theme.logo -%}
+      {{ config.docs_dir }}/{{ config.theme.logo }}
+    {%- endif -%}
+
+  # Logo (icon)
+  - &logo_icon >-
+    {{ config.theme.icon.logo | x }}
+
 size: { width: 1200, height: 630 }
 layers:
   - background:
@@ -5,37 +46,46 @@ layers:
   - size: { width: 44, height: 44 }
     offset: { x: 970, y: 521 }
     background:
-      image: "{{ config.docs_dir }}/{{ config.theme.logo }}"
+      image: *logo
   - size: { width: 300, height: 42 }
     offset: { x: 1018, y: 525 }
     typography:
-      content: "{{ config.site_name }}"
+      content: *site_name
       color: "white"
-      font:
-        family: Roboto
-        style: Bold
   - size: { width: 850, height: 320 }
     offset: { x: 80, y: 115 }
     typography:
-      content: "{{ page.title }}"
+      content: *page_title
       overflow: shrink
       align: start
       color: "white"
       line:
         amount: 3
         height: 1.25
-      font:
-        family: Roboto
-        style: Bold
   - size: { width: 850, height: 64 }
     offset: { x: 80, y: 495 }
     typography:
-      content: "{{ page.meta.get('description', config.site_description) }}"
+      content: *page_description
       align: start
       color: "white"
       line:
         amount: 2
         height: 1.5
-      font:
-        family: Roboto
-        style: Regular
+
+tags:
+
+  # Open Graph
+  og:type: website
+  og:title: *page_title_with_site_name
+  og:description: *page_description
+  og:image: "{{ image.url }}"
+  og:image:type: "{{ image.type }}"
+  og:image:width: "{{ image.width }}"
+  og:image:height: "{{ image.height }}"
+  og:url: "{{ page.canonical_url }}"
+
+  # Twitter
+  twitter:card: summary_large_image
+  twitter.title: *page_title_with_site_name
+  twitter:description: *page_description
+  twitter:image: "{{ image.url }}"
