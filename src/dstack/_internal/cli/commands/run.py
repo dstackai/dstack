@@ -177,7 +177,7 @@ class RunCommand(APIBaseCommand):
                 # Gently stop the run and wait for it to finish
                 with console.status("Stopping..."):
                     run.stop(abort=False)
-                    while not run.status.is_finished():
+                    while not (run.status.is_finished() or run.status == RunStatus.TERMINATING):
                         time.sleep(2)
                         run.refresh()
                 console.print("Stopped")

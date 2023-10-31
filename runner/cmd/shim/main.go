@@ -31,7 +31,7 @@ func main() {
 				Destination: &backendName,
 				EnvVars:     []string{"DSTACK_BACKEND"},
 				Action: func(c *cli.Context, s string) error {
-					for _, backend := range []string{"aws", "azure", "gcp", "lambda", "local"} {
+					for _, backend := range []string{"aws", "azure", "gcp", "lambda", "tensordock", "local"} {
 						if s == backend {
 							return nil
 						}

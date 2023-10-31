@@ -200,11 +200,10 @@ async def stop_runs(
     runs_names: List[str],
     abort: bool,
 ):
-    new_status = JobStatus.TERMINATED
+    new_status = JobStatus.TERMINATING
     if abort:
         new_status = JobStatus.ABORTED
 
-    # TODO stop instances
     res = await session.execute(
         select(JobModel).where(
             JobModel.project_id == project.id,

@@ -28,6 +28,7 @@ generative AI models across various cloud providers (e.g., AWS, GCP, Azure, Lamb
 
 ## Latest news ✨
 
+- [2023/10] [Fine-tuning API](https://dstack.ai/docs/guides/fine-tuning/) (Release)
 - [2023/10] [Simplified cloud setup, and refined API](https://dstack.ai/blog/2023/10/18/simplified-cloud-setup/) (Release)
 - [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/examples/llama-index-weaviate) (Example)
 - [2023/09] [Deploying LLMs using Python API](https://dstack.ai/examples/deploy-python) (Example)
@@ -57,7 +58,7 @@ $ pip install "dstack[all]" -U
 If you have default AWS, GCP, or Azure credentials on your machine, `dstack` will pick them up automatically.
 
 Otherwise, you need to manually specify the cloud credentials in `~/.dstack/server/config.yml`.
-For further cloud configuration details, refer to [Clouds](https://dstack.ai/docs/configuration/server).
+For further cloud configuration details, refer to [server configuration](https://dstack.ai/docs/configuration/server).
 
 ### Start the server
 
@@ -128,7 +129,7 @@ env:
 port: 80
 
 commands:
-  - text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code
+  - text-generation-launcher --trust-remote-code --quantize gptq
 ```
 
 > **Note:**

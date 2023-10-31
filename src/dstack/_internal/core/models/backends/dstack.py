@@ -7,4 +7,4 @@ class DstackConfigInfo(BaseModel):
 
 
 class DstackConfigValues(BaseModel):
-    type: Literal["aws"] = "aws"
+    type: Literal["dstack"] = "dstack"

@@ -58,7 +58,13 @@ class PortsLock:
         return mapping
 
     def dict(self) -> Dict[int, int]:
-        return {remote_port: sock.getsockname()[1] for remote_port, sock in self.sockets.items()}
+        d = {}
+        for remote_port, local_port in self.restrictions.items():
+            if local_port:
+                d[remote_port] = local_port
+            else:
+                d[remote_port] = self.sockets[remote_port].getsockname()[1]
+        return d
 
     @staticmethod
     def _listen(port: int) -> Optional[socket.socket]:

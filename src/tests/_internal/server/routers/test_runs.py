@@ -470,7 +470,7 @@ class TestStopRuns:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_terminates_run(self, test_db, session: AsyncSession):
+    async def test_terminates_submitted_run(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -498,6 +498,38 @@ class TestStopRuns:
         assert response.status_code == 200
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATED
+
+    @pytest.mark.asyncio
+    async def test_terminates_running_run(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+        )
+        with patch("dstack._internal.server.services.jobs._stop_runner") as m:
+            response = client.post(
+                f"/api/project/{project.name}/runs/stop",
+                headers=get_auth_headers(user.token),
+                json={"runs_names": [run.run_name], "abort": False},
+            )
+        assert response.status_code == 200
+        await session.refresh(job)
+        assert job.status == JobStatus.TERMINATING
 
     @pytest.mark.asyncio
     async def test_leaves_finished_runs_unchanged(self, test_db, session: AsyncSession):

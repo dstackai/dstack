@@ -1,5 +1,5 @@
 import asyncio
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Type
 
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +32,7 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-_CONFIGURATOR_CLASSES: List[Configurator] = []
+_CONFIGURATOR_CLASSES: List[Type[Configurator]] = []
 
 try:
     from dstack._internal.server.services.backends.configurators.aws import AWSConfigurator
@@ -61,6 +61,15 @@ try:
     )
 
     _CONFIGURATOR_CLASSES.append(LambdaConfigurator)
+except ImportError:
+    pass
+
+try:
+    from dstack._internal.server.services.backends.configurators.tensordock import (
+        TensorDockConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(TensorDockConfigurator)
 except ImportError:
     pass
 

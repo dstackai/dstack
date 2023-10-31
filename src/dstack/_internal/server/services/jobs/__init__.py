@@ -1,6 +1,5 @@
 import asyncio
 import socket
-from contextlib import closing
 from datetime import timezone
 from typing import Dict, List, Optional
 
@@ -17,7 +16,6 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
-from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.models import JobModel, ProjectModel
 from dstack._internal.server.services.backends import get_project_backend_by_type
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
@@ -26,6 +24,7 @@ from dstack._internal.server.services.jobs.configurators.service import ServiceJ
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,6 +35,9 @@ SUBMITTED_PROCESSING_JOBS_IDS = set()
 
 RUNNING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 RUNNING_PROCESSING_JOBS_IDS = set()
+
+TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
+TERMINATING_PROCESSING_JOBS_IDS = set()
 
 
 def get_jobs_from_run_spec(run_spec: RunSpec) -> List[Job]:
@@ -76,37 +78,46 @@ async def stop_job(
 ):
     if job_model.status.is_finished():
         return
-    async with SUBMITTED_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_LOCK:
+    async with SUBMITTED_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_LOCK, TERMINATING_PROCESSING_JOBS_LOCK:
         # If the job provisioning is in progress, we have to wait until it's done.
         # We can also consider returning an error when stopping a provisioning job.
         while (
             job_model.id in SUBMITTED_PROCESSING_JOBS_IDS
             or job_model.id in RUNNING_PROCESSING_JOBS_IDS
+            or job_model.id in TERMINATING_PROCESSING_JOBS_IDS
         ):
             await asyncio.sleep(0.1)
         await session.refresh(job_model)
+        if job_model.status.is_finished():
+            return
+
         job_submission = job_model_to_job_submission(job_model)
-        if (
-            job_model.status != JobStatus.SUBMITTED
-            and new_status == JobStatus.ABORTED
-            or job_model.status == JobStatus.PROVISIONING
-        ):
-            await terminate_job_submission_instance(
-                project=project,
-                job_submission=job_submission,
-            )
-        elif job_model.status == JobStatus.RUNNING:
+        if job_model.status in (JobStatus.PENDING, JobStatus.SUBMITTED):
+            if new_status == JobStatus.TERMINATING:
+                # there is no instance, just mark as terminated
+                new_status = JobStatus.TERMINATED
+        elif new_status == JobStatus.TERMINATING and job_model.status == JobStatus.RUNNING:
             await run_async(
                 _stop_runner,
                 job_submission,
                 project.ssh_private_key,
             )
+        elif new_status == JobStatus.ABORTED or job_model.status in (
+            JobStatus.PROVISIONING,
+            JobStatus.PULLING,
+        ):
+            await terminate_job_submission_instance(
+                project=project,
+                job_submission=job_submission,
+            )
+        else:
+            raise RuntimeError(
+                f"Unexpected job status transition: {job_model.status} -> {new_status}"
+            )
         await session.execute(
             update(JobModel)
-            .where(
-                JobModel.id == job_model.id,
-            )
-            .values(status=new_status)
+            .where(JobModel.id == job_model.id)
+            .values(status=new_status, last_processed_at=get_current_datetime())
         )
 
 

@@ -26,7 +26,7 @@ class TestListBackendTypes:
     def test_returns_backend_types(self):
         response = client.post("/api/backends/list_types")
         assert response.status_code == 200, response.json()
-        assert response.json() == ["aws", "azure", "gcp", "lambda"]
+        assert response.json() == ["aws", "azure", "gcp", "lambda", "tensordock"]
 
 
 class TestGetBackendConfigValuesAWS:

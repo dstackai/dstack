@@ -11,6 +11,7 @@ class BackendType(str, enum.Enum):
     GCP = "gcp"
     LAMBDA = "lambda"
     LOCAL = "local"
+    TENSORDOCK = "tensordock"
 
 
 class ConfigElementValue(BaseModel):

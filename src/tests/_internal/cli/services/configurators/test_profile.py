@@ -17,6 +17,28 @@ from dstack._internal.core.models.profiles import (
 )
 
 
+class TestGPUComputeCapability:
+    def test_empty(self):
+        gpu = ProfileGPU()
+        assert gpu.compute_capability is None
+
+    def test_float(self):
+        gpu = ProfileGPU(compute_capability=7.5)
+        assert gpu.compute_capability == (7, 5)
+
+    def test_string(self):
+        gpu = ProfileGPU(compute_capability="8.1")
+        assert gpu.compute_capability == (8, 1)
+
+    def test_tuple(self):
+        gpu = ProfileGPU(compute_capability=(9, 0))
+        assert gpu.compute_capability == (9, 0)
+
+    def test_fail(self):
+        with pytest.raises(ValueError):
+            ProfileGPU(compute_capability="8.1.1")
+
+
 class TestGPUSpec:
     def test_name(self):
         assert gpu_spec("A100") == {"name": "A100"}

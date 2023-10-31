@@ -4,15 +4,6 @@ With `dstack`, fine-tuning generative AI models using [tasks](tasks.md) offers m
 For a simpler out-of-the-box solution, try our fine-grained API. This API allows you to fine-tune any 
 Hugging Face model with SFT or DPO techniques in your cloud with just one line of code. 
 
-??? info "Prerequisites"
-    To try the new API, make sure to install `0.12.1rc1`:
-
-    ```shell
-    pip install "dstack[all]==0.12.1rc1"
-    ```
-
-    Also, make sure you've configured clouds and started the server.
-
 First, you connect to the `dstack` server:
 
 ```python

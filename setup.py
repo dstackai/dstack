@@ -60,6 +60,7 @@ BASE_DEPS = [
     "docker>=6.0.0",
     "dnspython",
     "grpcio>=1.50",  # indirect
+    "gpuhunt==0.0.1rc2",
 ]
 
 AWS_DEPS = [
@@ -123,7 +124,7 @@ setup(
         "Source": "https://github.com/dstackai/dstack",
     },
     description="dstack is an open-source platform for training, fine-tuning, and deployment of generative AI models "
-                "across various cloud providers.",
+    "across various cloud providers.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.8",

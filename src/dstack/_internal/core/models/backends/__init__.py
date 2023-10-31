@@ -27,12 +27,19 @@ from dstack._internal.core.models.backends.lambdalabs import (
     LambdaConfigInfoWithCredsPartial,
     LambdaConfigValues,
 )
+from dstack._internal.core.models.backends.tensordock import (
+    TensorDockConfigInfo,
+    TensorDockConfigInfoWithCreds,
+    TensorDockConfigInfoWithCredsPartial,
+    TensorDockConfigValues,
+)
 
 AnyConfigInfoWithoutCreds = Union[
     AWSConfigInfo,
     AzureConfigInfo,
     GCPConfigInfo,
     LambdaConfigInfo,
+    TensorDockConfigInfo,
     DstackConfigInfo,
 ]
 AnyConfigInfoWithCreds = Union[
@@ -40,6 +47,7 @@ AnyConfigInfoWithCreds = Union[
     AzureConfigInfoWithCreds,
     GCPConfigInfoWithCreds,
     LambdaConfigInfoWithCreds,
+    TensorDockConfigInfoWithCreds,
     DstackConfigInfo,
 ]
 AnyConfigInfoWithCredsPartial = Union[
@@ -47,6 +55,7 @@ AnyConfigInfoWithCredsPartial = Union[
     AzureConfigInfoWithCredsPartial,
     GCPConfigInfoWithCredsPartial,
     LambdaConfigInfoWithCredsPartial,
+    TensorDockConfigInfoWithCredsPartial,
     DstackConfigInfo,
 ]
 AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
@@ -57,6 +66,7 @@ AnyConfigValues = Union[
     AzureConfigValues,
     GCPConfigValues,
     LambdaConfigValues,
+    TensorDockConfigValues,
     DstackConfigValues,
 ]
 
