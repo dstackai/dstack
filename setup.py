@@ -61,6 +61,7 @@ BASE_DEPS = [
     "dnspython",
     "grpcio>=1.50",  # indirect
     "gpuhunt==0.0.1rc2",
+    "sentry-sdk[fastapi]",
 ]
 
 AWS_DEPS = [
