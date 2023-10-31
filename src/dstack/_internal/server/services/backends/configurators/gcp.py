@@ -150,11 +150,15 @@ class GCPConfigurator(Configurator):
                 raise_invalid_credentials_error(fields=[["creds", "data"]])
             else:
                 raise_invalid_credentials_error(fields=[["creds"]])
-        if config.project_id is None:
-            return config_values
-        if config.project_id != project_id:
+        if (
+            project_id is not None
+            and config.project_id is not None
+            and config.project_id != project_id
+        ):
             raise ServerClientError(msg="Wrong project_id", fields=[["project_id"]])
         config_values.project_id = self._get_project_id_element(selected=project_id)
+        if config.project_id is None:
+            return config_values
         config_values.regions = self._get_regions_element(
             selected=config.regions or DEFAULT_REGIONS
         )
