@@ -112,6 +112,14 @@ class RepoCollection:
                     f"The repo is not initialized. Run `dstack init` to initialize the repo."
                 )
             repo = load_repo(repo_config)
+            try:
+                self._api_client.repos.get(self._project, repo.repo_id, include_creds=False)
+            except requests.HTTPError as e:
+                if "404" in e.args[0]:
+                    raise ConfigurationError(
+                        f"The repo is not initialized. Run `dstack init` to initialize the repo."
+                    )
+                raise
         else:
             logger.debug("Initializing repo")
             repo = LocalRepo(repo_dir=repo_dir)  # default
