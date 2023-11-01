@@ -2,6 +2,8 @@ import asyncio
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 from dstack._internal.server.db import db
 from dstack._internal.server.models import BaseModel
@@ -48,7 +50,12 @@ def run_migrations_online():
         run_migrations(connection)
 
 
-def run_migrations(connection):
+def run_migrations(connection: AsyncConnection):
+    # Temporarily disable foreign keys,
+    # so that sqlite batch table migrations are performed without data loss:
+    # https://alembic.sqlalchemy.org/en/latest/batch.html#dealing-with-referencing-foreign-keys
+    connection.execute(text("PRAGMA foreign_keys=OFF;"))
+    connection.commit()
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -57,6 +64,8 @@ def run_migrations(connection):
     )
     with context.begin_transaction():
         context.run_migrations()
+    connection.execute(text("PRAGMA foreign_keys=ON;"))
+    connection.commit()
 
 
 async def run_async_migrations():

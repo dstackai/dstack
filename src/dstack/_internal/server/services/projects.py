@@ -4,7 +4,7 @@ from typing import Awaitable, Callable, List, Optional, Tuple
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ForbiddenError, ServerClientError
+from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
 from dstack._internal.core.models.backends import BackendInfo
 from dstack._internal.core.models.projects import Member, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -56,6 +56,9 @@ async def get_project_by_name(
 
 
 async def create_project(session: AsyncSession, user: UserModel, project_name: str) -> Project:
+    project = await get_project_model_by_name(session=session, project_name=project_name)
+    if project is not None:
+        raise ResourceExistsError()
     await _check_projects_quota(session=session, user=user)
     project = await create_project_model(
         session=session,

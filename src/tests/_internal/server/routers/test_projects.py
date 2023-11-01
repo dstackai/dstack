@@ -133,7 +133,7 @@ class TestCreateProject:
         response = client.post(
             "/api/projects/create",
             headers=get_auth_headers(user.token),
-            json={"project_name": f"project{i}"},
+            json={"project_name": f"project4"},
         )
         assert response.status_code == 400
         assert response.json() == {

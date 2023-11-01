@@ -40,7 +40,7 @@ def override_db(new_db: Database):
 
 
 async def migrate():
-    async with db.engine.begin() as connection:
+    async with db.engine.connect() as connection:
         await connection.run_sync(_run_alembic_upgrade)
 
 
