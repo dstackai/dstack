@@ -1,6 +1,8 @@
 import time
 from typing import List, Optional
 
+import requests
+
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import get_docker_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -13,6 +15,8 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+
+POLLING_INTERVAL = 10
 
 
 class VastAICompute(Compute):
@@ -56,11 +60,17 @@ class VastAICompute(Compute):
             registry_auth=registry_auth,
         )
         instance_id = resp["new_contract"]
-        while (resp := self.api_client.get_instance(instance_id))["actual_status"] != "running":
-            time.sleep(5)
+        try:
+            while (resp := self.api_client.get_instance(instance_id))[
+                "actual_status"
+            ] != "running":
+                time.sleep(POLLING_INTERVAL)
+        except requests.HTTPError:
+            self.terminate_instance(instance_id, instance_offer.region)
+            raise
         return LaunchedInstanceInfo(
             instance_id=instance_id,
-            ip_address=resp["public_ipaddr"],
+            ip_address=resp["public_ipaddr"].strip(),
             region=instance_offer.region,
             username="root",
             ssh_port=int(resp["ports"]["10022/tcp"][0]["HostPort"]),
@@ -68,4 +78,7 @@ class VastAICompute(Compute):
         )
 
     def terminate_instance(self, instance_id: str, region: str):
-        self.api_client.destroy_instance(instance_id)
+        try:
+            self.api_client.destroy_instance(instance_id)
+        except requests.HTTPError:
+            pass

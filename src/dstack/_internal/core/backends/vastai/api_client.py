@@ -3,10 +3,12 @@ from typing import List, Optional, Union
 import requests
 
 import dstack._internal.server.services.docker as docker
+from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.configurations import RegistryAuth
 
 
 class VastAIAPIClient:
+    # TODO(egor-s): handle error 429
     def __init__(self, api_key: str):
         self.api_url = "https://console.vast.ai/api/v0".rstrip("/")
         self.api_key = api_key
@@ -51,11 +53,11 @@ class VastAIAPIClient:
         }
         resp = self.s.put(self._url(f"/asks/{bundle_id}/"), json=payload)
         if resp.status_code != 200 or not (data := resp.json())["success"]:
-            raise requests.HTTPError(resp.text)
+            raise NoCapacityError(resp.text)
         return data
 
     def destroy_instance(self, instance_id: Union[str, int]):
-        resp = self.s.delete(self._url(f"/asks/{instance_id}/"))
+        resp = self.s.delete(self._url(f"/instances/{instance_id}/"))
         resp.raise_for_status()
         data = resp.json()
         if not data["success"]:
