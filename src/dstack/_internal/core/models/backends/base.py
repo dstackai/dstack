@@ -12,6 +12,7 @@ class BackendType(str, enum.Enum):
     LAMBDA = "lambda"
     LOCAL = "local"
     TENSORDOCK = "tensordock"
+    VASTAI = "vastai"
 
 
 class ConfigElementValue(BaseModel):
