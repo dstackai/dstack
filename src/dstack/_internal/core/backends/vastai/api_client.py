@@ -84,5 +84,12 @@ class VastAIAPIClient:
             raise requests.HTTPError(data)
         return data
 
+    def auth_test(self) -> bool:
+        try:
+            self.get_instances()
+            return True
+        except requests.HTTPError:
+            return False
+
     def _url(self, path):
         return f"{self.api_url}/{path.lstrip('/')}?api_key={self.api_key}"

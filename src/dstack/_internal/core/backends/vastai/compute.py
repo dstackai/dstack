@@ -5,6 +5,7 @@ from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import get_docker_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
+from dstack._internal.core.backends.vastai.config import VastAIConfig
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -15,15 +16,16 @@ from dstack._internal.core.models.runs import Job, Requirements, Run
 
 
 class VastAICompute(Compute):
-    def __init__(self, config):  # TODO type
+    def __init__(self, config: VastAIConfig):
         self.config = config
-        self.api_client = VastAIAPIClient(config.api_key)
+        self.api_client = VastAIAPIClient(config.creds.api_key)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             provider=BackendType.VASTAI.value,
+            # TODO(egor-s): locations
             requirements=requirements,
         )
         offers = [

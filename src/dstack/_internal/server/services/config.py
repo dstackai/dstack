@@ -11,6 +11,7 @@ from dstack._internal.core.models.backends.aws import AnyAWSCreds
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
 from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
+from dstack._internal.core.models.backends.vastai import AnyVastAICreds
 from dstack._internal.core.models.common import ForbidExtra
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel
@@ -82,6 +83,12 @@ class TensorDockConfig(ForbidExtra):
     creds: AnyTensorDockCreds
 
 
+class VastAIConfig(ForbidExtra):
+    type: Literal["vastai"] = "vastai"
+    regions: Optional[List[str]] = None
+    creds: AnyVastAICreds
+
+
 class DstackConfig(ForbidExtra):
     type: Literal["dstack"] = "dstack"
 
@@ -92,6 +99,7 @@ AnyBackendConfig = Union[
     GCPConfig,
     LambdaConfig,
     TensorDockConfig,
+    VastAIConfig,
     DstackConfig,
 ]
 
