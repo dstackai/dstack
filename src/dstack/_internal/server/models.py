@@ -175,6 +175,9 @@ class JobModel(BaseModel):
     job_spec_data: Mapped[str] = mapped_column(String(4000))
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
     runner_timestamp: Mapped[Optional[int]] = mapped_column(Integer)
+    # `removed` is used to ensure that the instance is killed after the job is finished
+    removed: Mapped[bool] = mapped_column(Boolean, default=False)
+    remove_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
 
 class GatewayModel(BaseModel):
