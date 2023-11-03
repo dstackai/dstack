@@ -1,13 +1,16 @@
 import time
 from typing import List, Optional
 
+import gpuhunt
 import requests
+from gpuhunt.providers.vastai import VastAIProvider
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import get_docker_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
+from dstack._internal.core.backends.vastai.api_client import DISK_SIZE, VastAIAPIClient
 from dstack._internal.core.backends.vastai.config import VastAIConfig
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -15,7 +18,9 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.utils.logging import get_logger
 
+logger = get_logger(__name__)
 POLLING_INTERVAL = 10
 
 
@@ -23,14 +28,29 @@ class VastAICompute(Compute):
     def __init__(self, config: VastAIConfig):
         self.config = config
         self.api_client = VastAIAPIClient(config.creds.api_key)
+        self.catalog = gpuhunt.Catalog(fill_missing=False, auto_reload=False)
+        self.catalog.add_provider(
+            VastAIProvider(
+                extra_filters={
+                    "direct_port_count": {"gte": 1},
+                    "reliability2": {"gte": 0.9},
+                    "inet_down": {"gt": 100},
+                    "verified": {"eq": True},
+                    "cuda_max_good": {"gte": 11.8},
+                    "disk_space": {"gte": DISK_SIZE},
+                }
+            )
+        )
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             provider=BackendType.VASTAI.value,
-            # TODO(egor-s): locations
             requirements=requirements,
+            # TODO(egor-s): spots currently not supported
+            extra_filter=lambda offer: not offer.instance.resources.spot,
+            catalog=self.catalog,
         )
         offers = [
             InstanceOfferWithAvailability(
@@ -64,8 +84,18 @@ class VastAICompute(Compute):
             while (resp := self.api_client.get_instance(instance_id))[
                 "actual_status"
             ] != "running":
+                if (
+                    resp["actual_status"] == "created"
+                    and ": OCI runtime create failed:" in resp["status_msg"]
+                ):
+                    raise ComputeError(resp["status_msg"])
+                logger.debug(
+                    "Waiting %s: %s", instance_id, {k: v for k, v in resp.items() if "stat" in k}
+                )
                 time.sleep(POLLING_INTERVAL)
-        except requests.HTTPError:
+
+        except (requests.HTTPError, ComputeError):
+            logger.warning("Failed to launch instance %s, request termination", instance_id)
             self.terminate_instance(instance_id, instance_offer.region)
             raise
         return LaunchedInstanceInfo(
@@ -78,7 +108,4 @@ class VastAICompute(Compute):
         )
 
     def terminate_instance(self, instance_id: str, region: str):
-        try:
-            self.api_client.destroy_instance(instance_id)
-        except requests.HTTPError:
-            pass
+        self.api_client.destroy_instance(instance_id)

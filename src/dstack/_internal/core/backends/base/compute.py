@@ -136,7 +136,6 @@ def get_gateway_user_data(authorized_key: str) -> str:
 def get_docker_commands(authorized_keys: List[str]) -> List[str]:
     authorized_keys = "\n".join(authorized_keys).strip()
     commands = [
-        "echo TODO start",
         # note: &> redirection doesn't work in /bin/sh
         # check in sshd is here, install if not
         (

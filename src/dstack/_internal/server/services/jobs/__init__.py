@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.runs import (
     Job,
@@ -97,11 +98,16 @@ async def stop_job(
                 # there is no instance, just mark as terminated
                 new_status = JobStatus.TERMINATED
         elif new_status == JobStatus.TERMINATING and job_model.status == JobStatus.RUNNING:
-            await run_async(
-                _stop_runner,
-                job_submission,
-                project.ssh_private_key,
-            )
+            try:
+                await run_async(
+                    _stop_runner,
+                    job_submission,
+                    project.ssh_private_key,
+                )
+            except SSHError:
+                logger.debug(
+                    "Failed to stop runner %s", job_submission.job_provisioning_data.hostname
+                )
         elif new_status == JobStatus.ABORTED or job_model.status in (
             JobStatus.PROVISIONING,
             JobStatus.PULLING,

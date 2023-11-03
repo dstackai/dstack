@@ -6,9 +6,12 @@ import dstack._internal.server.services.docker as docker
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.configurations import RegistryAuth
 
+DISK_SIZE = 20  # TODO(egor-s): use requirements instead
+
 
 class VastAIAPIClient:
     # TODO(egor-s): handle error 429
+    # TODO(egor-s): cache responses to avoid error 429
     def __init__(self, api_key: str):
         self.api_url = "https://console.vast.ai/api/v0".rstrip("/")
         self.api_key = api_key
@@ -29,6 +32,20 @@ class VastAIAPIClient:
         onstart: str,
         registry_auth: Optional[RegistryAuth] = None,
     ) -> dict:
+        """
+        Args:
+            instance_name: instance label
+            bundle_id: desired host
+            image_name: docker image name
+            onstart: commands to run on start
+            registry_auth: registry auth credentials for private images
+
+        Raises:
+            NoCapacityError: if instance cannot be created
+
+        Returns:
+            create instance response
+        """
         image_login = None
         if registry_auth:
             registry = docker.parse_image_name(image_name).registry or "docker.io"
@@ -36,7 +53,7 @@ class VastAIAPIClient:
         payload = {
             "client_id": "me",
             "image": image_name,
-            "disk": 20,  # TODO(egor-s) configurable
+            "disk": DISK_SIZE,
             "label": instance_name,
             "env": {
                 "-p 10022:10022": "1",
@@ -56,12 +73,18 @@ class VastAIAPIClient:
             raise NoCapacityError(resp.text)
         return data
 
-    def destroy_instance(self, instance_id: Union[str, int]):
+    def destroy_instance(self, instance_id: Union[str, int]) -> bool:
+        """
+        Args:
+            instance_id: instance to destroy
+
+        Returns:
+            True if instance was destroyed successfully
+        """
         resp = self.s.delete(self._url(f"/instances/{instance_id}/"))
-        resp.raise_for_status()
-        data = resp.json()
-        if not data["success"]:
-            raise requests.HTTPError(data)
+        if resp.status_code != 200 or not resp.json()["success"]:
+            return False
+        return True
 
     def get_instances(self) -> List[dict]:
         resp = self.s.get(self._url(f"/instances/"))
