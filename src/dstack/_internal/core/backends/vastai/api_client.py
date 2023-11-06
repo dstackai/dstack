@@ -6,7 +6,7 @@ import dstack._internal.server.services.docker as docker
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.configurations import RegistryAuth
 
-DISK_SIZE = 20  # TODO(egor-s): use requirements instead
+DISK_SIZE = 80  # TODO(egor-s): use requirements instead
 
 
 class VastAIAPIClient:
