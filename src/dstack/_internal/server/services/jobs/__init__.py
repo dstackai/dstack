@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import socket
 from datetime import timezone
 from typing import Dict, List, Optional
@@ -90,36 +91,24 @@ async def stop_job(
             await asyncio.sleep(0.1)
         await session.refresh(job_model)
         if job_model.status.is_finished():
+            # process_finished_jobs will process the job in the background
             return
 
         job_submission = job_model_to_job_submission(job_model)
-        if job_model.status in (JobStatus.PENDING, JobStatus.SUBMITTED):
-            if new_status == JobStatus.TERMINATING:
-                # there is no instance, just mark as terminated
-                new_status = JobStatus.TERMINATED
-        elif new_status == JobStatus.TERMINATING and job_model.status == JobStatus.RUNNING:
+        if new_status == JobStatus.TERMINATED and job_model.status == JobStatus.RUNNING:
             try:
                 await run_async(
                     _stop_runner,
                     job_submission,
                     project.ssh_private_key,
                 )
+                # delay termination for 15 seconds to allow the runner to stop gracefully
+                delay_job_instance_termination(job_model)
             except SSHError:
                 logger.debug(
                     "Failed to stop runner %s", job_submission.job_provisioning_data.hostname
                 )
-        elif new_status == JobStatus.ABORTED or job_model.status in (
-            JobStatus.PROVISIONING,
-            JobStatus.PULLING,
-        ):
-            await terminate_job_submission_instance(
-                project=project,
-                job_submission=job_submission,
-            )
-        else:
-            raise RuntimeError(
-                f"Unexpected job status transition: {job_model.status} -> {new_status}"
-            )
+        # process_finished_jobs will terminate the instance in the background
         await session.execute(
             update(JobModel)
             .where(JobModel.id == job_model.id)
@@ -141,6 +130,10 @@ async def terminate_job_submission_instance(
         job_submission.job_provisioning_data.instance_id,
         job_submission.job_provisioning_data.region,
     )
+
+
+def delay_job_instance_termination(job_model: JobModel):
+    job_model.remove_at = get_current_datetime() + datetime.timedelta(seconds=15)
 
 
 def get_runner_ports(ports: Optional[List[int]] = None) -> Dict[int, int]:
