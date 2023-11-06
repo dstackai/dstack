@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Union
 
 from pydantic import BaseModel
 
@@ -33,6 +33,12 @@ from dstack._internal.core.models.backends.tensordock import (
     TensorDockConfigInfoWithCredsPartial,
     TensorDockConfigValues,
 )
+from dstack._internal.core.models.backends.vastai import (
+    VastAIConfigInfo,
+    VastAIConfigInfoWithCreds,
+    VastAIConfigInfoWithCredsPartial,
+    VastAIConfigValues,
+)
 
 AnyConfigInfoWithoutCreds = Union[
     AWSConfigInfo,
@@ -40,6 +46,7 @@ AnyConfigInfoWithoutCreds = Union[
     GCPConfigInfo,
     LambdaConfigInfo,
     TensorDockConfigInfo,
+    VastAIConfigInfo,
     DstackConfigInfo,
 ]
 AnyConfigInfoWithCreds = Union[
@@ -48,6 +55,7 @@ AnyConfigInfoWithCreds = Union[
     GCPConfigInfoWithCreds,
     LambdaConfigInfoWithCreds,
     TensorDockConfigInfoWithCreds,
+    VastAIConfigInfoWithCreds,
     DstackConfigInfo,
 ]
 AnyConfigInfoWithCredsPartial = Union[
@@ -56,6 +64,7 @@ AnyConfigInfoWithCredsPartial = Union[
     GCPConfigInfoWithCredsPartial,
     LambdaConfigInfoWithCredsPartial,
     TensorDockConfigInfoWithCredsPartial,
+    VastAIConfigInfoWithCredsPartial,
     DstackConfigInfo,
 ]
 AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
@@ -67,6 +76,7 @@ AnyConfigValues = Union[
     GCPConfigValues,
     LambdaConfigValues,
     TensorDockConfigValues,
+    VastAIConfigValues,
     DstackConfigValues,
 ]
 

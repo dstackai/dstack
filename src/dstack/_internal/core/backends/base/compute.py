@@ -131,3 +131,45 @@ def get_gateway_user_data(authorized_key: str) -> str:
             },
         ],
     )
+
+
+def get_docker_commands(authorized_keys: List[str]) -> List[str]:
+    authorized_keys = "\n".join(authorized_keys).strip()
+    commands = [
+        # note: &> redirection doesn't work in /bin/sh
+        # check in sshd is here, install if not
+        (
+            "if ! command -v sshd >/dev/null 2>&1; then { "
+            "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server; "
+            "} || { "
+            "yum -y install openssh-server; "
+            "}; fi"
+        ),
+        # prohibit password authentication
+        'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
+        # create ssh dirs and add public key
+        "mkdir -p /run/sshd ~/.ssh",
+        "chmod 700 ~/.ssh",
+        f"echo '{authorized_keys}' > ~/.ssh/authorized_keys",
+        "chmod 600 ~/.ssh/authorized_keys",
+        # preserve environment variables for SSH clients
+        "env >> ~/.ssh/environment",
+        'echo "export PATH=$PATH" >> ~/.profile',
+        # regenerate host keys
+        "rm -rf /etc/ssh/ssh_host_*",
+        "ssh-keygen -A > /dev/null",
+        # start sshd
+        "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
+        "touch ~/.no_auto_tmux",
+    ]
+    build = get_dstack_runner_version()
+    runner = "/usr/local/bin/dstack-runner"
+    bucket = "dstack-runner-downloads-stgn"
+    if version.__is_release__:
+        bucket = "dstack-runner-downloads"
+    commands += [
+        f'sudo curl --output {runner} "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',
+        f"sudo chmod +x {runner}",
+        f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
+    ]
+    return commands

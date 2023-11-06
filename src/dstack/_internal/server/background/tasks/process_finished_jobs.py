@@ -1,6 +1,4 @@
-import datetime
-
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.runs import JobStatus
@@ -17,18 +15,17 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-TERMINATE_JOB_INTERVAL = datetime.timedelta(seconds=15)
 
-
-async def process_terminating_jobs():
+async def process_finished_jobs():
     async with get_session_ctx() as session:
         async with TERMINATING_PROCESSING_JOBS_LOCK:
             res = await session.execute(
                 select(JobModel)
                 .where(
-                    JobModel.status == JobStatus.TERMINATING,
                     JobModel.id.not_in(TERMINATING_PROCESSING_JOBS_IDS),
-                    JobModel.last_processed_at < get_current_datetime() - TERMINATE_JOB_INTERVAL,
+                    JobModel.removed.is_(False),
+                    JobModel.status.in_(JobStatus.finished_statuses()),
+                    or_(JobModel.remove_at.is_(None), JobModel.remove_at < get_current_datetime()),
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)  # TODO(egor-s) process multiple at once
@@ -50,11 +47,16 @@ async def _process_job(job_id):
         )
         job_model = res.scalar_one()
         job_submission = job_model_to_job_submission(job_model)
-        await terminate_job_submission_instance(
-            project=job_model.project,
-            job_submission=job_submission,
-        )
-        job_model.status = JobStatus.TERMINATED
+        try:
+            if job_submission.job_provisioning_data is not None:
+                await terminate_job_submission_instance(
+                    project=job_model.project,
+                    job_submission=job_submission,
+                )
+            job_model.removed = True
+            logger.debug("Job %s is marked as removed", job_model.job_name)
+        except Exception as e:
+            job_model.removed = False
+            logger.error("Failed to terminate job instance %s: %s", job_model.job_name, e)
         job_model.last_processed_at = get_current_datetime()
-        logger.debug("Job %s is terminated", job_model.job_name)
         await session.commit()

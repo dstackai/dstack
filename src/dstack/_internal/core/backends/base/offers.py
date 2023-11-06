@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from typing import Callable, List, Optional
 
 import gpuhunt
@@ -12,44 +13,26 @@ def get_catalog_offers(
     locations: Optional[List[str]] = None,
     requirements: Optional[Requirements] = None,
     extra_filter: Optional[Callable[[InstanceOffer], bool]] = None,
+    catalog: Optional[gpuhunt.Catalog] = None,
 ) -> List[InstanceOffer]:
     provider = backend.value
     if backend == BackendType.LAMBDA:
         provider = "lambdalabs"
-    filters = dict(provider=[provider])
-    if requirements is not None:
-        filters.update(
-            min_cpu=requirements.cpus,
-            max_price=requirements.max_price,
-            min_disk_size=100,
-            spot=requirements.spot,
-        )
-        if requirements.memory_mib is not None:
-            filters["min_memory"] = requirements.memory_mib / 1024
-        if requirements.gpus is not None:
-            if requirements.gpus.name is not None:
-                filters["gpu_name"] = [requirements.gpus.name]
-            if requirements.gpus.memory_mib is not None:
-                filters["min_gpu_memory"] = requirements.gpus.memory_mib / 1024
-            if requirements.gpus.count is not None:
-                filters["min_gpu_count"] = requirements.gpus.count
-            if requirements.gpus.total_memory_mib is not None:
-                filters["min_total_gpu_memory"] = requirements.gpus.total_memory_mib / 1024
-            if requirements.gpus.compute_capability is not None:
-                filters["min_compute_capability"] = requirements.gpus.compute_capability
-
+    q = requirements_to_query_filter(requirements)
+    q.provider = [provider]
     offers = []
-    for item in gpuhunt.query(**filters):
+    catalog = catalog if catalog is not None else gpuhunt.default_catalog()
+    for item in catalog.query(**asdict(q)):
         if locations is not None and item.location not in locations:
             continue
-        offer = _catalog_item_to_offer(backend, item)
+        offer = catalog_item_to_offer(backend, item)
         if extra_filter is not None and not extra_filter(offer):
             continue
         offers.append(offer)
     return offers
 
 
-def _catalog_item_to_offer(backend: BackendType, item: gpuhunt.CatalogItem) -> InstanceOffer:
+def catalog_item_to_offer(backend: BackendType, item: gpuhunt.CatalogItem) -> InstanceOffer:
     gpus = []
     if item.gpu_count > 0:
         gpus = [Gpu(name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024))] * item.gpu_count
@@ -67,3 +50,27 @@ def _catalog_item_to_offer(backend: BackendType, item: gpuhunt.CatalogItem) -> I
         region=item.location,
         price=item.price,
     )
+
+
+def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFilter:
+    q = gpuhunt.QueryFilter()
+    if req is None:
+        return q
+    q.min_cpu = req.cpus
+    q.max_price = req.max_price
+    q.min_disk_size = 100  # TODO(egor-s): take from requirements
+    q.spot = req.spot
+    if req.memory_mib is not None:
+        q.min_memory = req.memory_mib / 1024
+    if req.gpus is not None:
+        if req.gpus.name is not None:
+            q.gpu_name = [req.gpus.name]
+        if req.gpus.memory_mib is not None:
+            q.min_gpu_memory = req.gpus.memory_mib / 1024
+        if req.gpus.count is not None:
+            q.min_gpu_count = req.gpus.count
+        if req.gpus.total_memory_mib is not None:
+            q.min_total_gpu_memory = req.gpus.total_memory_mib / 1024
+        if req.gpus.compute_capability is not None:
+            q.min_compute_capability = req.gpus.compute_capability
+    return q

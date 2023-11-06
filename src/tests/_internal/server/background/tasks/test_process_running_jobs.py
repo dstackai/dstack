@@ -284,15 +284,11 @@ class TestProcessRunningJobs:
         )
         with patch(
             "dstack._internal.server.services.runner.ssh.RunnerTunnel"
-        ) as RunnerTunnelMock, patch(
-            "dstack._internal.server.background.tasks.process_running_jobs.terminate_job_submission_instance"
-        ) as TerminateJobMock, patch(
-            "dstack._internal.server.services.runner.ssh.time.sleep"
-        ):
+        ) as RunnerTunnelMock, patch("dstack._internal.server.services.runner.ssh.time.sleep"):
             RunnerTunnelMock.side_effect = SSHError
             await process_running_jobs()
             assert RunnerTunnelMock.call_count == 3
-            TerminateJobMock.assert_called_once()
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.FAILED
+        assert job.remove_at is None

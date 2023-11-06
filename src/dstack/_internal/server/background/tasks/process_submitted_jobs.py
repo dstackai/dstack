@@ -114,7 +114,7 @@ async def _run_job(
         logger.info(
             "Trying %s in %s/%s for $%0.4f per hour",
             offer.instance.name,
-            offer.backend,
+            offer.backend.value,
             offer.region,
             offer.price,
         )

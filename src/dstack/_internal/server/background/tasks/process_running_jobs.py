@@ -16,8 +16,8 @@ from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
+    delay_job_instance_termination,
     job_model_to_job_submission,
-    terminate_job_submission_instance,
 )
 from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
 from dstack._internal.server.services.runner import client
@@ -163,15 +163,7 @@ async def _process_job(job_id: UUID):
                             status=JobStatus.PENDING,
                         )
                         session.add(new_job_model)
-                if (
-                    job_model.error_code == JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
-                ):  # TODO currently always True
-                    # JobErrorCode.INTERRUPTED_BY_NO_CAPACITY means that we could not connect to runner.
-                    # The instance may still be running (e.g. network issue), so we force termination.
-                    await terminate_job_submission_instance(
-                        project=project,
-                        job_submission=job_submission,
-                    )
+                # job will be terminated by process_finished_jobs
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
 
@@ -208,8 +200,6 @@ def _process_provisioning_no_shim(
         secrets=secrets,
         repo_credentials=repo_credentials,
     )
-    job_model.status = JobStatus.RUNNING
-    logger.debug("Job %s is running", job_model.job_name)
     return True
 
 
@@ -316,6 +306,8 @@ def _process_running(
     if len(resp.job_states) > 0:
         last_job_state = resp.job_states[-1]
         job_model.status = last_job_state.state
+        if job_model.status == JobStatus.DONE:
+            delay_job_instance_termination(job_model)
         logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
     return True
 

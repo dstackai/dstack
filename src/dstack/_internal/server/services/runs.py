@@ -201,7 +201,7 @@ async def stop_runs(
     runs_names: List[str],
     abort: bool,
 ):
-    new_status = JobStatus.TERMINATING
+    new_status = JobStatus.TERMINATED
     if abort:
         new_status = JobStatus.ABORTED
 

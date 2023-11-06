@@ -7,7 +7,7 @@
 #SCHEMA# dstack._internal.server.services.config.ProjectConfig
     overrides:
         backends:
-            type: 'Union[AWSConfigInfoWithCreds, AzureConfigInfoWithCreds, GCPConfigInfoWithCreds, LambdaConfigInfoWithCreds, TensorDockInfoWithCreds]'
+            type: 'Union[AWSConfigInfoWithCreds, AzureConfigInfoWithCreds, GCPConfigInfoWithCreds, LambdaConfigInfoWithCreds, TensorDockConfigInfoWithCreds, VastAIConfigInfoWithCreds]'
 
 #SCHEMA# dstack._internal.server.services.config.AWSConfig
 
@@ -34,3 +34,7 @@
 #SCHEMA# dstack._internal.server.services.config.TensorDockConfig
 
 ##SCHEMA# dstack._internal.core.models.backends.tensordock.TensorDockAPIKeyCreds
+
+#SCHEMA# dstack._internal.server.services.config.VastAIConfig
+
+##SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds

@@ -519,15 +519,18 @@ class TestStopRuns:
             run=run,
             status=JobStatus.RUNNING,
         )
-        with patch("dstack._internal.server.services.jobs._stop_runner") as m:
+        with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
             response = client.post(
                 f"/api/project/{project.name}/runs/stop",
                 headers=get_auth_headers(user.token),
                 json={"runs_names": [run.run_name], "abort": False},
             )
+            stop_runner.assert_called_once()
         assert response.status_code == 200
         await session.refresh(job)
-        assert job.status == JobStatus.TERMINATING
+        assert job.status == JobStatus.TERMINATED
+        assert not job.removed
+        assert job.remove_at is not None
 
     @pytest.mark.asyncio
     async def test_leaves_finished_runs_unchanged(self, test_db, session: AsyncSession):
