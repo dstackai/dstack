@@ -20,7 +20,6 @@ from dstack._internal.core.models.backends import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
-    InstanceCandidate,
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.runs import Job
@@ -254,27 +253,14 @@ async def get_instance_offers(
     """
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
-    candidates = []
+    offers = []
     tasks = [
         run_async(backend.compute().get_offers, job.job_spec.requirements) for backend in backends
     ]
-    for backend, backend_candidates in zip(backends, await asyncio.gather(*tasks)):
-        for offer in backend_candidates:
+    for backend, backend_offers in zip(backends, await asyncio.gather(*tasks)):
+        for offer in backend_offers:
             if not exclude_not_available or offer.availability not in _NOT_AVAILABLE:
-                candidates.append((backend, offer))
+                offers.append((backend, offer))
 
     # Put NOT_AVAILABLE and NO_QUOTA instances at the end
-    return sorted(candidates, key=lambda i: (i[1].availability in _NOT_AVAILABLE, i[1].price))
-
-
-async def get_instance_candidates(
-    backends: List[Backend], job: Job, exclude_not_available: bool = False
-) -> List[InstanceCandidate]:
-    offers = await get_instance_offers(
-        backends=backends, job=job, exclude_not_available=exclude_not_available
-    )
-    candidates = []
-    for backend, offer in offers:
-        candidate = InstanceCandidate(backend=backend.TYPE, **offer.dict())
-        candidates.append(candidate)
-    return candidates
+    return sorted(offers, key=lambda i: (i[1].availability in _NOT_AVAILABLE, i[1].price))

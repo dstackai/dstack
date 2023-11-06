@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
-    InstanceCandidate,
     InstanceOfferWithAvailability,
     InstanceType,
     Resources,
@@ -39,7 +38,7 @@ def get_dev_env_run_plan_dict(
     username: str = "test_user",
     run_name: str = "dry-run",
     repo_id: str = "test_repo",
-    candidates: List[InstanceCandidate] = [],
+    offers: List[InstanceOfferWithAvailability] = [],
 ) -> Dict:
     return {
         "project_name": project_name,
@@ -117,7 +116,7 @@ def get_dev_env_run_plan_dict(
                     "retry_policy": {"limit": None, "retry": False},
                     "working_dir": ".",
                 },
-                "candidates": [json.loads(c.json()) for c in candidates],
+                "offers": [json.loads(o.json()) for o in offers],
             }
         ],
     }
@@ -314,8 +313,9 @@ class TestGetRunPlan:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         repo = await create_repo(session=session, project_id=project.id)
-        candidates = [
-            InstanceCandidate(
+        offers = [
+            InstanceOfferWithAvailability(
+                backend=BackendType.AWS,
                 instance=InstanceType(
                     name="instance",
                     resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
@@ -323,15 +323,13 @@ class TestGetRunPlan:
                 region="us",
                 price=1.0,
                 availability=InstanceAvailability.AVAILABLE,
-                backend=BackendType.AWS,
             )
         ]
-        offers = [InstanceOfferWithAvailability.parse_obj(c) for c in candidates]
         run_plan_dict = get_dev_env_run_plan_dict(
             project_name=project.name,
             username=user.name,
             repo_id=repo.name,
-            candidates=candidates,
+            offers=offers,
         )
         body = {"run_spec": run_plan_dict["run_spec"]}
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:

@@ -27,7 +27,7 @@ class TensorDockCompute(Compute):
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
-            provider=BackendType.TENSORDOCK.value,
+            backend=BackendType.TENSORDOCK,
             requirements=requirements,
         )
         offers = [

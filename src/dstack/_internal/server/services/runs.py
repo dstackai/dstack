@@ -104,14 +104,15 @@ async def get_run_plan(
     jobs = get_jobs_from_run_spec(run_spec)
     job_plans = []
     for job in jobs:
-        candidates = await backends_services.get_instance_candidates(
+        offers = await backends_services.get_instance_offers(
             backends=backends,
             job=job,
             exclude_not_available=False,
         )
+        offers = [offer for _, offer in offers]
         job_plan = JobPlan(
             job_spec=job.job_spec,
-            candidates=candidates[:50],
+            offers=offers[:50],
         )
         job_plans.append(job_plan)
     run_spec.run_name = run_name  # restore run_name

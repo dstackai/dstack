@@ -75,6 +75,7 @@ class TestProcessSubmittedJobs:
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = [
                 InstanceOfferWithAvailability(
+                    backend=BackendType.AWS,
                     instance=InstanceType(
                         name="instance",
                         resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),

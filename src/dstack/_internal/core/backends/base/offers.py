@@ -3,17 +3,21 @@ from typing import Callable, List, Optional
 
 import gpuhunt
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import Gpu, InstanceOffer, InstanceType, Resources
 from dstack._internal.core.models.runs import Requirements
 
 
 def get_catalog_offers(
-    provider: str,
+    backend: BackendType,
     locations: Optional[List[str]] = None,
     requirements: Optional[Requirements] = None,
     extra_filter: Optional[Callable[[InstanceOffer], bool]] = None,
     catalog: Optional[gpuhunt.Catalog] = None,
 ) -> List[InstanceOffer]:
+    provider = backend.value
+    if backend == BackendType.LAMBDA:
+        provider = "lambdalabs"
     q = requirements_to_query_filter(requirements)
     q.provider = [provider]
     offers = []
@@ -21,18 +25,19 @@ def get_catalog_offers(
     for item in catalog.query(**asdict(q)):
         if locations is not None and item.location not in locations:
             continue
-        offer = catalog_item_to_offer(item)
+        offer = catalog_item_to_offer(backend, item)
         if extra_filter is not None and not extra_filter(offer):
             continue
         offers.append(offer)
     return offers
 
 
-def catalog_item_to_offer(item: gpuhunt.RawCatalogItem) -> InstanceOffer:
+def catalog_item_to_offer(backend: BackendType, item: gpuhunt.CatalogItem) -> InstanceOffer:
     gpus = []
     if item.gpu_count > 0:
         gpus = [Gpu(name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024))] * item.gpu_count
     return InstanceOffer(
+        backend=backend,
         instance=InstanceType(
             name=item.instance_name,
             resources=Resources(

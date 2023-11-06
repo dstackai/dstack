@@ -46,7 +46,7 @@ class AWSCompute(Compute):
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
-            provider=BackendType.AWS.value,
+            backend=BackendType.AWS,
             locations=self.config.regions,
             requirements=requirements,
             extra_filter=_supported_instances,
