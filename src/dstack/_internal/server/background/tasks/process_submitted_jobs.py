@@ -141,5 +141,6 @@ async def _run_job(
                 username=launched_instance_info.username,
                 ssh_port=launched_instance_info.ssh_port,
                 dockerized=launched_instance_info.dockerized,
+                backend_data=launched_instance_info.backend_data,
             )
     return None

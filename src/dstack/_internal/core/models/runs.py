@@ -131,6 +131,7 @@ class JobProvisioningData(BaseModel):
     username: str
     ssh_port: int  # could be different from 22 for some backends
     dockerized: bool  # True if JumpProxy is needed
+    backend_data: Optional[str]  # backend-specific data in json
 
 
 class JobSubmission(BaseModel):
