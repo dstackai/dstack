@@ -9,7 +9,7 @@ from dstack._internal.utils.common import pretty_date
 from dstack.api import Run
 
 
-def print_run_plan(run_plan: RunPlan, candidates_limit: int = 3):
+def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     job_plan = run_plan.job_plans[0]
 
     props = Table(box=None, show_header=False)
@@ -48,42 +48,45 @@ def print_run_plan(run_plan: RunPlan, candidates_limit: int = 3):
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Retry policy"), retry_policy)
 
-    candidates = Table(box=None)
-    candidates.add_column("#")
-    candidates.add_column("BACKEND")
-    candidates.add_column("REGION")
-    candidates.add_column("INSTANCE")
-    candidates.add_column("RESOURCES")
-    candidates.add_column("SPOT")
-    candidates.add_column("PRICE")
-    candidates.add_column()
+    offers = Table(box=None)
+    offers.add_column("#")
+    offers.add_column("BACKEND")
+    offers.add_column("REGION")
+    offers.add_column("INSTANCE")
+    offers.add_column("RESOURCES")
+    offers.add_column("SPOT")
+    offers.add_column("PRICE")
+    offers.add_column()
 
-    job_plan.candidates = job_plan.candidates[:candidates_limit]
+    job_plan.offers = job_plan.offers[:offers_limit]
 
-    for i, c in enumerate(job_plan.candidates, start=1):
-        r = c.instance.resources
+    for i, offer in enumerate(job_plan.offers, start=1):
+        r = offer.instance.resources
 
         availability = ""
-        if c.availability in {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}:
-            availability = c.availability.value.replace("_", " ").title()
-        candidates.add_row(
+        if offer.availability in {
+            InstanceAvailability.NOT_AVAILABLE,
+            InstanceAvailability.NO_QUOTA,
+        }:
+            availability = offer.availability.value.replace("_", " ").title()
+        offers.add_row(
             f"{i}",
-            c.backend,
-            c.region,
-            c.instance.name,
+            offer.backend,
+            offer.region,
+            offer.instance.name,
             r.pretty_format(),
             "yes" if r.spot else "no",
-            f"${c.price:g}",
+            f"${offer.price:g}",
             availability,
             style=None if i == 1 else "grey58",
         )
-    if len(job_plan.candidates) == candidates_limit:
-        candidates.add_row("", "...", style="grey58")
+    if len(job_plan.offers) == offers_limit:
+        offers.add_row("", "...", style="grey58")
 
     console.print(props)
     console.print()
-    if len(job_plan.candidates) > 0:
-        console.print(candidates)
+    if len(job_plan.offers) > 0:
+        console.print(offers)
         console.print()
 
 

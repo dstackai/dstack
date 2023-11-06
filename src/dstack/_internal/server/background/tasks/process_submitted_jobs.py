@@ -109,14 +109,12 @@ async def _run_job(
 ) -> Optional[JobProvisioningData]:
     if run.run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
-    candidates = await backends_services.get_instance_offers(
-        backends, job, exclude_not_available=True
-    )
-    for backend, offer in candidates:
+    offers = await backends_services.get_instance_offers(backends, job, exclude_not_available=True)
+    for backend, offer in offers:
         logger.info(
             "Trying %s in %s/%s for $%0.4f per hour",
             offer.instance.name,
-            backend.TYPE,
+            offer.backend,
             offer.region,
             offer.price,
         )

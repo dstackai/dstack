@@ -61,6 +61,7 @@ class InstanceAvailability(Enum):
 
 
 class InstanceOffer(BaseModel):
+    backend: BackendType
     instance: InstanceType
     region: str
     price: float
@@ -68,10 +69,6 @@ class InstanceOffer(BaseModel):
 
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
-
-
-class InstanceCandidate(InstanceOfferWithAvailability):
-    backend: BackendType
 
 
 class LaunchedGatewayInfo(BaseModel):

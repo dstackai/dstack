@@ -7,8 +7,8 @@ from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration, RegistryAuth
-from dstack._internal.core.models.instances import InstanceCandidate, InstanceType
-from dstack._internal.core.models.profiles import Profile, SpotPolicy
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability, InstanceType
+from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import pretty_resources
@@ -182,7 +182,7 @@ class Run(BaseModel):
 
 class JobPlan(BaseModel):
     job_spec: JobSpec
-    candidates: List[InstanceCandidate]
+    offers: List[InstanceOfferWithAvailability]
 
 
 class RunPlan(BaseModel):
