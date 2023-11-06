@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 
+{% block header %}
+    {% include "header-2.html" %}
+{% endblock %}
+
 {% block scripts %}
 <script src="/assets/javascripts/termynal.js" data-termynal-container="#termynal"></script>
+<script async src="https://tally.so/widgets/embed.js"></script>
 {{ super() }}
 {% endblock %}
 

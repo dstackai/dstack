@@ -1,13 +1,16 @@
 # Tasks
 
-A task can be a batch job or a web app. Tasks can be used to run web apps for development purposes.
+With `dstack`, you can use the CLI or API to run tasks like training scripts, batch jobs, or web apps. 
+Provide the commands, ports, and choose the Python version or a Docker image.
+
+`dstack` handles the execution on configured cloud GPU provider(s) with the necessary resources.
 
 ## Using the CLI
 
 ### Define a configuration
 
-To run a task via the CLI, first create its configuration file. 
-The configuration file name must end with `.dstack.yml` (e.g., `.dstack.yml` or `train.dstack.yml` are both acceptable).
+First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `train.dstack.yml`
+are both acceptable).
 
 <div editor-title="train.dstack.yml"> 
 
@@ -42,7 +45,8 @@ commands:
 
 </div>
 
-When you run such a task, `dstack` forwards the configured ports to `localhost`.
+When running a task, `dstack` forwards the remote ports to `localhost` for secure 
+and convenient access.
 
 By default, `dstack` uses its own Docker images to run dev environments, 
 which are pre-configured with Python, Conda, and essential CUDA drivers.
@@ -54,18 +58,20 @@ which are pre-configured with Python, Conda, and essential CUDA drivers.
 
 ### Run the configuration
 
-The `dstack run` command requires the working directory path, and optionally, the `-f`
-argument pointing to the configuration file.
-
-If the `-f` argument is not specified, `dstack` looks for the default configuration (`.dstack.yml`) in the working directory.
+To run a configuration, use the `dstack run` command followed by the working directory path, 
+configuration file path, and any other options (e.g., for requesting hardware resources).
 
 <div class="termy">
 
 ```shell
 $ dstack run . -f train.dstack.yml --gpu A100
 
- RUN            CONFIGURATION     BACKEND  RESOURCES        SPOT  PRICE
- wet-mangust-7  train.dstack.yml  aws      5xCPUs, 15987MB  yes   $0.0547  
+ BACKEND     REGION         RESOURCES                     SPOT  PRICE
+ tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
+ azure       westus3        24xCPU, 220GB, 1xA100 (80GB)  no    $3.673
+ azure       westus2        24xCPU, 220GB, 1xA100 (80GB)  no    $3.673
+ 
+Continue? [y/n]: y
 
 Provisioning...
 ---> 100%
@@ -77,28 +83,27 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 
 </div>
 
-#### Request resources
+!!! info "Run options"
+    The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
+    and many other options (incl. spot instances, max price, max duration, retry policy, etc.).
+    For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
 
-The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
-`--memory` to request memory (e.g. `--memory 128GB`),
-and many other options (incl. spot instances, max price, max duration, etc.).
+??? info "Port mapping"
+    When running a task, `dstack` forwards the remote ports to `localhost` for secure 
+    and convenient access.
+    You can override local ports via `--port`:
+    
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . -f serve.dstack.yml --port 8080:7860
+    ```
+    
+    </div>
+    
+    This will forward the task's port `7860` to `localhost:8080`.
 
-#### Override local ports
-
-If your task configures ports, `dstack` forwards them to localhost using the same port. You can override the local port
-through the CLI using `--port`:
-
-<div class="termy">
-
-```shell
-$ dstack run . -f serve.dstack.yml --port 8080:7860
-```
-
-</div>
-
-This will forward the task's port `7860` to `localhost:8080`.
-
-#### Pass run arguments
+### Parametrize tasks
 
 You can parameterize tasks with user arguments using `${{ run.args }}` in the configuration.
 
@@ -130,10 +135,10 @@ $ dstack run . -f train.dstack.yml --gpu A100 --train_batch_size=1 --num_train_e
 
 The `dstack run` command will pass `--train_batch_size=1` and `--num_train_epochs=100` as arguments to `train.py`.
 
-#### Configure a retry limit
+### Configure retry limit
 
-By default, tf `dstack` is unable to find capacity, the `dstack run` command will fail. However, you may
-pass the [`--retry-limit`](../reference/cli/run.md#RETRY_LIMIT) option to `dstack run` to specify the timeframe in which `dstack` should search for
+By default, if `dstack` is unable to find capacity, `dstack run` will fail. However, you may
+pass the [`--retry-limit`](../reference/cli/index.md#dstack-run) option to `dstack run` to specify the timeframe in which `dstack` should search for
 capacity and automatically resubmit the run.
 
 Example:
@@ -146,6 +151,6 @@ $ dstack run . -f train.dstack.yml --retry-limit 3h
 
 </div>
 
-For more details on the `dstack run` command, refer to the [Reference](../reference/cli/run.md).
+For more details on the `dstack run` command, refer to the [Reference](../reference/cli/index.md#dstack-run).
 
 [//]: # (Using the API)

@@ -1,14 +1,15 @@
 # Dev environments
 
-A dev environment is a cloud instance pre-configured with an IDE.
-It is ideal when you want to interactively work with code using your favorite IDE.
+Before submitting a long-running task or deploying a model, you may want to experiment 
+interactively using your IDE, terminal, or Jupyter notebooks.
 
-## Using the CLI
+With `dstack`, you can provision a dev environment with the required cloud resources, 
+code, and environment via a single command.
 
-### Define a configuration
+## Define a configuration
 
-To run a dev environment via the CLI, first create its configuration file. 
-The configuration file name must end with `.dstack.yml` (e.g., `.dstack.yml` or `dev.dstack.yml` are both acceptable).
+First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are
+both acceptable).
 
 <div editor-title=".dstack.yml"> 
 
@@ -22,30 +23,29 @@ ide: vscode
 
 </div>
 
-By default, `dstack` uses its own Docker images to run dev environments, 
-which are pre-configured with Python, Conda, and essential CUDA drivers.
-
 !!! info "Configuration options"
-    Configuration file allows you to specify a custom Docker image, ports, environment variables, and many other 
-    options.
+    You can specify your own Docker image, configure environment variables, etc.
+    If no image is specified, `dstack` uses its own Docker image (pre-configured with Python, Conda, and essential CUDA drivers).
     For more details, refer to the [Reference](../reference/dstack.yml/dev-environment.md).
 
-### Run the configuration
+## Run the configuration
 
-The `dstack run` command requires the working directory path, and optionally, the `-f`
-argument pointing to the configuration file.
-
-If the `-f` argument is not specified, `dstack` looks for the default configuration (`.dstack.yml`) in the working directory.
+To run a configuration, use the `dstack run` command followed by the working directory path, 
+configuration file path, and any other options (e.g., for requesting hardware resources).
 
 <div class="termy">
 
 ```shell
-$ dstack run . --gpu A100
+$ dstack run . -f .dstack.yml --gpu A100
 
- RUN          CONFIGURATION  BACKEND  RESOURCES        SPOT  PRICE
- fast-moth-1  .dstack.yml    aws      5xCPUs, 15987MB  yes   $0.0547 
+ BACKEND     REGION         RESOURCES                     SPOT  PRICE
+ tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
+ azure       westus3        24xCPU, 220GB, 1xA100 (80GB)  no    $3.673
+ azure       westus2        24xCPU, 220GB, 1xA100 (80GB)  no    $3.673
  
-Provisioning and starting SSH tunnel...
+Continue? [y/n]: y
+
+Provisioning...
 ---> 100%
 
 To open in VS Code Desktop, use this link:
@@ -54,16 +54,23 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
-After you run it, `dstack` provides a URL to open the dev environment in your desktop VS Code.
+!!! info "Run options"
+    The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
+    and many other options (incl. spot instances, max price, max duration, retry policy, etc.).
+    For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
+
+Once the dev environment is provisioned, click the link to open the environment in your desktop IDE.
 
 ![](../../assets/images/dstack-vscode-jupyter.png){ width=800 }
 
-By default, the dev environment comes with pre-installed Python and Jupyter extensions.
+!!! info "Port forwarding"
+    When running a dev environment, `dstack` forwards the remote ports to `localhost` for secure 
+    and convenient access.
 
-#### Request resources
+No need to worry about copying code, setting up environment, IDE, etc. `dstack` handles it all 
+automatically.
 
-The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
-`--memory` to request memory (e.g. `--memory 128GB`),
-and many other options (incl. spot instances, max price, max duration, retry policy, etc.).
+??? info ".gitignore"
+    When running a dev environment, `dstack` uses the exact version of code from your project directory. 
 
-For more details on the `dstack run` command, refer to the [Reference](../reference/cli/run.md).
+    If there are large files, consider creating a `.gitignore` file to exclude them for better performance.

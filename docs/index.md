@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: Orchestrate generative AI workloads with ease
+title: An easier way to train and deploy generative AI
 hide:
    - navigation
    - toc

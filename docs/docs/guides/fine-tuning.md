@@ -1,10 +1,16 @@
 # Fine-tuning
 
-With `dstack`, fine-tuning generative AI models using [tasks](tasks.md) offers maximum flexibility. 
-For a simpler out-of-the-box solution, try our fine-grained API. This API allows you to fine-tune any 
-Hugging Face model with SFT or DPO techniques in your cloud with just one line of code. 
+If you want to fine-tune an LLM based on a given dataset, consider using
+`dstack`'s finetuning API.
 
-First, you connect to the `dstack` server:
+You specify a model name, dataset on HuggingFace, and training parameters.
+`dstack` takes care of the training and pushes it to the HuggingFace hub upon completion. 
+
+You can use any cloud GPU provider(s) and experiment tracker of your choice.
+
+## Create a client
+
+First, you connect to `dstack`:
 
 ```python
 from dstack.api import Client, ClientError
@@ -15,23 +21,28 @@ except ClientError:
     print("Can't connect to the server")
 ```
 
-Then, you create a fine-tuning task:
+## Create a task
+
+Then, you create a fine-tuning task, specifying the model and dataset, 
+and various [training parameters](../../docs/reference/api/python/index.md#dstack.api.finetuning.SFTFineTuningTask).
 
 ```python
-from dstack.api.huggingface import SFTFineTuningTask
+from dstack.api.finetuning import SFTFineTuningTask
 
-task = SFTFineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
-                         dataset_name="peterschmidt85/samsum",
-                         num_train_epochs=2,
-                         env={
-                             "HUGGING_FACE_HUB_TOKEN": "...",
-                         })
+task = SFTFineTuningTask(hf_model_name="NousResearch/Llama-2-13b-hf",
+                         hf_dataset_name="peterschmidt85/samsum",
+                         hf_token="...",
+                         num_train_epochs=2)
 ```
 
-The task requires the `HUGGING_FACE_HUB_TOKEN` environment
-variable and allows configuration of [various training parameters](../../docs/reference/api/python/index.md#dstack.api.huggingface.SFTFineTuningTask).
+!!! info "Dataset format"
+    For the SFT fine-tuning method, the dataset should contain a `"text"` column with completions following the prompt format
+    of the corresponding model.
+    Check the [peterschmidt85/samsum](https://huggingface.co/datasets/peterschmidt85/samsum) example. 
 
-And finally, submit the task:
+## Submit the task
+
+When submitting a task, you can configure resources, and many [other options](../../docs/reference/api/python/index.md#dstack.api.RunCollection.submit).
 
 ```python
 from dstack.api import Resources, GPU
@@ -39,33 +50,42 @@ from dstack.api import Resources, GPU
 run = client.runs.submit(
     run_name="Llama-2-13b-samsum", # (Optional) If unset, its chosen randomly
     configuration=task,
-    resources=Resources(gpu=GPU(memory="24GB", count=4)),
+    resources=Resources(gpu=GPU(memory="24GB")),
 )
 ```
 
-When submitting a task, you can configure resources, along with [many other options](../../docs/reference/api/python/index.md#dstack.api.RunCollection.submit).
-
-You can use the [methods](../../docs/reference/api/python/index.md#dstack.api.Client) on `client` to manage your runs, including getting a list of runs, stopping a given
-run, etc.
-
-To track experiment metrics, specify `report_to` and related authentication environment variables.
-
-```python
-task = SFTFineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
-                         dataset_name="peterschmidt85/samsum",
-                         num_train_epochs=2,
-                         report_to="wandb",
-                         env={
-                             "HUGGING_FACE_HUB_TOKEN": "...",
-                             "WANDB_API_KEY": "...",
-                             "WANDB_PROJECT": ...
-                         })
-```
-
-Currently, the API supports `"tensorboard"` and `"wandb"`:
-
-![](../../assets/images/dstack-finetuning-wandb.png){ width=800 }
+!!! info "Fine-tuning methods"
+    The API currently supports only SFT, with support for DPO and other methods coming soon.
 
 When the training is done, `dstack` pushes the final model to the Hugging Face hub.
 
 ![](../../assets/images/dstack-finetuning-hf.png){ width=800 }
+
+## Manage runs
+
+You can use the instance of [`dstack.api.Client`](../../docs/reference/api/python/index.md#dstack.api.Client) to manage your runs, 
+including getting a list of runs, stopping a given run, etc.
+
+## Track experiments
+
+To track experiment metrics, specify `report_to` and related authentication environment variables.
+
+```python
+task = SFTFineTuningTask(hf_model_name="NousResearch/Llama-2-13b-hf",
+                         hf_dataset_name="peterschmidt85/samsum",
+                         hf_token="...",
+                         report_to="wandb",
+                         env={
+                             "WANDB_API_KEY": "...",
+                             "WANDB_PROJECT": "...",
+                         },
+                         num_train_epochs=2
+                         )
+```
+
+Currently, the API supports `"tensorboard"` and `"wandb"`.
+
+![](../../assets/images/dstack-finetuning-wandb.png){ width=800 }
+
+[//]: # (TODO: Example)
+[//]: # (TODO: Next steps)

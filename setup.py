@@ -124,8 +124,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="dstack is an open-source platform for training, fine-tuning, and deployment of generative AI models "
-    "across various cloud providers.",
+    description="dstack simplifies training, fine-tuning, and deploying generative AI models on any cloud.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.8",

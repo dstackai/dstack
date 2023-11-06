@@ -45,8 +45,13 @@
     {% if config.extra.alternate %}
       {% include "partials/alternate.html" %}
     {% endif %}
+
     {% if "material/search" in config.plugins %}
-      <div class="md-search"></div>
+      <label class="md-header__button md-icon" for="__search">
+        {% set icon = config.theme.icon.search or "material/magnify" %}
+        {% include ".icons/" ~ icon ~ ".svg" %}
+      </label>
+      {% include "partials/search.html" %}
     {% endif %}
 
     {% if config.repo_url %}
@@ -54,6 +59,7 @@
         {% include "partials/source.html" %}
       </div>
     {% endif %}
+
     <div class="md-header__buttons">
       <a href="/docs" class="md-button md-button--primary">Get stated</a>
       <!--<a href="#" data-tally-open="w7K17R" class="md-button md-button-secondary">Request cloud GPU</a>-->

@@ -3,8 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source platform that simplifies generative AI training and deployment
-  across various cloud GPU providers.
+  dstack simplifies training, fine-tuning, and deploying generative AI models, leveraging the open-source ecosystem.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -77,7 +76,7 @@ plugins:
         'docs/quick-start.md': 'docs/index.md'
         'docs/installation/index.md': 'docs/index.md'
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion-xl.md'
-        'docs/guides/projects.md': 'configuration/server.md'
+        'docs/guides/projects.md': 'docs/configuration/server.md'
         'examples/python-api.md': 'examples/deploy-python.md'
         'guides/clouds.md': 'configuration/server.md'
   - typeset
@@ -161,35 +160,19 @@ nav:
           - Configuration:
               - Server configuration: docs/configuration/server.md
       - Guides:
+          - Fine-tuning: docs/guides/fine-tuning.md
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
           - Services: docs/guides/services.md
-          - Fine-tuning: docs/guides/fine-tuning.md
-#          - Artifacts: docs/guides/artifacts.md
       - Reference:
-          - CLI:
-              - dstack server: docs/reference/cli/server.md
-              - dstack init: docs/reference/cli/init.md
-              - dstack config: docs/reference/cli/config.md
-              - dstack run: docs/reference/cli/run.md
-              - dstack ps: docs/reference/cli/ps.md
-              - dstack logs: docs/reference/cli/logs.md
-              - dstack stop: docs/reference/cli/stop.md
-              - dstack gateway: docs/reference/cli/gateway.md
-          - Python API: docs/reference/api/python/index.md
-#              - Overview: docs/reference/api/python/index.md
-#              - Server: docs/reference/api/python/server.md
+          - CLI: docs/reference/cli/index.md
+          - API: docs/reference/api/python/index.md
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
               - task: docs/reference/dstack.yml/task.md
               - service: docs/reference/dstack.yml/service.md
-          - profiles.yml: docs/reference/profiles.yml.md
           - "server/config.yml": docs/reference/server/config.yml.md
-#          - Backends:
-#            - AWS: docs/reference/backends/aws.md
-#            - GCP: docs/reference/backends/gcp.md
-#            - Azure: docs/reference/backends/azure.md
-#            - Lambda: docs/reference/backends/lambda.md
+          - profiles.yml: docs/reference/profiles.yml.md
   - Examples:
     - examples/index.md
     - Examples:

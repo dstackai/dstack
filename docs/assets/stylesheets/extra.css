@@ -99,7 +99,11 @@
     border-radius: 6px;
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details) :is(.highlight,.termy,.md-typeset__table,p,h4,h3):not(.admonition-title) {
+[dir=ltr] .md-typeset :is(.admonition,details) blockquote {
+    margin-left: 32px;
+}
+
+[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.highlight,.termy,.md-typeset__table,p,h4,h3):not(.admonition-title) {
     padding-left: 32px;
 }
 
@@ -113,7 +117,7 @@
 }
 
 [dir=ltr] .md-typeset :is(.admonition-title,summary) {
-    font-size: 1em;
+    font-size: 1.1em !important;
     letter-spacing: -0.5px;
     font-weight: 800;
     /*padding-left: 18px;*/
@@ -360,7 +364,11 @@ h4.doc-heading {
     margin: 0;
 }
 
-.md-typeset :not(td, pre, h2, h3, h4) > code {
+.md-typeset :is(table) :not(pre, h2, h3, h4) > code {
+    font-size: .85em;
+}
+
+.md-typeset :not(pre, h2, h3, h4) > code {
     font-size: 0.65rem;
 }
 
@@ -370,7 +378,7 @@ h4.doc-heading {
 
 .md-typeset pre > code {
     background-color: rgb(21, 22, 29);
-    padding: 65px 25px 35px;
+    padding: 35px 25px;
     border-radius: 4px;
     font-size: 15px;
 
@@ -381,7 +389,7 @@ h4.doc-heading {
     /*font-size: .85em;*/
 }
 
-.md-typeset pre > code:before {
+.md-typeset div[editor-title] pre > code:before {
      content: '';
     position: absolute;
     top: 15px;
@@ -396,6 +404,10 @@ h4.doc-heading {
     /*        box-shadow: 25px 0 0 #f4c025, 50px 0 0 #3ec930;*/
     -webkit-box-shadow: 20px 0 0 #f4c025, 40px 0 0 #3ec930;
             box-shadow: 20px 0 0 #f4c025, 40px 0 0 #3ec930;
+}
+
+.md-typeset div[editor-title] pre > code {
+    padding: 65px 25px 35px;
 }
 
 @media screen and (min-width: 60em) {
@@ -418,6 +430,12 @@ h4.doc-heading {
 .md-code__button:after {
     width: 1em;
     height: 1em;
+}
+
+.md-code__nav {
+    top: 1em;
+    right: .25em;
+    background: none;
 }
 
 .md-code__nav .md-code__button {
@@ -833,12 +851,13 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 .md-typeset .tabbed-labels>label {
-    margin-right: 14px !important;
-    padding: 9px 0 !important;
-    font-weight: 700 !important;
-    font-size: 0.75rem !important;
+    padding: 18px 18px 16px !important;
+    font-weight: 800 !important;
+    font-size: 0.7rem !important;
     line-height: 1.2 !important;
     -webkit-font-smoothing: auto !important;
+    z-index: 1000 !important;
+    color: rgba(0,0,0,.63)
 }
 
 .md-typeset .tabbed-labels--linked>label>a {
@@ -862,6 +881,20 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     letter-spacing: -0.25px;
 }
 
+.md-typeset .tabbed-set {
+   border-radius: 0;
+}
+
+.md-typeset .tabbed-block>.highlight:first-child>pre>code, .md-typeset .tabbed-block>pre:first-child>code {
+    margin-top: 17px;
+}
+
+@media screen and (min-width: 76.1875em) {
+    .md-typeset .tabbed-block > .highlight:first-child > pre > code, .md-typeset .tabbed-block > pre:first-child > code {
+        border-radius: 6px;
+    }
+}
+
 .md-typeset .tabbed-set>input:checked~.tabbed-labels code,
 .md-typeset .tabbed-set>input:first-child:checked~.tabbed-labels>:first-child {
     /*MKDocs Insiders fix*/
@@ -870,8 +903,15 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 .js .md-typeset .tabbed-labels:before {
-    height: 1px;
-    background-color: var(--md-typeset-a-color);
+    height: 100%;
+    background: none;
+    z-index: 1;
+    border: black 0.5px solid;
+    padding: 5px;
+    /*border-top-right-radius: 6px;
+    border-top-left-radius: 6px;*/
+    /*border-bottom: none;*/
+    border-radius: 6px;
 }
 
 .md-typeset .tabbed-labels {
@@ -1277,6 +1317,11 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     color: white !important;
 }
 */
+
+[dir=ltr] .md-typeset blockquote {
+    border-left: 0.1rem solid var(--md-accent-fg-color);
+    color: var(--md-default-fg-color);
+}
 
 a.md-go-to-action.secondary {
     color: rgba(0,0,0,0.87);

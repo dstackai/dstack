@@ -1,4 +1,4 @@
-# Python API
+# API
 
 The Python API allows for running tasks, services, and managing runs programmatically.
 
@@ -63,11 +63,11 @@ The Python API allows for running tasks, services, and managing runs programmati
       show_root_toc_entry: false
       heading_level: 4
 
-## `dstack.api.huggingface` { #dstack.api.huggingface data-toc-label="dstack.api.huggingface" }
+## `dstack.api.finetuning` { #dstack.api.finetuning data-toc-label="dstack.api.finetuning" }
 
-### `dstack.api.huggingface.SFTFineTuningTask` { #dstack.api.huggingface.SFTFineTuningTask data-toc-label="SFTFineTuningTask" }
+### `dstack.api.finetuning.SFTFineTuningTask` { #dstack.api.finetuning.SFTFineTuningTask data-toc-label="SFTFineTuningTask" }
 
-::: dstack.api.huggingface.SFTFineTuningTask
+::: dstack.api.finetuning.SFTFineTuningTask
     options:
       show_bases: false
       show_root_heading: false

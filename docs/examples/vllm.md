@@ -73,7 +73,7 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
 !!! info "Hugging Face Hub token"
 
     To use a model with gated access, ensure configuring the `HUGGING_FACE_HUB_TOKEN` environment variable 
-    (with [`--env`](../docs/reference/cli/run.md#ENV) in `dstack run` or 
+    (with [`--env`](../docs/reference/cli/index.md#dstack-run) in `dstack run` or 
     using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
     
     <div class="termy">

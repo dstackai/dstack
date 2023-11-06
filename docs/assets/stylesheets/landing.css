@@ -50,7 +50,7 @@
     font-size: 0.6rem;
     line-height: 21px;
     text-align: center;
-    padding: 13px 5px;
+    padding: 16px 5px 13px;
 }
 
 @media screen and (max-width: 76.1875em) {
@@ -90,7 +90,7 @@
 
     .tx-landing__hero {
         margin-bottom: 2.5rem;
-        font-size: 19px;
+        font-size: 1.1em;
         line-height: 1.5;
     }
 
@@ -192,12 +192,10 @@
     background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
 }
 
-.md-header__buttons .md-button--primary {
-    font-weight: 500 !important;
-}
-
+.md-header__buttons .md-button--primary,
 .md-header__buttons .md-button-secondary {
     font-weight: 500 !important;
+    white-space: nowrap;
 }
 
 .md-header__buttons .md-button-secondary,
@@ -230,7 +228,7 @@
 }
 
 .tx-landing__highlights_text h2 {
-    font-size: 1.8em;
+    font-size: 2.2em;
     max-width: 500px;
     margin-bottom: 2.75em;
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
@@ -270,7 +268,7 @@
     align-items: center;
     justify-content: center;
     gap: 14px;
-    padding: 10px 5px 3px;
+    padding: 14px 5px 3px;
 }
 
 .tx-landing__integrations .logo-xlarge {
@@ -366,10 +364,10 @@
 }
 
 .tx-landing__bottom_cta h2, .tx-landing__major_feature h2 {
-    font-size: 1.8em;
+    font-size: 2.2em;
     max-width: 500px;
-    margin-bottom: 1.5em;
-    margin-top: 0;
+    margin-top: 0.75em;
+    margin-bottom: 0.75em;
     background: -webkit-linear-gradient(45deg, #ff00ff, #8500ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;

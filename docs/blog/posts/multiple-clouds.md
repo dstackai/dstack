@@ -78,7 +78,7 @@ YAML (instead of the gateway IP address).
 ### dstack run
 
 Using the dstack run command, you are now able to utilize options such as `--gpu`, `--memory`, `--env`, `--max-price`,
-and several [other arguments](../../docs/reference/cli/run.md) to override the profile settings.
+and several [other arguments](../../docs/reference/cli/index.md#dstack-run) to override the profile settings.
 
 Lastly, the local backend is no longer supported. Now, you can run everything using only a cloud backend.
 

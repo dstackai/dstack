@@ -1,9 +1,9 @@
 # Server configuration
 
-The `dstack` server manages your workloads' state and orchestrates them across configured cloud providers.
+If you're using the open-source server, you can configure your own 
+cloud accounts, allowing `dstack` to provision workloads there.
 
-For flexibility, the server allows you to configure multiple projects and users. Within each project, you can set up
-multiple cloud accounts.
+For flexibility, the server allows you to have multiple projects and users.
 
 To configure a cloud account, specify its settings in `~/.dstack/server/config.yml` under the `backends` property 
 of the respective project.
