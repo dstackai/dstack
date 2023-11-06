@@ -51,6 +51,7 @@ class LaunchedInstanceInfo(BaseModel):
     username: str
     ssh_port: int  # could be different from 22 for some backends
     dockerized: bool  # True if JumpProxy is needed
+    backend_data: Optional[str]  # backend-specific data in json
 
 
 class InstanceAvailability(Enum):
@@ -61,6 +62,7 @@ class InstanceAvailability(Enum):
 
 
 class InstanceOffer(BaseModel):
+    backend: BackendType
     instance: InstanceType
     region: str
     price: float
@@ -68,10 +70,6 @@ class InstanceOffer(BaseModel):
 
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
-
-
-class InstanceCandidate(InstanceOfferWithAvailability):
-    backend: BackendType
 
 
 class LaunchedGatewayInfo(BaseModel):

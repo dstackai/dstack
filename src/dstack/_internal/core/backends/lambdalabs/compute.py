@@ -37,7 +37,7 @@ class LambdaCompute(Compute):
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
-            provider="lambdalabs",
+            backend=BackendType.LAMBDA,
             locations=self.config.regions,
             requirements=requirements,
         )
