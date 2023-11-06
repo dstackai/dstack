@@ -24,6 +24,7 @@ from dstack._internal.server.routers import (
 )
 from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.services.projects import get_or_create_default_project
+from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME, SERVER_URL
 from dstack._internal.server.utils.logging import configure_logging
@@ -100,6 +101,8 @@ async def lifespan(app: FastAPI):
     create_default_project_config(
         project_name=DEFAULT_PROJECT_NAME, url=SERVER_URL, token=admin.token
     )
+    if settings.SERVER_BUCKET is not None:
+        init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = dstack.version.__version__ if dstack.version.__version__ else "(no version)"
     print(f"\nThe dstack server {dstack_version} is running at {SERVER_URL}.")

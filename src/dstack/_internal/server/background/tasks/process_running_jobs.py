@@ -11,7 +11,7 @@ from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, Run
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import JobModel, RepoModel, RunModel
+from dstack._internal.server.models import JobModel, ProjectModel, RepoModel, RunModel
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
@@ -26,6 +26,7 @@ from dstack._internal.server.services.runs import (
     create_job_model_for_new_submission,
     run_model_to_run,
 )
+from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.interpolator import VariablesInterpolator
@@ -99,6 +100,7 @@ async def _process_job(job_id: UUID):
                 logger.debug("Polling provisioning job without shim: %s", job_model.job_name)
                 code = await _get_job_code(
                     session=session,
+                    project=project,
                     repo=repo_model,
                     code_hash=run.run_spec.repo_code_hash,
                 )
@@ -128,6 +130,7 @@ async def _process_job(job_id: UUID):
                 logger.debug("Polling pulling job with shim: %s", job_model.job_name)
                 code = await _get_job_code(
                     session=session,
+                    project=project,
                     repo=repo_model,
                     code_hash=run.run_spec.repo_code_hash,
                 )
@@ -320,11 +323,22 @@ def _process_running(
     return True
 
 
-async def _get_job_code(session: AsyncSession, repo: RepoModel, code_hash: str) -> bytes:
+async def _get_job_code(
+    session: AsyncSession, project: ProjectModel, repo: RepoModel, code_hash: str
+) -> bytes:
     code_model = await get_code_model(session=session, repo=repo, code_hash=code_hash)
-    if code_model is not None:
+    if code_model is None:
+        return b""
+    storage = get_default_storage()
+    if storage is None or code_model.blob is not None:
         return code_model.blob
-    return b""
+    blob = await run_async(
+        storage.get_code,
+        project.name,
+        repo.name,
+        code_hash,
+    )
+    return blob
 
 
 def _submit_job_to_runner(
