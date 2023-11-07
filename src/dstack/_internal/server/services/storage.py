@@ -58,7 +58,7 @@ def init_default_storage():
     global _default_storage
     _default_storage = S3Storage(
         bucket=settings.SERVER_BUCKET,
-        region="eu-west-1",
+        region=settings.SERVER_BUCKET_REGION,
     )
 
 
