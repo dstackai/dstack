@@ -132,7 +132,7 @@ class CodeModel(BaseModel):
     repo_id: Mapped[UUIDType] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     repo: Mapped["RepoModel"] = relationship()
     blob_hash: Mapped[str] = mapped_column(String(4000), unique=True)
-    blob: Mapped[bytes] = mapped_column(BLOB)
+    blob: Mapped[Optional[bytes]] = mapped_column(BLOB)  # None means blob is stored on s3
 
 
 class RunModel(BaseModel):

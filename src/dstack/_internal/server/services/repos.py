@@ -15,7 +15,10 @@ from dstack._internal.core.models.repos import (
     RepoHeadWithCreds,
 )
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
+from dstack._internal.server import settings
 from dstack._internal.server.models import CodeModel, ProjectModel, RepoModel
+from dstack._internal.server.services.storage import get_default_storage
+from dstack._internal.server.utils.common import run_async
 
 
 async def list_repos(
@@ -145,11 +148,20 @@ async def upload_code(
     if code is not None:
         return
     blob = await file.read()
-    code = CodeModel(
-        repo_id=repo.id,
-        blob_hash=code_hash,
-        blob=blob,
-    )
+    storage = get_default_storage()
+    if storage is None:
+        code = CodeModel(
+            repo_id=repo.id,
+            blob_hash=code_hash,
+            blob=blob,
+        )
+    else:
+        code = CodeModel(
+            repo_id=repo.id,
+            blob_hash=code_hash,
+            blob=None,
+        )
+        await run_async(storage.upload_code, project.name, repo.name, code.blob_hash, blob)
     session.add(code)
     await session.commit()
 
