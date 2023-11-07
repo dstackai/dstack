@@ -182,6 +182,7 @@ nav:
       - Deploying LLMs using TGI: examples/text-generation-inference.md
       - Deploying SDXL using FastAPI: examples/stable-diffusion-xl.md
       - Deploying LLMs using vLLM: examples/vllm.md
+  - Pricing: pricing.md
   - Blog:
       - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd
