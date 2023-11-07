@@ -44,38 +44,6 @@ def create_app() -> FastAPI:
         )
 
     app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
-    app.include_router(users.router)
-    app.include_router(projects.router)
-    app.include_router(backends.root_router)
-    app.include_router(backends.project_router)
-    app.include_router(repos.router)
-    app.include_router(runs.root_router)
-    app.include_router(runs.project_router)
-    app.include_router(logs.router)
-    app.include_router(secrets.router)
-    app.include_router(gateways.router)
-
-    @app.exception_handler(ServerClientError)
-    async def server_client_error_handler(request: Request, exc: ServerClientError):
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": get_server_client_error_details(exc)},
-        )
-
-    @app.middleware("http")
-    async def log_request(request: Request, call_next):
-        start_time = time.time()
-        response = await call_next(request)
-        process_time = time.time() - start_time
-        logger.debug(
-            "Processed request %s %s in %s", request.method, request.url, f"{process_time:0.6f}s"
-        )
-        return response
-
-    @app.get("/")
-    async def index():
-        return RedirectResponse("/api/docs")
-
     return app
 
 
@@ -118,3 +86,37 @@ _ON_STARTUP_HOOKS = []
 
 def register_on_startup_hook(func: Callable[[FastAPI], None]):
     _ON_STARTUP_HOOKS.append(func)
+
+
+def register_routes(app: FastAPI):
+    app.include_router(users.router)
+    app.include_router(projects.router)
+    app.include_router(backends.root_router)
+    app.include_router(backends.project_router)
+    app.include_router(repos.router)
+    app.include_router(runs.root_router)
+    app.include_router(runs.project_router)
+    app.include_router(logs.router)
+    app.include_router(secrets.router)
+    app.include_router(gateways.router)
+
+    @app.exception_handler(ServerClientError)
+    async def server_client_error_handler(request: Request, exc: ServerClientError):
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": get_server_client_error_details(exc)},
+        )
+
+    @app.middleware("http")
+    async def log_request(request: Request, call_next):
+        start_time = time.time()
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        logger.debug(
+            "Processed request %s %s in %s", request.method, request.url, f"{process_time:0.6f}s"
+        )
+        return response
+
+    @app.get("/")
+    async def index():
+        return RedirectResponse("/api/docs")
