@@ -1,7 +1,7 @@
 """Make blob nullable
 
 Revision ID: 23e01c56279a
-Revises: 112753bc17dd
+Revises: 14f2cb002fc2
 Create Date: 2023-11-06 16:13:00.455543
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "23e01c56279a"
-down_revision = "112753bc17dd"
+down_revision = "14f2cb002fc2"
 branch_labels = None
 depends_on = None
 
