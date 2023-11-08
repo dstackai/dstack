@@ -52,7 +52,6 @@ class NebiusConfigurator(Configurator):
         if config.regions is None:
             config.regions = REGIONS
         self._validate_nebius_creds(config.creds)
-        # TODO create security_group
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,

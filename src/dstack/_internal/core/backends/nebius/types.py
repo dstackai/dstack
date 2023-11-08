@@ -14,7 +14,7 @@ class ResourcesSpec(TypedDict):
     memory: int
     cores: int
     coreFraction: int
-    gpus: Literal[0, 1, 2, 4, 8]
+    gpus: int
 
 
 class NebiusError(Exception):
@@ -22,6 +22,10 @@ class NebiusError(Exception):
 
 
 class ForbiddenError(NebiusError):
+    pass
+
+
+class NotFoundError(NebiusError):
     pass
 
 

@@ -8,12 +8,13 @@ from dstack._internal.core.backends.nebius.types import (
     ConflictError,
     ForbiddenError,
     NebiusError,
+    NotFoundError,
     ResourcesSpec,
     ServiceAccount,
 )
 from dstack._internal.utils.logging import get_logger
 
-logger = get_logger(__name__)
+logger = get_logger("nebius")
 API_URL = "api.ai.nebius.cloud"
 
 
@@ -67,7 +68,6 @@ class NebiusAPIClient:
                 **kwargs,
             ),
         )
-        # TODO raise already exists error
         self.raise_for_status(resp)
         return resp.json()
 
@@ -82,7 +82,6 @@ class NebiusAPIClient:
                 **kwargs,
             ),
         )
-        # TODO raise already exists error
         self.raise_for_status(resp)
         return resp.json()
 
@@ -100,26 +99,25 @@ class NebiusAPIClient:
     def vpc_subnets_create(
         self,
         folder_id: str,
-        subnet_name: str,
+        name: str,
         network_id: str,
         zone: str,
         cird_blocks: List[str],
         **kwargs,
     ) -> dict:
-        logger.debug("Creating subnet %s in %s", subnet_name, network_id)
+        logger.debug("Creating subnet %s in %s", name, network_id)
         self.get_token()
         resp = self.s.post(
             self.url("vpc", "/subnets"),
             json=omit_none(
                 folderId=folder_id,
-                name=subnet_name,
+                name=name,
                 networkId=network_id,
                 zoneId=zone,
                 v4CidrBlocks=cird_blocks,
                 **kwargs,
             ),
         )
-        # TODO raise already exists error
         self.raise_for_status(resp)
         return resp.json()
 
@@ -149,7 +147,6 @@ class NebiusAPIClient:
                 **kwargs,
             ),
         )
-        # TODO raise already exists error
         self.raise_for_status(resp)
         return resp.json()
 
@@ -294,6 +291,8 @@ class NebiusAPIClient:
             raise NebiusError(resp.text)
         if resp.status_code == 403:
             raise ForbiddenError(resp.text)
+        if resp.status_code == 404:
+            raise NotFoundError(resp.text)
         if resp.status_code == 409:
             raise ConflictError(resp.text)
         resp.raise_for_status()
