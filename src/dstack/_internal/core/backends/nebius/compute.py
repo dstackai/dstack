@@ -30,7 +30,7 @@ class NebiusCompute(Compute):
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
-            backend=BackendType.GCP,
+            backend=BackendType.NEBIUS,
             locations=self.config.regions,
             requirements=requirements,
         )
@@ -76,7 +76,7 @@ class NebiusCompute(Compute):
                     registry_auth_required=job.job_spec.registry_auth is not None,
                 ),
             },
-            disk_size=100 * 1024 * MEGABYTE,  # TODO(egor-s) make configurable
+            disk_size_gb=100,  # TODO(egor-s) make configurable
             image_id=image_id,
             subnet_id=subnet_id,
             security_group_ids=[security_group_id],

@@ -10,7 +10,6 @@ from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
 from dstack._internal.core.models.backends.aws import AnyAWSCreds
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
-from dstack._internal.core.models.backends.nebius import AnyNebiusCreds
 from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.backends.vastai import AnyVastAICreds
 from dstack._internal.core.models.common import ForbidExtra
@@ -46,7 +45,7 @@ class GCPServiceAccountCreds(ForbidExtra):
 
     @root_validator
     def fill_data(cls, values):
-        _fill_data(values)
+        return _fill_data(values)
 
 
 class GCPDefaultCreds(ForbidExtra):
@@ -76,7 +75,10 @@ class NebiusServiceAccountCreds(ForbidExtra):
 
     @root_validator
     def fill_data(cls, values):
-        _fill_data(values)
+        return _fill_data(values)
+
+
+AnyNebiusCreds = Union[NebiusServiceAccountCreds]
 
 
 class NebiusConfig(ForbidExtra):

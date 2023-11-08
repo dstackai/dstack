@@ -5,6 +5,7 @@ import jwt
 import requests
 
 from dstack._internal.core.backends.nebius.types import (
+    ClientError,
     ConflictError,
     ForbiddenError,
     NebiusError,
@@ -174,7 +175,7 @@ class NebiusAPIClient:
         platform_id: str,
         resources_spec: ResourcesSpec,
         metadata: Optional[Dict[str, str]],
-        disk_size: int,
+        disk_size_gb: int,
         image_id: str,
         subnet_id: str,
         security_group_ids: List[str],
@@ -196,7 +197,7 @@ class NebiusAPIClient:
                     autoDelete=True,
                     diskSpec=dict(
                         typeId="network-ssd",
-                        size=disk_size * 1024 * 1024 * 1024,
+                        size=disk_size_gb * 1024 * 1024 * 1024,
                         imageId=image_id,
                     ),
                 ),
@@ -289,6 +290,8 @@ class NebiusAPIClient:
     def raise_for_status(self, resp: requests.Response):
         if resp.status_code == 400:
             raise NebiusError(resp.text)
+        if resp.status_code == 401:
+            raise ClientError(resp.text)
         if resp.status_code == 403:
             raise ForbiddenError(resp.text)
         if resp.status_code == 404:

@@ -21,6 +21,10 @@ class NebiusError(Exception):
     pass
 
 
+class ClientError(NebiusError):
+    pass
+
+
 class ForbiddenError(NebiusError):
     pass
 
