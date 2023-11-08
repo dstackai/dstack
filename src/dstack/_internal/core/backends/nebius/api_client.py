@@ -164,6 +164,7 @@ class NebiusAPIClient:
 
     def vpc_security_groups_delete(self, security_group_id: str):
         logger.debug("Deleting security group %s", security_group_id)
+        self.get_token()
         resp = self.s.delete(self.url("vpc", f"/securityGroups/{security_group_id}"))
         self.raise_for_status(resp)
 
@@ -234,6 +235,7 @@ class NebiusAPIClient:
 
     def compute_instances_delete(self, instance_id: str):
         logger.debug("Deleting instance %s", instance_id)
+        self.get_token()
         resp = self.s.delete(self.url("compute", f"/instances/{instance_id}"))
         self.raise_for_status(resp)
 

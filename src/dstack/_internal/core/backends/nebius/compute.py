@@ -8,7 +8,12 @@ from dstack._internal.core.backends.base.compute import get_user_data
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius.api_client import NebiusAPIClient
 from dstack._internal.core.backends.nebius.config import NebiusConfig
-from dstack._internal.core.backends.nebius.types import NotFoundError, ResourcesSpec
+from dstack._internal.core.backends.nebius.types import (
+    ForbiddenError,
+    NotFoundError,
+    ResourcesSpec,
+)
+from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -55,7 +60,24 @@ class NebiusCompute(Compute):
         subnet_id = self._get_subnet_id(zone=instance_offer.region)
         image_id = self._get_image_id(cuda=cuda)
         if cuda:
-            cloud_config = {}
+            cloud_config = {
+                "write_files": [
+                    {
+                        "path": "/etc/docker/daemon.json",
+                        "content": json.dumps(
+                            {
+                                "runtimes": {
+                                    "nvidia": {
+                                        "path": "nvidia-container-runtime",
+                                        "runtimeArgs": [],
+                                    }
+                                },
+                                "exec-opts": ["native.cgroupdriver=cgroupfs"],
+                            }
+                        ),
+                    }
+                ],
+            }
         else:
             cloud_config = {
                 "apt": {
@@ -71,36 +93,40 @@ class NebiusCompute(Compute):
                     "docker-ce-cli",
                 ],
             }
-
-        resp = self.api_client.compute_instances_create(
-            folder_id=self.config.folder_id,
-            name=job.job_spec.job_name,  # TODO(egor-s) make globally unique
-            zone_id=instance_offer.region,
-            platform_id=instance_offer.instance.name,
-            resources_spec=ResourcesSpec(
-                memory=int(instance_offer.instance.resources.memory_mib * MEGABYTE),
-                cores=instance_offer.instance.resources.cpus,
-                coreFraction=100,
-                gpus=len(instance_offer.instance.resources.gpus),
-            ),
-            metadata={
-                "user-data": get_user_data(
-                    backend=BackendType.NEBIUS,
-                    image_name=job.job_spec.image_name,
-                    authorized_keys=[
-                        run.run_spec.ssh_key_pub.strip(),
-                        project_ssh_public_key.strip(),
-                    ],
-                    registry_auth_required=job.job_spec.registry_auth is not None,
-                    cloud_config_kwargs=cloud_config,
+        try:
+            resp = self.api_client.compute_instances_create(
+                folder_id=self.config.folder_id,
+                name=job.job_spec.job_name,  # TODO(egor-s) make globally unique
+                zone_id=instance_offer.region,
+                platform_id=instance_offer.instance.name,
+                resources_spec=ResourcesSpec(
+                    memory=int(instance_offer.instance.resources.memory_mib * MEGABYTE),
+                    cores=instance_offer.instance.resources.cpus,
+                    coreFraction=100,
+                    gpus=len(instance_offer.instance.resources.gpus),
                 ),
-            },
-            disk_size_gb=100,  # TODO(egor-s) make configurable
-            image_id=image_id,
-            subnet_id=subnet_id,
-            security_group_ids=[security_group_id],
-            labels=self._get_labels(project=run.project_name),
-        )
+                metadata={
+                    "user-data": get_user_data(
+                        backend=BackendType.NEBIUS,
+                        image_name=job.job_spec.image_name,
+                        authorized_keys=[
+                            run.run_spec.ssh_key_pub.strip(),
+                            project_ssh_public_key.strip(),
+                        ],
+                        registry_auth_required=job.job_spec.registry_auth is not None,
+                        cloud_config_kwargs=cloud_config,
+                    ),
+                },
+                disk_size_gb=100,  # TODO(egor-s) make configurable
+                image_id=image_id,
+                subnet_id=subnet_id,
+                security_group_ids=[security_group_id],
+                labels=self._get_labels(project=run.project_name),
+            )
+        except ForbiddenError as e:
+            if instance_offer.instance.name in e.args[0]:
+                raise NoCapacityError(json.loads(e.args[0])["message"])
+            raise
         instance_id = resp["metadata"]["instanceId"]
         try:
             while True:
