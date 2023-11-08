@@ -25,7 +25,7 @@ async def list_users(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ) -> List[User]:
-    return await users.list_users(session=session)
+    return await users.list_users_for_user(session=session, user=user)
 
 
 @router.post("/get_my_user")

@@ -21,7 +21,16 @@ async def get_or_create_admin_user(session: AsyncSession) -> Tuple[UserModel, bo
     return admin, True
 
 
-async def list_users(
+async def list_users_for_user(
+    session: AsyncSession,
+    user: UserModel,
+) -> List[User]:
+    if user.global_role == GlobalRole.ADMIN:
+        return await list_all_users(session=session)
+    return [user_model_to_user(user)]
+
+
+async def list_all_users(
     session: AsyncSession,
 ) -> List[User]:
     res = await session.execute(select(UserModel))
