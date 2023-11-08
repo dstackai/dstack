@@ -27,6 +27,12 @@ from dstack._internal.core.models.backends.lambdalabs import (
     LambdaConfigInfoWithCredsPartial,
     LambdaConfigValues,
 )
+from dstack._internal.core.models.backends.nebius import (
+    NebiusConfigInfo,
+    NebiusConfigInfoWithCreds,
+    NebiusConfigInfoWithCredsPartial,
+    NebiusConfigValues,
+)
 from dstack._internal.core.models.backends.tensordock import (
     TensorDockConfigInfo,
     TensorDockConfigInfoWithCreds,
@@ -45,6 +51,7 @@ AnyConfigInfoWithoutCreds = Union[
     AzureConfigInfo,
     GCPConfigInfo,
     LambdaConfigInfo,
+    NebiusConfigInfo,
     TensorDockConfigInfo,
     VastAIConfigInfo,
     DstackConfigInfo,
@@ -54,6 +61,7 @@ AnyConfigInfoWithCreds = Union[
     AzureConfigInfoWithCreds,
     GCPConfigInfoWithCreds,
     LambdaConfigInfoWithCreds,
+    NebiusConfigInfoWithCreds,
     TensorDockConfigInfoWithCreds,
     VastAIConfigInfoWithCreds,
     DstackConfigInfo,
@@ -63,6 +71,7 @@ AnyConfigInfoWithCredsPartial = Union[
     AzureConfigInfoWithCredsPartial,
     GCPConfigInfoWithCredsPartial,
     LambdaConfigInfoWithCredsPartial,
+    NebiusConfigInfoWithCredsPartial,
     TensorDockConfigInfoWithCredsPartial,
     VastAIConfigInfoWithCredsPartial,
     DstackConfigInfo,
@@ -75,6 +84,7 @@ AnyConfigValues = Union[
     AzureConfigValues,
     GCPConfigValues,
     LambdaConfigValues,
+    NebiusConfigValues,
     TensorDockConfigValues,
     VastAIConfigValues,
     DstackConfigValues,

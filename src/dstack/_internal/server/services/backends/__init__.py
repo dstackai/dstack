@@ -64,6 +64,13 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.server.services.backends.configurators.nebius import NebiusConfigurator
+
+    _CONFIGURATOR_CLASSES.append(NebiusConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.server.services.backends.configurators.tensordock import (
         TensorDockConfigurator,
     )
