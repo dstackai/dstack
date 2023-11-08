@@ -1,3 +1,5 @@
+from typing import List
+
 from pydantic import BaseModel
 
 from dstack._internal.core.models.users import GlobalRole
@@ -17,3 +19,7 @@ UpdateUserRequest = CreateUserRequest
 
 class RefreshTokenRequest(BaseModel):
     username: str
+
+
+class DeleteUsersRequest(BaseModel):
+    users: List[str]

@@ -36,7 +36,10 @@ async def list_user_projects(
     session: AsyncSession,
     user: UserModel,
 ) -> List[Project]:
-    projects = await list_user_project_models(session=session, user=user)
+    if user.global_role == GlobalRole.ADMIN:
+        projects = await list_project_models(session=session)
+    else:
+        projects = await list_user_project_models(session=session, user=user)
     return [project_model_to_project(p) for p in projects]
 
 

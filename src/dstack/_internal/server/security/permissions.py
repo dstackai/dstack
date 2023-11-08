@@ -54,6 +54,10 @@ class ProjectAdmin:
         if user is None:
             raise_invalid_token()
         project = await get_project_model_by_name(session=session, project_name=project_name)
+        if project is None:
+            raise_forbidden()
+        if user.global_role == GlobalRole.ADMIN:
+            return user, project
         for member in project.members:
             if member.user_id == user.id:
                 if member.project_role == ProjectRole.ADMIN:
@@ -77,6 +81,8 @@ class ProjectMember:
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
             raise_not_found()
+        if user.global_role == GlobalRole.ADMIN:
+            return user, project
         for member in project.members:
             if member.user_id == user.id:
                 return user, project

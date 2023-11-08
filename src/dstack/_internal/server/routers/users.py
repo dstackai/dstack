@@ -8,6 +8,7 @@ from dstack._internal.server.db import get_session
 from dstack._internal.server.models import UserModel
 from dstack._internal.server.schemas.users import (
     CreateUserRequest,
+    DeleteUsersRequest,
     GetUserRequest,
     RefreshTokenRequest,
     UpdateUserRequest,
@@ -24,7 +25,7 @@ async def list_users(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ) -> List[User]:
-    return await users.list_users(session=session)
+    return await users.list_users_for_user(session=session, user=user)
 
 
 @router.post("/get_my_user")
@@ -80,3 +81,16 @@ async def refresh_token(
 ) -> UserWithCreds:
     res = await users.refresh_user_token(session=session, username=body.username)
     return users.user_model_to_user_with_creds(res)
+
+
+@router.post("/delete")
+async def create_user(
+    body: DeleteUsersRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(GlobalAdmin()),
+):
+    await users.delete_users(
+        session=session,
+        user=user,
+        usernames=body.users,
+    )
