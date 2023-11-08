@@ -4,6 +4,7 @@ from typing import Awaitable, Callable, List, Optional, Tuple
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ResourceExistsError
 from dstack._internal.core.models.users import GlobalRole, User, UserTokenCreds, UserWithCreds
 from dstack._internal.server.models import UserModel
 
@@ -42,7 +43,12 @@ async def get_user_with_creds_by_name(
 
 
 async def create_user(session: AsyncSession, username: str, global_role: GlobalRole) -> UserModel:
-    user = UserModel(name=username, global_role=global_role, token=str(uuid.uuid4()))
+    user_model = await get_user_model_by_name(session=session, username=username)
+    if user_model is not None:
+        raise ResourceExistsError()
+    user = UserModel(
+        id=uuid.uuid4(), name=username, global_role=global_role, token=str(uuid.uuid4())
+    )
     session.add(user)
     await session.commit()
     for func in _CREATE_USER_HOOKS:
