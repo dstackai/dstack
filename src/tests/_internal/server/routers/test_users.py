@@ -143,3 +143,22 @@ class TestCreateUser:
         assert response.status_code == 400
         res = await session.execute(select(UserModel).where(UserModel.name == "test"))
         assert len(res.scalars().all()) == 1
+
+
+class TestDeleteUsers:
+    def test_returns_40x_if_not_authenticated(self):
+        response = client.post("/api/users/delete")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    async def test_deletes_users(self, test_db, session: AsyncSession):
+        admin = await create_user(name="admin", session=session)
+        user = await create_user(name="test", session=session)
+        response = client.post(
+            "/api/users/delete",
+            headers=get_auth_headers(admin.token),
+            json={"users": [user.name]},
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(UserModel).where(UserModel.name == user.name))
+        assert len(res.scalars().all()) == 0

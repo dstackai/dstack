@@ -1,7 +1,7 @@
 import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceExistsError
@@ -70,6 +70,14 @@ async def refresh_user_token(session: AsyncSession, username: str) -> Optional[U
         update(UserModel).where(UserModel.name == username).values(token=uuid.uuid4())
     )
     return get_user_model_by_name(session=session, username=username)
+
+
+async def delete_users(
+    session: AsyncSession,
+    user: UserModel,
+    usernames: List[str],
+):
+    await session.execute(delete(UserModel).where(UserModel.name.in_(usernames)))
 
 
 async def get_user_model_by_name(session: AsyncSession, username: str) -> Optional[UserModel]:
