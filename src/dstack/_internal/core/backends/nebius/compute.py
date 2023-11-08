@@ -50,9 +50,27 @@ class NebiusCompute(Compute):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
+        cuda = len(instance_offer.instance.resources.gpus) > 0
         security_group_id = self._get_security_group_id(project_name=run.project_name)
         subnet_id = self._get_subnet_id(zone=instance_offer.region)
-        image_id = self._get_image_id(cuda=len(instance_offer.instance.resources.gpus) > 0)
+        image_id = self._get_image_id(cuda=cuda)
+        if cuda:
+            cloud_config = {}
+        else:
+            cloud_config = {
+                "apt": {
+                    "sources": {
+                        "docker.list": {
+                            "source": "deb [arch=amd64] https://download.docker.com/linux/ubuntu $RELEASE stable",
+                            "keyid": "9DC858229FC7DD38854AE2D88D81803C0EBFCD88",
+                        },
+                    },
+                },
+                "packages": [
+                    "docker-ce",
+                    "docker-ce-cli",
+                ],
+            }
 
         resp = self.api_client.compute_instances_create(
             folder_id=self.config.folder_id,
@@ -74,6 +92,7 @@ class NebiusCompute(Compute):
                         project_ssh_public_key.strip(),
                     ],
                     registry_auth_required=job.job_spec.registry_auth is not None,
+                    cloud_config_kwargs=cloud_config,
                 ),
             },
             disk_size_gb=100,  # TODO(egor-s) make configurable

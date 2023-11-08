@@ -51,7 +51,11 @@ class Compute(ABC):
 
 
 def get_user_data(
-    backend: BackendType, image_name: str, authorized_keys: List[str], registry_auth_required: bool
+    backend: BackendType,
+    image_name: str,
+    authorized_keys: List[str],
+    registry_auth_required: bool,
+    cloud_config_kwargs: Optional[dict] = None,
 ) -> str:
     commands = get_shim_commands(
         backend=backend,
@@ -62,6 +66,7 @@ def get_user_data(
     return get_cloud_config(
         runcmd=[["sh", "-c", " && ".join(commands)]],
         ssh_authorized_keys=authorized_keys,
+        **(cloud_config_kwargs or {}),
     )
 
 
