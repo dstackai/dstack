@@ -1,6 +1,7 @@
 import time
 from contextlib import asynccontextmanager
 from typing import Callable
+from urllib.parse import urlparse
 
 import sentry_sdk
 from fastapi import FastAPI, Request, status
@@ -41,10 +42,20 @@ def create_app() -> FastAPI:
             dsn=settings.SENTRY_DSN,
             environment=settings.SERVER_ENVIRONMENT,
             enable_tracing=True,
+            before_send_transaction=filter_sentry_transactions,
+            traces_sample_rate=0.25,
         )
 
     app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
     return app
+
+
+def filter_sentry_transactions(event, hint):
+    url_string = event["request"]["url"]
+    parsed_url = urlparse(url_string)
+    if parsed_url.path == "/api/healthcheck":
+        return None
+    return event
 
 
 @asynccontextmanager
@@ -116,6 +127,10 @@ def register_routes(app: FastAPI):
             "Processed request %s %s in %s", request.method, request.url, f"{process_time:0.6f}s"
         )
         return response
+
+    @app.get("/healthcheck")
+    async def healthcheck():
+        return JSONResponse(content={"status": "running"})
 
     @app.get("/")
     async def index():
