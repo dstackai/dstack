@@ -44,6 +44,7 @@ from dstack._internal.core.models.backends.base import (
     ConfigElementValue,
     ConfigMultiElement,
 )
+from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
@@ -101,9 +102,13 @@ class AzureConfigurator(Configurator):
 
     def get_config_values(self, config: AzureConfigInfoWithCredsPartial) -> AzureConfigValues:
         config_values = AzureConfigValues()
-        config_values.default_creds = auth.default_creds_available()
+        config_values.default_creds = (
+            settings.DEFAULT_CREDS_ENABLED and auth.default_creds_available()
+        )
         if config.creds is None:
             return config_values
+        if isinstance(config.creds, AzureDefaultCreds) and not settings.DEFAULT_CREDS_ENABLED:
+            raise_invalid_credentials_error(fields=[["creds"]])
         if isinstance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         try:
