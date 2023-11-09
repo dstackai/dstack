@@ -54,3 +54,26 @@ Set environment variables.
 | AZURE_TENANT_ID | tenant_id |
 | AZURE_SUBSCRIPTION_ID | subscription_id |
 
+# Nebius
+
+## Setup Nebius credentials
+
+> `compute.admin` is not sufficient for packer. Use `admin` role instead.
+
+```shell
+ncp config profile create packer
+ncp config set service-account-key path/to/service_account.json
+ncp config set endpoint api.ai.nebius.cloud:443
+export PKR_VAR_nebius_token=$(ncp iam create-token)
+```
+
+## Build images
+
+```shell
+export PKR_VAR_nebius_folder_id=...
+export PKR_VAR_nebius_subnet_id=...
+# no CUDA
+packer build -only yandex.nebius -var image_version=0.4rc3 .
+# with CUDA
+packer build -only yandex.nebius-cuda -var image_version=0.4rc3 .
+```
