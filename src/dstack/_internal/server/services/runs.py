@@ -109,6 +109,8 @@ async def get_run_plan(
             job=job,
             exclude_not_available=False,
         )
+        for backend, offer in offers:
+            offer.backend = backend.TYPE
         offers = [offer for _, offer in offers]
         job_plan = JobPlan(
             job_spec=job.job_spec,
