@@ -21,6 +21,7 @@ from dstack._internal.core.models.backends.base import (
     ConfigElementValue,
     ConfigMultiElement,
 )
+from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     raise_invalid_credentials_error,
@@ -63,9 +64,13 @@ class AWSConfigurator(ABC):
 
     def get_config_values(self, config: AWSConfigInfoWithCredsPartial) -> AWSConfigValues:
         config_values = AWSConfigValues()
-        config_values.default_creds = auth.default_creds_available()
+        config_values.default_creds = (
+            settings.DEFAULT_CREDS_ENABLED and auth.default_creds_available()
+        )
         if config.creds is None:
             return config_values
+        if isinstance(config.creds, AWSDefaultCreds) and not settings.DEFAULT_CREDS_ENABLED:
+            raise_invalid_credentials_error(fields=[["creds"]])
         try:
             auth.authenticate(creds=config.creds, region=MAIN_REGION)
         except:
