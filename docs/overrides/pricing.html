@@ -17,5 +17,159 @@
 {% endblock %}
 
 {% block content %}
-    TBA
+<section class="tx-container">
+    <div class="md-grid md-typeset">
+        <div class="tx-pricing">
+            <div class="tx-pricing__text">
+                <h1>Pricing</h1>
+                <p>Adjust your preferences and see all available pricing options.</p>
+            </div>
+
+            <form class="tx-pricing__filters js-pricing-filter-form">
+                <div class="tx-pricing__filter-field">
+                    <label>
+                        <span class="tx-pricing__filter-field-label">Type</span>
+
+                        <select name="type">
+                            <option value="">All</option>
+                            <option value="marketplace">Marketplace</option>
+                            <option value="datacenters">Datacenters</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="tx-pricing__filter-field">
+                    <label>
+                        <span class="tx-pricing__filter-field-label">Contract</span>
+
+                        <select name="contract">
+                            <option value="">All</option>
+                            <option value="ondemand">On-demand</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="tx-pricing__filter-field">
+                    <label>
+                        <span class="tx-pricing__filter-field-label">Region</span>
+
+                        <select name="region">
+                            <option value="">All</option>
+                            <option value="europe">Europe</option>
+                            <option value="asia">Asia</option>
+                        </select>
+                    </label>
+                </div>
+            </form>
+
+            <div class="tx-pricing__cards">
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['marketplace']"
+                     data-contract="['ondemand']"
+                     data-region="['europe']"
+                >
+                    <div class="tx-pricing__card-title">H100, 12 GB</div>
+                    <div class="tx-pricing__card-price">$ 6.03</div>
+                    <div class="tx-pricing__card-options">Europe, Marketplace</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenters']"
+                     data-contract="['ondemand']"
+                     data-region="['asia']"
+                >
+                    <div class="tx-pricing__card-title">H101, 12 GB</div>
+                    <div class="tx-pricing__card-price">$ 6.03</div>
+                    <div class="tx-pricing__card-options">Asia, Datacenters</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenters']"
+                     data-contract="['ondemand']"
+                     data-region="['europe', 'asia']"
+                >
+                    <div class="tx-pricing__card-title">H102, 12 GB</div>
+                    <div class="tx-pricing__card-price">$ 6.03</div>
+                    <div class="tx-pricing__card-options">Europe, Asia, Datacenters</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['marketplace', 'datacenters']"
+                     data-contract="['ondemand']"
+                     data-region="['europe']"
+                >
+                    <div class="tx-pricing__card-title">H103, 12 GB</div>
+                    <div class="tx-pricing__card-price">$ 6.03</div>
+                    <div class="tx-pricing__card-options">Europe, Datacenters ,Marketplace</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tx-faq">
+            <div class="tx-faq__text">
+                <h1>FAQ</h1>
+            </div>
+
+            <div class="tx-faq__list">
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        What is dstack?
+                        <div class="tx-faq__item-title-icon">
+
+                        </div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        Add the variable font stylesheet request to your head tag and the current variable axes configuration to icons using CSS. Alternatively, the current configuration can be loaded as a static font instead of a variable one.
+                    </div>
+                </div>
+
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        What memory size is optimal for me?
+                        <div class="tx-faq__item-title-icon"></div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        Add the variable font stylesheet request to your head tag and the current variable axes configuration to icons using CSS. Alternatively, the current configuration can be loaded as a static font instead of a variable one.
+                    </div>
+                </div>
+
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        How to calculate monthly costs for selected configuration? A long question actually.
+                        <div class="tx-faq__item-title-icon"></div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        Add the variable font stylesheet request to your head tag and the current variable axes configuration to icons using CSS. Alternatively, the current configuration can be loaded as a static font instead of a variable one.
+                    </div>
+                </div>
+
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        Something else
+                        <div class="tx-faq__item-title-icon"></div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        Add the variable font stylesheet request to your head tag and the current variable axes configuration to icons using CSS. Alternatively, the current configuration can be loaded as a static font instead of a variable one.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tx-try">
+            <div class="tx-try__text">
+                <h1>Try dstack right now!</h1>
+
+                <p>Add the variable font stylesheet request to your head tag and the current variable axes configuration to icons using CSS. Alternatively, the current configuration can be loaded as a static font instead of a variable one.</p>
+
+                <a href="#"
+                   class="md-button md-button--primary small"
+                >Sign Up</a>
+            </div>
+        </div>
+    </div>
+</section>
 {% endblock %}

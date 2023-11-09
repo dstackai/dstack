@@ -127,8 +127,10 @@ extra_css:
   - assets/stylesheets/extra.css
   - assets/stylesheets/termynal.css
   - assets/stylesheets/landing.css
+  - assets/stylesheets/pricing.css
 extra_javascript:
   - assets/javascripts/extra.js
+  - assets/javascripts/pricing.js
 extra:
   homepage: /
   generator: false

@@ -495,3 +495,130 @@
         gap: 4.5rem;
     }
 }
+
+
+// plans section
+.tx-landing__plans_text {
+
+}
+
+.tx-landing__plans_text h2 {
+    margin-bottom: 2rem;
+    font-weight: 800;
+    font-size: 2rem;
+    text-align: center;
+}
+
+.tx-landing__plans_text h2 .gradient {
+    background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-right: 4px;
+    margin-right: -4px;
+}
+
+.tx-landing__plans_cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+    justify-content: center;
+}
+
+.plans_card {
+    display: flex;
+    flex-direction: column;
+    max-width: 445px;
+    width: 100%;
+    border-radius: 5px;
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-width: 1px;
+    border-style: solid;
+    padding: 28px 20px 32px 46px
+}
+
+.plans_card__title {
+    margin-bottom: .6rem;
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1.33;
+}
+
+.plans_card__subtitle {
+    margin-bottom: 1.1rem;
+    font-size: .9rem;
+    line-height: 1.44;
+    color: #696F86;
+}
+
+.plans_card__services {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 1.9rem;
+}
+
+.plans_card__service-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    border-radius: 30px;
+    border: 1px solid #BABFD3;
+    font-size: .9rem;
+    line-height: 1.44;
+    color: #2A292D;
+}
+
+.plans_card__service-item img {
+    max-width: none;
+    height: initial;
+}
+
+.plans_card__service-name {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.plans_card__items {
+    margin-bottom: .4rem;
+}
+
+.plans_card__buttons {
+    margin-top: auto;
+}
+
+.plans_card__item {
+    font-size: .9rem;
+    line-height: 1.66;
+    color: #696F86;
+}
+
+.plans_card__item .strong {
+    color: #2A292D;
+    font-weight: 700;
+}
+
+.plans_card__item .highlighted {
+    font-weight: 700;
+    color: var(--md-typeset-a-color);
+}
+
+.plans_card__link {
+    margin-bottom: 1.9rem;
+    font-size: .9rem;
+    line-height: 1.66;
+}
+
+.plans_card__buttons .md-button {
+    margin: 0;
+}
+
+@media screen and (max-width: 76.1875em) {
+
+}
+
+@media screen and (min-width: 76.1875em) {
+    .tx-landing__plans_text h2 {
+        font-size: 2.5rem;
+    }
+}
