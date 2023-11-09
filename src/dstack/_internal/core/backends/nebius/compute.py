@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from typing import List, Optional
 
@@ -59,40 +60,7 @@ class NebiusCompute(Compute):
         security_group_id = self._get_security_group_id(project_name=run.project_name)
         subnet_id = self._get_subnet_id(zone=instance_offer.region)
         image_id = self._get_image_id(cuda=cuda)
-        if cuda:
-            cloud_config = {
-                "write_files": [
-                    {
-                        "path": "/etc/docker/daemon.json",
-                        "content": json.dumps(
-                            {
-                                "runtimes": {
-                                    "nvidia": {
-                                        "path": "nvidia-container-runtime",
-                                        "runtimeArgs": [],
-                                    }
-                                },
-                                "exec-opts": ["native.cgroupdriver=cgroupfs"],
-                            }
-                        ),
-                    }
-                ],
-            }
-        else:
-            cloud_config = {
-                "apt": {
-                    "sources": {
-                        "docker.list": {
-                            "source": "deb [arch=amd64] https://download.docker.com/linux/ubuntu $RELEASE stable",
-                            "keyid": "9DC858229FC7DD38854AE2D88D81803C0EBFCD88",
-                        },
-                    },
-                },
-                "packages": [
-                    "docker-ce",
-                    "docker-ce-cli",
-                ],
-            }
+
         try:
             resp = self.api_client.compute_instances_create(
                 folder_id=self.config.folder_id,
@@ -114,7 +82,6 @@ class NebiusCompute(Compute):
                             project_ssh_public_key.strip(),
                         ],
                         registry_auth_required=job.job_spec.registry_auth is not None,
-                        cloud_config_kwargs=cloud_config,
                     ),
                 },
                 disk_size_gb=100,  # TODO(egor-s) make configurable
@@ -210,8 +177,13 @@ class NebiusCompute(Compute):
         return resp["response"]["id"]
 
     def _get_image_id(self, cuda: bool) -> str:
-        # Ubuntu 22.04 LTS
-        return "arl9llpjsrb21ocqafoc" if cuda else "arl390lhup87ofmsg8mc"
+        image_name = re.sub(r"[^a-z0-9-]", "-", f"dstack-{version.base_image}")
+        if cuda:
+            image_name += "-cuda"
+        images = self.api_client.compute_images_list(
+            folder_id="bjel82ie37qos4pc6guk", filter=f'name="{image_name}"'
+        )
+        return images[0]["id"]
 
     def _get_labels(self, **kwargs) -> dict:
         labels = {
