@@ -180,7 +180,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Get Nebius CLI
         run: |
-          echo "Getting CLI $CLI_VERSION"
+          echo "CLI_VERSION=$CLI_VERSION"
           curl -sSL https://storage.ai.nebius.cloud/ncp/install.sh | bash
           echo "$HOME/nebius-cloud/bin" >> $GITHUB_PATH
         env:
@@ -210,6 +210,3 @@ jobs:
         env:
           PKR_VAR_nebius_folder_id: ${{ secrets.NEBIUS_FOLDER_ID }}
           PKR_VAR_nebius_subnet_id: ${{ secrets.NEBIUS_SUBNET_ID }}
-      - name: Delete Nebius profile
-        run: |
-          ncp config profile delete packer
