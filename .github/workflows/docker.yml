@@ -206,7 +206,7 @@ jobs:
       - name: Run packer (HCL2)
         run: |
           export PKR_VAR_nebius_token=$(ncp iam create-token)
-          ./packer build -only yandex.nebius-${{ matrix.variant }} -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX .
+          ./packer build -only yandex.nebius${{ matrix.variant }} -var image_version=${{ inputs.image_version }} -var build_prefix=$BUILD_PREFIX .
         env:
           PKR_VAR_nebius_folder_id: ${{ secrets.NEBIUS_FOLDER_ID }}
           PKR_VAR_nebius_subnet_id: ${{ secrets.NEBIUS_SUBNET_ID }}
