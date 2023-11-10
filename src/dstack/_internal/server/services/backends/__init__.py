@@ -251,6 +251,15 @@ def clear_backend_cache(project_name: str):
         del _BACKENDS_CACHE[project_name]
 
 
+async def get_project_backend_model_by_type(
+    project: ProjectModel, backend_type: BackendType
+) -> Optional[BackendModel]:
+    for backend in project.backends:
+        if backend.type == backend_type:
+            return backend
+    return None
+
+
 _NOT_AVAILABLE = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}
 
 
