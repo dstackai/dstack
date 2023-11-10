@@ -45,16 +45,7 @@ class GCPServiceAccountCreds(ForbidExtra):
 
     @root_validator
     def fill_data(cls, values):
-        if values.get("data") is not None:
-            return values
-        if "filename" not in values:
-            raise ValueError()
-        try:
-            with open(Path(values["filename"]).expanduser()) as f:
-                values["data"] = f.read()
-        except OSError:
-            raise ValueError(f"No such file {values['filename']}")
-        return values
+        return _fill_data(values)
 
 
 class GCPDefaultCreds(ForbidExtra):
@@ -75,6 +66,28 @@ class LambdaConfig(ForbidExtra):
     type: Literal["lambda"] = "lambda"
     regions: Optional[List[str]] = None
     creds: AnyLambdaCreds
+
+
+class NebiusServiceAccountCreds(ForbidExtra):
+    type: Literal["service_account"] = "service_account"
+    filename: str
+    data: Optional[str] = None
+
+    @root_validator
+    def fill_data(cls, values):
+        return _fill_data(values)
+
+
+AnyNebiusCreds = Union[NebiusServiceAccountCreds]
+
+
+class NebiusConfig(ForbidExtra):
+    type: Literal["nebius"] = "nebius"
+    cloud_id: str
+    folder_id: str
+    network_id: str
+    regions: Optional[List[str]] = None
+    creds: AnyNebiusCreds
 
 
 class TensorDockConfig(ForbidExtra):
@@ -98,6 +111,7 @@ AnyBackendConfig = Union[
     AzureConfig,
     GCPConfig,
     LambdaConfig,
+    NebiusConfig,
     TensorDockConfig,
     VastAIConfig,
     DstackConfig,
@@ -251,3 +265,16 @@ def _config_to_internal_config(backend_config: BackendConfig) -> AnyConfigInfoWi
     if backend_config.type == "azure":
         config_info.__root__.locations = backend_config.regions
     return config_info.__root__
+
+
+def _fill_data(values: dict):
+    if values.get("data") is not None:
+        return values
+    if "filename" not in values:
+        raise ValueError()
+    try:
+        with open(Path(values["filename"]).expanduser()) as f:
+            values["data"] = f.read()
+    except OSError:
+        raise ValueError(f"No such file {values['filename']}")
+    return values

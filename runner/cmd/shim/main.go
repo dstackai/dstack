@@ -30,14 +30,6 @@ func main() {
 				Required:    true,
 				Destination: &backendName,
 				EnvVars:     []string{"DSTACK_BACKEND"},
-				Action: func(c *cli.Context, s string) error {
-					for _, backend := range []string{"aws", "azure", "gcp", "lambda", "tensordock", "local"} {
-						if s == backend {
-							return nil
-						}
-					}
-					return gerrors.Newf("unknown backend %s", s)
-				},
 			},
 			/* Shim Parameters */
 			&cli.PathFlag{
