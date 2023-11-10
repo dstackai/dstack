@@ -1,6 +1,9 @@
+import threading
+import time
 from typing import List, Optional, Union
 
 import requests
+from requests.adapters import HTTPAdapter, Retry
 
 import dstack._internal.server.services.docker as docker
 from dstack._internal.core.errors import NoCapacityError
@@ -10,12 +13,19 @@ DISK_SIZE = 80  # TODO(egor-s): use requirements instead
 
 
 class VastAIAPIClient:
-    # TODO(egor-s): handle error 429
-    # TODO(egor-s): cache responses to avoid error 429
     def __init__(self, api_key: str):
         self.api_url = "https://console.vast.ai/api/v0".rstrip("/")
         self.api_key = api_key
         self.s = requests.Session()
+        retries = Retry(
+            total=5,
+            backoff_factor=1,
+            status_forcelist=[429],
+        )
+        self.s.mount(prefix=self._url("/instances/"), adapter=HTTPAdapter(max_retries=retries))
+        self.lock = threading.Lock()
+        self.instances_cache_ts: float = 0
+        self.instances_cache: List[dict] = []
 
     def get_bundle(self, bundle_id: Union[str, int]) -> Optional[dict]:
         resp = self.s.post(self._url(f"/bundles/"), json={"id": {"eq": bundle_id}})
@@ -71,6 +81,7 @@ class VastAIAPIClient:
         resp = self.s.put(self._url(f"/asks/{bundle_id}/"), json=payload)
         if resp.status_code != 200 or not (data := resp.json())["success"]:
             raise NoCapacityError(resp.text)
+        self._invalidate_cache()
         return data
 
     def destroy_instance(self, instance_id: Union[str, int]) -> bool:
@@ -84,13 +95,18 @@ class VastAIAPIClient:
         resp = self.s.delete(self._url(f"/instances/{instance_id}/"))
         if resp.status_code != 200 or not resp.json()["success"]:
             return False
+        self._invalidate_cache()
         return True
 
-    def get_instances(self) -> List[dict]:
-        resp = self.s.get(self._url(f"/instances/"))
-        resp.raise_for_status()
-        data = resp.json()
-        return data["instances"]
+    def get_instances(self, cache_ttl: float = 3.0) -> List[dict]:
+        with self.lock:
+            if time.time() - self.instances_cache_ts > cache_ttl:
+                resp = self.s.get(self._url(f"/instances/"))
+                resp.raise_for_status()
+                data = resp.json()
+                self.instances_cache_ts = time.time()
+                self.instances_cache = data["instances"]
+            return self.instances_cache
 
     def get_instance(self, instance_id: Union[str, int]) -> Optional[dict]:
         instances = self.get_instances()
@@ -118,3 +134,8 @@ class VastAIAPIClient:
 
     def _url(self, path):
         return f"{self.api_url}/{path.lstrip('/')}?api_key={self.api_key}"
+
+    def _invalidate_cache(self):
+        with self.lock:
+            self.instances_cache_ts = 0
+            self.instances_cache = []
