@@ -42,20 +42,11 @@ def create_app() -> FastAPI:
             dsn=settings.SENTRY_DSN,
             environment=settings.SERVER_ENVIRONMENT,
             enable_tracing=True,
-            before_send_transaction=filter_sentry_transactions,
-            traces_sample_rate=0.25,
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
         )
 
     app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
     return app
-
-
-def filter_sentry_transactions(event, hint):
-    url_string = event["request"]["url"]
-    parsed_url = urlparse(url_string)
-    if parsed_url.path == "/api/healthcheck":
-        return None
-    return event
 
 
 @asynccontextmanager
