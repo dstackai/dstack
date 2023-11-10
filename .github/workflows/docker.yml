@@ -186,7 +186,7 @@ jobs:
         env:
           CLI_VERSION: 0.113.0+Nebius-AI
       - name: Write Nebius credentials
-        uses: jsdaniell/create-json@1.2.2
+        uses: jsdaniell/create-json@v1.2.2
         with:
           name: "service_account.json"
           json: ${{ secrets.NEBIUS_SERVICE_ACCOUNT }}
