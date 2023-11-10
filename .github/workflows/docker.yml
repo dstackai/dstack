@@ -185,9 +185,14 @@ jobs:
           echo "$HOME/nebius-cloud/bin" >> $GITHUB_PATH
         env:
           CLI_VERSION: 0.113.0+Nebius-AI
+      - name: Write Nebius credentials
+        uses: jsdaniell/create-json@1.2.2
+        with:
+          name: "service_account.json"
+          json: ${{ secrets.NEBIUS_SERVICE_ACCOUNT }}
+          dir: "packer/"
       - name: Setup Nebius profile
         run: |
-          echo ${{ secrets.NEBIUS_SERVICE_ACCOUNT }} > service_account.json
           ncp config profile create packer
           ncp config set endpoint api.ai.nebius.cloud:443
           ncp config set service-account-key service_account.json
