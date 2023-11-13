@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 225 225">
+	<defs>
+		<style>
+			.cls-1{fill:#0f122a;stroke:#fff;stroke-width:6.65px;}
+			.cls-2{fill:none;stroke:#0f122a;stroke-width:13.3px;}</style>
+	</defs>
+	<circle class="cls-2" cx="111.64" cy="100.2" r="93.1"/>
+	<path class="cls-1"
+		d="m214.17,31.29l-100.06,183.53-.12.21-.08.23-1.2,2.19-1.2-2.19-.08-.23-.12-.21L11.26,31.29h43.29l1.53,2.57,53.69,101.46,2.94,5.55,2.94-5.55,53.69-101.46,1.53-2.57h43.29Z" />
+</svg>

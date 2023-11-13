@@ -277,6 +277,30 @@ projects:
 !!! info "NOTE:"
     The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
 
+### Vast AI
+
+Log into your [Vast AI](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
+API Key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: vastai
+    creds:
+      type: api_key
+      api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
+```
+
+</div>
+
+!!! info "NOTE:"
+    The `vastai` backend supports on-demand instances only. Spot instance support coming soon.
+
 ## Cloud regions
 
 In addition to credentials, each cloud (except TensorDock) optionally allows for region configuration.

@@ -48,9 +48,9 @@
 .tx-landing__hero_button_placeholder {
     color: #202128;
     font-size: 0.67rem;
-    line-height: 28px;
+    line-height: 24px;
     text-align: center;
-    padding: 20px 5px 13px;
+    padding: 18px 5px 13px;
 }
 
 @media screen and (max-width: 76.1875em) {
@@ -269,16 +269,16 @@
     align-items: center;
     justify-content: center;
     gap: 14px;
-    padding: 14px 5px 3px;
+    padding: 18px 5px 3px;
 }
 
 .tx-landing__integrations .logo-xlarge {
-    width: 41px;
+    width: 31px;
     margin-top: 2px;
 }
 
 .tx-landing__integrations .logo-large {
-    width: 30px;
+    width: 20px;
 }
 
 .tx-landing__integrations .logo-medium {
