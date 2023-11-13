@@ -165,7 +165,6 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
         "ssh-keygen -A > /dev/null",
         # start sshd
         "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
-        "touch ~/.no_auto_tmux",
     ]
     build = get_dstack_runner_version()
     runner = "/usr/local/bin/dstack-runner"
@@ -173,8 +172,8 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
     if version.__is_release__:
         bucket = "dstack-runner-downloads"
     commands += [
-        f'sudo curl --output {runner} "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',
-        f"sudo chmod +x {runner}",
+        f'curl --output {runner} "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',
+        f"chmod +x {runner}",
         f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
     return commands
