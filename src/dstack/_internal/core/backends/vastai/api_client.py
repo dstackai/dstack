@@ -21,7 +21,7 @@ class VastAIAPIClient:
         retries = Retry(
             total=5,
             backoff_factor=1,
-            status_forcelist=[429],
+            status_forcelist=[429, 504],
         )
         self.s.mount(prefix=self._url("/instances/"), adapter=HTTPAdapter(max_retries=retries))
         self.lock = threading.Lock()

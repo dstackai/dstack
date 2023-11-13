@@ -67,7 +67,9 @@ class GCPCompute(Compute):
             offers_with_availability[key].region = region
         return list(offers_with_availability.values())
 
-    def terminate_instance(self, instance_id: str, region: str):
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ):
         try:
             self.instances_client.delete(
                 project=self.config.project_id, zone=region, instance=instance_id

@@ -128,7 +128,9 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
             continue
         backend = await get_project_backend_by_type(project, gateway.backend.type)
         tasks.append(
-            run_async(backend.compute().terminate_instance, gateway.instance_id, gateway.region)
+            run_async(
+                backend.compute().terminate_instance, gateway.instance_id, gateway.region, None
+            )
         )
         gateways.append(gateway)
     # terminate in parallel

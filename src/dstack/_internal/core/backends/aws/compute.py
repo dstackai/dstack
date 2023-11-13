@@ -101,7 +101,9 @@ class AWSCompute(Compute):
             "stopped": InstanceState.STOPPED,
         }[state]
 
-    def terminate_instance(self, instance_id: str, region: str):
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ):
         client = self.session.client("ec2", region_name=region)
         try:
             client.terminate_instances(InstanceIds=[instance_id])
