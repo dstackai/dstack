@@ -47,10 +47,10 @@
 
 .tx-landing__hero_button_placeholder {
     color: #202128;
-    font-size: 0.6rem;
-    line-height: 21px;
+    font-size: 0.67rem;
+    line-height: 28px;
     text-align: center;
-    padding: 16px 5px 13px;
+    padding: 20px 5px 13px;
 }
 
 @media screen and (max-width: 76.1875em) {
@@ -95,7 +95,7 @@
     }
 
     .tx-landing__hero_text {
-        margin-top: 4.3rem;
+        margin-top: 5.1rem;
     }
 
     .tx-landing__hero_text h1 {
@@ -183,8 +183,8 @@
 
 .tx-container .md-button.small {
     min-width: 175px;
-    padding: 0.3em 1.5em;
-    font-size: 19px;
+    padding: 0.4em 1.7em;
+    font-size: 20px;
 }
 
 .md-header__buttons .md-button--primary,
@@ -230,7 +230,8 @@
 .tx-landing__highlights_text h2 {
     font-size: 2.2em;
     max-width: 500px;
-    margin-bottom: 2.75em;
+    margin-top: 1.75em;
+    margin-bottom: 2.5em;
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -258,8 +259,8 @@
 
 .tx-landing__integrations_text {
     color: #202128;
-    font-size: 0.6rem;
-    line-height: 16px;
+    font-size: 0.65rem;
+    line-height: 24px;
     text-align: center;
 }
 
@@ -272,12 +273,12 @@
 }
 
 .tx-landing__integrations .logo-xlarge {
-    width: 35px;
+    width: 41px;
     margin-top: 2px;
 }
 
 .tx-landing__integrations .logo-large {
-    width: 25px;
+    width: 30px;
 }
 
 .tx-landing__integrations .logo-medium {
@@ -364,7 +365,7 @@
 }
 
 .tx-landing__bottom_cta h2, .tx-landing__major_feature h2 {
-    font-size: 2.2em;
+    font-size: 1.8em;
     max-width: 500px;
     margin-top: 0.75em;
     margin-bottom: 0.75em;
@@ -496,8 +497,10 @@
     }
 }
 
+.tx-landing__plans {
+    margin-bottom: 2.75rem;
+}
 
-// plans section
 .tx-landing__plans_text {
 
 }
@@ -518,10 +521,10 @@
 }
 
 .tx-landing__plans_cards {
-    display: flex;
+    display: grid;
     flex-wrap: wrap;
-    gap: 30px;
-    justify-content: center;
+    gap: 2rem;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
 }
 
 .plans_card {
@@ -531,21 +534,21 @@
     width: 100%;
     border-radius: 5px;
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
-    border-width: 1px;
+    border-width: 0.5px;
     border-style: solid;
-    padding: 28px 20px 32px 46px
+    padding: 38px 20px 38px 46px
 }
 
 .plans_card__title {
-    margin-bottom: .6rem;
-    font-size: 1.5rem;
+    margin-bottom: 0.9rem;
+    font-size: 1.5em;
     font-weight: 800;
     line-height: 1.33;
 }
 
 .plans_card__subtitle {
-    margin-bottom: 1.1rem;
-    font-size: .9rem;
+    margin-bottom: 1.4rem;
+    font-size: 1.0em;
     line-height: 1.44;
     color: #696F86;
 }
@@ -554,7 +557,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 1.9rem;
+    margin-bottom: 2.4rem;
 }
 
 .plans_card__service-item {
@@ -563,8 +566,8 @@
     gap: 8px;
     padding: 7px 16px;
     border-radius: 30px;
-    border: 1px solid #BABFD3;
-    font-size: .9rem;
+    border: 0.5px solid black;
+    font-size: .88em;
     line-height: 1.44;
     color: #2A292D;
 }
@@ -588,9 +591,9 @@
 }
 
 .plans_card__item {
-    font-size: .9rem;
-    line-height: 1.66;
-    color: #696F86;
+    font-size: 1.0em;
+    line-height: 2.0;
+    color: black;
 }
 
 .plans_card__item .strong {
@@ -598,14 +601,15 @@
     font-weight: 700;
 }
 
-.plans_card__item .highlighted {
+.highlighted {
     font-weight: 700;
     color: var(--md-typeset-a-color);
 }
 
 .plans_card__link {
+    margin-top: 1.0rem;
     margin-bottom: 1.9rem;
-    font-size: .9rem;
+    font-size: 1.0em;
     line-height: 1.66;
 }
 

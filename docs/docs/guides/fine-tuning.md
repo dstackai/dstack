@@ -30,9 +30,9 @@ and various [training parameters](../../docs/reference/api/python/index.md#dstac
 from dstack.api.finetuning import SFTFineTuningTask
 
 task = SFTFineTuningTask(hf_model_name="NousResearch/Llama-2-13b-hf",
-                         hf_dataset_name="peterschmidt85/samsum",
-                         hf_token="...",
-                         num_train_epochs=2)
+                      hf_dataset_name="peterschmidt85/samsum",
+                      hf_token="...",
+                      num_train_epochs=2)
 ```
 
 !!! info "Dataset format"

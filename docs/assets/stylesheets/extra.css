@@ -378,7 +378,7 @@ h4.doc-heading {
 
 .md-typeset pre > code {
     background-color: rgb(21, 22, 29);
-    padding: 35px 25px;
+    padding: 60px 25px 35px 40px;
     border-radius: 4px;
     font-size: 15px;
 
@@ -407,7 +407,7 @@ h4.doc-heading {
 }
 
 .md-typeset div[editor-title] pre > code {
-    padding: 65px 25px 35px;
+    padding: 65px 25px 35px 45px;
 }
 
 @media screen and (min-width: 60em) {
