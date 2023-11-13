@@ -165,7 +165,6 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
         "ssh-keygen -A > /dev/null",
         # start sshd
         "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
-        "touch ~/.no_auto_tmux",
     ]
     build = get_dstack_runner_version()
     runner = "/usr/local/bin/dstack-runner"
