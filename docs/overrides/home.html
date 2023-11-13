@@ -11,42 +11,10 @@
         s.src = "https://client.crisp.chat/l.js";
         s.async = 1;
         d.getElementsByTagName("head")[0].appendChild(s);
-        $crisp.push(["do", "chat:hide"]);
+        /*$crisp.push(["do", "chat:hide"]);*/
     })();
 </script>
 <script type="text/javascript">
-/*
-    new Termynal('.tx-landing__hero_code>[data-termynal]',
-        {
-            lineData: [
-                {type: 'input', value: 'dstack run . --gpu 40GB'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, value: ' Configuration               .dstack.yml', class: 'newline'},
-                {delay: 0, value: ' Min resources               2xCPUs, 8GB, 1x40GB', class: 'newline'},
-                {delay: 0, value: ' Max price                   -', class: 'newline'},
-                {delay: 0, value: ' Spot policy                 auto', class: 'newline'},
-                {delay: 0, value: ' Max duration                72h', class: 'newline'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, value: ' #  BACKEND  RESOURCES                      SPOT  PRICE', class: 'newline'},
-                {delay: 0, value: ' 1  lambda   30xCPUs, 200GB, 1xA100 (80GB)  yes   $1.1', class: 'newline'},
-                {delay: 0, value: ' 2  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes   $1.20582', class: 'newline'},
-                {delay: 0, value: ' 3  azure    24xCPUs, 220GB, 1xA100 (80GB)  yes   $1.6469', class: 'newline'},
-                {delay: 0, value: '    ...', class: 'newline'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 0, startDelay: 0, lineDelay: 0, value: 'Continue? ', class: 'no-newline'},
-                {
-                    type: 'input',
-                    startDelay: 0,
-                    lineDelay: 0,
-                    delay: 1000000,
-                    prompt: '[y/n]',
-                    value: '',
-                    class: 'no-newline'
-                },
-            ]
-        }
-    )
-*/
     new Termynal('#tx-landing__major_feature_training_terminal',
         {
             lineData: [
@@ -127,7 +95,8 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>An <span class="gradient">easier way</span> to train and deploy <span class="gradient">generative AI</span></h1>
+                <h1>An <span class="gradient">easier way</span> to train and deploy <span
+                        class="gradient">generative AI</span></h1>
 
                 <p>
                     dstack simplifies training, fine-tuning, and deploying
@@ -137,6 +106,20 @@
 
             <div class="tx-landing__hero_buttons">
                 <div class="tx-landing__hero_button_container">
+                    <a href="#"
+                       class="md-button md-button--primary"
+                       data-tally-open="w7K17R"
+                       style="min-width: 250px"
+                    >Sign up for free</a>
+
+                    <div class="tx-landing__hero_button_placeholder">
+                        <strong>A100</strong> from <span class="highlighted">$1.4/hr</span>, <strong>H100</strong> from
+                        <span class="highlighted">$4.12/hr</span><br>
+                        No reservation needed
+                    </div>
+                </div>
+
+                <div class="tx-landing__hero_button_container">
                     <!--<a href="https://discord.gg/u8SmfwPpMd" class="md-button md-button-secondary discord">
                         Join the community
                     </a>
@@ -145,35 +128,24 @@
                         Get support and learn from <br>the community
                     </div>-->
 
-                    <a href="/docs" class="md-button md-button-secondary">
+                    <a href="/docs" class="md-button md-button-secondary"
+                       style="min-width: 250px">
                         Install open-source</a>
 
                     <div class="tx-landing__integrations">
                         <div class="tx-landing__integrations_logos">
-                            <img class="logo-xlarge" src="assets/images/aws-logo.svg" title="Amazon Web Services">
-                            <img class="logo-large" src="assets/images/gcp-logo.svg" title="Google Cloud Platform">
-                            <img class="logo-large" src="assets/images/azure-logo.svg" title="Microsoft Azure">
-                            <img class="logo-large" src="assets/images/lambda-logo.svg" title="Lambda Cloud">
-                            <img class="logo-large" src="assets/images/tensordock-logo.svg" title="TensorDock">
+                            <img class="logo-xlarge" src="/assets/images/aws-logo.svg" title="Amazon Web Services">
+                            <img class="logo-large" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <img class="logo-large" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <img class="logo-large" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
+                            <img class="logo-large" src="/assets/images/tensordock-logo.svg" title="TensorDock">
                         </div>
 
                         <div class="tx-landing__integrations_text">
-                            Use with your own cloud accounts
+                            Use your own cloud account
                         </div>
                     </div>
 
-                </div>
-
-                <div class="tx-landing__hero_button_container">
-                    <a href="#"
-                       class="md-button md-button--primary"
-                       data-tally-open="w7K17R"
-                    >Use the cloud GPU</a>
-
-                    <div class="tx-landing__hero_button_placeholder">
-                        A100 from $1.4/hr, H100 from $4.12/hr<br>
-                        No reservation needed
-                    </div>
                 </div>
             </div>
 
@@ -186,16 +158,16 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>Streamline training</h2>
+                    <h2>Tasks</h2>
 
-                    <p>Efficiently pre-train or fine-tune LLMs and other generative AI models via the CLI or API.
-                        Utilize your preferred libraries or rely on the provided recipes.
-                    </p>
+                    <p>Want to run a custom training job or a batch task using your own code? Describe it as a
+                        configuration and execute it either via the CLI or Python API. Specify your own Docker image,
+                        run your own scripts, expose ports, etc.</p>
 
-                    <p>
-                        <a href="/docs/guides/tasks" target="_blank"
-                           class="md-button md-button-secondary small">Learn more</a>
-                    </p>
+                    <!--<p>
+                        <a href="/docs/guides/fine-tuning" target="_blank"
+                           class="md-button md-button-secondary small">Docs</a>
+                    </p>-->
                 </div>
 
                 <div class="block large">
@@ -212,16 +184,16 @@
                     </div>
                 </div>
                 <div class="block">
-                    <h2>Optimize deployment</h2>
+                    <h2>Services</h2>
 
-                    <p>Deploy LLMs and other generative AI models as public endpoints using the CLI or API. Utilize
-                        custom Docker images or our user-friendly high-level API.
-                    </p>
+                    <p>Want to deploy a model or a web application using your own code? Describe it as a
+                        configuration and execute it either via the CLI or Python API. Utilize your own Docker image,
+                        and scripts, etc.</p>
 
-                    <p>
+                    <!--<p>
                         <a href="/docs/guides/services" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
-                    </p>
+                    </p>-->
                 </div>
             </div>
         </div>
@@ -229,200 +201,98 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>Accelerate development</h2>
+                    <h2>Dev environments</h2>
                     <p>Quickly provision dev environments for interactive development
-                    automatically set up based on a pre-defined configuration.</p>
+                        automatically set up based on a pre-defined configuration.</p>
 
-                    <p>
+                    <!--<p>
                         <a href="/docs/guides/dev-environments" target="_blank"
-                           class="md-button md-button-secondary small">Learn more</a>
-                    </p>
+                           class="md-button md-button-secondary small">Docs</a>
+                    </p>-->
                 </div>
 
                 <div class="block large">
-                    <img src="assets/images/dstack-vscode-jupyter.png" alt="">
+                    <img src="/assets/images/dstack-vscode-jupyter.png" alt="">
                 </div>
             </div>
         </div>
 
-        <div class="-landing__highlights">
+        <div class="tx-landing__plans">
             <div class="tx-landing__highlights_text">
-                <h2>Featured examples</h2>
-            </div>
-
-            <div class="tx-landing__highlights_grid">
-                <a href="/examples/llama-index-weaviate">
-                    <div class="feature-cell">
-                        <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <path d="M12 3C7.58 3 4 4.79 4 7s3.58 4 8 4 8-1.79 8-4-3.58-4-8-4M4 9v3c0 2.21 3.58 4 8 4s8-1.79 8-4V9c0 2.21-3.58 4-8 4s-8-1.79-8-4m0 5v3c0 2.21 3.58 4 8 4s8-1.79 8-4v-3c0 2.21-3.58 4-8 4s-8-1.79-8-4Z"></path>
-                            </svg>
-                        </div>
-                        <h3>
-                            RAG with Llama Index and Weaviate
-                        </h3>
-
-                        <p>
-                            Use <strong>Llama Index</strong> and <strong>Weaviate</strong> to enhance the capabilities
-                            of LLMs with the context of your data.
-                        </p>
-                    </div>
-                </a>
-
-                <a href="/examples/deploy-python">
-                    <div class="feature-cell">
-                        <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <path d="M7 7H5a2 2 0 0 0-2 2v8h2v-4h2v4h2V9a2 2 0 0 0-2-2m0 4H5V9h2m7-2h-4v10h2v-4h2a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2m0 4h-2V9h2m6 0v6h1v2h-4v-2h1V9h-1V7h4v2Z"></path>
-                            </svg>
-                        </div>
-                        <h3>
-                            Deploying LLMs using Python API
-                        </h3>
-
-                        <p>
-                            <strong>Streamlit</strong> application that programmatically deploys a
-                            <strong>Llama</strong> LLM using <strong>dstack</strong>'s <strong>Python API</strong>.
-                        </p>
-                    </div>
-                </a>
-
-                <a href="/examples/finetuning-llama-2">
-                    <div class="feature-cell">
-                        <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <path d="M3 17v2h6v-2H3M3 5v2h10V5H3m10 16v-2h8v-2h-8v-2h-2v6h2M7 9v2H3v2h4v2h2V9H7m14 4v-2H11v2h10m-6-4h2V7h4V5h-4V3h-2v6Z"></path>
-                            </svg>
-                        </div>
-                        <h3>
-                            Fine-tuning Llama 2 using QLoRA
-                        </h3>
-
-                        <p>
-                            Fine-tune <strong>Llama 2</strong> on a custom dataset using the <strong>peft</strong>, and
-                            <strong>bitsandbytes</strong>, and <strong>trl</strong> libraries.
-                        </p>
-                    </div>
-                </a>
-
-                <a href="/examples/text-generation-inference">
-                    <div class="feature-cell">
-                        <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <path d="M16 9h3l-5 7m-4-7h4l-2 8M5 9h3l2 7m5-12h2l2 3h-3m-5-3h2l1 3h-4M7 4h2L8 7H5m1-5L2 8l10 14L22 8l-4-6H6Z"></path>
-                            </svg>
-                        </div>
-                        <h3>
-                            Deploying LLMs using TGI
-                            <br/><br/>
-                        </h3>
-
-                        <p>
-                            Deploy LLMs as services with optimized performance using <strong>TGI</strong>, an
-                            open-source serving framework by Hugging Face.
-                        </p>
-                    </div>
-                </a>
-
-                <a href="/examples/stable-diffusion-xl">
-                    <div class="feature-cell">
-                        <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <path d="M17.5 12a1.5 1.5 0 0 1-1.5-1.5A1.5 1.5 0 0 1 17.5 9a1.5 1.5 0 0 1 1.5 1.5 1.5 1.5 0 0 1-1.5 1.5m-3-4A1.5 1.5 0 0 1 13 6.5 1.5 1.5 0 0 1 14.5 5 1.5 1.5 0 0 1 16 6.5 1.5 1.5 0 0 1 14.5 8m-5 0A1.5 1.5 0 0 1 8 6.5 1.5 1.5 0 0 1 9.5 5 1.5 1.5 0 0 1 11 6.5 1.5 1.5 0 0 1 9.5 8m-3 4A1.5 1.5 0 0 1 5 10.5 1.5 1.5 0 0 1 6.5 9 1.5 1.5 0 0 1 8 10.5 1.5 1.5 0 0 1 6.5 12M12 3a9 9 0 0 0-9 9 9 9 0 0 0 9 9 1.5 1.5 0 0 0 1.5-1.5c0-.39-.15-.74-.39-1-.23-.27-.38-.62-.38-1a1.5 1.5 0 0 1 1.5-1.5H16a5 5 0 0 0 5-5c0-4.42-4.03-8-9-8Z"></path>
-                            </svg>
-                        </div>
-                        <h3>
-                            Deploying Stable Diffusion using FastAPI
-                        </h3>
-
-                        <p>
-                            Deploy <strong>Stable Diffusion XL</strong> as a service using <strong>FastAPI</strong>.
-                            <br/><br/>
-                        </p>
-                    </div>
-                </a>
-
-                <a href="/examples/vllm">
-                    <div class="feature-cell">
-                        <div class="feature-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 27 27">
-                                <path d="m13.13 22.19-1.63-3.83c1.57-.58 3.04-1.36 4.4-2.27l-2.77 6.1M5.64 12.5l-3.83-1.63 6.1-2.77C7 9.46 6.22 10.93 5.64 12.5M21.61 2.39S16.66.269 11 5.93c-2.19 2.19-3.5 4.6-4.35 6.71-.28.75-.09 1.57.46 2.13l2.13 2.12c.55.56 1.37.74 2.12.46A19.1 19.1 0 0 0 18.07 13c5.66-5.66 3.54-10.61 3.54-10.61m-7.07 7.07c-.78-.78-.78-2.05 0-2.83s2.05-.78 2.83 0c.77.78.78 2.05 0 2.83-.78.78-2.05.78-2.83 0m-5.66 7.07-1.41-1.41 1.41 1.41M6.24 22l3.64-3.64c-.34-.09-.67-.24-.97-.45L4.83 22h1.41M2 22h1.41l4.77-4.76-1.42-1.41L2 20.59V22m0-2.83 4.09-4.08c-.21-.3-.36-.62-.45-.97L2 17.76v1.41Z"></path>
-                            </svg>
-                        </div>
-                        <h3>
-                            Deploying LLMs using vLLM
-                            <br/><br/>
-                        </h3>
-
-                        <p>
-                            Deploy LLMs as services with up to 24 times higher throughput using
-                            the
-                            <strong>vLLM</strong> library.
-                        </p>
-                    </div>
-                </a>
-            </div>
-        </div>
-
-        <div class="tx-landing__bottom_cta">
-            <div>
                 <h2>Get started in less than a minute</h2>
-                <div class="termy">
-                    <pre class="highlight">
-$ pip install "dstack[all] -U"
-$ dstack server
+            </div>
 
-The server is available at http://127.0.0.1:3000?token=b934d226-e24a-4eab-eb92b353b10f
-                    </pre>
+            <div class="tx-landing__plans_cards">
+                <div class="plans_card">
+                    <div class="plans_card__title">GPU cloud</div>
+                    <div class="plans_card__subtitle">No reservation needed</div>
+
+                    <div class="plans_card__items">
+                        <div class="plans_card__item">
+                            <span class="strong">H100</span> (80GB) from <span class="highlighted">$4.12/hr</span>
+                        </div>
+
+                        <div class="plans_card__item">
+                            <span class="strong">A100</span> (80GB) from <span class="highlighted">$1.4/hr</span>
+                        </div>
+
+                        <div class="plans_card__item">
+                            <span class="strong">L40</span> (48GB) from <span class="highlighted">$1.05/hr</span>
+                        </div>
+
+                        <div class="plans_card__item">
+                            <span class="strong">A6000</span> (80GB) from <span class="highlighted">$0.43/hr</span>
+                        </div>
+                    </div>
+
+                    <a href="/pricing" class="plans_card__link">See all pricing options →</a>
+
+                    <div class="plans_card__buttons">
+                        <a href="#" target="_blank"
+                           data-tally-open="w7K17R"
+                           class="md-button md-button--primary small">Sign up for free</a>
+                    </div>
                 </div>
-                <p class="tx-landing__bottom_cta_text">
-                    <strong>Done!</strong> Configure clouds, and use the CLI or API to train,
-                    fine-tune, and deploy generative AI models.
-                </p>
 
-                <a href="/docs" class="md-button md-button--primary">Get started</a>
+                <div class="plans_card">
+                    <div class="plans_card__title">Open-source</div>
+                    <div class="plans_card__subtitle">Use your own cloud account</div>
 
-                <a href="https://discord.gg/u8SmfwPpMd" class="md-button md-button-secondary discord">
-                    Community
-                </a>
+                    <div class="plans_card__services">
+                        <div class="plans_card__service-item">
+                            <img width="39" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                                 style="padding-top: 5px">
+                            <div class="plans_card__service-name">Amazon Web Services</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="24" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <div class="plans_card__service-name">Azure</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="30" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">Google Cloud Platform</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="23" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
+                            <div class="plans_card__service-name">Lambda</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="23" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
+                            <div class="plans_card__service-name">TensorDock</div>
+                        </div>
+                    </div>
+
+                    <div class="plans_card__buttons">
+                        <a href="/docs" target="_blank"
+                           class="md-button md-button-secondary small">Install open-source</a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </section>
-{% endblock %}
-
-{% block footer %}
-    <footer class="tx-footer">
-        <div class="md-main__inner md-grid">
-            <div class="tx-footer__left-side">
-                <div class="tx-footer__copyright">
-                    {% include "partials/copyright.html" %}
-                    {% if config.extra.social %}
-                        {% include "partials/social.html" %}
-                    {% endif %}
-                </div>
-            </div>
-
-            <div class="tx-footer__right-side">
-                <div class="tx-footer__section">
-                    <div class="tx-footer__section-title">Contact</div>
-                    <a href="mailto:hello@dstack.ai" class="tx-footer__section-link">hello@dstack.ai</a>
-                </div>
-
-                <div class="tx-footer__section">
-                    <div class="tx-footer__section-title">Resources</div>
-                    <a href="/docs" class="tx-footer__section-link">Docs</a>
-                    <a href="/examples" class="tx-footer__section-link">Examples</a>
-                    <a href="/blog" class="tx-footer__section-link">Blog</a>
-                </div>
-
-                <div class="tx-footer__section">
-                    <div class="tx-footer__section-title">Community</div>
-                    <a href="https://github.com/dstackai/dstack" class="tx-footer__section-link">GitHub</a>
-                    <a href="https://discord.gg/u8SmfwPpMd" class="tx-footer__section-link">Discord</a>
-                    <a href="https://twitter.com/dstackai/" class="tx-footer__section-link">Twitter</a>
-                </div>
-            </div>
-        </div>
-    </footer>
 {% endblock %}

@@ -9,7 +9,7 @@ ecosystem.
 To use `dstack`, either set up the open-source server (and configure your own cloud accounts)
 or use the cloud version (which provides GPU out of the box).
 
-??? info "Install open-source"
+??? info "Open-source"
 
     If you wish to use `dstack` with your own cloud accounts, you can set up the open-source server.
 
@@ -72,10 +72,10 @@ or use the cloud version (which provides GPU out of the box).
 
     The client configuration is stored via `~/.dstack/config.yml`.
 
-??? info "Use the cloud GPU"
+??? info "GPU cloud"
     
     If you want `dstack` to provide cloud GPU, 
-    <a href="#" data-tally-open="w7K17R">sign up</a> for the cloud version of `dstack`, and configure the client 
+    <a href="#" data-tally-open="w7K17R">sign up</a>, and configure the client 
     with server address, user token, and project name using `dstack config`.
 
     <div class="termy">
@@ -114,7 +114,7 @@ client = Client.from_config()
     from dstack.api import Resources, GPU
     from dstack.api.finetuning import SFTFineTuningTask
 
-    # Specify a HuggingFace model and dataset and training params
+    # Pass a model, dataset, and training params
 
     task = SFTFineTuningTask(
         hf_model_name="NousResearch/Llama-2-13b-hf",
@@ -122,6 +122,8 @@ client = Client.from_config()
         hf_token="...",
         num_train_epochs=2
     )
+
+    # Run the fine-tuning task
 
     run = client.runs.submit(
         configuration=task,

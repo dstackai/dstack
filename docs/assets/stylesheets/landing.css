@@ -47,10 +47,10 @@
 
 .tx-landing__hero_button_placeholder {
     color: #202128;
-    font-size: 0.6rem;
-    line-height: 21px;
+    font-size: 0.67rem;
+    line-height: 28px;
     text-align: center;
-    padding: 16px 5px 13px;
+    padding: 20px 5px 13px;
 }
 
 @media screen and (max-width: 76.1875em) {
@@ -95,7 +95,7 @@
     }
 
     .tx-landing__hero_text {
-        margin-top: 4.3rem;
+        margin-top: 5.1rem;
     }
 
     .tx-landing__hero_text h1 {
@@ -183,8 +183,8 @@
 
 .tx-container .md-button.small {
     min-width: 175px;
-    padding: 0.3em 1.5em;
-    font-size: 19px;
+    padding: 0.4em 1.7em;
+    font-size: 20px;
 }
 
 .md-header__buttons .md-button--primary,
@@ -230,7 +230,8 @@
 .tx-landing__highlights_text h2 {
     font-size: 2.2em;
     max-width: 500px;
-    margin-bottom: 2.75em;
+    margin-top: 1.75em;
+    margin-bottom: 2.5em;
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -258,8 +259,8 @@
 
 .tx-landing__integrations_text {
     color: #202128;
-    font-size: 0.6rem;
-    line-height: 16px;
+    font-size: 0.65rem;
+    line-height: 24px;
     text-align: center;
 }
 
@@ -272,12 +273,12 @@
 }
 
 .tx-landing__integrations .logo-xlarge {
-    width: 35px;
+    width: 41px;
     margin-top: 2px;
 }
 
 .tx-landing__integrations .logo-large {
-    width: 25px;
+    width: 30px;
 }
 
 .tx-landing__integrations .logo-medium {
@@ -364,7 +365,7 @@
 }
 
 .tx-landing__bottom_cta h2, .tx-landing__major_feature h2 {
-    font-size: 2.2em;
+    font-size: 1.8em;
     max-width: 500px;
     margin-top: 0.75em;
     margin-bottom: 0.75em;
@@ -493,5 +494,135 @@
         margin-left: auto;
         display: flex;
         gap: 4.5rem;
+    }
+}
+
+.tx-landing__plans {
+    margin-bottom: 2.75rem;
+}
+
+.tx-landing__plans_text {
+
+}
+
+.tx-landing__plans_text h2 {
+    margin-bottom: 2rem;
+    font-weight: 800;
+    font-size: 2rem;
+    text-align: center;
+}
+
+.tx-landing__plans_text h2 .gradient {
+    background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-right: 4px;
+    margin-right: -4px;
+}
+
+.tx-landing__plans_cards {
+    display: grid;
+    flex-wrap: wrap;
+    gap: 2rem;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+}
+
+.plans_card {
+    display: flex;
+    flex-direction: column;
+    max-width: 445px;
+    width: 100%;
+    border-radius: 5px;
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-width: 0.5px;
+    border-style: solid;
+    padding: 38px 20px 38px 46px
+}
+
+.plans_card__title {
+    margin-bottom: 0.9rem;
+    font-size: 1.5em;
+    font-weight: 800;
+    line-height: 1.33;
+}
+
+.plans_card__subtitle {
+    margin-bottom: 1.4rem;
+    font-size: 1.0em;
+    line-height: 1.44;
+    color: #696F86;
+}
+
+.plans_card__services {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 2.4rem;
+}
+
+.plans_card__service-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    border-radius: 30px;
+    border: 0.5px solid black;
+    font-size: .88em;
+    line-height: 1.44;
+    color: #2A292D;
+}
+
+.plans_card__service-item img {
+    max-width: none;
+    height: initial;
+}
+
+.plans_card__service-name {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.plans_card__items {
+    margin-bottom: .4rem;
+}
+
+.plans_card__buttons {
+    margin-top: auto;
+}
+
+.plans_card__item {
+    font-size: 1.0em;
+    line-height: 2.0;
+    color: black;
+}
+
+.plans_card__item .strong {
+    color: #2A292D;
+    font-weight: 700;
+}
+
+.highlighted {
+    font-weight: 700;
+    color: var(--md-typeset-a-color);
+}
+
+.plans_card__link {
+    margin-top: 1.0rem;
+    margin-bottom: 1.9rem;
+    font-size: 1.0em;
+    line-height: 1.66;
+}
+
+.plans_card__buttons .md-button {
+    margin: 0;
+}
+
+@media screen and (max-width: 76.1875em) {
+
+}
+
+@media screen and (min-width: 76.1875em) {
+    .tx-landing__plans_text h2 {
+        font-size: 2.5rem;
     }
 }

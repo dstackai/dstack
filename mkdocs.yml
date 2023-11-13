@@ -127,8 +127,10 @@ extra_css:
   - assets/stylesheets/extra.css
   - assets/stylesheets/termynal.css
   - assets/stylesheets/landing.css
+  - assets/stylesheets/pricing.css
 extra_javascript:
   - assets/javascripts/extra.js
+  - assets/javascripts/pricing.js
 extra:
   homepage: /
   generator: false
@@ -136,16 +138,16 @@ extra:
     provider: google
     property: G-JX21114P7B
   social:
-    - icon: /fontawesome/brands/github
-      link: https://github.com/dstackai/dstack
-#    - icon: /fontawesome/brands/python
-#      link: https://pypi.org/project/dstack
-    - icon: /fontawesome/brands/docker
-      link: https://hub.docker.com/r/dstackai/dstack
     - icon: /fontawesome/brands/discord
       link: https://discord.gg/u8SmfwPpMd
     - icon: /simple/x
       link: https://twitter.com/dstackai
+    - icon: /fontawesome/brands/github
+      link: https://github.com/dstackai/dstack
+#    - icon: /fontawesome/brands/python
+#      link: https://pypi.org/project/dstack
+#    - icon: /fontawesome/brands/docker
+#      link: https://hub.docker.com/r/dstackai/dstack
   status:
     new: Recently added
 # Page tree
@@ -182,6 +184,7 @@ nav:
       - Deploying LLMs using TGI: examples/text-generation-inference.md
       - Deploying SDXL using FastAPI: examples/stable-diffusion-xl.md
       - Deploying LLMs using vLLM: examples/vllm.md
+  - Pricing: pricing.md
   - Blog:
       - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd

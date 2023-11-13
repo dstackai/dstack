@@ -1,0 +1,186 @@
+{% extends "landing.html" %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    window.$crisp = [];
+    window.CRISP_WEBSITE_ID = "ce56e3b2-a23e-4d3f-9e80-e08c61a2b3cb";
+    (function () {
+        let d = document;
+        let s = d.createElement("script");
+        s.src = "https://client.crisp.chat/l.js";
+        s.async = 1;
+        d.getElementsByTagName("head")[0].appendChild(s);
+        /*$crisp.push(["do", "chat:hide"]);*/
+    })();
+</script>
+{% endblock %}
+
+{% block content %}
+<section class="tx-container">
+    <div class="md-grid md-typeset">
+        <div class="tx-pricing">
+            <div class="tx-landing__highlights_text">
+                <h2>Pricing</h2>
+            </div>
+
+            <form class="tx-pricing__filters js-pricing-filter-form">
+                <div class="tx-pricing__filter-field" style="display: none">
+                    <label>
+                        <span class="tx-pricing__filter-field-label">Type</span>
+
+                        <select name="type">
+                            <option value="">All</option>
+                            <option value="datacenter">Data center</option>
+                            <option value="marketplace">Marketplace</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="tx-pricing__filter-field">
+                    <label>
+                        <span class="tx-pricing__filter-field-label">Contract</span>
+
+                        <select name="contract">
+                            <!--<option value="">All</option>-->
+                            <option value="ondemand">On-demand</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="tx-pricing__filter-field">
+                    <label>
+                        <span class="tx-pricing__filter-field-label">Region</span>
+
+                        <select name="region">
+                            <option value="">All</option>
+                            <option value="us">United States</option>
+                            <option value="europe">Europe</option>
+                        </select>
+                    </label>
+                </div>
+            </form>
+
+            <div class="tx-pricing__cards">
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['ondemand']"
+                     data-region="['europe']"
+                >
+                    <div class="tx-pricing__card-title">H100 (80GB)</div>
+                    <div class="tx-pricing__card-price">$4.12/hr</div>
+                    <div class="tx-pricing__card-options">Europe</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['ondemand']"
+                     data-region="['europe']"
+                >
+                    <div class="tx-pricing__card-title">A100 (80GB)</div>
+                    <div class="tx-pricing__card-price">$1.4/hr</div>
+                    <div class="tx-pricing__card-options">Europe</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['ondemand']"
+                     data-region="['us']"
+                >
+                    <div class="tx-pricing__card-title">A100 (80GB)</div>
+                    <div class="tx-pricing__card-price">$1.4/hr</div>
+                    <div class="tx-pricing__card-options">United States</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['ondemand']"
+                     data-region="['europe']"
+                >
+                    <div class="tx-pricing__card-title">L40 (80GB)</div>
+                    <div class="tx-pricing__card-price">$1.05/hr</div>
+                    <div class="tx-pricing__card-options">Europe</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['ondemand']"
+                     data-region="['us']"
+                >
+                    <div class="tx-pricing__card-title">L40 (80GB)</div>
+                    <div class="tx-pricing__card-price">$1.05/hr</div>
+                    <div class="tx-pricing__card-options">United States</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['ondemand']"
+                     data-region="['europe']"
+                >
+                    <div class="tx-pricing__card-title">A6000 (48GB)</div>
+                    <div class="tx-pricing__card-price">$0.47/hr</div>
+                    <div class="tx-pricing__card-options">Europe</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['ondemand']"
+                     data-region="['us']"
+                >
+                    <div class="tx-pricing__card-title">A6000 (48GB)</div>
+                    <div class="tx-pricing__card-price">$0.47/hr</div>
+                    <div class="tx-pricing__card-options">United States</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['ondemand']"
+                     data-region="['europe']"
+                >
+                    <div class="tx-pricing__card-title">A5000 (24GB)</div>
+                    <div class="tx-pricing__card-price">$0.21/hr</div>
+                    <div class="tx-pricing__card-options">Europe</div>
+                </div>
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['ondemand']"
+                     data-region="['us']"
+                >
+                    <div class="tx-pricing__card-title">A5000 (24GB)</div>
+                    <div class="tx-pricing__card-price">$0.21/hr</div>
+                    <div class="tx-pricing__card-options">United States</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tx-faq">
+            <div class="tx-landing__highlights_text">
+                <h2>FAQ</h2>
+            </div>
+
+            <div class="tx-faq__list">
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        How is the total cost per usage calculated?
+                        <div class="tx-faq__item-title-icon">
+                        </div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        The cloud version of dstack provides GPUs from various verified cloud GPU providers. Each
+                        provider may have its own pricing, and while dstack offers you the minimum available price, you
+                        have control over the maximum price. The prices above are starting prices per GPU. Storage
+                        and CPU are billed separately. If you need more details on the cost breakdown, feel free to
+                        contact <a href="javascript:void(0)" onclick="$crisp.push(['do', 'chat:open'])">support</a>.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <a href="#" class="md-button md-button--primary" data-tally-open="w7K17R">Sign up for free</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

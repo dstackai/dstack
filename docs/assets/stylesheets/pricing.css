@@ -1,0 +1,227 @@
+.tx-pricing {
+
+}
+
+.tx-pricing__text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.tx-pricing__text h1 {
+    text-align: center;
+    margin-bottom: .75rem;
+    font-weight: 800;
+    font-size: 2em;
+    letter-spacing: -3px;
+    background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-right: 4px;
+    margin-right: -4px;
+}
+
+.tx-pricing__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 3.3rem;
+}
+
+.tx-pricing__filter-field {
+    flex-shrink: 0;
+}
+
+.tx-pricing__filter-field-label {
+    display: block;
+    color: #696F86;
+    font-size: .9rem;
+    line-height: 1.44;
+    margin-bottom: .1rem;
+}
+
+.tx-pricing__filter-field select {
+    min-width: 230px;
+    height: 48px;
+    padding: 10px 40px 10px 16px;
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-width: 0.5px;
+    border-style: solid;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    outline: none;
+    background-size: 10px;
+    background-image: url("/assets/images/chevron-down.svg");
+    background-repeat: no-repeat;
+    background-position: right 20px bottom 50%;
+}
+
+.tx-pricing__cards {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.tx-pricing__card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+            "title price"
+            "options options";
+    gap: 10px;
+    padding: 12px 16px;
+    //background-color: #fff;
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-width: 0.5px;
+    border-style: solid;
+}
+
+.tx-pricing__card-title {
+    grid-area: title;
+    color: #2A292D;
+    font-size: .9rem;
+    font-weight: 700;
+    line-height: 1.44;
+}
+
+.tx-pricing__card-price {
+    grid-area: price;
+    color: var(--md-typeset-a-color);
+    font-size: .9rem;
+    font-weight: 700;
+    line-height: 1.44;
+}
+
+.tx-pricing__card-options {
+    grid-area: options;
+    color: #696F86;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.857;
+}
+
+.tx-faq__text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.tx-faq__text h1 {
+    text-align: center;
+    margin-top: 4rem;
+    margin-bottom: .75rem;
+    font-weight: 800;
+    font-size: 2.5em;
+    letter-spacing: -3px;
+    background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-right: 4px;
+    margin-right: -4px;
+}
+
+.tx-faq__list {
+    //padding: 30px 40px;
+    //border-radius: 66px;
+    //background-color: #fff;
+}
+
+.tx-faq__item {
+    padding-top: 20px;
+    padding-bottom: 20px;
+}
+
+.tx-faq__item:not(:last-child) {
+    border-bottom: 0.5px solid #E4E4E7;
+}
+
+.tx-faq__item-title {
+    position: relative;
+    padding-right: 40px;
+    color: #2A292D;
+    font-size: 0.85rem;
+    font-weight: 800;
+    line-height: 1.33;
+    cursor: pointer;
+}
+
+.tx-faq__item-title-icon {
+    position: absolute;
+    top: calc(50% - 15px);
+    right: 0;
+    width: 30px;
+    height: 30px;
+}
+
+.tx-faq, .tx-pricing {
+    margin-bottom: 2.75rem;
+}
+
+.tx-faq__item:not(._open) .tx-faq__item-title-icon {
+    background-image: url("/assets/images/plus.svg");
+}
+
+.tx-faq__item._open .tx-faq__item-title-icon {
+    background-image: url("/assets/images/minus.svg");
+}
+
+.tx-faq__item:not(._open) .tx-faq__item-body {
+    display: none;
+}
+
+.tx-faq__item._open .tx-faq__item-body {
+    display: block;
+}
+
+.tx-faq__item-body {
+    margin-top: 1rem;
+    color: #2A292D;
+    font-size: 1em;
+    line-height: 1.5;
+}
+
+
+.tx-try__text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.tx-try__text h1 {
+    text-align: center;
+    margin-top: 4rem;
+    margin-bottom: .75rem;
+    font-weight: 800;
+    font-size: 2.5em;
+    letter-spacing: -3px;
+    background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding-right: 4px;
+    margin-right: -4px;
+}
+
+.tx-try__text p {
+    max-width: 899px;
+    text-align: center;
+}
+
+.tx-try__text .md-button {
+    margin-top: 1.4rem;
+}
+
+@media screen and (min-width: 76.1875em) {
+    .tx-pricing__text h1 {
+        font-size: 3rem;
+    }
+
+    .tx-try__text h1,
+    .tx-faq__text h1 {
+        font-size: 2.5rem;
+    }
+}
