@@ -103,7 +103,9 @@ class TensorDockCompute(Compute):
             dockerized=True,
         )
 
-    def terminate_instance(self, instance_id: str, region: str):
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ):
         try:
             self.api_client.delete_single(instance_id)
         except requests.HTTPError:

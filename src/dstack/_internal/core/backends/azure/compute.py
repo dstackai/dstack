@@ -160,7 +160,9 @@ class AzureCompute(Compute):
         logger.info("Failed to request instance")
         raise NoCapacityError()
 
-    def terminate_instance(self, instance_id: str, region: str):
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ):
         _terminate_instance(
             compute_client=self._compute_client,
             resource_group=self.config.resource_group,

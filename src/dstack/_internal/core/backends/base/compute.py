@@ -34,7 +34,9 @@ class Compute(ABC):
         pass
 
     @abstractmethod
-    def terminate_instance(self, instance_id: str, region: str):
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ):
         pass
 
     def get_instance_state(self, instance_id: str, region: str) -> InstanceState:

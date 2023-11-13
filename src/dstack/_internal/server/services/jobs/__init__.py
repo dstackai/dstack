@@ -129,6 +129,7 @@ async def terminate_job_submission_instance(
         backend.compute().terminate_instance,
         job_submission.job_provisioning_data.instance_id,
         job_submission.job_provisioning_data.region,
+        job_submission.job_provisioning_data.backend_data,
     )
 
 

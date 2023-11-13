@@ -109,5 +109,7 @@ class VastAICompute(Compute):
             dockerized=False,
         )
 
-    def terminate_instance(self, instance_id: str, region: str):
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ):
         self.api_client.destroy_instance(instance_id)

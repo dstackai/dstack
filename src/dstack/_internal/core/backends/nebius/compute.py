@@ -115,7 +115,9 @@ class NebiusCompute(Compute):
             dockerized=True,
         )
 
-    def terminate_instance(self, instance_id: str, region: str):
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ):
         try:
             self.api_client.compute_instances_delete(instance_id)
         except NotFoundError:

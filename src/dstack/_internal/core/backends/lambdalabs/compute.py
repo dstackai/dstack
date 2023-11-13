@@ -74,7 +74,9 @@ class LambdaCompute(Compute):
             launch_command=launch_command,
         )
 
-    def terminate_instance(self, instance_id: str, region: str):
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ):
         self.api_client.terminate_instances(instance_ids=[instance_id])
 
     def _get_offers_with_availability(
