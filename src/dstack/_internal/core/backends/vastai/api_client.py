@@ -1,3 +1,4 @@
+import shlex
 import threading
 import time
 from typing import List, Optional, Union
@@ -68,8 +69,9 @@ class VastAIAPIClient:
             "env": {
                 "-p 10022:10022": "1",
             },
-            "onstart": onstart,
-            "runtype": "ssh_direc",
+            "onstart": "/bin/sh",
+            "args": ["-c", onstart],
+            "runtype": "args",
             "image_login": image_login,
             "python_utf8": False,
             "lang_utf8": False,

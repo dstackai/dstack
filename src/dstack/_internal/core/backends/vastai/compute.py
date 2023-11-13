@@ -89,6 +89,8 @@ class VastAICompute(Compute):
                     and ": OCI runtime create failed:" in resp["status_msg"]
                 ):
                     raise ComputeError(resp["status_msg"])
+                # if resp["actual_status"] == "exited":
+                #     raise ComputeError(resp["status_msg"])
                 logger.debug(
                     "Waiting %s: %s", instance_id, {k: v for k, v in resp.items() if "stat" in k}
                 )
