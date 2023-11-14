@@ -299,11 +299,21 @@ projects:
 </div>
 
 !!! info "NOTE:"
-    The `vastai` backend supports on-demand instances only. Spot instance support coming soon.
+    To use Vast AI, ensure you have the latest version:
+
+    <div class="termy">
+
+    ```shell
+    $ pip install "dstack[all]==0.12.3rc1"
+    ```
+
+    </div>
+
+    Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
 ## Cloud regions
 
-In addition to credentials, each cloud (except TensorDock) optionally allows for region configuration.
+In addition to credentials, each cloud (except TensorDock and Vast AI) optionally allows for region configuration.
 
 Example:
 

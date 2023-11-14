@@ -11,4 +11,6 @@ from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.services.ssh.ports import PortUsedError
 from dstack.api._public import BackendCollection, Client, RepoCollection, RunCollection
 from dstack.api._public.backends import Backend
+from dstack.api._public.huggingface.completions import CompletionService
+from dstack.api._public.huggingface.finetuning.sft import FineTuningTask
 from dstack.api._public.runs import Run, RunStatus, SubmittedRun

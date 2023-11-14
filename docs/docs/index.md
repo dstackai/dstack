@@ -11,7 +11,8 @@ or use the cloud version (which provides GPU out of the box).
 
 ??? info "Open-source"
 
-    If you wish to use `dstack` with your own cloud accounts, you can set up the open-source server.
+    If you wish to use `dstack` with your own cloud accounts, you can do it 
+    by using the open-source server.
 
     ### Install the server
     
@@ -74,7 +75,7 @@ or use the cloud version (which provides GPU out of the box).
 
 ??? info "GPU cloud"
     
-    If you want `dstack` to provide cloud GPU, 
+    If you want to use the cloud version of `dstack`, 
     <a href="#" data-tally-open="w7K17R">sign up</a>, and configure the client 
     with server address, user token, and project name using `dstack config`.
 
@@ -111,15 +112,16 @@ client = Client.from_config()
 === "Fine-tuning"
 
     ```python
-    from dstack.api import Resources, GPU
-    from dstack.api.finetuning import SFTFineTuningTask
+    from dstack.api import FineTuningTask, Resources, GPU
 
     # Pass a model, dataset, and training params
 
-    task = SFTFineTuningTask(
-        hf_model_name="NousResearch/Llama-2-13b-hf",
-        hf_dataset_name="peterschmidt85/samsum",
-        hf_token="...",
+    task = FineTuningTask(
+        model_name="NousResearch/Llama-2-13b-hf",
+        dataset_name="peterschmidt85/samsum",
+        env={
+            "WANDB_API_KEY": "..."
+        },
         num_train_epochs=2
     )
 
@@ -132,6 +134,29 @@ client = Client.from_config()
     ```
 
     > Go to [Fine-tuning](guides/fine-tuning.md) to learn more.
+
+=== "Model serving"
+
+    ```python
+    from dstack.api import Client, GPU, CompletionService, Resources
+
+    # Pass a model and quantization params
+
+    service = CompletionService(
+        model_name="TheBloke/CodeLlama-34B-GPTQ",
+        quantize="gptq"
+    )
+
+    # Deploy the model as a public endpoint
+
+    run = client.runs.submit(
+        run_name = "llama-2-13b-hf",  # If not set, assigned randomly
+        configuration=service,
+        resources=Resources(gpu=GPU(memory="24GB"))
+    )
+    ```
+
+[//]: # (    > Go to [Text generation]&#40;guides/text-generation.md&#41; to learn more.)
 
 ## Using the CLI
 

@@ -269,7 +269,7 @@
     align-items: center;
     justify-content: center;
     gap: 14px;
-    padding: 18px 5px 3px;
+    padding: 19px 5px 1px;
 }
 
 .tx-landing__integrations .logo-xlarge {
@@ -341,7 +341,7 @@
 }
 
 .tx-landing__major_feature {
-    font-size: 1.1em;
+    font-size: 1.05em;
     margin-top: 5em;
 }
 

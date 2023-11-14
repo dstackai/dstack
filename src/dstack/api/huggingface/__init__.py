@@ -1,9 +1,9 @@
 from typing import Dict, Optional
 
-from dstack.api._public.huggingface.finetuning.sft import SFTFineTuningTask as _SFTFineTuningTask
+from dstack.api._public.huggingface.finetuning.sft import FineTuningTask
 
 
-class SFTFineTuningTask(_SFTFineTuningTask):
+class SFTFineTuningTask(FineTuningTask):
     def __init__(
         self,
         model_name: str,
@@ -42,7 +42,6 @@ class SFTFineTuningTask(_SFTFineTuningTask):
             model_name,
             dataset_name,
             new_model_name,
-            env["HUGGING_FACE_HUB_TOKEN"],
             env,
             report_to,
             per_device_train_batch_size,

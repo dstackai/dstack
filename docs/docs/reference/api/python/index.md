@@ -30,6 +30,15 @@ The Python API allows for running tasks, services, and managing runs programmati
       show_root_toc_entry: false
       heading_level: 4
 
+### `dstack.api.FineTuningTask` { #dstack.api.FineTuningTask data-toc-label="FineTuningTask" }
+
+::: dstack.api.FineTuningTask
+    options:
+      show_bases: false
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+
 ### `dstack.api.Run` { ##dstack.api.Run data-toc-label="Run" }
 
 ::: dstack.api.Run
@@ -59,17 +68,6 @@ The Python API allows for running tasks, services, and managing runs programmati
 
 ::: dstack.api.BackendCollection
     options:
-      show_root_heading: false
-      show_root_toc_entry: false
-      heading_level: 4
-
-## `dstack.api.finetuning` { #dstack.api.finetuning data-toc-label="dstack.api.finetuning" }
-
-### `dstack.api.finetuning.SFTFineTuningTask` { #dstack.api.finetuning.SFTFineTuningTask data-toc-label="SFTFineTuningTask" }
-
-::: dstack.api.finetuning.SFTFineTuningTask
-    options:
-      show_bases: false
       show_root_heading: false
       show_root_toc_entry: false
       heading_level: 4

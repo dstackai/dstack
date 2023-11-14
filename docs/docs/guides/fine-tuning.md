@@ -1,12 +1,22 @@
 # Fine-tuning
 
-If you want to fine-tune an LLM based on a given dataset, consider using
-`dstack`'s finetuning API.
+For fine-tuning an LLM with dstack's API, specify a model name, HuggingFace dataset, and training parameters.
 
 You specify a model name, dataset on HuggingFace, and training parameters.
 `dstack` takes care of the training and pushes it to the HuggingFace hub upon completion. 
 
 You can use any cloud GPU provider(s) and experiment tracker of your choice.
+
+??? info "Prerequisites"
+    To use the fine-tuning API, ensure you have the latest version:
+
+    <div class="termy">
+
+    ```shell
+    $ pip install "dstack[all]==0.12.3rc1"
+    ```
+
+    </div>
 
 ## Create a client
 
@@ -24,15 +34,17 @@ except ClientError:
 ## Create a task
 
 Then, you create a fine-tuning task, specifying the model and dataset, 
-and various [training parameters](../../docs/reference/api/python/index.md#dstack.api.finetuning.SFTFineTuningTask).
+and various [training parameters](../../docs/reference/api/python/index.md#dstack.api.FineTuningTask).
 
 ```python
-from dstack.api.finetuning import SFTFineTuningTask
+from dstack.api import FineTuningTask
 
-task = SFTFineTuningTask(hf_model_name="NousResearch/Llama-2-13b-hf",
-                         hf_dataset_name="peterschmidt85/samsum",
-                         hf_token="...",
-                         num_train_epochs=2)
+task = FineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
+                      dataset_name="peterschmidt85/samsum",
+                      env={
+                          "HUGGING_FACE_HUB_TOKEN": "...",
+                      },
+                      num_train_epochs=2)
 ```
 
 !!! info "Dataset format"
@@ -71,16 +83,15 @@ including getting a list of runs, stopping a given run, etc.
 To track experiment metrics, specify `report_to` and related authentication environment variables.
 
 ```python
-task = SFTFineTuningTask(hf_model_name="NousResearch/Llama-2-13b-hf",
-                         hf_dataset_name="peterschmidt85/samsum",
-                         hf_token="...",
-                         report_to="wandb",
-                         env={
-                             "WANDB_API_KEY": "...",
-                             "WANDB_PROJECT": "...",
-                         },
-                         num_train_epochs=2
-                         )
+task = FineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
+                      dataset_name="peterschmidt85/samsum",
+                      report_to="wandb",
+                      env={
+                          "HUGGING_FACE_HUB_TOKEN": "...",
+                          "WANDB_API_KEY": "...",
+                      },
+                      num_train_epochs=2
+                      )
 ```
 
 Currently, the API supports `"tensorboard"` and `"wandb"`.

@@ -7,25 +7,24 @@ from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack.api._public.huggingface.finetuning import sft
 
 
-class SFTFineTuningTaskRepo(VirtualRepo):
+class FineTuningTaskRepo(VirtualRepo):
     def __init__(self, repo_id: str):
         super().__init__(repo_id)
         self.add_file_from_package(package=sft, path="requirements.txt")
         self.add_file_from_package(package=sft, path="train.py")
 
 
-class SFTFineTuningTask(TaskConfiguration):
+class FineTuningTask(TaskConfiguration):
     """
-    This task loads a given model from the Hugging Face hub and fine-tunes it on the provided dataset
+    This task configuration loads a given model from the Hugging Face hub and fine-tunes it on the provided dataset
     (also from Hugging Face hub),
     utilizing the SFT and QLoRA techniques. The final model is pushed
     to Hugging Face hub.
 
     Args:
-        hf_model_name: The model that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc.
-        hf_dataset_name: The instruction dataset to use.
-        new_hf_model_name: The name to use for pushing the fine-tuned model to the Hugging Face Hub. If unset, it defaults to the name of the run.
-        hf_token: The HuggingFace hub access token, if not set, will be taken by dstack from the environment variable `"HUGGING_FACE_HUB_TOKEN"`.
+        model_name: The model that you want to train from the Hugging Face hub. E.g. gpt2, gpt2-xl, bert, etc.
+        dataset_name: The instruction dataset to use.
+        new_model_name: The name to use for pushing the fine-tuned model to the Hugging Face Hub. If unset, it defaults to the name of the run.
         env: The list of environment variables, e.g. `"HUGGING_FACE_HUB_TOKEN"`, `"WANDB_API_KEY"`, `"WANDB_PROJECT"`, etc.
         report_to: Supported integrations include `"wandb"` and `"tensorboard"`.
         per_device_train_batch_size: Batch size per GPU for training.
@@ -58,10 +57,9 @@ class SFTFineTuningTask(TaskConfiguration):
 
     def __init__(
         self,
-        hf_model_name: str,
-        hf_dataset_name: str,
-        new_hf_model_name: Optional[str] = None,
-        hf_token: Optional[str] = None,
+        model_name: str,
+        dataset_name: str,
+        new_model_name: Optional[str] = None,
         env: Dict[str, str] = None,
         report_to: Optional[str] = None,
         per_device_train_batch_size: int = 4,
@@ -93,7 +91,7 @@ class SFTFineTuningTask(TaskConfiguration):
     ):
         args = " ".join(
             [
-                SFTFineTuningTask._get_arg(t[0], t[1], t[2])
+                FineTuningTask._get_arg(t[0], t[1], t[2])
                 for t in [
                     ("report_to", report_to, None),
                     ("per_device_train_batch_size", per_device_train_batch_size, 4),
@@ -129,7 +127,7 @@ class SFTFineTuningTask(TaskConfiguration):
         # TODO: Support more integrations
         # Validating environment variables
         if "HUGGING_FACE_HUB_TOKEN" not in env:
-            env["HUGGING_FACE_HUB_TOKEN"] = hf_token or os.environ["HUGGING_FACE_HUB_TOKEN"]
+            env["HUGGING_FACE_HUB_TOKEN"] = os.environ["HUGGING_FACE_HUB_TOKEN"]
         report_to_env = ""
         if report_to == "wandb":
             if "WANDB_API_KEY" not in env:
@@ -140,7 +138,7 @@ class SFTFineTuningTask(TaskConfiguration):
         python_command = re.sub(
             " +",
             " ",
-            f"{report_to_env} HF_HUB_ENABLE_HF_TRANSFER=1 python train.py --model_name {hf_model_name} --new_model_name {new_hf_model_name or '$RUN_NAME'} --dataset_name {hf_dataset_name} --merge_and_push {args}",
+            f"{report_to_env} HF_HUB_ENABLE_HF_TRANSFER=1 python train.py --model_name {model_name} --new_model_name {new_model_name or '$RUN_NAME'} --dataset_name {dataset_name} --merge_and_push {args}",
         ).strip()
         pip_install_command = "pip install -r requirements.txt"
         commands = [pip_install_command]
@@ -161,5 +159,5 @@ class SFTFineTuningTask(TaskConfiguration):
         else:
             return ""
 
-    def get_repo(self) -> SFTFineTuningTaskRepo:
-        return SFTFineTuningTaskRepo(repo_id="dstack.api._public.huggingface.finetuning.sft")
+    def get_repo(self) -> FineTuningTaskRepo:
+        return FineTuningTaskRepo(repo_id="dstack.api._public.huggingface.finetuning.sft")
