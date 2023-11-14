@@ -5,11 +5,12 @@ Provide the commands, port, and choose the Python version or a Docker image.
 
 `dstack` handles the deployment on configured cloud GPU provider(s) with the necessary resources.
 
-## Prerequisites
+??? info "Prerequisites"
 
-If you're using the open-source server, you first have to set up a gateway.
+    If you're using the open-source server, you first have to set up a gateway.
 
-??? info "Set up a gateway"
+    ### Set up a gateway
+
     For example, if your domain is `example.com`, go ahead and run the 
     `dstack gateway create` command:
     
@@ -92,6 +93,9 @@ Serving HTTP on https://yellow-cat-1.example.com ...
 ```
 
 </div>
+
+Once the service is deployed, its endpoint will be available at
+`https://<run-name>.<domain-name>` (using the domain set up for the gateway).
 
 !!! info "Run options"
     The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),

@@ -1,11 +1,7 @@
 # Fine-tuning
 
-For fine-tuning an LLM with dstack's API, specify a model name, HuggingFace dataset, and training parameters.
-
-You specify a model name, dataset on HuggingFace, and training parameters.
-`dstack` takes care of the training and pushes it to the HuggingFace hub upon completion. 
-
-You can use any cloud GPU provider(s) and experiment tracker of your choice.
+For fine-tuning an LLM with `dstack`'s API, specify a model, dataset, training parameters,
+and required compute resources. `dstack` takes care of everything else.
 
 ??? info "Prerequisites"
     To use the fine-tuning API, ensure you have the latest version:
@@ -39,12 +35,14 @@ and various [training parameters](../../docs/reference/api/python/index.md#dstac
 ```python
 from dstack.api import FineTuningTask
 
-task = FineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
-                      dataset_name="peterschmidt85/samsum",
-                      env={
-                          "HUGGING_FACE_HUB_TOKEN": "...",
-                      },
-                      num_train_epochs=2)
+task = FineTuningTask(
+    model_name="NousResearch/Llama-2-13b-hf",
+    dataset_name="peterschmidt85/samsum",
+    env={
+        "HUGGING_FACE_HUB_TOKEN": "...",
+    },
+    num_train_epochs=2
+)
 ```
 
 !!! info "Dataset format"
@@ -52,9 +50,9 @@ task = FineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
     of the corresponding model.
     Check the [peterschmidt85/samsum](https://huggingface.co/datasets/peterschmidt85/samsum) example. 
 
-## Submit the task
+## Run the task
 
-When submitting a task, you can configure resources, and many [other options](../../docs/reference/api/python/index.md#dstack.api.RunCollection.submit).
+When running a task, you can configure resources, and many [other options](../../docs/reference/api/python/index.md#dstack.api.RunCollection.submit).
 
 ```python
 from dstack.api import Resources, GPU
@@ -83,15 +81,16 @@ including getting a list of runs, stopping a given run, etc.
 To track experiment metrics, specify `report_to` and related authentication environment variables.
 
 ```python
-task = FineTuningTask(model_name="NousResearch/Llama-2-13b-hf",
-                      dataset_name="peterschmidt85/samsum",
-                      report_to="wandb",
-                      env={
-                          "HUGGING_FACE_HUB_TOKEN": "...",
-                          "WANDB_API_KEY": "...",
-                      },
-                      num_train_epochs=2
-                      )
+task = FineTuningTask(
+    model_name="NousResearch/Llama-2-13b-hf",
+    dataset_name="peterschmidt85/samsum",
+    report_to="wandb",
+    env={
+        "HUGGING_FACE_HUB_TOKEN": "...",
+        "WANDB_API_KEY": "...",
+    },
+    num_train_epochs=2
+)
 ```
 
 Currently, the API supports `"tensorboard"` and `"wandb"`.

@@ -120,7 +120,7 @@ client = Client.from_config()
         model_name="NousResearch/Llama-2-13b-hf",
         dataset_name="peterschmidt85/samsum",
         env={
-            "WANDB_API_KEY": "..."
+            "HUGGING_FACE_HUB_TOKEN": "..."
         },
         num_train_epochs=2
     )
@@ -135,7 +135,7 @@ client = Client.from_config()
 
     > Go to [Fine-tuning](guides/fine-tuning.md) to learn more.
 
-=== "Model serving"
+=== "Text generation"
 
     ```python
     from dstack.api import Client, GPU, CompletionService, Resources
@@ -150,13 +150,13 @@ client = Client.from_config()
     # Deploy the model as a public endpoint
 
     run = client.runs.submit(
-        run_name = "llama-2-13b-hf",  # If not set, assigned randomly
+        run_name = "codellama-34b-gptq",  # If not set, assigned randomly
         configuration=service,
         resources=Resources(gpu=GPU(memory="24GB"))
     )
     ```
 
-[//]: # (    > Go to [Text generation]&#40;guides/text-generation.md&#41; to learn more.)
+    > Go to [Text generation](guides/text-generation.md) to learn more.
 
 ## Using the CLI
 

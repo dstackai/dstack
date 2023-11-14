@@ -163,6 +163,7 @@ nav:
               - Server configuration: docs/configuration/server.md
       - Guides:
           - Fine-tuning: docs/guides/fine-tuning.md
+          - Text generation: docs/guides/text-generation.md
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
           - Services: docs/guides/services.md
