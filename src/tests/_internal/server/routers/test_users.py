@@ -29,6 +29,7 @@ class TestListUsers:
                 "id": str(user.id),
                 "username": user.name,
                 "global_role": user.global_role,
+                "email": None,
             }
         ]
 
@@ -47,6 +48,7 @@ class TestGetMyUser:
             "id": str(user.id),
             "username": user.name,
             "global_role": user.global_role,
+            "email": None,
         }
 
 
@@ -80,6 +82,7 @@ class TestGetUser:
             "id": str(other_user.id),
             "username": other_user.name,
             "global_role": other_user.global_role,
+            "email": None,
             "creds": {"token": "1234"},
         }
 
@@ -100,6 +103,7 @@ class TestCreateUser:
                 json={
                     "username": "test",
                     "global_role": GlobalRole.USER,
+                    "email": "test@example.com",
                 },
             )
         assert response.status_code == 200
@@ -107,6 +111,7 @@ class TestCreateUser:
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "test",
             "global_role": "user",
+            "email": "test@example.com",
         }
         res = await session.execute(select(UserModel).where(UserModel.name == "test"))
         assert len(res.scalars().all()) == 1
@@ -129,6 +134,7 @@ class TestCreateUser:
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "test",
             "global_role": "user",
+            "email": None,
         }
         with patch("uuid.uuid4") as uuid_mock:
             uuid_mock.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")

@@ -54,6 +54,7 @@ class TestListProjects:
                     "id": str(user.id),
                     "username": user.name,
                     "global_role": user.global_role,
+                    "email": None,
                 },
                 "backends": [
                     {
@@ -70,6 +71,7 @@ class TestListProjects:
                             "id": str(user.id),
                             "username": user.name,
                             "global_role": user.global_role,
+                            "email": None,
                         },
                         "project_role": ProjectRole.ADMIN,
                     }
@@ -104,6 +106,7 @@ class TestCreateProject:
                 "id": str(user.id),
                 "username": user.name,
                 "global_role": user.global_role,
+                "email": None,
             },
             "backends": [],
             "members": [
@@ -112,6 +115,7 @@ class TestCreateProject:
                         "id": str(user.id),
                         "username": user.name,
                         "global_role": user.global_role,
+                        "email": None,
                     },
                     "project_role": ProjectRole.ADMIN,
                 }
@@ -230,6 +234,7 @@ class TestGetProject:
                 "id": str(user.id),
                 "username": user.name,
                 "global_role": user.global_role,
+                "email": None,
             },
             "backends": [],
             "members": [
@@ -238,6 +243,7 @@ class TestGetProject:
                         "id": str(user.id),
                         "username": user.name,
                         "global_role": user.global_role,
+                        "email": None,
                     },
                     "project_role": ProjectRole.ADMIN,
                 }
@@ -286,6 +292,7 @@ class TestSetProjectMembers:
                     "id": str(admin.id),
                     "username": admin.name,
                     "global_role": admin.global_role,
+                    "email": None,
                 },
                 "project_role": ProjectRole.ADMIN,
             },
@@ -294,6 +301,7 @@ class TestSetProjectMembers:
                     "id": str(user1.id),
                     "username": user1.name,
                     "global_role": user1.global_role,
+                    "email": None,
                 },
                 "project_role": ProjectRole.ADMIN,
             },
@@ -302,6 +310,7 @@ class TestSetProjectMembers:
                     "id": str(user2.id),
                     "username": user2.name,
                     "global_role": user2.global_role,
+                    "email": None,
                 },
                 "project_role": ProjectRole.USER,
             },

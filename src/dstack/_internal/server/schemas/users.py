@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -12,6 +12,7 @@ class GetUserRequest(BaseModel):
 class CreateUserRequest(BaseModel):
     username: str
     global_role: GlobalRole
+    email: Optional[str]
 
 
 UpdateUserRequest = CreateUserRequest

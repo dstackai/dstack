@@ -46,6 +46,8 @@ class UserModel(BaseModel):
     token: Mapped[str] = mapped_column(String(200), unique=True)
     global_role: Mapped[GlobalRole] = mapped_column(Enum(GlobalRole))
 
+    email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+
     projects_quota: Mapped[int] = mapped_column(Integer, default=3)
 
 
