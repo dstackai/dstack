@@ -291,3 +291,31 @@ class TestUploadCode:
         code = res.scalar()
         assert code.blob_hash == file[0]
         assert code.blob == file[1]
+
+    @pytest.mark.asyncio
+    async def test_uploads_same_code_for_different_repos(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo1 = await create_repo(session=session, repo_name="repo1", project_id=project.id)
+        repo2 = await create_repo(session=session, repo_name="repo2", project_id=project.id)
+        file = ("blob_hash", b"blob_content")
+        response = client.post(
+            f"/api/project/{project.name}/repos/upload_code",
+            headers=get_auth_headers(user.token),
+            params={"repo_id": repo1.name},
+            files={"file": file},
+        )
+        assert response.status_code == 200, response.json()
+        response = client.post(
+            f"/api/project/{project.name}/repos/upload_code",
+            headers=get_auth_headers(user.token),
+            params={"repo_id": repo2.name},
+            files={"file": file},
+        )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(CodeModel))
+        codes = res.scalars().all()
+        assert len(codes) == 2
