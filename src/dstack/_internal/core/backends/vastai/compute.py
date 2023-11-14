@@ -34,7 +34,7 @@ class VastAICompute(Compute):
                 extra_filters={
                     "direct_port_count": {"gte": 1},
                     "reliability2": {"gte": 0.9},
-                    "inet_down": {"gt": 100},
+                    "inet_down": {"gt": 128},
                     "verified": {"eq": True},
                     "cuda_max_good": {"gte": 11.8},
                     "disk_space": {"gte": DISK_SIZE},

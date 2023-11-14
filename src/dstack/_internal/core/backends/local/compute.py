@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from dstack._internal.core.backends.base.compute import Compute, get_dstack_runner_version
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -22,6 +23,7 @@ class LocalCompute(Compute):
     ) -> List[InstanceOfferWithAvailability]:
         return [
             InstanceOfferWithAvailability(
+                backend=BackendType.LOCAL,
                 instance=InstanceType(
                     name="local",
                     resources=Resources(cpus=4, memory_mib=8192, gpus=[], spot=False),

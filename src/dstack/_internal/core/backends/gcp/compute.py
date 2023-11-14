@@ -47,25 +47,25 @@ class GCPCompute(Compute):
         for region in self.regions_client.list(project=self.config.project_id):
             for quota in region.quotas:
                 quotas[region.name][quota.metric] = quota.limit - quota.usage
-        offers_with_availability: Dict[Tuple[str, str], InstanceOfferWithAvailability] = {}
+
+        seen_region_offers = set()
+        offers_with_availability = []
         for offer in offers:
             region = offer.region[:-2]  # strip zone
-            key = (
-                _unique_instance_name(offer.instance),
-                region,
-            )
-            if key in offers_with_availability:
+            key = (_unique_instance_name(offer.instance), region)
+            if key in seen_region_offers:
                 continue
-            availability = InstanceAvailability.UNKNOWN
-            if not _has_gpu_quota(quotas[region], offer.instance.resources):
-                availability = InstanceAvailability.NO_QUOTA
+            seen_region_offers.add(key)
+            availability = InstanceAvailability.NO_QUOTA
+            if _has_gpu_quota(quotas[region], offer.instance.resources):
+                availability = InstanceAvailability.UNKNOWN
             # todo quotas: cpu, memory, global gpu
-
-            offers_with_availability[key] = InstanceOfferWithAvailability(
-                **offer.dict(), availability=availability
+            offers_with_availability.append(
+                InstanceOfferWithAvailability(**offer.dict(), availability=availability)
             )
-            offers_with_availability[key].region = region
-        return list(offers_with_availability.values())
+            offers_with_availability[-1].region = region
+
+        return offers_with_availability
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
