@@ -1,4 +1,5 @@
 import asyncio
+import heapq
 from typing import List, Optional, Tuple, Type
 
 from sqlalchemy import delete, update
@@ -269,14 +270,18 @@ async def get_instance_offers(
     """
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
-    offers = []
     tasks = [
         run_async(backend.compute().get_offers, job.job_spec.requirements) for backend in backends
     ]
-    for backend, backend_offers in zip(backends, await asyncio.gather(*tasks)):
-        for offer in backend_offers:
-            if not exclude_not_available or offer.availability not in _NOT_AVAILABLE:
-                offers.append((backend, offer))
-
-    # Put NOT_AVAILABLE and NO_QUOTA instances at the end
-    return sorted(offers, key=lambda i: (i[1].availability in _NOT_AVAILABLE, i[1].price))
+    offers_by_backend = [
+        [
+            (backend, offer)
+            for offer in backend_offers
+            if not exclude_not_available or offer.availability not in _NOT_AVAILABLE
+        ]
+        for backend, backend_offers in zip(backends, await asyncio.gather(*tasks))
+    ]
+    # Merge preserving order for every backend
+    offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)
+    # Put NOT_AVAILABLE and NO_QUOTA instances at the end, do not sort by price
+    return sorted(offers, key=lambda i: i[1].availability in _NOT_AVAILABLE)

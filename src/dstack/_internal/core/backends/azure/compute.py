@@ -244,30 +244,27 @@ def _get_offers_with_availability(
     config_locations: List[str],
     offers: List[InstanceOffer],
 ) -> List[InstanceOfferWithAvailability]:
-    availability_offers = {}
-    locations = set()
+    offers = [offer for offer in offers if offer.region in config_locations]
+    locations = set(offer.region for offer in offers)
 
-    for offer in offers:
-        location = offer.region
-        if location not in config_locations:
-            continue
-        locations.add(location)
-        instance_name = offer.instance.name
-        spot = offer.instance.resources.spot
-        availability_offers[(instance_name, location, spot)] = InstanceOfferWithAvailability(
-            **offer.dict(), availability=InstanceAvailability.NO_QUOTA
-        )
-
+    has_quota = set()
     for location in locations:
         resources = compute_client.resource_skus.list(filter=f"location eq '{location}'")
         for resource in resources:
             if resource.resource_type != "virtualMachines" or not _vm_type_available(resource):
                 continue
-            for spot in (True, False):
-                key = (resource.name, location, spot)
-                if key in availability_offers:
-                    availability_offers[key].availability = InstanceAvailability.UNKNOWN
-    return list(availability_offers.values())
+            has_quota.add((resource.name, location))
+
+    offers_with_availability = []
+    for offer in offers:
+        availability = InstanceAvailability.NO_QUOTA
+        if (offer.instance.name, offer.region) in has_quota:
+            availability = InstanceAvailability.UNKNOWN
+        offers_with_availability.append(
+            InstanceOfferWithAvailability(**offer.dict(), availability=availability)
+        )
+
+    return offers_with_availability
 
 
 def _vm_type_available(vm_resource: ResourceSku) -> bool:
