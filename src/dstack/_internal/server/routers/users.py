@@ -56,7 +56,10 @@ async def create_user(
     user: User = Depends(GlobalAdmin()),
 ) -> User:
     res = await users.create_user(
-        session=session, username=body.username, global_role=body.global_role
+        session=session,
+        username=body.username,
+        global_role=body.global_role,
+        email=body.email,
     )
     return users.user_model_to_user(res)
 
@@ -67,8 +70,11 @@ async def update_user(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(GlobalAdmin()),
 ) -> User:
-    res = await users.update_user_role(
-        session=session, username=body.username, global_role=body.global_role
+    res = await users.update_user(
+        session=session,
+        username=body.username,
+        global_role=body.global_role,
+        email=body.email,
     )
     return users.user_model_to_user(res)
 

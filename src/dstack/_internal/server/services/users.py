@@ -51,12 +51,21 @@ async def get_user_with_creds_by_name(
     return None
 
 
-async def create_user(session: AsyncSession, username: str, global_role: GlobalRole) -> UserModel:
+async def create_user(
+    session: AsyncSession,
+    username: str,
+    global_role: GlobalRole,
+    email: Optional[str] = None,
+) -> UserModel:
     user_model = await get_user_model_by_name(session=session, username=username)
     if user_model is not None:
         raise ResourceExistsError()
     user = UserModel(
-        id=uuid.uuid4(), name=username, global_role=global_role, token=str(uuid.uuid4())
+        id=uuid.uuid4(),
+        name=username,
+        global_role=global_role,
+        token=str(uuid.uuid4()),
+        email=email,
     )
     session.add(user)
     await session.commit()
@@ -65,13 +74,18 @@ async def create_user(session: AsyncSession, username: str, global_role: GlobalR
     return user
 
 
-async def update_user_role(
-    session: AsyncSession, username: str, global_role: GlobalRole
+async def update_user(
+    session: AsyncSession,
+    username: str,
+    global_role: GlobalRole,
+    email: Optional[str] = None,
 ) -> Optional[UserModel]:
     await session.execute(
-        update(UserModel).where(UserModel.name == username).values(global_role=global_role)
+        update(UserModel)
+        .where(UserModel.name == username)
+        .values(global_role=global_role, email=email)
     )
-    return get_user_model_by_name(session=session, username=username)
+    return await get_user_model_by_name(session=session, username=username)
 
 
 async def refresh_user_token(session: AsyncSession, username: str) -> Optional[UserModel]:
@@ -104,6 +118,7 @@ def user_model_to_user(user_model: UserModel) -> User:
         id=user_model.id,
         username=user_model.name,
         global_role=user_model.global_role,
+        email=user_model.email,
     )
 
 
@@ -112,6 +127,7 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
         id=user_model.id,
         username=user_model.name,
         global_role=user_model.global_role,
+        email=user_model.email,
         creds=UserTokenCreds(token=user_model.token),
     )
 
