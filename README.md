@@ -26,7 +26,7 @@ Train and deploy generative AI on any cloud
 `dstack` simplifies training, fine-tuning, and deploying
 generative AI models on any cloud. 
 
-Supported providers: AWS, GCP, Azure, Lambda, and TensorDock.
+Supported providers: AWS, GCP, Azure, Lambda, TensorDock, and Vast.ai.
 
 ## Latest news ✨
 
