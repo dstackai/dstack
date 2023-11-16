@@ -885,7 +885,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
    border-radius: 0;
 }
 
-.md-typeset .tabbed-block>.highlight:first-child>pre>code, .md-typeset .tabbed-block>pre:first-child>code {
+.md-typeset .tabbed-block>.highlight:first-child>pre>code, .md-typeset .tabbed-block>pre:first-child>code,
+.md-typeset .tabbed-block>.termy {
     margin-top: 17px;
 }
 

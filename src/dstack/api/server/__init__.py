@@ -42,6 +42,7 @@ class APIClient:
             token: API token
         """
         self._base_url = base_url.rstrip("/")
+        self._token = token
         self._s = requests.session()
         self._s.headers.update({"Authorization": f"Bearer {token}"})
 

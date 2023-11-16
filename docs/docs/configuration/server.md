@@ -304,7 +304,7 @@ projects:
     <div class="termy">
 
     ```shell
-    $ pip install "dstack[all]==0.12.3rc2"
+    $ pip install "dstack[all]==0.12.3rc3"
     ```
 
     </div>

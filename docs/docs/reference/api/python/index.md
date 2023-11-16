@@ -39,6 +39,24 @@ The Python API allows for running tasks, services, and managing runs programmati
       show_root_toc_entry: false
       heading_level: 4
 
+### `dstack.api.CompletionService` { #dstack.api.CompletionService data-toc-label="CompletionService" }
+
+::: dstack.api.CompletionService
+    options:
+      show_bases: false
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+
+### `dstack.api.CompletionTask` { #dstack.api.CompletionTask data-toc-label="CompletionTask" }
+
+::: dstack.api.CompletionTask
+    options:
+      show_bases: false
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+
 ### `dstack.api.Run` { ##dstack.api.Run data-toc-label="Run" }
 
 ::: dstack.api.Run

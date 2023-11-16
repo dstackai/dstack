@@ -110,7 +110,10 @@ class Run(ABC):
         hostname = "127.0.0.1"
         secure = False
         if job_spec.gateway is not None:
-            ports = {**ports, job_spec.gateway.service_port: job_spec.gateway.public_port}
+            ports = {
+                **ports,
+                job_spec.gateway.service_port: job_spec.gateway.public_port,
+            }
             hostname = job_spec.gateway.hostname
             secure = job_spec.gateway.secure
         replace_urls = URLReplacer(

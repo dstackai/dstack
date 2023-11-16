@@ -9,7 +9,7 @@ and required compute resources. `dstack` takes care of everything else.
     <div class="termy">
 
     ```shell
-    $ pip install "dstack[all]==0.12.3rc2"
+    $ pip install "dstack[all]==0.12.3rc3"
     ```
 
     </div>
