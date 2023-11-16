@@ -97,9 +97,11 @@ GCP_DEPS = [
     "google-cloud-billing>=1.11.0",
 ]
 
+DATACRUNCH_DEPS = ["datacrunch"]
+
 LAMBDA_DEPS = AWS_DEPS
 
-ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS
+ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS
 
 
 setup(
@@ -133,6 +135,7 @@ setup(
         "all": ALL_DEPS,
         "aws": AWS_DEPS,
         "azure": AZURE_DEPS,
+        "datacrunch": DATACRUNCH_DEPS,
         "gcp": GCP_DEPS,
         "lambda": LAMBDA_DEPS,
     },
