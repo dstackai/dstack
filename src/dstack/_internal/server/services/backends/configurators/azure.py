@@ -231,7 +231,6 @@ class AzureConfigurator(Configurator):
         if selected is not None and selected not in tenant_ids:
             raise ServerClientError(
                 "Invalid tenant_id",
-                code="invalid_tenant_id",
                 fields=[["tenant_id"]],
             )
         if len(tenant_ids) == 1:
@@ -257,7 +256,6 @@ class AzureConfigurator(Configurator):
         if selected is not None and selected not in subscription_ids:
             raise ServerClientError(
                 "Invalid subscription_id",
-                code="invalid_subscription_id",
                 fields=[["subscription_id"]],
             )
         if len(subscription_ids) == 1:
@@ -265,8 +263,7 @@ class AzureConfigurator(Configurator):
         if len(subscription_ids) == 0:
             # Credentials without granted roles don't see any subscriptions
             raise ServerClientError(
-                message="No Azure subscriptions found for provided credentials. Ensure the account has enough permissions.",
-                code="forbidden",
+                msg="No Azure subscriptions found for provided credentials. Ensure the account has enough permissions.",
             )
         return element
 
@@ -316,7 +313,7 @@ class AzureConfigurator(Configurator):
         subscription_id: str,
         resource_group: str,
         runner_principal_id: str,
-    ) -> str:
+    ):
         roles_manager = RolesManager(credential=credential, subscription_id=subscription_id)
         roles_manager.grant_vm_contributor_role(
             resource_group=resource_group,

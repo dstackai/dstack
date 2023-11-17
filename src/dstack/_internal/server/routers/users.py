@@ -15,7 +15,7 @@ from dstack._internal.server.schemas.users import (
 )
 from dstack._internal.server.security.permissions import Authenticated, GlobalAdmin
 from dstack._internal.server.services import users
-from dstack._internal.server.utils.routers import raise_not_found
+from dstack._internal.server.utils.routers import error_not_found
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -45,7 +45,7 @@ async def get_user(
         session=session, current_user=user, username=body.username
     )
     if res is None:
-        raise_not_found()
+        raise error_not_found()
     return res
 
 
@@ -53,7 +53,7 @@ async def get_user(
 async def create_user(
     body: CreateUserRequest,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(GlobalAdmin()),
+    user: UserModel = Depends(GlobalAdmin()),
 ) -> User:
     res = await users.create_user(
         session=session,
@@ -68,7 +68,7 @@ async def create_user(
 async def update_user(
     body: UpdateUserRequest,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(GlobalAdmin()),
+    user: UserModel = Depends(GlobalAdmin()),
 ) -> User:
     res = await users.update_user(
         session=session,
@@ -76,6 +76,8 @@ async def update_user(
         global_role=body.global_role,
         email=body.email,
     )
+    if res is None:
+        raise error_not_found()
     return users.user_model_to_user(res)
 
 
@@ -83,17 +85,19 @@ async def update_user(
 async def refresh_token(
     body: RefreshTokenRequest,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(GlobalAdmin()),
+    user: UserModel = Depends(GlobalAdmin()),
 ) -> UserWithCreds:
     res = await users.refresh_user_token(session=session, username=body.username)
+    if res is None:
+        raise error_not_found()
     return users.user_model_to_user_with_creds(res)
 
 
 @router.post("/delete")
-async def create_user(
+async def delete_users(
     body: DeleteUsersRequest,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(GlobalAdmin()),
+    user: UserModel = Depends(GlobalAdmin()),
 ):
     await users.delete_users(
         session=session,

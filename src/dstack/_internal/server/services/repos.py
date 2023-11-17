@@ -1,5 +1,4 @@
 import json
-import uuid
 from typing import List, Optional
 
 import sqlalchemy.exc
@@ -15,7 +14,6 @@ from dstack._internal.core.models.repos import (
     RepoHeadWithCreds,
 )
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
-from dstack._internal.server import settings
 from dstack._internal.server.models import CodeModel, ProjectModel, RepoModel
 from dstack._internal.server.services.storage import get_default_storage
 from dstack._internal.server.utils.common import run_async
@@ -139,6 +137,8 @@ async def upload_code(
     repo = await get_repo_model(session=session, project=project, repo_id=repo_id)
     if repo is None:
         raise RepoDoesNotExistError.with_id(repo_id)
+    if file.filename is None:
+        raise ServerClientError("filename not specified")
     code_hash = file.filename
     code = await get_code_model(
         session=session,

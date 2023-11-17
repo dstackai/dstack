@@ -9,6 +9,7 @@ from typing_extensions import Annotated
 from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
 from dstack._internal.core.models.backends.aws import AnyAWSCreds
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
 from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.backends.vastai import AnyVastAICreds
@@ -146,18 +147,21 @@ class ServerConfigManager:
             self._save_config(self.config)
 
     async def apply_config(self, session: AsyncSession):
+        if self.config is None:
+            raise ValueError("Config is not loaded")
         for project_config in self.config.projects:
-            project = await projects_services.get_project_model_by_name(
+            project = await projects_services.get_project_model_by_name_or_error(
                 session=session,
                 project_name=project_config.name,
             )
             backends_to_delete = backends_services.list_available_backend_types()
             for backend_config in project_config.backends:
                 config_info = _config_to_internal_config(backend_config)
-                backends_to_delete.remove(config_info.type)
+                backend_type = BackendType(config_info.type)
+                backends_to_delete.remove(backend_type)
                 current_config_info = await backends_services.get_config_info(
                     project=project,
-                    backend_type=config_info.type,
+                    backend_type=backend_type,
                 )
                 if config_info == current_config_info:
                     continue

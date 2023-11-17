@@ -72,7 +72,7 @@ async def _process_job(job_id: UUID):
             .options(joinedload(RunModel.user))
             .options(joinedload(RunModel.repo))
         )
-        run_model = res.scalar()
+        run_model = res.scalar_one()
         repo_model = run_model.repo
         project = run_model.project
         run = run_model_to_run(run_model)

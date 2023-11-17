@@ -1,5 +1,4 @@
 import json
-from abc import ABC
 from typing import List, Optional
 
 from dstack._internal.core.backends.aws import AWSBackend, auth
@@ -24,6 +23,7 @@ from dstack._internal.core.models.backends.base import (
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
+    Configurator,
     raise_invalid_credentials_error,
 )
 
@@ -45,7 +45,7 @@ DEFAULT_REGIONS = REGION_VALUES
 MAIN_REGION = "us-east-1"
 
 
-class AWSConfigurator(ABC):
+class AWSConfigurator(Configurator):
     TYPE: BackendType = BackendType.AWS
 
     def get_default_configs(self) -> List[AWSConfigInfoWithCreds]:
@@ -63,7 +63,7 @@ class AWSConfigurator(ABC):
         ]
 
     def get_config_values(self, config: AWSConfigInfoWithCredsPartial) -> AWSConfigValues:
-        config_values = AWSConfigValues()
+        config_values = AWSConfigValues(regions=None)
         config_values.default_creds = (
             settings.DEFAULT_CREDS_ENABLED and auth.default_creds_available()
         )

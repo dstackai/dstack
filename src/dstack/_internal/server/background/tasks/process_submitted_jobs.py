@@ -1,4 +1,3 @@
-import asyncio
 from typing import List, Optional, Tuple
 from uuid import UUID
 
@@ -72,7 +71,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         .options(joinedload(RunModel.project))
         .options(joinedload(RunModel.user))
     )
-    run_model = res.scalar()
+    run_model = res.scalar_one()
     project_model = run_model.project
     run = run_model_to_run(run_model)
     job = run.jobs[job_model.job_num]

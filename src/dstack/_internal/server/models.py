@@ -39,7 +39,7 @@ class BaseModel(DeclarativeBase):
 class UserModel(BaseModel):
     __tablename__ = "users"
 
-    id: Mapped[UUIDType] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
@@ -54,12 +54,12 @@ class UserModel(BaseModel):
 class ProjectModel(BaseModel):
     __tablename__ = "projects"
 
-    id: Mapped[UUIDType] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
 
-    owner_id: Mapped[UUIDType] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     owner: Mapped[UserModel] = relationship(lazy="joined")
     members: Mapped[List["MemberModel"]] = relationship(back_populates="project", lazy="selectin")
 
@@ -81,12 +81,12 @@ class ProjectModel(BaseModel):
 class MemberModel(BaseModel):
     __tablename__ = "members"
 
-    id: Mapped[UUIDType] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[UUIDType] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
-    user_id: Mapped[UUIDType] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped[UserModel] = relationship(lazy="joined")
     project_role: Mapped[ProjectRole] = mapped_column(Enum(ProjectRole))
 
@@ -94,10 +94,10 @@ class MemberModel(BaseModel):
 class BackendModel(BaseModel):
     __tablename__ = "backends"
 
-    id: Mapped[UUIDType] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[UUIDType] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
     type: Mapped[BackendType] = mapped_column(Enum(BackendType))
 
@@ -111,10 +111,10 @@ class RepoModel(BaseModel):
     __tablename__ = "repos"
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_repos_project_id_name"),)
 
-    id: Mapped[UUIDType] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[UUIDType] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
     # RepoModel.name stores repo_id
     name: Mapped[str] = mapped_column(String(100))
@@ -128,10 +128,10 @@ class CodeModel(BaseModel):
     __tablename__ = "codes"
     __table_args__ = (UniqueConstraint("repo_id", "blob_hash", name="uq_codes_repo_id_blob_hash"),)
 
-    id: Mapped[UUIDType] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    repo_id: Mapped[UUIDType] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     repo: Mapped["RepoModel"] = relationship()
     blob_hash: Mapped[str] = mapped_column(String(4000))
     blob: Mapped[Optional[bytes]] = mapped_column(BLOB)  # None means blob is stored on s3
@@ -140,12 +140,12 @@ class CodeModel(BaseModel):
 class RunModel(BaseModel):
     __tablename__ = "runs"
 
-    id: Mapped[UUIDType] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[UUIDType] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
-    repo_id: Mapped[UUIDType] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     repo: Mapped["RepoModel"] = relationship()
     user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped["UserModel"] = relationship()
@@ -159,12 +159,12 @@ class RunModel(BaseModel):
 class JobModel(BaseModel):
     __tablename__ = "jobs"
 
-    id: Mapped[UUIDType] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[UUIDType] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
-    run_id: Mapped[UUIDType] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
     run_name: Mapped[str] = mapped_column(String(100))
     run: Mapped["RunModel"] = relationship()
     job_num: Mapped[int] = mapped_column(Integer)
@@ -185,7 +185,7 @@ class JobModel(BaseModel):
 class GatewayModel(BaseModel):
     __tablename__ = "gateways"
 
-    id: Mapped[UUIDType] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(100))
@@ -195,9 +195,9 @@ class GatewayModel(BaseModel):
     wildcard_domain: Mapped[str] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
 
-    project_id: Mapped[UUIDType] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
-    backend_id: Mapped[UUIDType] = mapped_column(ForeignKey("backends.id", ondelete="CASCADE"))
+    backend_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("backends.id", ondelete="CASCADE"))
     backend: Mapped["BackendModel"] = relationship(lazy="selectin")
 
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_gateways_project_id_name"),)

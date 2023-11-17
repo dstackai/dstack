@@ -14,7 +14,7 @@ from dstack._internal.server.schemas.projects import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin, ProjectMember
 from dstack._internal.server.services import projects
-from dstack._internal.server.utils.routers import raise_forbidden
+from dstack._internal.server.utils.routers import error_forbidden
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -53,7 +53,7 @@ async def delete_projects(
             projects_names=body.projects_names,
         )
     except ForbiddenError:
-        raise_forbidden()
+        raise error_forbidden()
 
 
 @router.post("/{project_name}/get")

@@ -14,7 +14,7 @@ from dstack._internal.server.schemas.repos import (
 )
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import repos
-from dstack._internal.server.utils.routers import raise_not_found, request_size_exceeded
+from dstack._internal.server.utils.routers import error_not_found, request_size_exceeded
 
 router = APIRouter(prefix="/api/project/{project_name}/repos", tags=["repos"])
 
@@ -42,7 +42,7 @@ async def get_repo(
         include_creds=body.include_creds,
     )
     if repo is None:
-        raise_not_found()
+        raise error_not_found()
     return repo
 
 

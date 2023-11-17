@@ -42,7 +42,7 @@ async def get_user_with_creds_by_name(
     session: AsyncSession,
     current_user: UserModel,
     username: str,
-) -> Optional[User]:
+) -> Optional[UserWithCreds]:
     user_model = await get_user_model_by_name(session=session, username=username)
     if user_model is None:
         return None
@@ -79,20 +79,20 @@ async def update_user(
     username: str,
     global_role: GlobalRole,
     email: Optional[str] = None,
-) -> Optional[UserModel]:
+) -> UserModel:
     await session.execute(
         update(UserModel)
         .where(UserModel.name == username)
         .values(global_role=global_role, email=email)
     )
-    return await get_user_model_by_name(session=session, username=username)
+    return await get_user_model_by_name_or_error(session=session, username=username)
 
 
 async def refresh_user_token(session: AsyncSession, username: str) -> Optional[UserModel]:
     await session.execute(
         update(UserModel).where(UserModel.name == username).values(token=uuid.uuid4())
     )
-    return get_user_model_by_name(session=session, username=username)
+    return await get_user_model_by_name(session=session, username=username)
 
 
 async def delete_users(
@@ -106,6 +106,11 @@ async def delete_users(
 async def get_user_model_by_name(session: AsyncSession, username: str) -> Optional[UserModel]:
     res = await session.execute(select(UserModel).where(UserModel.name == username))
     return res.scalar()
+
+
+async def get_user_model_by_name_or_error(session: AsyncSession, username: str) -> UserModel:
+    res = await session.execute(select(UserModel).where(UserModel.name == username))
+    return res.scalar_one()
 
 
 async def get_user_model_by_token(session: AsyncSession, token: str) -> Optional[UserModel]:

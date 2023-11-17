@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
@@ -71,7 +72,9 @@ async def list_project_runs(
         if repo is None:
             raise RepoDoesNotExistError.with_id(repo_id)
         filters.append(RunModel.repo_id == repo.id)
-    res = await session.execute(select(RunModel).where(*filters))
+    res = await session.execute(
+        select(RunModel).where(*filters).options(joinedload(RunModel.user))
+    )
     run_models = res.scalars().all()
     return [run_model_to_run(r) for r in run_models]
 
@@ -82,7 +85,9 @@ async def get_run(
     run_name: str,
 ) -> Optional[Run]:
     res = await session.execute(
-        select(RunModel).where(RunModel.project_id == project.id, RunModel.run_name == run_name)
+        select(RunModel)
+        .where(RunModel.project_id == project.id, RunModel.run_name == run_name)
+        .options(joinedload(RunModel.user))
     )
     run_model = res.scalar()
     if run_model is None:
@@ -260,7 +265,8 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
                 job_spec = JobSpec.parse_raw(job_model.job_spec_data)
             if include_job_submissions:
                 submissions.append(job_model_to_job_submission(job_model))
-        jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
+        if job_spec is not None:
+            jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
     run_spec = RunSpec.parse_raw(run_model.run_spec)
     run = Run(
         id=run_model.id,

@@ -3,7 +3,6 @@ from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ResourceExistsError, ServerClientError
 from dstack._internal.core.models.runs import Run, RunPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -16,7 +15,7 @@ from dstack._internal.server.schemas.runs import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
-from dstack._internal.server.utils.routers import raise_not_found, raise_server_client_error
+from dstack._internal.server.utils.routers import error_not_found
 
 root_router = APIRouter(
     prefix="/api/runs",
@@ -55,7 +54,7 @@ async def get_run(
         run_name=body.run_name,
     )
     if run is None:
-        raise_not_found()
+        raise error_not_found()
     return run
 
 
@@ -82,15 +81,12 @@ async def submit_run(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Run:
     user, project = user_project
-    try:
-        return await runs.submit_run(
-            session=session,
-            user=user,
-            project=project,
-            run_spec=body.run_spec,
-        )
-    except ServerClientError as e:
-        raise_server_client_error(e)
+    return await runs.submit_run(
+        session=session,
+        user=user,
+        project=project,
+        run_spec=body.run_spec,
+    )
 
 
 @project_router.post("/stop")

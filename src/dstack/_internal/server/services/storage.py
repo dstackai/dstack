@@ -56,6 +56,8 @@ _default_storage = None
 
 def init_default_storage():
     global _default_storage
+    if settings.SERVER_BUCKET is None:
+        raise ValueError("settings.SERVER_BUCKET not set")
     _default_storage = S3Storage(
         bucket=settings.SERVER_BUCKET,
         region=settings.SERVER_BUCKET_REGION,
