@@ -85,7 +85,9 @@ async def get_run(
     run_name: str,
 ) -> Optional[Run]:
     res = await session.execute(
-        select(RunModel).where(RunModel.project_id == project.id, RunModel.run_name == run_name)
+        select(RunModel)
+        .where(RunModel.project_id == project.id, RunModel.run_name == run_name)
+        .options(joinedload(RunModel.user))
     )
     run_model = res.scalar()
     if run_model is None:
