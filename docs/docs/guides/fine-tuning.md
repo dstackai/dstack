@@ -1,7 +1,7 @@
 # Fine-tuning
 
 For fine-tuning an LLM with `dstack`'s API, specify a model, dataset, training parameters,
-and required compute resources. `dstack` takes care of everything else.
+and required compute resources. The API takes care of everything else.
 
 ??? info "Prerequisites"
     To use the fine-tuning API, ensure you have the latest version:
@@ -14,17 +14,36 @@ and required compute resources. `dstack` takes care of everything else.
 
     </div>
 
+> The API currently supports only supervised fine-tuning (SFT). Support for DPO and RLHF is coming soon.
+
+## Prepare a dataset
+
+The dataset should contain a `"text"` column with completions following the prompt format
+of the corresponding model. Check the [example](https://huggingface.co/datasets/peterschmidt85/samsum)
+(for fine-tuning Llama 2).
+
+> Once the dataset is prepared, it must be [uploaded](https://huggingface.co/docs/datasets/upload_dataset) to Hugging Face.
+
+??? info "Uploading a dataset"
+    Here's an example of how to upload a dataset programmatically:
+
+    ```python
+    import pandas as pd
+    from datasets import Dataset
+
+    df = pd.read_json("samsum.jsonl", lines=True)
+    dataset = Dataset.from_pandas(df)
+    dataset.push_to_hub("peterschmidt85/samsum")
+    ```
+
 ## Create a client
 
 First, you connect to `dstack`:
 
 ```python
-from dstack.api import Client, ClientError
+from dstack.api import Client
 
-try:
-    client = Client.from_config()
-except ClientError:
-    print("Can't connect to the server")
+client = Client.from_config()
 ```
 
 ## Create a task
@@ -41,14 +60,11 @@ task = FineTuningTask(
     env={
         "HUGGING_FACE_HUB_TOKEN": "...",
     },
-    num_train_epochs=2
+    num_train_epochs=2,
+    max_seq_length=1024,
+    per_device_train_batch_size=2,
 )
 ```
-
-!!! info "Dataset format"
-    For the SFT fine-tuning method, the dataset should contain a `"text"` column with completions following the prompt format
-    of the corresponding model.
-    Check the [peterschmidt85/samsum](https://huggingface.co/datasets/peterschmidt85/samsum) example. 
 
 ## Run the task
 
@@ -64,19 +80,22 @@ run = client.runs.submit(
 )
 ```
 
-!!! info "Fine-tuning methods"
-    The API currently supports only SFT, with support for DPO and other methods coming soon.
+!!! info "GPU memory"
+    The API defaults to using QLoRA based on the provided 
+    [training parameters](../../docs/reference/api/python/index.md#dstack.api.FineTuningTask).
+    When specifying GPU memory, consider both the model size and the specified batch size.
+    After a few attempts, you'll discover the best configuration.
 
-When the training is done, `dstack` pushes the final model to the Hugging Face hub.
+When the training is done, the API pushes the final model to the Hugging Face hub.
 
 ![](../../assets/images/dstack-finetuning-hf.png){ width=800 }
 
 ## Manage runs
 
-You can use the instance of [`dstack.api.Client`](../../docs/reference/api/python/index.md#dstack.api.Client) to manage your runs, 
-including getting a list of runs, stopping a given run, etc.
+You can manage runs using [API](../../docs/reference/api/python/index.md#dstack.api.Client),
+the [CLI](../../docs/reference/cli/index.md), or the user interface.
 
-## Track experiments
+## Track metrics
 
 To track experiment metrics, specify `report_to` and related authentication environment variables.
 
@@ -97,5 +116,13 @@ Currently, the API supports `"tensorboard"` and `"wandb"`.
 
 ![](../../assets/images/dstack-finetuning-wandb.png){ width=800 }
 
-[//]: # (TODO: Example)
-[//]: # (TODO: Next steps)
+[//]: # (TODO: Examples - Llama 2, Mistral, etc)
+
+## What's next?
+
+- Once the model is trained, proceed to [deploy](text-generation.md) it as an endpoint.
+  The deployed endpoint can be used from your apps directly or via LangChain.
+- The source code of the fine-tuning task is available
+  at [GitHub](https://github.com/dstackai/dstack/tree/master/src/dstack/api/_public/huggingface/finetuning/sft).
+  If you prefer using a custom script, feel free to do so using [dev environments](dev-environments.md) and 
+  [tasks](tasks.md).

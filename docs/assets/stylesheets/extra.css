@@ -796,14 +796,14 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 .md-typeset :where(ul) > li:before {
-    background-color: #d1d5db;
+    background-color: rgba(0,0,0,87);
     border-radius: 50%;
     content: "";
-    height: 0.375em;
+    height: 0.48em;
+    width: 0.48em;
     left: 0.25em;
     position: absolute;
     top: 0.6875em;
-    width: 0.375em;
 }
 
 .md-typeset :where(ol) > li:before {

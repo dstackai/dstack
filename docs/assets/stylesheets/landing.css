@@ -187,6 +187,28 @@
     font-size: 20px;
 }
 
+.tx-container .md-button {
+    vertical-align: middle;
+}
+
+.tx-container .md-button--primary:hover {
+    transform: translateY(-2px);
+    transition: opacity .2s ease,transform .2s ease;
+}
+
+.tx-container .md-button .icon {
+    display: inline-block;
+    position: relative;
+    width: 15px;
+    height: 15px;
+    margin-left: 7px;
+    transition: opacity .2s ease,transform .2s ease;
+}
+
+.tx-container .md-button--primary:hover .icon {
+    transform: translateX(3px)
+}
+
 .md-header__buttons .md-button--primary,
 .tx-container .md-button--primary {
     background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
@@ -548,9 +570,16 @@
 
 .plans_card__subtitle {
     margin-bottom: 1.4rem;
-    font-size: 1.0em;
+    font-size: 0.98em;
     line-height: 1.44;
     color: #696F86;
+}
+
+.plans_card__buttons_subtitle {
+    margin-top: 10px;
+    margin-left: 10px;
+    color: #202128;
+    font-size: 0.7rem;
 }
 
 .plans_card__services {

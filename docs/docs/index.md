@@ -73,7 +73,7 @@ or use the cloud version (which provides GPU out of the box).
 
     The client configuration is stored via `~/.dstack/config.yml`.
 
-??? info "GPU cloud"
+??? info "dstack Cloud"
     
     If you want to use the cloud version of `dstack`, 
     <a href="#" data-tally-open="w7K17R">sign up</a>, and configure the client 
