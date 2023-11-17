@@ -15,6 +15,9 @@ from dstack._internal.server.services.backends import get_configurator
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 async def get_or_create_default_project(
@@ -209,6 +212,9 @@ def project_model_to_project(project_model: ProjectModel) -> Project:
     backends = []
     for b in project_model.backends:
         configurator = get_configurator(b.type)
+        if configurator is None:
+            logger.warning("Configurator for backend %s not found", b.type)
+            continue
         config_info = configurator.get_config_info(model=b, include_creds=False)
         backend_info = BackendInfo(
             name=b.type,

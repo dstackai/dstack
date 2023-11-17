@@ -260,7 +260,8 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
                 job_spec = JobSpec.parse_raw(job_model.job_spec_data)
             if include_job_submissions:
                 submissions.append(job_model_to_job_submission(job_model))
-        jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
+        if job_spec is not None:
+            jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
     run_spec = RunSpec.parse_raw(run_model.run_spec)
     run = Run(
         id=run_model.id,
