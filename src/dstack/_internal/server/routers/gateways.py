@@ -10,7 +10,7 @@ from dstack._internal.core.errors import NotFoundError
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
-from dstack._internal.server.utils.routers import raise_not_found
+from dstack._internal.server.utils.routers import error_not_found
 
 router = APIRouter(prefix="/api/project/{project_name}/gateways", tags=["gateways"])
 
@@ -33,7 +33,7 @@ async def get_gateway(
     _, project = user_project
     gateway = await gateways.get_gateway_by_name(session=session, project=project, name=body.name)
     if gateway is None:
-        raise_not_found()
+        raise error_not_found()
     return gateway
 
 
@@ -53,7 +53,7 @@ async def create_gateway(
             region=body.region,
         )
     except NotFoundError:
-        raise_not_found()
+        raise error_not_found()
 
 
 @router.post("/delete")
@@ -76,7 +76,7 @@ async def set_default_gateway(
     try:
         await gateways.set_default_gateway(session=session, project=project, name=body.name)
     except NotFoundError:
-        raise_not_found()
+        raise error_not_found()
 
 
 @router.post("/set_wildcard_domain")
@@ -91,4 +91,4 @@ async def set_gateway_wildcard_domain(
             session=session, project=project, name=body.name, wildcard_domain=body.wildcard_domain
         )
     except NotFoundError:
-        raise_not_found()
+        raise error_not_found()

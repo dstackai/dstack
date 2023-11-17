@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 from uuid import UUID
@@ -43,10 +44,10 @@ def _write_logs(
     log_file_path: Path,
     log_events: List[RunnerLogEvent],
 ):
-    log_events = [_runner_log_event_to_log_event(l) for l in log_events]
+    log_events_parsed = [_runner_log_event_to_log_event(l) for l in log_events]
     log_file_path.parent.mkdir(exist_ok=True, parents=True)
     with open(log_file_path, "a") as f:
-        f.writelines(l.json() + "\n" for l in log_events)
+        f.writelines(l.json() + "\n" for l in log_events_parsed)
 
 
 def poll_logs(
@@ -83,7 +84,7 @@ def poll_logs(
 
 def _runner_log_event_to_log_event(runner_log_event: RunnerLogEvent) -> LogEvent:
     return LogEvent(
-        timestamp=runner_log_event.timestamp,
+        timestamp=datetime.fromtimestamp(runner_log_event.timestamp / 1e9, tz=timezone.utc),
         log_source=LogEventSource.STDOUT,
         message=base64.b64encode(runner_log_event.message).decode(),
     )

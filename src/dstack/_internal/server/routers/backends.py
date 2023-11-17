@@ -16,7 +16,7 @@ from dstack._internal.server.schemas.backends import DeleteBackendsRequest
 from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin
 from dstack._internal.server.services import backends
 from dstack._internal.server.services.config import ServerConfigManager
-from dstack._internal.server.utils.routers import raise_not_found
+from dstack._internal.server.utils.routers import error_not_found
 
 root_router = APIRouter(prefix="/api/backends", tags=["backends"])
 project_router = APIRouter(prefix="/api/project/{project_name}/backends", tags=["backends"])
@@ -83,5 +83,5 @@ async def get_backend_config_info(
     _, project = user_project
     config_info = await backends.get_config_info(project=project, backend_type=backend_name)
     if config_info is None:
-        raise_not_found()
+        raise error_not_found()
     return config_info

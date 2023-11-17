@@ -42,7 +42,7 @@ async def get_user_with_creds_by_name(
     session: AsyncSession,
     current_user: UserModel,
     username: str,
-) -> Optional[User]:
+) -> Optional[UserWithCreds]:
     user_model = await get_user_model_by_name(session=session, username=username)
     if user_model is None:
         return None
@@ -92,7 +92,7 @@ async def refresh_user_token(session: AsyncSession, username: str) -> Optional[U
     await session.execute(
         update(UserModel).where(UserModel.name == username).values(token=uuid.uuid4())
     )
-    return get_user_model_by_name(session=session, username=username)
+    return await get_user_model_by_name(session=session, username=username)
 
 
 async def delete_users(

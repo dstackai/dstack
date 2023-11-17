@@ -37,7 +37,7 @@ class ServerClientError(ServerError, ClientError):
     msg: str = ""
     fields: List[List[str]] = []
 
-    def __init__(self, msg: Optional[str] = None, fields: List[List[str]] = None):
+    def __init__(self, msg: Optional[str] = None, fields: Optional[List[List[str]]] = None):
         if msg is not None:
             self.msg = msg
         super().__init__(self.msg)  # show the message in stacktrace

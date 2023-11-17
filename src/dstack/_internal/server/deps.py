@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.services.projects import get_project_model_by_name
-from dstack._internal.server.utils.routers import raise_not_found
+from dstack._internal.server.utils.routers import error_not_found
 
 
 class Project:
@@ -15,5 +15,5 @@ class Project:
     ) -> ProjectModel:
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
-            raise_not_found()
+            raise error_not_found()
         return project

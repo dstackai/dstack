@@ -140,16 +140,16 @@ class GCPConfigurator(Configurator):
         ]
 
     def get_config_values(self, config: GCPConfigInfoWithCredsPartial) -> GCPConfigValues:
-        config_values = GCPConfigValues()
-        config_values.default_creds = auth.default_creds_available()
+        config_values = GCPConfigValues(project_id=None, regions=None)
+        config_values.default_creds = (
+            settings.DEFAULT_CREDS_ENABLED and auth.default_creds_available()
+        )
         if config.creds is None:
             return config_values
         if isinstance(config.creds, GCPDefaultCreds) and not settings.DEFAULT_CREDS_ENABLED:
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
-            _, project_id = settings.DEFAULT_CREDS_ENABLED and auth.authenticate(
-                creds=config.creds
-            )
+            _, project_id = auth.authenticate(creds=config.creds)
         except BackendAuthError:
             if isinstance(config.creds, GCPServiceAccountCreds):
                 raise_invalid_credentials_error(fields=[["creds", "data"]])

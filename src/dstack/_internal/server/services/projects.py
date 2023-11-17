@@ -74,7 +74,7 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
         user=user,
         project_role=ProjectRole.ADMIN,
     )
-    project = await get_project_model_by_name(session=session, project_name=project_name)
+    project = await get_project_model_by_name_or_error(session=session, project_name=project_name)
     for hook in _CREATE_PROJECT_HOOKS:
         await hook(session, project)
     await session.refresh(project)  # a hook may change project
@@ -153,14 +153,14 @@ async def list_user_project_models(
             MemberModel.user_id == user.id,
         )
     )
-    return res.scalars().all()
+    return list(res.scalars().all())
 
 
 async def list_project_models(
     session: AsyncSession,
 ) -> List[ProjectModel]:
     res = await session.execute(select(ProjectModel))
-    return res.scalars().all()
+    return list(res.scalars().all())
 
 
 async def get_project_model_by_name(
@@ -169,6 +169,14 @@ async def get_project_model_by_name(
 ) -> Optional[ProjectModel]:
     res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
     return res.scalar()
+
+
+async def get_project_model_by_name_or_error(
+    session: AsyncSession,
+    project_name: str,
+) -> ProjectModel:
+    res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
+    return res.scalar_one()
 
 
 async def create_project_model(

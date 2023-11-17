@@ -11,9 +11,9 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.services.projects import get_project_model_by_name
 from dstack._internal.server.services.users import get_user_model_by_token
 from dstack._internal.server.utils.routers import (
-    raise_forbidden,
-    raise_invalid_token,
-    raise_not_found,
+    error_forbidden,
+    error_invalid_token,
+    error_not_found,
 )
 
 
@@ -25,7 +25,7 @@ class Authenticated:
     ) -> UserModel:
         user = await get_user_model_by_token(session=session, token=token.credentials)
         if user is None:
-            raise_invalid_token()
+            raise error_invalid_token()
         return user
 
 
@@ -37,10 +37,10 @@ class GlobalAdmin:
     ) -> UserModel:
         user = await get_user_model_by_token(session=session, token=token.credentials)
         if user is None:
-            raise_invalid_token()
+            raise error_invalid_token()
         if user.global_role == GlobalRole.ADMIN:
             return user
-        raise_forbidden()
+        raise error_forbidden()
 
 
 class ProjectAdmin:
@@ -52,10 +52,10 @@ class ProjectAdmin:
     ) -> Tuple[UserModel, ProjectModel]:
         user = await get_user_model_by_token(session=session, token=token.credentials)
         if user is None:
-            raise_invalid_token()
+            raise error_invalid_token()
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
-            raise_forbidden()
+            raise error_forbidden()
         if user.global_role == GlobalRole.ADMIN:
             return user, project
         for member in project.members:
@@ -63,8 +63,8 @@ class ProjectAdmin:
                 if member.project_role == ProjectRole.ADMIN:
                     return user, project
                 else:
-                    raise_forbidden()
-        raise_forbidden()
+                    raise error_forbidden()
+        raise error_forbidden()
 
 
 class ProjectMember:
@@ -77,13 +77,13 @@ class ProjectMember:
     ) -> Tuple[UserModel, ProjectModel]:
         user = await get_user_model_by_token(session=session, token=token.credentials)
         if user is None:
-            raise_invalid_token()
+            raise error_invalid_token()
         project = await get_project_model_by_name(session=session, project_name=project_name)
         if project is None:
-            raise_not_found()
+            raise error_not_found()
         if user.global_role == GlobalRole.ADMIN:
             return user, project
         for member in project.members:
             if member.user_id == user.id:
                 return user, project
-        raise_forbidden()
+        raise error_forbidden()

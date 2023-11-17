@@ -1,6 +1,6 @@
 import asyncio
 import heapq
-from typing import List, Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type, Union
 
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,11 +91,12 @@ except ImportError:
 _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP = {c.TYPE: c for c in _CONFIGURATOR_CLASSES}
 
 
-def register_configurator(configurator: Configurator):
+def register_configurator(configurator: Type[Configurator]):
     _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP[configurator.TYPE] = configurator
 
 
-def get_configurator(backend_type: BackendType) -> Optional[Configurator]:
+def get_configurator(backend_type: Union[BackendType, str]) -> Optional[Configurator]:
+    backend_type = BackendType(backend_type)
     configurator_class = _BACKEND_TYPE_TO_CONFIGURATOR_CLASS_MAP.get(backend_type)
     if configurator_class is None:
         return None
