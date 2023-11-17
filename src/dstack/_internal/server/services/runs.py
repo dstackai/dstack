@@ -6,6 +6,7 @@ from typing import List, Optional
 
 from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
@@ -71,7 +72,9 @@ async def list_project_runs(
         if repo is None:
             raise RepoDoesNotExistError.with_id(repo_id)
         filters.append(RunModel.repo_id == repo.id)
-    res = await session.execute(select(RunModel).where(*filters))
+    res = await session.execute(
+        select(RunModel).where(*filters).options(joinedload(RunModel.user))
+    )
     run_models = res.scalars().all()
     return [run_model_to_run(r) for r in run_models]
 
