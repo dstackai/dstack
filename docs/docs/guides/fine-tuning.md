@@ -16,7 +16,16 @@ and required compute resources. The API takes care of everything else.
 
 > The API currently supports only supervised fine-tuning (SFT). Support for DPO and RLHF is coming soon.
 
-## Prepare a dataset
+## How does it work?
+
+`dstack` loads a base model and dataset from Hugging Face, schedules the fine-tuning task to run on a configured cloud,
+and reports metrics to a tracker of your choice.
+
+![](../../assets/images/dstack-fine-tuning-diagram.png)
+
+Once the model is fine-tuned, it's pushed to Hugging Face and is ready for deployment.
+
+### Prepare a dataset
 
 The dataset should contain a `"text"` column with completions following the prompt format
 of the corresponding model. Check the [example](https://huggingface.co/datasets/peterschmidt85/samsum)
@@ -36,7 +45,7 @@ of the corresponding model. Check the [example](https://huggingface.co/datasets/
     dataset.push_to_hub("peterschmidt85/samsum")
     ```
 
-## Create a client
+### Create a client
 
 First, you connect to `dstack`:
 
@@ -46,7 +55,7 @@ from dstack.api import Client
 client = Client.from_config()
 ```
 
-## Create a task
+### Create a task
 
 Then, you create a fine-tuning task, specifying the model and dataset, 
 and various [training parameters](../../docs/reference/api/python/index.md#dstack.api.FineTuningTask).
@@ -66,7 +75,7 @@ task = FineTuningTask(
 )
 ```
 
-## Run the task
+### Run the task
 
 When running a task, you can configure resources, and many [other options](../../docs/reference/api/python/index.md#dstack.api.RunCollection.submit).
 
@@ -90,12 +99,12 @@ When the training is done, the API pushes the final model to the Hugging Face hu
 
 ![](../../assets/images/dstack-finetuning-hf.png){ width=800 }
 
-## Manage runs
+### Manage runs
 
 You can manage runs using [API](../../docs/reference/api/python/index.md#dstack.api.Client),
 the [CLI](../../docs/reference/cli/index.md), or the user interface.
 
-## Track metrics
+### Track metrics
 
 To track experiment metrics, specify `report_to` and related authentication environment variables.
 
