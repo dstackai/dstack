@@ -124,11 +124,15 @@ async def set_project_members(
     project: ProjectModel,
     members: List[MemberSetting],
 ):
+    await clear_project_members(session=session, project=project)
     usernames = [m.username for m in members]
     res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))
     users = res.scalars().all()
-    await clear_project_members(session=session, project=project)
-    for user, member in zip(users, members):
+    username_to_user = {user.name: user for user in users}
+    for member in members:
+        user = username_to_user.get(member.username)
+        if user is None:
+            continue
         await add_project_member(
             session=session,
             project=project,
