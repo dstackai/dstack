@@ -1,8 +1,8 @@
-from tkinter import font
 from tracemalloc import start
 from typing import Any, Dict, List, Optional
 
 from datacrunch import DataCrunchClient
+from datacrunch.exceptions import APIException
 
 from dstack._internal.utils.ssh import get_public_key_fingerprint
 
@@ -12,7 +12,10 @@ class DataCrunchAPIClient:
         self.client = DataCrunchClient(client_id, client_secret)
 
     def delete_instance(self, instance_id: str) -> None:
-        self.client.instances.action(id_list=[instance_id], action="delete")
+        try:
+            self.client.instances.action(id_list=[instance_id], action="delete")
+        except APIException:
+            pass
 
     def get_or_create_ssh_key(self, name: str, public_key: str) -> str:
         fingerprint = get_public_key_fingerprint(public_key)

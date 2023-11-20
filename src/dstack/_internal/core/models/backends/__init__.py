@@ -14,6 +14,12 @@ from dstack._internal.core.models.backends.azure import (
     AzureConfigInfoWithCredsPartial,
     AzureConfigValues,
 )
+from dstack._internal.core.models.backends.datacrunch import (
+    DataCrunchConfigInfo,
+    DataCrunchConfigInfoWithCreds,
+    DataCrunchConfigInfoWithCredsPartial,
+    DataCrunchConfigValues,
+)
 from dstack._internal.core.models.backends.dstack import DstackConfigInfo, DstackConfigValues
 from dstack._internal.core.models.backends.gcp import (
     GCPConfigInfo,
@@ -49,6 +55,7 @@ from dstack._internal.core.models.backends.vastai import (
 AnyConfigInfoWithoutCreds = Union[
     AWSConfigInfo,
     AzureConfigInfo,
+    DataCrunchConfigInfo,
     GCPConfigInfo,
     LambdaConfigInfo,
     NebiusConfigInfo,
@@ -59,6 +66,7 @@ AnyConfigInfoWithoutCreds = Union[
 AnyConfigInfoWithCreds = Union[
     AWSConfigInfoWithCreds,
     AzureConfigInfoWithCreds,
+    DataCrunchConfigInfoWithCreds,
     GCPConfigInfoWithCreds,
     LambdaConfigInfoWithCreds,
     NebiusConfigInfoWithCreds,
@@ -69,6 +77,7 @@ AnyConfigInfoWithCreds = Union[
 AnyConfigInfoWithCredsPartial = Union[
     AWSConfigInfoWithCredsPartial,
     AzureConfigInfoWithCredsPartial,
+    DataCrunchConfigInfoWithCredsPartial,
     GCPConfigInfoWithCredsPartial,
     LambdaConfigInfoWithCredsPartial,
     NebiusConfigInfoWithCredsPartial,
@@ -82,6 +91,7 @@ AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 AnyConfigValues = Union[
     AWSConfigValues,
     AzureConfigValues,
+    DataCrunchConfigValues,
     GCPConfigValues,
     LambdaConfigValues,
     NebiusConfigValues,

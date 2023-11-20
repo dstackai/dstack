@@ -152,13 +152,13 @@ def _add_ssh_keys(
     api_client: LambdaAPIClient, user_ssh_public_key: str, project_ssh_public_key: str
 ) -> Tuple[str, str]:
     ssh_keys = api_client.list_ssh_keys()
-    ssh_key_names = [k["name"] for k in ssh_keys]
+    ssh_key_names: List[str] = [k["name"] for k in ssh_keys]
     user_key_name = _add_ssh_key(api_client, ssh_key_names, user_ssh_public_key)
     project_key_name = _add_ssh_key(api_client, ssh_key_names, project_ssh_public_key)
     return user_key_name, project_key_name
 
 
-def _add_ssh_key(api_client: LambdaAPIClient, ssh_key_names: str, public_key: str) -> str:
+def _add_ssh_key(api_client: LambdaAPIClient, ssh_key_names: List[str], public_key: str) -> str:
     key_name = _get_ssh_key_name(public_key)
     if key_name in ssh_key_names:
         return key_name

@@ -48,6 +48,16 @@ try:
 except ImportError:
     pass
 
+
+try:
+    from dstack._internal.server.services.backends.configurators.datacrunch import (
+        DataCrunchConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(DataCrunchConfigurator)
+except ImportError:
+    pass
+
 try:
     from dstack._internal.server.services.backends.configurators.gcp import GCPConfigurator
 
