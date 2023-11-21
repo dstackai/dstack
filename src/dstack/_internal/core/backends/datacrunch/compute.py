@@ -5,6 +5,7 @@ from dstack._internal.core.backends.base.compute import get_shim_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
 from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -105,12 +106,17 @@ class DataCrunchCompute(Compute):
             registry_auth_required=job.job_spec.registry_auth is not None,
         )
 
-        startup_script = " ".join(["sh", "-c", " && ".join(commands)])
+        startup_script = " ".join([" && ".join(commands)])
+        script_name = f"dstack-{job.job_spec.job_name}.sh"
         startup_script_ids = self.api_client.get_or_create_startup_scrpit(
-            name=f"dstack-{job.job_spec.job_name}.sh", script=startup_script
+            name=script_name, script=startup_script
         )
 
         name = job.job_spec.job_name
+
+        # Id of image "Ubuntu 22.04 + CUDA 12.0 + Docker"
+        # from API https://datacrunch.stoplight.io/docs/datacrunch-public/c46ab45dbc508-get-all-image-types
+        image_name = "2088da25-bb0d-41cc-a191-dccae45d96fd"
 
         instance = self.api_client.deploy_instance(
             instance_type=instance_offer.instance.name,
@@ -118,8 +124,12 @@ class DataCrunchCompute(Compute):
             startup_script_id=startup_script_ids,
             hostname=name,
             description=name,
-            image=job.job_spec.image_name,
+            image=image_name,
         )
+
+        instance = self.api_client.wait_for_instance(instance.id)
+        if instance is None:
+            raise BackendError()
 
         launched_instance = LaunchedInstanceInfo(
             instance_id=instance.id,

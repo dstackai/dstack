@@ -1,8 +1,10 @@
+import time
 from tracemalloc import start
 from typing import Any, Dict, List, Optional
 
 from datacrunch import DataCrunchClient
 from datacrunch.exceptions import APIException
+from datacrunch.instances.instances import Instance
 
 from dstack._internal.utils.ssh import get_public_key_fingerprint
 
@@ -39,6 +41,21 @@ class DataCrunchAPIClient:
 
         startup_script = self.client.startup_scripts.create(name, script)
         return startup_script.id
+
+    def get_instance_by_id(self, instance_id: str) -> Optional[Instance]:
+        try:
+            return self.client.instances.get_by_id(instance_id)
+        except APIException:
+            return None
+
+    def wait_for_instance(self, instance_id: str) -> Optional[Instance]:
+        WAIT_FOR_INSTANCE_ATTEMPTS = 60
+        WAIT_FOR_INSTANCE_INTERVAL = 10
+        for _ in range(WAIT_FOR_INSTANCE_ATTEMPTS):
+            instance = self.get_instance_by_id(instance_id)
+            if instance is not None and instance.status == "running":
+                return instance
+            time.sleep(WAIT_FOR_INSTANCE_INTERVAL)
 
     def deploy_instance(
         self,
