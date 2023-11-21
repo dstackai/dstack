@@ -165,7 +165,7 @@ async def submit_run(
     session.add(run_model)
     jobs = get_jobs_from_run_spec(run_spec)
     if run_spec.configuration.type == "service":
-        await gateways.register_service_jobs(session, project, jobs)
+        await gateways.register_service_jobs(session, project, run_spec.run_name, jobs)
     for job in jobs:
         job_model = create_job_model_for_new_submission(
             run_model=run_model,

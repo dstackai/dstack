@@ -210,9 +210,12 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
             return name
 
 
-async def register_service_jobs(session: AsyncSession, project: ProjectModel, jobs: List[Job]):
-    # we are expecting that all jobs are for the same service and the same gateway
-    gateway_name = jobs[0].job_spec.gateway.gateway_name
+async def register_service_jobs(
+    session: AsyncSession, project: ProjectModel, run_name: str, jobs: List[Job]
+):
+    # we publish only one job
+    job = jobs[0]
+    gateway_name = job.job_spec.gateway.gateway_name
     if gateway_name is None:
         gateway = await get_project_default_gateway(session=session, project=project)
         if gateway is None:
@@ -223,26 +226,25 @@ async def register_service_jobs(session: AsyncSession, project: ProjectModel, jo
             raise ResourceNotExistsError("Gateway does not exist")
 
     domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
-    private_bytes, public_bytes = generate_rsa_key_pair_bytes(
-        comment=f"{project}/{jobs[0].job_spec.job_name}"
-    )
-    for i, job in enumerate(jobs):
-        job.job_spec.gateway.gateway_name = gateway.name
-        job.job_spec.gateway.ssh_key = private_bytes.decode()
-        if domain is not None:
-            job.job_spec.gateway.secure = True
-            job.job_spec.gateway.public_port = 443
-            job.job_spec.gateway.hostname = f"{job.job_spec.job_name}.{domain}"
-        else:
-            job.job_spec.gateway.secure = False
-            # use provided public port
-            job.job_spec.gateway.hostname = gateway.ip_address
+    private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=f"{project}/{run_name}")
+
+    job.job_spec.gateway.gateway_name = gateway.name
+    job.job_spec.gateway.ssh_key = private_bytes.decode()
+    if domain is not None:
+        job.job_spec.gateway.secure = True
+        job.job_spec.gateway.public_port = 443
+        job.job_spec.gateway.hostname = f"{run_name}.{domain}"
+    else:
+        job.job_spec.gateway.secure = False
+        # use provided public port
+        job.job_spec.gateway.hostname = gateway.ip_address
+
     await run_async(
         configure_gateway_over_ssh,
         f"ubuntu@{gateway.ip_address}",
         project.ssh_private_key,
         public_bytes.decode(),
-        jobs,
+        [job],
     )
 
 
