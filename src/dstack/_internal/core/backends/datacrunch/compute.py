@@ -70,6 +70,7 @@ class DataCrunchCompute(Compute):
             "provisioning": InstanceState.PROVISIONING,
             "running": InstanceState.RUNNING,
             "offline": InstanceState.STOPPED,
+            'discontinued': InstanceState.TERMINATED,
         }
         status = state_map.get(instance.status, InstanceState.NOT_FOUND)
         return status
