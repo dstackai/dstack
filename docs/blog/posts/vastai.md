@@ -1,27 +1,27 @@
 ---
 title: "Accessing the GPU marketplace with Vast.ai and dstack"
 date: 2023-11-21
-description: "With dstack 0.12.3, you can now use Vast.ai's GPU marketplace to train and deploy gen AI models."
+description: "With dstack 0.12.3, you can now develop, train and deploy gen AI models using affordable cloud GPUs."
 slug: "vastai"
 categories:
 - Releases
-draft: true
 ---
 
 # Accessing the GPU marketplace with Vast.ai and dstack
 
 __With dstack 0.12.3, you can now use Vast.ai's GPU marketplace as a cloud provider.__
 
-`dstack` offers a developer-friendly CLI and API to train and deploy gen AI models across any
-cloud. It streamlines development and deployment, eliminating the need for cloud infrastructure setup.
+`dstack` simplifies gen AI model development and deployment through its developer-friendly CLI and API. 
+It eliminates cloud infrastructure hassles while supporting top cloud providers (such as AWS, GCP,
+Azure, among others).
 
-The cost of GPUs is often the most critical factor hindering development. To address this, we 
-integrated with [Vast.ai](https://vast.ai/), providing GPUs from the marketplace at a lower cost.
+While `dstack` streamlines infrastructure challenges, GPU costs can still hinder development. To address this, 
+we've integrated `dstack` with [Vast.ai](https://vast.ai/), a marketplace providing GPUs from independent hosts at 
+notably lower prices compared to other providers.
 
 <!-- more -->
 
-Vast.ai offers a variety of GPUs from independent hosts and data centers.
-By default, it suggests GPU instances based on their quality score. If you want to, you can set the maximum price.
+With the `dstack` 0.12.3 release, it's now possible use Vast.ai alongside other cloud providers.
 
 <div class="termy">
 
@@ -39,12 +39,13 @@ Continue? [y/n]:
 
 </div>
 
+By default, it suggests GPU instances based on their quality score. If you want to, you can control the maximum price.
+
 You can use Vast.ai to [fine-tune](../../docs/guides/fine-tuning.md), and 
 [deploy](../../docs/guides/text-generation.md) models or
-launching [dev environments](../../docs/guides/dev-environments.md) (which are highly convenient for interactive coding with your favorite IDE).
-Additionally, you can use Vast.ai alongside other cloud providers, switching to it when needed.
+launch [dev environments](../../docs/guides/dev-environments.md) (which are highly convenient for interactive coding with your favorite IDE).
 
-Configuring Vast.ai for use with `dstack` is very easy. Log into your [Vast AI](https://cloud.vast.ai/) account, click Account in the sidebar,
+Configuring Vast.ai for use with `dstack` is easy. Log into your [Vast AI](https://cloud.vast.ai/) account, click `Account` in the sidebar,
 and copy your API Key.
 
 Then, go ahead and configure the backend:
@@ -65,12 +66,13 @@ projects:
 
 Now you can restart the server and proceed to using `dstack`'s CLI and API.
 
-If you've been seeking the simplest way to train and deploy generative AI models utilizing cost-effective cloud GPUs, be
-sure to give `dstack` with Vast.ai a try. 
-
-Lastly, take the time to check out the new preview versions of the [fine-tuning](../../docs/guides/fine-tuning.md) and 
-[text generation](../../docs/guides/text-generation.md) APIs.
+If you want an easy way to 
+develop, train and deploy gen AI models using affordable cloud GPUs, 
+give `dstack` with Vast.ai a try.
 
 !!! info "Feedback and support"
     Feel free to ask questions or seek help in our 
     [Discord server](https://discord.gg/u8SmfwPpMd).
+
+> Lastly, take the time to check out the preview of the new [fine-tuning](../../docs/guides/fine-tuning.md) and 
+[text generation](../../docs/guides/text-generation.md) APIs.

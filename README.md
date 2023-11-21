@@ -30,11 +30,10 @@ Supported providers: AWS, GCP, Azure, Lambda, TensorDock, and Vast.ai.
 
 ## Latest news ✨
 
+- [2023/11] [Access the GPU marketplace with Vast.ai](https://dstack.ai/blog/2023/11/21/vastai/) (Release)
 - [2023/10] [Use world's cheapest GPUs with TensorDock](https://dstack.ai/blog/2023/10/31/tensordock/) (Release)
-- [2023/10] [Fine-tuning API](https://dstack.ai/docs/guides/fine-tuning/) (Release)
+- [2023/10] [A preview of fine-tuning API](https://dstack.ai/docs/guides/fine-tuning/) (Release)
 - [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/examples/llama-index-weaviate) (Example)
-- [2023/09] [Deploying LLMs using Python API](https://dstack.ai/examples/deploy-python) (Example)
-- [2023/08] [Fine-tuning Llama 2 using QLoRA](https://dstack.ai/examples/finetuning-llama-2) (Example)
 - [2023/08] [Deploying Stable Diffusion using FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
 - [2023/07] [Deploying LLMs using TGI](https://dstack.ai/examples/text-generation-inference) (Example)
 - [2023/07] [Deploying LLMs using vLLM](https://dstack.ai/examples/vllm) (Example)
