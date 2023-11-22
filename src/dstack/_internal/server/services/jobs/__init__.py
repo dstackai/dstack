@@ -11,6 +11,7 @@ from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.runs import (
     Job,
+    JobErrorCode,
     JobProvisioningData,
     JobSpec,
     JobStatus,
@@ -24,6 +25,7 @@ from dstack._internal.server.services.jobs.configurators.base import JobConfigur
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
+from dstack._internal.server.services.logging import job_log
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
@@ -105,15 +107,13 @@ async def stop_job(
                 # delay termination for 15 seconds to allow the runner to stop gracefully
                 delay_job_instance_termination(job_model)
             except SSHError:
-                logger.debug(
-                    "Failed to stop runner %s", job_submission.job_provisioning_data.hostname
-                )
+                logger.debug(*job_log("failed to stop runner", job_model))
         # process_finished_jobs will terminate the instance in the background
-        await session.execute(
-            update(JobModel)
-            .where(JobModel.id == job_model.id)
-            .values(status=new_status, last_processed_at=get_current_datetime())
-        )
+        job_model.status = new_status
+        job_model.last_processed_at = get_current_datetime()
+        job_model.error_code = JobErrorCode.TERMINATED_BY_USER
+        await session.commit()
+        logger.info(*job_log("%s by user", job_model, new_status.value))
 
 
 async def terminate_job_submission_instance(

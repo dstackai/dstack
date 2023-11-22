@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -22,6 +22,7 @@ from dstack._internal.server.services.jobs import (
     SUBMITTED_PROCESSING_JOBS_IDS,
     SUBMITTED_PROCESSING_JOBS_LOCK,
 )
+from dstack._internal.server.services.logging import job_log
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
@@ -64,7 +65,7 @@ async def _process_job(job_id: UUID):
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
-    logger.debug("Provisioning job %s", job_model.job_name)
+    logger.debug(*job_log("provisioning", job_model))
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
@@ -77,6 +78,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     job = run.jobs[job_model.job_num]
     backends = await backends_services.get_project_backends(project=run_model.project)
     job_provisioning_data = await _run_job(
+        job_model=job_model,
         run=run,
         job=job,
         backends=backends,
@@ -84,13 +86,13 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         project_ssh_private_key=project_model.ssh_private_key,
     )
     if job_provisioning_data is not None:
-        logger.debug("Provisioning job %s succeded", job_model.job_name)
+        logger.info(*job_log("now is provisioning", job_model))
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
     else:
-        logger.debug("Provisioning job %s failed", job_model.job_name)
+        logger.debug(*job_log("provisioning failed", job_model))
         if job.is_retry_active():
-            logger.debug("Retry is enabled. Transitioning job %s to pending.", job_model.job_name)
+            logger.debug(*job_log("now is pending because retry is active", job_model))
             job_model.status = JobStatus.PENDING
         else:
             job_model.status = JobStatus.FAILED
@@ -100,6 +102,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
 
 async def _run_job(
+    job_model: JobModel,
     run: Run,
     job: Job,
     backends: List[Backend],
@@ -110,12 +113,15 @@ async def _run_job(
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
     offers = await backends_services.get_instance_offers(backends, job, exclude_not_available=True)
     for backend, offer in offers:
-        logger.info(
-            "Trying %s in %s/%s for $%0.4f per hour",
-            offer.instance.name,
-            offer.backend.value,
-            offer.region,
-            offer.price,
+        logger.debug(
+            *job_log(
+                "trying %s in %s/%s for $%0.4f per hour",
+                job_model,
+                offer.instance.name,
+                offer.backend.value,
+                offer.region,
+                offer.price,
+            )
         )
         try:
             launched_instance_info: LaunchedInstanceInfo = await run_async(
@@ -127,7 +133,16 @@ async def _run_job(
                 project_ssh_private_key,
             )
         except BackendError as e:
-            logger.debug("Instance launch failed: %s", e)
+            logger.debug(
+                *job_log(
+                    "%s launch in %s/%s failed: %s",
+                    job_model,
+                    offer.instance.name,
+                    offer.backend.value,
+                    offer.region,
+                    e,
+                )
+            )
             continue
         else:
             return JobProvisioningData(

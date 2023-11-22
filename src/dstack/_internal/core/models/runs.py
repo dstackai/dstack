@@ -52,6 +52,7 @@ class JobErrorCode(str, Enum):
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
+    TERMINATED_BY_USER = "terminated_by_user"
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"
