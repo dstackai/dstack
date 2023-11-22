@@ -21,6 +21,10 @@
 
 ##SCHEMA# dstack._internal.core.models.backends.azure.AzureClientCreds
 
+#SCHEMA# dstack._internal.server.services.config.DataCrunchConfig
+
+##SCHEMA# dstack._internal.core.models.backends.datacrunch.DataCrunchAPIKeyCreds
+
 #SCHEMA# dstack._internal.server.services.config.GCPConfig
 
 ##SCHEMA# dstack._internal.server.services.config.GCPDefaultCreds
