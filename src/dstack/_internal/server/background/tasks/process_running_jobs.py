@@ -19,6 +19,7 @@ from dstack._internal.server.services.jobs import (
     delay_job_instance_termination,
     job_model_to_job_submission,
 )
+from dstack._internal.server.services.logging import job_log
 from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
@@ -87,7 +88,11 @@ async def _process_job(job_id: UUID):
             job_model.status == JobStatus.PROVISIONING
         ):  # fails are acceptable until timeout is exceeded
             if job_provisioning_data.dockerized:
-                logger.debug("Polling provisioning job with shim: %s", job_model.job_name)
+                logger.debug(
+                    *job_log(
+                        "process provisioning job with shim, age=%s", job_model, job_submission.age
+                    )
+                )
                 success = await run_async(
                     _process_provisioning_with_shim,
                     server_ssh_private_key,
@@ -97,7 +102,13 @@ async def _process_job(job_id: UUID):
                     job.job_spec.registry_auth,
                 )
             else:
-                logger.debug("Polling provisioning job without shim: %s", job_model.job_name)
+                logger.debug(
+                    *job_log(
+                        "process provisioning job without shim, age=%s",
+                        job_model,
+                        job_submission.age,
+                    )
+                )
                 code = await _get_job_code(
                     session=session,
                     project=project,
@@ -120,14 +131,21 @@ async def _process_job(job_id: UUID):
                     job_provisioning_data.backend
                 ):
                     logger.warning(
-                        "Job %s failed because runner has not become available in time.",
-                        job_model.job_name,
+                        *job_log(
+                            "failed because runner has not become available in time, age=%s",
+                            job_model,
+                            job_submission.age,
+                        )
                     )
                     job_model.status = JobStatus.FAILED
                     job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
         else:  # fails are not acceptable
             if job_model.status == JobStatus.PULLING:
-                logger.debug("Polling pulling job with shim: %s", job_model.job_name)
+                logger.debug(
+                    *job_log(
+                        "process pulling job with shim, age=%s", job_model, job_submission.age
+                    )
+                )
                 code = await _get_job_code(
                     session=session,
                     project=project,
@@ -146,7 +164,9 @@ async def _process_job(job_id: UUID):
                     repo_creds,
                 )
             elif job_model.status == JobStatus.RUNNING:
-                logger.debug("Polling running job: %s", job_model.job_name)
+                logger.debug(
+                    *job_log("process running job, age=%s", job_model, job_submission.age)
+                )
                 success = await run_async(
                     _process_running,
                     server_ssh_private_key,
@@ -155,7 +175,13 @@ async def _process_job(job_id: UUID):
                     job_model,
                 )
             if not success:  # kill the job
-                logger.debug("Job %s failed because runner is not available", job_model.job_name)
+                logger.warning(
+                    *job_log(
+                        "failed because runner is not available, age=%s",
+                        job_model,
+                        job_submission.age,
+                    )
+                )
                 job_model.status = JobStatus.FAILED
                 job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
                 if job.is_retry_active():
@@ -225,17 +251,17 @@ def _process_provisioning_with_shim(
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
     resp = shim_client.healthcheck()
     if resp is None:
-        logger.debug("Shim is not available yet: %s", job_model.job_name)
+        logger.debug(*job_log("shim is not available yet", job_model))
         return False  # shim is not available yet
     if registry_auth is not None:
-        logger.debug("Authenticating %s to the registry...", job_model.job_name)
+        logger.debug(*job_log("authenticating to the registry...", job_model))
         interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
         shim_client.registry_auth(
             username=interpolate(registry_auth.username),
             password=interpolate(registry_auth.password),
         )
     job_model.status = JobStatus.PULLING
-    logger.debug("Job %s is pulling", job_model.job_name)
+    logger.info(*job_log("now is pulling", job_model))
     return True
 
 
@@ -311,7 +337,7 @@ def _process_running(
         job_model.status = last_job_state.state
         if job_model.status == JobStatus.DONE:
             delay_job_instance_termination(job_model)
-        logger.debug("Updated job %s status to %s", job_model.job_name, job_model.status)
+        logger.info(*job_log("now is %s", job_model, job_model.status.value))
     return True
 
 
@@ -342,10 +368,13 @@ def _submit_job_to_runner(
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
 ):
-    logger.debug("Submitting job %s...", job_model.job_name)
+    logger.debug(*job_log("submitting job spec", job_model))
     logger.debug(
-        "Repo credentials: %s",
-        None if repo_credentials is None else repo_credentials.protocol.value,
+        *job_log(
+            "repo credentials are %s",
+            job_model,
+            None if repo_credentials is None else repo_credentials.protocol.value,
+        )
     )
     runner_client.submit_job(
         run_spec=run.run_spec,
@@ -353,12 +382,12 @@ def _submit_job_to_runner(
         secrets=secrets,
         repo_credentials=repo_credentials,
     )
-    logger.debug("Uploading code %s...", job_model.job_name)
+    logger.debug(*job_log("uploading code", job_model))
     runner_client.upload_code(code)
-    logger.debug("Running job %s...", job_model.job_name)
+    logger.debug(*job_log("starting job", job_model))
     runner_client.run_job()
     job_model.status = JobStatus.RUNNING
-    logger.debug("Job %s is running", job_model.job_name)
+    # do not log here, because the runner will send a new status
 
 
 def _get_runner_timeout_interval(backend_type: BackendType) -> timedelta:

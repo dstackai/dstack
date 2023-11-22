@@ -10,6 +10,7 @@ from dstack._internal.server.services.jobs import (
     job_model_to_job_submission,
     terminate_job_submission_instance,
 )
+from dstack._internal.server.services.logging import job_log
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -54,9 +55,9 @@ async def _process_job(job_id):
                     job_submission=job_submission,
                 )
             job_model.removed = True
-            logger.debug("Job %s is marked as removed", job_model.job_name)
+            logger.info(*job_log("marked as removed", job_model))
         except Exception as e:
             job_model.removed = False
-            logger.error("Failed to terminate job instance %s: %s", job_model.job_name, e)
+            logger.error(*job_log("failed to terminate job instance: %s", job_model, e))
         job_model.last_processed_at = get_current_datetime()
         await session.commit()
