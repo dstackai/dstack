@@ -7,10 +7,17 @@ from typing import Dict, Optional
 
 from filelock import FileLock
 from paramiko.config import SSHConfig
+from paramiko.pkey import PKey, PublicBlob
 
 from dstack._internal.utils.path import PathLike
 
 default_ssh_config_path = "~/.ssh/config"
+
+
+def get_public_key_fingerprint(text: str) -> str:
+    pb = PublicBlob.from_string(text)
+    pk = PKey.from_type_string(pb.key_type, pb.key_blob)
+    return pk.fingerprint
 
 
 def get_host_config(hostname: str, ssh_config_path: PathLike = default_ssh_config_path) -> dict:

@@ -156,6 +156,29 @@ projects:
 
 </div>
 
+
+### DataCrunch
+
+
+Log into your [DataCrunch](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+```yaml
+projects:
+- name: main
+  backends:
+  - type: datacrunch
+    creds:
+      type: api_key
+      client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
+      client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8
+```
+
+</div>
+
+
 ### GCP
 
 ??? info "Enable APIs"

@@ -9,6 +9,7 @@ class BackendType(str, enum.Enum):
     AZURE = "azure"
     DSTACK = "dstack"
     GCP = "gcp"
+    DATACRUNCH = "datacrunch"
     LAMBDA = "lambda"
     LOCAL = "local"
     NEBIUS = "nebius"

@@ -10,6 +10,7 @@ from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
 from dstack._internal.core.models.backends.aws import AnyAWSCreds
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.datacrunch import AnyDataCrunchCreds
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
 from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.backends.vastai import AnyVastAICreds
@@ -36,6 +37,12 @@ class AzureConfig(ForbidExtra):
     subscription_id: str
     regions: Optional[List[str]] = None
     creds: AnyAzureCreds = Field(..., discriminator="type")
+
+
+class DataCrunchConfig(ForbidExtra):
+    type: Literal["datacrunch"] = "datacrunch"
+    regions: Optional[List[str]] = None
+    creds: AnyDataCrunchCreds
 
 
 class GCPServiceAccountCreds(ForbidExtra):
@@ -110,6 +117,7 @@ class DstackConfig(ForbidExtra):
 AnyBackendConfig = Union[
     AWSConfig,
     AzureConfig,
+    DataCrunchConfig,
     GCPConfig,
     LambdaConfig,
     NebiusConfig,
