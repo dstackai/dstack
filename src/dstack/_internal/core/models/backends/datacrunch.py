@@ -1,6 +1,6 @@
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement

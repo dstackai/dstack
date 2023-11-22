@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal, Optional, TypedDict
+from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import get_shim_commands
@@ -70,7 +70,7 @@ class DataCrunchCompute(Compute):
             "provisioning": InstanceState.PROVISIONING,
             "running": InstanceState.RUNNING,
             "offline": InstanceState.STOPPED,
-            'discontinued': InstanceState.TERMINATED,
+            "discontinued": InstanceState.TERMINATED,
         }
         status = state_map.get(instance.status, InstanceState.NOT_FOUND)
         return status
@@ -126,19 +126,20 @@ class DataCrunchCompute(Compute):
             hostname=name,
             description=name,
             image=image_name,
+            location=instance_offer.region,
         )
 
-        instance = self.api_client.wait_for_instance(instance.id)
-        if instance is None:
-            raise BackendError()
+        running_instance = self.api_client.wait_for_instance(instance.id)
+        if running_instance is None:
+            raise BackendError(f"Wait instance {instance.id!r} timeout")
 
         launched_instance = LaunchedInstanceInfo(
-            instance_id=instance.id,
-            ip_address=instance.ip,
-            region=instance.location,
+            instance_id=running_instance.id,
+            ip_address=running_instance.ip,
+            region=running_instance.location,
             ssh_port=22,
             username="root",
-            dockerized=False,
+            dockerized=True,
             backend_data=None,
         )
 

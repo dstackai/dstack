@@ -1,6 +1,5 @@
 import time
-from tracemalloc import start
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 from datacrunch import DataCrunchClient
 from datacrunch.exceptions import APIException
