@@ -35,6 +35,7 @@ def get_job_provisioning_data(dockerized: bool) -> JobProvisioningData:
         username="ubuntu",
         ssh_port=22,
         dockerized=dockerized,
+        backend_data=None,
     )
 
 

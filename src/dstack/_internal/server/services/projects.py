@@ -163,6 +163,14 @@ async def list_user_project_models(
     return list(res.scalars().all())
 
 
+async def list_user_owned_project_models(
+    session: AsyncSession,
+    user: UserModel,
+) -> List[ProjectModel]:
+    res = await session.execute(select(ProjectModel).where(ProjectModel.owner_id == user.id))
+    return list(res.scalars().all())
+
+
 async def list_project_models(
     session: AsyncSession,
 ) -> List[ProjectModel]:
@@ -183,6 +191,14 @@ async def get_project_model_by_name_or_error(
     project_name: str,
 ) -> ProjectModel:
     res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
+    return res.scalar_one()
+
+
+async def get_project_model_by_id_or_error(
+    session: AsyncSession,
+    project_id: uuid.UUID,
+) -> ProjectModel:
+    res = await session.execute(select(ProjectModel).where(ProjectModel.id == project_id))
     return res.scalar_one()
 
 

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.instances import InstanceType, Resources
 from dstack._internal.core.models.profiles import Profile, SpotPolicy
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
@@ -196,8 +197,6 @@ async def create_job(
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = get_job_specs_from_run_spec(run_spec)[0]
-    if job_provisioning_data is not None:
-        job_provisioning_data = job_provisioning_data.json()
     job = JobModel(
         project_id=run.project_id,
         run_id=run.id,
@@ -210,11 +209,29 @@ async def create_job(
         status=status,
         error_code=error_code,
         job_spec_data=job_spec.json(),
-        job_provisioning_data=job_provisioning_data,
+        job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
     )
     session.add(job)
     await session.commit()
     return job
+
+
+def get_job_provisioning_data() -> JobProvisioningData:
+    return JobProvisioningData(
+        backend=BackendType.AWS,
+        instance_type=InstanceType(
+            name="instance",
+            resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+        ),
+        instance_id="instance_id",
+        hostname="127.0.0.4",
+        region="us-east-1",
+        price=10.5,
+        username="ubuntu",
+        ssh_port=22,
+        dockerized=False,
+        backend_data=None,
+    )
 
 
 async def create_gateway(
