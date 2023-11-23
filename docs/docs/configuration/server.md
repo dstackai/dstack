@@ -156,29 +156,6 @@ projects:
 
 </div>
 
-
-### DataCrunch
-
-
-Log into your [DataCrunch](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-```yaml
-projects:
-- name: main
-  backends:
-  - type: datacrunch
-    creds:
-      type: api_key
-      client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
-      client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8
-```
-
-</div>
-
-
 ### GCP
 
 ??? info "Enable APIs"
@@ -322,17 +299,27 @@ projects:
 </div>
 
 !!! info "NOTE:"
-    To use Vast AI, ensure you have the latest version:
-
-    <div class="termy">
-
-    ```shell
-    $ pip install "dstack[all]==0.12.3rc3"
-    ```
-
-    </div>
-
     Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
+
+[//]: # (### DataCrunch)
+[//]: # ()
+[//]: # (Log into your [DataCrunch]&#40;https://cloud.datacrunch.io/signin&#41; account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.)
+[//]: # ()
+[//]: # (Then, go ahead and configure the backend:)
+[//]: # ()
+[//]: # (<div editor-title="~/.dstack/server/config.yml">)
+[//]: # (```yaml)
+[//]: # (projects:)
+[//]: # (- name: main)
+[//]: # (  backends:)
+[//]: # (  - type: datacrunch)
+[//]: # (    creds:)
+[//]: # (      type: api_key)
+[//]: # (      client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T)
+[//]: # (      client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8)
+[//]: # (```)
+[//]: # ()
+[//]: # (</div>)
 
 ## Cloud regions
 

@@ -1,14 +1,12 @@
-# Deploying LLMs using TGI
+# Deploying LLMs with TGI
 
-The example below demonstrates how to use `dstack` to deploy an LLM as a service using TGI. 
+!!! info "NOTE:"
+    This example demonstrates how to deploy an LLM
+    using [Services](../docs/guides/services.md) and [Text Generation Inference](https://github.com/huggingface/text-generation-inference) (TGI),
+    an open-source framework by Hugging Face.
 
-??? info "About services"
-    [Services](../docs/guides/services.md) allow running web-based applications as public endpoints. This is the recommended way to deploy LLMs for
-    production purposes. If you want to run web applications for development purposes, you can also consider running them as [tasks](../docs/guides/tasks.md).
-
-??? info "About TGI"
-    [Text Generation Inference](https://github.com/huggingface/text-generation-inference) (TGI) is an open-source framework by Hugging Face for serving LLMs that increases throughput, supports continuous batching, 
-    GPU parallelism, streaming output, quantization, etc.
+    If you'd like to deploy an LLM via a simple API,
+    consider using the [Text generation](../docs/guides/task-generation.md) API. It's a lot simpler.
 
 ## Define the configuration
 
@@ -45,10 +43,9 @@ $ dstack run . -f text-generation-inference/serve.dstack.yml --gpu 24GB
 
 </div>
 
-!!! info "Wildcard domain"
-    If you've configured a [wildcard domain](../docs/guides/services.md#set-up-a-gateway) for the gateway, 
-    `dstack` enables HTTPS automatically and serves the service at 
-    `https://<run name>.<your domain name>`.
+!!! info "Endpoint URL"
+    Once the service is deployed, its endpoint will be available at 
+    `https://<run-name>.<domain-name>` (using the domain set up for the gateway).
 
     If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
 
@@ -57,7 +54,7 @@ Once the service is up, you can query it:
 <div class="termy">
 
 ```shell
-$ curl -X POST --location https://yellow-cat-1.mydomain.com \
+$ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
     -H 'Content-Type: application/json' \
     -d '{
           "inputs": "What is Deep Learning?",

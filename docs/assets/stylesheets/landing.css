@@ -261,11 +261,40 @@
 }
 
 .tx-landing__highlights_grid .feature-cell {
-    padding: 25px 40px 40px;
+    padding: 35px 40px 40px;
     border-radius: 5px;
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
     border-width: 0.75px;
     border-style: solid;
+}
+
+.tx-landing__highlights_grid .feature-cell:hover {
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.015), rgba(0, 42, 255, 0.015), rgba(225, 101, 254, 0.025));
+}
+
+.tx-landing__highlights_grid .feature-cell strong {
+    font-weight: 500;
+}
+
+.tx-landing__highlights_grid .feature-cell .feature-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin: 0 -5px;
+}
+
+.tx-landing__highlights_grid .feature-cell .feature-tags .feature-tag {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 15px;
+    border-radius: 30px;
+    font-size: 0.85em;
+    font-weight: 300;
+    line-height: 1.44;
+    color: black;
+    margin-top: 10px;
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.05), rgba(0, 42, 255, 0.05), rgba(225, 101, 254, 0.05));
 }
 
 .tx-landing__highlights_grid > a, .tx-landing__highlights_grid > a:hover {

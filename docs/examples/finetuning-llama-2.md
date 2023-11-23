@@ -1,11 +1,12 @@
-# Fine-tuning Llama 2 using QLoRA
+# Fine-tuning LLMs using Tasks
 
-The release of Llama 2 by Meta has caused quite a stir due to its impressive performance and its license that permits commercial use.
-Along with other advancements in the LLM toolchain, such as LangChain and vector databases, Llama 2 has vast potential
-for applications.
+!!! info "NOTE:"
+    This example demonstrates how to fine-tune [`llama-2-7b-chat-hf`](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf),
+    with QLoRA and your own script, using [Tasks](../docs/guides/tasks.md).
 
-This example demonstrates how to use `dstack` to fine-tune [`llama-2-7b-chat-hf`](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf), 
-using any cloud of your choice.
+    If you'd like to fine-tune an LLM via a simple API,
+    consider using the [Fine-tuning](../docs/guides/task-generation.md) API. It's a lot simpler and 
+    doesn't need your own script.
 
 ## Prepare a dataset
 
@@ -173,7 +174,7 @@ def merge_and_push(args):
     tokenizer.push_to_hub(args.new_model_name, use_temp_dir=False)
 ```
 
-### Putting it all together
+### Put it all together
 
 Finally, in the main part of the script, we put it all together.
 

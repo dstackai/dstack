@@ -11,16 +11,6 @@ and required compute resources.
     [set up a gateway](services.md#set-up-a-gateway) before running models as public endpoints. 
     Not required for private endpoints.
 
-    > Please note that the text generation API requires you to use the latest version.
-
-    <div class="termy">
-
-    ```shell
-    $ pip install "dstack[all]==0.12.3rc3"
-    ```
-
-    </div>
-
 ## Create a client
 
 First, you connect to `dstack`:

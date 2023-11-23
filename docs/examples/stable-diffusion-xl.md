@@ -1,4 +1,4 @@
-# Serving SDXL with FastAPI
+# Deploying SDXL with Services
 
 Stable Diffusion XL (SDXL) 1.0 is the latest version of the open-source model that is capable 
 of generating high-quality images from text.
@@ -12,7 +12,7 @@ generation and refinement.
 
 Here's the list of libraries that our example will require:
 
-<div editor-title="text-generation-inference/requirements.txt">
+<div editor-title="stable-diffusion-xl/requirements.txt">
 
 ```text
 transformers
@@ -204,9 +204,8 @@ $ dstack run . -f stable-diffusion-xl/api.dstack.yml
 </div>
 
 !!! info "Endpoint URL"
-    If you've configured a [wildcard domain](../docs/guides/services.md#set-up-a-gateway) for the gateway, 
-    `dstack` enables HTTPS automatically and serves the service at 
-    `https://<run name>.<your domain name>`.
+    Once the service is deployed, its endpoint will be available at 
+    `https://<run-name>.<domain-name>` (using the domain set up for the gateway).
 
     If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
 
@@ -222,4 +221,5 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
 
 </div>
 
-[Source code](https://github.com/dstackai/dstack-examples){ .md-button .md-button--github }
+!!! info "Source code"
+    The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).

@@ -78,7 +78,7 @@ plugins:
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion-xl.md'
         'docs/guides/projects.md': 'docs/configuration/server.md'
         'examples/python-api.md': 'examples/deploy-python.md'
-        'guides/clouds.md': 'configuration/server.md'
+        'guides/clouds.md': 'docs/configuration/server.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -180,11 +180,11 @@ nav:
     - examples/index.md
     - Examples:
       - RAG with Llama Index and Weaviate: examples/llama-index-weaviate.md
-      - Deploying LLMs using Python API: examples/deploy-python.md
-      - Fine-tuning Llama 2 using QLoRA: examples/finetuning-llama-2.md
-      - Deploying LLMs using TGI: examples/text-generation-inference.md
-      - Deploying SDXL using FastAPI: examples/stable-diffusion-xl.md
-      - Deploying LLMs using vLLM: examples/vllm.md
+#      - Deploying LLMs using Python API: examples/deploy-python.md
+      - Fine-tuning LLMs using Tasks: examples/finetuning-llama-2.md
+      - Deploying LLMs with TGI: examples/text-generation-inference.md
+      - Deploying SDXL using Services: examples/stable-diffusion-xl.md
+      - Deploying LLMs with vLLM: examples/vllm.md
   - Pricing: pricing.md
   - Blog:
       - blog/index.md

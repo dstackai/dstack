@@ -5,26 +5,14 @@ RAG, or retrieval-augmented generation, empowers LLMs by providing them with acc
 Here's an example of how to apply this technique using the [Llama Index](https://www.llamaindex.ai/) framework 
 and [Weaviate](https://weaviate.io/) vector database.
 
-??? info "About Llama Index"
-    Llama Index is an open-source framework that makes it easy extract data from different sources and connect
-    it to LLMs. It provides a variety of tools and APIs to help you ingest, structure, and access your data in a way that is
-    easy for LLMs to consume.
-
-??? info "About Weaviate"
-    Weaviate is an open-source vector database that allows you to store and query objects 
-    using their vector representations, also known as embeddings.
-    A vector representation is a mathematical way of representing an object as a point in a high-dimensional space.
-    This allows Weaviate to perform semantic search, which is the ability to search for objects based on their meaning,
-    rather than just their exact match to a query.
-
 ## How does it work?
 
-1. Llama Index loads data from local files, structures it into chunks, and ingests it into Weaviate. It uses local
-  embeddings through the [SentenceTransformers](https://www.sbert.net/) library.
-2. `dstack` allows us to configure cloud accounts (e.g. AWS, GCP, Azure, or Lambda Cloud), 
-  and deploy LLMs (e.g. Llama 2) there. In this example, it employs [Text Generation Inference](https://github.com/huggingface/text-generation-inference)
-  to serve the LLM. Refer to [Deploying LLMs using TGI](text-generation-inference.md) and [Deploying LLMs via Python API](deploy-python.md).
-3. Llama Index allows us to prompt the LLM and automatically incorporates context from Weaviate. 
+1. Llama Index loads data from local files, structures it into chunks, and ingests it into Weaviate (an open-source vector database).
+   We set up Llama Index to use local embeddings through the [SentenceTransformers](https://www.sbert.net/) library.
+2. `dstack` allows us to deploy LLMs to any cloud provider, e.g.
+   via the [text generation](../docs/guides/text-generation.md) API. Alternatively, you can also deploy using [TGI](text-generation-inference.md)'s 
+   docker image (as a task or a service).
+3. Llama Index allows us to prompt the LLM automatically incorporating the context from Weaviate. 
  
 ## Requirements
 
@@ -60,8 +48,11 @@ client.schema.delete_class("DstackExample")
 ```
 
 Next, prepare the Llama Index classes: `llama_index.ServiceContext` (for indexing and querying) and
-`llama_index.StorageContext` (for loading and storing). Note that we're using
-`langchain.embeddings.huggingface.HuggingFaceEmbeddings` for local embeddings instead of OpenAI.
+`llama_index.StorageContext` (for loading and storing). 
+
+!!! info "Embeddings"
+    Note that we're using
+    `langchain.embeddings.huggingface.HuggingFaceEmbeddings` for local embeddings instead of OpenAI.
 
 ```python
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
@@ -106,29 +97,33 @@ The data is in the vector database! Now we can proceed with the part where we in
 
 ## Deploy an LLM
 
-This example assumes we're using an LLM deployed with `dstack` which can be set up either as a task (for development) or
-as a service (for production).
+This example assumes we're using an LLM deployed via the [text generation](../docs/guides/text-generation.md) API,
+or using [TGI](text-generation-inference.md).
 
-For a detailed example on how to deploy an LLM as a service, check out
-[Deploying LLMs using TGI](text-generation-inference.md).
+Once you deployed the model, make sure to set the `TGI_ENDPOINT_URL` environment variable 
+to its URL, e.g. `https://<run-name>.<domain-name>` (or `http://localhost:<port>` if it's deployed 
+as a task). We'll use this environment variable below.
 
-Alternatively, for development purposes, you can also check out [Deploying LLMs using Python API](deploy-python.md). The example comes with a simple
-Streamlit app that allows you to deploy an LLM as a task with just one click.
+<div class="termy">
 
-![llama-index-weaviate.md](images/python-api/dstack-python-api-streamlit-example.png)
+```shell
+$ curl -X POST --location $TGI_ENDPOINT_URL/generate \
+    -H 'Content-Type: application/json' \
+    -d '{
+          "inputs": "What is Deep Learning?",
+          "parameters": {
+            "max_new_tokens": 20
+          }
+        }'
+```
+
+</div>
 
 ## Generate response
 
-Once the LLM is up, we can prompt it through Llama Index to automatically incorporate context from Weaviate.
+Once the LLM endpoint is up, we can prompt it through Llama Index to automatically incorporate context from Weaviate.
 
 Since we'll invoke the actual LLM, when configuring `llama_index.ServiceContext`, we must include the LLM configuration.
-
-In our example, using an LLM deployed with dstack via TGI, we'll use the `langchain.HuggingFaceTextGenInference` wrapper.
-This wrapper requires the LLM's URL and other LLM parameters.
-
-!!! info "NOTE:"
-    If you've deployed the LLM using [Deploying LLMs using Python API](deploy-python.md),
-    make sure to set the `TGI_ENDPOINT_URL` to `http://localhost:8080`.
 
 ```python
 import os
@@ -171,7 +166,7 @@ index = VectorStoreIndex.from_vector_store(
 
 Once `llama_index.VectorStoreIndex` is ready, we can proceed with querying it.
 
-!!! info "NOTE:"
+!!! info "Prompt format"
     If we're deploying Llama 2, we have to ensure that the prompt format is correct.
 
 ```python

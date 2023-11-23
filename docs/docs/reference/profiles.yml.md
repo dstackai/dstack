@@ -1,6 +1,6 @@
 # profiles.yml
 
-Instead of configuring resources and other run options through[`dstack run`](cli/run.md), 
+Instead of configuring resources and other run options through[`dstack run`](cli/index.md#dstack-run), 
 you can do so via `.dstack/profiles.yml` in the root folder of the project. 
 
 ## Example

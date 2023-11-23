@@ -3,17 +3,6 @@
 For fine-tuning an LLM with `dstack`'s API, specify a model, dataset, training parameters,
 and required compute resources. The API takes care of everything else.
 
-??? info "Prerequisites"
-    To use the fine-tuning API, ensure you have the latest version:
-
-    <div class="termy">
-
-    ```shell
-    $ pip install "dstack[all]==0.12.3rc3"
-    ```
-
-    </div>
-
 > The API currently supports only supervised fine-tuning (SFT). Support for DPO and RLHF is coming soon.
 
 ## How does it work?

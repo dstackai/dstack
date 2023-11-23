@@ -95,7 +95,7 @@ Serving HTTP on https://yellow-cat-1.example.com ...
 </div>
 
 Once the service is deployed, its endpoint will be available at
-`https://<run-name>.<domain-name>` (using the domain set up for the gateway).
+`https://<run-name>.<domain-name>` (using the domain [set up for the gateway](#set-up-a-gateway)).
 
 !!! info "Run options"
     The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
