@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
 import dstack.version
-from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import create_default_project_config
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
@@ -29,7 +29,11 @@ from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME, SERVER_URL
 from dstack._internal.server.utils.logging import configure_logging
-from dstack._internal.server.utils.routers import get_server_client_error_details
+from dstack._internal.server.utils.routers import (
+    error_detail,
+    error_forbidden,
+    get_server_client_error_details,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -101,6 +105,13 @@ def register_routes(app: FastAPI):
     app.include_router(logs.router)
     app.include_router(secrets.router)
     app.include_router(gateways.router)
+
+    @app.exception_handler(ForbiddenError)
+    async def forbidden_error_handler(request: Request, exc: ForbiddenError):
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content=error_detail("Access denied"),
+        )
 
     @app.exception_handler(ServerClientError)
     async def server_client_error_handler(request: Request, exc: ServerClientError):
