@@ -6,7 +6,7 @@
     an open-source library.
 
     If you'd like to deploy an LLM via a simple API,
-    consider using the [Text generation](../docs/guides/task-generation.md) API. It's a lot simpler.
+    consider using the [Text generation](../docs/guides/text-generation.md) API. It's a lot simpler.
 
 ## Define the configuration
 

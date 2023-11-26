@@ -5,7 +5,7 @@
     with QLoRA and your own script, using [Tasks](../docs/guides/tasks.md).
 
     If you'd like to fine-tune an LLM via a simple API,
-    consider using the [Fine-tuning](../docs/guides/task-generation.md) API. It's a lot simpler and 
+    consider using the [Fine-tuning](../docs/guides/text-generation.md) API. It's a lot simpler and 
     doesn't need your own script.
 
 ## Prepare a dataset
