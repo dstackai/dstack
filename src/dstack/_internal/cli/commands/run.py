@@ -69,6 +69,12 @@ class RunCommand(APIBaseCommand):
             help="Do not ask for plan confirmation",
             action="store_true",
         )
+        self._parser.add_argument(
+            "--max-offers",
+            help="Number of offers to show in the run plan",
+            type=int,
+            default=3,
+        )
         register_profile_args(self._parser)
 
     def _command(self, args: argparse.Namespace):
@@ -116,7 +122,7 @@ class RunCommand(APIBaseCommand):
         except ConfigurationError as e:
             raise CLIError(str(e))
 
-        print_run_plan(run_plan)
+        print_run_plan(run_plan, offers_limit=args.max_offers)
         if not args.yes and not confirm_ask("Continue?"):
             console.print("\nExiting...")
             return

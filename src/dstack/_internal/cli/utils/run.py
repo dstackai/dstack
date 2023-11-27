@@ -124,7 +124,7 @@ def generate_runs_table(
                 provisioning.instance_type if provisioning else None, verbose
             ),
             ("yes" if provisioning.instance_type.resources.spot else "no") if provisioning else "",
-            f"{provisioning.price:.4}$" if provisioning else "",
+            f"${provisioning.price:.4}" if provisioning else "",
             run.status,
             pretty_date(run.submitted_at),
         ]
