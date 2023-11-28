@@ -26,6 +26,7 @@ class Resources(BaseModel):
     memory_mib: int
     gpus: List[Gpu]
     spot: bool
+    description: str = ""
 
     def pretty_format(self) -> str:
         if not self.gpus:

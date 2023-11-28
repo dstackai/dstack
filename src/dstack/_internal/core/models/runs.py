@@ -145,8 +145,15 @@ class JobSubmission(BaseModel):
     job_provisioning_data: Optional[JobProvisioningData]
 
     @property
-    def age(self):
+    def age(self) -> timedelta:
         return common_utils.get_current_datetime() - self.submitted_at
+
+    @property
+    def duration(self) -> timedelta:
+        end_time = common_utils.get_current_datetime()
+        if self.finished_at is not None:
+            end_time = self.finished_at
+        return end_time - self.submitted_at
 
 
 class Job(BaseModel):
@@ -180,6 +187,8 @@ class Run(BaseModel):
     status: JobStatus
     run_spec: RunSpec
     jobs: List[Job]
+    latest_job_submission: Optional[JobSubmission]
+    cost: float = 0
 
 
 class JobPlan(BaseModel):

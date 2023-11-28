@@ -224,6 +224,16 @@ def get_dev_env_run_dict(
                 ],
             }
         ],
+        "latest_job_submission": {
+            "id": job_id,
+            "submission_num": 0,
+            "submitted_at": submitted_at,
+            "finished_at": finished_at,
+            "status": "submitted",
+            "error_code": None,
+            "job_provisioning_data": None,
+        },
+        "cost": 0,
     }
 
 
@@ -290,6 +300,16 @@ class TestListRuns:
                         ],
                     }
                 ],
+                "latest_job_submission": {
+                    "id": str(job.id),
+                    "submission_num": 0,
+                    "submitted_at": "2023-01-02T03:04:00+00:00",
+                    "finished_at": None,
+                    "status": "submitted",
+                    "error_code": None,
+                    "job_provisioning_data": None,
+                },
+                "cost": 0,
             }
         ]
 
