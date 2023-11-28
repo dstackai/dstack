@@ -72,7 +72,7 @@ class ConfigCommand(BaseCommand):
                     or not default_project
                     or confirm_ask(f"Set '{args.project}' as your default project?")
                 )
-                if not args.no
+                if not args.no_default
                 else False
             )
             config_manager.configure_project(

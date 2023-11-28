@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import yaml
 from pytest import CaptureFixture
@@ -27,7 +27,10 @@ class TestConfig:
             )
             APIClientMock.assert_called_once_with(base_url="http://127.0.0.1:31313", token="token")
         assert exit_code == 0, capsys.readouterr().out
-        assert capsys.readouterr().out == "OK\n"
+        assert (
+            capsys.readouterr().out.replace("\n", "")
+            == f"Configuration updated at {cli_config_path}."
+        )
         assert yaml.load(cli_config_path.read_text(), yaml.FullLoader) == {
             "projects": [
                 {
