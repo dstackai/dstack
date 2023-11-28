@@ -16,6 +16,9 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class TensorDockCompute(Compute):
@@ -92,7 +95,8 @@ class TensorDockCompute(Compute):
                     ],
                 },
             )
-        except requests.HTTPError:
+        except requests.HTTPError as e:
+            logger.warning("Got error from tensordock: %s", e)
             raise NoCapacityError()
         return LaunchedInstanceInfo(
             instance_id=resp["server"],

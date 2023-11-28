@@ -2,6 +2,7 @@ import argparse
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.configurators.profile import (
@@ -16,9 +17,11 @@ from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.models.runs import JobErrorCode
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
+from dstack.api._public.runs import SubmittedRun
 from dstack.api.utils import load_configuration, load_profile
 
 logger = get_logger(__name__)
@@ -173,6 +176,7 @@ class RunCommand(APIBaseCommand):
 
             run.refresh()
             if run.status.is_finished():
+                _print_fail_message(run)
                 abort_at_exit = False
         except KeyboardInterrupt:
             try:
@@ -196,3 +200,28 @@ class RunCommand(APIBaseCommand):
                 with console.status("Aborting..."):
                     run.stop(abort=True)
                 console.print("Aborted")
+
+
+def _print_fail_message(run: SubmittedRun):
+    error_code = _get_run_error_code(run)
+    message = "Run failed due to unknown reason. Check CLI and server logs."
+    if _get_run_error_code(run) == JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
+        message = (
+            "All provisioning attempts failed. "
+            "This is likely due to cloud providers not having enough capacity. "
+            "Check CLI and server logs for more details."
+        )
+    elif error_code is not None:
+        message = (
+            f"Run failed with error code {error_code}. "
+            "Check CLI and server logs for more details."
+        )
+    console.print(f"[error]{message}[/]")
+
+
+def _get_run_error_code(run: SubmittedRun) -> Optional[JobErrorCode]:
+    job = run._run.jobs[0]
+    if len(job.job_submissions) == 0:
+        return None
+    job_submission = job.job_submissions[0]
+    return job_submission.error_code

@@ -174,7 +174,7 @@ class AWSCompute(Compute):
                 dockerized=True,  # because `dstack-shim docker` is used
             )
         except botocore.exceptions.ClientError as e:
-            logger.debug("Got botocore.exceptions.ClientError: %s", e)
+            logger.warning("Got botocore.exceptions.ClientError: %s", e)
             raise NoCapacityError()
 
     def create_gateway(

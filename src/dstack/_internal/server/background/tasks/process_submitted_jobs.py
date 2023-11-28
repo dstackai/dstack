@@ -133,14 +133,14 @@ async def _run_job(
                 project_ssh_private_key,
             )
         except BackendError as e:
-            logger.debug(
+            logger.warning(
                 *job_log(
                     "%s launch in %s/%s failed: %s",
                     job_model,
                     offer.instance.name,
                     offer.backend.value,
                     offer.region,
-                    e,
+                    repr(e),
                 )
             )
             continue
