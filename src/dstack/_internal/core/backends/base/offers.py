@@ -36,16 +36,18 @@ def catalog_item_to_offer(backend: BackendType, item: gpuhunt.CatalogItem) -> In
     gpus = []
     if item.gpu_count > 0:
         gpus = [Gpu(name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024))] * item.gpu_count
+    resources = Resources(
+        cpus=item.cpu,
+        memory_mib=round(item.memory * 1024),
+        gpus=gpus,
+        spot=item.spot,
+    )
+    resources.description = resources.pretty_format()
     return InstanceOffer(
         backend=backend,
         instance=InstanceType(
             name=item.instance_name,
-            resources=Resources(
-                cpus=item.cpu,
-                memory_mib=round(item.memory * 1024),
-                gpus=gpus,
-                spot=item.spot,
-            ),
+            resources=resources,
         ),
         region=item.location,
         price=item.price,

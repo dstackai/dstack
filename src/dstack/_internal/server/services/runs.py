@@ -1,5 +1,6 @@
 import asyncio
 import itertools
+import math
 import uuid
 from datetime import timezone
 from typing import List, Optional
@@ -254,7 +255,7 @@ async def delete_runs(
 
 
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:
-    jobs = []
+    jobs: List[Job] = []
     # JobSpec from JobConfigurator doesn't have gateway information for `service` type
     run_jobs = sorted(run_model.jobs, key=lambda j: (j.job_num, j.submission_num))
     for job_num, job_submissions in itertools.groupby(run_jobs):
@@ -268,6 +269,9 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
         if job_spec is not None:
             jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
     run_spec = RunSpec.parse_raw(run_model.run_spec)
+    latest_job_submission = None
+    if include_job_submissions:
+        latest_job_submission = jobs[0].job_submissions[-1]
     run = Run(
         id=run_model.id,
         project_name=run_model.project.name,
@@ -276,7 +280,9 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
         status=get_run_status(jobs),
         run_spec=run_spec,
         jobs=jobs,
+        latest_job_submission=latest_job_submission,
     )
+    run.cost = _get_run_cost(run)
     return run
 
 
@@ -308,3 +314,19 @@ async def _generate_run_name(
         ):
             idx += 1
         return f"{run_name_base}-{idx}"
+
+
+def _get_run_cost(run: Run) -> float:
+    run_cost = sum(
+        _get_job_submission_cost(submission)
+        for job in run.jobs
+        for submission in job.job_submissions
+    )
+    return round(run_cost, 4)
+
+
+def _get_job_submission_cost(job_submission: JobSubmission) -> float:
+    if job_submission.job_provisioning_data is None:
+        return 0
+    duration_hours = job_submission.duration.total_seconds() / 3600
+    return job_submission.job_provisioning_data.price * duration_hours

@@ -60,6 +60,10 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
     job_provisioning_data = None
     if job_model.job_provisioning_data is not None:
         job_provisioning_data = JobProvisioningData.parse_raw(job_model.job_provisioning_data)
+        # TODO remove after transitioning to computed fields
+        job_provisioning_data.instance_type.resources.description = (
+            job_provisioning_data.instance_type.resources.pretty_format()
+        )
     finished_at = None
     if job_model.status.is_finished():
         finished_at = job_model.last_processed_at.replace(tzinfo=timezone.utc)
