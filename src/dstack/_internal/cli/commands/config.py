@@ -4,8 +4,8 @@ from requests import HTTPError
 
 import dstack.api.server
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.cli.utils.common import console
-from dstack._internal.core.errors import ClientError, CLIError
+from dstack._internal.cli.utils.common import colors, confirm_ask, console
+from dstack._internal.core.errors import CLIError
 from dstack._internal.core.services.configs import ConfigManager
 
 
@@ -23,11 +23,16 @@ class ConfigCommand(BaseCommand):
         self._parser.add_argument(
             "--default",
             action="store_true",
-            help="Make the project default. It will be used when --project is ommitted in commands.",
+            help="Set the project as default. It will be used when --project is omitted in commands.",
             default=False,
         )
         self._parser.add_argument(
             "--remove", action="store_true", help="Delete project configuration"
+        )
+        self._parser.add_argument(
+            "--no-default",
+            help="Do not prompt to set the project as default.",
+            action="store_true",
         )
 
     def _command(self, args: argparse.Namespace):
@@ -54,8 +59,26 @@ class ConfigCommand(BaseCommand):
                 raise CLIError(f"Project '{args.project}' not found.")
             else:
                 raise e
-        config_manager.configure_project(
-            name=args.project, url=args.url, token=args.token, default=args.default
+        default_project = config_manager.get_project_config()
+        if (
+            default_project is None
+            or default_project.name != args.project
+            or default_project.url != args.url
+            or default_project.token != args.token
+        ):
+            set_it_as_default = (
+                (
+                    args.default
+                    or not default_project
+                    or confirm_ask(f"Set '{args.project}' as your default project?")
+                )
+                if not args.no
+                else False
+            )
+            config_manager.configure_project(
+                name=args.project, url=args.url, token=args.token, default=set_it_as_default
+            )
+            config_manager.save()
+        console.print(
+            f"[grey58]Configuration updated at [{colors['code']}]{config_manager.config_filepath}[/{colors['code']}].[/grey58]"
         )
-        config_manager.save()
-        console.print(f"[grey58]OK[/]")
