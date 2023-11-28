@@ -28,7 +28,7 @@ class VastAICompute(Compute):
     def __init__(self, config: VastAIConfig):
         self.config = config
         self.api_client = VastAIAPIClient(config.creds.api_key)
-        self.catalog = gpuhunt.Catalog(fill_missing=False, auto_reload=False)
+        self.catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
         self.catalog.add_provider(
             VastAIProvider(
                 extra_filters={
