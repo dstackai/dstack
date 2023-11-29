@@ -107,11 +107,11 @@ class ProfileGPU(ForbidExtra):
 
 
 class ProfileResources(ForbidExtra):
-    cpu: Annotated[Optional[int], Field(description="The minimum number of CPUs")]
+    cpu: Annotated[int, Field(description="The minimum number of CPUs")] = 2
     memory: Annotated[
-        Optional[Union[int, str]],
+        Union[int, str],
         Field(description='The minimum size of RAM memory (e.g., "16GB")'),
-    ]
+    ] = parse_memory("8GB")
     gpu: Annotated[
         Optional[Union[int, ProfileGPU]],
         Field(description="The minimum number of GPUs or a GPU spec"),
