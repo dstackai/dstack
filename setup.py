@@ -116,6 +116,7 @@ setup(
             "scripts/*.sh",
             "scripts/*.py",
         ],
+        "dstack.api._public.huggingface.finetuning.sft": ["requirements.txt"],
     },
     include_package_data=True,
     scripts=[],
