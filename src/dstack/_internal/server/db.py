@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-from typing import Optional
 
 from alembic import command, config
 from sqlalchemy import event
@@ -25,6 +24,7 @@ class Database:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA journal_mode=WAL;")
             cursor.execute("PRAGMA foreign_keys=ON;")
+            cursor.execute("PRAGMA busy_timeout=5000;")
             cursor.close()
 
     def get_session(self) -> AsyncSession:
