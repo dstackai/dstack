@@ -14,7 +14,7 @@ DATABASE_URL = f"sqlite+aiosqlite:///{str(SERVER_DATA_DIR_PATH.absolute())}/sqli
 
 SERVER_HOST = os.getenv("DSTACK_SERVER_HOST", "localhost")
 SERVER_PORT = os.getenv("DSTACK_SERVER_PORT", "8000")
-SERVER_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+SERVER_URL = os.getenv("DSTACK_SERVER_URL", f"http://{SERVER_HOST}:{SERVER_PORT}")
 
 SERVER_ENVIRONMENT = os.getenv("DSTACK_SERVER_ENVIRONMENT", "dev")
 
