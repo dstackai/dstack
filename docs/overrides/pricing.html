@@ -42,13 +42,14 @@
                         <span class="tx-pricing__filter-field-label">Contract</span>
 
                         <select name="contract">
-                            <!--<option value="">All</option>-->
+                            <option value="">All</option>
                             <option value="ondemand">On-demand</option>
+                            <option value="reserved">Reserved</option>
                         </select>
                     </label>
                 </div>
 
-                <div class="tx-pricing__filter-field">
+                <!--<div class="tx-pricing__filter-field">
                     <label>
                         <span class="tx-pricing__filter-field-label">Region</span>
 
@@ -58,18 +59,30 @@
                             <option value="europe">Europe</option>
                         </select>
                     </label>
-                </div>
+                </div>-->
             </form>
 
             <div class="tx-pricing__cards">
+<!--
                 <div class="tx-pricing__card js-pricing-card"
                      data-type="['datacenter']"
-                     data-contract="['ondemand']"
+                     data-contract="['reserved']"
+                     data-region="['us']"
+                >
+                    <div class="tx-pricing__card-title">H100 (80GB)</div>
+                    <div class="tx-pricing__card-price">$2.10/h</div>
+                    <div class="tx-pricing__card-options">United States, Reserved</div>
+                </div>
+-->
+
+                <div class="tx-pricing__card js-pricing-card"
+                     data-type="['datacenter']"
+                     data-contract="['reserved']"
                      data-region="['europe']"
                 >
                     <div class="tx-pricing__card-title">H100 (80GB)</div>
-                    <div class="tx-pricing__card-price">$4.12/h</div>
-                    <div class="tx-pricing__card-options">Europe</div>
+                    <div class="tx-pricing__card-price">$2.10/h</div>
+                    <div class="tx-pricing__card-options">Reserved</div>
                 </div>
 
                 <div class="tx-pricing__card js-pricing-card"
@@ -79,18 +92,18 @@
                 >
                     <div class="tx-pricing__card-title">A100 (80GB)</div>
                     <div class="tx-pricing__card-price">$1.4/h</div>
-                    <div class="tx-pricing__card-options">Europe</div>
+                    <div class="tx-pricing__card-options">On-demand</div>
                 </div>
 
-                <div class="tx-pricing__card js-pricing-card"
+                <!--<div class="tx-pricing__card js-pricing-card"
                      data-type="['datacenter']"
                      data-contract="['ondemand']"
                      data-region="['us']"
                 >
                     <div class="tx-pricing__card-title">A100 (80GB)</div>
                     <div class="tx-pricing__card-price">$1.4/h</div>
-                    <div class="tx-pricing__card-options">United States</div>
-                </div>
+                    <div class="tx-pricing__card-options">United States, On-demand</div>
+                </div>-->
 
                 <div class="tx-pricing__card js-pricing-card"
                      data-type="['datacenter']"
@@ -99,18 +112,18 @@
                 >
                     <div class="tx-pricing__card-title">L40 (80GB)</div>
                     <div class="tx-pricing__card-price">$1.05/h</div>
-                    <div class="tx-pricing__card-options">Europe</div>
+                    <div class="tx-pricing__card-options">On-demand</div>
                 </div>
 
-                <div class="tx-pricing__card js-pricing-card"
+                <!--<div class="tx-pricing__card js-pricing-card"
                      data-type="['datacenter']"
                      data-contract="['ondemand']"
                      data-region="['us']"
                 >
                     <div class="tx-pricing__card-title">L40 (80GB)</div>
                     <div class="tx-pricing__card-price">$1.05/h</div>
-                    <div class="tx-pricing__card-options">United States</div>
-                </div>
+                    <div class="tx-pricing__card-options">United States, On-demand</div>
+                </div>-->
 
                 <div class="tx-pricing__card js-pricing-card"
                      data-type="['datacenter']"
@@ -119,18 +132,18 @@
                 >
                     <div class="tx-pricing__card-title">A6000 (48GB)</div>
                     <div class="tx-pricing__card-price">$0.47/h</div>
-                    <div class="tx-pricing__card-options">Europe</div>
+                    <div class="tx-pricing__card-options">On-demand</div>
                 </div>
 
-                <div class="tx-pricing__card js-pricing-card"
+                <!--<div class="tx-pricing__card js-pricing-card"
                      data-type="['datacenter']"
                      data-contract="['ondemand']"
                      data-region="['us']"
                 >
                     <div class="tx-pricing__card-title">A6000 (48GB)</div>
                     <div class="tx-pricing__card-price">$0.47/h</div>
-                    <div class="tx-pricing__card-options">United States</div>
-                </div>
+                    <div class="tx-pricing__card-options">United States, On-demand</div>
+                </div>-->
 
                 <div class="tx-pricing__card js-pricing-card"
                      data-type="['datacenter']"
@@ -139,18 +152,18 @@
                 >
                     <div class="tx-pricing__card-title">A5000 (24GB)</div>
                     <div class="tx-pricing__card-price">$0.21/h</div>
-                    <div class="tx-pricing__card-options">Europe</div>
+                    <div class="tx-pricing__card-options">On-demand</div>
                 </div>
 
-                <div class="tx-pricing__card js-pricing-card"
+                <!--<div class="tx-pricing__card js-pricing-card"
                      data-type="['datacenter']"
                      data-contract="['ondemand']"
                      data-region="['us']"
                 >
                     <div class="tx-pricing__card-title">A5000 (24GB)</div>
                     <div class="tx-pricing__card-price">$0.21/h</div>
-                    <div class="tx-pricing__card-options">United States</div>
-                </div>
+                    <div class="tx-pricing__card-options">United States, On-demand</div>
+                </div>-->
             </div>
         </div>
 
@@ -178,10 +191,14 @@
             </div>
         </div>
 
-        <div>
+        <div class="tx-pricing-cta">
             <a href="#" class="md-button md-button--primary" data-tally-open="w7K17R">
                 <span>Try now for free</span>
                 <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+            </a>
+
+            <a href="#" class="md-button md-button-secondary" data-tally-open="mY4gWv">
+                <span>Reserve now</span>
             </a>
         </div>
     </div>

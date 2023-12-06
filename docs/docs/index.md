@@ -74,7 +74,7 @@ or use the cloud version (which provides GPU out of the box).
     The client configuration is stored via `~/.dstack/config.yml`.
 
 ??? info "dstack Cloud"
-    
+
     If you want to use the cloud version of `dstack`, 
     <a href="#" data-tally-open="w7K17R">sign up</a>, and configure the client 
     with server address, user token, and project name using `dstack config`.
@@ -92,71 +92,6 @@ or use the cloud version (which provides GPU out of the box).
     The client configuration is stored via `~/.dstack/config.yml`.
     
 Once `dstack` is set up, you can use CLI or API.
-
-## Using the API
-
-### Create a client
-
-<div editor-title="">
-
-```python
-from dstack.api import Client
-
-client = Client.from_config()
-```
-
-</div>
-
-### Submit a run
-
-=== "Fine-tuning"
-
-    ```python
-    from dstack.api import FineTuningTask, Resources, GPU
-
-    # Pass a model, dataset, and training params
-
-    task = FineTuningTask(
-        model_name="NousResearch/Llama-2-13b-hf",
-        dataset_name="peterschmidt85/samsum",
-        env={
-            "HUGGING_FACE_HUB_TOKEN": "..."
-        },
-        num_train_epochs=2
-    )
-
-    # Run the fine-tuning task
-
-    run = client.runs.submit(
-        configuration=task,
-        resources=Resources(gpu=GPU(memory="24GB"))
-    )
-    ```
-
-    > Go to [Fine-tuning](guides/fine-tuning.md) to learn more.
-
-=== "Text generation"
-
-    ```python
-    from dstack.api import Client, GPU, CompletionService, Resources
-
-    # Pass a model and quantization params
-
-    service = CompletionService(
-        model_name="TheBloke/CodeLlama-34B-GPTQ",
-        quantize="gptq"
-    )
-
-    # Deploy the model as a public endpoint
-
-    run = client.runs.submit(
-        run_name = "codellama-34b-gptq",  # If not set, assigned randomly
-        configuration=service,
-        resources=Resources(gpu=GPU(memory="24GB"))
-    )
-    ```
-
-    > Go to [Text generation](guides/text-generation.md) to learn more.
 
 ## Using the CLI
 
@@ -178,7 +113,9 @@ are both acceptable).
     ide: vscode
     ```
 
-    > Go to [Dev environments](guides/dev-environments.md) to learn more.
+    A dev environments is a perfect tool for interactive experimentation with your IDE.
+    It allows to pre-configure the Python version or a Docker image, etc.
+    Go to [Dev environments](guides/dev-environments.md) to learn more.
 
 === "Task"
 
@@ -195,7 +132,8 @@ are both acceptable).
       - gradio app.py
     ```
 
-    > Go to [Tasks](guides/tasks.md) to learn more.
+    A task may run training scripts, batch jobs, or web apps. It allows to specify the commands, ports, 
+    and pre-configure the Python version or a Docker image, etc. Go to [Tasks](guides/tasks.md) to learn more.
 
 === "Service"
 
@@ -213,9 +151,10 @@ are both acceptable).
       - text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code
     ```
 
-    > Go to [Services](guides/services.md) to learn more.
+    A service makes it very easy to deploy models or web apps. It allows to specify the commands, 
+    and the Python version or a Docker image, etc. Go to [Services](guides/services.md) to learn more.
 
-### Run the configuration
+### Run configuration
 
 To run a configuration, use the `dstack run` command followed by the working directory path, 
 configuration file path, and any other options (e.g., for requesting hardware resources).
