@@ -1,6 +1,6 @@
 ---
-template: examples.html
-title: Examples
+template: learn.html
+title: Learning center
 hide:
    - navigation
    - toc

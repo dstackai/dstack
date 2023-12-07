@@ -77,8 +77,12 @@ plugins:
         'docs/installation/index.md': 'docs/index.md'
         'tutorials/stable-diffusion.md': 'examples/stable-diffusion-xl.md'
         'docs/guides/projects.md': 'docs/configuration/server.md'
-        'examples/python-api.md': 'examples/deploy-python.md'
         'guides/clouds.md': 'docs/configuration/server.md'
+        'examples/llama-index-weaviate.md': 'learn/llama-index-weaviate.md'
+        'examples/finetuning-llama-2.md': 'learn/finetuning-llama-2.md'
+        'examples/text-generation-inference.md': 'learn/text-generation-inference.md'
+        'examples/stable-diffusion-xl.md': 'learn/stable-diffusion-xl.md'
+        'examples/vllm.md': 'learn/vllm.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -162,8 +166,6 @@ nav:
           - Configuration:
               - Server configuration: docs/configuration/server.md
       - Guides:
-#          - Fine-tuning: docs/guides/fine-tuning.md
-#          - Text generation: docs/guides/text-generation.md
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
           - Services: docs/guides/services.md
@@ -176,15 +178,14 @@ nav:
               - service: docs/reference/dstack.yml/service.md
           - "server/config.yml": docs/reference/server/config.yml.md
           - profiles.yml: docs/reference/profiles.yml.md
-  - Examples:
-    - examples/index.md
+  - Learn:
+    - learn/index.md
     - Examples:
-      - RAG with Llama Index and Weaviate: examples/llama-index-weaviate.md
-#      - Deploying LLMs using Python API: examples/deploy-python.md
-      - Fine-tuning LLMs using Tasks: examples/finetuning-llama-2.md
-      - Deploying LLMs with TGI: examples/text-generation-inference.md
-      - Deploying SDXL using Services: examples/stable-diffusion-xl.md
-      - Deploying LLMs with vLLM: examples/vllm.md
+      - RAG with Llama Index and Weaviate: learn/llama-index-weaviate.md
+      - Fine-tuning LLMs with QLoRA: learn/finetuning-llama-2.md
+      - Deploying LLMs with TGI: learn/text-generation-inference.md
+      - Deploying SDXL with FastAPI: learn/stable-diffusion-xl.md
+      - Deploying LLMs with vLLM: learn/vllm.md
   - Pricing: pricing.md
   - Blog:
       - blog/index.md
