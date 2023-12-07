@@ -24,6 +24,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
     BackendModel,
+    GatewayComputeModel,
     GatewayModel,
     JobModel,
     ProjectModel,
@@ -239,20 +240,36 @@ async def create_gateway(
     project_id: UUID,
     backend_id: UUID,
     name: str = "test_gateway",
+    region: str = "us",
+    wildcard_domain: Optional[str] = None,
+    gateway_compute_id: Optional[UUID] = None,
+) -> GatewayModel:
+    gateway = GatewayModel(
+        project_id=project_id,
+        backend_id=backend_id,
+        name=name,
+        region=region,
+        wildcard_domain=wildcard_domain,
+        gateway_compute_id=gateway_compute_id,
+    )
+    session.add(gateway)
+    await session.commit()
+    return gateway
+
+
+async def create_gateway_compute(
+    session: AsyncSession,
+    backend_id: Optional[UUID] = None,
     ip_address: Optional[str] = "1.1.1.1",
     region: str = "us",
     instance_id: Optional[str] = "i-1234567890",
-    wildcard_domain: Optional[str] = None,
-) -> GatewayModel:
-    async with session.begin():
-        gateway = GatewayModel(
-            project_id=project_id,
-            backend_id=backend_id,
-            name=name,
-            ip_address=ip_address,
-            region=region,
-            instance_id=instance_id,
-            wildcard_domain=wildcard_domain,
-        )
-        session.add(gateway)
-    return gateway
+) -> GatewayComputeModel:
+    gateway_compute = GatewayComputeModel(
+        backend_id=backend_id,
+        ip_address=ip_address,
+        region=region,
+        instance_id=instance_id,
+    )
+    session.add(gateway_compute)
+    await session.commit()
+    return gateway_compute

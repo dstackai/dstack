@@ -17,6 +17,7 @@ from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_backend,
     create_gateway,
+    create_gateway_compute,
     create_project,
     create_user,
     get_auth_headers,
@@ -38,8 +39,17 @@ class TestListAndGetGateways:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        backend = await create_backend(session, project.id)
-        gateway = await create_gateway(session, project.id, backend.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        gateway_compute = await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+        )
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+        )
         response = client.post(
             f"/api/project/{project.name}/gateways/list",
             headers=get_auth_headers(user.token),
@@ -50,8 +60,8 @@ class TestListAndGetGateways:
                 "backend": backend.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
-                "instance_id": gateway.instance_id,
-                "ip_address": gateway.ip_address,
+                "instance_id": gateway_compute.instance_id,
+                "ip_address": gateway_compute.ip_address,
                 "name": gateway.name,
                 "region": gateway.region,
                 "wildcard_domain": gateway.wildcard_domain,
@@ -66,7 +76,16 @@ class TestListAndGetGateways:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         backend = await create_backend(session, project.id)
-        gateway = await create_gateway(session, project.id, backend.id)
+        gateway_compute = await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+        )
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+        )
         response = client.post(
             f"/api/project/{project.name}/gateways/get",
             json={"name": gateway.name},
@@ -77,8 +96,8 @@ class TestListAndGetGateways:
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": False,
-            "instance_id": gateway.instance_id,
-            "ip_address": gateway.ip_address,
+            "instance_id": gateway_compute.instance_id,
+            "ip_address": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
@@ -283,7 +302,16 @@ class TestDefaultGateway:
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         backend = await create_backend(session, project.id)
-        gateway = await create_gateway(session, project.id, backend.id)
+        gateway_compute = await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+        )
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+        )
         response = client.post(
             f"/api/project/{project.name}/gateways/set_default",
             json={"name": gateway.name},
@@ -301,8 +329,8 @@ class TestDefaultGateway:
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": True,
-            "instance_id": gateway.instance_id,
-            "ip_address": gateway.ip_address,
+            "instance_id": gateway_compute.instance_id,
+            "ip_address": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
@@ -346,8 +374,28 @@ class TestDeleteGateway:
         )
         backend_aws = await create_backend(session, project.id)
         backend_gcp = await create_backend(session, project.id, backend_type=BackendType.GCP)
-        gateway_aws = await create_gateway(session, project.id, backend_aws.id, name="gateway-aws")
-        gateway_gcp = await create_gateway(session, project.id, backend_gcp.id, name="gateway-gcp")
+        gateway_compute_aws = await create_gateway_compute(
+            session=session,
+            backend_id=backend_aws.id,
+        )
+        gateway_aws = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend_aws.id,
+            name="gateway-aws",
+            gateway_compute_id=gateway_compute_aws.id,
+        )
+        gateway_compute_gcp = await create_gateway_compute(
+            session=session,
+            backend_id=backend_gcp.id,
+        )
+        gateway_gcp = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend_gcp.id,
+            name="gateway-gcp",
+            gateway_compute_id=gateway_compute_gcp.id,
+        )
         with patch("dstack._internal.server.services.gateways.get_project_backend_by_type") as m:
             aws = Mock()
             aws.compute.return_value.terminate_instance.return_value = None  # success
@@ -378,8 +426,8 @@ class TestDeleteGateway:
                 "backend": backend_gcp.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
-                "instance_id": gateway_gcp.instance_id,
-                "ip_address": gateway_gcp.ip_address,
+                "instance_id": gateway_compute_gcp.instance_id,
+                "ip_address": gateway_compute_gcp.ip_address,
                 "name": gateway_gcp.name,
                 "region": gateway_gcp.region,
                 "wildcard_domain": gateway_gcp.wildcard_domain,
@@ -409,7 +457,16 @@ class TestUpdateGateway:
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         backend = await create_backend(session, project.id)
-        gateway = await create_gateway(session, project.id, backend.id)
+        gateway_compute = await create_gateway_compute(
+            session=session,
+            backend_id=backend.id,
+        )
+        gateway = await create_gateway(
+            session=session,
+            project_id=project.id,
+            backend_id=backend.id,
+            gateway_compute_id=gateway_compute.id,
+        )
         response = client.post(
             f"/api/project/{project.name}/gateways/set_wildcard_domain",
             json={"name": gateway.name, "wildcard_domain": "test.com"},
@@ -420,8 +477,8 @@ class TestUpdateGateway:
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": False,
-            "instance_id": gateway.instance_id,
-            "ip_address": gateway.ip_address,
+            "instance_id": gateway_compute.instance_id,
+            "ip_address": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": "test.com",

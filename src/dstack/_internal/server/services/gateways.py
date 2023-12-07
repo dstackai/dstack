@@ -20,7 +20,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
-from dstack._internal.server.models import GatewayModel, ProjectModel
+from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
 from dstack._internal.server.services.backends import (
     get_project_backend_by_type,
     get_project_backends_with_models,
@@ -73,8 +73,6 @@ async def create_gateway(
 
     gateway = GatewayModel(  # reserve name
         name=name,
-        ip_address="",  # to be filled after provisioning
-        instance_id="",  # to be filled after provisioning
         region=region,
         project_id=project.id,
         backend_id=backend_model.id,
@@ -93,17 +91,22 @@ async def create_gateway(
             region,
             project.name,
         )
+        gateway_compute = GatewayComputeModel(
+            backend_id=backend_model.id,
+            ip_address=info.ip_address,
+            region=info.region,
+            instance_id=info.instance_id,
+        )
+        session.add(gateway_compute)
+        await session.commit()
+        await session.refresh(gateway_compute)
         await session.execute(
             update(GatewayModel)
             .where(
                 GatewayModel.project_id == project.id,
                 GatewayModel.name == name,
             )
-            .values(
-                ip_address=info.ip_address,
-                region=info.region,
-                instance_id=info.instance_id,
-            )
+            .values(gateway_compute_id=gateway_compute.id)
         )
         await session.commit()
         await session.refresh(gateway)
@@ -127,12 +130,16 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
         if gateway.name not in gateways_names:
             continue
         backend = await get_project_backend_by_type(project, gateway.backend.type)
-        tasks.append(
-            run_async(
-                backend.compute().terminate_instance, gateway.instance_id, gateway.region, None
+        if gateway.gateway_compute is not None:
+            tasks.append(
+                run_async(
+                    backend.compute().terminate_instance,
+                    gateway.gateway_compute.instance_id,
+                    gateway.region,
+                    None,
+                )
             )
-        )
-        gateways.append(gateway)
+            gateways.append(gateway)
     # terminate in parallel
     terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
     for gateway, error in zip(gateways, terminate_results):
@@ -249,10 +256,15 @@ async def register_service_jobs(
 
 
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
+    ip_address = None
+    instance_id = None
+    if gateway_model.gateway_compute is not None:
+        ip_address = gateway_model.gateway_compute.ip_address
+        instance_id = gateway_model.gateway_compute.instance_id
     return Gateway(
         name=gateway_model.name,
-        ip_address=gateway_model.ip_address,
-        instance_id=gateway_model.instance_id,
+        ip_address=ip_address,
+        instance_id=instance_id,
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=gateway_model.project.default_gateway_id == gateway_model.id,
