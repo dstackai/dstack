@@ -14,7 +14,7 @@ Train and deploy generative AI on any cloud
 
 <p align="center">
 <a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> •
-<a href="https://dstack.ai/examples" target="_blank"><b>Examples</b></a> •
+<a href="https://dstack.ai/learn" target="_blank"><b>Learn</b></a> •
 <a href="https://dstack.ai/blog" target="_blank"><b>Blog</b></a> •
 <a href="https://discord.gg/u8SmfwPpMd" target="_blank"><b>Discord</b></a>
 </p>
@@ -32,11 +32,10 @@ Supported providers: AWS, GCP, Azure, Lambda, TensorDock, and Vast.ai.
 
 - [2023/11] [Access the GPU marketplace with Vast.ai](https://dstack.ai/blog/2023/11/21/vastai/) (Release)
 - [2023/10] [Use world's cheapest GPUs with TensorDock](https://dstack.ai/blog/2023/10/31/tensordock/) (Release)
-- [2023/10] [A preview of fine-tuning API](https://dstack.ai/docs/guides/fine-tuning/) (Release)
-- [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/examples/llama-index-weaviate) (Example)
-- [2023/08] [Deploying Stable Diffusion using FastAPI](https://dstack.ai/examples/stable-diffusion-xl) (Example)
-- [2023/07] [Deploying LLMs using TGI](https://dstack.ai/examples/text-generation-inference) (Example)
-- [2023/07] [Deploying LLMs using vLLM](https://dstack.ai/examples/vllm) (Example)
+- [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/learn/llama-index-weaviate) (Example)
+- [2023/08] [Deploying Stable Diffusion using FastAPI](https://dstack.ai/learn/stable-diffusion-xl) (Example)
+- [2023/07] [Deploying LLMs using TGI](https://dstack.ai/learn/text-generation-inference) (Example)
+- [2023/07] [Deploying LLMs using vLLM](https://dstack.ai/learn/vllm) (Example)
 
 ## Installation
 
@@ -86,7 +85,7 @@ The admin token is bbae0f28-d3dd-4820-bf61-8f4bb40815da
 For additional information and examples, see the following links:
 
 - [Docs](https://dstack.ai/docs)
-- [Examples](https://dstack.ai/examples)
+- [Learn](https://dstack.ai/learn)
 - [Blog](https://dstack.ai/blog)
 - [Discord](https://discord.gg/u8SmfwPpMd)
 

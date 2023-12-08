@@ -1,4 +1,4 @@
-# Fine-tuning LLMs using Tasks
+# Fine-tuning LLMs with QLoRA
 
 !!! info "NOTE:"
     This example demonstrates how to fine-tune [`llama-2-7b-chat-hf`](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf),

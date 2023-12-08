@@ -225,3 +225,11 @@
         font-size: 2.5rem;
     }
 }
+
+.tx-container .tx-pricing-cta {
+    margin-bottom: 2.75rem;
+}
+
+.tx-container .tx-pricing-cta .md-button {
+    min-width: 250px;
+}

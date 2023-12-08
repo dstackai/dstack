@@ -44,6 +44,7 @@ async def create_user(
     name: str = "test_user",
     global_role: GlobalRole = GlobalRole.ADMIN,
     token: Optional[str] = None,
+    email: Optional[str] = None,
 ) -> UserModel:
     if token is None:
         token = str(uuid.uuid4())
@@ -51,6 +52,7 @@ async def create_user(
         name=name,
         global_role=global_role,
         token=token,
+        email=email,
     )
     session.add(user)
     await session.commit()

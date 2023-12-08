@@ -266,6 +266,8 @@
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
     border-width: 0.75px;
     border-style: solid;
+    display: flex;
+    flex-direction: column;
 }
 
 .tx-landing__highlights_grid .feature-cell:hover {
@@ -281,6 +283,7 @@
     flex-wrap: wrap;
     gap: 2px;
     margin: 0 -5px;
+    margin-top: auto;
 }
 
 .tx-landing__highlights_grid .feature-cell .feature-tags .feature-tag {
