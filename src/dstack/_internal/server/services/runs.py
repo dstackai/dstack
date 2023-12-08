@@ -25,7 +25,7 @@ from dstack._internal.core.models.runs import (
     ServiceModelInfo,
 )
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
+from dstack._internal.server.models import JobModel, PoolModel, ProjectModel, RunModel, UserModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.jobs import (
@@ -33,6 +33,7 @@ from dstack._internal.server.services.jobs import (
     job_model_to_job_submission,
     stop_job,
 )
+from dstack._internal.server.services.pool import create_pool_model
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
@@ -132,6 +133,7 @@ async def get_run_plan(
     jobs = get_jobs_from_run_spec(run_spec)
     job_plans = []
     for job in jobs:
+        # TODO: use the job.pool_name to select an offer
         offers = await backends_services.get_instance_offers(
             backends=backends,
             job=job,
@@ -177,6 +179,13 @@ async def submit_run(
         )
     else:
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
+
+    pool_name = run_spec.profile.pool_name
+    pools_result = await session.execute(select(PoolModel).where(PoolModel.name == pool_name))
+    pools = pools_result.scalars().all()
+    if not pools:
+        await create_pool_model(name=pool_name, session=session, project=project)
+
     run_model = RunModel(
         id=uuid.uuid4(),
         project_id=project.id,
@@ -346,7 +355,7 @@ async def _generate_run_name(
 
 
 def _get_run_cost(run: Run) -> float:
-    run_cost = sum(
+    run_cost = math.fsum(
         _get_job_submission_cost(submission)
         for job in run.jobs
         for submission in job.job_submissions

@@ -17,6 +17,7 @@ from dstack._internal.server.routers import (
     backends,
     gateways,
     logs,
+    pool,
     projects,
     repos,
     runs,
@@ -130,6 +131,7 @@ def add_no_api_version_check_routes(paths: List[str]):
 def register_routes(app: FastAPI):
     app.include_router(users.router)
     app.include_router(projects.router)
+    app.include_router(pool.router)
     app.include_router(backends.root_router)
     app.include_router(backends.project_router)
     app.include_router(repos.router)

@@ -79,6 +79,13 @@ class ProjectModel(BaseModel):
         foreign_keys=[default_gateway_id], lazy="selectin"
     )
 
+    default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"), nullable=True
+    )
+    default_pool: Mapped["PoolModel"] = relationship(
+        foreign_keys=[default_pool_id], lazy="selectin"
+    )
+
 
 class MemberModel(BaseModel):
     __tablename__ = "members"
@@ -230,3 +237,36 @@ class GatewayComputeModel(BaseModel):
     ssh_public_key: Mapped[str] = mapped_column(Text)
 
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
+
+
+class PoolModel(BaseModel):
+    __tablename__ = "pools"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(50), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    instances: Mapped[List["InstanceModel"]] = relationship(back_populates="pool", lazy="selectin")
+
+
+class InstanceModel(BaseModel):
+    __tablename__ = "instances"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    pool_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("pools.id"))
+    pool: Mapped["PoolModel"] = relationship(back_populates="instances")
+
+    job_provisioning_data: Mapped[str] = mapped_column(String(4000))
+    offer: Mapped[str] = mapped_column(String(4000))

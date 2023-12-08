@@ -10,6 +10,7 @@ from dstack._internal.utils.logging import get_logger
 from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
+from dstack.api.server._pool import PoolAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
 from dstack.api.server._repos import ReposAPIClient
 from dstack.api.server._runs import RunsAPIClient
@@ -34,6 +35,7 @@ class APIClient:
         runs: operations with runs
         logs: operations with logs
         gateways: operations with gateways
+        pools: operations with pools
     """
 
     def __init__(self, base_url: str, token: str):
@@ -82,8 +84,16 @@ class APIClient:
     def gateways(self) -> GatewaysAPIClient:
         return GatewaysAPIClient(self._request)
 
+    @property
+    def pool(self) -> PoolAPIClient:
+        return PoolAPIClient(self._request)
+
     def _request(
-        self, path: str, body: Optional[str] = None, raise_for_status: bool = True, **kwargs
+        self,
+        path: str,
+        body: Optional[str] = None,
+        raise_for_status: bool = True,
+        **kwargs,
     ) -> requests.Response:
         path = path.lstrip("/")
         if body is not None:

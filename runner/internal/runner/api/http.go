@@ -26,7 +26,9 @@ func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (
 func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.executor.Lock()
 	defer s.executor.Unlock()
-	if s.executor.GetRunnerState() != executor.WaitSubmit {
+	state := s.executor.GetRunnerState()
+	if state != executor.WaitSubmit {
+		log.Warning(r.Context(), "Executor doesn't wait submit", "current_state", state)
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 

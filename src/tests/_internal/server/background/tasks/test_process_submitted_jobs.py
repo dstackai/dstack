@@ -1,7 +1,5 @@
-import json
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
-from uuid import UUID
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +12,7 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
     Resources,
 )
-from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, ProfileRetryPolicy
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 from dstack._internal.server.testing.common import (
@@ -69,22 +67,21 @@ class TestProcessSubmittedJobs:
             session=session,
             run=run,
         )
+        offer = InstanceOfferWithAvailability(
+            backend=BackendType.AWS,
+            instance=InstanceType(
+                name="instance",
+                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+            ),
+            region="us",
+            price=1.0,
+            availability=InstanceAvailability.AVAILABLE,
+        )
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock = Mock()
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
-            backend_mock.compute.return_value.get_offers.return_value = [
-                InstanceOfferWithAvailability(
-                    backend=BackendType.AWS,
-                    instance=InstanceType(
-                        name="instance",
-                        resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
-                    ),
-                    region="us",
-                    price=1.0,
-                    availability=InstanceAvailability.AVAILABLE,
-                )
-            ]
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
             backend_mock.compute.return_value.run_job.return_value = LaunchedInstanceInfo(
                 instance_id="instance_id",
                 region="us",
@@ -97,9 +94,21 @@ class TestProcessSubmittedJobs:
             m.assert_called_once()
             backend_mock.compute.return_value.get_offers.assert_called_once()
             backend_mock.compute.return_value.run_job.assert_called_once()
+
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PROVISIONING
+
+        await session.refresh(project)
+        assert project.default_pool.name == DEFAULT_POOL_NAME
+
+        instance_offer = InstanceOfferWithAvailability.parse_raw(
+            project.default_pool.instances[0].offer
+        )
+        assert offer == instance_offer
+
+        pool_job_provisioning_data = project.default_pool.instances[0].job_provisioning_data
+        assert pool_job_provisioning_data == job.job_provisioning_data
 
     @pytest.mark.asyncio
     async def test_transitions_job_with_retry_to_pending_on_no_capacity(
@@ -134,9 +143,13 @@ class TestProcessSubmittedJobs:
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
             await process_submitted_jobs()
+
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PENDING
+
+        await session.refresh(project)
+        assert not project.default_pool.instances
 
     @pytest.mark.asyncio
     async def test_transitions_job_with_outdated_retry_to_failed_on_no_capacity(
@@ -171,6 +184,10 @@ class TestProcessSubmittedJobs:
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = datetime(2023, 1, 2, 5, 0, 0, tzinfo=timezone.utc)
             await process_submitted_jobs()
+
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.FAILED
+
+        await session.refresh(project)
+        assert not project.default_pool.instances

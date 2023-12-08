@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import select
@@ -7,7 +7,11 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError
-from dstack._internal.core.models.instances import LaunchedInstanceInfo
+from dstack._internal.core.models.instances import (
+    InstanceOfferWithAvailability,
+    LaunchedInstanceInfo,
+)
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
 from dstack._internal.core.models.runs import (
     Job,
     JobErrorCode,
@@ -16,7 +20,7 @@ from dstack._internal.core.models.runs import (
     Run,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.models import InstanceModel, JobModel, PoolModel, RunModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.jobs import (
     SUBMITTED_PROCESSING_JOBS_IDS,
@@ -74,10 +78,22 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
     run_model = res.scalar_one()
     project_model = run_model.project
+
+    pool = project_model.default_pool
+    if pool is None:
+        pool = PoolModel(
+            name=DEFAULT_POOL_NAME,
+            project=project_model,
+        )
+        session.add(pool)
+        await session.commit()
+        if pool.id is not None:
+            project_model.default_pool_id = pool.id
+
     run = run_model_to_run(run_model)
     job = run.jobs[job_model.job_num]
     backends = await backends_services.get_project_backends(project=run_model.project)
-    job_provisioning_data = await _run_job(
+    job_provisioning_data, offer = await _run_job(
         job_model=job_model,
         run=run,
         job=job,
@@ -89,6 +105,15 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         logger.info(*job_log("now is provisioning", job_model))
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
+
+        im = InstanceModel(
+            project=project_model,
+            pool=pool,
+            job_provisioning_data=job_provisioning_data.json(),
+            offer=offer.json(),
+        )
+        session.add(im)
+
     else:
         logger.debug(*job_log("provisioning failed", job_model))
         if job.is_retry_active():
@@ -108,7 +133,7 @@ async def _run_job(
     backends: List[Backend],
     project_ssh_public_key: str,
     project_ssh_private_key: str,
-) -> Optional[JobProvisioningData]:
+) -> Tuple[Optional[JobProvisioningData], Optional[InstanceOfferWithAvailability]]:
     if run.run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
     try:
@@ -151,7 +176,7 @@ async def _run_job(
             )
             continue
         else:
-            return JobProvisioningData(
+            job_provisioning_data = JobProvisioningData(
                 backend=backend.TYPE,
                 instance_type=offer.instance,
                 instance_id=launched_instance_info.instance_id,
@@ -164,4 +189,6 @@ async def _run_job(
                 ssh_proxy=launched_instance_info.ssh_proxy,
                 backend_data=launched_instance_info.backend_data,
             )
-    return None
+
+            return (job_provisioning_data, offer)
+    return (None, None)

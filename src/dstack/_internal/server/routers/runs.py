@@ -8,6 +8,7 @@ from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
     DeleteRunsRequest,
+    GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
     StopRunsRequest,
@@ -60,7 +61,7 @@ async def get_run(
 
 @project_router.post("/get_plan")
 async def get_run_plan(
-    body: SubmitRunRequest,
+    body: GetRunPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> RunPlan:

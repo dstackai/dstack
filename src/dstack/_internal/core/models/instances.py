@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.utils.common import pretty_resources
@@ -67,8 +67,8 @@ class LaunchedInstanceInfo(BaseModel):
     username: str
     ssh_port: int  # could be different from 22 for some backends
     dockerized: bool  # True if backend starts shim
-    ssh_proxy: Optional[SSHConnectionParams]
-    backend_data: Optional[str]  # backend-specific data in json
+    ssh_proxy: Optional[SSHConnectionParams] = Field(default=None)
+    backend_data: Optional[str] = Field(default=None)  # backend-specific data in json
 
 
 class InstanceAvailability(Enum):

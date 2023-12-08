@@ -370,6 +370,7 @@ class RunCollection:
         max_price: Optional[float] = None,
         working_dir: Optional[str] = None,
         run_name: Optional[str] = None,
+        pool_name: Optional[str] = None,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`
@@ -380,10 +381,10 @@ class RunCollection:
         if working_dir is None:
             working_dir = "."
         elif repo.repo_dir is not None:
-            working_dir = Path(repo.repo_dir) / working_dir
-            if not path_in_dir(working_dir, repo.repo_dir):
+            working_dir_path = Path(repo.repo_dir) / working_dir
+            if not path_in_dir(working_dir_path, repo.repo_dir):
                 raise ConfigurationError("Working directory is outside of the repo")
-            working_dir = working_dir.relative_to(repo.repo_dir).as_posix()
+            working_dir = working_dir_path.relative_to(repo.repo_dir).as_posix()
 
         if configuration_path is None:
             configuration_path = "(python)"
@@ -399,6 +400,7 @@ class RunCollection:
             retry_policy=retry_policy,
             max_duration=max_duration,
             max_price=max_price,
+            pool_name=pool_name,
         )
         run_spec = RunSpec(
             run_name=run_name,

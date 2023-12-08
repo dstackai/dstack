@@ -17,6 +17,7 @@ from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
 from dstack._internal.core.models.runs import JobErrorCode
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
@@ -78,6 +79,11 @@ class RunCommand(APIBaseCommand):
             type=int,
             default=3,
         )
+        self._parser.add_argument(
+            "--pool",
+            dest="pool_name",
+            help="The name of the pool",
+        )
         register_profile_args(self._parser)
 
     def _command(self, args: argparse.Namespace):
@@ -109,6 +115,8 @@ class RunCommand(APIBaseCommand):
             known, unknown = parser.parse_known_args(args.unknown)
             configurator.apply(known, unknown, conf)
 
+            pool_name = DEFAULT_POOL_NAME if args.pool_name is None else args.pool_name
+
             with console.status("Getting run plan..."):
                 run_plan = self.api.runs.get_plan(
                     configuration=conf,
@@ -121,6 +129,7 @@ class RunCommand(APIBaseCommand):
                     max_price=profile.max_price,
                     working_dir=args.working_dir,
                     run_name=args.run_name,
+                    pool_name=pool_name,
                 )
         except ConfigurationError as e:
             raise CLIError(str(e))

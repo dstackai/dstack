@@ -9,6 +9,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ForbidExtra
 
 DEFAULT_RETRY_LIMIT = 3600
+DEFAULT_POOL_NAME = "default-pool"
 
 
 class SpotPolicy(str, Enum):
@@ -94,6 +95,10 @@ class Profile(ForbidExtra):
     default: Annotated[
         bool, Field(description="If set to true, `dstack run` will use this profile by default.")
     ] = False
+    pool_name: Annotated[
+        Optional[str],
+        Field(description="The name of the pool. If not set, dstack will use the default name."),
+    ] = DEFAULT_POOL_NAME
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration

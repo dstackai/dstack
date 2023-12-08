@@ -120,6 +120,7 @@ class JobSpec(BaseModel):
     requirements: Requirements
     retry_policy: RetryPolicy
     working_dir: str
+    pool_name: Optional[str]
 
 
 class JobProvisioningData(BaseModel):

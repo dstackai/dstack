@@ -43,6 +43,7 @@ class JobConfigurator(ABC):
             requirements=self._requirements(),
             retry_policy=self._retry_policy(),
             working_dir=self._working_dir(),
+            pool_name=self._pool_name(),
         )
         return [job_spec]
 
@@ -142,6 +143,9 @@ class JobConfigurator(ABC):
             return self.run_spec.configuration.python.value
         version_info = sys.version_info
         return PythonVersion(f"{version_info.major}.{version_info.minor}").value
+
+    def _pool_name(self):
+        return self.run_spec.profile.pool_name
 
 
 def _join_shell_commands(commands: List[str], env: Optional[Dict[str, str]] = None) -> str:

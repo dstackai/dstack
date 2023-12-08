@@ -16,6 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
 from dstack._internal.core.models.runs import JobSpec, JobStatus, RunSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
@@ -74,6 +75,7 @@ def get_dev_env_run_plan_dict(
                 "max_duration": "off",
                 "max_price": None,
                 "name": "string",
+                "pool_name": DEFAULT_POOL_NAME,
                 "retry_policy": {"limit": None, "retry": False},
                 "spot_policy": "spot",
             },
@@ -112,6 +114,7 @@ def get_dev_env_run_plan_dict(
                     "job_name": f"{run_name}-0",
                     "job_num": 0,
                     "max_duration": None,
+                    "pool_name": DEFAULT_POOL_NAME,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -180,6 +183,7 @@ def get_dev_env_run_dict(
                 "max_duration": "off",
                 "max_price": None,
                 "name": "string",
+                "pool_name": DEFAULT_POOL_NAME,
                 "retry_policy": {"limit": None, "retry": False},
                 "spot_policy": "spot",
             },
@@ -218,6 +222,7 @@ def get_dev_env_run_dict(
                     "job_name": f"{run_name}-0",
                     "job_num": 0,
                     "max_duration": None,
+                    "pool_name": DEFAULT_POOL_NAME,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {

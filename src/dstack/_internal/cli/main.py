@@ -6,6 +6,7 @@ from dstack._internal.cli.commands.config import ConfigCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogsCommand
+from dstack._internal.cli.commands.pool import PoolCommand
 from dstack._internal.cli.commands.ps import PsCommand
 from dstack._internal.cli.commands.run import RunCommand
 from dstack._internal.cli.commands.server import ServerCommand
@@ -50,6 +51,7 @@ def main():
     subparsers = parser.add_subparsers(metavar="COMMAND")
     ConfigCommand.register(subparsers)
     GatewayCommand.register(subparsers)
+    PoolCommand.register(subparsers)
     InitCommand.register(subparsers)
     LogsCommand.register(subparsers)
     PsCommand.register(subparsers)
