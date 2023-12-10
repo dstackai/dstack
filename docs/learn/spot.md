@@ -8,18 +8,19 @@ Once you've [configured](../docs/config/server.md) any of these, you can use spo
 for [dev environments](../docs/guides/dev-environments.md), [tasks](../docs/guides/tasks.md), and 
 [services](../docs/guides/services.md).
 
-!!! info "Quotas"
-    Note, before you can use spot instances with AWS, GCP, and Azure, ensure you request the necessary quota via a support
-    ticket.
+!!! info "NOTE:"
+    Before you can use spot instances with AWS, GCP, and Azure, ensure you request the necessary quota 
+    in the corresponding regions via a support ticket.
 
 ## Setting a spot policy
 
-For dev environments, `dstack` uses on-demand instances by default. For
-tasks and services, `dstack` tries to use spot instances if they are available, falling back to on-demand instances.
+By default, for dev environments, `dstack` doesn't use spot instances. For
+tasks and services, `dstack` uses spot instances only if they are available (falling back to on-demand otherwise).
+This default behavior can be overriden. 
 
-The `dstack run` command allows you to override the default behavior.
-To use `spot` instances, pass `--spot`. To use `spot` instances only they are available,
-pass `--spot-auto`.
+To use only spot instances, pass `--spot` to `dstack run`. 
+To use spot instances only if they are available (and fallback to on-demand instances otherwise),
+pass `--spot-auto`:
 
 <div class="termy">
 
@@ -43,8 +44,8 @@ Continue? [y/n]:
 
 ## Setting a retry policy
 
-If the requested instance is unavailable, the `dstack run` command will fail unless you specify a retry policy.
-The policy can be specified via `--retry-limit`:
+If the requested instance is unavailable, the `dstack run` command will fail – unless you specify a retry policy.
+This can be done via `--retry-limit`:
 
 <div class="termy">
 
@@ -54,10 +55,11 @@ $ dstack run . --gpu 24GB --spot --retry-limit 1h
 
 </div>
 
-In this case, `dstack` will retry to find spot instances within one hour.
+In this case, `dstack` will retry to find spot instances within one hour. All that time, the run will be marked as
+pending.
 
 !!! info "NOTE:"
-    Note that if you've set the retry duration and the spot instance is taken while your run was not 
+    If you've set the retry duration and the spot instance is taken while your run was not 
     finished, `dstack` will restart it from scratch.
 
 If you run a service using spot instances, the default retry duration is set to infinity.  
