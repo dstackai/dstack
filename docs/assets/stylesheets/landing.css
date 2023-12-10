@@ -254,10 +254,13 @@
     max-width: 500px;
     margin-top: 1.75em;
     margin-bottom: 2.5em;
+    letter-spacing: -1.5px;
+}
+
+.tx-landing__highlights_text h2 .gradient {
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    letter-spacing: -1.5px;
 }
 
 .tx-landing__highlights_grid .feature-cell {

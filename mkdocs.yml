@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack simplifies training, fine-tuning, and deploying generative AI models, leveraging the open-source ecosystem.
+  dstack simplifies training, fine-tuning, and deployment of generative AI models on any cloud, while leveraging the open-source ecosystem.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -75,13 +75,13 @@ plugins:
         'quickstart.md': 'docs/index.md'
         'docs/quick-start.md': 'docs/index.md'
         'docs/installation/index.md': 'docs/index.md'
-        'tutorials/stable-diffusion.md': 'examples/stable-diffusion-xl.md'
-        'docs/guides/projects.md': 'docs/configuration/server.md'
+        'docs/guides/projects.md': 'docs/config/server.md'
+        'docs/configuration/server.md': 'docs/config/server.md'
         'guides/clouds.md': 'docs/configuration/server.md'
-        'examples/llama-index-weaviate.md': 'learn/llama-index-weaviate.md'
-        'examples/finetuning-llama-2.md': 'learn/finetuning-llama-2.md'
-        'examples/text-generation-inference.md': 'learn/text-generation-inference.md'
-        'examples/stable-diffusion-xl.md': 'learn/stable-diffusion-xl.md'
+        'examples/llama-index-weaviate.md': 'learn/rag.md'
+        'examples/finetuning-llama-2.md': 'learn/qlora.md'
+        'examples/text-generation-inference.md': 'learn/tgi.md'
+        'examples/stable-diffusion-xl.md': 'learn/sdxl.md'
         'examples/vllm.md': 'learn/vllm.md'
   - typeset
   - gen-files:
@@ -164,7 +164,7 @@ nav:
 #              - pip: docs/installation/pip.md
 #              - Docker: docs/installation/docker.md
           - Configuration:
-              - Server configuration: docs/configuration/server.md
+              - Server configuration: docs/config/server.md
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
@@ -180,11 +180,13 @@ nav:
           - profiles.yml: docs/reference/profiles.yml.md
   - Learn:
     - learn/index.md
+    - Guides:
+        Leveraging spot instances effectively: learn/spot.md
     - Examples:
-      - RAG with Llama Index and Weaviate: learn/llama-index-weaviate.md
-      - Fine-tuning LLMs with QLoRA: learn/finetuning-llama-2.md
-      - Deploying LLMs with TGI: learn/text-generation-inference.md
-      - Deploying SDXL with FastAPI: learn/stable-diffusion-xl.md
+      - Building RAG with Llama Index: learn/llama-index.md
+      - Fine-tuning LLMs with QLoRA: learn/qlora.md
+      - Deploying LLMs with TGI: learn/tgi.md
+      - Deploying SDXL with FastAPI: learn/sdxl.md
       - Deploying LLMs with vLLM: learn/vllm.md
   - Pricing: pricing.md
   - Blog:

@@ -33,7 +33,7 @@ or use the cloud version (which provides GPU out of the box).
     If you have default AWS, GCP, or Azure credentials on your machine, the `dstack` server will pick them up automatically.
     
     Otherwise, you need to manually specify the cloud credentials in `~/.dstack/server/config.yml`.
-    For further details, refer to [server configuration](configuration/server.md).
+    For further details, refer to [server configuration](config/server.md).
     
     ### Start the server
     

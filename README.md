@@ -23,19 +23,20 @@ Train and deploy generative AI on any cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` simplifies training, fine-tuning, and deploying
-generative AI models on any cloud. 
+`dstack` simplifies training, fine-tuning, and deployment of generative AI models on any cloud.
 
 Supported providers: AWS, GCP, Azure, Lambda, TensorDock, and Vast.ai.
 
 ## Latest news ✨
 
-- [2023/11] [Access the GPU marketplace with Vast.ai](https://dstack.ai/blog/2023/11/21/vastai/) (Release)
-- [2023/10] [Use world's cheapest GPUs with TensorDock](https://dstack.ai/blog/2023/10/31/tensordock/) (Release)
-- [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/learn/llama-index-weaviate) (Example)
-- [2023/08] [Deploying Stable Diffusion using FastAPI](https://dstack.ai/learn/stable-diffusion-xl) (Example)
-- [2023/07] [Deploying LLMs using TGI](https://dstack.ai/learn/text-generation-inference) (Example)
-- [2023/07] [Deploying LLMs using vLLM](https://dstack.ai/learn/vllm) (Example)
+- [2023/12] [Leveraging spot instances effectively](https://dstack.ai/learn/spot) (Learn)
+- [2023/11] [Access the GPU marketplace with Vast.ai](https://dstack.ai/blog/2023/11/21/vastai/) (Blog)
+- [2023/10] [Use world's cheapest GPUs with TensorDock](https://dstack.ai/blog/2023/10/31/tensordock/) (Blog)
+- [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/learn/llama-index) (Learn)
+- [2023/08] [Fine-tuning Llama 2 using QLoRA](https://dstack.ai/learn/qlora) (Learn)
+- [2023/08] [Deploying Stable Diffusion using FastAPI](https://dstack.ai/learn/sdxl) (Learn)
+- [2023/07] [Deploying LLMs using TGI](https://dstack.ai/learn/tgi) (Learn)
+- [2023/07] [Deploying LLMs using vLLM](https://dstack.ai/learn/vllm) (Learn)
 
 ## Installation
 

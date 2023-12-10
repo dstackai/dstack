@@ -2,6 +2,42 @@
 
 The Python API allows for running tasks, services, and managing runs programmatically.
 
+#### Usage example
+
+```python
+import sys
+
+from dstack.api import Task, GPU, Client, Resources
+
+client = Client.from_config()
+
+task = Task(
+    image="ghcr.io/huggingface/text-generation-inference:latest",
+    env={"MODEL_ID": "TheBloke/Llama-2-13B-chat-GPTQ"},
+    commands=[
+        "text-generation-launcher --trust-remote-code --quantize gptq",
+    ],
+    ports=["80"],
+)
+
+run = client.runs.submit(
+    run_name="my-awesome-run",  # (Optional) If not specified, 
+    configuration=task,
+    resources=Resources(gpu=GPU(memory="24GB")),
+)
+
+run.attach()
+
+try:
+    for log in run.logs():
+        sys.stdout.buffer.write(log)
+        sys.stdout.buffer.flush()
+except KeyboardInterrupt:
+    run.stop(abort=True)
+finally:
+    run.detach()
+```
+
 ## `dstack.api` { #dstack.api data-toc-label="dstack.api" }
 
 ### `dstack.api.Client` { #dstack.api.Client data-toc-label="Client" }
@@ -24,33 +60,6 @@ The Python API allows for running tasks, services, and managing runs programmati
 ### `dstack.api.Service`  { #dstack.api.Service data-toc-label="Service" }
 
 ::: dstack.api.Service
-    options:
-      show_bases: false
-      show_root_heading: false
-      show_root_toc_entry: false
-      heading_level: 4
-
-### `dstack.api.FineTuningTask` { #dstack.api.FineTuningTask data-toc-label="FineTuningTask" }
-
-::: dstack.api.FineTuningTask
-    options:
-      show_bases: false
-      show_root_heading: false
-      show_root_toc_entry: false
-      heading_level: 4
-
-### `dstack.api.CompletionService` { #dstack.api.CompletionService data-toc-label="CompletionService" }
-
-::: dstack.api.CompletionService
-    options:
-      show_bases: false
-      show_root_heading: false
-      show_root_toc_entry: false
-      heading_level: 4
-
-### `dstack.api.CompletionTask` { #dstack.api.CompletionTask data-toc-label="CompletionTask" }
-
-::: dstack.api.CompletionTask
     options:
       show_bases: false
       show_root_heading: false
