@@ -1,6 +1,6 @@
 import time
 from contextlib import asynccontextmanager
-from typing import Callable
+from typing import Awaitable, Callable
 from urllib.parse import urlparse
 
 import sentry_sdk
@@ -90,7 +90,7 @@ async def lifespan(app: FastAPI):
 _ON_STARTUP_HOOKS = []
 
 
-def register_on_startup_hook(func: Callable[[FastAPI], None]):
+def register_on_startup_hook(func: Callable[[FastAPI], Awaitable[None]]):
     _ON_STARTUP_HOOKS.append(func)
 
 

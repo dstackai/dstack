@@ -86,5 +86,6 @@ def main():
         run_migrations_online()
 
 
-if __name__ == "__main__":
+# invoked via alembic command
+if __name__ == "env_py":
     main()

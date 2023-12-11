@@ -1,8 +1,8 @@
 """Separate gateways from compute
 
-Revision ID: 47034a9d75bb
+Revision ID: e6391ca6a264
 Revises: 686fb8341ea5
-Create Date: 2023-12-07 12:01:17.243168
+Create Date: 2023-12-11 10:34:28.112500
 
 """
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "47034a9d75bb"
+revision = "e6391ca6a264"
 down_revision = "686fb8341ea5"
 branch_labels = None
 depends_on = None
@@ -26,6 +26,8 @@ def upgrade() -> None:
         sa.Column("ip_address", sa.String(length=100), nullable=False),
         sa.Column("region", sa.String(length=100), nullable=False),
         sa.Column("backend_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=True),
+        sa.Column("ssh_private_key", sa.Text(), nullable=False),
+        sa.Column("ssh_public_key", sa.Text(), nullable=False),
         sa.ForeignKeyConstraint(
             ["backend_id"],
             ["backends.id"],

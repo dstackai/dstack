@@ -221,3 +221,7 @@ class GatewayComputeModel(BaseModel):
         ForeignKey("backends.id", ondelete="CASCADE")
     )
     backend: Mapped[Optional["BackendModel"]] = relationship()
+
+    # The key to authorize the server with the gateway
+    ssh_private_key: Mapped[str] = mapped_column(Text)
+    ssh_public_key: Mapped[str] = mapped_column(Text)

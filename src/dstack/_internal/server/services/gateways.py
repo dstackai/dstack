@@ -15,6 +15,7 @@ from dstack._internal.core.errors import (
     GatewayError,
     NotFoundError,
     ResourceNotExistsError,
+    ServerClientError,
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -83,11 +84,15 @@ async def create_gateway(
     if project.default_gateway is None:
         await set_default_gateway(session=session, project=project, name=name)
 
+    private_bytes, public_bytes = generate_rsa_key_pair_bytes()
+    gateway_ssh_private_key = private_bytes.decode()
+    gateway_ssh_public_key = public_bytes.decode()
+
     try:
         info = await run_async(
             backend.compute().create_gateway,
             name,
-            project.ssh_public_key,
+            gateway_ssh_public_key,
             region,
             project.name,
         )
@@ -96,6 +101,8 @@ async def create_gateway(
             ip_address=info.ip_address,
             region=info.region,
             instance_id=info.instance_id,
+            ssh_private_key=gateway_ssh_private_key,
+            ssh_public_key=gateway_ssh_private_key,
         )
         session.add(gateway_compute)
         await session.commit()
@@ -222,15 +229,23 @@ async def register_service_jobs(
 ):
     # we publish only one job
     job = jobs[0]
+    if job.job_spec.gateway is None:
+        raise ServerClientError("Job spec has no gateway")
+
     gateway_name = job.job_spec.gateway.gateway_name
     if gateway_name is None:
-        gateway = await get_project_default_gateway(session=session, project=project)
+        gateway = project.default_gateway
         if gateway is None:
             raise ResourceNotExistsError("Default gateway is not set")
     else:
-        gateway = await get_gateway_by_name(session=session, project=project, name=gateway_name)
+        gateway = await get_project_gateway_model_by_name(
+            session=session, project=project, name=gateway_name
+        )
         if gateway is None:
             raise ResourceNotExistsError("Gateway does not exist")
+
+    if gateway.gateway_compute is None:
+        raise ServerClientError("Gateway has no instance associated with it")
 
     domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=f"{project}/{run_name}")
@@ -244,12 +259,12 @@ async def register_service_jobs(
     else:
         job.job_spec.gateway.secure = False
         # use provided public port
-        job.job_spec.gateway.hostname = gateway.ip_address
+        job.job_spec.gateway.hostname = gateway.gateway_compute.ip_address
 
     await run_async(
         configure_gateway_over_ssh,
-        f"ubuntu@{gateway.ip_address}",
-        project.ssh_private_key,
+        f"ubuntu@{gateway.gateway_compute.ip_address}",
+        gateway.gateway_compute.ssh_private_key,
         public_bytes.decode(),
         [job],
     )
