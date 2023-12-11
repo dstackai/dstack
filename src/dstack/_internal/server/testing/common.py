@@ -265,12 +265,16 @@ async def create_gateway_compute(
     ip_address: Optional[str] = "1.1.1.1",
     region: str = "us",
     instance_id: Optional[str] = "i-1234567890",
+    ssh_private_key: str = "",
+    ssh_public_key: str = "",
 ) -> GatewayComputeModel:
     gateway_compute = GatewayComputeModel(
         backend_id=backend_id,
         ip_address=ip_address,
         region=region,
         instance_id=instance_id,
+        ssh_private_key=ssh_private_key,
+        ssh_public_key=ssh_public_key,
     )
     session.add(gateway_compute)
     await session.commit()
