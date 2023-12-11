@@ -11,13 +11,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.utils.random_names as random_names
-from dstack._internal.core.errors import (
-    GatewayError,
-    NotFoundError,
-    ResourceNotExistsError,
-    ServerClientError,
-    SSHError,
-)
+from dstack._internal.core.errors import GatewayError, ResourceNotExistsError, ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
@@ -67,7 +61,7 @@ async def create_gateway(
         if backend_model.type == backend_type:
             break
     else:
-        raise NotFoundError()
+        raise ResourceNotExistsError()
 
     if name is None:
         name = await generate_gateway_name(session=session, project=project)
@@ -134,6 +128,8 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
     tasks = []
     gateways = []
     for gateway in await list_project_gateway_models(session=session, project=project):
+        if gateway.backend.type == BackendType.DSTACK:
+            continue
         if gateway.name not in gateways_names:
             continue
         backend = await get_project_backend_by_type(project, gateway.backend.type)
@@ -159,6 +155,15 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
 async def set_gateway_wildcard_domain(
     session: AsyncSession, project: ProjectModel, name: str, wildcard_domain: Optional[str]
 ) -> Gateway:
+    gateway = await get_project_gateway_model_by_name(
+        session=session,
+        project=project,
+        name=name,
+    )
+    if gateway is None:
+        raise ResourceNotExistsError()
+    if gateway.backend.type == BackendType.DSTACK:
+        raise ServerClientError("Custom domains for dstack Cloud gateway are not supported")
     await session.execute(
         update(GatewayModel)
         .where(
@@ -170,21 +175,20 @@ async def set_gateway_wildcard_domain(
         )
     )
     await session.commit()
-    res = await session.execute(
-        select(GatewayModel).where(
-            GatewayModel.project_id == project.id, GatewayModel.name == name
-        )
+    gateway = await get_project_gateway_model_by_name(
+        session=session,
+        project=project,
+        name=name,
     )
-    gateway = res.scalar()
     if gateway is None:
-        raise NotFoundError()
+        raise ResourceNotExistsError()
     return gateway_model_to_gateway(gateway)
 
 
 async def set_default_gateway(session: AsyncSession, project: ProjectModel, name: str):
     gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
     if gateway is None:
-        raise NotFoundError()
+        raise ResourceNotExistsError()
     await session.execute(
         update(ProjectModel)
         .where(

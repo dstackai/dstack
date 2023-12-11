@@ -252,7 +252,7 @@ class TestCreateGateway:
             json={"name": "test", "backend_type": "aws", "region": "us"},
             headers=get_auth_headers(user.token),
         )
-        assert response.status_code == 404
+        assert response.status_code == 400
 
 
 class TestDefaultGateway:
@@ -348,7 +348,7 @@ class TestDefaultGateway:
             json={"name": "missing"},
             headers=get_auth_headers(user.token),
         )
-        assert response.status_code == 404
+        assert response.status_code == 400
 
 
 class TestDeleteGateway:
@@ -496,4 +496,4 @@ class TestUpdateGateway:
             json={"name": "missing", "wildcard_domain": "test.com"},
             headers=get_auth_headers(user.token),
         )
-        assert response.status_code == 404
+        assert response.status_code == 400
