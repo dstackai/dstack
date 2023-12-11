@@ -199,6 +199,8 @@ async def delete_backends(
     project: ProjectModel,
     backends_types: List[BackendType],
 ):
+    if BackendType.DSTACK in backends_types:
+        raise ServerClientError("Cannot delete dstack backend")
     await session.execute(
         delete(BackendModel).where(
             BackendModel.type.in_(backends_types),
