@@ -11,16 +11,11 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.utils.random_names as random_names
-from dstack._internal.core.errors import (
-    GatewayError,
-    NotFoundError,
-    ResourceNotExistsError,
-    SSHError,
-)
+from dstack._internal.core.errors import GatewayError, ResourceNotExistsError, ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
-from dstack._internal.server.models import GatewayModel, ProjectModel
+from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
 from dstack._internal.server.services.backends import (
     get_project_backend_by_type,
     get_project_backends_with_models,
@@ -66,15 +61,13 @@ async def create_gateway(
         if backend_model.type == backend_type:
             break
     else:
-        raise NotFoundError()
+        raise ResourceNotExistsError()
 
     if name is None:
         name = await generate_gateway_name(session=session, project=project)
 
     gateway = GatewayModel(  # reserve name
         name=name,
-        ip_address="",  # to be filled after provisioning
-        instance_id="",  # to be filled after provisioning
         region=region,
         project_id=project.id,
         backend_id=backend_model.id,
@@ -85,25 +78,36 @@ async def create_gateway(
     if project.default_gateway is None:
         await set_default_gateway(session=session, project=project, name=name)
 
+    private_bytes, public_bytes = generate_rsa_key_pair_bytes()
+    gateway_ssh_private_key = private_bytes.decode()
+    gateway_ssh_public_key = public_bytes.decode()
+
     try:
         info = await run_async(
             backend.compute().create_gateway,
             name,
-            project.ssh_public_key,
+            gateway_ssh_public_key,
             region,
             project.name,
         )
+        gateway_compute = GatewayComputeModel(
+            backend_id=backend_model.id,
+            ip_address=info.ip_address,
+            region=info.region,
+            instance_id=info.instance_id,
+            ssh_private_key=gateway_ssh_private_key,
+            ssh_public_key=gateway_ssh_private_key,
+        )
+        session.add(gateway_compute)
+        await session.commit()
+        await session.refresh(gateway_compute)
         await session.execute(
             update(GatewayModel)
             .where(
                 GatewayModel.project_id == project.id,
                 GatewayModel.name == name,
             )
-            .values(
-                ip_address=info.ip_address,
-                region=info.region,
-                instance_id=info.instance_id,
-            )
+            .values(gateway_compute_id=gateway_compute.id)
         )
         await session.commit()
         await session.refresh(gateway)
@@ -124,15 +128,21 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
     tasks = []
     gateways = []
     for gateway in await list_project_gateway_models(session=session, project=project):
+        if gateway.backend.type == BackendType.DSTACK:
+            continue
         if gateway.name not in gateways_names:
             continue
         backend = await get_project_backend_by_type(project, gateway.backend.type)
-        tasks.append(
-            run_async(
-                backend.compute().terminate_instance, gateway.instance_id, gateway.region, None
+        if gateway.gateway_compute is not None:
+            tasks.append(
+                run_async(
+                    backend.compute().terminate_instance,
+                    gateway.gateway_compute.instance_id,
+                    gateway.region,
+                    None,
+                )
             )
-        )
-        gateways.append(gateway)
+            gateways.append(gateway)
     # terminate in parallel
     terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
     for gateway, error in zip(gateways, terminate_results):
@@ -145,6 +155,15 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
 async def set_gateway_wildcard_domain(
     session: AsyncSession, project: ProjectModel, name: str, wildcard_domain: Optional[str]
 ) -> Gateway:
+    gateway = await get_project_gateway_model_by_name(
+        session=session,
+        project=project,
+        name=name,
+    )
+    if gateway is None:
+        raise ResourceNotExistsError()
+    if gateway.backend.type == BackendType.DSTACK:
+        raise ServerClientError("Custom domains for dstack Cloud gateway are not supported")
     await session.execute(
         update(GatewayModel)
         .where(
@@ -156,21 +175,20 @@ async def set_gateway_wildcard_domain(
         )
     )
     await session.commit()
-    res = await session.execute(
-        select(GatewayModel).where(
-            GatewayModel.project_id == project.id, GatewayModel.name == name
-        )
+    gateway = await get_project_gateway_model_by_name(
+        session=session,
+        project=project,
+        name=name,
     )
-    gateway = res.scalar()
     if gateway is None:
-        raise NotFoundError()
+        raise ResourceNotExistsError()
     return gateway_model_to_gateway(gateway)
 
 
 async def set_default_gateway(session: AsyncSession, project: ProjectModel, name: str):
     gateway = await get_project_gateway_model_by_name(session=session, project=project, name=name)
     if gateway is None:
-        raise NotFoundError()
+        raise ResourceNotExistsError()
     await session.execute(
         update(ProjectModel)
         .where(
@@ -215,15 +233,23 @@ async def register_service_jobs(
 ):
     # we publish only one job
     job = jobs[0]
+    if job.job_spec.gateway is None:
+        raise ServerClientError("Job spec has no gateway")
+
     gateway_name = job.job_spec.gateway.gateway_name
     if gateway_name is None:
-        gateway = await get_project_default_gateway(session=session, project=project)
+        gateway = project.default_gateway
         if gateway is None:
             raise ResourceNotExistsError("Default gateway is not set")
     else:
-        gateway = await get_gateway_by_name(session=session, project=project, name=gateway_name)
+        gateway = await get_project_gateway_model_by_name(
+            session=session, project=project, name=gateway_name
+        )
         if gateway is None:
             raise ResourceNotExistsError("Gateway does not exist")
+
+    if gateway.gateway_compute is None:
+        raise ServerClientError("Gateway has no instance associated with it")
 
     domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=f"{project}/{run_name}")
@@ -237,22 +263,27 @@ async def register_service_jobs(
     else:
         job.job_spec.gateway.secure = False
         # use provided public port
-        job.job_spec.gateway.hostname = gateway.ip_address
+        job.job_spec.gateway.hostname = gateway.gateway_compute.ip_address
 
     await run_async(
         configure_gateway_over_ssh,
-        f"ubuntu@{gateway.ip_address}",
-        project.ssh_private_key,
+        f"ubuntu@{gateway.gateway_compute.ip_address}",
+        gateway.gateway_compute.ssh_private_key,
         public_bytes.decode(),
         [job],
     )
 
 
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
+    ip_address = None
+    instance_id = None
+    if gateway_model.gateway_compute is not None:
+        ip_address = gateway_model.gateway_compute.ip_address
+        instance_id = gateway_model.gateway_compute.instance_id
     return Gateway(
         name=gateway_model.name,
-        ip_address=gateway_model.ip_address,
-        instance_id=gateway_model.instance_id,
+        ip_address=ip_address,
+        instance_id=instance_id,
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=gateway_model.project.default_gateway_id == gateway_model.id,

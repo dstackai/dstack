@@ -70,7 +70,7 @@ class ProjectModel(BaseModel):
         back_populates="project", lazy="selectin"
     )
 
-    default_gateway_id: Mapped[Optional[UUIDType]] = mapped_column(
+    default_gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateways.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )
     default_gateway: Mapped["GatewayModel"] = relationship(
@@ -189,8 +189,6 @@ class GatewayModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(100))
-    ip_address: Mapped[str] = mapped_column(String(100))
-    instance_id: Mapped[str] = mapped_column(String(100))
     region: Mapped[str] = mapped_column(String(100))
     wildcard_domain: Mapped[str] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
@@ -200,4 +198,30 @@ class GatewayModel(BaseModel):
     backend_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("backends.id", ondelete="CASCADE"))
     backend: Mapped["BackendModel"] = relationship(lazy="selectin")
 
+    gateway_compute_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("gateway_computes.id", ondelete="CASCADE")
+    )
+    gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship(lazy="joined")
+
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_gateways_project_id_name"),)
+
+
+class GatewayComputeModel(BaseModel):
+    __tablename__ = "gateway_computes"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    instance_id: Mapped[str] = mapped_column(String(100))
+    ip_address: Mapped[str] = mapped_column(String(100))
+    region: Mapped[str] = mapped_column(String(100))
+
+    backend_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("backends.id", ondelete="CASCADE")
+    )
+    backend: Mapped[Optional["BackendModel"]] = relationship()
+
+    # The key to authorize the server with the gateway
+    ssh_private_key: Mapped[str] = mapped_column(Text)
+    ssh_public_key: Mapped[str] = mapped_column(Text)
