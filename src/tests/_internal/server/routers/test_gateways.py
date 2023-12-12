@@ -396,7 +396,9 @@ class TestDeleteGateway:
             name="gateway-gcp",
             gateway_compute_id=gateway_compute_gcp.id,
         )
-        with patch("dstack._internal.server.services.gateways.get_project_backend_by_type") as m:
+        with patch(
+            "dstack._internal.server.services.gateways.get_project_backend_by_type_or_error"
+        ) as m:
             aws = Mock()
             aws.compute.return_value.terminate_instance.return_value = None  # success
             gcp = Mock()
