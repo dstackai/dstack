@@ -261,6 +261,15 @@ async def get_project_backend_by_type(
     return None
 
 
+async def get_project_backend_by_type_or_error(
+    project: ProjectModel, backend_type: BackendType
+) -> Backend:
+    backend = await get_project_backend_by_type(project=project, backend_type=backend_type)
+    if backend is None:
+        raise BackendNotAvailable()
+    return backend
+
+
 def clear_backend_cache(project_name: str):
     if project_name in _BACKENDS_CACHE:
         del _BACKENDS_CACHE[project_name]

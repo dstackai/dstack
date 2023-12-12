@@ -17,7 +17,7 @@ from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
 from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
 from dstack._internal.server.services.backends import (
-    get_project_backend_by_type,
+    get_project_backend_by_type_or_error,
     get_project_backends_with_models,
 )
 from dstack._internal.server.utils.common import run_async
@@ -132,7 +132,7 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
             continue
         if gateway.name not in gateways_names:
             continue
-        backend = await get_project_backend_by_type(project, gateway.backend.type)
+        backend = await get_project_backend_by_type_or_error(project, gateway.backend.type)
         if gateway.gateway_compute is not None:
             tasks.append(
                 run_async(
@@ -142,7 +142,9 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
                     None,
                 )
             )
-            gateways.append(gateway)
+        else:
+            tasks.append(run_async(lambda: ...))
+        gateways.append(gateway)
     # terminate in parallel
     terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
     for gateway, error in zip(gateways, terminate_results):
@@ -275,8 +277,8 @@ async def register_service_jobs(
 
 
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
-    ip_address = None
-    instance_id = None
+    ip_address = ""
+    instance_id = ""
     if gateway_model.gateway_compute is not None:
         ip_address = gateway_model.gateway_compute.ip_address
         instance_id = gateway_model.gateway_compute.instance_id
