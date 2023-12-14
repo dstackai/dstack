@@ -46,7 +46,7 @@ BASE_DEPS = [
     "fastapi",
     "starlette>=0.26.0",
     "uvicorn",
-    "pydantic<=1.10.10",
+    "pydantic>=1.10.10,<2.0.0",
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
     "alembic>=1.10.2",
