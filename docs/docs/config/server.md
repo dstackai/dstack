@@ -78,10 +78,61 @@ projects:
 
 </div>
 
-### Azure
+??? info "Required AWS permissions"
+    The following AWS policy permissions are sufficient for `dstack` to work:
 
-!!! info "Permission"
-    You must have the `Owner` permission for the Azure subscription.
+    ```
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "ec2:*"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "servicequotas:*"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "iam:GetRole",
+                    "iam:CreateRole",
+                    "iam:AttachRolePolicy",
+                    "iam:TagRole"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "iam:CreatePolicy",
+                    "iam:TagPolicy"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "iam:GetInstanceProfile",
+                    "iam:CreateInstanceProfile",
+                    "iam:AddRoleToInstanceProfile",
+                    "iam:TagInstanceProfile",
+                    "iam:PassRole"
+                ],
+                "Resource": "*"
+            }
+        ]
+    }
+    ```
+
+### Azure
 
 There are two ways to configure Azure: using a client secret or using the default credentials.
 
@@ -156,6 +207,11 @@ projects:
 
 </div>
 
+??? info "Required Azure permissions"
+
+    You must have the `Owner` permission for the Azure subscription.
+    Please, [let us know](https://discord.gg/u8SmfwPpMd) if your use case requires more granular Azure permissions.
+
 ### GCP
 
 ??? info "Enable APIs"
@@ -179,7 +235,7 @@ There are two ways to configure GCP: using a service account or using the defaul
 #### Service account
 
 To create a service account, follow [this guide](https://cloud.google.com/iam/docs/service-accounts-create).
-Make sure to grant it the `Service Account User`, and `Compute Admin` roles.
+Make sure to grant it the `Service Account User` and `Compute Admin` roles.
 
 After setting up the service account [create a key](https://cloud.google.com/iam/docs/keys-create-delete) for it 
 and download the corresponding JSON file.
@@ -230,6 +286,11 @@ projects:
 ```
 
 </div>
+
+??? info "Required GCP permissions"
+
+    The `Service Account User` and `Compute Admin` roles are sufficient for `dstack` to work.
+
 
 ### Lambda
 
