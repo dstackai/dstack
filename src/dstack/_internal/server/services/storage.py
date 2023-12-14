@@ -1,7 +1,12 @@
 from typing import Optional
 
-import botocore.exceptions
-from boto3 import Session
+BOTO_AVAILABLE = True
+
+try:
+    import botocore.exceptions
+    from boto3 import Session
+except ImportError:
+    BOTO_AVAILABLE = False
 
 from dstack._internal.server import settings
 
@@ -58,6 +63,8 @@ def init_default_storage():
     global _default_storage
     if settings.SERVER_BUCKET is None:
         raise ValueError("settings.SERVER_BUCKET not set")
+    if not BOTO_AVAILABLE:
+        raise ValueError("AWS dependencies are not installed")
     _default_storage = S3Storage(
         bucket=settings.SERVER_BUCKET,
         region=settings.SERVER_BUCKET_REGION,

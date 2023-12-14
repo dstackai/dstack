@@ -166,7 +166,10 @@ class ServerConfigManager:
             for backend_config in project_config.backends:
                 config_info = _config_to_internal_config(backend_config)
                 backend_type = BackendType(config_info.type)
-                backends_to_delete.remove(backend_type)
+                try:
+                    backends_to_delete.remove(backend_type)
+                except ValueError:
+                    continue
                 current_config_info = await backends_services.get_config_info(
                     project=project,
                     backend_type=backend_type,
