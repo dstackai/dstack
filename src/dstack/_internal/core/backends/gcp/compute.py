@@ -91,12 +91,17 @@ class GCPCompute(Compute):
             firewalls_client=self.firewalls_client,
             project_id=self.config.project_id,
         )
+        disk_size_mib = (
+            instance_offer.instance.resources.disk.size_mib
+            or job.job_spec.requirements.disk.size_mib
+        )
+        disk_size = round(disk_size_mib / 1024) if disk_size_mib else 100
         for zone in _get_instance_zones(instance_offer):
             request = compute_v1.InsertInstanceRequest()
             request.zone = zone
             request.project = self.config.project_id
             request.instance_resource = gcp_resources.create_instance_struct(
-                disk_size=100,
+                disk_size=disk_size,
                 image_id=gcp_resources.get_image_id(
                     len(instance_offer.instance.resources.gpus) > 0,
                 ),

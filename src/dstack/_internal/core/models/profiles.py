@@ -106,6 +106,14 @@ class ProfileGPU(ForbidExtra):
         return v
 
 
+class ProfileDisk(ForbidExtra):
+    size: Annotated[
+        Optional[Union[int, str]],
+        Field(description='The minimum size of disk (e.g., "100GB")'),
+    ]
+    _validate_size = validator("size", pre=True, allow_reuse=True)(parse_memory)
+
+
 class ProfileResources(ForbidExtra):
     cpu: Annotated[Optional[int], Field(description="The minimum number of CPUs")] = 2
     memory: Annotated[
@@ -122,6 +130,10 @@ class ProfileResources(ForbidExtra):
             description='The size of shared memory (e.g., "8GB"). If you are using parallel communicating processes ('
             "e.g., dataloaders in PyTorch), you may need to configure this."
         ),
+    ]
+    disk: Annotated[
+        Optional[Union[int, ProfileDisk]],
+        Field(description="The minimum size of disk or a disk spec"),
     ]
     _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
 

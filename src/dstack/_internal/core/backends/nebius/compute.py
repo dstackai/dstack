@@ -62,6 +62,11 @@ class NebiusCompute(Compute):
         image_id = self._get_image_id(cuda=cuda)
 
         try:
+            disk_size_mib = (
+                instance_offer.instance.resources.disk.size_mib
+                or job.job_spec.requirements.disk.size_mib
+            )
+            disk_size = round(disk_size_mib / 1024) if disk_size_mib else 100
             resp = self.api_client.compute_instances_create(
                 folder_id=self.config.folder_id,
                 name=job.job_spec.job_name,  # TODO(egor-s) make globally unique
@@ -84,7 +89,7 @@ class NebiusCompute(Compute):
                         registry_auth_required=job.job_spec.registry_auth is not None,
                     ),
                 },
-                disk_size_gb=100,  # TODO(egor-s) make configurable
+                disk_size_gb=disk_size,
                 image_id=image_id,
                 subnet_id=subnet_id,
                 security_group_ids=[security_group_id],

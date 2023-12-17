@@ -65,6 +65,7 @@ def pretty_resources(
     gpu_memory: Optional[int] = None,
     total_gpu_memory: Optional[float] = None,
     compute_capability: Optional[Tuple[int, int]] = None,
+    disk_size: Optional[int] = None,
 ) -> str:
     """
     >>> pretty_resources(4, 16*1024)
@@ -100,6 +101,8 @@ def pretty_resources(
         if gpu_parts:
             gpu += f" ({', '.join(gpu_parts)})"
         parts.append(gpu)
+    if disk_size:
+        parts.append(f"{disk_size / 1024:g}GB (disk)")
     return ", ".join(parts)
 
 
