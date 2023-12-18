@@ -132,15 +132,23 @@ class ProfileResources(ForbidExtra):
         ),
     ]
     disk: Annotated[
-        Optional[Union[int, ProfileDisk]],
+        Optional[Union[int, str, ProfileDisk]],
         Field(description="The minimum size of disk or a disk spec"),
-    ]
+    ] = ProfileDisk(size=parse_memory("100GB"))
     _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
 
     @validator("gpu", pre=True)
     def _validate_gpu(cls, v: Optional[Union[int, ProfileGPU]]) -> Optional[ProfileGPU]:
         if isinstance(v, int):
             v = ProfileGPU(count=v)
+        return v
+
+    @validator("disk", pre=True)
+    def _validate_disk(cls, v: Optional[Union[int, str, ProfileDisk]]) -> Optional[ProfileDisk]:
+        if isinstance(v, int):
+            v = ProfileDisk(size=v)
+        if isinstance(v, str):
+            v = ProfileDisk(size=parse_memory(v))
         return v
 
 

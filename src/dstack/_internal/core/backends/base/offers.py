@@ -31,23 +31,32 @@ def get_catalog_offers(
     for item in catalog.query(**asdict(q)):
         if locations is not None and item.location not in locations:
             continue
-        offer = catalog_item_to_offer(backend, item)
+        offer = catalog_item_to_offer(backend, item, requirements)
         if extra_filter is not None and not extra_filter(offer):
             continue
         offers.append(offer)
     return offers
 
 
-def catalog_item_to_offer(backend: BackendType, item: gpuhunt.CatalogItem) -> InstanceOffer:
+def catalog_item_to_offer(
+    backend: BackendType, item: gpuhunt.CatalogItem, requirements: Optional[Requirements]
+) -> InstanceOffer:
     gpus = []
     if item.gpu_count > 0:
         gpus = [Gpu(name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024))] * item.gpu_count
+    disk_size_mib = round(
+        item.disk_size * 1024
+        if item.disk_size
+        else requirements.disk.size_mib
+        if requirements and requirements.disk and requirements.disk.size_mib
+        else 102400  # TODO: Make requirements' fields required
+    )
     resources = Resources(
         cpus=item.cpu,
         memory_mib=round(item.memory * 1024),
         gpus=gpus,
         spot=item.spot,
-        disk=Disk(size_mib=item.disk_size * 1024 if item.disk_size else None),
+        disk=Disk(size_mib=disk_size_mib),
     )
     resources.description = resources.pretty_format()
     return InstanceOffer(

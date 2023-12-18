@@ -22,7 +22,7 @@ class Gpu(BaseModel):
 
 
 class Disk(BaseModel):
-    size_mib: Optional[int]
+    size_mib: int
 
 
 class Resources(BaseModel):
@@ -30,7 +30,7 @@ class Resources(BaseModel):
     memory_mib: int
     gpus: List[Gpu]
     spot: bool
-    disk: Disk = Disk()
+    disk: Disk = Disk(size_mib=102400)  # the default value (100GB) for backward compatibility
     description: str = ""
 
     def pretty_format(self) -> str:

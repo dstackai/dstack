@@ -74,6 +74,7 @@ class DiskRequirements(BaseModel):
 
 
 class Requirements(BaseModel):
+    # TODO: Make requirements' fields required
     cpus: Optional[int]
     memory_mib: Optional[int]
     gpus: Optional[GpusRequirements]

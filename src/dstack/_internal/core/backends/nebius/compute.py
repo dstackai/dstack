@@ -62,11 +62,7 @@ class NebiusCompute(Compute):
         image_id = self._get_image_id(cuda=cuda)
 
         try:
-            disk_size_mib = (
-                instance_offer.instance.resources.disk.size_mib
-                or job.job_spec.requirements.disk.size_mib
-            )
-            disk_size = round(disk_size_mib / 1024) if disk_size_mib else 100
+            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             resp = self.api_client.compute_instances_create(
                 folder_id=self.config.folder_id,
                 name=job.job_spec.job_name,  # TODO(egor-s) make globally unique

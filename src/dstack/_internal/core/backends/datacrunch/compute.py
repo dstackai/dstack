@@ -119,11 +119,7 @@ class DataCrunchCompute(Compute):
         # from API https://datacrunch.stoplight.io/docs/datacrunch-public/c46ab45dbc508-get-all-image-types
         image_name = "2088da25-bb0d-41cc-a191-dccae45d96fd"
 
-        disk_size_mib = (
-            instance_offer.instance.resources.disk.size_mib
-            or job.job_spec.requirements.disk.size_mib
-        )
-        disk_size = round(disk_size_mib / 1024) if disk_size_mib else 100
+        disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
         instance = self.api_client.deploy_instance(
             instance_type=instance_offer.instance.name,
             ssh_key_ids=ssh_ids,

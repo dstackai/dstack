@@ -133,11 +133,7 @@ class AWSCompute(Compute):
             {"Key": "dstack_user", "Value": run.user},
         ]
         try:
-            disk_size_mib = (
-                instance_offer.instance.resources.disk.size_mib
-                or job.job_spec.requirements.disk.size_mib
-            )
-            disk_size = round(disk_size_mib / 1024) if disk_size_mib else 100
+            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             response = ec2.create_instances(
                 **aws_resources.create_instances_struct(
                     disk_size=disk_size,

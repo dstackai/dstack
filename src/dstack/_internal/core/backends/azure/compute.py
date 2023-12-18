@@ -101,11 +101,7 @@ class AzureCompute(Compute):
             project_ssh_public_key.strip(),
         ]
         try:
-            disk_size_mib = (
-                instance_offer.instance.resources.disk.size_mib
-                or job.job_spec.requirements.disk.size_mib
-            )
-            disk_size = round(disk_size_mib / 1024) if disk_size_mib else 100
+            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             vm = _launch_instance(
                 compute_client=self._compute_client,
                 subscription_id=self.config.subscription_id,
