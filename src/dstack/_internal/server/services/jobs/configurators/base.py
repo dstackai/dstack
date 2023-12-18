@@ -115,7 +115,7 @@ class JobConfigurator(ABC):
         if self.run_spec.configuration.image is not None:
             return self.run_spec.configuration.image
         # TODO: non-cuda image
-        return f"dstackai/base:py{self._python()}-{version.base_image}-cuda-11.8"
+        return f"dstackai/base:py{self._python()}-{version.base_image}-cuda-12.1"
 
     def _max_duration(self) -> Optional[int]:
         if self.run_spec.profile.max_duration is None:
