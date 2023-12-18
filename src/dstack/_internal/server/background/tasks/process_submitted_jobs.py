@@ -111,7 +111,13 @@ async def _run_job(
 ) -> Optional[JobProvisioningData]:
     if run.run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
-    offers = await backends_services.get_instance_offers(backends, job, exclude_not_available=True)
+    try:
+        offers = await backends_services.get_instance_offers(
+            backends, job, exclude_not_available=True
+        )
+    except BackendError as e:
+        logger.warning(*job_log("failed to get instance offers: %s", job_model, repr(e)))
+        return None
     for backend, offer in offers:
         logger.debug(
             *job_log(
