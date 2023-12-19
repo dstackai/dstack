@@ -58,6 +58,7 @@ class ProjectModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     owner: Mapped[UserModel] = relationship(lazy="joined")
@@ -143,6 +144,7 @@ class RunModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
     repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
@@ -165,8 +167,8 @@ class JobModel(BaseModel):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
     run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"))
-    run_name: Mapped[str] = mapped_column(String(100))
     run: Mapped["RunModel"] = relationship()
+    run_name: Mapped[str] = mapped_column(String(100))
     job_num: Mapped[int] = mapped_column(Integer)
     job_name: Mapped[str] = mapped_column(String(100))
     submission_num: Mapped[int] = mapped_column(Integer)

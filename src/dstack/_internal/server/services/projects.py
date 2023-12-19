@@ -1,7 +1,7 @@
 import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
@@ -14,6 +14,7 @@ from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import get_configurator
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
 from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
@@ -98,7 +99,16 @@ async def delete_projects(
         for project in user_projects:
             if not _is_project_admin(user=user, project=project):
                 raise ForbiddenError()
-    await session.execute(delete(ProjectModel).where(ProjectModel.name.in_(projects_names)))
+    timestamp = str(int(get_current_datetime().timestamp()))
+    new_project_name = "_deleted_" + timestamp + ProjectModel.name
+    await session.execute(
+        update(ProjectModel)
+        .where(ProjectModel.name.in_(projects_names))
+        .values(
+            deleted=True,
+            name=new_project_name,
+        )
+    )
 
 
 async def add_project_member(
@@ -158,23 +168,31 @@ async def list_user_project_models(
         select(ProjectModel).where(
             MemberModel.project_id == ProjectModel.id,
             MemberModel.user_id == user.id,
+            ProjectModel.deleted == False,
         )
     )
     return list(res.scalars().all())
 
 
 async def list_user_owned_project_models(
-    session: AsyncSession,
-    user: UserModel,
+    session: AsyncSession, user: UserModel, include_deleted: bool = False
 ) -> List[ProjectModel]:
-    res = await session.execute(select(ProjectModel).where(ProjectModel.owner_id == user.id))
+    filters = [
+        ProjectModel.owner_id == user.id,
+        ProjectModel.deleted == False,
+    ]
+    if not include_deleted:
+        filters.append(ProjectModel.deleted == False)
+    res = await session.execute(select(ProjectModel).where(*filters))
     return list(res.scalars().all())
 
 
 async def list_project_models(
     session: AsyncSession,
 ) -> List[ProjectModel]:
-    res = await session.execute(select(ProjectModel))
+    res = await session.execute(
+        select(ProjectModel).where(ProjectModel.deleted == False),
+    )
     return list(res.scalars().all())
 
 
@@ -182,7 +200,12 @@ async def get_project_model_by_name(
     session: AsyncSession,
     project_name: str,
 ) -> Optional[ProjectModel]:
-    res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
+    res = await session.execute(
+        select(ProjectModel).where(
+            ProjectModel.name == project_name,
+            ProjectModel.deleted == False,
+        )
+    )
     return res.scalar()
 
 
@@ -190,7 +213,12 @@ async def get_project_model_by_name_or_error(
     session: AsyncSession,
     project_name: str,
 ) -> ProjectModel:
-    res = await session.execute(select(ProjectModel).where(ProjectModel.name == project_name))
+    res = await session.execute(
+        select(ProjectModel).where(
+            ProjectModel.name == project_name,
+            ProjectModel.deleted == False,
+        )
+    )
     return res.scalar_one()
 
 
@@ -198,7 +226,12 @@ async def get_project_model_by_id_or_error(
     session: AsyncSession,
     project_id: uuid.UUID,
 ) -> ProjectModel:
-    res = await session.execute(select(ProjectModel).where(ProjectModel.id == project_id))
+    res = await session.execute(
+        select(ProjectModel).where(
+            ProjectModel.id == project_id,
+            ProjectModel.deleted == False,
+        )
+    )
     return res.scalar_one()
 
 
@@ -258,8 +291,7 @@ def register_create_project_hook(func: Callable[[AsyncSession, ProjectModel], Aw
 
 
 async def _check_projects_quota(session: AsyncSession, user: UserModel):
-    res = await session.execute(select(ProjectModel).where(ProjectModel.owner_id == user.id))
-    owned_projects = res.scalars().all()
+    owned_projects = await list_user_owned_project_models(session=session, user=user)
     if len(owned_projects) >= user.projects_quota:
         raise ServerClientError("User project quota exceeded")
 
