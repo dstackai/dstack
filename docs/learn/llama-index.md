@@ -9,9 +9,7 @@ and [Weaviate](https://weaviate.io/) vector database.
 
 1. Llama Index loads data from local files, structures it into chunks, and ingests it into Weaviate (an open-source vector database).
    We set up Llama Index to use local embeddings through the [SentenceTransformers](https://www.sbert.net/) library.
-2. `dstack` allows us to deploy LLMs to any cloud provider, e.g.
-   via the [text generation](../docs/guides/text-generation.md) API. Alternatively, you can also deploy using [TGI](text-generation-inference.md)'s 
-   docker image (as a task or a service).
+2. `dstack` allows us to deploy LLMs to any cloud provider, e.g. via [Services](../docs/guides/services.md) using [TGI](tgi.md) or [vLLM](vllm.md).
 3. Llama Index allows us to prompt the LLM automatically incorporating the context from Weaviate. 
  
 ## Requirements

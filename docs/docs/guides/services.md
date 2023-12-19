@@ -99,7 +99,7 @@ Once the service is deployed, its endpoint will be available at
 
 !!! info "Run options"
     The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
-    and many other options (incl. spot instances, max price, max duration, retry policy, etc.).
+    and many other options (incl. spot instances, disk size, max price, max duration, retry policy, etc.).
     For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
 
 [//]: # (TODO: Example)

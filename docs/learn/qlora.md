@@ -4,10 +4,6 @@
     This example demonstrates how to fine-tune [`llama-2-7b-chat-hf`](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf),
     with QLoRA and your own script, using [Tasks](../docs/guides/tasks.md).
 
-    If you'd like to fine-tune an LLM via a simple API,
-    consider using the [Fine-tuning](../docs/guides/text-generation.md) API. It's a lot simpler and 
-    doesn't need your own script.
-
 ## Prepare a dataset
 
 When selecting a dataset, make sure that it is pre-processed to match the prompt format of Llama 2:

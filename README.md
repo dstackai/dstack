@@ -25,7 +25,7 @@ Train and deploy generative AI on any cloud
 
 `dstack` simplifies training, fine-tuning, and deployment of generative AI models on any cloud.
 
-Supported providers: AWS, GCP, Azure, Lambda, TensorDock, and Vast.ai.
+Supported providers: AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, and DataCrunch.
 
 ## Latest news ✨
 
@@ -34,9 +34,9 @@ Supported providers: AWS, GCP, Azure, Lambda, TensorDock, and Vast.ai.
 - [2023/10] [Use world's cheapest GPUs with TensorDock](https://dstack.ai/blog/2023/10/31/tensordock/) (Blog)
 - [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/learn/llama-index) (Learn)
 - [2023/08] [Fine-tuning Llama 2 using QLoRA](https://dstack.ai/learn/qlora) (Learn)
-- [2023/08] [Deploying Stable Diffusion using FastAPI](https://dstack.ai/learn/sdxl) (Learn)
-- [2023/07] [Deploying LLMs using TGI](https://dstack.ai/learn/tgi) (Learn)
-- [2023/07] [Deploying LLMs using vLLM](https://dstack.ai/learn/vllm) (Learn)
+- [2023/08] [Serving Stable Diffusion using FastAPI](https://dstack.ai/learn/sdxl) (Learn)
+- [2023/07] [Serving LLMs using TGI](https://dstack.ai/learn/tgi) (Learn)
+- [2023/07] [Serving LLMs using vLLM](https://dstack.ai/learn/vllm) (Learn)
 
 ## Installation
 

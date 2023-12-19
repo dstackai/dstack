@@ -1,4 +1,4 @@
-# Deploying LLMs using Python API
+# Serving LLMs using Python API
 
 The [Python API](../docs/reference/api/python/index.md) of `dstack` can be used to run [tasks](../docs/guides/tasks.md) and [services](../docs/guides/services.md) programmatically.
 

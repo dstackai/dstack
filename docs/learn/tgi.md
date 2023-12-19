@@ -1,12 +1,9 @@
-# Deploying LLMs with TGI
+# Serving LLMs with TGI
 
 !!! info "NOTE:"
     This example demonstrates how to deploy an LLM
     using [Services](../docs/guides/services.md) and [TGI](https://github.com/huggingface/text-generation-inference),
     an open-source framework by Hugging Face.
-
-    If you'd like to deploy an LLM via a simple API,
-    consider using the [Text generation](../docs/guides/text-generation.md) API. It's a lot simpler.
 
 ## Define the configuration
 

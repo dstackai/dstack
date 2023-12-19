@@ -1,12 +1,9 @@
-# Deploying LLMs with vLLM
+# Serving LLMs with vLLM
 
 !!! info "NOTE:"
     This example demonstrates how to deploy an LLM
     using [Services](../docs/guides/services.md) and [vLLM](https://vllm.ai/),
     an open-source library.
-
-    If you'd like to deploy an LLM via a simple API,
-    consider using the [Text generation](../docs/guides/text-generation.md) API. It's a lot simpler.
 
 ## Define the configuration
 
