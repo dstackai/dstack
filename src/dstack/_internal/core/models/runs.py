@@ -103,8 +103,6 @@ class Requirements(BaseModel):
                 res += f", {'spot' if self.spot else 'on-demand'}"
             if self.max_price is not None:
                 res += f" under ${self.max_price:g} per hour"
-            if self.disk is not None:
-                res += f" disk {self.disk.size_mib / 1024:g}GB"
         return res
 
 
