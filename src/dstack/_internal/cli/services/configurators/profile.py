@@ -5,6 +5,7 @@ from typing import Dict
 
 from dstack._internal.core.models.profiles import (
     Profile,
+    ProfileDisk,
     ProfileGPU,
     ProfileRetryPolicy,
     SpotPolicy,
@@ -28,6 +29,13 @@ def register_profile_args(parser: argparse.ArgumentParser):
         type=gpu_spec,
         help="Request a GPU for the run. The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
         dest="gpu_spec",
+    )
+    profile_group.add_argument(
+        "--disk",
+        metavar="SIZE",
+        type=str,
+        help="Request the minimum size of disk for the run. Example [code]--disk 100GB[/].",
+        dest="disk_size",
     )
     profile_group.add_argument(
         "--max-price",
@@ -95,6 +103,10 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile):
         gpu = (profile.resources.gpu or ProfileGPU()).dict(exclude_defaults=True)
         gpu.update(args.gpu_spec)
         profile.resources.gpu = ProfileGPU.parse_obj(gpu)
+    if args.disk_size is not None:
+        disk = (profile.resources.disk or ProfileDisk()).dict(exclude_defaults=True)
+        disk["size"] = args.disk_size
+        profile.resources.disk = ProfileDisk.parse_obj(disk)
     if args.max_price is not None:
         profile.max_price = args.max_price
     if args.max_duration is not None:

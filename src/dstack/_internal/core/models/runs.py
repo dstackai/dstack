@@ -69,13 +69,19 @@ class GpusRequirements(BaseModel):
     compute_capability: Optional[Tuple[int, int]]
 
 
+class DiskRequirements(BaseModel):
+    size_mib: Optional[int]
+
+
 class Requirements(BaseModel):
+    # TODO: Make requirements' fields required
     cpus: Optional[int]
     memory_mib: Optional[int]
     gpus: Optional[GpusRequirements]
     shm_size_mib: Optional[int]
     max_price: Optional[float]
     spot: Optional[bool]
+    disk: Optional[DiskRequirements]
 
     def pretty_format(self, resources_only: bool = False):
         resources = dict(cpus=self.cpus, memory=self.memory_mib)
@@ -86,6 +92,10 @@ class Requirements(BaseModel):
                 gpu_memory=self.gpus.memory_mib,
                 total_gpu_memory=self.gpus.total_memory_mib,
                 compute_capability=self.gpus.compute_capability,
+            )
+        if self.disk:
+            resources.update(
+                disk_size=self.disk.size_mib,
             )
         res = pretty_resources(**resources)
         if not resources_only:

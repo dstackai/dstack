@@ -64,6 +64,7 @@ class DataCrunchAPIClient:
         hostname,
         description,
         startup_script_id,
+        disk_size,
         is_spot=True,
         location="FIN-01",
     ):
@@ -76,5 +77,6 @@ class DataCrunchAPIClient:
             startup_script_id=startup_script_id,
             is_spot=is_spot,
             location=location,
+            os_volume={"name": "OS volume", "size": disk_size},
         )
         return instance

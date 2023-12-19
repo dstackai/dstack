@@ -13,6 +13,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import (
     AppSpec,
+    DiskRequirements,
     Gateway,
     GpusRequirements,
     JobSpec,
@@ -145,6 +146,8 @@ class JobConfigurator(ABC):
                 total_memory_mib=self.run_spec.profile.resources.gpu.total_memory,
                 compute_capability=self.run_spec.profile.resources.gpu.compute_capability,
             )
+        if self.run_spec.profile.resources.disk:
+            r.disk = DiskRequirements(size_mib=self.run_spec.profile.resources.disk.size)
         return r
 
     def _working_dir(self) -> str:

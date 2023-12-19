@@ -101,6 +101,7 @@ class AzureCompute(Compute):
             project_ssh_public_key.strip(),
         ]
         try:
+            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             vm = _launch_instance(
                 compute_client=self._compute_client,
                 subscription_id=self.config.subscription_id,
@@ -138,7 +139,7 @@ class AzureCompute(Compute):
                 ),
                 ssh_pub_keys=ssh_pub_keys,
                 spot=instance_offer.instance.resources.spot,
-                disk_size=100,
+                disk_size=disk_size,
                 computer_name="runnervm",
             )
             logger.info("Request succeeded")

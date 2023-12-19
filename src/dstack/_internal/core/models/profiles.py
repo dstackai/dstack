@@ -106,6 +106,14 @@ class ProfileGPU(ForbidExtra):
         return v
 
 
+class ProfileDisk(ForbidExtra):
+    size: Annotated[
+        Optional[Union[int, str]],
+        Field(description='The minimum size of disk (e.g., "100GB")'),
+    ]
+    _validate_size = validator("size", pre=True, allow_reuse=True)(parse_memory)
+
+
 class ProfileResources(ForbidExtra):
     cpu: Annotated[Optional[int], Field(description="The minimum number of CPUs")] = 2
     memory: Annotated[
@@ -123,12 +131,24 @@ class ProfileResources(ForbidExtra):
             "e.g., dataloaders in PyTorch), you may need to configure this."
         ),
     ]
+    disk: Annotated[
+        Optional[Union[int, str, ProfileDisk]],
+        Field(description="The minimum size of disk or a disk spec"),
+    ] = ProfileDisk(size=parse_memory("100GB"))
     _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
 
     @validator("gpu", pre=True)
     def _validate_gpu(cls, v: Optional[Union[int, ProfileGPU]]) -> Optional[ProfileGPU]:
         if isinstance(v, int):
             v = ProfileGPU(count=v)
+        return v
+
+    @validator("disk", pre=True)
+    def _validate_disk(cls, v: Optional[Union[int, str, ProfileDisk]]) -> Optional[ProfileDisk]:
+        if isinstance(v, int):
+            v = ProfileDisk(size=v)
+        if isinstance(v, str):
+            v = ProfileDisk(size=parse_memory(v))
         return v
 
 
