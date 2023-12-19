@@ -34,6 +34,7 @@ commands:
 
 !!! warning "Gateway"
     Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
+    If you're using dstack Cloud, the dstack gateway is configured automatically for you.
 
 <div class="termy">
 
@@ -75,7 +76,9 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
     <div class="termy">
     
     ```shell
-    $ dstack run . -f text-generation-inference/serve.dstack.yml --env HUGGING_FACE_HUB_TOKEN=&lt;token&gt; --gpu 24GB
+    $ dstack run . -f text-generation-inference/serve.dstack.yml \
+        --env HUGGING_FACE_HUB_TOKEN=&lt;token&gt; \
+        --gpu 24GB
     ```
     </div>
 

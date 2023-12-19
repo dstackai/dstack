@@ -192,6 +192,7 @@ commands:
 
 !!! warning "NOTE:"
     Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
+    If you're using dstack Cloud, the dstack gateway is configured automatically for you.
 
 After the gateway is configured, go ahead run the service.
 
