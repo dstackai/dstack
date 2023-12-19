@@ -163,8 +163,8 @@ class TestDeleteProject:
             json={"projects_names": [project.name]},
         )
         assert response.status_code == 200
-        res = await session.execute(select(ProjectModel))
-        assert len(res.all()) == 0
+        await session.refresh(project)
+        assert project.deleted
 
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_admin(self, test_db, session: AsyncSession):

@@ -637,10 +637,8 @@ class TestDeleteRuns:
             json={"runs_names": [run.run_name]},
         )
         assert response.status_code == 200
-        res = await session.execute(select(RunModel))
-        assert len(res.scalars().all()) == 0
-        res = await session.execute(select(JobModel))
-        assert len(res.scalars().all()) == 0
+        await session.refresh(run)
+        assert run.deleted
 
     @pytest.mark.asyncio
     async def test_returns_400_if_runs_active(self, test_db, session: AsyncSession):

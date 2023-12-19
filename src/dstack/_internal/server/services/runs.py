@@ -63,7 +63,10 @@ async def list_project_runs(
     project: ProjectModel,
     repo_id: Optional[str],
 ) -> List[Run]:
-    filters = [RunModel.project_id == project.id]
+    filters = [
+        RunModel.project_id == project.id,
+        RunModel.deleted == False,
+    ]
     if repo_id is not None:
         repo = await repos_services.get_repo_model(
             session=session,
@@ -87,7 +90,11 @@ async def get_run(
 ) -> Optional[Run]:
     res = await session.execute(
         select(RunModel)
-        .where(RunModel.project_id == project.id, RunModel.run_name == run_name)
+        .where(
+            RunModel.project_id == project.id,
+            RunModel.run_name == run_name,
+            RunModel.deleted == False,
+        )
         .options(joinedload(RunModel.user))
     )
     run_model = res.scalar()
@@ -248,9 +255,12 @@ async def delete_runs(
             msg=f"Cannot delete active runs: {[r.run_spec.run_name for r in active_runs]}"
         )
     await session.execute(
-        delete(RunModel).where(
-            RunModel.project_id == project.id, RunModel.run_name.in_(runs_names)
+        update(RunModel)
+        .where(
+            RunModel.project_id == project.id,
+            RunModel.run_name.in_(runs_names),
         )
+        .values(deleted=True)
     )
 
 
