@@ -183,6 +183,7 @@ nav:
     - Guides:
         Leveraging spot instances effectively: learn/spot.md
     - Examples:
+      - Serving text embeddings with TEI: learn/tei.md
       - Building RAG with Llama Index: learn/llama-index.md
       - Fine-tuning LLMs with QLoRA: learn/qlora.md
       - Deploying LLMs with TGI: learn/tgi.md
