@@ -50,7 +50,7 @@ theme:
     #    - navigation.instant
     #    - toc.integrate
     - navigation.sections
-    #    - navigation.expand
+    - navigation.expand
     - navigation.top
     - announce.dismiss
     - navigation.tracking
@@ -77,8 +77,8 @@ plugins:
         'docs/installation/index.md': 'docs/index.md'
         'docs/guides/projects.md': 'docs/config/server.md'
         'docs/configuration/server.md': 'docs/config/server.md'
-        'guides/clouds.md': 'docs/configuration/server.md'
-        'examples/llama-index-weaviate.md': 'learn/rag.md'
+        'guides/clouds.md': 'docs/config/server.md'
+        'examples/llama-index-weaviate.md': 'learn/llama-index.md'
         'examples/finetuning-llama-2.md': 'learn/qlora.md'
         'examples/text-generation-inference.md': 'learn/tgi.md'
         'examples/stable-diffusion-xl.md': 'learn/sdxl.md'
@@ -172,23 +172,22 @@ nav:
       - Reference:
           - CLI: docs/reference/cli/index.md
           - API: docs/reference/api/python/index.md
-          - .dstack.yml:
-              - dev-environment: docs/reference/dstack.yml/dev-environment.md
-              - task: docs/reference/dstack.yml/task.md
-              - service: docs/reference/dstack.yml/service.md
-          - "server/config.yml": docs/reference/server/config.yml.md
+          - .dstack.yml: docs/reference/dstack.yml.md
+          - server/config.yml: docs/reference/server/config.yml.md
           - profiles.yml: docs/reference/profiles.yml.md
   - Learn:
-    - learn/index.md
-    - Guides:
-        Leveraging spot instances effectively: learn/spot.md
-    - Examples:
-      - Serving embeddings with TEI: learn/tei.md
-      - Building RAG with Llama Index: learn/llama-index.md
-      - Fine-tuning LLMs with QLoRA: learn/qlora.md
-      - Serving LLMs with TGI: learn/tgi.md
-      - Serving SDXL with FastAPI: learn/sdxl.md
-      - Serving LLMs with vLLM: learn/vllm.md
+    - learn.md
+    - RAG:
+      - Llama Index: learn/llama-index.md
+    - Fine-tuning:
+      - QLoRA: learn/qlora.md
+    - Deployment:
+      - vLLM: learn/vllm.md
+      - Text Generation Inference: learn/tgi.md
+      - Text Embedding Interface: learn/tei.md
+      - SDXL: learn/sdxl.md
+    - Best practices:
+        Spot instances: learn/spot.md
   - Pricing: pricing.md
   - Blog:
       - blog/index.md

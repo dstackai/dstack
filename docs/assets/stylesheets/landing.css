@@ -216,7 +216,7 @@
 
 .md-header__buttons .md-button--primary,
 .md-header__buttons .md-button-secondary {
-    font-weight: 500 !important;
+    font-weight: 400 !important;
     white-space: nowrap;
 }
 
@@ -250,11 +250,25 @@
 }
 
 .tx-landing__highlights_text h2 {
-    font-size: 2.2em;
+    font-size: 2.0em;
     max-width: 500px;
     margin-top: 1.75em;
     margin-bottom: 2.5em;
     letter-spacing: -1.5px;
+}
+
+.tx-landing__highlights_cta {
+    margin-top: 3vw;
+}
+
+.tx-landing__highlights_cta a {
+    display: inline-block;
+    font-size: 19px;
+    margin-top: 30px;
+    border: 1px solid;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-weight: 500;
 }
 
 .tx-landing__highlights_text h2 .gradient {
@@ -689,4 +703,11 @@
     .tx-landing__plans_text h2 {
         font-size: 2.5rem;
     }
+}
+
+.typed-cursor {
+    background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    padding: 0 7px;
 }

@@ -95,8 +95,8 @@ Once `dstack` is set up, you can use CLI or API.
 
 ## Using the CLI
 
-The CLI allows you to define configurations (what you want to run) as YAML files and run them using the `dstack run`
-command.
+With `dstack`, you can define what you want to run as YAML [configuration files](reference/dstack.yml.md) 
+and run them using the `dstack run` command.
 
 ### Define a configuration
 
@@ -183,3 +183,11 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 
 No need to worry about copying code, setting up environment, IDE, etc. `dstack` handles it all 
 automatically.
+
+## What's next?
+
+1. Configure [cloud accounts](config/server.md)
+2. Read about [dev environments](guides/dev-environments.md), [tasks](guides/tasks.md), 
+    and [services](guides/services.md)
+3. See all [learning materials](../learn/index.md)
+4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

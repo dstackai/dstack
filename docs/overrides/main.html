@@ -1,5 +1,18 @@
 {% extends "base.html" %}
 
+{% block container %}
+<div class="md-content" data-md-component="content">
+  {% if "navigation.path" in features %}
+    {% include "path.html" %}
+  {% endif %}
+  <article class="md-content__inner md-typeset">
+    {% block content %}
+      {% include "partials/content.html" %}
+    {% endblock %}
+  </article>
+</div>
+{% endblock %}
+
 {% block header %}
     {% include "header-2.html" %}
 {% endblock %}

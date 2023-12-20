@@ -80,7 +80,7 @@ run = client.runs.submit(
 
 The `dstack.api.Run` instance provides methods for various operations including attaching to the run, 
 forwarding ports to `localhost`, retrieving status, stopping, and accessing logs. For more details, refer to 
-the [example](../../examples/deploy-python.md) and [reference](../../docs/reference/api/python/index.md).
+the [example](../../learn/deploy-python.md) and [reference](../../docs/reference/api/python/index.md).
 
 ## Other changes
 
@@ -101,7 +101,7 @@ This means you'll need to delete `~/.dstack` and configure `dstack` from scratch
 3. Configure clouds via `~/.dstack/server/config.yml` (see the [new guide](../../docs/config/server.md))
 4. Run `dstack server`
 
-The [documentation](../../docs/index.md) and [examples](../../examples/index.md) are updated.
+The [documentation](../../docs/index.md) and [examples](../../learn/index.md) are updated.
 
 ## Give it a try
 

@@ -67,7 +67,7 @@ which are pre-configured with Python, Conda, and essential CUDA drivers.
 !!! info "Configuration options"
     Configuration file allows you to specify a custom Docker image, environment variables, and many other 
     options.
-    For more details, refer to the [Reference](../reference/dstack.yml/service.md).
+    For more details, refer to the [Reference](../reference/dstack.yml.md#service).
 
 ### Run the configuration
 
@@ -103,3 +103,11 @@ Once the service is deployed, its endpoint will be available at
     For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
 
 [//]: # (TODO: Example)
+
+What's next?
+
+1. Check the [Text Generation Inference](../../learn/tgi.md) and [vLLM](../../learn/vllm.md) examples
+2. Read about [dev environments](../guides/dev-environments.md) 
+    and [tasks](../guides/tasks.md)
+3. See all [learning materials](../../learn/index.md)
+4. Check the [reference](../reference/dstack.yml.md#service)

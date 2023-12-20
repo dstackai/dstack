@@ -26,7 +26,7 @@ ide: vscode
 !!! info "Configuration options"
     You can specify your own Docker image, configure environment variables, etc.
     If no image is specified, `dstack` uses its own Docker image (pre-configured with Python, Conda, and essential CUDA drivers).
-    For more details, refer to the [Reference](../reference/dstack.yml/dev-environment.md).
+    For more details, refer to the [Reference](../reference/dstack.yml.md#dev-environment).
 
 ## Run the configuration
 
@@ -74,3 +74,8 @@ automatically.
     When running a dev environment, `dstack` uses the exact version of code from your project directory. 
 
     If there are large files, consider creating a `.gitignore` file to exclude them for better performance.
+
+## What's next?
+
+1. See all [learning materials](../../learn/index.md)
+2. Check the [reference](../reference/dstack.yml.md#dev-environment)

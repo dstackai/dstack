@@ -1,9 +1,6 @@
-# Serving LLMs with TGI
+# Text Generation Inference
 
-!!! info "NOTE:"
-    This example demonstrates how to deploy an LLM
-    using [Services](../docs/guides/services.md) and [TGI](https://github.com/huggingface/text-generation-inference),
-    an open-source framework by Hugging Face.
+This example demonstrates how to deploy an LLM using [TGI](https://github.com/huggingface/text-generation-inference), an open-source framework by Hugging Face.
 
 ## Define the configuration
 
@@ -31,7 +28,7 @@ commands:
 
 !!! warning "Gateway"
     Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
-    If you're using dstack Cloud, the dstack gateway is configured automatically for you.
+    If you're using dstack Cloud, the default gateway is configured automatically for you.
 
 <div class="termy">
 
@@ -68,7 +65,7 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
 
     To use a model with gated access, ensure configuring the `HUGGING_FACE_HUB_TOKEN` environment variable 
     (with [`--env`](../docs/reference/cli/index.md#dstack-run) in `dstack run` or 
-    using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
+    using [`env`](../docs/reference/dstack.yml.md#service) in the configuration file).
     
     <div class="termy">
     
@@ -110,5 +107,13 @@ A similar approach allows running the Llama 2 70B model on an `40GB` GPU (A100).
 To calculate the exact GPU memory required for a specific model with different quantization methods, you can use the
 [hf-accelerate/memory-model-usage](https://huggingface.co/spaces/hf-accelerate/model-memory-usage) Space.
 
-!!! info "Source code"
-    The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+## Source code
+    
+The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+
+## What's next?
+
+1. Check the [Text Embeddings Inference](tei.md) and [vLLM](vllm.md) examples
+2. Read about [services](../docs/guides/services.md)
+3. See all [learning materials](index.md)
+4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

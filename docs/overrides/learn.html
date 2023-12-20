@@ -1,140 +1,133 @@
 {% extends "landing.html" %}
 
-{% block content %}
-<section class="tx-container">
-    <div class="md-grid md-typeset">
-        <div class="-landing__highlights">
-            <div class="tx-landing__highlights_text">
-                <h2>Learning center</h2>
+{% block container %}
+<div class="md-content" data-md-component="content">
+    <article class="md-content__inner md-typeset">
+        <section class="tx-container">
+            <div class="md-grid md-typeset">
+                <div class="tx-landing__highlights">
+                    <div class="tx-landing__highlights_text">
+                        <h2>Learning materials</h2>
+                    </div>
+
+                    <div class="tx-landing__highlights_grid">
+                        <a href="/learn/tei" class="feature-cell">
+                            <h3>
+                                Text Embeddings Inference
+                            </h3>
+
+                            <p>
+                                Deploy text embeddings models using <strong>Services</strong> and <strong>TEI</strong>,
+                                an open-source text embeddings toolkit by Hugging Face.
+                            </p>
+
+                            <div class="feature-tags">
+                                <div class="feature-tag">Deployment</div>
+                            </div>
+                        </a>
+
+                        <a href="/learn/spot" class="feature-cell">
+                            <h3>
+                                Spot instances
+                            </h3>
+
+                            <p>
+                                Use spot instances with <strong>AWS</strong>, <strong>GCP</strong>, and
+                                <strong>Azure</strong> to significantly reduce the cost of cloud GPU.
+                            </p>
+
+                            <div class="feature-tags">
+                                <div class="feature-tag">Best practices</div>
+                            </div>
+                        </a>
+
+                        <a href="/learn/llama-index" class="feature-cell">
+                            <h3>
+                                Llama Index
+                            </h3>
+
+                            <p>
+                                Use <strong>Llama Index</strong> and <strong>Weaviate</strong> to enhance the
+                                capabilities
+                                of LLMs with the context of your data.
+                            </p>
+
+                            <div class="feature-tags">
+                                <div class="feature-tag">RAG</div>
+                            </div>
+                        </a>
+
+                        <a href="/learn/qlora" class="feature-cell">
+                            <h3>
+                                QLoRA
+                            </h3>
+
+                            <p>
+                                Fine-tune <strong>Llama 2</strong> on a custom dataset, with QLoRA
+                                and your own script, using <strong>Tasks</strong>.
+                            </p>
+
+                            <div class="feature-tags">
+                                <div class="feature-tag">Fine-tuning</div>
+                            </div>
+                        </a>
+
+                        <a href="/learn/tgi" class="feature-cell">
+                            <h3>
+                                Text Generation Inference
+                            </h3>
+
+                            <p>
+                                Deploy LLMs using <strong>Services</strong> and <strong>TGI</strong>, an
+                                open-source serving framework by Hugging Face.
+                            </p>
+
+                            <div class="feature-tags">
+                                <div class="feature-tag">Deployment</div>
+                            </div>
+                        </a>
+
+                        <a href="/learn/sdxl" class="feature-cell">
+                            <h3>
+                                SDXL
+                            </h3>
+
+                            <p>
+                                Deploy <strong>Stable Diffusion XL</strong>,
+                                with <strong>FastAPI</strong> and <strong>Diffusers</strong>,
+                                using <strong>Services</strong>.
+                                <br><br>
+                            </p>
+
+                            <div class="feature-tags">
+                                <div class="feature-tag">Deployment</div>
+                            </div>
+                        </a>
+
+                        <a href="/learn/vllm" class="feature-cell">
+                            <h3>
+                                vLLM
+                            </h3>
+
+                            <p>
+                                Deploy LLMs with <strong>Services</strong> and <strong>vLLM</strong>,
+                                an open-source serving library.
+
+                                <br><br>
+                            </p>
+
+                            <div class="feature-tags">
+                                <div class="feature-tag">Deployment</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
             </div>
-
-            <div class="tx-landing__highlights_grid">
-                <a href="/learn/tei" class="feature-cell">
-                    <h3>
-                        Serving embeddings with TEI
-                    </h3>
-
-                    <p>
-                        Deploy text embeddings models using <strong>Services</strong> and <strong>TEI</strong>,
-                        an open-source text embeddings toolkit by Hugging Face.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Example</div>
-                        <div class="feature-tag">Embeddings</div>
-                        <div class="feature-tag">RAG</div>
-                    </div>
-                </a>
-
-                <a href="/learn/spot" class="feature-cell">
-                    <h3>
-                        Leveraging spot instances effectively
-                    </h3>
-
-                    <p>
-                        Use spot instances with <strong>AWS</strong>, <strong>GCP</strong>, and
-                        <strong>Azure</strong> to significantly reduce the cost of cloud GPU.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Guide</div>
-                        <div class="feature-tag">GPU</div>
-                    </div>
-                </a>
-
-                <a href="/learn/llama-index" class="feature-cell">
-                    <h3>
-                        Building RAG with Llama Index
-                    </h3>
-
-                    <p>
-                        Use <strong>Llama Index</strong> and <strong>Weaviate</strong> to enhance the capabilities
-                        of LLMs with the context of your data.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Example</div>
-                        <div class="feature-tag">RAG</div>
-                    </div>
-                </a>
-
-                <a href="/learn/qlora" class="feature-cell">
-                    <h3>
-                        Fine-tuning LLMs with QLoRA
-                    </h3>
-
-                    <p>
-                        Fine-tune <strong>Llama 2</strong> on a custom dataset, with QLoRA
-                        and your own script, using <strong>Tasks</strong>.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Example</div>
-                        <div class="feature-tag">Fine-tuning</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
-                </a>
-
-                <a href="/learn/tgi" class="feature-cell">
-                    <h3>
-                        Serving LLMs with TGI
-                    </h3>
-
-                    <p>
-                        Deploy LLMs using <strong>Services</strong> and <strong>TGI</strong>, an
-                        open-source serving framework by Hugging Face.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Example</div>
-                        <div class="feature-tag">Inference</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
-                </a>
-
-                <a href="/learn/sdxl" class="feature-cell">
-                    <h3>
-                        Serving SDXL with FastAPI
-                    </h3>
-
-                    <p>
-                        Deploy <strong>Stable Diffusion XL</strong>,
-                        with <strong>FastAPI</strong> and <strong>Diffusers</strong>,
-                        using <strong>Services</strong>.
-                        <br><br>
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Example</div>
-                        <div class="feature-tag">Inference</div>
-                        <div class="feature-tag">Image generation</div>
-                    </div>
-                </a>
-
-                <a href="/learn/vllm" class="feature-cell">
-                    <h3>
-                        Serving LLMs with vLLM
-                    </h3>
-
-                    <p>
-                        Deploy LLMs with <strong>Services</strong> and <strong>vLLM</strong>,
-                        an open-source serving library.
-
-                        <br><br>
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Example</div>
-                        <div class="feature-tag">Inference</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
-                </a>
-            </div>
-        </div>
-    </div>
-</section>
-<br>
-<br>
-<br>
-<br>
+        </section>
+        <br>
+        <br>
+        <br>
+        <br>
+    </article>
+</div>
 {% endblock %}

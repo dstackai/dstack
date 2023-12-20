@@ -2,6 +2,7 @@
 
 {% block scripts %}
 {{ super() }}
+<script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
     window.$crisp = [];
     window.CRISP_WEBSITE_ID = "ce56e3b2-a23e-4d3f-9e80-e08c61a2b3cb";
@@ -14,6 +15,15 @@
         /*$crisp.push(["do", "chat:hide"]);*/
     })();
 </script>
+<script>
+    var typed = new Typed('#typed', {
+      strings: ['develop', 'train', 'fine-tune', 'deploy', 'scale'],
+      backDelay: 5000,
+      typeSpeed: 150,
+      backSpeed: 100,
+      loop: true,
+    });
+  </script>
 <script type="text/javascript">
     new Termynal('#tx-landing__major_feature_training_terminal',
         {
@@ -95,8 +105,8 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>An <span class="gradient">easier way</span> to train and deploy <span
-                        class="gradient">generative AI</span></h1>
+                <h1>An <span class="gradient">easier way</span> to <span
+                        class="gradient" id="typed"></span> generative AI</span></h1>
 
                 <p>
                     dstack simplifies training, fine-tuning, and deploying
@@ -110,14 +120,13 @@
                        class="md-button md-button--primary"
                        data-tally-open="w7K17R"
                        style="min-width: 250px"
-                    ><span>Start free trial</span>
+                    ><span>Get started free</span>
                         <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                     </a>
 
                     <div class="tx-landing__hero_button_placeholder">
-                        <strong>A100</strong> from <span class="highlighted">$1.4/h</span>, <strong>H100</strong> from
-                        <span class="highlighted">$2.10/h</span><br>
-                        Get <span class="highlighted">$15</span> of free compute
+                        On-demand
+                        cloud GPU <br>starting at <span class="highlighted">$0.21/h</span>
                     </div>
                 </div>
 
@@ -145,7 +154,7 @@
                         </div>
 
                         <div class="tx-landing__integrations_text">
-                            Use your own cloud account
+                            Use your cloud account
                         </div>
                     </div>
 
@@ -161,11 +170,10 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>Dev environments</h2>
-                    <p>Want to quickly provision a dev environment for interactive development?</p>
+                    <h2>Simplify development</h2>
+                    <p>Experiment interactively in your IDE, terminal, or Jupyter notebooks before submitting long tasks or deploying models.</p>
 
-                    <p>Specify a Docker image, your IDE, and required compute resources, then launch it via the CLI.</p>
-
+                    <p>With dstack, a single command provisions the necessary cloud resources, code, and environment for your dev setup.</p>
                     <p>
                         <a href="/docs/guides/dev-environments" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
@@ -186,12 +194,12 @@
                 </div>
 
                 <div class="block">
-                    <h2>Tasks</h2>
+                    <h2>Accelerate training</h2>
 
-                    <p>Run a custom training job or batch task with your code.</p>
+                    <p>With dstack, running tasks such as training or fine-tuning scripts, or any other batch jobs, is incredibly easy.</p>
 
-                    <p>Specify Docker image (if any), commands, exposed ports, compute resources, and schedule via CLI
-                        or Python API.</p>
+                    <p>Simply provide the commands, ports, and choose the Python version or a Docker image. dstack will
+                        handle the execution on configured cloud GPU provider(s) with the necessary resources.</p>
 
                     <p>
                         <a href="/docs/guides/tasks" target="_blank"
@@ -204,12 +212,12 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>Services</h2>
+                    <h2>Scale deployment</h2>
 
-                    <p>Deploy your model using custom code.</p>
+                    <p>With dstack, deploying models or any other web apps is straightforward.</p>
 
-                    <p>Specify Docker image (if any), run commands, and allocate compute resources. Deploy as a public
-                        endpoint via CLI or Python API.</p>
+                    <p>Just provide commands, port, and select Python version or Docker image. dstack handles deployment
+                        on configured cloud GPU provider(s), giving you a public HTTPS endpoint.</p>
 
                     <p>
                         <a href="/docs/guides/services" target="_blank"
@@ -226,46 +234,11 @@
 
         <div class="tx-landing__plans">
             <div class="tx-landing__highlights_text">
-                <h2>Opt for <span class="gradient">our cloud GPU</span> or use with <span class="gradient">your cloud account</span></h2>
+                <h2>Use <span class="gradient">your cloud</span> account or <br>opt for
+                    our <span class="gradient">cloud GPU</span></h2>
             </div>
 
             <div class="tx-landing__plans_cards">
-                <div class="plans_card">
-                    <div class="plans_card__title">dstack Cloud</div>
-                    <div class="plans_card__subtitle">A managed solution for training and deploying gen AI models
-                        with on-demand cloud GPU. Compatible with the open-source CLI and API.</div>
-
-                    <div class="plans_card__items">
-                        <div class="plans_card__item">
-                            <span class="strong">H100</span> (80GB) from <span class="highlighted">$2.10/h</span>
-                        </div>
-
-                        <div class="plans_card__item">
-                            <span class="strong">A100</span> (80GB) from <span class="highlighted">$1.4/h</span>
-                        </div>
-
-                        <div class="plans_card__item">
-                            <span class="strong">L40</span> (48GB) from <span class="highlighted">$1.05/h</span>
-                        </div>
-
-                        <div class="plans_card__item">
-                            <span class="strong">A6000</span> (80GB) from <span class="highlighted">$0.43/h</span>
-                        </div>
-                    </div>
-
-                    <a href="/pricing" class="plans_card__link">See all pricing options →</a>
-
-                    <div class="plans_card__buttons">
-                        <a href="#" target="_blank"
-                           data-tally-open="w7K17R"
-                           class="md-button md-button--primary small">
-                            <span>Start free trial</span>
-                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
-                        </a>
-                        <div class="plans_card__buttons_subtitle">Get <span class="highlighted">$15</span> of free compute</div>
-                    </div>
-                </div>
-
                 <div class="plans_card">
                     <div class="plans_card__title">Open-source</div>
                     <div class="plans_card__subtitle">A convenient CLI and API to train and deploy gen AI models
@@ -307,9 +280,134 @@
                     <div class="plans_card__buttons">
                         <a href="/docs" target="_blank"
                            class="md-button md-button-secondary small">Install open-source</a>
-                        <div class="plans_card__buttons_subtitle">Use your own cloud account</div>
+                        <div class="plans_card__buttons_subtitle">Use your cloud account</div>
                     </div>
                 </div>
+
+                <div class="plans_card">
+                    <div class="plans_card__title">dstack Cloud</div>
+                    <div class="plans_card__subtitle">A managed solution for training and deploying gen AI models
+                        with on-demand cloud GPU. Compatible with the open-source CLI and API.</div>
+
+                    <div class="plans_card__items">
+                        <div class="plans_card__item">
+                            <span class="strong">H100</span> (80GB) from <span class="highlighted">$2.10/h</span>
+                        </div>
+
+                        <div class="plans_card__item">
+                            <span class="strong">A100</span> (80GB) from <span class="highlighted">$1.4/h</span>
+                        </div>
+
+                        <div class="plans_card__item">
+                            <span class="strong">L40</span> (48GB) from <span class="highlighted">$1.05/h</span>
+                        </div>
+
+                        <div class="plans_card__item">
+                            <span class="strong">A6000</span> (80GB) from <span class="highlighted">$0.43/h</span>
+                        </div>
+                    </div>
+
+                    <a href="/pricing" class="plans_card__link">See all pricing options →</a>
+
+                    <div class="plans_card__buttons">
+                        <a href="#" target="_blank"
+                           data-tally-open="w7K17R"
+                           class="md-button md-button--primary small">
+                            <span>Get started free</span>
+                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                        </a>
+                        <div class="plans_card__buttons_subtitle">Get <span class="highlighted">$15</span> of free compute</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tx-landing__highlights">
+            <div class="tx-landing__highlights_text">
+                <h2>Featured examples</h2>
+            </div>
+
+            <div class="tx-landing__highlights_grid">
+                <a href="/learn/tei" class="feature-cell">
+                    <h3>
+                        Text Embeddings Inference
+                    </h3>
+
+                    <p>
+                        Deploy text embeddings models using <strong>Services</strong> and <strong>TEI</strong>,
+                        an open-source text embeddings toolkit by Hugging Face.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                    </div>
+                </a>
+
+                <a href="/learn/llama-index" class="feature-cell">
+                    <h3>
+                        Llama Index
+                    </h3>
+
+                    <p>
+                        Use <strong>Llama Index</strong> and <strong>Weaviate</strong> to enhance the capabilities
+                        of LLMs with the context of your data.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">RAG</div>
+                    </div>
+                </a>
+
+                <a href="/learn/qlora" class="feature-cell">
+                    <h3>
+                        QLoRA
+                    </h3>
+
+                    <p>
+                        Fine-tune <strong>Llama 2</strong> on a custom dataset, with QLoRA
+                        and your own script, using <strong>Tasks</strong>.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Fine-tuning</div>
+                    </div>
+                </a>
+
+                <a href="/learn/tgi" class="feature-cell">
+                    <h3>
+                        Text Generation Inference
+                    </h3>
+
+                    <p>
+                        Deploy LLMs using <strong>Services</strong> and <strong>TGI</strong>, an
+                        open-source serving framework by Hugging Face.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                    </div>
+                </a>
+
+                <a href="/learn/vllm" class="feature-cell">
+                    <h3>
+                        vLLM
+                    </h3>
+
+                    <p>
+                        Deploy LLMs with <strong>Services</strong> and <strong>vLLM</strong>,
+                        an open-source serving library.
+
+                        <br><br>
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="tx-landing__highlights_cta">
+                <a href="/learn">See all learning materials →</a>
             </div>
         </div>
     </div>

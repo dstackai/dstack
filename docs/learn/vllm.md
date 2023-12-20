@@ -1,9 +1,6 @@
-# Serving LLMs with vLLM
+# vLLM
 
-!!! info "NOTE:"
-    This example demonstrates how to deploy an LLM
-    using [Services](../docs/guides/services.md) and [vLLM](https://vllm.ai/),
-    an open-source library.
+This example demonstrates how to deploy an LLM using [Services](../docs/guides/services.md) and [vLLM](https://vllm.ai/), an open-source library.
 
 ## Define the configuration
 
@@ -32,7 +29,7 @@ commands:
 
 !!! warning "Gateway"
     Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
-    If you're using dstack Cloud, the dstack gateway is configured automatically for you.
+    If you're using dstack Cloud, the default gateway is configured automatically for you.
 
 <div class="termy">
 
@@ -69,7 +66,7 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
 
     To use a model with gated access, ensure configuring the `HUGGING_FACE_HUB_TOKEN` environment variable 
     (with [`--env`](../docs/reference/cli/index.md#dstack-run) in `dstack run` or 
-    using [`env`](../docs/reference/dstack.yml/service.md#env) in the configuration file).
+    using [`env`](../docs/reference/dstack.yml.md#service) in the configuration file).
     
     <div class="termy">
     
@@ -78,5 +75,13 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
     ```
     </div>
 
-!!! info "Source code"
-    The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+## Source code
+    
+The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+
+## What's next?
+
+1. Check the [Text Generation Inference](tgi.md) example
+2. Read about [services](../docs/guides/services.md)
+3. See all [learning materials](index.md)
+4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

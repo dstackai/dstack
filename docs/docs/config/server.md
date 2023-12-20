@@ -406,3 +406,11 @@ projects:
 </div>
 
 If regions aren't specified, `dstack` will use all available regions.
+
+## What's next?
+
+1. Read about [dev environments](../guides/dev-environments.md), [tasks](../guides/tasks.md), 
+    and [services](../guides/services.md)
+2. See all [learning materials](../../learn/index.md)
+3. Join the [Discord server](https://discord.gg/u8SmfwPpMd)
+4. Sign up for [dstack Cloud](../../index.md) (if you'd like the server to be hosted by `dstack`)

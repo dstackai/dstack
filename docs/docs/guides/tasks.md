@@ -54,7 +54,7 @@ which are pre-configured with Python, Conda, and essential CUDA drivers.
 !!! info "Configuration options"
     Configuration file allows you to specify a custom Docker image, ports, environment variables, and many other 
     options.
-    For more details, refer to the [Reference](../reference/dstack.yml/task.md).
+    For more details, refer to the [Reference](../reference/dstack.yml.md#task).
 
 ### Run the configuration
 
@@ -154,3 +154,11 @@ $ dstack run . -f train.dstack.yml --retry-limit 3h
 For more details on the `dstack run` command, refer to the [Reference](../reference/cli/index.md#dstack-run).
 
 [//]: # (Using the API)
+
+## What's next?
+
+1. Check the [QLoRA](../../learn/qlora.md) example
+2. Read about [dev environments](../guides/dev-environments.md) 
+    and [services](../guides/services.md)
+3. See all [learning materials](../../learn/index.md)
+4. Check the [reference](../reference/dstack.yml.md#task)
