@@ -1,8 +1,10 @@
 import asyncio
+import functools
 import logging
 from abc import ABC, abstractmethod
 from asyncio import Lock
 from collections import defaultdict
+from contextlib import AsyncExitStack
 from functools import lru_cache, partial
 from typing import Dict, List, Set, Tuple
 
@@ -36,24 +38,22 @@ class Store:
                 docker_host=service.docker_ssh_host,
                 docker_port=service.docker_ssh_port,
             )
-            rollbacks = []
-            try:
+            async with AsyncExitStack() as stack:
                 await run_async(tunnel.start)
-                rollbacks.append(partial(run_async, tunnel.stop))
+                stack.push_async_callback(supress_exc(run_async, tunnel.stop))
+
                 await self.nginx.register_service(service.public_domain, tunnel.sock_path)
-                rollbacks.append(partial(self.nginx.unregister_service, service.public_domain))
+                stack.push_async_callback(
+                    supress_exc(self.nginx.unregister_service, service.public_domain)
+                )
+
                 for subscriber in self.subscribers:
                     await subscriber.on_register(project, service)
-                    rollbacks.append(
-                        partial(subscriber.on_unregister, project, service.public_domain)
+                    stack.push_async_callback(
+                        supress_exc(subscriber.on_unregister, project, service.public_domain)
                     )
-            except Exception:
-                for rollback in reversed(rollbacks):
-                    try:
-                        await rollback()
-                    except Exception:
-                        pass
-                raise
+
+                stack.pop_all()  # no need to rollback
             self.projects[project].add(service.public_domain)
             self.services[service.public_domain] = (service, tunnel)
 
@@ -113,6 +113,17 @@ class StoreSubscriber(ABC):
     @abstractmethod
     async def on_unregister(self, project: str, domain: str):
         ...
+
+
+def supress_exc(func, *args, **kwargs):
+    @functools.wraps(func)
+    async def wrapper():
+        try:
+            return await func(*args, **kwargs)
+        except Exception:
+            pass
+
+    return wrapper
 
 
 @lru_cache()

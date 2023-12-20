@@ -46,9 +46,9 @@ class TestRegister:
     @pytest.mark.asyncio
     async def test_fail_rollback(self, ssh_tunnel, nginx):
         store = Store(nginx)
-        nginx.register_service.side_effect = BarException()
-        ssh_tunnel.stop.side_effect = FooException()
-        with pytest.raises(BarException):
+        nginx.register_service.side_effect = FooException()
+        ssh_tunnel.stop.side_effect = BarException()
+        with pytest.raises(FooException):
             await store.register("project", get_service("domain.com"))
         ssh_tunnel.start.assert_called_once()
         ssh_tunnel.stop.assert_called_once()
