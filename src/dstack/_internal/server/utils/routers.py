@@ -1,8 +1,11 @@
 from typing import Dict, List, Optional
 
 from fastapi import HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
+from packaging import version
 
 from dstack._internal.core.errors import ServerClientError
+from dstack._internal.server import settings
 
 
 def error_detail(msg: str, code: Optional[str] = None, **kwargs) -> Dict:
@@ -53,3 +56,57 @@ def request_size_exceeded(request: Request, limit: int) -> bool:
     if content_length > limit:
         return True
     return False
+
+
+def check_client_server_compatibility(
+    client_version: Optional[str],
+    server_version: Optional[str],
+) -> Optional[JSONResponse]:
+    """
+    Returns `JSONResponse` with error if client/server versions are incompatible.
+    Returns `None` otherwise.
+    """
+    if server_version is None:
+        return None
+    parsed_server_version = version.parse(server_version)
+    if client_version is None:
+        return error_incompatible_versions(client_version, server_version, ask_cli_update=True)
+    # latest allows client to bypass compatibility check (e.g. frontend)
+    if client_version == "latest":
+        return None
+    try:
+        parsed_client_version = version.parse(client_version)
+    except version.InvalidVersion:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={
+                "detail": get_server_client_error_details(
+                    ServerClientError("Bad API version specified")
+                )
+            },
+        )
+    if parsed_client_version < parsed_server_version and (
+        parsed_client_version.major < parsed_server_version.major
+        or parsed_client_version.minor < parsed_server_version.minor
+    ):
+        return error_incompatible_versions(client_version, server_version, ask_cli_update=True)
+    elif parsed_client_version > parsed_server_version and (
+        parsed_client_version.major > parsed_server_version.major
+        or parsed_client_version.minor > parsed_server_version.minor
+    ):
+        return error_incompatible_versions(client_version, server_version, ask_cli_update=False)
+    return None
+
+
+def error_incompatible_versions(
+    client_version: Optional[str],
+    server_version: str,
+    ask_cli_update: bool,
+) -> JSONResponse:
+    msg = f"The client/CLI version ({client_version}) is incompatible with the server version ({server_version})."
+    if ask_cli_update:
+        msg += f" Update the dstack CLI: `pip install dstack=={server_version}`."
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"detail": get_server_client_error_details(ServerClientError(msg=msg))},
+    )

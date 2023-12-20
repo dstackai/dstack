@@ -30,8 +30,8 @@ from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME, SERVER_URL
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
+    check_client_server_compatibility,
     error_detail,
-    error_forbidden,
     get_server_client_error_details,
 )
 from dstack._internal.utils.logging import get_logger
@@ -129,6 +129,18 @@ def register_routes(app: FastAPI):
             "Processed request %s %s in %s", request.method, request.url, f"{process_time:0.6f}s"
         )
         return response
+
+    @app.middleware("http")
+    async def check_client_version(request: Request, call_next):
+        if not request.url.path.startswith("/api/") or request.url.path == "/api/docs":
+            return await call_next(request)
+        response = check_client_server_compatibility(
+            client_version=request.headers.get("x-api-version"),
+            server_version=settings.SERVER_API_VERSION,
+        )
+        if response is not None:
+            return response
+        return await call_next(request)
 
     @app.get("/healthcheck")
     async def healthcheck():
