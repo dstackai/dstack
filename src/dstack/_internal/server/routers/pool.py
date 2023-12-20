@@ -39,7 +39,7 @@ async def create_pool(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     _, project = user_project
-    await pool.create_pool_model(name=body.name, session=session, project=project)
+    await pool.create_pool_model(session=session, project=project, name=body.name)
 
 
 @router.post("/show")
@@ -49,4 +49,4 @@ async def how_pool(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     _, project = user_project
-    return await pool.show_pool(pool_name=body.name, session=session, project=project)
+    return await pool.show_pool(session, project, pool_name=body.name)

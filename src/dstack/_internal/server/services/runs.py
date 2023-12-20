@@ -2,7 +2,7 @@ import asyncio
 import itertools
 import uuid
 from datetime import timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import pydantic
 from sqlalchemy import select, update
@@ -11,13 +11,27 @@ from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
-from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError
+from dstack._internal.core.backends.base import Backend
+from dstack._internal.core.backends.base.compute import (
+    DockerConfig,
+    InstanceConfiguration,
+    SSHKeys,
+)
+from dstack._internal.core.errors import BackendError, RepoDoesNotExistError, ServerClientError
+from dstack._internal.core.models.instances import (
+    InstanceOfferWithAvailability,
+    LaunchedInstanceInfo,
+)
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
 from dstack._internal.core.models.runs import (
+    GpusRequirements,
     Job,
     JobPlan,
+    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobSubmission,
+    Requirements,
     Run,
     RunPlan,
     RunSpec,
@@ -28,13 +42,19 @@ from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import JobModel, PoolModel, ProjectModel, RunModel, UserModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import repos as repos_services
+from dstack._internal.server.services.docker import parse_image_name
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     job_model_to_job_submission,
     stop_job,
 )
+from dstack._internal.server.services.jobs.configurators.base import (
+    get_default_image,
+    get_default_python_verison,
+)
 from dstack._internal.server.services.pool import create_pool_model
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
 
@@ -119,6 +139,103 @@ async def get_run(
     return run_model_to_run(run_model)
 
 
+async def get_run_plan_by_requirements(
+    project: ProjectModel, profile: Profile
+) -> Tuple[Requirements, List[Tuple[Backend, InstanceOfferWithAvailability]]]:
+    backends = await backends_services.get_project_backends(project=project)
+    if profile.backends is not None:
+        backends = [b for b in backends if b.TYPE in profile.backends]
+
+    spot_policy = profile.spot_policy or SpotPolicy.AUTO  # TODO: improve
+    requirements = Requirements(
+        cpus=profile.resources.cpu,
+        memory_mib=profile.resources.memory,
+        gpus=None,
+        shm_size_mib=profile.resources.shm_size,
+        max_price=profile.max_price,
+        spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
+    )
+    if profile.resources.gpu:
+        requirements.gpus = GpusRequirements(
+            count=profile.resources.gpu.count,
+            memory_mib=profile.resources.gpu.memory,
+            name=profile.resources.gpu.name,
+            total_memory_mib=profile.resources.gpu.total_memory,
+            compute_capability=profile.resources.gpu.compute_capability,
+        )
+
+    offers = await backends_services.get_instance_offers(
+        backends=backends,
+        requirements=requirements,
+        exclude_not_available=False,
+    )
+
+    return requirements, offers
+
+
+async def create_instance(
+    project: ProjectModel, user: UserModel, pool_name: str, instance_name: str, profile: Profile
+):
+    _, offers = await get_run_plan_by_requirements(project, profile)
+
+    ssh_key = SSHKeys(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+    instance_config = InstanceConfiguration(
+        instance_name=instance_name,
+        pool_name=pool_name,
+        ssh_keys=[ssh_key],
+        job_docker_config=DockerConfig(
+            image=parse_image_name(get_default_image(get_default_python_verison())),
+            registry_auth=None,
+        ),
+    )
+
+    for backend, instance_offer in offers:
+
+        logger.debug(
+            "trying %s in %s/%s for $%0.4f per hour",
+            instance_offer.instance.name,
+            instance_offer.backend.value,
+            instance_offer.region,
+            instance_offer.price,
+        )
+        try:
+            launched_instance_info: LaunchedInstanceInfo = await run_async(
+                backend.compute().create_instance,
+                project,
+                user,
+                instance_offer,
+                instance_config,
+            )
+        except BackendError as e:
+            logger.warning(
+                "%s launch in %s/%s failed: %s",
+                instance_offer.instance.name,
+                instance_offer.backend.value,
+                instance_offer.region,
+                repr(e),
+            )
+            continue
+        else:
+            job_provisioning_data = JobProvisioningData(
+                backend=backend.TYPE,
+                instance_type=instance_offer.instance,
+                instance_id=launched_instance_info.instance_id,
+                hostname=launched_instance_info.ip_address,
+                region=launched_instance_info.region,
+                price=instance_offer.price,
+                username=launched_instance_info.username,
+                ssh_port=launched_instance_info.ssh_port,
+                dockerized=launched_instance_info.dockerized,
+                backend_data=launched_instance_info.backend_data,
+            )
+
+            return (job_provisioning_data, instance_offer)
+    return (None, None)
+
+
 async def get_run_plan(
     session: AsyncSession,
     project: ProjectModel,
@@ -134,9 +251,10 @@ async def get_run_plan(
     job_plans = []
     for job in jobs:
         # TODO: use the job.pool_name to select an offer
+        requirements = job.job_spec.requirements
         offers = await backends_services.get_instance_offers(
             backends=backends,
-            job=job,
+            requirements=requirements,
             exclude_not_available=False,
         )
         for backend, offer in offers:
@@ -180,11 +298,13 @@ async def submit_run(
     else:
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
-    pool_name = run_spec.profile.pool_name
+    pool_name = (
+        DEFAULT_POOL_NAME if run_spec.profile.pool_name is None else run_spec.profile.pool_name
+    )
     pools_result = await session.execute(select(PoolModel).where(PoolModel.name == pool_name))
     pools = pools_result.scalars().all()
     if not pools:
-        await create_pool_model(name=pool_name, session=session, project=project)
+        await create_pool_model(session=session, project=project, name=pool_name)
 
     run_model = RunModel(
         id=uuid.uuid4(),

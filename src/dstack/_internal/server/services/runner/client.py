@@ -99,10 +99,12 @@ class ShimClient:
         except requests.exceptions.RequestException:
             return None
 
-    def registry_auth(self, username: str, password: str):
+    def registry_auth(self, username: str, password: str, image_name: str):
         resp = requests.post(
             self._url("/api/registry_auth"),
-            json=RegistryAuthBody(username=username, password=password).dict(),
+            json=RegistryAuthBody(
+                username=username, password=password, image_name=image_name
+            ).dict(),
         )
         resp.raise_for_status()
 

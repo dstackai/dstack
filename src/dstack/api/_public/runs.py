@@ -7,7 +7,7 @@ from abc import ABC
 from copy import copy
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import requests
 from websocket import WebSocketApp
@@ -16,11 +16,13 @@ import dstack.api as api
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, SpotPolicy
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
+from dstack._internal.core.models.runs import Requirements
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.core.models.runs import RunPlan, RunSpec
 from dstack._internal.core.services.logs import URLReplacer
@@ -356,6 +358,14 @@ class RunCollection:
             run_name=run_name,
         )
         return self.exec_plan(run_plan, repo, reserve_ports=reserve_ports)
+
+    def get_offers(
+        self, profile: Profile
+    ) -> Tuple[Requirements, List[InstanceOfferWithAvailability]]:
+        return self._api_client.runs.get_offers(self._project, profile)
+
+    def create_instance(self, pool_name: str, profile: Profile):
+        self._api_client.runs.create_instance(self._project, pool_name, profile)
 
     def get_plan(
         self,

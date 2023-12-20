@@ -68,3 +68,4 @@ class HealthcheckResponse(BaseModel):
 class RegistryAuthBody(BaseModel):
     username: str
     password: str
+    image_name: str

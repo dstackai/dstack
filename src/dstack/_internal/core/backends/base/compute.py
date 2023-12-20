@@ -6,10 +6,12 @@ from typing import List, Optional
 import git
 import requests
 import yaml
+from pydantic import BaseModel
 
 from dstack import version
 from dstack._internal import settings
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedGatewayInfo,
@@ -19,6 +21,28 @@ from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.server.services.docker import DockerImage
+
+
+class SSHKeys(BaseModel):
+    public: str
+    private: Optional[str]
+
+
+class DockerConfig(BaseModel):
+    registry_auth: Optional[RegistryAuth]
+    image: Optional[DockerImage]
+
+
+class InstanceConfiguration(BaseModel):
+    pool_name: str
+    instance_name: str  # unique in pool
+    ssh_keys: List[SSHKeys]
+    job_docker_config: Optional[DockerConfig]
+
+    def get_public_keys(self):
+        return [ssh_key.public.strip() for ssh_key in self.ssh_keys]
 
 
 class Compute(ABC):
@@ -36,6 +60,16 @@ class Compute(ABC):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+    ) -> LaunchedInstanceInfo:
+        pass
+
+    @abstractmethod
+    def create_instance(
+        self,
+        project: ProjectModel,
+        user: UserModel,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
     ) -> LaunchedInstanceInfo:
         pass
 

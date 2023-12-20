@@ -1,13 +1,16 @@
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.runs import Run, RunPlan
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.runs import Requirements, Run, RunPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
+    CreateInstanceRequest,
     DeleteRunsRequest,
+    GetOffersRequest,
     GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
@@ -16,6 +19,7 @@ from dstack._internal.server.schemas.runs import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
+from dstack._internal.server.services.pool import generate_instance_name
 from dstack._internal.server.utils.routers import error_not_found
 
 root_router = APIRouter(
@@ -57,6 +61,39 @@ async def get_run(
     if run is None:
         raise error_not_found()
     return run
+
+
+@project_router.post("/get_offers")
+async def get_offers(
+    body: GetOffersRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+) -> Tuple[Requirements, List[InstanceOfferWithAvailability]]:
+    _, project = user_project
+    reqs, offers = await runs.get_run_plan_by_requirements(
+        project=project,
+        profile=body.profile,
+    )
+    return (reqs, [instance for _, instance in offers])
+
+
+@project_router.post("/create_instance")
+async def create_instance(
+    body: CreateInstanceRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+):
+    user, project = user_project
+    instance_name = await generate_instance_name(
+        session=session, project=project, pool_name=body.pool_name
+    )
+    await runs.create_instance(
+        project=project,
+        user=user,
+        pool_name=body.pool_name,
+        instance_name=instance_name,
+        profile=body.profile,
+    )
 
 
 @project_router.post("/get_plan")

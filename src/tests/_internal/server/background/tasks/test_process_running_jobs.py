@@ -214,7 +214,9 @@ class TestProcessRunningJobs:
             await process_running_jobs()
             RunnerTunnelMock.assert_called_once()
             ShimClientMock.return_value.healthcheck.assert_called_once()
-            ShimClientMock.return_value.registry_auth.assert_not_called()
+            ShimClientMock.return_value.registry_auth.assert_called_once_with(
+                username="", password="", image_name="dstackai/base:py3.11-0.4rc4-cuda-12.1"
+            )
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PULLING

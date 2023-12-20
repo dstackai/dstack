@@ -93,7 +93,6 @@ func main() {
 					&cli.StringFlag{
 						Name:        "image",
 						Usage:       "Docker image name",
-						Required:    true,
 						Destination: &args.Docker.ImageName,
 						EnvVars:     []string{"DSTACK_IMAGE_NAME"},
 					},

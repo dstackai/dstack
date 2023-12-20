@@ -11,6 +11,7 @@ from dstack._internal import settings
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    InstanceConfiguration,
     get_gateway_user_data,
     get_instance_name,
     get_user_data,
@@ -27,6 +28,7 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -94,6 +96,70 @@ class AWSCompute(Compute):
                 pass
             else:
                 raise e
+
+    def create_instance(
+        self,
+        project: ProjectModel,
+        user: UserModel,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+    ) -> LaunchedInstanceInfo:
+        project_id = project.name
+        ec2 = self.session.resource("ec2", region_name=instance_offer.region)
+        ec2_client = self.session.client("ec2", region_name=instance_offer.region)
+        iam_client = self.session.client("iam", region_name=instance_offer.region)
+
+        tags = [
+            {"Key": "Name", "Value": run.run_spec.run_name},
+            {"Key": "owner", "Value": "dstack"},
+            {"Key": "dstack_project", "Value": project_id},
+            {"Key": "dstack_user", "Value": run.user},
+        ]
+        try:
+            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+            response = ec2.create_instances(
+                **aws_resources.create_instances_struct(
+                    disk_size=disk_size,
+                    image_id=aws_resources.get_image_id(
+                        ec2_client, len(instance_offer.instance.resources.gpus) > 0
+                    ),
+                    instance_type=instance_offer.instance.name,
+                    iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
+                        iam_client, project_id
+                    ),
+                    user_data=get_user_data(
+                        backend=BackendType.AWS,
+                        image_name=job.job_spec.image_name,
+                        authorized_keys=[
+                            run.run_spec.ssh_key_pub.strip(),
+                            project_ssh_public_key.strip(),
+                        ],
+                        registry_auth_required=job.job_spec.registry_auth is not None,
+                    ),
+                    tags=tags,
+                    security_group_id=aws_resources.create_security_group(ec2_client, project_id),
+                    spot=instance_offer.instance.resources.spot,
+                )
+            )
+            instance = response[0]
+            instance.wait_until_running()
+            instance.reload()  # populate instance.public_ip_address
+
+            if instance_offer.instance.resources.spot:  # it will not terminate the instance
+                ec2_client.cancel_spot_instance_requests(
+                    SpotInstanceRequestIds=[instance.spot_instance_request_id]
+                )
+            return LaunchedInstanceInfo(
+                instance_id=instance.instance_id,
+                ip_address=instance.public_ip_address,
+                region=instance_offer.region,
+                username="ubuntu",
+                ssh_port=22,
+                dockerized=True,  # because `dstack-shim docker` is used
+            )
+        except botocore.exceptions.ClientError as e:
+            logger.warning("Got botocore.exceptions.ClientError: %s", e)
+            raise NoCapacityError()
 
     def run_job(
         self,

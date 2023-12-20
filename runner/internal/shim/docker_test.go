@@ -116,10 +116,8 @@ func (c *dockerParametersMock) DockerMounts() ([]mount.Mount, error) {
 
 type apiAdapterMock struct{}
 
-func (s *apiAdapterMock) GetRegistryAuth() <-chan string {
-	ch := make(chan string)
-	close(ch)
-	return ch
+func (s *apiAdapterMock) GetRegistryAuth() ImagePullConfig {
+	return ImagePullConfig{}
 }
 
 func (s *apiAdapterMock) SetState(string) {}

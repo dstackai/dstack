@@ -8,6 +8,7 @@ import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack._internal.core.backends.base.compute import (
     Compute,
+    InstanceConfiguration,
     get_gateway_user_data,
     get_instance_name,
     get_user_data,
@@ -26,6 +27,8 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.utils.random_names import generate_name
 
 
 class GCPCompute(Compute):
@@ -77,6 +80,77 @@ class GCPCompute(Compute):
             )
         except google.api_core.exceptions.NotFound:
             pass
+
+    def create_instance(
+        self,
+        project: ProjectModel,
+        user: UserModel,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+    ) -> LaunchedInstanceInfo:
+
+        project_id = project.name
+        instance_name = instance_config.instance_name
+
+        gcp_resources.create_runner_firewall_rules(
+            firewalls_client=self.firewalls_client,
+            project_id=self.config.project_id,
+        )
+        disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+
+        registry_auth_required = instance_config.job_docker_config.registry_auth is not None
+        for zone in _get_instance_zones(instance_offer):
+            request = compute_v1.InsertInstanceRequest()
+            request.zone = zone
+            request.project = self.config.project_id
+            request.instance_resource = gcp_resources.create_instance_struct(
+                disk_size=disk_size,
+                image_id=gcp_resources.get_image_id(
+                    len(instance_offer.instance.resources.gpus) > 0,
+                ),
+                machine_type=instance_offer.instance.name,
+                accelerators=gcp_resources.get_accelerators(
+                    project_id=self.config.project_id,
+                    zone=zone,
+                    gpus=instance_offer.instance.resources.gpus,
+                ),
+                spot=instance_offer.instance.resources.spot,
+                user_data=get_user_data(
+                    backend=BackendType.GCP,
+                    image_name=instance_config.job_docker_config.image.image,
+                    authorized_keys=instance_config.get_public_keys(),
+                    registry_auth_required=registry_auth_required,
+                ),
+                labels={
+                    "owner": "dstack",
+                    "dstack_project": project_id,
+                    "dstack_user": user.name,
+                },
+                tags=[gcp_resources.DSTACK_INSTANCE_TAG],
+                instance_name=instance_name,
+                zone=zone,
+                service_account=self.config.service_account_email,
+            )
+            try:
+                operation = self.instances_client.insert(request=request)
+                gcp_resources.wait_for_extended_operation(operation, "instance creation")
+            except (
+                google.api_core.exceptions.ServiceUnavailable,
+                google.api_core.exceptions.NotFound,
+            ):
+                continue
+            instance = self.instances_client.get(
+                project=self.config.project_id, zone=zone, instance=instance_name
+            )
+            return LaunchedInstanceInfo(
+                instance_id=instance_name,
+                region=zone,
+                ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
+                username="ubuntu",
+                ssh_port=22,
+                dockerized=True,
+            )
+        raise NoCapacityError()
 
     def run_job(
         self,

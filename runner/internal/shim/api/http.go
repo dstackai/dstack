@@ -1,12 +1,9 @@
 package api
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"log"
 	"net/http"
 
-	"github.com/docker/docker/api/types/registry"
 	"github.com/dstackai/dstack/runner/internal/api"
 	"github.com/dstackai/dstack/runner/internal/shim"
 )
@@ -33,16 +30,7 @@ func (s *ShimServer) registryAuthPostHandler(w http.ResponseWriter, r *http.Requ
 		return nil, err
 	}
 
-	authConfig := registry.AuthConfig{
-		Username: body.Username,
-		Password: body.Password,
-	}
-	encodedConfig, err := json.Marshal(authConfig)
-	if err != nil {
-		log.Println("Failed to encode auth config", "err", err)
-		return nil, err
-	}
-	s.registryAuth <- base64.URLEncoding.EncodeToString(encodedConfig)
+	s.registryAuth = body.MakeConfig()
 
 	return nil, nil
 }

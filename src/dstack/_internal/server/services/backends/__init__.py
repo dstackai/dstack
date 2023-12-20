@@ -24,7 +24,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
 )
-from dstack._internal.core.models.runs import Job
+from dstack._internal.core.models.runs import Job, Requirements
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import Configurator
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
@@ -297,14 +297,12 @@ _NOT_AVAILABLE = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QU
 
 
 async def get_instance_offers(
-    backends: List[Backend], job: Job, exclude_not_available: bool = False
+    backends: List[Backend], requirements: Requirements, exclude_not_available: bool = False
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
-    tasks = [
-        run_async(backend.compute().get_offers, job.job_spec.requirements) for backend in backends
-    ]
+    tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
     offers_by_backend = [
         [
             (backend, offer)

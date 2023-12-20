@@ -16,7 +16,7 @@ type ShimServer struct {
 	srv *http.Server
 
 	mu           sync.RWMutex
-	registryAuth chan string
+	registryAuth shim.ImagePullConfig
 	state        string
 }
 
@@ -28,13 +28,10 @@ func NewShimServer(address string, registryAuthRequired bool) *ShimServer {
 			Handler: mux,
 		},
 
-		registryAuth: make(chan string, 1),
-		state:        shim.WaitRegistryAuth,
+		state: shim.WaitRegistryAuth,
 	}
 	if registryAuthRequired {
 		mux.HandleFunc("/api/registry_auth", api.JSONResponseHandler("POST", s.registryAuthPostHandler))
-	} else {
-		close(s.registryAuth) // no credentials ever would be sent
 	}
 	mux.HandleFunc("/api/healthcheck", api.JSONResponseHandler("GET", s.healthcheckGetHandler))
 	mux.HandleFunc("/api/pull", api.JSONResponseHandler("GET", s.pullGetHandler))
@@ -55,7 +52,7 @@ func (s *ShimServer) RunDocker(ctx context.Context, params shim.DockerParameters
 	return gerrors.Wrap(shim.RunDocker(ctx, params, s))
 }
 
-func (s *ShimServer) GetRegistryAuth() <-chan string {
+func (s *ShimServer) GetRegistryAuth() shim.ImagePullConfig {
 	return s.registryAuth
 }
 

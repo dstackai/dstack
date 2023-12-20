@@ -261,6 +261,7 @@ class InstanceModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    name: Mapped[str] = mapped_column(String(50))
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])

@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import get_shim_commands
+from dstack._internal.core.backends.base.compute import InstanceConfiguration, get_shim_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
 from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
@@ -14,6 +14,7 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.server.models import ProjectModel, UserModel
 
 
 class DataCrunchCompute(Compute):
@@ -58,6 +59,70 @@ class DataCrunchCompute(Compute):
             )
 
         return availability_offers
+
+    def create_instance(
+        self,
+        project: ProjectModel,
+        user: UserModel,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+    ) -> LaunchedInstanceInfo:
+        public_keys = instance_config.get_public_keys()
+        ssh_ids = []
+        for ssh_public_key in public_keys:
+            ssh_ids.append(
+                # datacrunch allows you to use the same name
+                self.api_client.get_or_create_ssh_key(
+                    name=f"dstack-{instance_config.instance_name}.key",
+                    public_key=ssh_public_key,
+                )
+            )
+
+        registry_auth_required = instance_config.job_docker_config.registry_auth is not None
+        commands = get_shim_commands(
+            backend=BackendType.DATACRUNCH,
+            image_name=instance_config.job_docker_config.image.image,
+            authorized_keys=public_keys,
+            registry_auth_required=registry_auth_required,
+        )
+
+        startup_script = " ".join([" && ".join(commands)])
+        script_name = f"dstack-{instance_config.instance_name}.sh"
+        startup_script_ids = self.api_client.get_or_create_startup_scrpit(
+            name=script_name, script=startup_script
+        )
+
+        # Id of image "Ubuntu 22.04 + CUDA 12.0 + Docker"
+        # from API https://datacrunch.stoplight.io/docs/datacrunch-public/c46ab45dbc508-get-all-image-types
+        image_name = "2088da25-bb0d-41cc-a191-dccae45d96fd"
+
+        disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+        instance = self.api_client.deploy_instance(
+            instance_type=instance_offer.instance.name,
+            ssh_key_ids=ssh_ids,
+            startup_script_id=startup_script_ids,
+            hostname=instance_config.instance_name,
+            description=instance_config.instance_name,
+            image=image_name,
+            disk_size=disk_size,
+            location=instance_offer.region,
+        )
+
+        running_instance = self.api_client.wait_for_instance(instance.id)
+        if running_instance is None:
+            raise BackendError(f"Wait instance {instance.id!r} timeout")
+
+        launched_instance = LaunchedInstanceInfo(
+            instance_id=running_instance.id,
+            ip_address=running_instance.ip,
+            region=running_instance.location,
+            ssh_port=22,
+            username="root",
+            dockerized=True,
+            backend_data=None,
+        )
+
+        return launched_instance
 
     def run_job(
         self,

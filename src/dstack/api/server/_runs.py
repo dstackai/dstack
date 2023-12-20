@@ -1,10 +1,14 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.models.runs import Run, RunPlan, RunSpec
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.runs import Requirements, Run, RunPlan, RunSpec
 from dstack._internal.server.schemas.runs import (
+    CreateInstanceRequest,
     DeleteRunsRequest,
+    GetOffersRequest,
     GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
@@ -24,6 +28,17 @@ class RunsAPIClient(APIClientGroup):
         body = GetRunRequest(run_name=run_name)
         resp = self._request(f"/api/project/{project_name}/runs/get", body=body.json())
         return parse_obj_as(Run, resp.json())
+
+    def get_offers(
+        self, project_name: str, profile: Profile
+    ) -> Tuple[Requirements, List[InstanceOfferWithAvailability]]:
+        body = GetOffersRequest(profile=profile)
+        resp = self._request(f"/api/project/{project_name}/runs/get_offers", body=body.json())
+        return parse_obj_as(Tuple[Requirements, List[InstanceOfferWithAvailability]], resp.json())
+
+    def create_instance(self, project_name: str, pool_name: str, profile: Profile):
+        body = CreateInstanceRequest(pool_name=pool_name, profile=profile)
+        self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
 
     def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:
         body = GetRunPlanRequest(run_spec=run_spec)

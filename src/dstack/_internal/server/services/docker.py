@@ -1,8 +1,8 @@
-from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
 import requests
+from pydantic import BaseModel
 
 manifests_media_types = [
     "application/vnd.oci.image.index.v1+json",
@@ -12,8 +12,11 @@ manifests_media_types = [
 ]
 
 
-@dataclass(frozen=True)
-class DockerImage:
+class DockerImage(BaseModel):
+    class Config:
+        frozen = True
+
+    image: str
     registry: Optional[str]
     repo: str
     tag: str
@@ -115,7 +118,7 @@ def parse_image_name(image: str) -> DockerImage:
         registry = components[0]
         repo = "/".join(components[1:])
 
-    return DockerImage(registry, repo, tag, digest)
+    return DockerImage(image=image, registry=registry, repo=repo, tag=tag, digest=digest)
 
 
 def is_host(s: str) -> bool:

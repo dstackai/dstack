@@ -2,6 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
+from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import RunSpec
 
 
@@ -16,6 +17,15 @@ class GetRunRequest(BaseModel):
 
 class GetRunPlanRequest(BaseModel):
     run_spec: RunSpec
+
+
+class GetOffersRequest(BaseModel):
+    profile: Profile
+
+
+class CreateInstanceRequest(BaseModel):
+    pool_name: str
+    profile: Profile
 
 
 class SubmitRunRequest(BaseModel):

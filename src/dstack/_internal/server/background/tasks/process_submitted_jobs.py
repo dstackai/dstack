@@ -107,6 +107,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_model.status = JobStatus.PROVISIONING
 
         im = InstanceModel(
+            name=job.job_spec.job_name,
             project=project_model,
             pool=pool,
             job_provisioning_data=job_provisioning_data.json(),
@@ -137,12 +138,13 @@ async def _run_job(
     if run.run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
     try:
+        requirements = job.job_spec.requirements
         offers = await backends_services.get_instance_offers(
-            backends, job, exclude_not_available=True
+            backends, requirements, exclude_not_available=True
         )
     except BackendError as e:
         logger.warning(*job_log("failed to get instance offers: %s", job_model, repr(e)))
-        return None
+        return None  # or (None, None)?
     for backend, offer in offers:
         logger.debug(
             *job_log(

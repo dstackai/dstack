@@ -29,13 +29,18 @@ func RunDocker(ctx context.Context, params DockerParameters, serverAPI APIAdapte
 	}
 
 	log.Println("Waiting for registry auth")
-	registryAuth := <-serverAPI.GetRegistryAuth()
+	registryAuth := serverAPI.GetRegistryAuth()
 	serverAPI.SetState(Pulling)
 
 	log.Println("Pulling image")
-	if err = pullImage(ctx, client, params.DockerImageName(), registryAuth); err != nil {
+	imageName := params.DockerImageName()
+	if imageName == "" {
+		imageName = registryAuth.ImageName
+	}
+	if err = pullImage(ctx, client, imageName, registryAuth); err != nil {
 		return gerrors.Wrap(err)
 	}
+
 	log.Println("Creating container")
 	containerID, err := createContainer(ctx, client, params)
 	if err != nil {
@@ -57,7 +62,7 @@ func RunDocker(ctx context.Context, params DockerParameters, serverAPI APIAdapte
 	return nil
 }
 
-func pullImage(ctx context.Context, client docker.APIClient, imageName string, registryAuth string) error {
+func pullImage(ctx context.Context, client docker.APIClient, imageName string, imagePullConfig ImagePullConfig) error {
 	if !strings.Contains(imageName, ":") {
 		imageName += ":latest"
 	}
@@ -71,7 +76,13 @@ func pullImage(ctx context.Context, client docker.APIClient, imageName string, r
 		return nil
 	}
 
-	reader, err := client.ImagePull(ctx, imageName, types.ImagePullOptions{RegistryAuth: registryAuth}) // todo test registry auth
+	opts := types.ImagePullOptions{}
+	regAuth, _ := imagePullConfig.EncodeRegistryAuth()
+	if regAuth != "" {
+		opts.RegistryAuth = regAuth
+	}
+
+	reader, err := client.ImagePull(ctx, imageName, opts) // todo test registry auth
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
