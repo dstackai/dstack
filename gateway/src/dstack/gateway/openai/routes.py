@@ -1,4 +1,4 @@
-from typing import Annotated, AsyncIterable, AsyncIterator, Iterable, Iterator, Union
+from typing import Annotated, AsyncIterator
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse

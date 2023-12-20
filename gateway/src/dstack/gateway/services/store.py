@@ -21,6 +21,7 @@ class Store:
     def __init__(self, nginx: Nginx):
         self.services: Dict[str, Tuple[Service, SSHTunnel]] = {}
         self.projects: Dict[str, Set[str]] = defaultdict(set)
+        self.entrypoints: Dict[str, Tuple[str, str]] = {}
         self.nginx = nginx
         self.lock = Lock()
         self.subscribers: List["StoreSubscriber"] = []
@@ -44,7 +45,7 @@ class Store:
 
                 await self.nginx.register_service(service.public_domain, tunnel.sock_path)
                 stack.push_async_callback(
-                    supress_exc(self.nginx.unregister_service, service.public_domain)
+                    supress_exc(self.nginx.unregister_domain, service.public_domain)
                 )
 
                 for subscriber in self.subscribers:
@@ -57,12 +58,23 @@ class Store:
             self.projects[project].add(service.public_domain)
             self.services[service.public_domain] = (service, tunnel)
 
+    async def register_entrypoint(self, project: str, domain: str, module: str):
+        async with self.lock:
+            if domain in self.entrypoints:
+                if self.entrypoints[domain] == (project, module):
+                    return
+                raise GatewayError(f"Domain {domain} is already registered")
+
+            logger.info("%s: registering entrypoint %s", project, domain)
+            await self.nginx.register_entrypoint(domain, f"/api/{module}/{project}")
+            self.entrypoints[domain] = (project, module)
+
     async def unregister_all(self):
         async with self.lock:
             logger.info("Unregistering all services")
             stop_tunnels = [run_async(tunnel.stop) for _, tunnel in self.services.values()]
             unregister_services = [
-                self.nginx.unregister_service(domain) for domain in self.services.keys()
+                self.nginx.unregister_domain(domain) for domain in self.services.keys()
             ]
             on_unregister = [
                 subscriber.on_unregister(project, domain)
@@ -87,7 +99,7 @@ class Store:
             service, tunnel = self.services.pop(domain)
             await asyncio.gather(
                 run_async(tunnel.stop),
-                self.nginx.unregister_service(domain),
+                self.nginx.unregister_domain(domain),
                 *(subscriber.on_unregister(project, domain) for subscriber in self.subscribers),
                 return_exceptions=True,
             )

@@ -30,7 +30,7 @@ class TestRegister:
         ssh_tunnel.start.assert_called_once()
         assert not ssh_tunnel.stop.called
         assert not nginx.register_service.called
-        assert not nginx.unregister_service.called
+        assert not nginx.unregister_domain.called
 
     @pytest.mark.asyncio
     async def test_fail_nginx(self, ssh_tunnel, nginx):
@@ -41,7 +41,7 @@ class TestRegister:
         ssh_tunnel.start.assert_called_once()
         ssh_tunnel.stop.assert_called_once()
         nginx.register_service.assert_called_once()
-        assert not nginx.unregister_service.called
+        assert not nginx.unregister_domain.called
 
     @pytest.mark.asyncio
     async def test_fail_rollback(self, ssh_tunnel, nginx):
@@ -53,7 +53,7 @@ class TestRegister:
         ssh_tunnel.start.assert_called_once()
         ssh_tunnel.stop.assert_called_once()
         nginx.register_service.assert_called_once()
-        assert not nginx.unregister_service.called
+        assert not nginx.unregister_domain.called
 
     @pytest.mark.asyncio
     async def test_fail_subscriber(self, ssh_tunnel, nginx):
@@ -66,7 +66,7 @@ class TestRegister:
         ssh_tunnel.start.assert_called_once()
         ssh_tunnel.stop.assert_called_once()
         nginx.register_service.assert_called_once()
-        nginx.unregister_service.assert_called_once()
+        nginx.unregister_domain.assert_called_once()
 
 
 def get_service(domain: str, options: Optional[Dict] = None) -> Service:

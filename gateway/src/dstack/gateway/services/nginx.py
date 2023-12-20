@@ -26,14 +26,27 @@ class Nginx:
                 raise GatewayError("Domain is already registered")
             await run_async(run_certbot, domain)
             self.write_conf(
-                self.get_conf(domain, f"unix:{sock_path}"),
+                self.get_service_conf(domain, f"unix:{sock_path}"),
                 CONFIGS_DIR / f"443-{domain}.conf",
             )
             self.domains.add(domain)
             await run_async(self.reload)
 
-    async def unregister_service(self, domain: str):
-        logger.info("Unregistering service %s", domain)
+    async def register_entrypoint(self, domain: str, prefix: str, port: int = 8000):
+        logger.info("Registering entrypoint %s", domain)
+        async with self.lock:
+            if domain in self.domains:
+                raise GatewayError("Domain is already registered")
+            await run_async(run_certbot, domain)
+            self.write_conf(
+                self.get_entrypoint_conf(domain, prefix, port),
+                CONFIGS_DIR / f"443-{domain}.conf",
+            )
+            self.domains.add(domain)
+            await run_async(self.reload)
+
+    async def unregister_domain(self, domain: str):
+        logger.info("Unregistering domain %s", domain)
         async with self.lock:
             if domain not in self.domains:
                 raise GatewayError("Domain is not registered")
@@ -44,8 +57,8 @@ class Nginx:
             self.domains.remove(domain)
             await run_async(self.reload)
 
-    @staticmethod
-    def get_conf(domain: str, server: str, upstream: Optional[str] = None) -> dict:
+    @classmethod
+    def get_service_conf(cls, domain: str, server: str, upstream: Optional[str] = None) -> dict:
         if upstream is None:
             upstream = re.sub(r"[^a-z0-9_.\-]", "_", server, flags=re.IGNORECASE)
         return {
@@ -73,23 +86,44 @@ class Nginx:
                     "proxy_set_header Host": "$host",
                 },
                 "listen": "80",
-                "listen 443": "ssl",
-                "ssl_certificate": f"/etc/letsencrypt/live/{domain}/fullchain.pem",
-                "ssl_certificate_key": f"/etc/letsencrypt/live/{domain}/privkey.pem",
-                "include": "/etc/letsencrypt/options-ssl-nginx.conf",
-                "ssl_dhparam": "/etc/letsencrypt/ssl-dhparams.pem",
-                # do not force https for localhost
-                # we rely on ordered dict (3.8+)
-                "set $force_https": "1",
-                'if ($scheme = "https")': {
-                    "set $force_https": "0",
+                **cls.get_ssl_conf(domain),
+            },
+        }
+
+    @classmethod
+    def get_entrypoint_conf(cls, domain: str, prefix: str, port: int) -> dict:
+        return {
+            "server": {
+                "server_name": domain,
+                "location /": {
+                    "proxy_pass": f"http://localhost:{port}/{prefix.strip('/')}/",
+                    "proxy_set_header X-Real-IP": "$remote_addr",
+                    "proxy_set_header Host": "$host",
                 },
-                "if ($remote_addr = 127.0.0.1)": {
-                    "set $force_https": "0",
-                },
-                "if ($force_https)": {
-                    "return": "301 https://$host$request_uri",
-                },
+                "listen": "80",
+                **cls.get_ssl_conf(domain),
+            },
+        }
+
+    @staticmethod
+    def get_ssl_conf(domain: str) -> dict:
+        return {
+            "listen 443": "ssl",
+            "ssl_certificate": f"/etc/letsencrypt/live/{domain}/fullchain.pem",
+            "ssl_certificate_key": f"/etc/letsencrypt/live/{domain}/privkey.pem",
+            "include": "/etc/letsencrypt/options-ssl-nginx.conf",
+            "ssl_dhparam": "/etc/letsencrypt/ssl-dhparams.pem",
+            # do not force https for localhost
+            # we rely on ordered dict (3.8+)
+            "set $force_https": "1",
+            'if ($scheme = "https")': {
+                "set $force_https": "0",
+            },
+            "if ($remote_addr = 127.0.0.1)": {
+                "set $force_https": "0",
+            },
+            "if ($force_https)": {
+                "return": "301 https://$host$request_uri",
             },
         }
 
