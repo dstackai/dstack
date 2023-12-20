@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from dstack import version
+
 DSTACK_DIR_PATH = Path("~/.dstack/").expanduser()
 
 SERVER_DIR_PATH = Path(os.getenv("DSTACK_SERVER_DIR", DSTACK_DIR_PATH / "server"))
@@ -24,6 +26,8 @@ LOG_LEVEL = os.getenv("DSTACK_SERVER_LOG_LEVEL", "WARNING").upper()
 ALEMBIC_MIGRATIONS_LOCATION = os.getenv(
     "DSTACK_ALEMBIC_MIGRATIONS_LOCATION", "dstack._internal.server:migrations"
 )
+
+SERVER_API_VERSION = os.getenv("DSTACK_SERVER_API_VERSION", version.__version__)
 
 SERVER_CONFIG_DISABLED = os.getenv("DSTACK_SERVER_CONFIG_DISABLED") is not None
 SERVER_CONFIG_ENABLED = not SERVER_CONFIG_DISABLED

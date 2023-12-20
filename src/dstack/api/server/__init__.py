@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Type
 
 import requests
 
+from dstack import version
 from dstack._internal.core.errors import ClientError, ServerClientError
 from dstack._internal.utils.logging import get_logger
 from dstack.api.server._backends import BackendsAPIClient
@@ -45,6 +46,8 @@ class APIClient:
         self._token = token
         self._s = requests.session()
         self._s.headers.update({"Authorization": f"Bearer {token}"})
+        if version.__version__ is not None:
+            self._s.headers.update({"X-API-VERSION": version.__version__})
 
     @property
     def users(self) -> UsersAPIClient:
