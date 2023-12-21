@@ -211,10 +211,10 @@ def get_latest_runner_build() -> Optional[str]:
     )
     resp.raise_for_status()
 
+    head = repo.head.commit
     for run in resp.json()["workflow_runs"]:
-        try:
-            repo.merge_base(run["head_sha"], "HEAD", is_ancestor=True)
-            return str(run["run_number"] + version_offset)
-        except git.exc.GitCommandError:
-            continue
+        if repo.is_ancestor(run["head_sha"], head):
+            ver = str(run["run_number"] + version_offset)
+            logger.debug(f"Found the latest runner build: %s", ver)
+            return ver
     return None
