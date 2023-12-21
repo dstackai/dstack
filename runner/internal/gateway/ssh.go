@@ -2,10 +2,11 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
 type SSHControl struct {
@@ -42,6 +43,7 @@ func (c *SSHControl) exec(args []string, command string) ([]byte, error) {
 		"-o", fmt.Sprintf("ControlPath=%s", c.controlPath),
 		"-o", "ControlMaster=auto",
 		"-o", "ControlPersist=yes",
+		"-o", "ServerAliveInterval=60",
 	}
 	if args != nil {
 		allArgs = append(allArgs, args...)
