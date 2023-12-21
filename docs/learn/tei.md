@@ -1,7 +1,7 @@
 # Text Embeddings Inference
 
-This example demonstrates how to deploy a text embeddings model as an API using [Services](../docs/guides/services.md)
-and [TEI](https://github.com/huggingface/text-embeddings-inference), an open-source framework by Hugging Face.
+This example demonstrates how to use [TEI](https://github.com/huggingface/text-embeddings-inference) with `dstack`'s
+[services](../docs/guides/services.md) to deploy embeddings.
 
 ## Define the configuration
 

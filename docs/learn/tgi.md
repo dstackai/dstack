@@ -1,6 +1,6 @@
 # Text Generation Inference
 
-This example demonstrates how to deploy an LLM using [TGI](https://github.com/huggingface/text-generation-inference), an open-source framework by Hugging Face.
+This example demonstrates how to use [TGI](https://github.com/huggingface/text-generation-inference) with `dstack`'s [services](../docs/guides/services.md) to deploy LLMs.
 
 ## Define the configuration
 

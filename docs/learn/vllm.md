@@ -1,6 +1,6 @@
 # vLLM
 
-This example demonstrates how to deploy an LLM using [Services](../docs/guides/services.md) and [vLLM](https://vllm.ai/), an open-source library.
+This example demonstrates how to use [vLLM](https://vllm.ai/) with `dstack`'s [services](../docs/guides/services.md) to deploy LLMs.
 
 ## Define the configuration
 

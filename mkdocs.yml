@@ -186,6 +186,8 @@ nav:
       - Text Generation Inference: learn/tgi.md
       - Text Embedding Interface: learn/tei.md
       - SDXL: learn/sdxl.md
+    - LLMs:
+      - Mixtral: learn/mixtral.md
     - Best practices:
         Spot instances: learn/spot.md
   - Pricing: pricing.md
