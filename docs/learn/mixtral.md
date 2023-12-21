@@ -64,10 +64,9 @@ Once the service is up, you can query it via it's OpenAI compatible endpoint:
 $ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
     -H "Content-Type: application/json" \
     -d '{
-          "model": "NousResearch/Llama-2-7b-hf",
-          "prompt": "San Francisco is a",
-          "max_tokens": 7,
-          "temperature": 0
+          "model": "mistralai/Mixtral-8X7B-Instruct-v0.1",
+          "prompt": "Hello!",
+          "max_tokens": 25,
         }'
 ```
 
