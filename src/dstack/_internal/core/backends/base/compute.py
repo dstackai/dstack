@@ -1,7 +1,10 @@
 import os
+import re
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
+import git
+import requests
 import yaml
 
 from dstack import version
@@ -13,6 +16,9 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Compute(ABC):
@@ -97,7 +103,7 @@ def get_shim_commands(
 def get_dstack_runner_version() -> str:
     if version.__is_release__:
         return version.__version__
-    return os.environ.get("DSTACK_RUNNER_VERSION", None) or "latest"
+    return os.environ.get("DSTACK_RUNNER_VERSION", None) or get_latest_runner_build() or "latest"
 
 
 def get_cloud_config(**config) -> str:
@@ -179,3 +185,36 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
         f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
     return commands
+
+
+def get_latest_runner_build() -> Optional[str]:
+    owner_repo = "dstackai/dstack"
+    workflow_id = "build.yml"
+    version_offset = 150
+
+    repo = git.Repo(search_parent_directories=True)
+    for remote in repo.remotes:
+        if re.search(rf"[@/]github\.com[:/]{owner_repo}\.", remote.url):
+            break
+    else:
+        return None
+
+    resp = requests.get(
+        f"https://api.github.com/repos/{owner_repo}/actions/workflows/{workflow_id}/runs",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        params={
+            "status": "success",
+        },
+    )
+    resp.raise_for_status()
+
+    for run in resp.json()["workflow_runs"]:
+        try:
+            repo.merge_base(run["head_sha"], "HEAD", is_ancestor=True)
+            return str(run["run_number"] + version_offset)
+        except git.exc.GitCommandError:
+            continue
+    return None
