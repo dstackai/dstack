@@ -388,6 +388,11 @@ def _submit_job_to_runner(
     runner_client.run_job()
     job_model.status = JobStatus.RUNNING
     # do not log here, because the runner will send a new status
+    # TODO(egor-s): register service at the gateway
+    #   - add the gateway ssh key through the runner and the shim on the remote instance
+    #   - gateway ip (use domain from the job)
+    #   - project ssh key!!!
+    #   - service details (from the job)
 
 
 def _get_runner_timeout_interval(backend_type: BackendType) -> timedelta:
