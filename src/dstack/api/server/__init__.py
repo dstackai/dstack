@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Dict, List, Optional, Type
 
@@ -46,8 +47,9 @@ class APIClient:
         self._token = token
         self._s = requests.session()
         self._s.headers.update({"Authorization": f"Bearer {token}"})
-        if version.__version__ is not None:
-            self._s.headers.update({"X-API-VERSION": version.__version__})
+        client_api_version = os.getenv("DSTACK_CLIENT_API_VERSION", version.__version__)
+        if client_api_version is not None:
+            self._s.headers.update({"X-API-VERSION": client_api_version})
 
     @property
     def users(self) -> UsersAPIClient:
