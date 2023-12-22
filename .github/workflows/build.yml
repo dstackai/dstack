@@ -190,7 +190,7 @@ jobs:
       - name: Install AWS
         run: pip install awscli
       - name: Install dependencies
-        run: pip install wheel
+        run: pip install wheel build
       - name: Compute version
         run: echo VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }})) > $GITHUB_ENV
       - name: Build package
