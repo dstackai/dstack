@@ -1,5 +1,5 @@
 ---
-title: "Accessing the GPU marketplace with Vast.ai and dstack"
+title: "dstack 0.12.3: Vast.ai integration"
 date: 2023-11-21
 description: "With dstack 0.12.3, you can now develop, train and deploy gen AI models using affordable cloud GPUs."
 slug: "vastai"
@@ -7,7 +7,7 @@ categories:
 - Releases
 ---
 
-# Accessing the GPU marketplace with Vast.ai and dstack
+# dstack 0.12.3: Vast.ai integration
 
 __With dstack 0.12.3, you can now use Vast.ai's GPU marketplace as a cloud provider.__
 
@@ -73,6 +73,3 @@ give `dstack` with Vast.ai a try.
 !!! info "Feedback and support"
     Feel free to ask questions or seek help in our 
     [Discord server](https://discord.gg/u8SmfwPpMd).
-
-> Lastly, take the time to check out the preview of the new [fine-tuning](../../docs/guides/fine-tuning.md) and 
-[text generation](../../docs/guides/text-generation.md) APIs.

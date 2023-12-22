@@ -1,4 +1,4 @@
-# Mixtral
+# Mixtral 8x7B
 
 This example demonstrates how to deploy `mistralai/Mixtral-8x7B-Instruct-v0.1 ` 
 with `dstack`'s [services](../docs/guides/services.md) and [vLLM](https://vllm.ai/).

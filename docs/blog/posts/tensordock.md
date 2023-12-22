@@ -1,5 +1,4 @@
 ---
-title: "World's cheapest GPUs with TensorDock and dstack"
 date: 2023-10-31
 description: "With dstack 0.12.2, you can now effortlessly orchestrate TensorDock's cloud GPUs, leveraging their highly competitive pricing."
 slug: "tensordock"
@@ -7,9 +6,9 @@ categories:
 - Releases
 ---
 
-# World's cheapest GPUs with TensorDock and dstack 
+# dstack 0.12.2: TensorDock integration 
 
-__With v0.12.2, you can now use cloud GPU at highly competitive pricing using TensorDock.__
+__With dstack 0.12.2, enjoy highly competitive pricing for cloud GPU with TensorDock.__
 
 At `dstack`, we remain committed to our mission of building the most convenient tool for orchestrating generative AI
 workloads in the cloud. In today's release, we have added support for TensorDock, making it easier for you to leverage

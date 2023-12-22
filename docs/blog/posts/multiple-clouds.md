@@ -1,15 +1,15 @@
 ---
-title: "dstack 0.11: Multi-cloud and multi-region GPU workloads"
+title: "dstack 0.11.0: Multi-cloud and multi-region projects"
 date: 2023-08-22
-description: "The v0.11 update now automatically finds the cheapest GPU across clouds and regions."
+description: "The latest update now automatically finds the cheapest GPU across clouds and regions."
 slug: "multiple-clouds"
 categories:
 - Releases
 ---
 
-# Multi-cloud and multi-region GPU workloads
+# dstack 0.11.0: Multi-cloud and multi-region projects
 
-__The v0.11 update now automatically finds the cheapest GPU across clouds and regions.__
+__The latest update now automatically finds the cheapest GPU across clouds and regions.__
 
 The latest release of `dstack` enables the automatic discovery of the best GPU price and availability across multiple
 configured cloud providers and regions.

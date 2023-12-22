@@ -6,9 +6,9 @@ categories:
 - Releases
 ---
 
-# Azure, better UI and more
+# dstack 0.9.1: Azure integration
 
-__The 0.9.1 update introduces Azure support among other improvements.__
+__The latest update introduces Azure support among other improvements.__
 
 At `dstack`, our goal is to create a simple and unified interface for ML engineers to run dev environments, pipelines, and
 apps on any cloud. With the latest update, we take another significant step in this direction.

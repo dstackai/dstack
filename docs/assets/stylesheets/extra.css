@@ -620,7 +620,7 @@ body {
         display: flex;
     }
 
-    .md-sidebar__inner > .md-nav--primary > .md-nav__list > .md-nav__item > .md-nav > .md-nav__list > .md-nav__item:not(.md-nav__item--section) {
+    .md-sidebar__inner > .md-nav--primary > .md-nav__list:not(.md-post__meta) > .md-nav__item > .md-nav > .md-nav__list > .md-nav__item:not(.md-nav__item--section) {
         display: none;
     }
 

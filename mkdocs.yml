@@ -187,9 +187,9 @@ nav:
       - Text Embedding Interface: learn/tei.md
       - SDXL: learn/sdxl.md
     - LLMs:
-      - Mixtral: learn/mixtral.md
+      - Mixtral 8x7B: learn/mixtral.md
     - Best practices:
-        Spot instances: learn/spot.md
+      - Spot instances: learn/spot.md
   - Pricing: pricing.md
   - Blog:
       - blog/index.md
