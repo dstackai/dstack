@@ -34,6 +34,16 @@ class ServerCommand(BaseCommand):
             help="Server logging level. Defaults to WARNING.",
             default=os.getenv("DSTACK_SERVER_LOG_LEVEL", "WARNING"),
         )
+        self._parser.add_argument(
+            "--default",
+            help="Update the default project configuration",
+            action="store_true",
+        )
+        self._parser.add_argument(
+            "--no-default",
+            help="Do not update the default project configuration",
+            action="store_true",
+        )
         self._parser.add_argument("--token", type=str, help="The admin user token")
 
     def _command(self, args: Namespace):
@@ -42,6 +52,8 @@ class ServerCommand(BaseCommand):
         os.environ["DSTACK_SERVER_HOST"] = args.host
         os.environ["DSTACK_SERVER_PORT"] = str(args.port)
         os.environ["DSTACK_SERVER_LOG_LEVEL"] = args.log_level
+        os.environ["DSTACK_UPDATE_DEFAULT_PROJECT"] = str(args.default)
+        os.environ["DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT"] = str(args.no_default)
         if args.token:
             os.environ["DSTACK_SERVER_ADMIN_TOKEN"] = args.token
         uvicorn_log_level = os.getenv("DSTACK_SERVER_UVICORN_LOG_LEVEL", "ERROR").lower()
