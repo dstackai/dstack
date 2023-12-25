@@ -6,8 +6,10 @@ from typing import Optional
 import filelock
 import yaml
 from pydantic import ValidationError
+from rich import print
 from rich.prompt import Confirm
 
+from dstack._internal.cli.utils.common import colors, confirm_ask
 from dstack._internal.core.models.config import GlobalConfig, ProjectConfig, RepoConfig
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.utils.common import get_dstack_dir
@@ -110,20 +112,32 @@ class ConfigManager:
         return self.dstack_ssh_dir / "config"
 
 
-def create_default_project_config(project_name: str, url: str, token: str):
+def update_default_project(
+    project_name: str, url: str, token: str, default: bool, no_default: bool
+):
     config_manager = ConfigManager()
-    default_project_config = config_manager.get_project_config()
-    project_config = config_manager.get_project_config(name=project_name)
-    default = default_project_config is None
-    if project_config is None or default_project_config is None:
-        config_manager.configure_project(name=project_name, url=url, token=token, default=default)
-        config_manager.save()
-        return
-    if project_config.url != url or project_config.token != token:
-        if Confirm.ask(
-            f"The default project in {config_manager.dstack_dir / 'config.yml'} is outdated. "
-            f"Update it?"
-        ):
-            config_manager.configure_project(name=project_name, url=url, token=token, default=True)
-        config_manager.save()
-        return
+    default_project = config_manager.get_project_config()
+    config_dir = str(config_manager.config_filepath).replace(os.path.expanduser("~"), "~", 1)
+    if (
+        default_project is None
+        or default_project.name != project_name
+        or default_project.url != url
+        or default_project.token != token
+    ):
+        set_it_as_default = (
+            (
+                default_project is None
+                or default
+                or confirm_ask(
+                    f"Update the default project in [{colors['code']}]{config_dir}[/{colors['code']}]?"
+                )
+            )
+            if not no_default
+            else False
+        )
+        if set_it_as_default:
+            config_manager.configure_project(
+                name=project_name, url=url, token=token, default=set_it_as_default
+            )
+            config_manager.save()
+            print(f"Configuration updated at [{colors['code']}]{config_dir}[/{colors['code']}].")
