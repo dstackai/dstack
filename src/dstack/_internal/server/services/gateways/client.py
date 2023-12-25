@@ -3,9 +3,11 @@ import requests
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.runs import Job, JobProvisioningData
 
+GATEWAY_MANAGEMENT_PORT = 8000
+
 
 class GatewayClient:
-    def __init__(self, port: int = 8000):
+    def __init__(self, port: int = GATEWAY_MANAGEMENT_PORT):
         self.base_url = f"http://localhost:{port}"
         self.s = requests.Session()
 

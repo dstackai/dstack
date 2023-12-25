@@ -254,26 +254,18 @@ async def register_service_jobs(
         raise ServerClientError("Gateway has no instance associated with it")
 
     domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
-    private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=f"{project}/{run_name}")
+    # private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=f"{project}/{run_name}")
 
     job.job_spec.gateway.gateway_name = gateway.name
-    job.job_spec.gateway.ssh_key = private_bytes.decode()
+    # job.job_spec.gateway.ssh_key = private_bytes.decode()
     if domain is not None:
         job.job_spec.gateway.secure = True
         job.job_spec.gateway.public_port = 443
         job.job_spec.gateway.hostname = f"{run_name}.{domain}"
     else:
-        job.job_spec.gateway.secure = False
-        # use provided public port
-        job.job_spec.gateway.hostname = gateway.gateway_compute.ip_address
+        raise ServerClientError("Domain is required for gateway")
 
-    await run_async(
-        configure_gateway_over_ssh,
-        f"ubuntu@{gateway.gateway_compute.ip_address}",
-        gateway.gateway_compute.ssh_private_key,
-        public_bytes.decode(),
-        [job],
-    )
+    # TODO(egor-s): issue SSL certificate without connecting to the service
 
 
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:

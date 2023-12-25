@@ -1,4 +1,5 @@
 import functools
+import inspect
 import time
 from typing import Callable, List
 
@@ -32,6 +33,17 @@ def runner_ssh_tunnel(
             Returns:
                 is successful
             """
+            func_kwargs_names = [
+                p.name
+                for p in inspect.signature(func).parameters.values()
+                if p.kind == p.KEYWORD_ONLY
+            ]
+            ssh_kwargs = {}
+            if "ssh_private_key" in func_kwargs_names:
+                ssh_kwargs["ssh_private_key"] = ssh_private_key
+            if "job_provisioning_data" in func_kwargs_names:
+                ssh_kwargs["job_provisioning_data"] = job_provisioning_data
+
             for attempt in range(retries):
                 last = attempt == retries - 1
                 try:
@@ -42,7 +54,7 @@ def runner_ssh_tunnel(
                         ports=get_runner_ports(ports=ports),
                         id_rsa=ssh_private_key,
                     ) as tun:
-                        return func(*args, ports=tun.ports, **kwargs)
+                        return func(*args, ports=tun.ports, **ssh_kwargs, **kwargs)
                 except SSHError as e:
                     pass  # error is logged in the tunnel
                 except requests.RequestException as e:
