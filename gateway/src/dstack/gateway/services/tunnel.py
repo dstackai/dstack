@@ -28,6 +28,7 @@ class SSHTunnel:
         cmd = ["ssh", "-i", id_rsa_path, "-M", "-S", control_path]
         cmd += ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
         cmd += ["-o", "StreamLocalBindMask=0111", "-o", "StreamLocalBindUnlink=yes"]
+        cmd += ["-o", "ServerAliveInterval=60"]
         cmd += ["-f", "-N", "-L", f"{self.sock_path}:localhost:{app_port}"]
         if docker_host is not None:
             # use `host` as a jump host
