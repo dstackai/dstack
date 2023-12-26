@@ -2,6 +2,7 @@ from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
 
+import requests
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -18,7 +19,13 @@ from dstack._internal.core.models.runs import (
     Run,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import JobModel, ProjectModel, RepoModel, RunModel
+from dstack._internal.server.models import (
+    GatewayModel,
+    JobModel,
+    ProjectModel,
+    RepoModel,
+    RunModel,
+)
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.gateways.ssh import gateway_tunnel_client
 from dstack._internal.server.services.jobs import (
@@ -92,8 +99,9 @@ async def _process_job(job_id: UUID):
         secrets = {}  # TODO secrets
         repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
 
+        initial_status = job_model.status
         if (
-            job_model.status == JobStatus.PROVISIONING
+            initial_status == JobStatus.PROVISIONING
         ):  # fails are acceptable until timeout is exceeded
             if job_provisioning_data.dockerized:
                 logger.debug(
@@ -148,7 +156,7 @@ async def _process_job(job_id: UUID):
                     job_model.status = JobStatus.FAILED
                     job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
         else:  # fails are not acceptable
-            if job_model.status == JobStatus.PULLING:
+            if initial_status == JobStatus.PULLING:
                 logger.debug(
                     *job_log(
                         "process pulling job with shim, age=%s", job_model, job_submission.age
@@ -171,7 +179,7 @@ async def _process_job(job_id: UUID):
                     secrets,
                     repo_creds,
                 )
-            elif job_model.status == JobStatus.RUNNING:
+            elif initial_status == JobStatus.RUNNING:
                 logger.debug(
                     *job_log("process running job, age=%s", job_model, job_submission.age)
                 )
@@ -201,6 +209,40 @@ async def _process_job(job_id: UUID):
                         )
                         session.add(new_job_model)
                 # job will be terminated by process_finished_jobs
+
+        if (
+            initial_status != job_model.status
+            and job_model.status == JobStatus.RUNNING
+            and run.run_spec.configuration.type == "service"
+        ):
+            res = await session.execute(
+                select(GatewayModel).where(
+                    GatewayModel.project_id == project.id,
+                    GatewayModel.name == job.job_spec.gateway.gateway_name,
+                )
+            )
+            gateway = res.scalar_one()
+            try:
+                await run_async(
+                    _register_service,
+                    project.name,
+                    job,
+                    job_provisioning_data,
+                    gateway.gateway_compute.ssh_private_key,
+                )
+            except GatewayError as e:
+                logger.warning(
+                    *job_log(
+                        "failed to register service: %s, age=%s",
+                        job_model,
+                        e,
+                        job_submission.age,
+                    )
+                )
+                job_model.status = JobStatus.FAILED
+                job_model.error_code = JobErrorCode.GATEWAY_ERROR
+                # TODO(egor-s): retry?
+
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
 
@@ -215,8 +257,6 @@ def _process_provisioning_no_shim(
     repo_credentials: Optional[RemoteRepoCreds],
     *,
     ports: Dict[int, int],
-    ssh_private_key: str,
-    job_provisioning_data: JobProvisioningData,
 ) -> bool:
     """
     Possible next states:
@@ -238,10 +278,7 @@ def _process_provisioning_no_shim(
         code=code,
         secrets=secrets,
         repo_credentials=repo_credentials,
-        ssh_private_key=ssh_private_key,
-        job_provisioning_data=job_provisioning_data,
     )
-    # TODO(egor-s): handle GatewayError
     return True
 
 
@@ -288,8 +325,6 @@ def _process_pulling_with_shim(
     repo_credentials: Optional[RemoteRepoCreds],
     *,
     ports: Dict[int, int],
-    ssh_private_key: str,
-    job_provisioning_data: JobProvisioningData,
 ) -> bool:
     """
     Possible next states:
@@ -307,20 +342,15 @@ def _process_pulling_with_shim(
     if resp is None:
         return True  # runner is not available yet, but shim is alive (pulling)
 
-    try:
-        _submit_job_to_runner(
-            runner_client=runner_client,
-            run=run,
-            job_model=job_model,
-            job=job,
-            code=code,
-            secrets=secrets,
-            repo_credentials=repo_credentials,
-            ssh_private_key=ssh_private_key,
-            job_provisioning_data=job_provisioning_data,
-        )
-    except GatewayError:
-        return False
+    _submit_job_to_runner(
+        runner_client=runner_client,
+        run=run,
+        job_model=job_model,
+        job=job,
+        code=code,
+        secrets=secrets,
+        repo_credentials=repo_credentials,
+    )
     return True
 
 
@@ -387,8 +417,6 @@ def _submit_job_to_runner(
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
-    ssh_private_key: str,
-    job_provisioning_data: JobProvisioningData,
 ):
     logger.debug(*job_log("submitting job spec", job_model))
     logger.debug(
@@ -409,18 +437,27 @@ def _submit_job_to_runner(
     logger.debug(*job_log("starting job", job_model))
     runner_client.run_job()
 
-    if run.run_spec.configuration.type == "service":
+    job_model.status = JobStatus.RUNNING
+    # do not log here, because the runner will send a new status
+
+
+def _register_service(
+    project: str,
+    job: Job,
+    job_provisioning_data: JobProvisioningData,
+    gateway_ssh_private_key: str,
+):
+    try:
         with gateway_tunnel_client(
-            job.job_spec.gateway.hostname, id_rsa=ssh_private_key
+            job.job_spec.gateway.hostname, id_rsa=gateway_ssh_private_key
         ) as gateway_client:
             gateway_client.register_service(
-                project=run.project_name,
+                project=project,
                 job=job,
                 job_provisioning_data=job_provisioning_data,
             )
-
-    job_model.status = JobStatus.RUNNING
-    # do not log here, because the runner will send a new status
+    except requests.RequestException as e:
+        raise GatewayError(str(e))
 
 
 def _get_runner_timeout_interval(backend_type: BackendType) -> timedelta:
