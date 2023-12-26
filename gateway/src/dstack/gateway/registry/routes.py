@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 
 from dstack.gateway.errors import GatewayError
 from dstack.gateway.registry.schemas import (
+    PreflightRequest,
     RegisterEntrypointRequest,
     RegisterRequest,
     UnregisterRequest,
@@ -44,6 +45,17 @@ async def post_register_entrypoint(
 ):
     try:
         await store.register_entrypoint(project, body.domain, module)
+    except GatewayError as e:
+        raise e.http()
+    return "ok"
+
+
+@router.post("/{project}/preflight")
+async def post_preflight(
+    project: str, body: PreflightRequest, store: Annotated[Store, Depends(get_store)]
+):
+    try:
+        await store.preflight(project, body.public_domain, body.ssh_private_key)
     except GatewayError as e:
         raise e.http()
     return "ok"

@@ -11,4 +11,4 @@ class Service(BaseModel):
     docker_ssh_host: Optional[str] = None
     docker_ssh_port: Optional[int] = None
 
-    options: Optional[dict] = {}
+    options: dict = {}

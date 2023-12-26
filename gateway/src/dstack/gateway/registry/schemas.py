@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 import dstack.gateway.schemas
@@ -13,3 +15,10 @@ class UnregisterRequest(BaseModel):
 
 class RegisterEntrypointRequest(BaseModel):
     domain: str
+
+
+class PreflightRequest(BaseModel):
+    public_domain: str
+    ssh_private_key: str
+
+    options: dict = {}

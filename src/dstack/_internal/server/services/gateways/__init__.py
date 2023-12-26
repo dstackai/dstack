@@ -1,12 +1,8 @@
 import asyncio
-import json
-import shlex
-import subprocess
-import tempfile
 from datetime import timezone
 from typing import List, Optional, Sequence
 
-import pkg_resources
+import requests
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +16,7 @@ from dstack._internal.server.services.backends import (
     get_project_backend_by_type_or_error,
     get_project_backends_with_models,
 )
+from dstack._internal.server.services.gateways.ssh import gateway_tunnel_client
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
@@ -254,10 +251,8 @@ async def register_service_jobs(
         raise ServerClientError("Gateway has no instance associated with it")
 
     domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
-    # private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=f"{project}/{run_name}")
 
     job.job_spec.gateway.gateway_name = gateway.name
-    # job.job_spec.gateway.ssh_key = private_bytes.decode()
     if domain is not None:
         job.job_spec.gateway.secure = True
         job.job_spec.gateway.public_port = 443
@@ -265,7 +260,23 @@ async def register_service_jobs(
     else:
         raise ServerClientError("Domain is required for gateway")
 
-    # TODO(egor-s): issue SSL certificate without connecting to the service
+    await run_async(
+        _gateway_preflight,
+        project.name,
+        job.job_spec.gateway.hostname,
+        gateway.gateway_compute.ssh_private_key,
+        project.ssh_private_key,
+    )
+
+
+def _gateway_preflight(
+    project: str, domain: str, gateway_ssh_private_key: str, project_ssh_private_key: str
+):
+    try:
+        with gateway_tunnel_client(domain, gateway_ssh_private_key) as client:
+            client.preflight(project, domain, project_ssh_private_key)
+    except requests.RequestException:
+        raise GatewayError(f"Gateway is not working")
 
 
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
@@ -284,54 +295,3 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         created_at=gateway_model.created_at.replace(tzinfo=timezone.utc),
         backend=gateway_model.backend.type,
     )
-
-
-def configure_gateway_over_ssh(host: str, id_rsa: str, authorized_key: str, jobs: List[Job]):
-    id_rsa_file = tempfile.NamedTemporaryFile("w")
-    id_rsa_file.write(id_rsa)
-    id_rsa_file.flush()
-
-    payload = {
-        "authorized_key": authorized_key,
-        "services": [
-            {
-                "hostname": job.job_spec.gateway.hostname,
-                "port": job.job_spec.gateway.public_port,
-                "secure": job.job_spec.gateway.secure,
-            }
-            for job in jobs
-        ],
-    }
-
-    logger.debug("Configuring %s gateway over SSH: %s", host, payload["services"])
-    script_path = pkg_resources.resource_filename(
-        "dstack._internal.server", "scripts/configure_gateway.py"
-    )
-    with open(script_path, "r") as script:
-        cmd = [
-            "ssh",
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            "-i",
-            id_rsa_file.name,
-            host,
-            f"sudo python3 - {shlex.quote(json.dumps(payload))}",
-        ]
-        proc = subprocess.Popen(cmd, stdin=script, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout, stderr = proc.communicate()
-    if proc.returncode != 0:
-        if b"Certbot failed:" in stderr:
-            raise GatewayError("Certbot failed, ensure the domain is valid")
-        if b"No such file or directory: 'certbot'" in stderr:
-            raise GatewayError(
-                "Certbot is not installed. Wait for gateway provisioning to finish."
-            )
-        raise GatewayError(
-            f"Error while connecting to gateway: {stderr.decode()}\nWait for gateway provisioning to finish."
-        )
-
-    sockets = json.loads(stdout)
-    for job, socket in zip(jobs, sockets):
-        job.job_spec.gateway.sock_path = socket

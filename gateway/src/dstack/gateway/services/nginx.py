@@ -24,7 +24,6 @@ class Nginx:
         async with self.lock:
             if domain in self.domains:
                 raise GatewayError("Domain is already registered")
-            await run_async(run_certbot, domain)
             self.write_conf(
                 self.get_service_conf(domain, f"unix:{sock_path}"),
                 CONFIGS_DIR / f"443-{domain}.conf",
@@ -37,7 +36,7 @@ class Nginx:
         async with self.lock:
             if domain in self.domains:
                 raise GatewayError("Domain is already registered")
-            await run_async(run_certbot, domain)
+            await run_async(self.run_certbot, domain)
             self.write_conf(
                 self.get_entrypoint_conf(domain, prefix, port),
                 CONFIGS_DIR / f"443-{domain}.conf",
@@ -160,15 +159,15 @@ class Nginx:
         if r.returncode != 0:
             raise GatewayError("Failed to write nginx config")
 
-
-def run_certbot(domain: str):
-    logger.info("Running certbot for %s", domain)
-    cmd = ["sudo", "certbot", "certonly"]
-    cmd += ["--non-interactive", "--agree-tos", "--register-unsafely-without-email"]
-    cmd += ["--nginx", "--domain", domain]
-    r = subprocess.run(cmd, capture_output=True)
-    if r.returncode != 0:
-        raise GatewayError(f"Certbot failed:\n{r.stderr.decode()}")
+    @staticmethod
+    def run_certbot(domain: str):
+        logger.info("Running certbot for %s", domain)
+        cmd = ["sudo", "certbot", "certonly"]
+        cmd += ["--non-interactive", "--agree-tos", "--register-unsafely-without-email"]
+        cmd += ["--nginx", "--domain", domain]
+        r = subprocess.run(cmd, capture_output=True)
+        if r.returncode != 0:
+            raise GatewayError(f"Certbot failed:\n{r.stderr.decode()}")
 
 
 @lru_cache()

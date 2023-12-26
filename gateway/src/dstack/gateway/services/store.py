@@ -1,11 +1,13 @@
 import asyncio
 import functools
 import logging
+import os
 from abc import ABC, abstractmethod
 from asyncio import Lock
 from collections import defaultdict
 from contextlib import AsyncExitStack
-from functools import lru_cache, partial
+from functools import lru_cache
+from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
 from dstack.gateway.common import run_async
@@ -25,6 +27,7 @@ class Store:
         self.nginx = nginx
         self.lock = Lock()
         self.subscribers: List["StoreSubscriber"] = []
+        self.ssh_keys_dir = Path("~/.ssh/projects").expanduser().resolve()
 
     async def register(self, project: str, service: Service):
         async with self.lock:
@@ -36,6 +39,7 @@ class Store:
                 host=service.ssh_host,
                 port=service.ssh_port,
                 app_port=service.app_port,
+                id_rsa_path=(self.ssh_keys_dir / project).as_posix(),
                 docker_host=service.docker_ssh_host,
                 docker_port=service.docker_ssh_port,
             )
@@ -115,6 +119,26 @@ class Store:
     async def subscribe(self, subscriber: "StoreSubscriber"):
         async with self.lock:
             self.subscribers.append(subscriber)
+
+    async def preflight(self, project: str, domain: str, ssh_private_key: str):
+        async with self.lock:
+            if domain in self.services:
+                raise GatewayError(f"Domain {domain} is already registered")
+            logger.info("%s: preflighting service %s", project, domain)
+
+            await run_async(self.nginx.run_certbot, domain)
+
+            self.ssh_keys_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            ssh_key_path = self.ssh_keys_dir / project
+            if (
+                ssh_key_path.exists()
+                and ssh_key_path.read_text().strip() != ssh_private_key.strip()
+            ):
+                logger.warning("%s: SSH key for project %s is different", domain, project)
+            with open(
+                ssh_key_path, "w", opener=lambda path, flags: os.open(path, flags, 0o600)
+            ) as f:
+                f.write(ssh_private_key)
 
 
 class StoreSubscriber(ABC):

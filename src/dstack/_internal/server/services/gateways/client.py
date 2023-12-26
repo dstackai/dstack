@@ -35,6 +35,15 @@ class GatewayClient:
             raise gateway_error(resp.json())
         resp.raise_for_status()
 
+    def preflight(self, project: str, domain: str, private_ssh_key: str):
+        resp = self.s.post(
+            self._url(f"/api/registry/{project}/preflight"),
+            json={"public_domain": domain, "ssh_private_key": private_ssh_key},
+        )
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+
     def _url(self, path: str) -> str:
         return f"{self.base_url}/{path.lstrip('/')}"
 
