@@ -17,11 +17,11 @@ class GatewayClient:
             "app_port": job.job_spec.gateway.service_port,
             "ssh_host": f"{job_provisioning_data.username}@{job_provisioning_data.hostname}",
             "ssh_port": job_provisioning_data.ssh_port,
+            "options": job.job_spec.gateway.options,
         }
         if job_provisioning_data.dockerized:
             payload["docker_ssh_host"] = f"root@localhost"
             payload["docker_ssh_port"] = 10022
-        # TODO(egor-s): openai
         resp = self.s.post(self._url(f"/api/registry/{project}/register"), json=payload)
         if resp.status_code == 400:
             raise gateway_error(resp.json())
@@ -35,10 +35,14 @@ class GatewayClient:
             raise gateway_error(resp.json())
         resp.raise_for_status()
 
-    def preflight(self, project: str, domain: str, private_ssh_key: str):
+    def preflight(self, project: str, domain: str, private_ssh_key: str, options: dict):
+        if "openai" in options:
+            # TODO(egor-s): custom entrypoint domain
+            entrypoint = f"{project}.{domain.split('.', maxsplit=1)[1]}"
+            self.register_openai_entrypoint(project, entrypoint)
         resp = self.s.post(
             self._url(f"/api/registry/{project}/preflight"),
-            json={"public_domain": domain, "ssh_private_key": private_ssh_key},
+            json={"public_domain": domain, "ssh_private_key": private_ssh_key, "options": options},
         )
         if resp.status_code == 400:
             raise gateway_error(resp.json())

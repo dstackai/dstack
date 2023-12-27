@@ -121,7 +121,7 @@ class TGIChatCompletions(ChatCompletionsClient):
 
     @staticmethod
     def finish_reason(reason: str) -> FinishReason:
-        if reason == "stop_sequence":
+        if reason == "stop_sequence" or reason == "eos_token":
             return "stop"
         if reason == "length":
             return "length"

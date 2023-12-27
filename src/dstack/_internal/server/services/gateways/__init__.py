@@ -266,15 +266,20 @@ async def register_service_jobs(
         job.job_spec.gateway.hostname,
         gateway.gateway_compute.ssh_private_key,
         project.ssh_private_key,
+        job.job_spec.gateway.options,
     )
 
 
 def _gateway_preflight(
-    project: str, domain: str, gateway_ssh_private_key: str, project_ssh_private_key: str
+    project: str,
+    domain: str,
+    gateway_ssh_private_key: str,
+    project_ssh_private_key: str,
+    options: dict,
 ):
     try:
         with gateway_tunnel_client(domain, gateway_ssh_private_key) as client:
-            client.preflight(project, domain, project_ssh_private_key)
+            client.preflight(project, domain, project_ssh_private_key, options)
     except requests.RequestException:
         raise GatewayError(f"Gateway is not working")
 

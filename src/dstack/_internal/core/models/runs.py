@@ -110,11 +110,11 @@ class Requirements(BaseModel):
 class Gateway(BaseModel):
     gateway_name: Optional[str]
     service_port: int
-    ssh_key: Optional[str]
-    sock_path: Optional[str]
     hostname: Optional[str]
     public_port: int = 80
     secure: bool = False
+
+    options: dict = {}
 
 
 class JobSpec(BaseModel):
