@@ -1,8 +1,8 @@
-"""add pool
+"""add pools
 
-Revision ID: beceb9d2895d
+Revision ID: a859c41ae3b7
 Revises: 48ad3ecbaea2
-Create Date: 2023-12-25 07:11:15.778338
+Create Date: 2023-12-28 10:13:48.608439
 
 """
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "beceb9d2895d"
+revision = "a859c41ae3b7"
 down_revision = "48ad3ecbaea2"
 branch_labels = None
 depends_on = None
@@ -23,6 +23,8 @@ def upgrade() -> None:
         sa.Column("id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
         sa.Column("name", sa.String(length=50), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("deleted", sa.Boolean(), nullable=False),
+        sa.Column("deleted_at", sa.DateTime(), nullable=True),
         sa.Column(
             "project_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False
         ),
@@ -38,11 +40,34 @@ def upgrade() -> None:
     op.create_table(
         "instances",
         sa.Column("id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
+        sa.Column("name", sa.String(length=50), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("deleted", sa.Boolean(), nullable=False),
+        sa.Column("deleted_at", sa.DateTime(), nullable=True),
         sa.Column(
             "project_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False
         ),
         sa.Column("pool_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=True),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "PENDING",
+                "SUBMITTED",
+                "PROVISIONING",
+                "PULLING",
+                "RUNNING",
+                "TERMINATING",
+                "TERMINATED",
+                "ABORTED",
+                "FAILED",
+                "DONE",
+                name="jobstatus",
+            ),
+            nullable=False,
+        ),
+        sa.Column("status_message", sa.String(length=50), nullable=True),
+        sa.Column("started_at", sa.DateTime(), nullable=True),
+        sa.Column("finished_at", sa.DateTime(), nullable=True),
         sa.Column("job_provisioning_data", sa.String(length=4000), nullable=False),
         sa.Column("offer", sa.String(length=4000), nullable=False),
         sa.ForeignKeyConstraint(

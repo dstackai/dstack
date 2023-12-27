@@ -15,7 +15,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
 )
-from dstack._internal.core.models.pool import Instance, Pool
+from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.core.services.configs import ConfigManager
@@ -162,7 +162,10 @@ class PoolCommand(APIBaseCommand):
 
         # list
         list_parser = subparsers.add_parser(
-            "list", help="List pools", formatter_class=self._parser.formatter_class
+            "list",
+            help="List pools",
+            description="List available pools",
+            formatter_class=self._parser.formatter_class,
         )
         list_parser.add_argument("-v", "--verbose", help="Show more information")
         list_parser.set_defaults(subfunc=self._list)
@@ -181,11 +184,17 @@ class PoolCommand(APIBaseCommand):
         delete_parser.add_argument(
             "-n", "--name", dest="pool_name", help="The name of the pool", required=True
         )
+        delete_parser.add_argument(
+            "-f", "--force", dest="force", help="Force remove", type=bool, default=False
+        )
         delete_parser.set_defaults(subfunc=self._delete)
 
         # show
         show_parser = subparsers.add_parser(
-            "show", help="Show pool instances", formatter_class=self._parser.formatter_class
+            "show",
+            help="Show pool instances",
+            description="Show instances in the pool",
+            formatter_class=self._parser.formatter_class,
         )
         show_parser.add_argument(
             "-n", "--name", dest="pool_name", help="The name of the pool", required=True
@@ -213,7 +222,7 @@ class PoolCommand(APIBaseCommand):
         self.api.client.pool.create(self.api.project, args.pool_name)
 
     def _delete(self, args: argparse.Namespace):
-        self.api.client.pool.delete(self.api.project, args.pool_name)
+        self.api.client.pool.delete(self.api.project, args.pool_name, args.force)
 
     def _show(self, args: argparse.Namespace):
         instances = self.api.client.pool.show(self.api.project, args.pool_name)

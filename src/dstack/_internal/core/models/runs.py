@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from pydantic import UUID4, BaseModel, Field
 from typing_extensions import Annotated, Literal
@@ -217,3 +217,24 @@ class RunPlan(BaseModel):
     user: str
     run_spec: RunSpec
     job_plans: List[JobPlan]
+
+
+class InstanceStatus(str, Enum):
+    PENDING = "pending"
+    CREATING = "creating"
+    STARTING = "starting"
+    READY = "ready"
+    BUSY = "busy"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
+    FAILED = "failed"
+
+    @property
+    def finished_statuses(cls) -> Sequence["InstanceStatus"]:
+        return (cls.TERMINATED, cls.FAILED)
+
+    def is_finished(self):
+        return self in self.finished_statuses
+
+    def is_started(self):
+        return not self.is_finished()

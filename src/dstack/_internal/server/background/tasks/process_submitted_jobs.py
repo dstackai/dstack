@@ -13,6 +13,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
 from dstack._internal.core.models.runs import (
+    InstanceStatus,
     Job,
     JobErrorCode,
     JobProvisioningData,
@@ -101,7 +102,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         project_ssh_public_key=project_model.ssh_public_key,
         project_ssh_private_key=project_model.ssh_private_key,
     )
-    if job_provisioning_data is not None:
+    if job_provisioning_data is not None and offer is not None:
         logger.info(*job_log("now is provisioning", job_model))
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
@@ -110,6 +111,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             name=job.job_spec.job_name,
             project=project_model,
             pool=pool,
+            status=InstanceStatus.PENDING,
             job_provisioning_data=job_provisioning_data.json(),
             offer=offer.json(),
         )
@@ -144,7 +146,7 @@ async def _run_job(
         )
     except BackendError as e:
         logger.warning(*job_log("failed to get instance offers: %s", job_model, repr(e)))
-        return None  # or (None, None)?
+        return (None, None)
     for backend, offer in offers:
         logger.debug(
             *job_log(

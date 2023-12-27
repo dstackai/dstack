@@ -19,7 +19,7 @@ from dstack._internal.server.schemas.runs import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
-from dstack._internal.server.services.pool import generate_instance_name
+from dstack._internal.server.services.pools import generate_instance_name
 from dstack._internal.server.utils.routers import error_not_found
 
 root_router = APIRouter(

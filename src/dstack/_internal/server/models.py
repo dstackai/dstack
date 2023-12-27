@@ -20,7 +20,7 @@ from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.repos.base import RepoType
-from dstack._internal.core.models.runs import JobErrorCode, JobStatus
+from dstack._internal.core.models.runs import InstanceStatus, JobErrorCode, JobStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.utils.common import get_current_datetime
 
@@ -247,6 +247,8 @@ class PoolModel(BaseModel):
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
@@ -260,14 +262,21 @@ class InstanceModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
     name: Mapped[str] = mapped_column(String(50))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
 
     pool_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("pools.id"))
     pool: Mapped["PoolModel"] = relationship(back_populates="instances")
+
+    status: Mapped[InstanceStatus] = mapped_column(Enum(JobStatus))
+    status_message: Mapped[Optional[str]] = mapped_column(String(50))
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
 
     job_provisioning_data: Mapped[str] = mapped_column(String(4000))
     offer: Mapped[str] = mapped_column(String(4000))

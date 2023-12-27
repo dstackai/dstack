@@ -78,11 +78,13 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
         user=user,
         project_role=ProjectRole.ADMIN,
     )
-    project = await get_project_model_by_name_or_error(session=session, project_name=project_name)
+    project_model = await get_project_model_by_name_or_error(
+        session=session, project_name=project_name
+    )
     for hook in _CREATE_PROJECT_HOOKS:
-        await hook(session, project)
-    await session.refresh(project)  # a hook may change project
-    return project_model_to_project(project)
+        await hook(session, project_model)
+    await session.refresh(project_model)  # a hook may change project
+    return project_model_to_project(project_model)
 
 
 async def delete_projects(

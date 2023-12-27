@@ -10,7 +10,7 @@ from dstack._internal.utils.logging import get_logger
 from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
-from dstack.api.server._pool import PoolAPIClient
+from dstack.api.server._pools import PoolAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
 from dstack.api.server._repos import ReposAPIClient
 from dstack.api.server._runs import RunsAPIClient

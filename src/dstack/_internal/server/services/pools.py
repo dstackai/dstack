@@ -8,11 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
-from dstack._internal.core.models.pool import Instance, Pool
+from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
 from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel
 from dstack._internal.utils import random_names
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -41,7 +42,7 @@ async def create_pool_model(session: AsyncSession, project: ProjectModel, name: 
     )
     session.add(pool)
     await session.commit()
-    project.default_pool = pool
+    project.default_pool = pool  # TODO: add CLI flag --set-default
     await session.commit()
     return pool
 
@@ -49,8 +50,10 @@ async def create_pool_model(session: AsyncSession, project: ProjectModel, name: 
 async def list_project_pool_models(
     session: AsyncSession, project: ProjectModel
 ) -> Sequence[PoolModel]:
-    pools = await session.execute(select(PoolModel).where(PoolModel.project_id == project.id))
-    return pools.unique().scalars().all()
+    pools = await session.scalars(
+        select(PoolModel).where(PoolModel.project_id == project.id, PoolModel.deleted == False)
+    )
+    return pools.all()
 
 
 async def delete_pool(session: AsyncSession, project: ProjectModel, pool_name: str):
@@ -59,14 +62,15 @@ async def delete_pool(session: AsyncSession, project: ProjectModel, pool_name: s
     default_pool: Optional[PoolModel] = None
     default_pool_removed = False
 
-    for pool in await list_project_pool_models(session=session, project=project):
+    for pool in await list_project_pool_models(session, project):
         if pool.name == DEFAULT_POOL_NAME:
             default_pool = pool
 
         if pool_name == pool.name:
             if project.default_pool_id == pool.id:
                 default_pool_removed = True
-            await session.delete(pool)
+            pool.deleted = True
+            pool.deleted_at = get_current_datetime()
 
     if default_pool_removed:
         if default_pool is not None:
@@ -75,6 +79,17 @@ async def delete_pool(session: AsyncSession, project: ProjectModel, pool_name: s
             await create_pool_model(session, project, DEFAULT_POOL_NAME)
 
     await session.commit()
+
+
+async def list_deleted_pools(
+    session: AsyncSession, project_model: ProjectModel
+) -> Sequence[PoolModel]:
+    pools = await session.scalars(
+        select(PoolModel).where(
+            PoolModel.project_id == project_model.id, PoolModel.deleted == True
+        )
+    )
+    return pools.all()
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
@@ -90,6 +105,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance_id=jpd.instance_id,
         instance_type=jpd.instance_type,
         hostname=jpd.hostname,
+        status=instance_model.status,
         price=offer.price,
     )
     return instance
@@ -98,8 +114,13 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
 async def show_pool(
     session: AsyncSession, project: ProjectModel, pool_name: str
 ) -> Sequence[Instance]:
-    pools_result = await session.execute(select(PoolModel).where(PoolModel.name == pool_name))
-    pools = pools_result.scalars().all()
+    pools = (
+        await session.scalars(
+            select(PoolModel).where(
+                PoolModel.name == pool_name, PoolModel.project_id == project.id
+            )
+        )
+    ).all()
 
     instances = [instance_model_to_instance(i) for i in pools[0].instances]
     return instances

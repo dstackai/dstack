@@ -6,7 +6,7 @@ from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack.api._public.backends import BackendCollection
-from dstack.api._public.pool import PoolCollection
+from dstack.api._public.pools import PoolCollection
 from dstack.api._public.repos import RepoCollection, get_ssh_keypair
 from dstack.api._public.runs import RunCollection
 from dstack.api.server import APIClient
