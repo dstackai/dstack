@@ -1,3 +1,5 @@
+import requests
+
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import ModelInfo
 
@@ -5,10 +7,25 @@ from dstack._internal.core.models.configurations import ModelInfo
 def complete_model(model_info: ModelInfo) -> dict:
     model_info = model_info.copy(deep=True)
     # TODO(egor-s): support more types and formats
-    # TODO(egor-s): get tokenizer_info.json from HF for chat/tgi
-    # https://huggingface.co/{model_info.name}/resolve/main/tokenizer_config.json
-    if model_info.chat_template is None:
-        raise ConfigurationError("Currently `chat_template` is required for `chat` models")
-    if model_info.eos_token is None:
-        raise ConfigurationError("Currently `eos_token` is required for `chat` models")
+
+    if model_info.chat_template is None or model_info.eos_token is None:
+        tokenizer_config = get_tokenizer_config(model_info.name)
+        if model_info.chat_template is None:
+            model_info.chat_template = tokenizer_config["chat_template"]  # TODO(egor-s): default
+        if model_info.eos_token is None:
+            model_info.eos_token = tokenizer_config["eos_token"]  # TODO(egor-s): default
+
     return {"model": model_info.dict()}
+
+
+def get_tokenizer_config(model_id: str) -> dict:
+    try:
+        resp = requests.get(
+            f"https://huggingface.co/{model_id}/resolve/main/tokenizer_config.json"
+        )
+        if resp.status_code == 403:
+            raise ConfigurationError("Private HF models are not supported")
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        raise ConfigurationError(f"Failed to get tokenizer info: {e}")
+    return resp.json()
