@@ -1,32 +1,86 @@
 # Mixtral 8x7B
 
-This example demonstrates how to deploy `mistralai/Mixtral-8x7B-Instruct-v0.1 ` 
-with `dstack`'s [services](../docs/guides/services.md) and [vLLM](https://vllm.ai/).
+This example demonstrates how to deploy Mixtral
+with `dstack`'s [services](../docs/guides/services.md).
 
 ## Define the configuration
 
-To deploy Mixtral as a service using vLLM, define the following configuration file:
+To deploy Mixtral as a service, you have to define the corresponding configuration file.
+Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
 
-<div editor-title="llms/mixtral/vllm.dstack.yml"> 
+=== "vLLM `fp16`"
 
-```yaml
-type: service
+    <div editor-title="llms/mixtral/vllm.dstack.yml"> 
 
-python: "3.11"
+    ```yaml
+    type: service
+    # This configuration deploys Mixtral in fp16 using vLLM
+    
+    python: "3.11"
+    
+    commands:
+      - pip install vllm
+      - python -m vllm.entrypoints.openai.api_server
+        --model mistralai/Mixtral-8X7B-Instruct-v0.1
+        --host 0.0.0.0
+        --tensor-parallel-size 2 # Should match the number of GPUs
+    
+    port: 8000
+    ```
 
-commands:
-  - conda install cuda # (required by megablocks)
-  - pip install torch # (required by megablocks)
-  - pip install vllm megablocks
-  - python -m vllm.entrypoints.openai.api_server
-    --model mistralai/Mixtral-8X7B-Instruct-v0.1
-    --host 0.0.0.0
-    --tensor-parallel-size 2 # should match the number of GPUs
+    </div>
 
-port: 8000
-```
+=== "TGI `fp16`"
 
-</div>
+    <div editor-title="llms/mixtral/tgi.dstack.yml"> 
+
+    ```yaml
+    type: service
+    # This configuration deploys Mixtral in fp16 using TGI
+    
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    
+    env:
+      - MODEL_ID=mistralai/Mixtral-8x7B-Instruct-v0.1
+    
+    commands:
+      - text-generation-launcher 
+        --hostname 0.0.0.0 
+        --port 8000 
+        --trust-remote-code
+        --num-shard 2 # Should match the number of GPUs
+    
+    port: 8000
+    ```
+
+    </div>
+
+=== "TGI `int4`"
+
+    <div editor-title="llms/mixtral/tgi-gptq.dstack.yml"> 
+
+    ```yaml
+    type: service
+    # This configuration deploys Mixtral in int4 using TGI
+    
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    
+    env:
+      - MODEL_ID=TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
+    
+    commands:
+      - text-generation-launcher 
+        --hostname 0.0.0.0 
+        --port 8000 
+        --trust-remote-code 
+        --quantize gptq
+    
+    port: 8000
+    ```
+
+    </div>
+
+> vLLM's support for quantized Mixtral is not yet stable. 
 
 ## Run the configuration
 
@@ -34,21 +88,41 @@ port: 8000
     Before running a service, make sure to set up a [gateway](../docs/guides/services.md#set-up-a-gateway).
     However, it's not required when using dstack Cloud, as it's set up automatically.
 
-<div class="termy">
+!!! info "Resources"
+    For `fp16`, deployment of Mixtral, ensure a minimum total GPU memory of `100GB` and disk size of `200GB`.
+    Also, make sure to adjust the `--tensor-parallel-size` and `--num-shard` parameters in the YAML configuration to align
+    with the number of GPUs used.
+    For `int4`, request at least `25GB` of GPU memory.
 
-```shell
-$ dstack run . -f llms/mixtral.dstack.yml --gpu "80GB:2" --disk 200GB
-```
+=== "vLLM `fp16`"
 
-</div>
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . -f llms/mixtral/vllm.dstack.yml --gpu "80GB:2" --disk 200GB
+    ```
+    
+    </div>
 
-!!! info "GPU memory"
-    To deploy Mixtral in `fp16`, ensure a minimum of `100GB` total GPU memory, 
-    and adjust the `--tensor-parallel-size` parameter in the YAML configuration 
-    to match the number of GPUs.
+=== "TGI `fp16`"
 
-!!! info "Disk size"
-    To deploy Mixtral, ensure a minimum of `200GB` of disk size.
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . -f llms/mixtral/tgi.dstack.yml --gpu "80GB:2" --disk 200GB
+    ```
+    
+    </div>
+
+=== "TGI `int4`"
+
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . -f llms/mixtral/tgi-gptq.dstack.yml --gpu 25GB
+    ```
+    
+    </div>
 
 !!! info "Endpoint URL"
     Once the service is deployed, its endpoint will be available at 
@@ -56,25 +130,24 @@ $ dstack run . -f llms/mixtral.dstack.yml --gpu "80GB:2" --disk 200GB
 
     If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
 
-Once the service is up, you can query it via it's OpenAI compatible endpoint:
+[//]: # (Once the service is up, you can query it via it's OpenAI compatible endpoint:)
+[//]: # (<div class="termy">)
+[//]: # ()
+[//]: # (```shell)
+[//]: # ($ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \)
+[//]: # (    -H "Content-Type: application/json" \)
+[//]: # (    -d '{)
+[//]: # (          "model": "mistralai/Mixtral-8X7B-Instruct-v0.1",)
+[//]: # (          "prompt": "Hello!",)
+[//]: # (          "max_tokens": 25,)
+[//]: # (        }')
+[//]: # (```)
+[//]: # ()
+[//]: # (</div>)
 
-<div class="termy">
-
-```shell
-$ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
-    -H "Content-Type: application/json" \
-    -d '{
-          "model": "mistralai/Mixtral-8X7B-Instruct-v0.1",
-          "prompt": "Hello!",
-          "max_tokens": 25,
-        }'
-```
-
-</div>
-
-!!! info "OpenAI-compatible API"
-    Since vLLM provides an OpenAI-compatible endpoint, feel free to access it using various OpenAI-compatible tools like
-    Chat UI, LangChain, Llama Index, etc. 
+[//]: # (!!! info "OpenAI-compatible API")
+[//]: # (    Since vLLM provides an OpenAI-compatible endpoint, feel free to access it using various OpenAI-compatible tools like)
+[//]: # (    Chat UI, LangChain, Llama Index, etc. )
 
 ??? info "Hugging Face Hub token"
 
@@ -82,12 +155,12 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
     (with [`--env`](../docs/reference/cli/index.md#dstack-run) in `dstack run` or 
     using [`env`](../docs/reference/dstack.yml.md#service) in the configuration file).
     
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . --env HUGGING_FACE_HUB_TOKEN=&lt;token&gt; -f llms/mixtral.dstack.yml --gpu "80GB:2" --disk 200GB
-    ```
-    </div>
+[//]: # (    <div class="termy">)
+[//]: # (    )
+[//]: # (    ```shell)
+[//]: # (    $ dstack run . --env HUGGING_FACE_HUB_TOKEN=&lt;token&gt; -f llms/mixtral.dstack.yml --gpu "80GB:2" --disk 200GB)
+[//]: # (    ```)
+[//]: # (    </div>)
 
 ## Source code
     
