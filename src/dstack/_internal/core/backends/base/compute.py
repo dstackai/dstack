@@ -132,17 +132,16 @@ def get_run_shim_script(registry_auth_required: bool) -> List[str]:
 def get_gateway_user_data(authorized_key: str) -> str:
     return get_cloud_config(
         package_update=True,
-        packages=["nginx"],
-        snap={"commands": [["install", "--classic", "certbot"]]},
-        runcmd=[["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"]],
-        ssh_authorized_keys=[authorized_key],
-        users=[
-            "default",
-            {
-                "name": "www-data",
-                "ssh_authorized_keys": [authorized_key],
-            },
+        packages=[
+            "nginx",
+            "python3.10-venv",
         ],
+        snap={"commands": [["install", "--classic", "certbot"]]},
+        runcmd=[
+            ["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"],
+            # TODO(egor-s): mkdir dstack, create blue/green venv. Install dstack-gateway. Run it.
+        ],
+        ssh_authorized_keys=[authorized_key],
     )
 
 
