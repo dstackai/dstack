@@ -139,7 +139,7 @@ def get_gateway_user_data(authorized_key: str) -> str:
         snap={"commands": [["install", "--classic", "certbot"]]},
         runcmd=[
             ["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"],
-            # TODO(egor-s): mkdir dstack, create blue/green venv. Install dstack-gateway. Run it.
+            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
         ],
         ssh_authorized_keys=[authorized_key],
     )
@@ -221,3 +221,15 @@ def get_latest_runner_build() -> Optional[str]:
             if "Not a valid commit name" not in e.stderr:
                 raise
     return None
+
+
+def get_dstack_gateway_commands() -> List[str]:
+    channel = "release" if version.__is_release__ else "stgn"
+    build = get_dstack_runner_version()
+    return [
+        "mkdir -p /home/ubuntu/dstack",
+        "python3 -m venv /home/ubuntu/dstack/blue",
+        "python3 -m venv /home/ubuntu/dstack/green",
+        f"/home/ubuntu/dstack/blue/bin/pip install https://dstack-gateway-downloads.s3.amazonaws.com/{channel}/dstack_gateway-{build}-py3-none-any.whl",
+        "/home/ubuntu/dstack/blue/python -m dstack.gateway.systemd install --run",
+    ]

@@ -12,8 +12,11 @@ working_dir = Path("/home/ubuntu/dstack")
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(required=True)
+
     install_parser = subparsers.add_parser("install")
     install_parser.set_defaults(action=install_action)
+    install_parser.add_argument("--run", action="store_true")
+
     args = parser.parse_args()
 
     args.action(args)
@@ -32,12 +35,14 @@ def install_action(args):
             "dstack.gateway.systemd", f"resources/{script_name}"
         )
         (working_dir / script_name).write_text(script)
+        # TODO(egor-s) make accessible by ubuntu user
 
     print("Reloading systemd daemon...")
     assert subprocess.run(["systemctl", "daemon-reload"]).returncode == 0
 
     print("Enabling service...")
-    assert subprocess.run(["systemctl", "enable", service_name]).returncode == 0
+    args = ["--now"] if args.run else []
+    assert subprocess.run(["systemctl", "enable", service_name] + args).returncode == 0
 
 
 if __name__ == "__main__":
