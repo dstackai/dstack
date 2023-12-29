@@ -4,6 +4,7 @@ from dstack._internal.core.models.configurations import ConfigurationType, PortM
 from dstack._internal.core.models.profiles import ProfileRetryPolicy, SpotPolicy
 from dstack._internal.core.models.runs import RetryPolicy, RunSpec
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
+from dstack._internal.server.services.jobs.configurators.extensions.fleet import JetBrainsFleet
 from dstack._internal.server.services.jobs.configurators.extensions.vscode import VSCodeDesktop
 
 DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
@@ -18,10 +19,14 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
     TYPE: ConfigurationType = ConfigurationType.DEV_ENVIRONMENT
 
     def __init__(self, run_spec: RunSpec):
-        self.ide = VSCodeDesktop(
-            run_name=run_spec.run_name,
-            version=run_spec.configuration.version,
-            extensions=["ms-python.python", "ms-toolsai.jupyter"],
+        self.ide = (
+            VSCodeDesktop(
+                run_name=run_spec.run_name,
+                version=run_spec.configuration.version,
+                extensions=["ms-python.python", "ms-toolsai.jupyter"],
+            )
+            if run_spec.configuration.ide == "vscode"
+            else JetBrainsFleet(run_name=run_spec.run_name)
         )
         super().__init__(run_spec)
 
