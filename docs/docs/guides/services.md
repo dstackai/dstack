@@ -109,5 +109,5 @@ What's next?
 1. Check the [Text Generation Inference](../../learn/tgi.md) and [vLLM](../../learn/vllm.md) examples
 2. Read about [dev environments](../guides/dev-environments.md) 
     and [tasks](../guides/tasks.md)
-3. See all [learning materials](../../learn/index.md)
+3. Browse [examples](../../examples/index.md)
 4. Check the [reference](../reference/dstack.yml.md#service)

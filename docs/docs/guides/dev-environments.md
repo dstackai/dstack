@@ -77,5 +77,5 @@ automatically.
 
 ## What's next?
 
-1. See all [learning materials](../../learn/index.md)
+1. Browse [examples](../../examples/index.md)
 2. Check the [reference](../reference/dstack.yml.md#dev-environment)

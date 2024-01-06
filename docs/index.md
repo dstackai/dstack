@@ -1,6 +1,6 @@
 ---
 template: home.html
-title: An easier way to train and deploy generative AI
+title: Orchestrate GPU workloads effortlessly on any cloud
 hide:
    - navigation
    - toc

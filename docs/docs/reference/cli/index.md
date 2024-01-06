@@ -121,7 +121,7 @@ $ dstack config --help
 
 A gateway is required for running services.
 
-#### dstack gateway list
+##### dstack gateway list
 
 The `dstack gateway list` command displays the names and addresses of the gateways configured in the project.
 
@@ -134,7 +134,7 @@ $ dstack gateway list --help
 
 </div>
 
-#### dstack gateway create
+##### dstack gateway create
 
 The `dstack gateway create` command creates a new gateway instance in the project.
 
@@ -147,7 +147,7 @@ $ dstack gateway create --help
 
 </div>
 
-#### dstack gateway delete
+##### dstack gateway delete
 
 The `dstack gateway delete` command deletes the specified gateway.
 
@@ -160,7 +160,7 @@ $ dstack gateway delete --help
 
 </div>
 
-#### dstack gateway update
+##### dstack gateway update
 
 The `dstack gateway update` command updates the specified gateway.
 
