@@ -1,5 +1,7 @@
 import argparse
 import importlib.resources
+import os
+import pwd
 import subprocess
 from pathlib import Path
 
@@ -10,6 +12,7 @@ working_dir = Path("/home/ubuntu/dstack")
 
 
 def main():
+    # requires sudo privileges
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(required=True)
 
@@ -23,19 +26,21 @@ def main():
 
 
 def install_action(args):
+    user = pwd.getpwnam("ubuntu")
+    uid, gid = user.pw_uid, user.pw_gid
+
     print("Writing service file...")
     service_file = importlib.resources.read_text(
-        "dstack.gateway.systemd", f"resources/{service_path.name}"
+        "dstack.gateway.systemd.resources", service_path.name
     )
     service_path.write_text(service_file.format(working_dir=working_dir.as_posix()))
 
     for script_name in ["start.sh", "update.sh"]:
         print(f"Writing {script_name} script...")
-        script = importlib.resources.read_text(
-            "dstack.gateway.systemd", f"resources/{script_name}"
-        )
-        (working_dir / script_name).write_text(script)
-        # TODO(egor-s) make accessible by ubuntu user
+        script = importlib.resources.read_text("dstack.gateway.systemd.resources", script_name)
+        script_path = working_dir / script_name
+        script_path.write_text(script)
+        os.chown(script_path, uid, gid)
 
     print("Reloading systemd daemon...")
     assert subprocess.run(["systemctl", "daemon-reload"]).returncode == 0

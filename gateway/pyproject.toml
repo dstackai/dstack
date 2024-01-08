@@ -17,5 +17,8 @@ dependencies = [
     "uvicorn",
 ]
 
+[tool.setuptools.package-data]
+"dstack.gateway" = ["systemd/resources/*"]
+
 [tool.setuptools.dynamic]
 version = {attr = "dstack.gateway.version.__version__"}

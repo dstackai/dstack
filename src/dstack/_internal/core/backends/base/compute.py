@@ -231,5 +231,5 @@ def get_dstack_gateway_commands() -> List[str]:
         "python3 -m venv /home/ubuntu/dstack/blue",
         "python3 -m venv /home/ubuntu/dstack/green",
         f"/home/ubuntu/dstack/blue/bin/pip install https://dstack-gateway-downloads.s3.amazonaws.com/{channel}/dstack_gateway-{build}-py3-none-any.whl",
-        "/home/ubuntu/dstack/blue/python -m dstack.gateway.systemd install --run",
+        "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
     ]
