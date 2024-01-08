@@ -1,7 +1,7 @@
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, List
 
 import sentry_sdk
 from fastapi import FastAPI, Request, status
@@ -114,6 +114,13 @@ def register_on_startup_hook(func: Callable[[FastAPI], Awaitable[None]]):
     _ON_STARTUP_HOOKS.append(func)
 
 
+_NO_API_VERSION_CHECK_ROUTES = ["/api/docs"]
+
+
+def add_no_api_version_check_routes(paths: List[str]):
+    _NO_API_VERSION_CHECK_ROUTES.extend(paths)
+
+
 def register_routes(app: FastAPI):
     app.include_router(users.router)
     app.include_router(projects.router)
@@ -152,7 +159,10 @@ def register_routes(app: FastAPI):
 
     @app.middleware("http")
     async def check_client_version(request: Request, call_next):
-        if not request.url.path.startswith("/api/") or request.url.path == "/api/docs":
+        if (
+            not request.url.path.startswith("/api/")
+            or request.url.path in _NO_API_VERSION_CHECK_ROUTES
+        ):
             return await call_next(request)
         response = check_client_server_compatibility(
             client_version=request.headers.get("x-api-version"),
