@@ -93,7 +93,7 @@ async def create_gateway(
             region=info.region,
             instance_id=info.instance_id,
             ssh_private_key=gateway_ssh_private_key,
-            ssh_public_key=gateway_ssh_private_key,
+            ssh_public_key=gateway_ssh_public_key,
         )
         session.add(gateway_compute)
         await session.commit()
