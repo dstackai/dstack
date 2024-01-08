@@ -230,6 +230,14 @@ async def _process_job(job_id: UUID):
                     job_provisioning_data,
                     gateway.gateway_compute.ssh_private_key,
                 )
+                logger.debug(
+                    *job_log(
+                        "service is registered: %s, age=%s",
+                        job_model,
+                        job.job_spec.gateway.hostname,
+                        job_submission.age,
+                    )
+                )
             except GatewayError as e:
                 logger.warning(
                     *job_log(

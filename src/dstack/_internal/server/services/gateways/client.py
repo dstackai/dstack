@@ -35,6 +35,14 @@ class GatewayClient:
             raise gateway_error(resp.json())
         resp.raise_for_status()
 
+    def unregister_service(self, project: str, public_domain: str):
+        resp = self.s.post(
+            self._url(f"/api/registry/{project}/unregister"), json={"public_domain": public_domain}
+        )
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+
     def preflight(self, project: str, domain: str, private_ssh_key: str, options: dict):
         if "openai" in options:
             # TODO(egor-s): custom entrypoint domain
