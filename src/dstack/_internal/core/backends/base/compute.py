@@ -139,6 +139,12 @@ def get_gateway_user_data(authorized_key: str) -> str:
         snap={"commands": [["install", "--classic", "certbot"]]},
         runcmd=[
             ["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"],
+            [
+                "sed",
+                "-i",
+                "s/# server_names_hash_bucket_size 64;/server_names_hash_bucket_size 128;/",
+                "/etc/nginx/nginx.conf",
+            ],
             ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
         ],
         ssh_authorized_keys=[authorized_key],
