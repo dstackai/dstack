@@ -135,7 +135,7 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
                 run_async(
                     backend.compute().terminate_instance,
                     gateway.gateway_compute.instance_id,
-                    gateway.region,
+                    gateway.gateway_compute.region,  # use LaunchedGatewayInfo.region
                     None,
                 )
             )
