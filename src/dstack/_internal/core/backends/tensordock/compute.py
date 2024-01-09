@@ -4,7 +4,7 @@ from typing import List, Optional
 import requests
 
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import get_shim_commands
+from dstack._internal.core.backends.base.compute import get_instance_name, get_shim_commands
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.tensordock.api_client import TensorDockAPIClient
 from dstack._internal.core.backends.tensordock.config import TensorDockConfig
@@ -60,7 +60,7 @@ class TensorDockCompute(Compute):
         )
         try:
             resp = self.api_client.deploy_single(
-                instance_name=job.job_spec.job_name,
+                instance_name=get_instance_name(run, job),
                 instance=instance_offer.instance,
                 cloudinit={
                     "ssh_pwauth": False,  # disable password auth
@@ -105,6 +105,7 @@ class TensorDockCompute(Compute):
             username="user",
             ssh_port={v: k for k, v in resp["port_forwards"].items()}["22"],
             dockerized=True,
+            backend_data=None,
         )
 
     def terminate_instance(

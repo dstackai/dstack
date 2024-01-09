@@ -36,6 +36,7 @@ from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
     get_gateway_user_data,
+    get_instance_name,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -130,7 +131,7 @@ class AzureCompute(Compute):
                 vm_size=instance_offer.instance.name,
                 # instance_name includes region because Azure may create an instance resource
                 # even when provisioning fails.
-                instance_name=f"{job.job_spec.job_name}-{instance_offer.region}",
+                instance_name=f"{get_instance_name(run, job)}-{instance_offer.region}",
                 user_data=get_user_data(
                     backend=BackendType.AZURE,
                     image_name=job.job_spec.image_name,
@@ -155,6 +156,7 @@ class AzureCompute(Compute):
                 username="ubuntu",
                 ssh_port=22,
                 dockerized=True,
+                backend_data=None,
             )
         except NoCapacityError:
             logger.info("Failed to request instance in %s", location)

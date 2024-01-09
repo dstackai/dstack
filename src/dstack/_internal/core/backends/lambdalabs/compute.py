@@ -7,7 +7,11 @@ from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel
 
-from dstack._internal.core.backends.base.compute import Compute, get_shim_commands
+from dstack._internal.core.backends.base.compute import (
+    Compute,
+    get_instance_name,
+    get_shim_commands,
+)
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.lambdalabs.api_client import LambdaAPIClient
 from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
@@ -70,7 +74,7 @@ class LambdaCompute(Compute):
             user_ssh_public_key=run.run_spec.ssh_key_pub,
             project_ssh_public_key=project_ssh_public_key,
             project_ssh_private_key=project_ssh_private_key,
-            instance_name=job.job_spec.job_name,
+            instance_name=get_instance_name(run, job),
             launch_command=launch_command,
         )
 
@@ -145,6 +149,7 @@ def _run_instance(
         username="ubuntu",
         ssh_port=22,
         dockerized=True,
+        backend_data=None,
     )
 
 
