@@ -46,9 +46,8 @@ async def migrate():
 
 async def get_session():
     async with db.get_session() as session:
-        async with session as s:
-            yield s
-            await s.commit()
+        yield session
+        await session.commit()
 
 
 get_session_ctx = asynccontextmanager(get_session)

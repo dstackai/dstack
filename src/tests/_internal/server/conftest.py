@@ -18,6 +18,5 @@ async def test_db():
 @pytest_asyncio.fixture
 async def session():
     async with db.get_session() as session:
-        async with session as s:
-            yield s
-            await s.commit()
+        yield session
+        await session.commit()

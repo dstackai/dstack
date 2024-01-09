@@ -115,6 +115,7 @@ async def update_repo(
             creds=repo.creds,
         )
     )
+    await session.commit()
     return repo
 
 
@@ -126,6 +127,7 @@ async def delete_repos(
     await session.execute(
         delete(RepoModel).where(RepoModel.project_id == project.id, RepoModel.name.in_(repos_ids))
     )
+    await session.commit()
 
 
 async def upload_code(
