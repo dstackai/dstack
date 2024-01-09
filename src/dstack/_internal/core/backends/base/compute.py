@@ -5,6 +5,7 @@ from typing import List, Optional
 import yaml
 
 from dstack import version
+from dstack._internal import settings
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -99,8 +100,8 @@ def get_shim_commands(
 
 
 def get_dstack_runner_version() -> str:
-    if version.__is_release__:
-        return version.__version__
+    if settings.DSTACK_VERSION is not None:
+        return settings.DSTACK_VERSION
     return os.environ.get("DSTACK_RUNNER_VERSION", None) or "latest"
 
 
@@ -110,7 +111,7 @@ def get_cloud_config(**config) -> str:
 
 def get_dstack_shim(build: str) -> List[str]:
     bucket = "dstack-runner-downloads-stgn"
-    if version.__is_release__:
+    if settings.DSTACK_VERSION is not None:
         bucket = "dstack-runner-downloads"
 
     return [
@@ -120,7 +121,7 @@ def get_dstack_shim(build: str) -> List[str]:
 
 
 def get_run_shim_script(registry_auth_required: bool) -> List[str]:
-    dev_flag = "" if version.__is_release__ else "--dev"
+    dev_flag = "" if settings.DSTACK_VERSION is not None else "--dev"
     with_auth_flag = "--with-auth" if registry_auth_required else ""
     return [
         f"nohup dstack-shim {dev_flag} docker {with_auth_flag} --keep-container >/root/shim.log 2>&1 &"
@@ -175,7 +176,7 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
     build = get_dstack_runner_version()
     runner = "/usr/local/bin/dstack-runner"
     bucket = "dstack-runner-downloads-stgn"
-    if version.__is_release__:
+    if settings.DSTACK_VERSION is not None:
         bucket = "dstack-runner-downloads"
     commands += [
         f'curl --output {runner} "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',

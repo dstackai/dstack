@@ -4,6 +4,7 @@ import time
 from typing import List, Optional
 
 import dstack.version as version
+from dstack._internal import settings
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import get_instance_name, get_user_data
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -194,6 +195,6 @@ class NebiusCompute(Compute):
             "owner": "dstack",
             **kwargs,
         }
-        if version.__version__:
-            labels["dstack-version"] = version.__version__.replace(".", "-")
+        if settings.DSTACK_VERSION is not None:
+            labels["dstack-version"] = settings.DSTACK_VERSION.replace(".", "-")
         return labels

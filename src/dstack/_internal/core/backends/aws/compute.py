@@ -7,6 +7,7 @@ import botocore.exceptions
 
 import dstack._internal.core.backends.aws.resources as aws_resources
 import dstack.version as version
+from dstack._internal import settings
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
@@ -194,8 +195,8 @@ class AWSCompute(Compute):
             {"Key": "owner", "Value": "dstack"},
             {"Key": "dstack_project", "Value": project_id},
         ]
-        if version.__version__ is not None:
-            tags.append({"Key": "dstack_version", "Value": version.__version__})
+        if settings.DSTACK_VERSION is not None:
+            tags.append({"Key": "dstack_version", "Value": settings.DSTACK_VERSION})
         response = ec2.create_instances(
             **aws_resources.create_instances_struct(
                 disk_size=10,

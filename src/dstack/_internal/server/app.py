@@ -8,13 +8,12 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from rich import print
 
-import dstack.version
 from dstack._internal.cli.utils.common import colors
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
-from dstack._internal.server.db import get_session, get_session_ctx, migrate
+from dstack._internal.server.db import get_session_ctx, migrate
 from dstack._internal.server.routers import (
     backends,
     gateways,
@@ -42,6 +41,7 @@ from dstack._internal.server.utils.routers import (
     error_detail,
     get_server_client_error_details,
 )
+from dstack._internal.settings import DSTACK_VERSION
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
     if settings.SERVER_BUCKET is not None:
         init_default_storage()
     scheduler = start_background_tasks()
-    dstack_version = dstack.version.__version__ if dstack.version.__version__ else "(no version)"
+    dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
     print(
         f"The dstack server [{colors['code']}]{dstack_version}[/{colors['code']}] is running at [{colors['code']}]{SERVER_URL}[/{colors['code']}]"
     )
@@ -166,7 +166,7 @@ def register_routes(app: FastAPI):
             return await call_next(request)
         response = check_client_server_compatibility(
             client_version=request.headers.get("x-api-version"),
-            server_version=settings.SERVER_API_VERSION,
+            server_version=DSTACK_VERSION,
         )
         if response is not None:
             return response
