@@ -85,6 +85,7 @@ async def update_user(
         .where(UserModel.name == username)
         .values(global_role=global_role, email=email)
     )
+    await session.commit()
     return await get_user_model_by_name_or_error(session=session, username=username)
 
 
@@ -92,6 +93,7 @@ async def refresh_user_token(session: AsyncSession, username: str) -> Optional[U
     await session.execute(
         update(UserModel).where(UserModel.name == username).values(token=uuid.uuid4())
     )
+    await session.commit()
     return await get_user_model_by_name(session=session, username=username)
 
 
@@ -101,6 +103,7 @@ async def delete_users(
     usernames: List[str],
 ):
     await session.execute(delete(UserModel).where(UserModel.name.in_(usernames)))
+    await session.commit()
 
 
 async def get_user_model_by_name(session: AsyncSession, username: str) -> Optional[UserModel]:
