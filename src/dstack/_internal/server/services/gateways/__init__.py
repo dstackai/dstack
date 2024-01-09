@@ -147,6 +147,9 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
     for gateway, error in zip(gateways, terminate_results):
         if isinstance(error, Exception):
             continue  # ignore error, but keep gateway
+        if gateway.gateway_compute is not None:
+            gateway.gateway_compute.deleted = True
+            session.add(gateway.gateway_compute)
         await session.delete(gateway)
     await session.commit()
 
