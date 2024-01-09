@@ -234,13 +234,17 @@ def get_latest_runner_build() -> Optional[str]:
     return None
 
 
-def get_dstack_gateway_commands() -> List[str]:
+def get_dstack_gateway_wheel(build: str) -> str:
     channel = "release" if version.__is_release__ else "stgn"
+    return f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}/dstack_gateway-{build}-py3-none-any.whl"
+
+
+def get_dstack_gateway_commands() -> List[str]:
     build = get_dstack_runner_version()
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",
         "python3 -m venv /home/ubuntu/dstack/green",
-        f"/home/ubuntu/dstack/blue/bin/pip install https://dstack-gateway-downloads.s3.amazonaws.com/{channel}/dstack_gateway-{build}-py3-none-any.whl",
+        f"/home/ubuntu/dstack/blue/bin/pip install {get_dstack_gateway_wheel(build)}",
         "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
     ]

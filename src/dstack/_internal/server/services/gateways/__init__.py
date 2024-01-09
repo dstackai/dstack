@@ -7,10 +7,15 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.utils.random_names as random_names
+from dstack._internal.core.backends.base.compute import (
+    get_dstack_gateway_wheel,
+    get_dstack_runner_version,
+)
 from dstack._internal.core.errors import GatewayError, ResourceNotExistsError, ServerClientError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
+from dstack._internal.core.services.ssh.exec import ssh_execute_command
 from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
 from dstack._internal.server.services.backends import (
     get_project_backend_by_type_or_error,
@@ -285,6 +290,34 @@ def _gateway_preflight(
             client.preflight(project, domain, project_ssh_private_key, options)
     except requests.RequestException:
         raise GatewayError(f"Gateway is not working")
+
+
+async def update_gateways(session: AsyncSession):
+    res = await session.execute(
+        select(GatewayComputeModel).where(GatewayComputeModel.deleted == False)
+    )
+    gateway_computes = res.scalars().all()
+
+    build = get_dstack_runner_version()
+    aws = [run_async(_update_gateway, gateway, build) for gateway in gateway_computes]
+
+    for error, gateway in zip(
+        await asyncio.gather(*aws, return_exceptions=True), gateway_computes
+    ):
+        if isinstance(error, Exception):
+            logger.warning(f"Failed to update gateway %s: %s", gateway.ip_address, error)
+            continue
+
+
+def _update_gateway(gateway_compute: GatewayComputeModel, build: str):
+    logger.debug("Updating gateway %s", gateway_compute.ip_address)
+    stdout = ssh_execute_command(
+        host=f"ubuntu@{gateway_compute.ip_address}",
+        id_rsa=gateway_compute.ssh_private_key,
+        command=f"/bin/sh dstack/update.sh {get_dstack_gateway_wheel(build)} {build}",
+    )
+    if "Update successfully completed" in stdout:
+        logger.info("Gateway %s updated", gateway_compute.ip_address)
 
 
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:

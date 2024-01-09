@@ -3,27 +3,11 @@ import subprocess
 import tempfile
 from typing import Dict, Optional
 
-from dstack._internal.core.errors import SSHError
+from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 
 logger = get_logger(__name__)
-
-
-class SSHTimeoutError(SSHError):
-    pass
-
-
-class SSHConnectionRefusedError(SSHError):
-    pass
-
-
-class SSHKeyError(SSHError):
-    pass
-
-
-class SSHPortInUseError(SSHError):
-    pass
 
 
 class SSHTunnel:
@@ -57,17 +41,7 @@ class SSHTunnel:
         if r.returncode == 0:
             return
         logger.debug("SSH tunnel failed: %s", r.stderr)
-        if b": Operation timed out" in r.stderr:
-            raise SSHTimeoutError()
-        if b": Connection refused" in r.stderr:
-            raise SSHConnectionRefusedError()
-        if b": Permission denied (publickey)" in r.stderr:
-            raise SSHKeyError(r.stderr)
-        if b": Address already in use" in r.stderr:
-            raise SSHPortInUseError()
-        # TODO: kex_exchange_identification: read: Connection reset by peer
-        # TODO: Connection timed out during banner exchange
-        raise SSHError(r.stderr.decode())
+        raise get_ssh_error(r.stderr)
 
     def close(self):
         command = ["ssh", "-S", self.control_sock_path, "-O", "exit", self.host]
