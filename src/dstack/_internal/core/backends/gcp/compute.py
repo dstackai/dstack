@@ -9,6 +9,7 @@ import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack._internal.core.backends.base.compute import (
     Compute,
     get_gateway_user_data,
+    get_instance_name,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -86,7 +87,7 @@ class GCPCompute(Compute):
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
         project_id = run.project_name
-        instance_name = run.run_spec.run_name
+        instance_name = get_instance_name(run, job)
         gcp_resources.create_runner_firewall_rules(
             firewalls_client=self.firewalls_client,
             project_id=self.config.project_id,
@@ -145,6 +146,7 @@ class GCPCompute(Compute):
                 username="ubuntu",
                 ssh_port=22,
                 dockerized=True,
+                backend_data=None,
             )
         raise NoCapacityError()
 

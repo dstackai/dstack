@@ -1,4 +1,4 @@
-# RAG with Llama Index and Weaviate
+# Llama Index
 
 RAG, or retrieval-augmented generation, empowers LLMs by providing them with access to your data.
 
@@ -96,7 +96,7 @@ The data is in the vector database! Now we can proceed with the part where we in
 ## Deploy an LLM
 
 This example assumes we're using an LLM deployed via the [text generation](../docs/guides/text-generation.md) API,
-or using [TGI](text-generation-inference.md).
+or using [TGI](tgi.md).
 
 Once you deployed the model, make sure to set the `TGI_ENDPOINT_URL` environment variable 
 to its URL, e.g. `https://<run-name>.<domain-name>` (or `http://localhost:<port>` if it's deployed 
@@ -215,5 +215,11 @@ using `dstack`. For more in-depth information, we encourage you to explore the d
 
 ## Source code
 
-!!! info "Source code"
-    The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+
+## What's next?
+
+1. Check the [Text Generation Inference](tgi.md) and [vLLM](vllm.md) examples
+2. Read about [services](../docs/guides/services.md)
+3. Browse all [examples](index.md)
+4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

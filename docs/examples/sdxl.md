@@ -1,4 +1,4 @@
-# Serving SDXL with FastAPI
+# SDXL
 
 Stable Diffusion XL (SDXL) 1.0 is the latest version of the open-source model that is capable 
 of generating high-quality images from text.
@@ -192,7 +192,7 @@ commands:
 
 !!! warning "NOTE:"
     Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
-    If you're using dstack Cloud, the dstack gateway is configured automatically for you.
+    If you're using dstack Cloud, the default gateway is configured automatically for you.
 
 After the gateway is configured, go ahead run the service.
 
@@ -222,5 +222,13 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
 
 </div>
 
-!!! info "Source code"
-    The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+## Source code
+    
+The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+
+## What's next?
+
+1. Check the [Text Generation Inference](tgi.md) and [vLLM](vllm.md) examples
+2. Read about [services](../docs/guides/services.md)
+3. Browse [examples](index.md)
+4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

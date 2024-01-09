@@ -31,7 +31,7 @@ class ConfigCommand(BaseCommand):
         )
         self._parser.add_argument(
             "--no-default",
-            help="Do not prompt to set the project as default.",
+            help="Do not prompt to set the project as default",
             action="store_true",
         )
 
@@ -80,5 +80,5 @@ class ConfigCommand(BaseCommand):
             )
             config_manager.save()
         console.print(
-            f"[grey58]Configuration updated at [{colors['code']}]{config_manager.config_filepath}[/{colors['code']}].[/grey58]"
+            f"Configuration updated at [{colors['code']}]{config_manager.config_filepath}[/{colors['code']}]."
         )

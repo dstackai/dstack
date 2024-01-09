@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack simplifies training, fine-tuning, and deployment of generative AI models on any cloud, while leveraging the open-source ecosystem.
+  dstack is an open-source toolkit for running GPU workloads on any cloud. It simplifies development, training, and deployment of gen AI models.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -11,7 +11,7 @@ repo_name: dstackai/dstack
 edit_uri: edit/master/docs/
 
 #Copyright
-copyright: © 2023 dstack
+copyright: © 2024 dstack GmbH
 
 # Configuration
 theme:
@@ -73,16 +73,22 @@ plugins:
   - redirects:
       redirect_maps:
         'quickstart.md': 'docs/index.md'
-        'docs/quick-start.md': 'docs/index.md'
-        'docs/installation/index.md': 'docs/index.md'
-        'docs/guides/projects.md': 'docs/config/server.md'
-        'docs/configuration/server.md': 'docs/config/server.md'
-        'guides/clouds.md': 'docs/configuration/server.md'
-        'examples/llama-index-weaviate.md': 'learn/rag.md'
-        'examples/finetuning-llama-2.md': 'learn/qlora.md'
-        'examples/text-generation-inference.md': 'learn/tgi.md'
-        'examples/stable-diffusion-xl.md': 'learn/sdxl.md'
-        'examples/vllm.md': 'learn/vllm.md'
+        'docs/quick-start.md': 'docs/quickstart.md'
+        'docs/guides/projects.md': 'docs/installation/index.md'
+        'docs/configuration/server.md': 'docs/installation/index.md'
+        'guides/clouds.md': 'docs/installation/index.md'
+        'examples/llama-index-weaviate.md': 'examples/llama-index.md'
+        'examples/finetuning-llama-2.md': 'examples/qlora.md'
+        'examples/text-generation-inference.md': 'examples/tgi.md'
+        'examples/stable-diffusion-xl.md': 'examples/sdxl.md'
+        'examples/vllm.md': 'examples/vllm.md'
+        'learn/mixtral.md': 'examples/mixtral.md'
+        'learn/tei.md': 'examples/tei.md'
+        'learn/llama-index.md': 'examples/llama-index.md'
+        'learn/qlora.md': 'examples/qlora.md'
+        'learn/tgi.md': 'examples/tgi.md'
+        'learn/sdxl.md': 'examples/sdxl.md'
+        'learn/vllm.md': 'examples/vllm.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -119,7 +125,7 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - toc:
-      toc_depth: 3
+      toc_depth: 4
       permalink: true
   - attr_list
   - md_in_html
@@ -146,8 +152,8 @@ extra:
       link: https://discord.gg/u8SmfwPpMd
     - icon: /simple/x
       link: https://twitter.com/dstackai
-    - icon: /fontawesome/brands/github
-      link: https://github.com/dstackai/dstack
+#    - icon: /fontawesome/brands/github
+#      link: https://github.com/dstackai/dstack
 #    - icon: /fontawesome/brands/python
 #      link: https://pypi.org/project/dstack
 #    - icon: /fontawesome/brands/docker
@@ -159,12 +165,9 @@ nav:
   - Home: index.md
   - Docs:
       - Getting started:
-          - Quickstart: docs/index.md
-#          - Installation:
-#              - pip: docs/installation/pip.md
-#              - Docker: docs/installation/docker.md
-          - Configuration:
-              - Server configuration: docs/config/server.md
+          - Overview: docs/index.md
+          - Installation: docs/installation/index.md
+          - Quickstart: docs/quickstart.md
       - Guides:
           - Dev environments: docs/guides/dev-environments.md
           - Tasks: docs/guides/tasks.md
@@ -172,25 +175,24 @@ nav:
       - Reference:
           - CLI: docs/reference/cli/index.md
           - API: docs/reference/api/python/index.md
-          - .dstack.yml:
-              - dev-environment: docs/reference/dstack.yml/dev-environment.md
-              - task: docs/reference/dstack.yml/task.md
-              - service: docs/reference/dstack.yml/service.md
-          - "server/config.yml": docs/reference/server/config.yml.md
+          - .dstack.yml: docs/reference/dstack.yml.md
+          - server/config.yml: docs/reference/server/config.yml.md
           - profiles.yml: docs/reference/profiles.yml.md
-  - Learn:
-    - learn/index.md
-    - Guides:
-        Leveraging spot instances effectively: learn/spot.md
-    - Examples:
-      - Serving embeddings with TEI: learn/tei.md
-      - Building RAG with Llama Index: learn/llama-index.md
-      - Fine-tuning LLMs with QLoRA: learn/qlora.md
-      - Serving LLMs with TGI: learn/tgi.md
-      - Serving SDXL with FastAPI: learn/sdxl.md
-      - Serving LLMs with vLLM: learn/vllm.md
-  - Pricing: pricing.md
-  - Blog:
-      - blog/index.md
-  - Discord: https://discord.gg/u8SmfwPpMd
-  - Twitter: https://twitter.com/dstackai/
+  - Examples:
+    - examples/index.md
+    - LLMs:
+        - Mixtral 8x7B: examples/mixtral.md
+    - Fine-tuning:
+        - QLoRA: examples/qlora.md
+    - Deployment:
+        - vLLM: examples/vllm.md
+        - Text Generation Inference: examples/tgi.md
+        - Text Embedding Interface: examples/tei.md
+        - SDXL: examples/sdxl.md
+    - RAG:
+        - Llama Index: examples/llama-index.md
+#  - Blog:
+#      - blog/index.md
+  - Community: https://discord.gg/u8SmfwPpMd
+  - Platform: platform.md
+  - GitHub: https://github.com/dstackai/dstack

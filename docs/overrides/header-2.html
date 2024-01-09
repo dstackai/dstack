@@ -19,9 +19,9 @@
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
-          <span class="md-ellipsis">
+          <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" class="md-ellipsis">
             {{ config.site_name }}
-          </span>
+          </a>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
@@ -54,11 +54,11 @@
       {% include "partials/search.html" %}
     {% endif %}
 
-    {% if config.repo_url %}
+    <!--{% if config.repo_url %}
       <div class="md-header__source">
         {% include "partials/source.html" %}
       </div>
-    {% endif %}
+    {% endif %}-->
 
     <!--<div class="md-header__buttons">
       <a href="/docs" class="md-button md-button-secondary">Get stated</a>

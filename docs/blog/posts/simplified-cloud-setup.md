@@ -1,15 +1,14 @@
 ---
-title: "dstack 0.12.0: Simplified cloud setup, refined API"
 date: 2023-10-18
-description: "The v0.12.0 update makes it much easier to configure clouds and enhances the Python API."
+description: "The latest update makes it much easier to configure clouds and enhances the Python API."
 slug: "simplified-cloud-setup"
 categories:
 - Releases
 ---
 
-# Simplified cloud setup, and refined API
+# dstack 0.12.0: Simplified cloud setup, and refined API
 
-__The v0.12.0 update makes it much easier to configure clouds and enhances the API.__
+__The latest update simplifies cloud configuration and enhances the Python API.__
 
 For the past six weeks, we've been diligently overhauling `dstack` with the aim of significantly simplifying the process
 of configuring clouds and enhancing the functionality of the API. Please take note of the breaking
@@ -80,7 +79,7 @@ run = client.runs.submit(
 
 The `dstack.api.Run` instance provides methods for various operations including attaching to the run, 
 forwarding ports to `localhost`, retrieving status, stopping, and accessing logs. For more details, refer to 
-the [example](../../examples/deploy-python.md) and [reference](../../docs/reference/api/python/index.md).
+the [example](../../learn/deploy-python.md) and [reference](../../docs/reference/api/python/index.md).
 
 ## Other changes
 
@@ -101,7 +100,7 @@ This means you'll need to delete `~/.dstack` and configure `dstack` from scratch
 3. Configure clouds via `~/.dstack/server/config.yml` (see the [new guide](../../docs/config/server.md))
 4. Run `dstack server`
 
-The [documentation](../../docs/index.md) and [examples](../../examples/index.md) are updated.
+The [documentation](../../docs/index.md) and [examples](../../learn/index.md) are updated.
 
 ## Give it a try
 

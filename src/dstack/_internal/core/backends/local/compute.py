@@ -71,4 +71,5 @@ class LocalCompute(Compute):
             username="root",
             ssh_port=10022,
             dockerized=False,
+            backend_data=None,
         )

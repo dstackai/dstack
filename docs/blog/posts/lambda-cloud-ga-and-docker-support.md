@@ -1,15 +1,14 @@
 ---
-title: "dstack 0.10.5: Lambda Cloud GA, and Docker support"
 date: 2023-07-14
-description: The latest update improves Lambda Cloud integration and adds custom Docker images support.
+description: The latest update improves Lambda integration and adds custom Docker images support.
 slug: "lambda-cloud-ga-and-docker-support"
 categories:
 - Releases
 ---
 
-# Lambda Cloud GA, and Docker support
+# dstack 0.10.5: Lambda integration, Docker support, and more
 
-__The 0.10.5 release improves Lambda Cloud integration and adds support for Docker.__
+__The latest release improves Lambda Cloud integration and adds support for Docker.__
 
 In the previous update, we added initial integration with <a href="https://lambdalabs.com" target="_blank">Lambda Cloud</a>. With today's release, this integration has
 significantly improved and finally goes generally available. Additionally, the latest release adds support for

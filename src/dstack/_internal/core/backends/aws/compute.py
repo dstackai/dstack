@@ -7,10 +7,12 @@ import botocore.exceptions
 
 import dstack._internal.core.backends.aws.resources as aws_resources
 import dstack.version as version
+from dstack._internal import settings
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base.compute import (
     Compute,
     get_gateway_user_data,
+    get_instance_name,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -127,7 +129,7 @@ class AWSCompute(Compute):
         iam_client = self.session.client("iam", region_name=instance_offer.region)
 
         tags = [
-            {"Key": "Name", "Value": run.run_spec.run_name},
+            {"Key": "Name", "Value": get_instance_name(run, job)},
             {"Key": "owner", "Value": "dstack"},
             {"Key": "dstack_project", "Value": project_id},
             {"Key": "dstack_user", "Value": run.user},
@@ -173,6 +175,7 @@ class AWSCompute(Compute):
                 username="ubuntu",
                 ssh_port=22,
                 dockerized=True,  # because `dstack-shim docker` is used
+                backend_data=None,
             )
         except botocore.exceptions.ClientError as e:
             logger.warning("Got botocore.exceptions.ClientError: %s", e)
@@ -192,8 +195,8 @@ class AWSCompute(Compute):
             {"Key": "owner", "Value": "dstack"},
             {"Key": "dstack_project", "Value": project_id},
         ]
-        if version.__version__ is not None:
-            tags.append({"Key": "dstack_version", "Value": version.__version__})
+        if settings.DSTACK_VERSION is not None:
+            tags.append({"Key": "dstack_version", "Value": settings.DSTACK_VERSION})
         response = ec2.create_instances(
             **aws_resources.create_instances_struct(
                 disk_size=10,

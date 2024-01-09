@@ -1,4 +1,4 @@
-# Leveraging spot instances effectively
+# Spot instances
 
 Cloud instances come in three types: `reserved` (for long-term commitments at a cheaper rate), `on-demand` (used as needed but
 more expensive), and `spot` (cheapest, provided when available, but can be taken away when requested by someone else).

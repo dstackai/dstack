@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from dstack import version
+
 DSTACK_DIR_PATH = Path("~/.dstack/").expanduser()
 
 SERVER_DIR_PATH = Path(os.getenv("DSTACK_SERVER_DIR", DSTACK_DIR_PATH / "server"))
@@ -33,6 +35,11 @@ SERVER_BUCKET = os.getenv("DSTACK_SERVER_BUCKET")
 SERVER_BUCKET_REGION = os.getenv("DSTACK_SERVER_BUCKET_REGION", "eu-west-1")
 
 DEFAULT_PROJECT_NAME = "main"
+
+DSTACK_UPDATE_DEFAULT_PROJECT = os.getenv("DSTACK_UPDATE_DEFAULT_PROJECT", "false") is True
+DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT = (
+    os.getenv("DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT", "false") is True
+)
 
 SENTRY_DSN = os.getenv("DSTACK_SENTRY_DSN")
 SENTRY_TRACES_SAMPLE_RATE = float(os.getenv("DSTACK_SENTRY_TRACES_SAMPLE_RATE", 0.1))

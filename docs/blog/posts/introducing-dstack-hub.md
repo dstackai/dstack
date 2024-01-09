@@ -1,14 +1,14 @@
 ---
 date: 2023-04-11
-description: A new tool for teams to manage their ML workflows.
+description: The latest update introduces the server with UI, team management, and more.
 slug: "introducing-dstack-hub"
 categories:
 - Releases
 ---
 
-# An early preview of dstack server
+# dstack 0.7.0: Introducing dstack server
 
-__The 0.7 update introduces the server with UI, team management, and more.__
+__The latest update introduces the server with UI, team management, and more.__
 
 Last October, we open-sourced the `dstack` CLI for defining ML workflows as code and running them easily on any cloud or
 locally. The tool abstracts ML engineers from vendor APIs and infrastructure, making it convenient to run scripts,

@@ -40,12 +40,24 @@ def generate_schema_reference(
 ) -> str:
     module, model_name = model_path.rsplit(".", maxsplit=1)
     cls = getattr(importlib.import_module(module), model_name)
-    rows = [
-        f"### {cls.__name__}",
-        "",
-        "| Property | Description | Type | Default value |",
-        "| --- | --- | --- | --- |",
-    ]
+    rows = []
+    if (
+        not overrides
+        or "show_root_heading" not in overrides
+        or overrides.get("show_root_heading") is True
+    ):
+        rows.extend(
+            [
+                f"### {cls.__name__}",
+                "",
+            ]
+        )
+    rows.extend(
+        [
+            "| Property | Description | Type | Default value |",
+            "| --- | --- | --- | --- |",
+        ]
+    )
     for name, field in cls.__fields__.items():
         values = dict(
             name=name,

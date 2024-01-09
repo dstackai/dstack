@@ -1,18 +1,19 @@
+import os
 import time
 from contextlib import asynccontextmanager
-from typing import Awaitable, Callable
-from urllib.parse import urlparse
+from typing import Awaitable, Callable, List
 
 import sentry_sdk
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from rich import print
 
-import dstack.version
+from dstack._internal.cli.utils.common import colors
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
-from dstack._internal.core.services.configs import create_default_project_config
+from dstack._internal.core.services.configs import update_default_project
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
-from dstack._internal.server.db import get_session, get_session_ctx, migrate
+from dstack._internal.server.db import get_session_ctx, migrate
 from dstack._internal.server.routers import (
     backends,
     gateways,
@@ -27,13 +28,20 @@ from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.services.projects import get_or_create_default_project
 from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
-from dstack._internal.server.settings import DEFAULT_PROJECT_NAME, SERVER_URL
+from dstack._internal.server.settings import (
+    DEFAULT_PROJECT_NAME,
+    DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT,
+    DSTACK_UPDATE_DEFAULT_PROJECT,
+    SERVER_CONFIG_FILE_PATH,
+    SERVER_URL,
+)
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
+    check_client_server_compatibility,
     error_detail,
-    error_forbidden,
     get_server_client_error_details,
 )
+from dstack._internal.settings import DSTACK_VERSION
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -64,23 +72,35 @@ async def lifespan(app: FastAPI):
         )
         if settings.SERVER_CONFIG_ENABLED:
             server_config_manager = ServerConfigManager()
-            print("Reading project configurations from ~/.dstack/server/config.yml...")
             config_loaded = server_config_manager.load_config()
+            server_config_dir = str(SERVER_CONFIG_FILE_PATH).replace(
+                os.path.expanduser("~"), "~", 1
+            )
             if not config_loaded:
-                print("No config was found. Initializing default configuration...")
+                print(
+                    f"Initializing the default configuration at [{colors['code']}]{server_config_dir}[/{colors['code']}]..."
+                )
                 await server_config_manager.init_config(session=session)
             else:
-                print("Applying configuration...")
+                print(
+                    f"Applying server configuration from [{colors['code']}]{server_config_dir}[/{colors['code']}]..."
+                )
                 await server_config_manager.apply_config(session=session)
-    create_default_project_config(
-        project_name=DEFAULT_PROJECT_NAME, url=SERVER_URL, token=admin.token
+    update_default_project(
+        project_name=DEFAULT_PROJECT_NAME,
+        url=SERVER_URL,
+        token=admin.token,
+        default=DSTACK_UPDATE_DEFAULT_PROJECT,
+        no_default=DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT,
     )
     if settings.SERVER_BUCKET is not None:
         init_default_storage()
     scheduler = start_background_tasks()
-    dstack_version = dstack.version.__version__ if dstack.version.__version__ else "(no version)"
-    print(f"\nThe dstack server {dstack_version} is running at {SERVER_URL}.")
-    print(f"The admin user token is '{admin.token}'.")
+    dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
+    print(
+        f"The dstack server [{colors['code']}]{dstack_version}[/{colors['code']}] is running at [{colors['code']}]{SERVER_URL}[/{colors['code']}]"
+    )
+    print(f"The admin token is [{colors['code']}]{admin.token}[/{colors['code']}].")
     for func in _ON_STARTUP_HOOKS:
         await func(app)
     yield
@@ -92,6 +112,13 @@ _ON_STARTUP_HOOKS = []
 
 def register_on_startup_hook(func: Callable[[FastAPI], Awaitable[None]]):
     _ON_STARTUP_HOOKS.append(func)
+
+
+_NO_API_VERSION_CHECK_ROUTES = ["/api/docs"]
+
+
+def add_no_api_version_check_routes(paths: List[str]):
+    _NO_API_VERSION_CHECK_ROUTES.extend(paths)
 
 
 def register_routes(app: FastAPI):
@@ -129,6 +156,21 @@ def register_routes(app: FastAPI):
             "Processed request %s %s in %s", request.method, request.url, f"{process_time:0.6f}s"
         )
         return response
+
+    @app.middleware("http")
+    async def check_client_version(request: Request, call_next):
+        if (
+            not request.url.path.startswith("/api/")
+            or request.url.path in _NO_API_VERSION_CHECK_ROUTES
+        ):
+            return await call_next(request)
+        response = check_client_server_compatibility(
+            client_version=request.headers.get("x-api-version"),
+            server_version=DSTACK_VERSION,
+        )
+        if response is not None:
+            return response
+        return await call_next(request)
 
     @app.get("/healthcheck")
     async def healthcheck():

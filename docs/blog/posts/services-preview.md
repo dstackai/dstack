@@ -1,15 +1,14 @@
 ---
-title: "dstack 0.10.7: Introducing services to simplify deployment"
 date: 2023-08-07
-description: "The 0.10.7 update introduces services, a new configuration type for easier deployment."
+description: "The latest update introduces services, a new configuration type for easier deployment."
 slug: "services-preview"
 categories:
 - Releases
 ---
 
-# Introducing services to simplify deployment
+# dstack 0.10.7: Introducing services to simplify deployment
 
-__The 0.10.7 update introduces services, a new configuration type for easier deployment.__
+__The latest update introduces services, a new configuration type for easier deployment.__
 
 Until now, `dstack` has supported `dev-environment` and `task` as configuration types. Even though `task` 
 may be used for basic serving use cases, it lacks crucial serving features. With the new update, we introduce

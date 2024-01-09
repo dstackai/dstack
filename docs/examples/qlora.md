@@ -1,8 +1,7 @@
-# Fine-tuning LLMs with QLoRA
+# QLoRA
 
-!!! info "NOTE:"
-    This example demonstrates how to fine-tune [`llama-2-7b-chat-hf`](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf),
-    with QLoRA and your own script, using [Tasks](../docs/guides/tasks.md).
+This example demonstrates how to fine-tune [`llama-2-7b-chat-hf`](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf),
+with QLoRA and your own script, using [Tasks](../docs/guides/tasks.md).
 
 ## Prepare a dataset
 
@@ -134,7 +133,7 @@ def create_and_prepare_trainer(model, tokenizer, dataset, args):
     return trainer
 ```
 
-### Publish the fine-tined model
+### Publish the fine-tuned model
 
 In the third part of the script, we merge the base model with the fine-tuned model and push it to the Hugging Face Hub.
 
@@ -257,5 +256,13 @@ tear down the cloud instance once the training is complete.
 
     ![](images/finetuning-llama-2/tensorboard.png)
 
-!!! info "Source code"
-    The complete and ready-to-run code for the example is available in our [GitHub repo](https://github.com/dstackai/dstack-examples).
+## Source code
+
+The complete and ready-to-run code for the example is available in our [GitHub repo](https://github.com/dstackai/dstack-examples).
+
+## What's next?
+
+1. Check the [Text Generation Inference](tgi.md) and [vLLM](vllm.md) examples
+2. Read about [tasks](../docs/guides/tasks.md)
+3. Browse [examples](index.md)
+4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

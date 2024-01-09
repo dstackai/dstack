@@ -5,17 +5,13 @@ import uuid
 from datetime import timezone
 from typing import List, Optional
 
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
-from dstack._internal.core.errors import (
-    RepoDoesNotExistError,
-    ResourceExistsError,
-    ServerClientError,
-)
+from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError
 from dstack._internal.core.models.runs import (
     Job,
     JobPlan,
@@ -26,6 +22,7 @@ from dstack._internal.core.models.runs import (
     RunPlan,
     RunSpec,
 )
+from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import repos as repos_services
@@ -34,7 +31,7 @@ from dstack._internal.server.services.jobs import (
     job_model_to_job_submission,
     stop_job,
 )
-from dstack._internal.server.services.projects import list_user_project_models
+from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils.random_names import generate_name
 
 
@@ -44,7 +41,10 @@ async def list_user_runs(
     project_name: Optional[str],
     repo_id: Optional[str],
 ) -> List[Run]:
-    projects = await list_user_project_models(session=session, user=user)
+    if user.global_role == GlobalRole.ADMIN:
+        projects = await list_project_models(session=session)
+    else:
+        projects = await list_user_project_models(session=session, user=user)
     if project_name:
         projects = [p for p in projects if p.name == project_name]
     runs = []
