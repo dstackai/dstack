@@ -6,7 +6,7 @@ import requests
 from gpuhunt.providers.vastai import VastAIProvider
 
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import get_docker_commands
+from dstack._internal.core.backends.base.compute import get_docker_commands, get_instance_name
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vastai.api_client import DISK_SIZE, VastAIAPIClient
 from dstack._internal.core.backends.vastai.config import VastAIConfig
@@ -73,7 +73,7 @@ class VastAICompute(Compute):
         )
         registry_auth = None  # TODO(egor-s): registry auth secrets
         resp = self.api_client.create_instance(
-            instance_name=job.job_spec.job_name,
+            instance_name=get_instance_name(run, job),
             bundle_id=instance_offer.instance.name,
             image_name=job.job_spec.image_name,
             onstart=" && ".join(commands),
@@ -107,6 +107,7 @@ class VastAICompute(Compute):
             username="root",
             ssh_port=int(resp["ports"]["10022/tcp"][0]["HostPort"]),
             dockerized=False,
+            backend_data=None,
         )
 
     def terminate_instance(

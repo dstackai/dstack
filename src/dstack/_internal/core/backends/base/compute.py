@@ -52,6 +52,10 @@ class Compute(ABC):
         raise NotImplementedError()
 
 
+def get_instance_name(run: Run, job: Job) -> str:
+    return f"{run.project_name}-{job.job_spec.job_name}"
+
+
 def get_user_data(
     backend: BackendType,
     image_name: str,

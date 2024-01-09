@@ -5,7 +5,7 @@ from typing import List, Optional
 
 import dstack.version as version
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import get_user_data
+from dstack._internal.core.backends.base.compute import get_instance_name, get_user_data
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.nebius.api_client import NebiusAPIClient
 from dstack._internal.core.backends.nebius.config import NebiusConfig
@@ -65,7 +65,7 @@ class NebiusCompute(Compute):
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             resp = self.api_client.compute_instances_create(
                 folder_id=self.config.folder_id,
-                name=job.job_spec.job_name,  # TODO(egor-s) make globally unique
+                name=get_instance_name(run, job),
                 zone_id=instance_offer.region,
                 platform_id=instance_offer.instance.name,
                 resources_spec=ResourcesSpec(
@@ -114,6 +114,7 @@ class NebiusCompute(Compute):
             username="ubuntu",
             ssh_port=22,
             dockerized=True,
+            backend_data=None,
         )
 
     def terminate_instance(
