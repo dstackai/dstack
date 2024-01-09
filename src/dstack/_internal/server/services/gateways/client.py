@@ -46,7 +46,7 @@ class GatewayClient:
     def preflight(self, project: str, domain: str, private_ssh_key: str, options: dict):
         if "openai" in options:
             # TODO(egor-s): custom entrypoint domain
-            entrypoint = f"{project}.{domain.split('.', maxsplit=1)[1]}"
+            entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
             self.register_openai_entrypoint(project, entrypoint)
         resp = self.s.post(
             self._url(f"/api/registry/{project}/preflight"),
