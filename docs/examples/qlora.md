@@ -264,5 +264,5 @@ The complete and ready-to-run code for the example is available in our [GitHub r
 
 1. Check the [Text Generation Inference](tgi.md) and [vLLM](vllm.md) examples
 2. Read about [tasks](../docs/guides/tasks.md)
-3. See all [learning materials](index.md)
+3. Browse [examples](index.md)
 4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

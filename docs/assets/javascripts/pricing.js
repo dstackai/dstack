@@ -42,14 +42,4 @@
             card.style.removeProperty('display');
         })
     }
-
-    document.querySelectorAll('.tx-faq__item').forEach(function (faqItem) {
-        faqItem.querySelector('.tx-faq__item-title').addEventListener('click', function () {
-            if (faqItem.classList.contains('_open')) {
-                faqItem.classList.remove('_open')
-            } else {
-                faqItem.classList.add('_open')
-            }
-        });
-    })
 })()

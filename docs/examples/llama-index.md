@@ -221,5 +221,5 @@ The complete, ready-to-run code is available in [dstackai/dstack-examples](https
 
 1. Check the [Text Generation Inference](tgi.md) and [vLLM](vllm.md) examples
 2. Read about [services](../docs/guides/services.md)
-3. See all [learning materials](index.md)
+3. Browse all [examples](index.md)
 4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

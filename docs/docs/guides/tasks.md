@@ -160,5 +160,5 @@ For more details on the `dstack run` command, refer to the [Reference](../refere
 1. Check the [QLoRA](../../learn/qlora.md) example
 2. Read about [dev environments](../guides/dev-environments.md) 
     and [services](../guides/services.md)
-3. See all [learning materials](../../learn/index.md)
+3. Browse [examples](../../examples/index.md)
 4. Check the [reference](../reference/dstack.yml.md#task)
