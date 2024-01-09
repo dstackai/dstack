@@ -76,10 +76,57 @@ class RemoteRunRepoData(RemoteRepoInfo):
                 return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
 
 
+# TODO: Add Git credentials here, so RunCollection.submit can pass these credentials to init
 class RemoteRepo(Repo):
-    """Represents both local git repository with configured remote and just remote repository"""
+    """
+    Allows mounting a remote Git repo to a run.
+
+    Mounting a locally checked-out Git repo:
+
+    ```python
+    run = client.runs.submit(
+        configuration=...,
+        repo=RemoteRepo.from_path("."),
+    )
+    ```
+
+    Mounting a remote Git repo:
+
+    ```python
+    run = client.runs.submit(
+        configuration=...,
+        repo=RemoteRepo.from_url("https://github.com/dstackai/dstack-examples"),
+    )
+    ```
+    """
 
     run_repo_data: RemoteRunRepoData
+
+    @staticmethod
+    def from_path(path: PathLike) -> "RemoteRepo":
+        """
+        Creates an instance of a remote repo from a local path.
+
+        Args:
+            path: The path to a local folder
+
+        Returns:
+            A remote repo instance
+        """
+        return RemoteRepo(local_repo_dir=path)
+
+    @staticmethod
+    def from_url(url: str) -> "RemoteRepo":
+        """
+        Creates an instance of a remote repo from a URL.
+
+        Args:
+            url: The URL of a remote Git repo
+
+        Returns:
+            A remote repo instance
+        """
+        return RemoteRepo(repo_url=url)
 
     def __init__(
         self,

@@ -21,8 +21,6 @@ class Client:
         repos: operations with repos
         backends: operations with backends
         runs: operations with runs
-        client: low-level server API client
-        project: project name
     """
 
     def __init__(
@@ -31,12 +29,12 @@ class Client:
         project_name: str,
         ssh_identity_file: Optional[PathLike] = None,
     ):
-        """
-        Args:
-            api_client: low-level server API client
-            project_name: project name used for runs
-            ssh_identity_file: SSH keypair to access instances
-        """
+        # """
+        # Args:
+        #     api_client: low-level server API client
+        #     project_name: project name used for runs
+        #     ssh_identity_file: SSH keypair to access instances
+        # """
         self._client = api_client
         self._project = project_name
         self._repos = RepoCollection(api_client, project_name)
@@ -64,7 +62,7 @@ class Client:
             ssh_identity_file: SSH keypair to access instances
 
         Returns:
-            dstack Client
+            A client instance
         """
         if server_url is not None and user_token is not None:
             if project_name is None:

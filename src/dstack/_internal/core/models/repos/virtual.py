@@ -18,7 +18,26 @@ class VirtualRunRepoData(VirtualRepoInfo):
 
 
 class VirtualRepo(Repo):
-    """Represents in-memory repo, transferred as a tar ball"""
+    """
+    Allows mounting a repo created programmatically.
+
+    Example:
+
+    ```python
+    virtual_repo = VirtualRepo(repo_id="some-unique-repo-id")
+    virtual_repo.add_file_from_package(package=some_package, path="requirements.txt")
+    virtual_repo.add_file_from_package(package=some_package, path="train.py")
+
+    run = client.runs.submit(
+        configuration=...,
+        repo=virtual_repo,
+    )
+    ```
+
+    Attributes:
+        repo_id: A unique identifier of the repo
+
+    """
 
     run_repo_data: VirtualRunRepoData
 
@@ -29,11 +48,27 @@ class VirtualRepo(Repo):
         self.run_repo_data = VirtualRunRepoData()
 
     def add_file_from_package(self, package: Union[ModuleType, str], path: str):
+        """
+        Includes a file from a given package to the repo.
+
+        Attributes:
+            package (Union[ModuleType, str]): A package to include the file from.
+            path (str): The path to the file to include to the repo. Must be relative to the package directory.
+        """
+
         req_file = impresources.files(package) / path
         with req_file.open("rb") as f:
             self.add_file(path, f.read())
 
     def add_file(self, path: str, content: bytes):
+        """
+        Adds a given file to the repo.
+
+        Attributes:
+            path (str): The path inside the repo to add the file.
+            content (bytes): The contents of the file.
+        """
+
         self.files[resolve_relative_path(path).as_posix()] = content
 
     def write_code_file(self, fp: BinaryIO) -> str:

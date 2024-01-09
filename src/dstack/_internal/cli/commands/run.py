@@ -21,7 +21,7 @@ from dstack._internal.core.models.runs import JobErrorCode
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
-from dstack.api._public.runs import SubmittedRun
+from dstack.api._public.runs import Run
 from dstack.api.utils import load_configuration, load_profile
 
 logger = get_logger(__name__)
@@ -202,7 +202,7 @@ class RunCommand(APIBaseCommand):
                 console.print("Aborted")
 
 
-def _print_fail_message(run: SubmittedRun):
+def _print_fail_message(run: Run):
     error_code = _get_run_error_code(run)
     message = "Run failed due to unknown reason. Check CLI and server logs."
     if _get_run_error_code(run) == JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
@@ -219,7 +219,7 @@ def _print_fail_message(run: SubmittedRun):
     console.print(f"[error]{message}[/]")
 
 
-def _get_run_error_code(run: SubmittedRun) -> Optional[JobErrorCode]:
+def _get_run_error_code(run: Run) -> Optional[JobErrorCode]:
     job = run._run.jobs[0]
     if len(job.job_submissions) == 0:
         return None
