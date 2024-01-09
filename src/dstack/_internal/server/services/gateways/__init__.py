@@ -254,7 +254,6 @@ async def register_service_jobs(
         raise ServerClientError("Gateway has no instance associated with it")
 
     domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
-    private_bytes, public_bytes = generate_rsa_key_pair_bytes(comment=f"{project.name}/{run_name}")
 
     job.job_spec.gateway.gateway_name = gateway.name
     if domain is not None:
