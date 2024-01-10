@@ -1,3 +1,4 @@
+from asyncio.proactor_events import _ProactorBasePipeTransport
 from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
@@ -12,8 +13,10 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.errors import GatewayError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.core.models.instances import InstanceState
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
+    InstanceStatus,
     Job,
     JobErrorCode,
     JobProvisioningData,
@@ -38,6 +41,7 @@ from dstack._internal.server.services.jobs import (
     job_model_to_job_submission,
 )
 from dstack._internal.server.services.logging import job_log
+from dstack._internal.server.services.pools import get_pool_instances
 from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
@@ -98,6 +102,7 @@ async def _process_job(job_id: UUID):
         job = run.jobs[job_model.job_num]
         job_submission = job_model_to_job_submission(job_model)
         job_provisioning_data = job_submission.job_provisioning_data
+
         server_ssh_private_key = project.ssh_private_key
         secrets = {}  # TODO secrets
         repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
@@ -145,6 +150,15 @@ async def _process_job(job_id: UUID):
                     secrets,
                     repo_creds,
                 )
+
+                if success:
+                    instance_name: str = job_provisioning_data.instance_id
+                    pool_name = str(job.job_spec.pool_name)
+                    instances = await get_pool_instances(session, project, pool_name)
+                    for inst in instances:
+                        if inst.name == instance_name:
+                            inst.status = InstanceStatus.BUSY
+
             if not success:  # check timeout
                 if job_submission.age > _get_runner_timeout_interval(
                     job_provisioning_data.backend
@@ -285,6 +299,7 @@ def _process_provisioning_no_shim(
     Returns:
         is successful
     """
+
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
     resp = runner_client.healthcheck()
     if resp is None:

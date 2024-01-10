@@ -8,6 +8,7 @@ import dstack._internal.server.schemas.pools as schemas
 import dstack._internal.server.services.pools as pools
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.server.schemas.runs import AddInstanceRequest
 from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
 from dstack._internal.server.services.runs import (
     abort_runs_of_pool,
@@ -77,3 +78,20 @@ async def how_pool(
 ):
     _, project = user_project
     return await pools.show_pool(session, project, pool_name=body.name)
+
+
+@router.post("/add")
+async def add_instance(
+    body: AddInstanceRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+):
+    _, project = user_project
+    await pools.add(
+        session,
+        project,
+        pool_name=body.pool_name,
+        instance_name=body.instance_name,
+        host=body.host,
+        port=body.port,
+    )

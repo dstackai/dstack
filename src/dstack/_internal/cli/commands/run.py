@@ -17,7 +17,7 @@ from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy
 from dstack._internal.core.models.runs import JobErrorCode
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
@@ -84,6 +84,13 @@ class RunCommand(APIBaseCommand):
             dest="pool_name",
             help="The name of the pool",
         )
+        self._parser.add_argument(
+            "--reuse",
+            dest="creation_policy",
+            action="store_const",
+            const=CreationPolicy.REUSE,
+            help="Reuse instance",
+        )
         register_profile_args(self._parser)
 
     def _command(self, args: argparse.Namespace):
@@ -147,6 +154,8 @@ class RunCommand(APIBaseCommand):
                 ):
                     console.print("\nExiting...")
                     return
+
+        run_plan.run_spec.profile.creation_policy = args.creation_policy
 
         try:
             with console.status("Submitting run..."):

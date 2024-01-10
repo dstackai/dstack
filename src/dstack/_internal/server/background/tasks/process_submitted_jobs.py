@@ -1,17 +1,19 @@
 from typing import List, Optional, Tuple
 from uuid import UUID
 
+from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -19,6 +21,7 @@ from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobStatus,
     Run,
+    RunSpec,
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, PoolModel, RunModel
@@ -28,7 +31,13 @@ from dstack._internal.server.services.jobs import (
     SUBMITTED_PROCESSING_JOBS_LOCK,
 )
 from dstack._internal.server.services.logging import job_log
+from dstack._internal.server.services.pools import (
+    get_pool_instances,
+    instance_model_to_instance,
+    show_pool,
+)
 from dstack._internal.server.services.runs import run_model_to_run
+from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
@@ -69,6 +78,34 @@ async def _process_job(job_id: UUID):
         )
 
 
+def check_relevance(profile: Profile, instance_model: InstanceModel) -> bool:
+
+    jpd: JobProvisioningData = parse_raw_as(
+        JobProvisioningData, instance_model.job_provisioning_data
+    )
+
+    if LOCAL_BACKEND_ENABLED and jpd.backend == BackendType.LOCAL:
+        return True
+
+    instance = instance_model_to_instance(instance_model)
+
+    if profile.backends is not None and instance.backend not in profile.backends:
+        return False
+
+    instance_resources = jpd.instance_type.resources
+
+    if profile.resources.cpu is not None and profile.resources.cpu < instance_resources.cpus:
+        return False
+
+    # TODO: full check
+    if isinstance(profile.resources.gpu, int):
+        if profile.resources.gpu < len(instance_resources.gpus):
+            return False
+
+    return True
+    # TODO: memory, shm_size, disk
+
+
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     logger.debug(*job_log("provisioning", job_model))
     res = await session.execute(
@@ -80,6 +117,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     run_model = res.scalar_one()
     project_model = run_model.project
 
+    # check default pool
     pool = project_model.default_pool
     if pool is None:
         pool = PoolModel(
@@ -91,9 +129,48 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         if pool.id is not None:
             project_model.default_pool_id = pool.id
 
+    profile = parse_raw_as(RunSpec, run_model.run_spec).profile
+    run_pool = profile.pool_name
+    if run_pool is None:
+        run_pool = pool.name
+
+    # pool capacity
+    pool_instances = await get_pool_instances(session, project_model, run_pool)
+    available_instanses = (p for p in pool_instances if p.status == InstanceStatus.PENDING)
+    relevant_instances: List[InstanceModel] = []
+    for instance in available_instanses:
+        if check_relevance(profile, instance):
+            relevant_instances.append(instance)
+
+    if relevant_instances:
+
+        sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
+        instance = sorted_instances[0]
+
+        instance.status = InstanceStatus.BUSY
+
+        logger.info(*job_log("now is provisioning", job_model))
+        job_model.job_provisioning_data = instance.job_provisioning_data
+        job_model.status = JobStatus.PROVISIONING
+        job_model.last_processed_at = common_utils.get_current_datetime()
+
+        await session.commit()
+
+        return
+
+    if profile.creation_policy == CreationPolicy.REUSE:
+        job_model.status = JobStatus.FAILED
+        job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        job_model.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
+        return
+
+    # create a new cloud instance
     run = run_model_to_run(run_model)
     job = run.jobs[job_model.job_num]
     backends = await backends_services.get_project_backends(project=run_model.project)
+
+    # TODO: create VM (backend.compute().create_instance)
     job_provisioning_data, offer = await _run_job(
         job_model=job_model,
         run=run,

@@ -26,6 +26,7 @@ class BackendType(str, enum.Enum):
     KUBERNETES = "kubernetes"
     LAMBDA = "lambda"
     LOCAL = "local"
+    # REMOTE= "remote" # replace for LOCAL
     NEBIUS = "nebius"
     TENSORDOCK = "tensordock"
     VASTAI = "vastai"

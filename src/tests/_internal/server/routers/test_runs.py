@@ -71,6 +71,7 @@ def get_dev_env_run_plan_dict(
             "configuration_path": "dstack.yaml",
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
+                "creation_policy": None,
                 "default": False,
                 "max_duration": "off",
                 "max_price": None,
@@ -78,6 +79,8 @@ def get_dev_env_run_plan_dict(
                 "pool_name": DEFAULT_POOL_NAME,
                 "retry_policy": {"limit": None, "retry": False},
                 "spot_policy": "spot",
+                "termination_idle_time": None,
+                "termination_policy": None,
             },
             "repo_code_hash": None,
             "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
@@ -179,6 +182,7 @@ def get_dev_env_run_dict(
             "configuration_path": "dstack.yaml",
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
+                "creation_policy": None,
                 "default": False,
                 "max_duration": "off",
                 "max_price": None,
@@ -186,6 +190,8 @@ def get_dev_env_run_dict(
                 "pool_name": DEFAULT_POOL_NAME,
                 "retry_policy": {"limit": None, "retry": False},
                 "spot_policy": "spot",
+                "termination_idle_time": None,
+                "termination_policy": None,
             },
             "repo_code_hash": None,
             "repo_data": {"repo_dir": "/repo", "repo_type": "local"},

@@ -18,6 +18,16 @@ class SpotPolicy(str, Enum):
     AUTO = "auto"
 
 
+class CreationPolicy(str, Enum):
+    REUSE = "reuse"
+    REUSE_OR_CREATE = "reuse-or-create"
+
+
+class TerminationPolicy(str, Enum):
+    DONT_DESTROY = "dont-destroy"
+    DESTROY_AFTER_IDLE = "destroy-after-idle"
+
+
 def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     if v is None:
         return None
@@ -99,10 +109,23 @@ class Profile(ForbidExtra):
         Optional[str],
         Field(description="The name of the pool. If not set, dstack will use the default name."),
     ] = DEFAULT_POOL_NAME
+    creation_policy: Annotated[
+        Optional[CreationPolicy], Field(description="The policy for using instances from the pool")
+    ]
+    termination_policy: Annotated[
+        Optional[TerminationPolicy], Field(description="The policy for termination instances")
+    ]
+    termination_idle_time: Annotated[
+        Optional[Union[Literal["off"], str, int]],
+        Field(description=""),
+    ]
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
     )
+    _validate_termination_idle_time = validator(
+        "termination_idle_time", pre=True, allow_reuse=True
+    )(parse_max_duration)
 
 
 class ProfilesConfig(ForbidExtra):

@@ -197,7 +197,7 @@ class PoolCommand(APIBaseCommand):
             formatter_class=self._parser.formatter_class,
         )
         show_parser.add_argument(
-            "-n", "--name", dest="pool_name", help="The name of the pool", required=True
+            "--name", "-n", dest="pool_name", help="The name of the pool", required=True
         )
         show_parser.set_defaults(subfunc=self._show)
 
@@ -211,6 +211,18 @@ class PoolCommand(APIBaseCommand):
         add_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )
+        add_parser.add_argument(
+            "--remote",
+            help="Add remote runner as an instance",
+            dest="remote",
+            action="store_true",
+            default=False,
+        )
+        add_parser.add_argument("--remote-host", help="Remote runner host", dest="remote_host")
+        add_parser.add_argument(
+            "--remote-port", help="Remote runner port", dest="remote_port", default=10999
+        )
+        add_parser.add_argument("--name", dest="instance_name", help="The name of the instance")
         add_parser.set_defaults(subfunc=self._add)
         register_profile_args(add_parser)
 
@@ -231,13 +243,20 @@ class PoolCommand(APIBaseCommand):
     def _add(self, args: argparse.Namespace):
         super()._command(args)
 
+        pool_name: str = DEFAULT_POOL_NAME if args.pool_name is None else args.pool_name
+
+        if args.remote:
+            self.api.client.pool.add(
+                self.api.project, pool_name, args.instance_name, args.remote_host, args.remote_port
+            )
+            return
+
         repo = self.api.repos.load(Path.cwd())
         self.api.ssh_identity_file = ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
 
         profile = load_profile(Path.cwd(), args.profile)
         apply_profile_args(args, profile)
 
-        pool_name: str = DEFAULT_POOL_NAME if args.pool_name is None else args.pool_name
         profile.pool_name = pool_name
 
         with console.status("Getting run plan..."):

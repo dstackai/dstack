@@ -268,12 +268,12 @@ class InstanceModel(BaseModel):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
-    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id], single_parent=True)
 
     pool_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("pools.id"))
-    pool: Mapped["PoolModel"] = relationship(back_populates="instances")
+    pool: Mapped["PoolModel"] = relationship(back_populates="instances", single_parent=True)
 
-    status: Mapped[InstanceStatus] = mapped_column(Enum(JobStatus))
+    status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
     status_message: Mapped[Optional[str]] = mapped_column(String(50))
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)

@@ -6,6 +6,7 @@ from dstack._internal.core.models.instances import InstanceOfferWithAvailability
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import Requirements, Run, RunPlan, RunSpec
 from dstack._internal.server.schemas.runs import (
+    AddInstanceRequest,
     CreateInstanceRequest,
     DeleteRunsRequest,
     GetOffersRequest,

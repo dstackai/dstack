@@ -1,8 +1,8 @@
 """add pools
 
-Revision ID: a859c41ae3b7
+Revision ID: ec4dbadbab3c
 Revises: 48ad3ecbaea2
-Create Date: 2023-12-28 10:13:48.608439
+Create Date: 2024-01-10 07:56:08.754541
 
 """
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "a859c41ae3b7"
+revision = "ec4dbadbab3c"
 down_revision = "48ad3ecbaea2"
 branch_labels = None
 depends_on = None

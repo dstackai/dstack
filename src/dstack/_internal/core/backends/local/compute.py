@@ -38,6 +38,20 @@ class LocalCompute(Compute):
     ):
         pass
 
+    def create_instance(
+        self, project, user, instance_offer, instance_config
+    ) -> LaunchedInstanceInfo:
+        launched_instance = LaunchedInstanceInfo(
+            instance_id="local",
+            ip_address="127.0.0.1",
+            region="",
+            username="root",
+            ssh_port=10022,
+            dockerized=False,
+            backend_data=None,
+        )
+        return launched_instance
+
     def run_job(
         self,
         run: Run,

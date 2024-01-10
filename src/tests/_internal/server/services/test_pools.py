@@ -45,7 +45,7 @@ async def test_pool(session: AsyncSession, test_db):
     )
     assert len(list_pool_models) == 1
 
-    pool_intances = await services_pools.get_pool_instances(session=session, pool_name="test_pool")
+    pool_intances = await services_pools.get_pool_instances(session, project, "test_pool")
     assert pool_intances == [im]
 
 
@@ -131,10 +131,10 @@ async def test_get_pool_instances(session: AsyncSession, test_db):
     session.add(im)
     await session.commit()
 
-    instances = await services_pools.get_pool_instances(session, POOL_NAME)
+    instances = await services_pools.get_pool_instances(session, project, POOL_NAME)
     assert len(instances) == 1
 
-    empty_instances = await services_pools.get_pool_instances(session, f"{POOL_NAME}-0")
+    empty_instances = await services_pools.get_pool_instances(session, project, f"{POOL_NAME}-0")
     assert len(empty_instances) == 0
 
 

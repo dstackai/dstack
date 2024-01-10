@@ -7,10 +7,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOfferWithAvailability,
+    InstanceType,
+    Resources,
+)
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
-from dstack._internal.core.models.runs import JobProvisioningData
+from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel
 from dstack._internal.utils import random_names
 from dstack._internal.utils.common import get_current_datetime
@@ -114,22 +120,32 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
 async def show_pool(
     session: AsyncSession, project: ProjectModel, pool_name: str
 ) -> Sequence[Instance]:
-    pools = (
+    pool = (
         await session.scalars(
             select(PoolModel).where(
-                PoolModel.name == pool_name, PoolModel.project_id == project.id
+                PoolModel.name == pool_name,
+                PoolModel.project_id == project.id,
+                PoolModel.deleted == False,
             )
         )
-    ).all()
+    ).one_or_none()
+    if pool is not None:
+        instances = [instance_model_to_instance(i) for i in pool.instances]
+        return instances
+    else:
+        return []
 
-    instances = [instance_model_to_instance(i) for i in pools[0].instances]
-    return instances
 
-
-async def get_pool_instances(session: AsyncSession, pool_name: str) -> List[InstanceModel]:
+async def get_pool_instances(
+    session: AsyncSession, project: ProjectModel, pool_name: str
+) -> List[InstanceModel]:
     res = await session.execute(
         select(PoolModel)
-        .where(PoolModel.name == pool_name)
+        .where(
+            PoolModel.name == pool_name,
+            PoolModel.project_id == project.id,
+            PoolModel.deleted == False,
+        )
         .options(joinedload(PoolModel.instances))
     )
     result = res.unique().scalars().one_or_none()
@@ -148,9 +164,72 @@ async def generate_instance_name(
 ) -> str:
     lock = _GENERATE_POOL_NAME_LOCK.setdefault(project.name, asyncio.Lock())
     async with lock:
-        pool_instances: List[InstanceModel] = await get_pool_instances(session, pool_name)
+        pool_instances: List[InstanceModel] = await get_pool_instances(session, project, pool_name)
         names = {g.name for g in pool_instances}
         while True:
             name = f"{random_names.generate_name()}"
             if name not in names:
                 return name
+
+
+async def add(
+    session: AsyncSession,
+    project: ProjectModel,
+    pool_name: str,
+    instance_name: Optional[str],
+    host: str,
+    port: str,
+):
+
+    instance_name = instance_name
+    if instance_name is None:
+        instance_name = await generate_instance_name(session, project, pool_name)
+
+    pool = (
+        await session.scalars(
+            select(PoolModel).where(
+                PoolModel.name == pool_name,
+                PoolModel.project_id == project.id,
+                PoolModel.deleted == False,
+            )
+        )
+    ).one_or_none()
+
+    if pool is None:
+        pool = await create_pool_model(session, project, pool_name)
+
+    local = JobProvisioningData(
+        backend=BackendType.LOCAL,
+        instance_type=InstanceType(
+            name="local", resources=Resources(cpus=0, memory_mib=0, gpus=[], spot=False)
+        ),
+        instance_id=instance_name,
+        hostname=host,
+        region="",
+        price=0,
+        username="",
+        ssh_port=22,
+        dockerized=False,
+        backend_data="",
+    )
+    offer = InstanceOfferWithAvailability(
+        backend=BackendType.LOCAL,
+        instance=InstanceType(
+            name="instance",
+            resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+        ),
+        region="",
+        price=0.0,
+        availability=InstanceAvailability.AVAILABLE,
+    )
+
+    im = InstanceModel(
+        name=instance_name,
+        project=project,
+        pool=pool,
+        status=InstanceStatus.PENDING,
+        job_provisioning_data=local.json(),
+        offer=offer.json(),
+    )
+    session.add(im)
+    await session.commit()
