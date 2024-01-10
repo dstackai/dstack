@@ -388,7 +388,7 @@ class RunCollection:
         profile = Profile(
             name="(python)",
             backends=backends,
-            resources=resources or Resources(),
+            resources=resources or ProfileResources(),
             spot_policy=spot_policy,
             retry_policy=retry_policy,
             max_duration=max_duration,
@@ -467,7 +467,7 @@ class RunCollection:
             run_name: run name
 
         Returns:
-            run or `None` if not found
+            The run or `None` if not found
         """
         try:
             run = self._api_client.runs.get(self._project, run_name)

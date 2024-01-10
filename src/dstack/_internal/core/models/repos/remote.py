@@ -76,57 +76,82 @@ class RemoteRunRepoData(RemoteRepoInfo):
                 return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
 
 
-# TODO: Add Git credentials here, so RunCollection.submit can pass these credentials to init
 class RemoteRepo(Repo):
     """
-    Allows mounting a remote Git repo to a run.
+    Creates an instance of a remote Git repo for mounting to a submitted run.
 
-    Mounting a locally checked-out Git repo:
+    Using a locally checked-out remote Git repo:
+
+    ```python
+    repo=RemoteRepo.from_dir(repo_dir=".")
+    ```
+
+    Using a remote Git repo by a URL:
+
+    ```python
+    repo=RemoteRepo.from_url(
+        repo_url="https://github.com/dstackai/dstack-examples",
+        repo_branch="main"
+    )
+    ```
+
+    Initialize the repo before mounting it.
+
+    ```python
+    client.repos.init(repo)
+    ```
+
+    By default, it uses the default Git credentials configured on the machine.
+    You can override these credentials via the `git_identity_file` or `oauth_token` arguments of the `init` method.
+
+    Finally, you can pass the repo object to the run:
 
     ```python
     run = client.runs.submit(
         configuration=...,
-        repo=RemoteRepo.from_path("."),
+        repo=repo,
     )
     ```
 
-    Mounting a remote Git repo:
-
-    ```python
-    run = client.runs.submit(
-        configuration=...,
-        repo=RemoteRepo.from_url("https://github.com/dstackai/dstack-examples"),
-    )
-    ```
     """
 
     run_repo_data: RemoteRunRepoData
 
     @staticmethod
-    def from_path(path: PathLike) -> "RemoteRepo":
+    def from_dir(repo_dir: PathLike) -> "RemoteRepo":
         """
         Creates an instance of a remote repo from a local path.
 
         Args:
-            path: The path to a local folder
+            repo_dir: The path to a local folder
 
         Returns:
             A remote repo instance
         """
-        return RemoteRepo(local_repo_dir=path)
+        return RemoteRepo(local_repo_dir=repo_dir)
 
     @staticmethod
-    def from_url(url: str) -> "RemoteRepo":
+    def from_url(
+        repo_url: str, repo_branch: Optional[str] = None, repo_hash: Optional[str] = None
+    ) -> "RemoteRepo":
         """
         Creates an instance of a remote repo from a URL.
 
         Args:
-            url: The URL of a remote Git repo
+            repo_url: The URL of a remote Git repo
+            repo_branch: The name of the remote branch. Must be specified if `hash` is not specified.
+            repo_hash: The hash of the revision. Must be specified if `branch` is not specified.
 
         Returns:
             A remote repo instance
         """
-        return RemoteRepo(repo_url=url)
+        if repo_branch is None and repo_hash is None:
+            raise ValueError("Either `repo_branch` or `repo_hash` must be specified.")
+        return RemoteRepo(
+            repo_url=repo_url,
+            repo_branch=repo_branch,
+            repo_hash=repo_hash,
+        )
 
     def __init__(
         self,
@@ -135,6 +160,8 @@ class RemoteRepo(Repo):
         local_repo_dir: Optional[PathLike] = None,
         repo_url: Optional[str] = None,
         repo_data: Optional[RemoteRunRepoData] = None,
+        repo_branch: Optional[str] = None,
+        repo_hash: Optional[str] = None,
     ):
         self.repo_dir = local_repo_dir
         self.repo_url = repo_url
@@ -155,6 +182,10 @@ class RemoteRepo(Repo):
             repo_data.repo_diff = _repo_diff_verbose(repo, repo_data.repo_hash)
         elif self.repo_url is not None:
             repo_data = RemoteRunRepoData.from_url(self.repo_url, parse_ssh_config=True)
+            if repo_branch is not None:
+                repo_data.repo_branch = repo_branch
+            if repo_hash is not None:
+                repo_data.repo_hash = repo_hash
         elif repo_data is None:
             raise RepoError("No remote repo data provided")
 

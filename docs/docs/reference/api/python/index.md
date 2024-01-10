@@ -69,9 +69,26 @@ finally:
       show_root_toc_entry: false
       heading_level: 4
 
+### `dstack.api.RepoCollection` { #dstack.api.Client.repos data-toc-label="RepoCollection" }
+
+::: dstack.api.RepoCollection
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+
+[//]: # (### `dstack.api.BackendCollection` { #dstack.api.Client.backends data-toc-label="BackendCollection" })
+
+[//]: # (::: dstack.api.BackendCollection)
+[//]: # (    options:)
+[//]: # (      show_bases: false)
+[//]: # (      show_root_heading: false)
+[//]: # (      show_root_toc_entry: false)
+[//]: # (      heading_level: 4)
+
 ### `dstack.api.Task` { #dstack.api.Task data-toc-label="Task" }
 
-::: dstack.api.Task
+::: dstack.api._TaskConfiguration
     options:
       show_bases: false
       show_root_heading: false
@@ -80,7 +97,7 @@ finally:
 
 ### `dstack.api.Service`  { #dstack.api.Service data-toc-label="Service" }
 
-::: dstack.api.Service
+::: dstack.api._ServiceConfiguration
     options:
       show_bases: false
       show_root_heading: false
@@ -90,6 +107,33 @@ finally:
 ### `dstack.api.Run` { ##dstack.api.Run data-toc-label="Run" }
 
 ::: dstack.api.Run
+    options:
+      show_bases: false
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+
+### `dstack.api.Resources` { ##dstack.api.Resources data-toc-label="Resources" }
+
+::: dstack.api._ProfileResources
+    options:
+      show_bases: false
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+
+### `dstack.api.GPU` { ##dstack.api.GPU data-toc-label="GPU" }
+
+::: dstack.api._ProfileGPU
+    options:
+      show_bases: false
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+
+### `dstack.api.Disk` { ##dstack.api.Disk data-toc-label="Disk" }
+
+::: dstack.api._ProfileDisk
     options:
       show_bases: false
       show_root_heading: false
@@ -123,17 +167,9 @@ finally:
       show_root_toc_entry: false
       heading_level: 4
 
-[//]: # (### `dstack.api.RepoCollection` { #dstack.api.Client.repos data-toc-label="RepoCollection" })
-[//]: # ()
-[//]: # (::: dstack.api.RepoCollection)
-[//]: # (    options:)
-[//]: # (      show_root_heading: false)
-[//]: # (      show_root_toc_entry: false)
-[//]: # (      heading_level: 4)
+### `dstack.api.RegistryAuth` { ##dstack.api.RegistryAuth data-toc-label="RegistryAuth" }
 
-### `dstack.api.BackendCollection` { #dstack.api.Client.backends data-toc-label="BackendCollection" }
-
-::: dstack.api.BackendCollection
+::: dstack.api.RegistryAuth
     options:
       show_bases: false
       show_root_heading: false

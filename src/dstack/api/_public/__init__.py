@@ -18,9 +18,9 @@ class Client:
     High-level API client for interacting with dstack server
 
     Attributes:
-        repos: operations with repos
-        backends: operations with backends
-        runs: operations with runs
+        runs: Operations with runs.
+        repos: Operations with repositories.
+        backends: Operations with backends.
     """
 
     def __init__(
@@ -53,13 +53,13 @@ class Client:
         ssh_identity_file: Optional[PathLike] = None,
     ) -> "Client":
         """
-        Creates a Client using global config `~/.dstack/config.yml`
+        Creates a Client using the default configuration from `~/.dstack/config.yml` if it exists.
 
         Args:
-            project_name: name of the project, required if `server_url` and `user_token` are specified
-            server_url: dstack server url, e.g. `http://localhost:3000/`
-            user_token: dstack user token
-            ssh_identity_file: SSH keypair to access instances
+            project_name: The name of the project, required if `server_url` and `user_token` are specified
+            server_url: The dstack server URL (e.g. `http://localhost:3000/` or `https://cloud.dstack.ai`)
+            user_token: The dstack user token
+            ssh_identity_file: The private SSH key path for SSH tunneling
 
         Returns:
             A client instance

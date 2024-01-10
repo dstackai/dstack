@@ -28,8 +28,16 @@ class PythonVersion(str, Enum):
 
 
 class RegistryAuth(ForbidExtra):
-    username: Annotated[Optional[str], Field(description="Username")]
-    password: Annotated[str, Field(description="Password or access token")]
+    """
+    Credentials for pulling a private Docker image.
+
+    Attributes:
+        username (str): The username
+        password (str): The password or access token
+    """
+
+    username: Annotated[Optional[str], Field(description="The username")]
+    password: Annotated[str, Field(description="The password or access token")]
 
 
 class PortMapping(ForbidExtra):
@@ -77,7 +85,7 @@ class BaseConfiguration(ForbidExtra):
         str, Field(description="The absolute path to the home directory inside the container")
     ] = "/root"
     registry_auth: Annotated[
-        Optional[RegistryAuth], Field(description="Credentials for pulling a private container")
+        Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")
     ]
     python: Annotated[
         Optional[PythonVersion],
@@ -142,7 +150,7 @@ class TaskConfiguration(BaseConfigurationWithPorts):
         image (Optional[str]): The name of the Docker image to run
         python (Optional[str]): The major version of Python
         entrypoint (Optional[str]): The Docker entrypoint
-        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private container
+        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
     """
 
@@ -159,7 +167,7 @@ class ServiceConfiguration(BaseConfiguration):
         image (Optional[str]): The name of the Docker image to run
         python (Optional[str]): The major version of Python
         entrypoint (Optional[str]): The Docker entrypoint
-        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private container
+        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
     """
 

@@ -41,6 +41,7 @@ class VirtualRepo(Repo):
 
     run_repo_data: VirtualRunRepoData
 
+    # TODO: Make repo_id optional
     def __init__(self, repo_id: str):
         self.repo_id = repo_id
         self.repo_dir = None
