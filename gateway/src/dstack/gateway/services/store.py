@@ -1,61 +1,73 @@
 import asyncio
+import concurrent
 import functools
 import logging
 import os
 from abc import ABC, abstractmethod
 from asyncio import Lock
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import AsyncExitStack
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import DefaultDict, Dict, List, Set, Tuple
+
+from pydantic import BaseModel, Field, PrivateAttr
 
 from dstack.gateway.common import run_async
 from dstack.gateway.errors import GatewayError
 from dstack.gateway.schemas import Service
-from dstack.gateway.services.nginx import Nginx, get_nginx
+from dstack.gateway.services.nginx import Nginx
+from dstack.gateway.services.persistent import get_persistent_state
 from dstack.gateway.services.tunnel import SSHTunnel
 
 logger = logging.getLogger(__name__)
 
 
-class Store:
-    def __init__(self, nginx: Nginx):
-        self.services: Dict[str, Tuple[Service, SSHTunnel]] = {}
-        self.projects: Dict[str, Set[str]] = defaultdict(set)
-        self.entrypoints: Dict[str, Tuple[str, str]] = {}
-        self.nginx = nginx
-        self.lock = Lock()
-        self.subscribers: List["StoreSubscriber"] = []
-        self.ssh_keys_dir = Path("~/.ssh/projects").expanduser().resolve()
+class Store(BaseModel):
+    """
+    Store is a central place to register and unregister services.
+    Other components can subscribe to updates.
+    Its internal state could be serialized to a file and restored from it using pydantic.
+    """
+
+    services: Dict[str, Tuple[Service, SSHTunnel]] = {}
+    projects: DefaultDict[str, Set[str]] = defaultdict(set)
+    entrypoints: Dict[str, Tuple[str, str]] = {}
+    nginx: Nginx = Field(default_factory=Nginx)
+    _lock: Lock = Lock()
+    _subscribers: List["StoreSubscriber"] = []
+    _ssh_keys_dir = PrivateAttr(
+        default_factory=lambda: Path("~/.ssh/projects").expanduser().resolve()
+    )
 
     async def register(self, project: str, service: Service):
-        async with self.lock:
+        async with self._lock:
             if service.public_domain in self.services:
                 raise GatewayError(f"Domain {service.public_domain} is already registered")
             logger.info("%s: registering service %s", project, service.public_domain)
 
-            tunnel = SSHTunnel(
+            tunnel = SSHTunnel.create(
                 host=service.ssh_host,
                 port=service.ssh_port,
                 app_port=service.app_port,
-                id_rsa_path=(self.ssh_keys_dir / project).as_posix(),
+                id_rsa_path=(self._ssh_keys_dir / project).as_posix(),
                 docker_host=service.docker_ssh_host,
                 docker_port=service.docker_ssh_port,
             )
             async with AsyncExitStack() as stack:
                 await run_async(tunnel.start)
-                stack.push_async_callback(supress_exc(run_async, tunnel.stop))
+                stack.push_async_callback(supress_exc_async(run_async, tunnel.stop))
 
                 await self.nginx.register_service(service.public_domain, tunnel.sock_path)
                 stack.push_async_callback(
-                    supress_exc(self.nginx.unregister_domain, service.public_domain)
+                    supress_exc_async(self.nginx.unregister_domain, service.public_domain)
                 )
 
-                for subscriber in self.subscribers:
+                for subscriber in self._subscribers:
                     await subscriber.on_register(project, service)
                     stack.push_async_callback(
-                        supress_exc(subscriber.on_unregister, project, service.public_domain)
+                        supress_exc_async(subscriber.on_unregister, project, service.public_domain)
                     )
 
                 stack.pop_all()  # no need to rollback
@@ -63,7 +75,7 @@ class Store:
             self.services[service.public_domain] = (service, tunnel)
 
     async def register_entrypoint(self, project: str, domain: str, module: str):
-        async with self.lock:
+        async with self._lock:
             if domain in self.entrypoints:
                 if self.entrypoints[domain] == (project, module):
                     return
@@ -73,26 +85,8 @@ class Store:
             await self.nginx.register_entrypoint(domain, f"/api/{module}/{project}")
             self.entrypoints[domain] = (project, module)
 
-    async def unregister_all(self):
-        async with self.lock:
-            logger.info("Unregistering all services")
-            stop_tunnels = [run_async(tunnel.stop) for _, tunnel in self.services.values()]
-            unregister_services = [
-                self.nginx.unregister_domain(domain) for domain in self.services.keys()
-            ]
-            on_unregister = [
-                subscriber.on_unregister(project, domain)
-                for subscriber in self.subscribers
-                for project, domains in self.projects.items()
-                for domain in domains
-            ]
-            await asyncio.gather(
-                *stop_tunnels, *unregister_services, *on_unregister, return_exceptions=True
-            )
-            self.services.clear()
-
     async def unregister(self, project: str, domain: str):
-        async with self.lock:
+        async with self._lock:
             if domain not in self.services:
                 raise GatewayError(f"Domain {domain} is not registered")
             if domain not in self.projects[project]:
@@ -104,32 +98,24 @@ class Store:
             await asyncio.gather(
                 run_async(tunnel.stop),
                 self.nginx.unregister_domain(domain),
-                *(subscriber.on_unregister(project, domain) for subscriber in self.subscribers),
+                *(subscriber.on_unregister(project, domain) for subscriber in self._subscribers),
                 return_exceptions=True,
             )
 
-    async def list_services(self, project: str) -> List:
-        services = []
-        async with self.lock:
-            for domain in self.projects.get(project, []):
-                service, _ = self.services[domain]
-                services.append(service)
-        return services
-
     async def subscribe(self, subscriber: "StoreSubscriber"):
-        async with self.lock:
-            self.subscribers.append(subscriber)
+        async with self._lock:
+            self._subscribers.append(subscriber)
 
     async def preflight(self, project: str, domain: str, ssh_private_key: str):
-        async with self.lock:
+        async with self._lock:
             if domain in self.services:
                 raise GatewayError(f"Domain {domain} is already registered")
             logger.info("%s: preflighting service %s", project, domain)
 
             await run_async(self.nginx.run_certbot, domain)
 
-            self.ssh_keys_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-            ssh_key_path = self.ssh_keys_dir / project
+            self._ssh_keys_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            ssh_key_path = self._ssh_keys_dir / project
             if (
                 ssh_key_path.exists()
                 and ssh_key_path.read_text().strip() != ssh_private_key.strip()
@@ -139,6 +125,14 @@ class Store:
                 ssh_key_path, "w", opener=lambda path, flags: os.open(path, flags, 0o600)
             ) as f:
                 f.write(ssh_private_key)
+
+    def start_tunnels(self):
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [
+                executor.submit(supress_exc(tunnel.start))
+                for domain, (service, tunnel) in self.services.items()
+            ]
+            concurrent.futures.wait(futures)
 
 
 class StoreSubscriber(ABC):
@@ -151,7 +145,7 @@ class StoreSubscriber(ABC):
         ...
 
 
-def supress_exc(func, *args, **kwargs):
+def supress_exc_async(func, *args, **kwargs):
     @functools.wraps(func)
     async def wrapper():
         try:
@@ -162,6 +156,19 @@ def supress_exc(func, *args, **kwargs):
     return wrapper
 
 
+def supress_exc(func, *args, **kwargs):
+    @functools.wraps(func)
+    def wrapper():
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            pass
+
+    return wrapper
+
+
 @lru_cache()
 def get_store() -> Store:
-    return Store(nginx=get_nginx())
+    store = Store.model_validate(get_persistent_state().get("store", {}))
+    store.start_tunnels()  # start tunnels after restoring the state
+    return store

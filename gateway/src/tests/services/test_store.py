@@ -11,7 +11,7 @@ from dstack.gateway.services.store import Store
 
 @pytest.fixture()
 def ssh_tunnel():
-    with patch("dstack.gateway.services.store.SSHTunnel") as mock:
+    with patch("dstack.gateway.services.store.SSHTunnel.create") as mock:
         yield mock.return_value
 
 
@@ -23,7 +23,7 @@ def nginx():
 class TestRegister:
     @pytest.mark.asyncio
     async def test_fail_tunnel(self, ssh_tunnel, nginx):
-        store = Store(nginx)
+        store = Store(nginx=nginx)
         ssh_tunnel.start.side_effect = FooException()
         with pytest.raises(FooException):
             await store.register("project", get_service("domain.com"))
@@ -34,7 +34,7 @@ class TestRegister:
 
     @pytest.mark.asyncio
     async def test_fail_nginx(self, ssh_tunnel, nginx):
-        store = Store(nginx)
+        store = Store(nginx=nginx)
         nginx.register_service.side_effect = FooException()
         with pytest.raises(FooException):
             await store.register("project", get_service("domain.com"))
@@ -45,7 +45,7 @@ class TestRegister:
 
     @pytest.mark.asyncio
     async def test_fail_rollback(self, ssh_tunnel, nginx):
-        store = Store(nginx)
+        store = Store(nginx=nginx)
         nginx.register_service.side_effect = FooException()
         ssh_tunnel.stop.side_effect = BarException()
         with pytest.raises(FooException):
@@ -57,7 +57,7 @@ class TestRegister:
 
     @pytest.mark.asyncio
     async def test_fail_subscriber(self, ssh_tunnel, nginx):
-        store = Store(nginx)
+        store = Store(nginx=nginx)
         openai_store = Mock(OpenAIStore)
         await store.subscribe(openai_store)
         openai_store.on_register.side_effect = FooException()

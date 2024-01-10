@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
+import pydantic_core
 from fastapi import FastAPI
 
 import dstack.gateway.openai.store as openai_store
@@ -8,15 +9,27 @@ import dstack.gateway.version
 from dstack.gateway.logging import configure_logging
 from dstack.gateway.openai.routes import router as openai_router
 from dstack.gateway.registry.routes import router as registry_router
+from dstack.gateway.services.persistent import save_persistent_state
 from dstack.gateway.services.store import get_store
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     store = get_store()
-    await store.subscribe(openai_store.get_store())
+    openai = openai_store.get_store()
+    await store.subscribe(openai)
     yield
-    await store.unregister_all()
+
+    async with store._lock, store.nginx._lock, openai._lock:
+        # Store the state between restarts
+        save_persistent_state(
+            pydantic_core.to_json(
+                {
+                    "store": store,
+                    "openai": openai,
+                }
+            )
+        )
 
 
 configure_logging(logging.DEBUG)

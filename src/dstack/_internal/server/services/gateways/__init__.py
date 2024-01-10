@@ -1,4 +1,5 @@
 import asyncio
+import os
 from datetime import timezone
 from typing import List, Optional, Sequence
 
@@ -293,6 +294,10 @@ def _gateway_preflight(
 
 
 async def update_gateways(session: AsyncSession):
+    if os.environ.get("DSTACK_SKIP_GATEWAY_UPDATE", None):
+        logger.debug("Skipping gateway update")
+        return
+
     res = await session.execute(
         select(GatewayComputeModel).where(GatewayComputeModel.deleted == False)
     )

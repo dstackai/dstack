@@ -5,7 +5,9 @@ import tempfile
 from asyncio import Lock
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
+from pydantic import BaseModel
 
 from dstack.gateway.common import run_async
 from dstack.gateway.errors import GatewayError
@@ -14,14 +16,18 @@ CONFIGS_DIR = Path("/etc/nginx/sites-enabled")
 logger = logging.getLogger(__name__)
 
 
-class Nginx:
-    def __init__(self):
-        self.lock = Lock()
-        self.domains = set()
+class Nginx(BaseModel):
+    """
+    Nginx keeps track of registered domains, updates nginx config and issues SSL certificates.
+    Its internal state could be serialized to a file and restored from it using pydantic.
+    """
+
+    domains: Set[str] = set()
+    _lock: Lock = Lock()
 
     async def register_service(self, domain: str, sock_path: str):
         logger.info("Registering service %s", domain)
-        async with self.lock:
+        async with self._lock:
             if domain in self.domains:
                 raise GatewayError("Domain is already registered")
             self.write_conf(
@@ -33,7 +39,7 @@ class Nginx:
 
     async def register_entrypoint(self, domain: str, prefix: str, port: int = 8000):
         logger.info("Registering entrypoint %s", domain)
-        async with self.lock:
+        async with self._lock:
             if domain in self.domains:
                 raise GatewayError("Domain is already registered")
             await run_async(self.run_certbot, domain)
@@ -46,7 +52,7 @@ class Nginx:
 
     async def unregister_domain(self, domain: str):
         logger.info("Unregistering domain %s", domain)
-        async with self.lock:
+        async with self._lock:
             if domain not in self.domains:
                 raise GatewayError("Domain is not registered")
             conf_path = CONFIGS_DIR / f"443-{domain}.conf"
@@ -168,8 +174,3 @@ class Nginx:
         r = subprocess.run(cmd, capture_output=True)
         if r.returncode != 0:
             raise GatewayError(f"Certbot failed:\n{r.stderr.decode()}")
-
-
-@lru_cache()
-def get_nginx() -> Nginx:
-    return Nginx()

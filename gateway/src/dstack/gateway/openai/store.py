@@ -3,7 +3,7 @@ import datetime
 from functools import lru_cache
 from typing import Dict, List, Tuple
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from dstack.gateway.errors import GatewayError, NotFoundError
 from dstack.gateway.openai.clients import ChatCompletionsClient
@@ -11,15 +11,19 @@ from dstack.gateway.openai.clients.tgi import TGIChatCompletions
 from dstack.gateway.openai.models import OpenAIOptions, ServiceModel
 from dstack.gateway.openai.schemas import Model
 from dstack.gateway.schemas import Service
+from dstack.gateway.services.persistent import get_persistent_state
 from dstack.gateway.services.store import StoreSubscriber
-from dstack.gateway.services.store import get_store as get_global_store
 
 
-class OpenAIStore(StoreSubscriber):
-    def __init__(self):
-        self.index: Dict[str, Dict[str, Dict[str, ServiceModel]]] = {}
-        self.domain_index: Dict[str, Tuple[str, str, str]] = {}
-        self.lock = asyncio.Lock()
+class OpenAIStore(BaseModel, StoreSubscriber):
+    """
+    OpenAIStore keeps track of LLM models registered in the system and dispatches requests.
+    Its internal state could be serialized to a file and restored from it using pydantic.
+    """
+
+    index: Dict[str, Dict[str, Dict[str, ServiceModel]]] = {}
+    domain_index: Dict[str, Tuple[str, str, str]] = {}
+    _lock: asyncio.Lock = asyncio.Lock()
 
     async def on_register(self, project: str, service: Service):
         if "openai" not in service.options:
@@ -29,7 +33,7 @@ class OpenAIStore(StoreSubscriber):
         except ValidationError as e:
             raise GatewayError(e)
 
-        async with self.lock:
+        async with self._lock:
             if project not in self.index:
                 self.index[project] = {}
             if model.type not in self.index[project]:
@@ -42,7 +46,7 @@ class OpenAIStore(StoreSubscriber):
             self.domain_index[service.public_domain] = (project, model.type, model.name)
 
     async def on_unregister(self, project: str, domain: str):
-        async with self.lock:
+        async with self._lock:
             if domain not in self.domain_index or self.domain_index[domain][0] != project:
                 return
             project, model_type, model_name = self.domain_index[domain]
@@ -51,7 +55,7 @@ class OpenAIStore(StoreSubscriber):
 
     async def list_models(self, project: str) -> List[Model]:
         models = []
-        async with self.lock:
+        async with self._lock:
             for model_type, type_models in self.index.get(project, {}).items():
                 for model_name, service in type_models.items():
                     models.append(
@@ -64,7 +68,7 @@ class OpenAIStore(StoreSubscriber):
         return models
 
     async def get_chat_client(self, project: str, model_name: str) -> ChatCompletionsClient:
-        async with self.lock:
+        async with self._lock:
             if project not in self.index:
                 raise NotFoundError(f"Project {project} not found")
             if "chat" not in self.index[project] or model_name not in self.index[project]["chat"]:
@@ -83,4 +87,4 @@ class OpenAIStore(StoreSubscriber):
 
 @lru_cache()
 def get_store() -> OpenAIStore:
-    return OpenAIStore()
+    return OpenAIStore.model_validate(get_persistent_state().get("openai", {}))
