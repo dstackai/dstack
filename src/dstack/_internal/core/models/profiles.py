@@ -64,6 +64,17 @@ def parse_max_duration(v: Union[int, str]) -> int:
 
 
 class ProfileGPU(ForbidExtra):
+    """
+    The GPU spec
+
+    Attributes:
+        name (Optional[str]): The name of the GPU (e.g., `"A100"` or `"H100"`)
+        count (int): The minimum number of GPUs
+        memory (Optional[str]): The minimum size of a single GPU memory (e.g., `"16GB"`)
+        total_memory (Optional[str]): The minimum total size of all GPUs memory (e.g., `"32GB"`)
+        compute_capability (float): The minimum compute capability of the GPU (e.g., `7.5`)
+    """
+
     name: Annotated[
         Optional[str],
         Field(description='The name of the GPU (e.g., "A100" or "H100")'),
@@ -107,14 +118,32 @@ class ProfileGPU(ForbidExtra):
 
 
 class ProfileDisk(ForbidExtra):
+    """
+    The disk spec
+
+    Attributes:
+        size (str): The minimum size of the disk (e.g., `"100GB"`)
+    """
+
     size: Annotated[
         Optional[Union[int, str]],
-        Field(description='The minimum size of disk (e.g., "100GB")'),
+        Field(description='The minimum size of the disk (e.g., "100GB")'),
     ]
     _validate_size = validator("size", pre=True, allow_reuse=True)(parse_memory)
 
 
 class ProfileResources(ForbidExtra):
+    """
+    The minimum resources requirements for the run.
+
+    Attributes:
+        cpu (Optional[int]): The minimum number of CPUs
+        memory (Optional[str]): The minimum size of RAM memory (e.g., `"16GB"`)
+        gpu (Optional[GPU]): The GPU spec
+        shm_size (Optional[str]): The size of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this.
+        disk (Optional[Disk]): The disk spec
+    """
+
     cpu: Annotated[Optional[int], Field(description="The minimum number of CPUs")] = 2
     memory: Annotated[
         Optional[Union[int, str]],

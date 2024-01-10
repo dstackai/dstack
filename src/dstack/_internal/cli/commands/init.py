@@ -31,14 +31,14 @@ class InitCommand(BaseCommand):
         self._parser.add_argument(
             "--git-identity",
             metavar="SSH_PRIVATE_KEY",
-            help="A path to the private SSH key file for non-public repositories",
+            help="The private SSH key path to access the remote repo",
             type=str,
             dest="git_identity_file",
         )
         self._parser.add_argument(
             "--ssh-identity",
             metavar="SSH_PRIVATE_KEY",
-            help="A path to the private SSH key file for SSH tunneling",
+            help="The private SSH key path for SSH tunneling",
             type=Path,
             dest="ssh_identity_file",
         )

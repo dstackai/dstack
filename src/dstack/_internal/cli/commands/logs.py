@@ -23,7 +23,7 @@ class LogsCommand(APIBaseCommand):
         self._parser.add_argument(
             "--ssh-identity",
             metavar="SSH_PRIVATE_KEY",
-            help="A path to the private SSH key file for SSH tunneling",
+            help="The private SSH key path for SSH tunneling",
             type=Path,
             dest="ssh_identity_file",
         )

@@ -21,9 +21,33 @@ class LocalRunRepoData(LocalRepoInfo):
 
 
 class LocalRepo(Repo):
-    """Represents local folder"""
+    """
+    Creates an instance of a local repo from a local path.
+
+    Example:
+
+    ```python
+    run = client.runs.submit(
+        configuration=...,
+        repo=LocalRepo.from_dir("."), # Mount the current folder to the run
+    )
+    ```
+    """
 
     run_repo_data: LocalRunRepoData
+
+    @staticmethod
+    def from_dir(repo_dir: PathLike) -> "LocalRepo":
+        """
+        Creates an instance of a local repo from a local path.
+
+        Args:
+            repo_dir: The path to a local folder
+
+        Returns:
+            A local repo instance
+        """
+        return LocalRepo(repo_dir=repo_dir)
 
     def __init__(
         self,
