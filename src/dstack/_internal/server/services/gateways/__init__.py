@@ -320,6 +320,7 @@ def _update_gateway(gateway_compute: GatewayComputeModel, build: str):
         host=f"ubuntu@{gateway_compute.ip_address}",
         id_rsa=gateway_compute.ssh_private_key,
         command=f"/bin/sh dstack/update.sh {get_dstack_gateway_wheel(build)} {build}",
+        options=["-o", "ConnectTimeout=5"],
     )
     if "Update successfully completed" in stdout:
         logger.info("Gateway %s updated", gateway_compute.ip_address)
