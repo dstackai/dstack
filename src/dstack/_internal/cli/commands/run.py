@@ -168,6 +168,10 @@ class RunCommand(APIBaseCommand):
             )
 
             if run.status in (RunStatus.RUNNING, RunStatus.DONE):
+                if run._run.run_spec.configuration.type == ConfigurationType.SERVICE.value:
+                    console.print(
+                        f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
+                    )
                 if run.attach():
                     for entry in run.logs():
                         sys.stdout.buffer.write(entry)
