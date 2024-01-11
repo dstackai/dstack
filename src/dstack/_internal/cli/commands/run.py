@@ -167,12 +167,13 @@ class RunCommand(APIBaseCommand):
                 f"[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
             )
 
-            if run.attach():
-                for entry in run.logs():
-                    sys.stdout.buffer.write(entry)
-                    sys.stdout.buffer.flush()
-            else:
-                console.print("[error]Failed to attach, exiting...[/]")
+            if run.status in (RunStatus.RUNNING, RunStatus.DONE):
+                if run.attach():
+                    for entry in run.logs():
+                        sys.stdout.buffer.write(entry)
+                        sys.stdout.buffer.flush()
+                else:
+                    console.print("[error]Failed to attach, exiting...[/]")
 
             run.refresh()
             if run.status.is_finished():
