@@ -17,6 +17,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
 from dstack._internal.core.services.ssh.exec import ssh_execute_command
+from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
 from dstack._internal.server.services.backends import (
     get_project_backend_by_type_or_error,
@@ -294,7 +295,7 @@ def _gateway_preflight(
 
 
 async def update_gateways(session: AsyncSession):
-    if os.environ.get("DSTACK_SKIP_GATEWAY_UPDATE", None):
+    if settings.SKIP_GATEWAY_UPDATE:
         logger.debug("Skipping gateway update")
         return
 
