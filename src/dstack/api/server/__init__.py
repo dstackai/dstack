@@ -31,7 +31,6 @@ class APIClient:
         users: operations with users
         projects: operations with projects
         backends: operations with backends
-        repos: operations with repos
         runs: operations with runs
         logs: operations with logs
         gateways: operations with gateways

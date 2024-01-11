@@ -29,7 +29,7 @@ def get_host_config(hostname: str, ssh_config_path: PathLike = default_ssh_confi
 
 
 def make_ssh_command_for_git(identity_file: PathLike) -> str:
-    return f"ssh -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={identity_file}"
+    return f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={identity_file}"
 
 
 def try_ssh_key_passphrase(identity_file: PathLike, passphrase: str = "") -> bool:

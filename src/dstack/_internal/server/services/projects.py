@@ -109,6 +109,7 @@ async def delete_projects(
             name=new_project_name,
         )
     )
+    await session.commit()
 
 
 async def add_project_member(

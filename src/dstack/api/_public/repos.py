@@ -38,12 +38,35 @@ class RepoCollection:
         oauth_token: Optional[str] = None,
     ):
         """
-        Upload credentials and initializes the repo in the project
+        Initializes the repo and configures its credentials in the project.
+        Must be invoked before mounting the repo to a run.
+
+        Example:
+
+        ```python
+        repo=RemoteRepo.from_url(
+            repo_url="https://github.com/dstackai/dstack-examples",
+            repo_branch="main",
+        )
+        client.repos.init(repo)
+        ```
+
+        By default, it uses the default Git credentials configured on the machine.
+        You can override these credentials via the `git_identity_file` or `oauth_token` arguments of the `init` method.
+
+        Once the repo is initialized, you can pass the repo object to the run:
+
+        ```python
+        run = client.runs.submit(
+            configuration=...,
+            repo=repo,
+        )
+        ```
 
         Args:
-            repo: repo to initialize
-            git_identity_file: SSH private key to access the remote repo
-            oauth_token: GitHub OAuth token to access the remote repo
+            repo: The repo to initialize.
+            git_identity_file: The private SSH key path for accessing the remote repo.
+            oauth_token: The GitHub OAuth token to access the remote repo.
         """
         creds = None
         if isinstance(repo, RemoteRepo):
@@ -62,15 +85,15 @@ class RepoCollection:
         self,
         repo: Repo,
     ) -> bool:
-        """
-        Checks if the remote repo is initialized in the project
-
-        Args:
-            repo: repo to check
-
-        Returns:
-            repo is initialized
-        """
+        # """
+        # Checks if the remote repo is initialized in the project
+        #
+        # Args:
+        #     repo: repo to check
+        #
+        # Returns:
+        #     repo is initialized
+        # """
         try:
             self._api_client.repos.get(self._project, repo.repo_id, include_creds=False)
             return True
@@ -87,22 +110,22 @@ class RepoCollection:
         git_identity_file: Optional[PathLike] = None,
         oauth_token: Optional[str] = None,
     ) -> Union[RemoteRepo, LocalRepo]:
-        """
-        Loads the repo from the local directory using global config
-
-        Args:
-            repo_dir: repo root directory
-            local: do not try to load `RemoteRepo` first
-            init: initialize the repo if it's not initialized
-            git_identity_file: path to an SSH private key to access the remote repo
-            oauth_token: GitHub OAuth token to access the remote repo
-
-        Raises:
-            ConfigurationError: if the repo is not initialized and `init` is `False`
-
-        Returns:
-            repo: initialized repo
-        """
+        # """
+        # Loads the repo from the local directory using global config
+        #
+        # Args:
+        #     repo_dir: repo root directory
+        #     local: do not try to load `RemoteRepo` first
+        #     init: initialize the repo if it's not initialized
+        #     git_identity_file: path to an SSH private key to access the remote repo
+        #     oauth_token: GitHub OAuth token to access the remote repo
+        #
+        # Raises:
+        #     ConfigurationError: if the repo is not initialized and `init` is `False`
+        #
+        # Returns:
+        #     repo: initialized repo
+        # """
         config = ConfigManager()
         if not init:
             logger.debug("Loading repo config")

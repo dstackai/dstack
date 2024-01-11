@@ -262,6 +262,7 @@ async def delete_runs(
         )
         .values(deleted=True)
     )
+    await session.commit()
 
 
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:

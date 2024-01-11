@@ -16,10 +16,12 @@ import dstack.api as api
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
-from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.profiles import ProfileResources as Resources
-from dstack._internal.core.models.profiles import ProfileRetryPolicy as RetryPolicy
-from dstack._internal.core.models.profiles import SpotPolicy
+from dstack._internal.core.models.profiles import (
+    Profile,
+    ProfileResources,
+    ProfileRetryPolicy,
+    SpotPolicy,
+)
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.runs import JobSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
@@ -52,12 +54,13 @@ class Run(ABC):
         project: str,
         ssh_identity_file: Optional[PathLike],
         run: RunModel,
+        ports_lock: Optional[PortsLock] = None,
     ):
         self._api_client = api_client
         self._project = project
         self._ssh_identity_file = ssh_identity_file
         self._run = run
-        self._ports_lock: Optional[PortsLock] = None
+        self._ports_lock: Optional[PortsLock] = ports_lock
         self._ssh_attach: Optional[SSHAttach] = None
 
     @property
@@ -279,20 +282,6 @@ class Run(ABC):
         return f"<Run '{self.name}'>"
 
 
-class SubmittedRun(Run):
-    def __init__(
-        self,
-        api_client: APIClient,
-        project: str,
-        ssh_identity_file: PathLike,
-        run: RunModel,
-        ports_lock: PortsLock,
-    ):
-        super().__init__(api_client, project, ssh_identity_file, run)
-        self._ports_lock = ports_lock
-        self._ports: Optional[Dict[int, int]] = None
-
-
 class RunCollection:
     """
     Operations with runs
@@ -314,31 +303,31 @@ class RunCollection:
         configuration_path: Optional[str] = None,
         repo: Optional[Repo] = None,
         backends: Optional[List[BackendType]] = None,
-        resources: Optional[Resources] = None,
+        resources: Optional[ProfileResources] = None,
         spot_policy: Optional[SpotPolicy] = None,
-        retry_policy: Optional[RetryPolicy] = None,
+        retry_policy: Optional[ProfileRetryPolicy] = None,
         max_duration: Optional[Union[int, str]] = None,
         max_price: Optional[float] = None,
         working_dir: Optional[str] = None,
         run_name: Optional[str] = None,
         reserve_ports: bool = True,
-    ) -> SubmittedRun:
+    ) -> Run:
         """
         Submit a run
 
         Args:
-            configuration: run configuration
-            configuration_path: run configuration path, relative to `repo_dir`
-            repo: repo to use for the run
-            backends: list of allowed backend for provisioning
-            resources: minimal resources for provisioning
-            spot_policy: spot policy for provisioning
-            retry_policy: retry policy for interrupted jobs
-            max_duration: max instance running duration in seconds
-            max_price: max instance price in dollars per hour for provisioning
-            working_dir: working directory relative to `repo_dir`
-            run_name: desired run_name. Must be unique in the project
-            reserve_ports: reserve local ports before submit
+            configuration (Union[Task, Service]): A run configuration.
+            configuration_path: The path to the configuration file, relative to the root directory of the repo.
+            repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): A repo to mount to the run.
+            backends: A list of allowed backend for provisioning.
+            resources (Resources): The minimal required resources for provisioning.
+            spot_policy: A spot policy for provisioning.
+            retry_policy (RetryPolicy): A retry policy.
+            max_duration: The max instance running duration in seconds.
+            max_price: The max instance price in dollars per hour for provisioning.
+            working_dir: A working directory relative to the repo root directory
+            run_name: A desired name of the run. Must be unique in the project. If not specified, a random name is assigned.
+            reserve_ports: Whether local ports should be reserved in advance.
 
         Returns:
             submitted run
@@ -347,6 +336,7 @@ class RunCollection:
             repo = configuration.get_repo()
             if repo is None:
                 raise ConfigurationError("Repo is required for this type of configuration")
+            # TODO: Add Git credentials to RemoteRepo and if they are set, pass them here to RepoCollection.init
             self._client.repos.init(repo)
 
         run_plan = self.get_plan(
@@ -370,20 +360,20 @@ class RunCollection:
         repo: Repo,
         configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
-        resources: Optional[Resources] = None,
+        resources: Optional[ProfileResources] = None,
         spot_policy: Optional[SpotPolicy] = None,
-        retry_policy: Optional[RetryPolicy] = None,
+        retry_policy: Optional[ProfileRetryPolicy] = None,
         max_duration: Optional[Union[int, str]] = None,
         max_price: Optional[float] = None,
         working_dir: Optional[str] = None,
         run_name: Optional[str] = None,
     ) -> RunPlan:
-        """
-        Get run plan. Same arguments as `submit`
-
-        Returns:
-            run plan
-        """
+        # """
+        # Get run plan. Same arguments as `submit`
+        #
+        # Returns:
+        #     run plan
+        # """
         if working_dir is None:
             working_dir = "."
         elif repo.repo_dir is not None:
@@ -398,7 +388,7 @@ class RunCollection:
         profile = Profile(
             name="(python)",
             backends=backends,
-            resources=resources or Resources(),
+            resources=resources or ProfileResources(),
             spot_policy=spot_policy,
             retry_policy=retry_policy,
             max_duration=max_duration,
@@ -423,18 +413,18 @@ class RunCollection:
         run_plan: RunPlan,
         repo: Repo,
         reserve_ports: bool = True,
-    ) -> SubmittedRun:
-        """
-        Execute run plan
-
-        Args:
-            run_plan: result of `get_plan` call
-            repo: repo to use for the run
-            reserve_ports: reserve local ports before submit
-
-        Returns:
-            submitted run
-        """
+    ) -> Run:
+        # """
+        # Execute run plan
+        #
+        # Args:
+        #     run_plan: result of `get_plan` call
+        #     repo: repo to use for the run
+        #     reserve_ports: reserve local ports before submit
+        #
+        # Returns:
+        #     submitted run
+        # """
         ports_lock = None
         if reserve_ports:
             # TODO handle multiple jobs
@@ -477,7 +467,7 @@ class RunCollection:
             run_name: run name
 
         Returns:
-            run or `None` if not found
+            The run or `None` if not found
         """
         try:
             run = self._api_client.runs.get(self._project, run_name)
@@ -495,10 +485,8 @@ class RunCollection:
             run,
         )
 
-    def _model_to_submitted_run(
-        self, run: RunModel, ports_lock: Optional[PortsLock]
-    ) -> SubmittedRun:
-        return SubmittedRun(
+    def _model_to_submitted_run(self, run: RunModel, ports_lock: Optional[PortsLock]) -> Run:
+        return Run(
             self._api_client,
             self._project,
             self._client.ssh_identity_file,
