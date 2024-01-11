@@ -11,7 +11,10 @@ from dstack._internal.core.models.configurations import (
     ConfigurationType,
     DevEnvironmentConfiguration,
     PortMapping,
+    ServiceConfiguration,
+    TaskConfiguration,
 )
+from dstack._internal.utils.interpolator import VariablesInterpolator
 
 
 class BaseRunConfigurator:
@@ -30,10 +33,19 @@ class BaseRunConfigurator:
         )
 
     @classmethod
-    def apply(cls, args: argparse.Namespace, conf: BaseConfiguration):
+    def apply(cls, args: argparse.Namespace, unknown: List[str], conf: BaseConfiguration):
         if args.envs:
             for k, v in args.envs:
                 conf.env[k] = v
+
+        cls.interpolate_list(conf.setup, unknown)
+
+    @classmethod
+    def interpolate_list(cls, value: List[str], unknown):
+        run_args = " ".join(unknown)
+        interpolator = VariablesInterpolator({"run": {"args": run_args}}, skip=["secrets"])
+        for i in range(len(value)):
+            value[i] = interpolator.interpolate(value[i])
 
 
 class RunWithPortsConfigurator(BaseRunConfigurator):
@@ -51,8 +63,8 @@ class RunWithPortsConfigurator(BaseRunConfigurator):
         )
 
     @classmethod
-    def apply(cls, args: argparse.Namespace, conf: BaseConfigurationWithPorts):
-        super().apply(args, conf)
+    def apply(cls, args: argparse.Namespace, unknown: List[str], conf: BaseConfigurationWithPorts):
+        super().apply(args, unknown, conf)
         if args.ports:
             conf.ports = list(merge_ports(conf.ports, args.ports).values())
 
@@ -60,13 +72,21 @@ class RunWithPortsConfigurator(BaseRunConfigurator):
 class TaskRunConfigurator(RunWithPortsConfigurator):
     TYPE = ConfigurationType.TASK
 
+    @classmethod
+    def apply(cls, args: argparse.Namespace, unknown: List[str], conf: TaskConfiguration):
+        super().apply(args, unknown, conf)
+
+        cls.interpolate_list(conf.commands, unknown)
+
 
 class DevEnvironmentRunConfigurator(RunWithPortsConfigurator):
     TYPE = ConfigurationType.DEV_ENVIRONMENT
 
     @classmethod
-    def apply(cls, args: argparse.Namespace, conf: DevEnvironmentConfiguration):
-        super().apply(args, conf)
+    def apply(
+        cls, args: argparse.Namespace, unknown: List[str], conf: DevEnvironmentConfiguration
+    ):
+        super().apply(args, unknown, conf)
         if conf.ide == "vscode" and conf.version is None:
             conf.version = _detect_vscode_version()
             if conf.version is None:
@@ -79,6 +99,12 @@ class DevEnvironmentRunConfigurator(RunWithPortsConfigurator):
 
 class ServiceRunConfigurator(BaseRunConfigurator):
     TYPE = ConfigurationType.SERVICE
+
+    @classmethod
+    def apply(cls, args: argparse.Namespace, unknown: List[str], conf: ServiceConfiguration):
+        super().apply(args, unknown, conf)
+
+        cls.interpolate_list(conf.commands, unknown)
 
 
 def env_var(v: str) -> Tuple[str, str]:

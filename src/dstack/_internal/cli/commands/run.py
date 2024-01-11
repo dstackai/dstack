@@ -106,7 +106,8 @@ class RunCommand(APIBaseCommand):
             parser = argparse.ArgumentParser()
             configurator = run_configurators_mapping[ConfigurationType(conf.type)]
             configurator.register(parser)
-            configurator.apply(parser.parse_args(args.unknown), conf)
+            args, unknown = parser.parse_known_args(args.unknown)
+            configurator.apply(args, unknown, conf)
 
             with console.status("Getting run plan..."):
                 run_plan = self.api.runs.get_plan(
