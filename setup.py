@@ -60,7 +60,7 @@ BASE_DEPS = [
     "docker>=6.0.0",
     "dnspython",
     "grpcio>=1.50",  # indirect
-    "gpuhunt==0.0.3rc1",
+    "gpuhunt==0.0.3",
     "sentry-sdk[fastapi]",
 ]
 
