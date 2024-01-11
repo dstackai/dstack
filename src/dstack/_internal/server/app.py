@@ -6,9 +6,8 @@ from typing import Awaitable, Callable, List
 import sentry_sdk
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from rich import print
 
-from dstack._internal.cli.utils.common import colors
+from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
 from dstack._internal.server import settings
@@ -77,13 +76,13 @@ async def lifespan(app: FastAPI):
                 os.path.expanduser("~"), "~", 1
             )
             if not config_loaded:
-                print(
-                    f"Initializing the default configuration at [{colors['code']}]{server_config_dir}[/{colors['code']}]..."
+                console.print(
+                    f"Initializing the default configuration at [code]{server_config_dir}[/]..."
                 )
                 await server_config_manager.init_config(session=session)
             else:
-                print(
-                    f"Applying server configuration from [{colors['code']}]{server_config_dir}[/{colors['code']}]..."
+                console.print(
+                    f"Applying server configuration from [code]{server_config_dir}[/]..."
                 )
                 await server_config_manager.apply_config(session=session)
     update_default_project(
@@ -97,10 +96,10 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
-    print(
-        f"The dstack server [{colors['code']}]{dstack_version}[/{colors['code']}] is running at [{colors['code']}]{SERVER_URL}[/{colors['code']}]"
+    console.print(
+        f"The dstack server [code]{dstack_version}[/] is running at [code]{SERVER_URL}[/]"
     )
-    print(f"The admin token is [{colors['code']}]{admin.token}[/{colors['code']}].")
+    console.print(f"The admin token is [code]{admin.token}[/].")
     for func in _ON_STARTUP_HOOKS:
         await func(app)
     yield
