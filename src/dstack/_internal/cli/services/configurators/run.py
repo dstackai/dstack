@@ -38,10 +38,10 @@ class BaseRunConfigurator:
             for k, v in args.envs:
                 conf.env[k] = v
 
-        cls.interpolate_list(conf.setup, unknown)
+        cls.interpolate_run_args(conf.setup, unknown)
 
     @classmethod
-    def interpolate_list(cls, value: List[str], unknown):
+    def interpolate_run_args(cls, value: List[str], unknown):
         run_args = " ".join(unknown)
         interpolator = VariablesInterpolator({"run": {"args": run_args}}, skip=["secrets"])
         for i in range(len(value)):
@@ -76,7 +76,7 @@ class TaskRunConfigurator(RunWithPortsConfigurator):
     def apply(cls, args: argparse.Namespace, unknown: List[str], conf: TaskConfiguration):
         super().apply(args, unknown, conf)
 
-        cls.interpolate_list(conf.commands, unknown)
+        cls.interpolate_run_args(conf.commands, unknown)
 
 
 class DevEnvironmentRunConfigurator(RunWithPortsConfigurator):
@@ -104,7 +104,7 @@ class ServiceRunConfigurator(BaseRunConfigurator):
     def apply(cls, args: argparse.Namespace, unknown: List[str], conf: ServiceConfiguration):
         super().apply(args, unknown, conf)
 
-        cls.interpolate_list(conf.commands, unknown)
+        cls.interpolate_run_args(conf.commands, unknown)
 
 
 def env_var(v: str) -> Tuple[str, str]:
