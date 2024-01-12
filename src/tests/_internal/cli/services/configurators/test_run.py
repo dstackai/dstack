@@ -67,6 +67,6 @@ def apply_args(
     configurator = run_configurators_mapping[conf.type]
     configurator.register(parser)
     conf = conf.copy(deep=True)  # to avoid modifying the original configuration
-    args = parser.parse_args(args)
-    configurator.apply(args, conf)
+    args, unknown = parser.parse_known_args(args)
+    configurator.apply(args, unknown, conf)
     return conf, args
