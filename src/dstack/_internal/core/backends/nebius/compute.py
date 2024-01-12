@@ -83,7 +83,6 @@ class NebiusCompute(Compute):
                             run.run_spec.ssh_key_pub.strip(),
                             project_ssh_public_key.strip(),
                         ],
-                        registry_auth_required=job.job_spec.registry_auth is not None,
                     ),
                 },
                 disk_size_gb=disk_size,

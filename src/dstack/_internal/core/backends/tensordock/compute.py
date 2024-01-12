@@ -56,7 +56,6 @@ class TensorDockCompute(Compute):
                 run.run_spec.ssh_key_pub.strip(),
                 project_ssh_public_key.strip(),
             ],
-            registry_auth_required=job.job_spec.registry_auth is not None,
         )
         try:
             resp = self.api_client.deploy_single(

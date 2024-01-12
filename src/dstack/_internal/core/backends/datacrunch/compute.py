@@ -78,12 +78,8 @@ class DataCrunchCompute(Compute):
                 )
             )
 
-        registry_auth_required = instance_config.job_docker_config.registry_auth is not None
         commands = get_shim_commands(
-            backend=BackendType.DATACRUNCH,
-            image_name=instance_config.job_docker_config.image.image,
             authorized_keys=public_keys,
-            registry_auth_required=registry_auth_required,
         )
 
         startup_script = " ".join([" && ".join(commands)])
@@ -147,13 +143,10 @@ class DataCrunchCompute(Compute):
         )
 
         commands = get_shim_commands(
-            backend=BackendType.DATACRUNCH,
-            image_name=job.job_spec.image_name,
             authorized_keys=[
                 run.run_spec.ssh_key_pub.strip(),
                 project_ssh_public_key.strip(),
             ],
-            registry_auth_required=job.job_spec.registry_auth is not None,
         )
 
         startup_script = " ".join([" && ".join(commands)])

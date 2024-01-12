@@ -22,96 +22,134 @@ import (
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
 
-func RunDocker(ctx context.Context, params DockerParameters, serverAPI APIAdapter) error {
+type DockerRunner struct {
+	client       *docker.Client
+	dockerParams DockerParameters
+	state        RunnerStatus
+}
+
+func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 	client, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithAPIVersionNegotiation())
 	if err != nil {
+		return nil, err
+	}
+
+	runner := &DockerRunner{
+		client:       client,
+		dockerParams: dockerParams,
+		state:        Pending,
+	}
+	return runner, nil
+}
+
+func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
+	var err error
+
+	log.Println("Pulling image")
+	d.state = Pulling
+	if err = pullImage(ctx, d.client, cfg); err != nil {
+		d.state = Pending
+		fmt.Printf("pullImage error: %s\n", err.Error())
 		return err
 	}
 
-	log.Println("Waiting for registry auth")
-	registryAuth := serverAPI.GetRegistryAuth()
-	serverAPI.SetState(Pulling)
-
-	log.Println("Pulling image")
-	imageName := params.DockerImageName()
-	if imageName == "" {
-		imageName = registryAuth.ImageName
-	}
-	if err = pullImage(ctx, client, imageName, registryAuth); err != nil {
-		return gerrors.Wrap(err)
-	}
-
 	log.Println("Creating container")
-	containerID, err := createContainer(ctx, client, params)
+	d.state = Creating
+	containerID, err := createContainer(ctx, d.client, d.dockerParams, cfg)
 	if err != nil {
-		return gerrors.Wrap(err)
+		d.state = Pending
+		fmt.Printf("createContainer error: %s\n", err.Error())
+		return err
 	}
-	if !params.DockerKeepContainer() {
+
+	if !d.dockerParams.DockerKeepContainer() {
 		defer func() {
 			log.Println("Deleting container")
-			_ = client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
+			err := d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
+			if err != nil {
+				log.Printf("ContainerRemove error: %s\n", err.Error())
+			}
 		}()
 	}
 
-	serverAPI.SetState(Running)
 	log.Printf("Running container, id=%s\n", containerID)
-	if err = runContainer(ctx, client, containerID); err != nil {
-		return gerrors.Wrap(err)
+	d.state = Running
+	if err = runContainer(ctx, d.client, containerID); err != nil {
+		d.state = Pending
+		fmt.Printf("runContainer error: %s\n", err.Error())
+		return err
 	}
-	log.Println("Container finished successfully")
+
+	log.Printf("Container finished successfully, id=%s\n", containerID)
+
+	d.state = Pending
 	return nil
 }
 
-func pullImage(ctx context.Context, client docker.APIClient, imageName string, imagePullConfig ImagePullConfig) error {
-	if !strings.Contains(imageName, ":") {
-		imageName += ":latest"
+func (d DockerRunner) GetState() RunnerStatus {
+	return d.state
+}
+
+func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerImageConfig) error {
+	if !strings.Contains(taskParams.ImageName, ":") {
+		taskParams.ImageName += ":latest"
 	}
 	images, err := client.ImageList(ctx, types.ImageListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", imageName)),
+		Filters: filters.NewArgs(filters.Arg("reference", taskParams.ImageName)),
 	})
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	if len(images) > 0 {
+
+	// TODO: force pull latset
+	if len(images) > 0 && !strings.Contains(taskParams.ImageName, ":latest") {
 		return nil
 	}
 
 	opts := types.ImagePullOptions{}
-	regAuth, _ := imagePullConfig.EncodeRegistryAuth()
+	regAuth, _ := taskParams.EncodeRegistryAuth()
 	if regAuth != "" {
 		opts.RegistryAuth = regAuth
 	}
 
-	reader, err := client.ImagePull(ctx, imageName, opts) // todo test registry auth
+	reader, err := client.ImagePull(ctx, taskParams.ImageName, opts) // todo test registry auth
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = reader.Close() }()
 
-	_, err = io.ReadAll(reader)
-	return gerrors.Wrap(err)
+	_, err = io.Copy(io.Discard, reader)
+	if err != nil {
+		return gerrors.Wrap(err)
+	}
+
+	// {"status":"Pulling from clickhouse/clickhouse-server","id":"latest"}
+	// {"status":"Digest: sha256:2ff5796c67e8d588273a5f3f84184b9cdaa39a324bcf74abd3652d818d755f8c"}
+	// {"status":"Status: Downloaded newer image for clickhouse/clickhouse-server:latest"}
+
+	return nil
 }
 
-func createContainer(ctx context.Context, client docker.APIClient, params DockerParameters) (string, error) {
+func createContainer(ctx context.Context, client docker.APIClient, dockerParams DockerParameters, taskParams DockerImageConfig) (string, error) {
 	runtime, err := getRuntime(ctx, client)
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
 
-	mounts, err := params.DockerMounts()
+	mounts, err := dockerParams.DockerMounts()
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}
 
 	containerConfig := &container.Config{
-		Image:        params.DockerImageName(),
-		Cmd:          []string{strings.Join(params.DockerShellCommands(), " && ")},
+		Image:        taskParams.ImageName,
+		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
-		ExposedPorts: exposePorts(params.DockerPorts()...),
+		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
 	}
 	hostConfig := &container.HostConfig{
 		NetworkMode:     getNetworkMode(),
-		PortBindings:    bindPorts(params.DockerPorts()...),
+		PortBindings:    bindPorts(dockerParams.DockerPorts()...),
 		PublishAllPorts: true,
 		Sysctls:         map[string]string{},
 		Runtime:         runtime,
@@ -204,21 +242,17 @@ func getRuntime(ctx context.Context, client docker.APIClient) (string, error) {
 
 /* DockerParameters interface implementation for CLIArgs */
 
-func (c *CLIArgs) DockerImageName() string {
-	return c.Docker.ImageName
-}
-
-func (c *CLIArgs) DockerKeepContainer() bool {
+func (c CLIArgs) DockerKeepContainer() bool {
 	return c.Docker.KeepContainer
 }
 
-func (c *CLIArgs) DockerShellCommands() []string {
+func (c CLIArgs) DockerShellCommands() []string {
 	commands := getSSHShellCommands(c.Docker.SSHPort, c.Docker.PublicSSHKey)
 	commands = append(commands, fmt.Sprintf("%s %s", DstackRunnerBinaryName, strings.Join(c.getRunnerArgs(), " ")))
 	return commands
 }
 
-func (c *CLIArgs) DockerMounts() ([]mount.Mount, error) {
+func (c CLIArgs) DockerMounts() ([]mount.Mount, error) {
 	runnerTemp := filepath.Join(c.Shim.HomeDir, "runners", time.Now().Format("20060102-150405"))
 	if err := os.MkdirAll(runnerTemp, 0755); err != nil {
 		return nil, gerrors.Wrap(err)
@@ -238,6 +272,6 @@ func (c *CLIArgs) DockerMounts() ([]mount.Mount, error) {
 	}, nil
 }
 
-func (c *CLIArgs) DockerPorts() []int {
+func (c CLIArgs) DockerPorts() []int {
 	return []int{c.Runner.HTTPPort, c.Docker.SSHPort}
 }

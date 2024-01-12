@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/log"
-	"github.com/golang/gddo/httputil/header"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/golang/gddo/httputil/header"
 )
 
 type Error struct {

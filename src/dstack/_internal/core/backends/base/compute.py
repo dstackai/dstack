@@ -94,17 +94,11 @@ def get_instance_name(run: Run, job: Job) -> str:
 
 
 def get_user_data(
-    backend: BackendType,
-    image_name: str,
     authorized_keys: List[str],
-    registry_auth_required: bool,
     cloud_config_kwargs: Optional[dict] = None,
 ) -> str:
     commands = get_shim_commands(
-        backend=backend,
-        image_name=image_name,
         authorized_keys=authorized_keys,
-        registry_auth_required=registry_auth_required,
     )
     return get_cloud_config(
         runcmd=[["sh", "-c", " && ".join(commands)]],
@@ -114,24 +108,19 @@ def get_user_data(
 
 
 def get_shim_commands(
-    backend: BackendType,
-    image_name: str,
     authorized_keys: List[str],
-    registry_auth_required: bool,
 ) -> List[str]:
     build = get_dstack_runner_version()
     env = {
-        "DSTACK_BACKEND": backend.value,
         "DSTACK_RUNNER_LOG_LEVEL": "6",
         "DSTACK_RUNNER_VERSION": build,
-        "DSTACK_IMAGE_NAME": image_name,
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
         "DSTACK_HOME": "/root/.dstack",
     }
     commands = get_dstack_shim(build)
     for k, v in env.items():
         commands += [f'export "{k}={v}"']
-    commands += get_run_shim_script(registry_auth_required)
+    commands += get_run_shim_script()
     return commands
 
 
@@ -156,12 +145,9 @@ def get_dstack_shim(build: str) -> List[str]:
     ]
 
 
-def get_run_shim_script(registry_auth_required: bool) -> List[str]:
+def get_run_shim_script() -> List[str]:
     dev_flag = "" if settings.DSTACK_VERSION is not None else "--dev"
-    with_auth_flag = "--with-auth" if registry_auth_required else ""
-    return [
-        f"nohup dstack-shim {dev_flag} docker {with_auth_flag} --keep-container >/root/shim.log 2>&1 &"
-    ]
+    return [f"nohup dstack-shim {dev_flag} docker --keep-container >/root/shim.log 2>&1 &"]
 
 
 def get_gateway_user_data(authorized_key: str) -> str:

@@ -98,7 +98,6 @@ class GCPCompute(Compute):
         )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
-        registry_auth_required = instance_config.job_docker_config.registry_auth is not None
         for zone in _get_instance_zones(instance_offer):
             request = compute_v1.InsertInstanceRequest()
             request.zone = zone
@@ -119,7 +118,6 @@ class GCPCompute(Compute):
                     backend=BackendType.GCP,
                     image_name=instance_config.job_docker_config.image.image,
                     authorized_keys=instance_config.get_public_keys(),
-                    registry_auth_required=registry_auth_required,
                 ),
                 labels={
                     "owner": "dstack",
@@ -190,7 +188,6 @@ class GCPCompute(Compute):
                         run.run_spec.ssh_key_pub.strip(),
                         project_ssh_public_key.strip(),
                     ],
-                    registry_auth_required=job.job_spec.registry_auth is not None,
                 ),
                 labels={
                     "owner": "dstack",

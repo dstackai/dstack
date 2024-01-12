@@ -63,7 +63,6 @@ class LambdaCompute(Compute):
                 run.run_spec.ssh_key_pub.strip(),
                 project_ssh_public_key.strip(),
             ],
-            registry_auth_required=job.job_spec.registry_auth is not None,
         )
         # shim is asssumed to be run under root
         launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"

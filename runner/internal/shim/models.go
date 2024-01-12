@@ -9,13 +9,7 @@ import (
 	"github.com/docker/docker/api/types/registry"
 )
 
-type APIAdapter interface {
-	GetRegistryAuth() ImagePullConfig
-	SetState(string)
-}
-
 type DockerParameters interface {
-	DockerImageName() string
 	DockerKeepContainer() bool
 	DockerShellCommands() []string
 	DockerMounts() ([]mount.Mount, error)
@@ -40,21 +34,23 @@ type CLIArgs struct {
 	}
 
 	Docker struct {
-		SSHPort              int
-		RegistryAuthRequired bool
-		ImageName            string
-		KeepContainer        bool
-		PublicSSHKey         string
+		SSHPort       int
+		KeepContainer bool
+		PublicSSHKey  string
 	}
 }
 
-type ImagePullConfig struct {
+type DockerImageConfig struct {
 	Username  string
 	Password  string
 	ImageName string
 }
 
-func (ra ImagePullConfig) EncodeRegistryAuth() (string, error) {
+func (ra DockerImageConfig) EncodeRegistryAuth() (string, error) {
+	if ra.Username == "" && ra.Password == "" {
+		return "", nil
+	}
+
 	authConfig := registry.AuthConfig{
 		Username: ra.Username,
 		Password: ra.Password,

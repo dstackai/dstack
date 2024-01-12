@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -8,7 +9,7 @@ import (
 	"github.com/dstackai/dstack/runner/internal/shim"
 )
 
-func (s *ShimServer) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (s *ShimServer) HealthcheckGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -17,29 +18,31 @@ func (s *ShimServer) healthcheckGetHandler(w http.ResponseWriter, r *http.Reques
 	}, nil
 }
 
-func (s *ShimServer) registryAuthPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.state != shim.WaitRegistryAuth {
+	if s.runner.GetState() != shim.Pending {
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
-	var body RegistryAuthBody
+	var body DockerTaskBody
 	if err := api.DecodeJSONBody(w, r, &body, true); err != nil {
 		log.Println("Failed to decode submit body", "err", err)
 		return nil, err
 	}
 
-	s.registryAuth = body.MakeConfig()
+	go func(taskParams shim.DockerImageConfig) {
+		s.runner.Run(context.TODO(), taskParams)
+	}(body.TaskParams())
 
 	return nil, nil
 }
 
-func (s *ShimServer) pullGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (s *ShimServer) PullGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return &PullResponse{
-		State: s.state,
+		State: string(s.runner.GetState()),
 	}, nil
 }

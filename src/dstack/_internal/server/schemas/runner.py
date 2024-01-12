@@ -65,7 +65,7 @@ class HealthcheckResponse(BaseModel):
     service: str
 
 
-class RegistryAuthBody(BaseModel):
+class DockerImageBody(BaseModel):
     username: str
     password: str
     image_name: str
