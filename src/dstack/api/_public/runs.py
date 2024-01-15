@@ -86,6 +86,19 @@ class Run(ABC):
     def hostname(self) -> str:
         return self._run.jobs[0].job_submissions[-1].job_provisioning_data.hostname
 
+    @property
+    def service_url(self) -> str:
+        if self._run.run_spec.configuration.type != "service":
+            raise ValueError("The run is not a service")
+        gateway = self._run.jobs[0].job_spec.gateway
+        if gateway.secure:
+            url = f"https://{gateway.hostname}"
+        else:
+            url = f"http://{gateway.hostname}"
+            if gateway.public_port != 80:
+                url += f":{gateway.public_port}"
+        return url
+
     def _attached_logs(
         self,
     ) -> Iterable[bytes]:

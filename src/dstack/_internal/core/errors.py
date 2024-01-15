@@ -108,3 +108,19 @@ class ConfigurationError(DstackError):
 
 class SSHError(DstackError):
     pass
+
+
+class SSHTimeoutError(SSHError):
+    pass
+
+
+class SSHConnectionRefusedError(SSHError):
+    pass
+
+
+class SSHKeyError(SSHError):
+    pass
+
+
+class SSHPortInUseError(SSHError):
+    pass

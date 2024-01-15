@@ -1,0 +1,14 @@
+[Unit]
+Description=dstack gateway service
+After=network.target
+
+[Service]
+ExecStart=/bin/sh {working_dir}/start.sh
+WorkingDirectory={working_dir}
+User=ubuntu
+Group=ubuntu
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

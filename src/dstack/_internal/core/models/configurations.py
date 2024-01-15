@@ -77,6 +77,15 @@ class Artifact(ForbidExtra):
     ] = False
 
 
+class ModelInfo(ForbidExtra):
+    type: Annotated[Literal["chat"], Field(description="The type of the model")]
+    name: Annotated[str, Field(description="The name of the model")]
+    format: Annotated[Literal["tgi"], Field(description="The serving format")]
+
+    chat_template: Optional[str] = None  # TODO(egor-s): use discriminator and root model
+    eos_token: Optional[str] = None
+
+
 class BaseConfiguration(ForbidExtra):
     type: Literal["none"]
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
@@ -169,6 +178,7 @@ class ServiceConfiguration(BaseConfiguration):
         entrypoint (Optional[str]): The Docker entrypoint
         registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
+        model (Optional[ModelInfo]): The model info for OpenAI interface
     """
 
     type: Literal["service"] = "service"
@@ -177,6 +187,9 @@ class ServiceConfiguration(BaseConfiguration):
         Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
         Field(description="The port, that application listens to or the mapping"),
     ]
+    model: Annotated[
+        Optional[ModelInfo], Field(description="The model info for OpenAI interface")
+    ] = None
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:

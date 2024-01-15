@@ -1,7 +1,10 @@
 import os
+import re
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
+import git
+import requests
 import yaml
 
 from dstack import version
@@ -14,6 +17,9 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Compute(ABC):
@@ -102,7 +108,7 @@ def get_shim_commands(
 def get_dstack_runner_version() -> str:
     if settings.DSTACK_VERSION is not None:
         return settings.DSTACK_VERSION
-    return os.environ.get("DSTACK_RUNNER_VERSION", None) or "latest"
+    return os.environ.get("DSTACK_RUNNER_VERSION", None) or get_latest_runner_build() or "latest"
 
 
 def get_cloud_config(**config) -> str:
@@ -131,17 +137,22 @@ def get_run_shim_script(registry_auth_required: bool) -> List[str]:
 def get_gateway_user_data(authorized_key: str) -> str:
     return get_cloud_config(
         package_update=True,
-        packages=["nginx"],
-        snap={"commands": [["install", "--classic", "certbot"]]},
-        runcmd=[["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"]],
-        ssh_authorized_keys=[authorized_key],
-        users=[
-            "default",
-            {
-                "name": "www-data",
-                "ssh_authorized_keys": [authorized_key],
-            },
+        packages=[
+            "nginx",
+            "python3.10-venv",
         ],
+        snap={"commands": [["install", "--classic", "certbot"]]},
+        runcmd=[
+            ["ln", "-s", "/snap/bin/certbot", "/usr/bin/certbot"],
+            [
+                "sed",
+                "-i",
+                "s/# server_names_hash_bucket_size 64;/server_names_hash_bucket_size 128;/",
+                "/etc/nginx/nginx.conf",
+            ],
+            ["su", "ubuntu", "-c", " && ".join(get_dstack_gateway_commands())],
+        ],
+        ssh_authorized_keys=[authorized_key],
     )
 
 
@@ -184,3 +195,56 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
         f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
     return commands
+
+
+def get_latest_runner_build() -> Optional[str]:
+    owner_repo = "dstackai/dstack"
+    workflow_id = "build.yml"
+    version_offset = 150
+
+    repo = git.Repo(search_parent_directories=True)
+    for remote in repo.remotes:
+        if re.search(rf"[@/]github\.com[:/]{owner_repo}\.", remote.url):
+            break
+    else:
+        return None
+
+    resp = requests.get(
+        f"https://api.github.com/repos/{owner_repo}/actions/workflows/{workflow_id}/runs",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        params={
+            "status": "success",
+        },
+    )
+    resp.raise_for_status()
+
+    head = repo.head.commit
+    for run in resp.json()["workflow_runs"]:
+        try:
+            if repo.is_ancestor(run["head_sha"], head):
+                ver = str(run["run_number"] + version_offset)
+                logger.debug(f"Found the latest runner build: %s", ver)
+                return ver
+        except git.GitCommandError as e:
+            if "Not a valid commit name" not in e.stderr:
+                raise
+    return None
+
+
+def get_dstack_gateway_wheel(build: str) -> str:
+    channel = "release" if version.__is_release__ else "stgn"
+    return f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}/dstack_gateway-{build}-py3-none-any.whl"
+
+
+def get_dstack_gateway_commands() -> List[str]:
+    build = get_dstack_runner_version()
+    return [
+        "mkdir -p /home/ubuntu/dstack",
+        "python3 -m venv /home/ubuntu/dstack/blue",
+        "python3 -m venv /home/ubuntu/dstack/green",
+        f"/home/ubuntu/dstack/blue/bin/pip install {get_dstack_gateway_wheel(build)}",
+        "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
+    ]

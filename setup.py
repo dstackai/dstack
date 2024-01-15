@@ -60,7 +60,7 @@ BASE_DEPS = [
     "docker>=6.0.0",
     "dnspython",
     "grpcio>=1.50",  # indirect
-    "gpuhunt==0.0.3rc1",
+    "gpuhunt==0.0.3",
     "sentry-sdk[fastapi]",
 ]
 
@@ -112,10 +112,6 @@ setup(
     package_dir={"": "src"},
     packages=find_packages("src"),
     package_data={
-        "dstack._internal.server": [
-            "scripts/*.sh",
-            "scripts/*.py",
-        ],
         "dstack.api._public.huggingface.finetuning.sft": ["requirements.txt"],
     },
     include_package_data=True,

@@ -15,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
@@ -227,3 +228,5 @@ class GatewayComputeModel(BaseModel):
     # The key to authorize the server with the gateway
     ssh_private_key: Mapped[str] = mapped_column(Text)
     ssh_public_key: Mapped[str] = mapped_column(Text)
+
+    deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())

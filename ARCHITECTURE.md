@@ -3,13 +3,14 @@
 
 ## Overview
 
-The `dstack` platform consists of five major components:
+The `dstack` platform consists of six major components:
 
 * the server
 * the Python API
 * the CLI
 * the runner
 * the shim
+* the gateway (optional)
 
 The server provides an HTTP API for submitting runs and managing all of the `dstack` functionality including users, projects, backends, repos, secrets, and gateways.
 
@@ -18,6 +19,8 @@ The Python API consists of the low-level and high-level Python API. The low-leve
 When the server provisions a cloud instance for a run, it launches a Docker image with the runner inside the image. The runner provides an HTTP API that the server uses for submitting the run, uploading the code, fetching logs and so on.
 
 The shim may be or may not be present depending on which type of cloud is used. If it's a GPU cloud that provides an API for running Docker images, then no shim is required. If it's a traditional cloud that provisions VMs, then the shim is started on the VM launch. It pulls and runs the Docker image, controls its execution, and implements any cloud-specific functionality such as terminating the instance.
+
+The gateway makes jobs available via a public URL. It works like a reverse proxy that forwards requests to the job instance via an SSH tunnel.
 
 ## Implementation of dstack run
 
@@ -78,3 +81,7 @@ The server is a FastAPI app backend by sqlite. The runner and shim are written i
             * `server` – the low-level Python API (a Python wrapper around server's HTTP API)
         * `core/` – core Python API modules (e.g. `dstack` errors)
     * `tests/`
+* `gateway/src/dstack/gateway` - source code for the gateway application
+  * `openai/` - OpenAI API proxy
+  * `registry/` - gateway services registry
+  * `systemd/` - systemd service files

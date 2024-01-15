@@ -24,6 +24,7 @@ from dstack._internal.server.routers import (
     users,
 )
 from dstack._internal.server.services.config import ServerConfigManager
+from dstack._internal.server.services.gateways import update_gateways
 from dstack._internal.server.services.projects import get_or_create_default_project
 from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
@@ -66,7 +67,7 @@ async def lifespan(app: FastAPI):
     await migrate()
     async with get_session_ctx() as session:
         admin, _ = await get_or_create_admin_user(session=session)
-        default_project, porject_created = await get_or_create_default_project(
+        default_project, project_created = await get_or_create_default_project(
             session=session, user=admin
         )
         if settings.SERVER_CONFIG_ENABLED:
@@ -85,6 +86,7 @@ async def lifespan(app: FastAPI):
                     f"Applying server configuration from [code]{server_config_dir}[/]..."
                 )
                 await server_config_manager.apply_config(session=session)
+        await update_gateways(session=session)
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,

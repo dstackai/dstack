@@ -53,6 +53,7 @@ class JobErrorCode(str, Enum):
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
     TERMINATED_BY_USER = "terminated_by_user"
+    GATEWAY_ERROR = "gateway_error"
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"
@@ -109,11 +110,11 @@ class Requirements(BaseModel):
 class Gateway(BaseModel):
     gateway_name: Optional[str]
     service_port: int
-    ssh_key: Optional[str]
-    sock_path: Optional[str]
     hostname: Optional[str]
     public_port: int = 80
     secure: bool = False
+
+    options: dict = {}
 
 
 class JobSpec(BaseModel):
