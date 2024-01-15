@@ -104,6 +104,74 @@ Once the service is deployed, its endpoint will be available at
 
 [//]: # (TODO: Example)
 
+### Enable OpenAI interface
+
+To use your model via the OpenAI interface, you need to extend the configuration with `model`.
+
+<div editor-title="mistral_openai.dstack.yml"> 
+
+```yaml
+type: service
+
+image: ghcr.io/huggingface/text-generation-inference:1.3
+
+env:
+  - MODEL_ID=TheBloke/Mistral-7B-OpenOrca-AWQ
+
+port: 8000
+
+commands:
+  - text-generation-launcher --hostname 0.0.0.0 --port 8000 --quantize awq --max-input-length 3696 --max-total-tokens 4096 --max-batch-prefill-tokens 4096
+
+model:
+  type: chat
+  name: TheBloke/Mistral-7B-OpenOrca-AWQ
+  format: tgi
+```
+
+</div>
+
+!!! info "Experimental feature"
+    OpenAI interface is an experimental feature. 
+    Only TGI chat models are supported at the moment.
+    Streaming is not supported yet.
+
+Run the configuration. Text Generation Inference requires a GPU with a compute capability above 8.0: e.g., L4 or A100.
+
+<div class="termy">
+
+```shell
+$ dstack run . -f mistral_openai.dstack.yml --gpu L4 
+```
+
+</div>
+
+Once the service is deployed,
+OpenAI interface will be available at `https://gateway.<domain-name>` for all deployed models in the project.
+
+The example below shows how to use the model with `openai` library:
+
+<div editor-title="mistral_complete.py">
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://gateway.<domain-name>",
+    api_key="none",
+)
+r = client.chat.completions.create(
+    model="TheBloke/Mistral-7B-OpenOrca-AWQ",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Three main ingredients of a burger in one sentence?"}
+    ],
+)
+print(r)
+```
+
+</div>
+
 What's next?
 
 1. Check the [Text Generation Inference](../../learn/tgi.md) and [vLLM](../../learn/vllm.md) examples
