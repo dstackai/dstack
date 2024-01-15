@@ -287,6 +287,7 @@ def _gateway_preflight(
     project_ssh_private_key: str,
     options: dict,
 ):
+    logger.debug("Running service preflight: %s", domain)
     try:
         with gateway_tunnel_client(domain, gateway_ssh_private_key) as client:
             client.preflight(project, domain, project_ssh_private_key, options)

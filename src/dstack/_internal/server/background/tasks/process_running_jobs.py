@@ -222,7 +222,7 @@ async def _process_job(job_id: UUID):
                 )
             )
             try:
-                if gateway := res.scalar_one_or_none() is None:
+                if (gateway := res.scalar_one_or_none()) is None:
                     raise GatewayError("Gateway is not found")
                 await run_async(
                     _register_service,
