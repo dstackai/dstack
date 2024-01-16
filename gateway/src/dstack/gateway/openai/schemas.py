@@ -35,6 +35,13 @@ class ChatCompletionsChoice(BaseModel):
     message: ChatMessage
 
 
+class ChatCompletionsChunkChoice(BaseModel):
+    delta: object
+    logprobs: Optional[object]
+    finish_reason: Optional[FinishReason]
+    index: int
+
+
 class ChatCompletionsUsage(BaseModel):
     completion_tokens: int
     prompt_tokens: int
@@ -53,7 +60,7 @@ class ChatCompletionsResponse(BaseModel):
 
 class ChatCompletionsChunk(BaseModel):
     id: str
-    choices: List[ChatCompletionsChoice]
+    choices: List[ChatCompletionsChunkChoice]
     created: int
     model: str
     system_fingerprint: str

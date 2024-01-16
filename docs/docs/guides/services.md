@@ -134,7 +134,6 @@ model:
 !!! info "Experimental feature"
     OpenAI interface is an experimental feature. 
     Only TGI chat models are supported at the moment.
-    Streaming is not supported yet.
 
 Run the configuration. Text Generation Inference requires a GPU with a compute capability above 8.0: e.g., L4 or A100.
 
