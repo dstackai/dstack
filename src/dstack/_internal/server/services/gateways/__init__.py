@@ -297,7 +297,7 @@ def _gateway_preflight(
 
 async def update_gateways(session: AsyncSession):
     if settings.SKIP_GATEWAY_UPDATE:
-        logger.debug("Skipping gateway update")
+        logger.debug("Skipping gateway update due to DSTACK_SKIP_GATEWAY_UPDATE env variable")
         return
 
     res = await session.execute(
@@ -306,8 +306,11 @@ async def update_gateways(session: AsyncSession):
     gateway_computes = res.scalars().all()
 
     build = get_dstack_runner_version()
-    aws = [run_async(_update_gateway, gateway, build) for gateway in gateway_computes]
+    if build == "latest":
+        logger.debug("Skipping gateway update due to `latest` version being used")
+        return
 
+    aws = [run_async(_update_gateway, gateway, build) for gateway in gateway_computes]
     for error, gateway in zip(
         await asyncio.gather(*aws, return_exceptions=True), gateway_computes
     ):
