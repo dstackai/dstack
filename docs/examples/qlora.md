@@ -1,7 +1,7 @@
 # QLoRA
 
 This example demonstrates how to fine-tune [`llama-2-7b-chat-hf`](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf),
-with QLoRA and your own script, using [Tasks](../docs/guides/tasks.md).
+with QLoRA and your own script, using [Tasks](../docs/concepts/tasks.md).
 
 ## Prepare a dataset
 
@@ -263,6 +263,6 @@ The complete and ready-to-run code for the example is available in our [GitHub r
 ## What's next?
 
 1. Check the [Text Generation Inference](tgi.md) and [vLLM](vllm.md) examples
-2. Read about [tasks](../docs/guides/tasks.md)
+2. Read about [tasks](../docs/concepts/tasks.md)
 3. Browse [examples](index.md)
 4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

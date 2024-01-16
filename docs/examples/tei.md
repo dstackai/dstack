@@ -1,7 +1,7 @@
 # Text Embeddings Inference
 
 This example demonstrates how to use [TEI](https://github.com/huggingface/text-embeddings-inference) with `dstack`'s
-[services](../docs/guides/services.md) to deploy embeddings.
+[services](../docs/concepts/services.md) to deploy embeddings.
 
 ## Define the configuration
 
@@ -29,7 +29,7 @@ commands:
 ## Run the configuration
 
 !!! warning "Gateway"
-    Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
+    Before running a service, ensure that you have configured a [gateway](../docs/concepts/services.md#set-up-a-gateway).
     If you're using dstack Cloud, the default gateway is configured automatically for you.
 
 <div class="termy">

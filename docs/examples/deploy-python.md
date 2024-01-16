@@ -1,6 +1,6 @@
 # Serving LLMs using Python API
 
-The [Python API](../docs/reference/api/python/index.md) of `dstack` can be used to run [tasks](../docs/guides/tasks.md) and [services](../docs/guides/services.md) programmatically.
+The [Python API](../docs/reference/api/python/index.md) of `dstack` can be used to run [tasks](../docs/concepts/tasks.md) and [services](../docs/concepts/services.md) programmatically.
 
 To demonstrate how it works, we've created a simple Streamlit app that uses `dstack`'s API to deploy a quantized 
 version of Llama 2 to your cloud with a click of a button.
@@ -33,7 +33,7 @@ except ClientError as e:
 ### Create a task
 
 !!! info "NOTE:"
-    With `dstack.Client`, you can run [tasks](../docs/guides/tasks.md) and [services](../docs/guides/services.md).
+    With `dstack.Client`, you can run [tasks](../docs/concepts/tasks.md) and [services](../docs/concepts/services.md).
     Running a task allows you to programmatically access its ports and
     forward traffic to your local machine. For example, if you run an LLM as a task, you can access it on `localhost`.
     Services on the other hand allow deploying applications as public endpoints.

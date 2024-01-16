@@ -41,10 +41,6 @@ Continue? [y/n]:
 
 By default, it suggests GPU instances based on their quality score. If you want to, you can control the maximum price.
 
-You can use Vast.ai to [fine-tune](../../docs/guides/fine-tuning.md), and 
-[deploy](../../docs/guides/text-generation.md) models or
-launch [dev environments](../../docs/guides/dev-environments.md) (which are highly convenient for interactive coding with your favorite IDE).
-
 Configuring Vast.ai for use with `dstack` is easy. Log into your [Vast AI](https://cloud.vast.ai/) account, click `Account` in the sidebar,
 and copy your API Key.
 

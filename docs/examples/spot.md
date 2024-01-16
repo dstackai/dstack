@@ -5,8 +5,8 @@ more expensive), and `spot` (cheapest, provided when available, but can be taken
 
 There are three cloud providers that offer spot instances: AWS, GCP, and Azure. 
 Once you've [configured](../docs/config/server.md) any of these, you can use spot instances 
-for [dev environments](../docs/guides/dev-environments.md), [tasks](../docs/guides/tasks.md), and 
-[services](../docs/guides/services.md).
+for [dev environments](../docs/concepts/dev-environments.md), [tasks](../docs/concepts/tasks.md), and 
+[services](../docs/concepts/services.md).
 
 !!! info "NOTE:"
     Before you can use spot instances with AWS, GCP, and Azure, ensure you request the necessary quota 

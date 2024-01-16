@@ -78,6 +78,6 @@ This initial support for services is the first step towards providing multi-clou
 !!! info "Give it a try and share feedback"
     Even though the current support is limited in many ways, we encourage you to give it a try and share your feedback with us!
 
-    More details on how to use services can be found in a [dedicated guide](../../docs/guides/services.md) in our docs. 
+    More details on how to use services can be found in a [dedicated guide](../../docs/concepts/services.md) in our docs. 
     Questions and requests for help are
     very much welcome in our [Discord server](https://discord.gg/u8SmfwPpMd).

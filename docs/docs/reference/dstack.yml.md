@@ -13,7 +13,7 @@ Below, you'll find the complete reference detailing all available properties for
 
 ## dev-environment
 
-This configuration type allows you to provision a [dev environment](../guides/dev-environments.md) with the required cloud resources, 
+This configuration type allows you to provision a [dev environment](../concepts/dev-environments.md) with the required cloud resources, 
 code, and environment.
 
 #SCHEMA# dstack._internal.core.models.configurations.DevEnvironmentConfiguration
@@ -24,7 +24,7 @@ code, and environment.
 
 ## task
 
-This configuration type allows you to run [tasks](../guides/tasks.md) like training scripts, batch jobs, or web apps.
+This configuration type allows you to run [tasks](../concepts/tasks.md) like training scripts, batch jobs, or web apps.
 
 #SCHEMA# dstack._internal.core.models.configurations.TaskConfiguration
     overrides:
@@ -34,7 +34,7 @@ This configuration type allows you to run [tasks](../guides/tasks.md) like train
 
 ## service
 
-This configuration type allows you to deploy models or web apps as [services](../guides/services.md).
+This configuration type allows you to deploy models or web apps as [services](../concepts/services.md).
 
 #SCHEMA# dstack._internal.core.models.configurations.ServiceConfiguration
     overrides:

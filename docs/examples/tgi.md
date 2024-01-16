@@ -1,6 +1,6 @@
 # Text Generation Inference
 
-This example demonstrates how to use [TGI](https://github.com/huggingface/text-generation-inference) with `dstack`'s [services](../docs/guides/services.md) to deploy LLMs.
+This example demonstrates how to use [TGI](https://github.com/huggingface/text-generation-inference) with `dstack`'s [services](../docs/concepts/services.md) to deploy LLMs.
 
 ## Define the configuration
 
@@ -27,7 +27,7 @@ commands:
 ## Run the configuration
 
 !!! warning "Gateway"
-    Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
+    Before running a service, ensure that you have configured a [gateway](../docs/concepts/services.md#set-up-a-gateway).
     If you're using dstack Cloud, the default gateway is configured automatically for you.
 
 <div class="termy">
@@ -114,6 +114,6 @@ The complete, ready-to-run code is available in [dstackai/dstack-examples](https
 ## What's next?
 
 1. Check the [Text Embeddings Inference](tei.md) and [vLLM](vllm.md) examples
-2. Read about [services](../docs/guides/services.md)
+2. Read about [services](../docs/concepts/services.md)
 3. Browse all [examples](index.md)
 4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

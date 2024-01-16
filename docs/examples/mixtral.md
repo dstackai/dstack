@@ -1,7 +1,7 @@
 # Mixtral 8x7B
 
 This example demonstrates how to deploy Mixtral
-with `dstack`'s [services](../docs/guides/services.md).
+with `dstack`'s [services](../docs/concepts/services.md).
 
 ## Define the configuration
 
@@ -85,7 +85,7 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
 ## Run the configuration
 
 !!! warning "Prerequisites"
-    Before running a service, make sure to set up a [gateway](../docs/guides/services.md#set-up-a-gateway).
+    Before running a service, make sure to set up a [gateway](../docs/concepts/services.md#set-up-a-gateway).
     However, it's not required when using dstack Cloud, as it's set up automatically.
 
 !!! info "Resources"
@@ -169,6 +169,6 @@ The complete, ready-to-run code is available in [dstackai/dstack-examples](https
 ## What's next?
 
 1. Check the [vLLM](tgi.md) and [Text Generation Inference](tgi.md) examples
-2. Read about [services](../docs/guides/services.md)
+2. Read about [services](../docs/concepts/services.md)
 3. Browse [examples](index.md)
 4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

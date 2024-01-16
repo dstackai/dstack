@@ -79,14 +79,14 @@ run = client.runs.submit(
 
 The `dstack.api.Run` instance provides methods for various operations including attaching to the run, 
 forwarding ports to `localhost`, retrieving status, stopping, and accessing logs. For more details, refer to 
-the [example](../../learn/deploy-python.md) and [reference](../../docs/reference/api/python/index.md).
+the [example](../../examples/deploy-python.md) and [reference](../../docs/reference/api/python/index.md).
 
 ## Other changes
 
 - Because we've prioritized CLI and API UX over the UI, the UI is no longer bundled. 
 Please inform us if you experience any significant inconvenience related to this.
 - Gateways should now be configured using the `dstack gateway` command, and their usage requires you to specify a domain.
-  Learn more about how to [set up a gateway](../../docs/guides/services.md#set-up-a-gateway).
+  Learn more about how to [set up a gateway](../../docs/concepts/services.md#set-up-a-gateway).
 - The `dstack start` command is now `dstack server`.
 - The Python API classes were moved from the `dstack` package to `dstack.api`.
 
@@ -100,7 +100,7 @@ This means you'll need to delete `~/.dstack` and configure `dstack` from scratch
 3. Configure clouds via `~/.dstack/server/config.yml` (see the [new guide](../../docs/config/server.md))
 4. Run `dstack server`
 
-The [documentation](../../docs/index.md) and [examples](../../learn/index.md) are updated.
+The [documentation](../../docs/index.md) and [examples](../../examples/index.md) are updated.
 
 ## Give it a try
 

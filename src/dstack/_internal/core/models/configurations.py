@@ -178,7 +178,6 @@ class ServiceConfiguration(BaseConfiguration):
         entrypoint (Optional[str]): The Docker entrypoint
         registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        model (Optional[ModelInfo]): The model info for OpenAI interface
     """
 
     type: Literal["service"] = "service"

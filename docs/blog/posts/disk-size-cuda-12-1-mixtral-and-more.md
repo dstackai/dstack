@@ -36,7 +36,7 @@ We've upgraded the default Docker image's CUDA drivers to 12.1 (for better compa
 
 ## Mixtral 8x7B
 
-Lastly, and most importantly, we've added a [guide](../../learn/mixtral.md) on deploying Mixtral 8x7B as a service. This guide allows you to
+Lastly, and most importantly, we've added a [guide](../../examples/mixtral.md) on deploying Mixtral 8x7B as a service. This guide allows you to
 effortlessly deploy a Mixtral endpoint on any cloud platform of your preference.
 
 Deploying Mixtral 8x7B is easy, especailly when using vLLM:
@@ -79,10 +79,10 @@ Chat UI, LangChain, Llama Index, etc.
 
 ![](../../assets/images/dstack-mixtral-chat-ui.png){ width=800 }
 
-Check the complete [guide](../../learn/mixtral.md) for more details.
+Check the complete [guide](../../examples/mixtral.md) for more details.
 
 Don't forget, with `dstack`, you can use spot instances across
-different clouds and regions. Check out our recent [guide](../../learn/spot.md) on this topic.
+different clouds and regions. Check out our recent [guide](../../examples/spot.md) on this topic.
 
 ## Feedback and support
 

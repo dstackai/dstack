@@ -89,6 +89,9 @@ plugins:
         'learn/tgi.md': 'examples/tgi.md'
         'learn/sdxl.md': 'examples/sdxl.md'
         'learn/vllm.md': 'examples/vllm.md'
+        'guides/dev-environments.md': 'concepts/dev-environments.md'
+        'guides/tasks.md': 'concepts/tasks.md'
+        'guides/services.md': 'concepts/services.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -165,13 +168,14 @@ nav:
   - Home: index.md
   - Docs:
       - Getting started:
-          - Overview: docs/index.md
+          - Introduction: docs/index.md
           - Installation: docs/installation/index.md
           - Quickstart: docs/quickstart.md
-      - Guides:
-          - Dev environments: docs/guides/dev-environments.md
-          - Tasks: docs/guides/tasks.md
-          - Services: docs/guides/services.md
+      - Concepts:
+#          - Overview: docs/guides/index.md
+          - Dev environments: docs/concepts/dev-environments.md
+          - Tasks: docs/concepts/tasks.md
+          - Services: docs/concepts/services.md
       - Reference:
           - CLI: docs/reference/cli/index.md
           - API: docs/reference/api/python/index.md

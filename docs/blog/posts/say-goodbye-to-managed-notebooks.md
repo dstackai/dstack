@@ -101,4 +101,4 @@ You can securely access the cloud development environment with the desktop IDE o
 ![](../../assets/images/dstack-vscode-jupyter.png){ width=800 }
 
 !!! info "Learn more"
-    Check out our [guide](../../docs/guides/dev-environments.md) for running dev environments in your cloud.
+    Check out our [guide](../../docs/concepts/dev-environments.md) for running dev environments in your cloud.

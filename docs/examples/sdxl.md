@@ -160,12 +160,12 @@ The code for the endpoints is ready. Now, let's explore how to use `dstack` to s
 
 ??? info "Tasks"
     If you want to serve an application for development purposes only, you can use 
-    [tasks](../docs/guides/services.md). 
+    [tasks](../docs/concepts/services.md). 
     In this scenario, while the application runs in the cloud, 
     it is accessible from your local machine only.
 
 For production purposes, the optimal approach to serve an application is by using 
-[services](../docs/guides/services.md). In this case, the application can be accessed through a public endpoint.
+[services](../docs/concepts/services.md). In this case, the application can be accessed through a public endpoint.
 
 Here's the configuration that uses services:
 
@@ -191,7 +191,7 @@ commands:
 ## Run the configuration
 
 !!! warning "NOTE:"
-    Before running a service, ensure that you have configured a [gateway](../docs/guides/services.md#set-up-a-gateway).
+    Before running a service, ensure that you have configured a [gateway](../docs/concepts/services.md#set-up-a-gateway).
     If you're using dstack Cloud, the default gateway is configured automatically for you.
 
 After the gateway is configured, go ahead run the service.
@@ -229,6 +229,6 @@ The complete, ready-to-run code is available in [dstackai/dstack-examples](https
 ## What's next?
 
 1. Check the [Text Generation Inference](tgi.md) and [vLLM](vllm.md) examples
-2. Read about [services](../docs/guides/services.md)
+2. Read about [services](../docs/concepts/services.md)
 3. Browse [examples](index.md)
 4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

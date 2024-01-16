@@ -63,7 +63,7 @@ If you're interested in a specific provider, please message us on [Discord](http
 ## Custom domains and HTTPS
 
 In other news, it is now possible to deploy services
-using [HTTPS](../../docs/guides/services.md#configure-a-domain-and-enable-https-optional).
+using [HTTPS](../../docs/concepts/services.md#configure-a-domain-and-enable-https-optional).
 All you need to do is configure a wildcard domain (e.g., `*.mydomain.com`), point it to the gateway IP address, and then
 pass the subdomain you want to use (e.g., `myservice.mydomain.com`) to the `gateway` property in
 YAML (instead of the gateway IP address).

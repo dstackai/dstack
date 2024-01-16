@@ -21,7 +21,7 @@ are both acceptable).
 
     A dev environments is a perfect tool for interactive experimentation with your IDE.
     It allows to pre-configure the Python version or a Docker image, etc.
-    Go to [Dev environments](guides/dev-environments.md) to learn more.
+    Go to [Dev environments](concepts/dev-environments.md) to learn more.
 
 === "Task"
 
@@ -40,7 +40,7 @@ are both acceptable).
     </div>
 
     A task may run training scripts, batch jobs, or web apps. It allows to specify the commands, ports, 
-    and pre-configure the Python version or a Docker image, etc. Go to [Tasks](guides/tasks.md) to learn more.
+    and pre-configure the Python version or a Docker image, etc. Go to [Tasks](concepts/tasks.md) to learn more.
 
 === "Service"
 
@@ -63,7 +63,7 @@ are both acceptable).
     </div>
 
     A service makes it very easy to deploy models or web apps. It allows to specify the commands, 
-    and the Python version or a Docker image, etc. Go to [Services](guides/services.md) to learn more.
+    and the Python version or a Docker image, etc. Go to [Services](concepts/services.md) to learn more.
 
 ## Run configuration
 
@@ -97,7 +97,7 @@ automatically.
 
 ## What's next?
 
-1. Learn more about [dev environments](guides/dev-environments.md), [tasks](guides/tasks.md), 
-    and [services](guides/services.md)
+1. Learn more about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
+    and [services](concepts/services.md)
 2. Browse [examples](../examples/index.md)
 3. Join the [Discord server](https://discord.gg/u8SmfwPpMd)
