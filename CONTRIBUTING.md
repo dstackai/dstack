@@ -49,6 +49,10 @@ We use [`black`](https://github.com/psf/black) to format Python code and [`isort
 
 There are also helper pre-commits installed for [`black`](https://black.readthedocs.io/en/stable/integrations/source_version_control.html) and [`isort`](https://pycqa.github.io/isort/docs/configuration/pre-commit.html) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
 
+## Adding a new backend
+
+Visit [How to add a backend](https://github.com/dstackai/dstack/wiki/How-to-add-a-backend) wiki page to learn how to add a new backend.
+
 ## P.S.
 
 Feel free to open an issue if you have difficulties contributing to `dstack`.
