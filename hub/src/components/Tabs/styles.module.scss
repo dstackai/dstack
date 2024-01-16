@@ -1,9 +1,0 @@
-.tabs {
-    &:not(.hasContent) {
-        :global {
-            [class^="awsui_tabs-content-wrapper"] {
-                display: none;
-            }
-        }
-    }
-}
