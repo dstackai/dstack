@@ -241,6 +241,8 @@ def get_dstack_gateway_wheel(build: str) -> str:
 
 def get_dstack_gateway_commands() -> List[str]:
     build = get_dstack_runner_version()
+    if build == "latest":
+        raise ValueError("`latest` is not appropriate version for a gateway")
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",
