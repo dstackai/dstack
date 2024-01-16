@@ -1,8 +1,8 @@
 """add pools
 
-Revision ID: ec4dbadbab3c
-Revises: 48ad3ecbaea2
-Create Date: 2024-01-10 07:56:08.754541
+Revision ID: 73a959f64596
+Revises: d3e8af4786fa
+Create Date: 2024-01-16 09:57:28.183650
 
 """
 import sqlalchemy as sa
@@ -10,8 +10,8 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "ec4dbadbab3c"
-down_revision = "48ad3ecbaea2"
+revision = "73a959f64596"
+down_revision = "d3e8af4786fa"
 branch_labels = None
 depends_on = None
 
@@ -52,22 +52,22 @@ def upgrade() -> None:
             "status",
             sa.Enum(
                 "PENDING",
-                "SUBMITTED",
-                "PROVISIONING",
-                "PULLING",
-                "RUNNING",
+                "CREATING",
+                "STARTING",
+                "READY",
+                "BUSY",
                 "TERMINATING",
                 "TERMINATED",
-                "ABORTED",
                 "FAILED",
-                "DONE",
-                name="jobstatus",
+                name="instancestatus",
             ),
             nullable=False,
         ),
         sa.Column("status_message", sa.String(length=50), nullable=True),
         sa.Column("started_at", sa.DateTime(), nullable=True),
         sa.Column("finished_at", sa.DateTime(), nullable=True),
+        sa.Column("termination_policy", sa.String(length=50), nullable=False),
+        sa.Column("termination_idle_time", sa.String(length=50), nullable=True),
         sa.Column("job_provisioning_data", sa.String(length=4000), nullable=False),
         sa.Column("offer", sa.String(length=4000), nullable=False),
         sa.ForeignKeyConstraint(

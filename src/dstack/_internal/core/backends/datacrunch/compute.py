@@ -15,6 +15,9 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger("datacrunch.compute")
 
 
 class DataCrunchCompute(Compute):
@@ -84,6 +87,9 @@ class DataCrunchCompute(Compute):
 
         startup_script = " ".join([" && ".join(commands)])
         script_name = f"dstack-{instance_config.instance_name}.sh"
+
+        logger.debug("startup script:", startup_script)
+
         startup_script_ids = self.api_client.get_or_create_startup_scrpit(
             name=script_name, script=startup_script
         )
@@ -102,6 +108,20 @@ class DataCrunchCompute(Compute):
             image=image_name,
             disk_size=disk_size,
             location=instance_offer.region,
+        )
+
+        logger.debug(
+            "deploy_instance",
+            {
+                "instance_type": instance_offer.instance.name,
+                "ssh_key_ids": ssh_ids,
+                "startup_script_id": startup_script_ids,
+                "hostname": instance_config.instance_name,
+                "description": instance_config.instance_name,
+                "image": image_name,
+                "disk_size": disk_size,
+                "location": instance_offer.region,
+            },
         )
 
         running_instance = self.api_client.wait_for_instance(instance.id)

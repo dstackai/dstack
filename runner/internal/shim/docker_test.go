@@ -32,7 +32,7 @@ func TestDocker_SSHServer(t *testing.T) {
 	defer cancel()
 
 	dockerRunner, _ := NewDockerRunner(params)
-	assert.NoError(t, dockerRunner.Run(ctx, DockerTaskConfig{ImageName: "ubuntu"}))
+	assert.NoError(t, dockerRunner.Run(ctx, DockerImageConfig{ImageName: "ubuntu"}))
 }
 
 // TestDocker_SSHServerConnect pulls ubuntu image (without sshd), installs openssh-server and tries to connect via SSH
@@ -63,7 +63,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		assert.NoError(t, dockerRunner.Run(ctx, DockerTaskConfig{ImageName: "ubuntu"}))
+		assert.NoError(t, dockerRunner.Run(ctx, DockerImageConfig{ImageName: "ubuntu"}))
 	}()
 
 	for i := 0; i < timeout; i++ {

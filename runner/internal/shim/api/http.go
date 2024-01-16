@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -32,7 +33,10 @@ func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (
 	}
 
 	go func(taskParams shim.DockerImageConfig) {
-		s.runner.Run(context.TODO(), taskParams)
+		err := s.runner.Run(context.TODO(), taskParams)
+		if err != nil {
+			fmt.Printf("failed Run %v", err)
+		}
 	}(body.TaskParams())
 
 	return nil, nil

@@ -19,7 +19,7 @@ func (ds DummyRunner) GetState() shim.RunnerStatus {
 	return ds.State
 }
 
-func (ds DummyRunner) Run(context.Context, shim.DockerTaskConfig) error {
+func (ds DummyRunner) Run(context.Context, shim.DockerImageConfig) error {
 	return nil
 }
 

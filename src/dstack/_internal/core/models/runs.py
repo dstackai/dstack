@@ -127,6 +127,7 @@ class JobProvisioningData(BaseModel):
     backend: BackendType
     instance_type: InstanceType
     instance_id: str
+    pool_id: str
     hostname: str
     region: str
     price: float

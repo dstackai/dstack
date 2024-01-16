@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
 	"github.com/urfave/cli/v2"
@@ -96,7 +95,7 @@ func main() {
 				Action: func(c *cli.Context) error {
 					if args.Runner.BinaryPath == "" {
 						if err := args.Download("linux"); err != nil {
-							return gerrors.Wrap(err)
+							return cli.Exit(err, 1)
 						}
 						defer func() { _ = os.Remove(args.Runner.BinaryPath) }()
 					}
@@ -110,13 +109,13 @@ func main() {
 					// set dstack home path
 					args.Shim.HomeDir, err = getDstackHome(args.Shim.HomeDir)
 					if err != nil {
-						return err
+						return cli.Exit(err, 1)
 					}
 					log.Printf("Docker: %+v\n", args)
 
 					dockerRunner, err := shim.NewDockerRunner(args)
 					if err != nil {
-						return err
+						return cli.Exit(err, 1)
 					}
 
 					address := fmt.Sprintf(":%d", args.Shim.HTTPPort)
@@ -129,11 +128,10 @@ func main() {
 					}()
 
 					if err := shimServer.HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-						panic(err)
+						return cli.Exit(err, 1)
 					}
 
 					return nil
-
 				},
 			},
 		},
@@ -151,7 +149,7 @@ func getDstackHome(flag string) (string, error) {
 
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		return "", err
 	}
 	return filepath.Join(home, consts.DSTACK_DIR_PATH), nil
 }

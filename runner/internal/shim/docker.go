@@ -19,7 +19,8 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/dstackai/dstack/runner/consts"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
+
+	"github.com/ztrue/tracerr"
 )
 
 type DockerRunner struct {
@@ -31,7 +32,7 @@ type DockerRunner struct {
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 	client, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithAPIVersionNegotiation())
 	if err != nil {
-		return nil, err
+		return nil, tracerr.Wrap(err)
 	}
 
 	runner := &DockerRunner{
@@ -98,7 +99,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 		Filters: filters.NewArgs(filters.Arg("reference", taskParams.ImageName)),
 	})
 	if err != nil {
-		return gerrors.Wrap(err)
+		return tracerr.Wrap(err)
 	}
 
 	// TODO: force pull latset
@@ -114,13 +115,13 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 
 	reader, err := client.ImagePull(ctx, taskParams.ImageName, opts) // todo test registry auth
 	if err != nil {
-		return gerrors.Wrap(err)
+		return tracerr.Wrap(err)
 	}
 	defer func() { _ = reader.Close() }()
 
 	_, err = io.Copy(io.Discard, reader)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return tracerr.Wrap(err)
 	}
 
 	// {"status":"Pulling from clickhouse/clickhouse-server","id":"latest"}
@@ -133,12 +134,12 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 func createContainer(ctx context.Context, client docker.APIClient, dockerParams DockerParameters, taskParams DockerImageConfig) (string, error) {
 	runtime, err := getRuntime(ctx, client)
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		return "", tracerr.Wrap(err)
 	}
 
 	mounts, err := dockerParams.DockerMounts()
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		return "", tracerr.Wrap(err)
 	}
 
 	containerConfig := &container.Config{
@@ -157,20 +158,20 @@ func createContainer(ctx context.Context, client docker.APIClient, dockerParams 
 	}
 	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		return "", tracerr.Wrap(err)
 	}
 	return resp.ID, nil
 }
 
 func runContainer(ctx context.Context, client docker.APIClient, containerID string) error {
 	if err := client.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
-		return gerrors.Wrap(err)
+		return tracerr.Wrap(err)
 	}
 	waitCh, errorCh := client.ContainerWait(ctx, containerID, "")
 	select {
 	case <-waitCh:
 	case err := <-errorCh:
-		return gerrors.Wrap(err)
+		return tracerr.Wrap(err)
 	}
 	return nil
 }
@@ -230,7 +231,7 @@ func getNetworkMode() container.NetworkMode {
 func getRuntime(ctx context.Context, client docker.APIClient) (string, error) {
 	info, err := client.Info(ctx)
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		return "", tracerr.Wrap(err)
 	}
 	for name := range info.Runtimes {
 		if name == consts.NVIDIA_RUNTIME {
@@ -255,7 +256,7 @@ func (c CLIArgs) DockerShellCommands() []string {
 func (c CLIArgs) DockerMounts() ([]mount.Mount, error) {
 	runnerTemp := filepath.Join(c.Shim.HomeDir, "runners", time.Now().Format("20060102-150405"))
 	if err := os.MkdirAll(runnerTemp, 0755); err != nil {
-		return nil, gerrors.Wrap(err)
+		return nil, tracerr.Wrap(err)
 	}
 
 	return []mount.Mount{

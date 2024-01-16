@@ -16,8 +16,8 @@ type PullResponse struct {
 	State string `json:"state"`
 }
 
-func (ra DockerTaskBody) TaskParams() shim.DockerTaskConfig {
-	res := shim.DockerTaskConfig{
+func (ra DockerTaskBody) TaskParams() shim.DockerImageConfig {
+	res := shim.DockerImageConfig{
 		ImageName: ra.ImageName,
 		Username:  ra.Username,
 		Password:  ra.Password,

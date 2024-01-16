@@ -19,6 +19,7 @@ from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.runs import InstanceStatus, JobErrorCode, JobStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -277,6 +278,9 @@ class InstanceModel(BaseModel):
     status_message: Mapped[Optional[str]] = mapped_column(String(50))
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
+
+    termination_policy: Mapped[TerminationPolicy] = mapped_column(String(50))
+    termination_idle_time: Mapped[Optional[str]] = mapped_column(String(50))
 
     job_provisioning_data: Mapped[str] = mapped_column(String(4000))
     offer: Mapped[str] = mapped_column(String(4000))

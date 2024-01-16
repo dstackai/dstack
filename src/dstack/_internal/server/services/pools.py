@@ -154,6 +154,20 @@ async def get_pool_instances(
     return result.instances
 
 
+async def get_instances_by_pool_id(session, pool_id: str) -> List[InstanceModel]:
+    res = await session.execute(
+        select(PoolModel)
+        .where(
+            PoolModel.id == pool_id,
+        )
+        .options(joinedload(PoolModel.instances))
+    )
+    result = res.unique().scalars().one_or_none()
+    if result is None:
+        return []
+    return result.instances
+
+
 _GENERATE_POOL_NAME_LOCK = {}
 
 

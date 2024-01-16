@@ -28,7 +28,7 @@ class CreateInstanceRequest(BaseModel):
     profile: Profile
 
 
-class AddInstanceRequest(BaseModel):
+class AddRemoteInstanceRequest(BaseModel):
     pool_name: str
     instance_name: Optional[str]
     host: str

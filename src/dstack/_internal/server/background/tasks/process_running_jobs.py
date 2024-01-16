@@ -151,13 +151,13 @@ async def _process_job(job_id: UUID):
                     repo_creds,
                 )
 
-                if success:
-                    instance_name: str = job_provisioning_data.instance_id
-                    pool_name = str(job.job_spec.pool_name)
-                    instances = await get_pool_instances(session, project, pool_name)
-                    for inst in instances:
-                        if inst.name == instance_name:
-                            inst.status = InstanceStatus.BUSY
+            if success:
+                instance_name: str = job_provisioning_data.instance_id
+                pool_name = str(job.job_spec.pool_name)
+                instances = await get_pool_instances(session, project, pool_name)
+                for inst in instances:
+                    if inst.name == instance_name:
+                        inst.status = InstanceStatus.BUSY
 
             if not success:  # check timeout
                 if job_submission.age > _get_runner_timeout_interval(
@@ -333,25 +333,29 @@ def _process_provisioning_with_shim(
         is successful
     """
     job_spec = parse_raw_as(JobSpec, job_model.job_spec_data)
+
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
+
     resp = shim_client.healthcheck()
     if resp is None:
         logger.debug(*job_log("shim is not available yet", job_model))
         return False  # shim is not available yet
+
     if registry_auth is not None:
         logger.debug(*job_log("authenticating to the registry...", job_model))
         interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
-        shim_client.registry_auth(
+        shim_client.submit(
             username=interpolate(registry_auth.username),
             password=interpolate(registry_auth.password),
             image_name=job_spec.image_name,
         )
     else:
-        shim_client.registry_auth(
+        shim_client.submit(
             username="",
             password="",
             image_name=job_spec.image_name,
         )
+
     job_model.status = JobStatus.PULLING
     logger.info(*job_log("now is pulling", job_model))
     return True

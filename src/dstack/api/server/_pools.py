@@ -4,7 +4,7 @@ from pydantic import parse_obj_as
 
 import dstack._internal.server.schemas.pools as schemas_pools
 from dstack._internal.core.models.pools import Instance, Pool
-from dstack._internal.server.schemas.runs import AddInstanceRequest
+from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
 from dstack.api.server._group import APIClientGroup
 
 
@@ -29,7 +29,7 @@ class PoolAPIClient(APIClientGroup):
     def add(
         self, project_name: str, pool_name: str, instance_name: Optional[str], host: str, port: str
     ):
-        body = AddInstanceRequest(
+        body = AddRemoteInstanceRequest(
             pool_name=pool_name, instance_name=instance_name, host=host, port=port
         )
         self._request(f"/api/project/{project_name}/pool/add", body=body.json())

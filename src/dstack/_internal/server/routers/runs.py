@@ -8,7 +8,7 @@ from dstack._internal.core.models.runs import Requirements, Run, RunPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
-    AddInstanceRequest,
+    AddRemoteInstanceRequest,
     CreateInstanceRequest,
     DeleteRunsRequest,
     GetOffersRequest,

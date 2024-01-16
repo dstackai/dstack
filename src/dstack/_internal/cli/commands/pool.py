@@ -259,7 +259,7 @@ class PoolCommand(APIBaseCommand):
 
         profile.pool_name = pool_name
 
-        with console.status("Getting run plan..."):
+        with console.status("Getting instances..."):
             requirements, offers = self.api.runs.get_offers(profile)
 
         print(pool_name, profile, requirements, offers)
@@ -269,7 +269,7 @@ class PoolCommand(APIBaseCommand):
             return
 
         try:
-            with console.status("Submitting run..."):
+            with console.status("Submitting instance..."):
                 self.api.runs.create_instance(pool_name, profile)
         except ServerClientError as e:
             raise CLIError(e.msg)

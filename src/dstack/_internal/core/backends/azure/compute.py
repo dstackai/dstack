@@ -136,7 +136,6 @@ class AzureCompute(Compute):
                     backend=BackendType.AZURE,
                     image_name=job.job_spec.image_name,
                     authorized_keys=ssh_pub_keys,
-                    registry_auth_required=job.job_spec.registry_auth is not None,
                 ),
                 ssh_pub_keys=ssh_pub_keys,
                 spot=instance_offer.instance.resources.spot,

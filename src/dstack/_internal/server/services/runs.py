@@ -224,6 +224,7 @@ async def create_instance(
                 backend=backend.TYPE,
                 instance_type=instance_offer.instance,
                 instance_id=launched_instance_info.instance_id,
+                pool_id=pool_name,
                 hostname=launched_instance_info.ip_address,
                 region=launched_instance_info.region,
                 price=instance_offer.price,
@@ -291,6 +292,7 @@ async def submit_run(
     backends = await backends_services.get_project_backends(project)
     if len(backends) == 0:
         raise ServerClientError("No backends configured")
+
     if run_spec.run_name is None:
         run_spec.run_name = await _generate_run_name(
             session=session,
@@ -304,7 +306,11 @@ async def submit_run(
     )
 
     # create pool
-    pools = (await session.scalars(select(PoolModel).where(PoolModel.name == pool_name))).all()
+    pools = (
+        await session.scalars(
+            select(PoolModel).where(PoolModel.name == pool_name, PoolModel.deleted == False)
+        )
+    ).all()
     if not pools:
         await create_pool_model(session, project, pool_name)
 
@@ -319,6 +325,7 @@ async def submit_run(
         run_spec=run_spec.json(),
     )
     session.add(run_model)
+
     jobs = get_jobs_from_run_spec(run_spec)
     if run_spec.configuration.type == "service":
         await gateways.register_service_jobs(session, project, run_spec.run_name, jobs)
@@ -332,6 +339,7 @@ async def submit_run(
         session.add(job_model)
     await session.commit()
     await session.refresh(run_model)
+
     run = run_model_to_run(run_model)
     return run
 
@@ -428,10 +436,13 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
                 submissions.append(job_model_to_job_submission(job_model))
         if job_spec is not None:
             jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
+
     run_spec = RunSpec.parse_raw(run_model.run_spec)
+
     latest_job_submission = None
     if include_job_submissions:
         latest_job_submission = jobs[0].job_submissions[-1]
+
     run = Run(
         id=run_model.id,
         project_name=run_model.project.name,

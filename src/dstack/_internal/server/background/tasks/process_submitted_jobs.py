@@ -13,7 +13,12 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
+from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_NAME,
+    CreationPolicy,
+    Profile,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -136,7 +141,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     # pool capacity
     pool_instances = await get_pool_instances(session, project_model, run_pool)
-    available_instanses = (p for p in pool_instances if p.status == InstanceStatus.PENDING)
+    available_instanses = (p for p in pool_instances if p.status == InstanceStatus.READY)
     relevant_instances: List[InstanceModel] = []
     for instance in available_instanses:
         if check_relevance(profile, instance):
@@ -181,6 +186,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
     if job_provisioning_data is not None and offer is not None:
         logger.info(*job_log("now is provisioning", job_model))
+        job_provisioning_data.pool_id = str(pool.id)
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
 
@@ -188,9 +194,11 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             name=job.job_spec.job_name,
             project=project_model,
             pool=pool,
-            status=InstanceStatus.PENDING,
+            status=InstanceStatus.CREATING,
             job_provisioning_data=job_provisioning_data.json(),
             offer=offer.json(),
+            termination_policy=profile.termination_policy,
+            termination_idle_time=profile.termination_idle_time,
         )
         session.add(im)
 
