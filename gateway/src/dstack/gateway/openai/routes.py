@@ -30,12 +30,12 @@ async def post_chat_completions(
         return await client.generate(body)
     else:
         return StreamingResponse(
-            stream_chunks(await client.stream(body)),
+            stream_chunks(client.stream(body)),
             media_type="text/event-stream",
         )
 
 
 async def stream_chunks(chunks: AsyncIterator[ChatCompletionsChunk]) -> AsyncIterator[bytes]:
     async for chunk in chunks:
-        yield f"data: {chunk.model_dump_json()}".encode()
-    yield "data: [DONE]\n".encode()
+        yield f"data:{chunk.model_dump_json()}\n\n".encode()
+    yield "data: [DONE]\n\n".encode()

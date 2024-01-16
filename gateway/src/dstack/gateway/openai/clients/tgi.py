@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import json
 import uuid
 from typing import AsyncIterator, Dict, List, Optional
 
@@ -11,6 +12,7 @@ from dstack.gateway.openai.clients import ChatCompletionsClient
 from dstack.gateway.openai.schemas import (
     ChatCompletionsChoice,
     ChatCompletionsChunk,
+    ChatCompletionsChunkChoice,
     ChatCompletionsRequest,
     ChatCompletionsResponse,
     ChatCompletionsUsage,
@@ -83,7 +85,42 @@ class TGIChatCompletions(ChatCompletionsClient):
         )
 
     async def stream(self, request: ChatCompletionsRequest) -> AsyncIterator[ChatCompletionsChunk]:
-        raise NotImplementedError()
+        completion_id = uuid.uuid4().hex
+        created = int(datetime.datetime.utcnow().timestamp())
+
+        payload = self.get_payload(request)
+        async with self.client.stream("POST", "/generate_stream", json=payload) as resp:
+            async for line in resp.aiter_lines():
+                if line.startswith("data:"):
+                    data = json.loads(line[len("data:") :].strip("\n"))
+                    if "error" in data:
+                        raise GatewayError(data["error"])
+                    chunk = ChatCompletionsChunk(
+                        id=completion_id,
+                        choices=[],
+                        created=created,
+                        model=request.model,
+                        system_fingerprint="",
+                    )
+                    if data["details"] is not None:
+                        chunk.choices = [
+                            ChatCompletionsChunkChoice(
+                                delta={},
+                                logprobs=None,
+                                finish_reason=self.finish_reason(data["details"]["finish_reason"]),
+                                index=0,
+                            )
+                        ]
+                    else:
+                        chunk.choices = [
+                            ChatCompletionsChunkChoice(
+                                delta={"content": data["token"]["text"], "role": "assistant"},
+                                logprobs=None,
+                                finish_reason=None,
+                                index=0,
+                            )
+                        ]
+                    yield chunk
 
     def get_payload(self, request: ChatCompletionsRequest) -> Dict:
         inputs = self.chat_template.render(
@@ -110,7 +147,7 @@ class TGIChatCompletions(ChatCompletionsClient):
             "best_of": request.n,
             # "watermark": False,
             "details": True,  # to get best_of_sequences
-            "decoder_input_details": True,
+            "decoder_input_details": not request.stream,
         }
         if request.top_p < 1.0:
             parameters["top_p"] = request.top_p
