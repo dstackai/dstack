@@ -1,4 +1,4 @@
-from typing import Any, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from pydantic import BaseModel, Field, parse_obj_as, root_validator
 from pydantic.generics import GenericModel
@@ -86,12 +86,8 @@ class ComputeCapability(Tuple[int, int]):
 
 
 class Gpu(BaseModel):
-    name: Annotated[
-        Optional[Union[str, List[str]]], Field(description="The GPU name or list of names")
-    ] = None
-    count: Annotated[Range[int], Field(description="The number of GPUs")] = parse_obj_as(
-        Range[int], "1"
-    )
+    name: Annotated[Optional[List[str]], Field(description="The GPU name or list of names")] = None
+    count: Annotated[Range[int], Field(description="The number of GPUs")] = None
     memory: Annotated[
         Optional[Range[Memory]], Field(description="The VRAM size (e.g., 16GB)")
     ] = None
@@ -113,7 +109,26 @@ class Gpu(BaseModel):
         if isinstance(v, int):
             v = str(v)
         if isinstance(v, str):
-            pass  # TODO(egor-s)
+            tokens = v.replace(" ", "").split(":")
+            spec = {"name": None, "count": None, "memory": None}
+            for token in tokens:
+                if not token:
+                    raise ValueError(f"GPU spec contains empty token: {v}")
+                elif token[0].isalpha():  # GPU name is always starts with a letter
+                    if spec["name"] is not None:
+                        raise ValueError(f"GPU spec name conflict: {v}")
+                    spec["name"] = token.split(",")
+                    if any(not name for name in spec["name"]):
+                        raise ValueError(f"GPU name can not be empty: {v}")
+                elif any(c.isalpha() for c in token):  # memory must have a unit
+                    if spec["memory"] is not None:
+                        raise ValueError(f"GPU spec memory conflict: {v}")
+                    spec["memory"] = token
+                else:  # count otherwise
+                    if spec["count"] is not None:
+                        raise ValueError(f"GPU spec count conflict: {v}")
+                    spec["count"] = token
+            return spec
         return v
 
 
