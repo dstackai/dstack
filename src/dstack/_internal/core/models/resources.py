@@ -1,11 +1,10 @@
-from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Generic, List, Optional, Tuple, TypeVar
 
-from pydantic import BaseModel, Field, parse_obj_as, root_validator
+from pydantic import Field, parse_obj_as, root_validator
 from pydantic.generics import GenericModel
 from typing_extensions import Annotated
 
-# TODO(egor-s): implement ForbidExtra recursive validator
-
+from dstack._internal.core.models.common import ForbidExtra
 
 T = TypeVar("T")
 
@@ -13,6 +12,9 @@ T = TypeVar("T")
 class Range(GenericModel, Generic[T]):
     min: Optional[T]
     max: Optional[T]
+
+    class Config:
+        extra = "forbid"
 
     @classmethod
     def __get_validators__(cls):
@@ -85,7 +87,7 @@ class ComputeCapability(Tuple[int, int]):
         raise ValueError(f"Invalid compute capability: {v}")
 
 
-class Gpu(BaseModel):
+class Gpu(ForbidExtra):
     name: Annotated[Optional[List[str]], Field(description="The GPU name or list of names")] = None
     count: Annotated[Range[int], Field(description="The number of GPUs")] = None
     memory: Annotated[
@@ -132,7 +134,7 @@ class Gpu(BaseModel):
         return v
 
 
-class Resources(BaseModel):
+class Resources(ForbidExtra):
     cpu: Annotated[
         Optional[Range[int]], Field(description="The number of CPU cores")
     ] = parse_obj_as(Range[int], "2..")
