@@ -50,12 +50,12 @@ class Memory(float):
         if isinstance(v, str):
             v = v.replace(" ", "").lower()
             if v.endswith("tb"):
-                return Memory(v[:-2]) * 1024
+                return cls(v[:-2]) * 1024
             if v.endswith("gb"):
-                return Memory(v[:-2])
+                return cls(v[:-2])
             if v.endswith("mb"):
-                return Memory(v[:-2]) / 1024
-            return Memory(v)
+                return cls(v[:-2]) / 1024
+            return cls(v)
         raise ValueError(f"Invalid memory size: {v}")
 
 
