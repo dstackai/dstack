@@ -7,6 +7,7 @@ from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.base import Backend
+from dstack._internal.core.backends.kubernetes import KubernetesBackend
 from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import (
     BackendInvalidCredentialsError,
@@ -248,6 +249,7 @@ async def get_project_backends(project: ProjectModel) -> List[Backend]:
     backends = [b for _, b in backends_with_models]
     if LOCAL_BACKEND_ENABLED:
         backends.append(LocalBackend())
+    backends.append(KubernetesBackend())
     return backends
 
 

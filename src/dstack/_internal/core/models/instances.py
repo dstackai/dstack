@@ -53,13 +53,20 @@ class InstanceType(BaseModel):
     resources: Resources
 
 
+class SSHConnectionParams(BaseModel):
+    hostname: str
+    username: str
+    port: int
+
+
 class LaunchedInstanceInfo(BaseModel):
     instance_id: str
-    ip_address: str
     region: str
+    ip_address: str
     username: str
     ssh_port: int  # could be different from 22 for some backends
-    dockerized: bool  # True if JumpProxy is needed
+    dockerized: bool  # True if backend starts shim
+    ssh_proxy: Optional[SSHConnectionParams]
     backend_data: Optional[str]  # backend-specific data in json
 
 

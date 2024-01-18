@@ -270,6 +270,7 @@ class Run(ABC):
                 ports_lock=self._ports_lock,
                 run_name=self.name,
                 dockerized=provisioning_data.dockerized,
+                ssh_proxy=provisioning_data.ssh_proxy,
                 control_sock_path=control_sock_path_and_port_locks[0]
                 if control_sock_path_and_port_locks
                 else None,

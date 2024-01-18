@@ -12,6 +12,7 @@ class BackendType(str, enum.Enum):
         DSTACK (BackendType): dstack Cloud
         GCP (BackendType): Google Cloud Platform
         DATACRUNCH (BackendType): DataCrunch
+        KUBERNETES (BackendType): Kubernetes
         LAMBDA (BackendType): Lambda Cloud
         TENSORDOCK (BackendType): TensorDock Marketplace
         VASTAI (BackendType): Vast.ai Marketplace
@@ -19,9 +20,10 @@ class BackendType(str, enum.Enum):
 
     AWS = "aws"
     AZURE = "azure"
+    DATACRUNCH = "datacrunch"
     DSTACK = "dstack"
     GCP = "gcp"
-    DATACRUNCH = "datacrunch"
+    KUBERNETES = "kubernetes"
     LAMBDA = "lambda"
     LOCAL = "local"
     NEBIUS = "nebius"

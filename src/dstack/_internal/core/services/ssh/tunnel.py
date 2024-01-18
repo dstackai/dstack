@@ -1,8 +1,10 @@
 import os
+import shlex
 import subprocess
 import tempfile
 from typing import Dict, Optional
 
+from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
@@ -36,12 +38,13 @@ class SSHTunnel:
         for port_remote, port_local in self.ports.items():
             command += ["-L", f"{port_local}:localhost:{port_remote}"]
         command += [self.host]
-
-        r = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # TODO: using stderr=subprocess.PIPE may block subprocess.run.
+        # Redirect stderr to file to get ssh error message
+        r = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if r.returncode == 0:
             return
-        logger.debug("SSH tunnel failed: %s", r.stderr)
-        raise get_ssh_error(r.stderr)
+        logger.debug("SSH tunnel failed")
+        raise get_ssh_error(b"")
 
     def close(self):
         command = ["ssh", "-S", self.control_sock_path, "-O", "exit", self.host]
@@ -69,6 +72,7 @@ class RunnerTunnel(SSHTunnel):
         id_rsa: str,
         *,
         control_sock_path: Optional[PathLike] = None,
+        ssh_proxy: Optional[SSHConnectionParams] = None,
         disconnect_delay: int = 5,
     ):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -79,19 +83,37 @@ class RunnerTunnel(SSHTunnel):
             f.write(id_rsa)
         if control_sock_path is None:
             control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
-        super().__init__(
-            host=f"{user}@{hostname}",
-            id_rsa_path=id_rsa_path,
-            ports=ports,
-            control_sock_path=control_sock_path,
-            options={
+        options = {}
+        if ssh_proxy is not None:
+            proxy_command = ["ssh", "-i", id_rsa_path, "-W", "%h:%p"]
+            proxy_command += [
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+            ]
+            proxy_command += [
+                "-p",
+                str(ssh_proxy.port),
+                f"{ssh_proxy.username}@{ssh_proxy.hostname}",
+            ]
+            options["ProxyCommand"] = shlex.join(proxy_command)
+        options.update(
+            {
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
                 "ExitOnForwardFailure": "yes",
                 "ConnectTimeout": "1",
                 # "ControlPersist": f"{disconnect_delay}s",
-                "Port": ssh_port,
-            },
+                "Port": str(ssh_port),
+            }
+        )
+        super().__init__(
+            host=f"{user}@{hostname}",
+            id_rsa_path=id_rsa_path,
+            ports=ports,
+            control_sock_path=control_sock_path,
+            options=options,
         )
 
     # def close(self):
