@@ -81,8 +81,8 @@ class Gpu(BaseModel):
     name: Annotated[
         Optional[Union[str, List[str]]], Field(description="The GPU name or list of names")
     ] = None
-    count: Annotated[Range[int], Field(description="The number of GPUs")] = Range[int](
-        min=1, max=1
+    count: Annotated[Range[int], Field(description="The number of GPUs")] = parse_obj_as(
+        Range[int], "1"
     )
     memory: Annotated[
         Optional[Range[Memory]], Field(description="The VRAM size (e.g., 16GB)")
