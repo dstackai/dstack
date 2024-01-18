@@ -1,6 +1,6 @@
 from typing import Any, Generic, List, Optional, Tuple, TypeVar, Union
 
-from pydantic import BaseModel, Field, parse_obj_as
+from pydantic import BaseModel, Field, parse_obj_as, root_validator
 from pydantic.generics import GenericModel
 from typing_extensions import Annotated
 
@@ -30,6 +30,14 @@ class Range(GenericModel, Generic[T]):
         if isinstance(v, (str, int, float)):
             return dict(min=v, max=v)
         return v
+
+    @root_validator()
+    def min_ge_max(cls, values):
+        min = values.get("min")
+        max = values.get("max")
+        if min is not None and max is not None and min > max:
+            raise ValueError(f"Invalid range order: {min}..{max}")
+        return values
 
 
 class Memory(float):

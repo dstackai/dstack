@@ -68,6 +68,10 @@ class TestIntRange:
     def test_dict(self):
         assert parse_obj_as(Range[int], {"min": 1, "max": 3}).dict() == dict(min=1, max=3)
 
+    def test_unordered(self):
+        with pytest.raises(ValidationError):
+            parse_obj_as(Range[int], "3..1")
+
 
 class TestMemoryRange:
     def test_mb(self):
