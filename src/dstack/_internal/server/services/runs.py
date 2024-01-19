@@ -1,10 +1,10 @@
 import asyncio
 import itertools
-import math
 import uuid
 from datetime import timezone
 from typing import List, Optional
 
+import pydantic
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -32,7 +32,10 @@ from dstack._internal.server.services.jobs import (
     stop_job,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
+
+logger = get_logger(__name__)
 
 
 async def list_user_runs(
@@ -80,7 +83,17 @@ async def list_project_runs(
         select(RunModel).where(*filters).options(joinedload(RunModel.user))
     )
     run_models = res.scalars().all()
-    return [run_model_to_run(r) for r in run_models]
+    runs = []
+    for r in run_models:
+        try:
+            runs.append(run_model_to_run(r))
+        except pydantic.ValidationError:
+            pass
+    if len(run_models) > len(runs):
+        logger.debug(
+            "Can't load %s runs from project %s", len(run_models) - len(runs), project.name
+        )
+    return runs
 
 
 async def get_run(

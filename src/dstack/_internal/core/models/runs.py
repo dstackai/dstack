@@ -86,12 +86,15 @@ class Requirements(BaseModel):
             cpus=self.resources.cpu.min, memory=self.resources.memory.min * 1024
         )  # TODO(egor-s): min?
         if self.resources.gpu:
+            gpu = self.resources.gpu
             resources.update(
-                gpu_name=self.resources.gpu.name,
-                gpu_count=self.resources.gpu.count.min,  # TODO(egor-s): min?
-                gpu_memory=self.resources.gpu.memory.min * 1024,  # TODO(egor-s): min?
-                total_gpu_memory=self.resources.gpu.total_memory.min * 1024,  # TODO(egor-s): min?
-                compute_capability=self.resources.gpu.compute_capability,
+                gpu_name=gpu.name,
+                gpu_count=gpu.count.min,  # TODO(egor-s): min?
+                gpu_memory=gpu.memory.min * 1024 if gpu.memory else None,  # TODO(egor-s): min?
+                total_gpu_memory=gpu.total_memory.min * 1024
+                if gpu.total_memory
+                else None,  # TODO(egor-s): min?
+                compute_capability=gpu.compute_capability,
             )
         if self.resources.disk:
             resources.update(
