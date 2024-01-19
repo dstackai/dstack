@@ -1,12 +1,8 @@
 import argparse
 import os
-import re
-from typing import Dict
 
 from dstack._internal.core.models.profiles import (
     Profile,
-    ProfileDisk,
-    ProfileGPU,
     ProfileRetryPolicy,
     SpotPolicy,
     parse_duration,
@@ -22,20 +18,6 @@ def register_profile_args(parser: argparse.ArgumentParser):
         help="The name of the profile. Defaults to [code]$DSTACK_PROFILE[/]",
         default=os.getenv("DSTACK_PROFILE"),
         dest="profile",
-    )
-    profile_group.add_argument(
-        "--gpu",
-        metavar="SPEC",
-        type=gpu_spec,
-        help="Request a GPU for the run. The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
-        dest="gpu_spec",
-    )
-    profile_group.add_argument(
-        "--disk",
-        metavar="SIZE",
-        type=str,
-        help="Request the minimum size of disk for the run. Example [code]--disk 100GB[/].",
-        dest="disk_size",
     )
     profile_group.add_argument(
         "--max-price",
@@ -99,14 +81,6 @@ def register_profile_args(parser: argparse.ArgumentParser):
 
 
 def apply_profile_args(args: argparse.Namespace, profile: Profile):
-    if args.gpu_spec is not None:
-        gpu = (profile.resources.gpu or ProfileGPU()).dict(exclude_defaults=True)
-        gpu.update(args.gpu_spec)
-        profile.resources.gpu = ProfileGPU.parse_obj(gpu)
-    if args.disk_size is not None:
-        disk = (profile.resources.disk or ProfileDisk()).dict(exclude_defaults=True)
-        disk["size"] = args.disk_size
-        profile.resources.disk = ProfileDisk.parse_obj(disk)
     if args.max_price is not None:
         profile.max_price = args.max_price
     if args.max_duration is not None:
@@ -126,24 +100,6 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile):
             profile.retry_policy = ProfileRetryPolicy()
         profile.retry_policy.retry = True
         profile.retry_policy.limit = args.retry_limit
-
-
-def gpu_spec(v: str) -> Dict[str, str]:
-    patterns = {
-        "name": r"^[a-z].+$",  # GPU name starts with a letter
-        "count": r"^\d+$",  # Count contains digits only
-        "memory": r"^\d+(mb|gb)$",  # Memory has a suffix
-    }
-    data = {}
-    for part in v.split(":"):
-        for key, pattern in patterns.items():
-            if re.match(pattern, part.lower()) is not None:
-                data[key] = part
-                patterns.pop(key)  # every field could be used at most once
-                break
-        else:
-            raise ValueError(part)
-    return data
 
 
 def max_duration(v: str) -> int:

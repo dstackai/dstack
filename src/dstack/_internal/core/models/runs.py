@@ -10,6 +10,7 @@ from dstack._internal.core.models.configurations import AnyRunConfiguration, Reg
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability, InstanceType
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos import AnyRunRepoData
+from dstack._internal.core.models.resources import Resources
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import pretty_resources
 
@@ -76,27 +77,25 @@ class DiskRequirements(BaseModel):
 
 class Requirements(BaseModel):
     # TODO: Make requirements' fields required
-    cpus: Optional[int]
-    memory_mib: Optional[int]
-    gpus: Optional[GpusRequirements]
-    shm_size_mib: Optional[int]
+    resources: Resources
     max_price: Optional[float]
     spot: Optional[bool]
-    disk: Optional[DiskRequirements]
 
     def pretty_format(self, resources_only: bool = False):
-        resources = dict(cpus=self.cpus, memory=self.memory_mib)
-        if self.gpus:
+        resources = dict(
+            cpus=self.resources.cpu.min, memory=self.resources.memory.min * 1024
+        )  # TODO(egor-s): min?
+        if self.resources.gpu:
             resources.update(
-                gpu_name=self.gpus.name,
-                gpu_count=self.gpus.count,
-                gpu_memory=self.gpus.memory_mib,
-                total_gpu_memory=self.gpus.total_memory_mib,
-                compute_capability=self.gpus.compute_capability,
+                gpu_name=self.resources.gpu.name,
+                gpu_count=self.resources.gpu.count.min,  # TODO(egor-s): min?
+                gpu_memory=self.resources.gpu.memory.min * 1024,  # TODO(egor-s): min?
+                total_gpu_memory=self.resources.gpu.total_memory.min * 1024,  # TODO(egor-s): min?
+                compute_capability=self.resources.gpu.compute_capability,
             )
-        if self.disk:
+        if self.resources.disk:
             resources.update(
-                disk_size=self.disk.size_mib,
+                disk_size=self.resources.disk.size.min,  # TODO(egor-s): min?
             )
         res = pretty_resources(**resources)
         if not resources_only:

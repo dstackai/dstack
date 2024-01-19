@@ -1,10 +1,14 @@
-from typing import Any, Generic, List, Optional, Tuple, TypeVar
+from typing import Any, Generic, List, Optional, Tuple, TypeVar, Union
 
-from pydantic import Field, parse_obj_as, root_validator
+from pydantic import Field, parse_obj_as, root_validator, validator
 from pydantic.generics import GenericModel
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import ForbidExtra
+
+# TODO(egor-s): add docstrings for API
+# TODO(egor-s): polish json schema
+
 
 T = TypeVar("T")
 
@@ -87,8 +91,10 @@ class ComputeCapability(Tuple[int, int]):
         raise ValueError(f"Invalid compute capability: {v}")
 
 
-class Gpu(ForbidExtra):
-    name: Annotated[Optional[List[str]], Field(description="The GPU name or list of names")] = None
+class GPU(ForbidExtra):
+    name: Annotated[
+        Optional[Union[List[str], str]], Field(description="The GPU name or list of names")
+    ] = None
     count: Annotated[Range[int], Field(description="The number of GPUs")] = None
     memory: Annotated[
         Optional[Range[Memory]], Field(description="The VRAM size (e.g., 16GB)")
@@ -133,6 +139,27 @@ class Gpu(ForbidExtra):
             return spec
         return v
 
+    @validator("name", pre=True)
+    def _validate_name(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [v]
+        return v
+
+
+class Disk(ForbidExtra):
+    size: Annotated[Range[Memory], Field(description="The disk size (e.g., 100GB)")]
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls._parse
+        yield cls.validate
+
+    @classmethod
+    def _parse(cls, v: Any) -> Any:
+        if isinstance(v, (str, int, float)):
+            return {"size": v}
+        return v
+
 
 class Resources(ForbidExtra):
     cpu: Annotated[
@@ -141,7 +168,13 @@ class Resources(ForbidExtra):
     memory: Annotated[
         Optional[Range[Memory]], Field(description="The RAM size (e.g., 8GB)")
     ] = parse_obj_as(Range[Memory], "8GB..")
-    gpu: Annotated[Optional[Gpu], Field(description="The GPU resources")] = None
-    disk: Annotated[
-        Optional[Range[Memory]], Field(description="The disk size (e.g., 100GB)")
-    ] = parse_obj_as(Range[Memory], "100GB..")
+    shm_size: Annotated[
+        Optional[Memory],
+        Field(
+            description="The size of shared memory (e.g., 8GB). "
+            "If you are using parallel communicating processes (e.g., dataloaders in PyTorch), "
+            "you may need to configure this."
+        ),
+    ] = None
+    gpu: Annotated[Optional[GPU], Field(description="The GPU resources")] = None
+    disk: Annotated[Disk, Field(description="The disk resources")] = None
