@@ -47,8 +47,8 @@ def catalog_item_to_offer(
     disk_size_mib = round(
         item.disk_size * 1024
         if item.disk_size
-        else requirements.disk.size_mib
-        if requirements and requirements.disk and requirements.disk.size_mib
+        else requirements.resources.disk.size.min * 1024
+        if requirements and requirements.resources.disk
         else 102400  # TODO: Make requirements' fields required
     )
     resources = Resources(
@@ -74,21 +74,33 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
     q = gpuhunt.QueryFilter()
     if req is None:
         return q
-    q.min_cpu = req.cpus
+
     q.max_price = req.max_price
-    q.min_disk_size = req.disk.size_mib / 1024 if req.disk and req.disk.size_mib else None
     q.spot = req.spot
-    if req.memory_mib is not None:
-        q.min_memory = req.memory_mib / 1024
-    if req.gpus is not None:
-        if req.gpus.name is not None:
-            q.gpu_name = [req.gpus.name]
-        if req.gpus.memory_mib is not None:
-            q.min_gpu_memory = req.gpus.memory_mib / 1024
-        if req.gpus.count is not None:
-            q.min_gpu_count = req.gpus.count
-        if req.gpus.total_memory_mib is not None:
-            q.min_total_gpu_memory = req.gpus.total_memory_mib / 1024
-        if req.gpus.compute_capability is not None:
-            q.min_compute_capability = req.gpus.compute_capability
+
+    res = req.resources
+    if res.cpu:
+        q.min_cpu = res.cpu.min
+        q.max_cpu = res.cpu.max
+    if res.memory:
+        q.min_memory = res.memory.min
+        q.max_memory = res.memory.max
+    if res.disk:
+        q.min_disk_size = res.disk.size.min
+        q.max_disk_size = res.disk.size.max
+
+    if res.gpu:
+        q.gpu_name = res.gpu.name
+        if res.gpu.memory:
+            q.min_gpu_memory = res.gpu.memory.min
+            q.max_gpu_memory = res.gpu.memory.max
+        if res.gpu.count:
+            q.min_gpu_count = res.gpu.count.min
+            q.max_gpu_count = res.gpu.count.max
+        if res.gpu.total_memory:
+            q.min_total_gpu_memory = res.gpu.total_memory.min
+            q.max_total_gpu_memory = res.gpu.total_memory.max
+        if res.gpu.compute_capability:
+            q.min_compute_capability = res.gpu.compute_capability
+
     return q
