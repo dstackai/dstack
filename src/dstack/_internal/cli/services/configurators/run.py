@@ -57,7 +57,7 @@ class BaseRunConfigurator:
                 conf.env[k] = v
         if args.gpu_spec:
             gpu = (conf.resources.gpu or resources.GPU()).dict()
-            gpu.update(args.gpu_spec.dict(exclude_defaults=True))
+            gpu.update(args.gpu_spec)
             conf.resources.gpu = resources.GPU.parse_obj(gpu)
         if args.disk_spec:
             conf.resources.disk = args.disk_spec
@@ -139,8 +139,8 @@ def env_var(v: str) -> Tuple[str, str]:
     return key, value
 
 
-def gpu_spec(v: str) -> resources.GPU:
-    return parse_obj_as(resources.GPU, v)
+def gpu_spec(v: str) -> Dict:
+    return resources.GPU.parse(v)
 
 
 def disk_spec(v: str) -> resources.Disk:

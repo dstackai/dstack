@@ -1,4 +1,4 @@
-from typing import Any, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from pydantic import Field, parse_obj_as, root_validator, validator
 from pydantic.generics import GenericModel
@@ -45,6 +45,13 @@ class Range(GenericModel, Generic[T]):
             raise ValueError(f"Invalid range order: {min}..{max}")
         return values
 
+    def __str__(self):
+        min = repr(self.min) if self.min is not None else ""
+        max = repr(self.max) if self.max is not None else ""
+        if min == max:
+            return min
+        return f"{min}..{max}"
+
 
 class Memory(float):
     """
@@ -57,10 +64,8 @@ class Memory(float):
 
     @classmethod
     def validate(cls, v: Any) -> float:
-        if isinstance(v, float):
-            return v
-        if isinstance(v, int):
-            return float(v)
+        if isinstance(v, (float, int)):
+            return cls(v)
         if isinstance(v, str):
             v = v.replace(" ", "").lower()
             if v.endswith("tb"):
@@ -71,6 +76,9 @@ class Memory(float):
                 return cls(v[:-2]) / 1024
             return cls(v)
         raise ValueError(f"Invalid memory size: {v}")
+
+    def __repr__(self):
+        return f"{self:g}GB"
 
 
 class ComputeCapability(Tuple[int, int]):
@@ -90,12 +98,15 @@ class ComputeCapability(Tuple[int, int]):
             return int(v[0]), int(v[1])
         raise ValueError(f"Invalid compute capability: {v}")
 
+    def __str__(self):
+        return f"{self[0]}.{self[1]}"
+
 
 class GPU(ForbidExtra):
-    name: Annotated[
-        Optional[Union[List[str], str]], Field(description="The GPU name or list of names")
-    ] = None
-    count: Annotated[Range[int], Field(description="The number of GPUs")] = None
+    name: Annotated[Optional[List[str]], Field(description="The GPU name or list of names")] = None
+    count: Annotated[Range[int], Field(description="The number of GPUs")] = parse_obj_as(
+        Range[int], 1
+    )
     memory: Annotated[
         Optional[Range[Memory]], Field(description="The VRAM size (e.g., 16GB)")
     ] = None
@@ -109,31 +120,31 @@ class GPU(ForbidExtra):
 
     @classmethod
     def __get_validators__(cls):
-        yield cls._parse
+        yield cls.parse
         yield cls.validate
 
     @classmethod
-    def _parse(cls, v: Any) -> Any:
+    def parse(cls, v: Any) -> Any:
         if isinstance(v, int):
             v = str(v)
         if isinstance(v, str):
             tokens = v.replace(" ", "").split(":")
-            spec = {"name": None, "count": None, "memory": None}
+            spec = {}
             for token in tokens:
                 if not token:
                     raise ValueError(f"GPU spec contains empty token: {v}")
                 elif token[0].isalpha():  # GPU name is always starts with a letter
-                    if spec["name"] is not None:
+                    if "name" in spec:
                         raise ValueError(f"GPU spec name conflict: {v}")
                     spec["name"] = token.split(",")
                     if any(not name for name in spec["name"]):
                         raise ValueError(f"GPU name can not be empty: {v}")
                 elif any(c.isalpha() for c in token):  # memory must have a unit
-                    if spec["memory"] is not None:
+                    if "memory" is spec:
                         raise ValueError(f"GPU spec memory conflict: {v}")
                     spec["memory"] = token
                 else:  # count otherwise
-                    if spec["count"] is not None:
+                    if "count" in spec:
                         raise ValueError(f"GPU spec count conflict: {v}")
                     spec["count"] = token
             return spec

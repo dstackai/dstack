@@ -82,24 +82,18 @@ class Requirements(BaseModel):
     spot: Optional[bool]
 
     def pretty_format(self, resources_only: bool = False):
-        resources = dict(
-            cpus=self.resources.cpu.min, memory=self.resources.memory.min * 1024
-        )  # TODO(egor-s): min?
+        resources = dict(cpus=self.resources.cpu, memory=self.resources.memory)
         if self.resources.gpu:
             gpu = self.resources.gpu
             resources.update(
-                gpu_name=gpu.name,
-                gpu_count=gpu.count.min,  # TODO(egor-s): min?
-                gpu_memory=gpu.memory.min * 1024 if gpu.memory else None,  # TODO(egor-s): min?
-                total_gpu_memory=gpu.total_memory.min * 1024
-                if gpu.total_memory
-                else None,  # TODO(egor-s): min?
+                gpu_name=",".join(gpu.name) if gpu.name else None,
+                gpu_count=gpu.count,
+                gpu_memory=gpu.memory,
+                total_gpu_memory=gpu.total_memory,
                 compute_capability=gpu.compute_capability,
             )
         if self.resources.disk:
-            resources.update(
-                disk_size=self.resources.disk.size.min,  # TODO(egor-s): min?
-            )
+            resources.update(disk_size=self.resources.disk.size)
         res = pretty_resources(**resources)
         if not resources_only:
             if self.spot is not None:
