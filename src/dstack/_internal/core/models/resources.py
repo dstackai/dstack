@@ -1,12 +1,26 @@
-from typing import Any, Generic, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Generic, List, Optional, Tuple, TypeVar, Union
 
 from pydantic import Field, root_validator, validator
+from pydantic.fields import ModelField
 from pydantic.generics import GenericModel
-from typing_extensions import Annotated
+from typing_extensions import Annotated, get_args, get_origin
 
 from dstack._internal.core.models.common import ForbidExtra
 
 # TODO(egor-s): add docstrings for API
+
+
+def force_type(v: Any, field: ModelField) -> Any:
+    """
+    Force the first argument of the Union.
+    The rest of the options are presented for flexible typing only.
+    """
+    origin, args = get_origin(field.type_), get_args(field.type_)
+    if origin is Union:
+        # this check is safe for required fields too
+        if not isinstance(v, (args[0], type(None))):
+            raise ValueError("Invalid type")
+    return v
 
 
 T = TypeVar("T", bound=Union[int, float])
@@ -15,7 +29,8 @@ T = TypeVar("T", bound=Union[int, float])
 class Range(GenericModel, Generic[T]):
     min: Optional[Union[T, float, int, str]]
     max: Optional[Union[T, float, int, str]]
-    _type: Type[T]
+
+    _force_type = validator("*", allow_reuse=True)(force_type)
 
     class Config:
         extra = "forbid"
@@ -29,8 +44,6 @@ class Range(GenericModel, Generic[T]):
     def _parse(cls, v: Any) -> Any:
         if isinstance(v, str) and ".." in v:
             v = v.replace(" ", "")
-            if v == "..":
-                raise ValueError("Invalid range: ..")
             min, max = v.split("..")
             return dict(min=min or None, max=max or None)
         if isinstance(v, (str, int, float)):
@@ -40,22 +53,17 @@ class Range(GenericModel, Generic[T]):
     @root_validator()
     def _post_validate(cls, values):
         min = values.get("min")
-        if min is not None and not isinstance(min, cls._type):
-            raise ValueError(f"Invalid min type")
-
         max = values.get("max")
-        if max is not None and not isinstance(max, cls._type):
-            raise ValueError(f"Invalid max type")
 
         if min is None and max is None:
-            raise ValueError("Invalid range: ..")
+            raise ValueError("Invalid empty range: ..")
         if min is not None and max is not None and min > max:
             raise ValueError(f"Invalid range order: {min}..{max}")
         return values
 
     def __str__(self):
-        min = repr(self.min) if self.min is not None else ""
-        max = repr(self.max) if self.max is not None else ""
+        min = self.min if self.min is not None else ""
+        max = self.max if self.max is not None else ""
         if min == max:
             return min
         return f"{min}..{max}"
@@ -110,27 +118,29 @@ class ComputeCapability(Tuple[int, int]):
         return f"{self[0]}.{self[1]}"
 
 
-class RangeInt(Range[int]):
-    _type = int
-
-
-class RangeMemory(Range[Memory]):
-    _type = Memory
-
-
 class GPU(ForbidExtra):
-    name: Annotated[Optional[List[str]], Field(description="The GPU name or list of names")] = None
-    count: Annotated[RangeInt, Field(description="The number of GPUs")] = RangeInt(min=1, max=1)
+    name: Annotated[
+        Optional[Union[List[str], str]], Field(description="The GPU name or list of names")
+    ] = None
+    count: Annotated[Union[Range[int], int, str], Field(description="The number of GPUs")] = Range[
+        int
+    ](min=1, max=1)
     memory: Annotated[
-        Optional[RangeMemory], Field(description="The VRAM size (e.g., 16GB)")
+        Optional[Union[Range[Memory], float, int, str]],
+        Field(description="The VRAM size (e.g., 16GB)"),
     ] = None
     total_memory: Annotated[
-        Optional[RangeMemory], Field(description="The total VRAM size (e.g., 32GB)")
+        Optional[Union[Range[Memory], float, int, str]],
+        Field(description="The total VRAM size (e.g., 32GB)"),
     ] = None
     compute_capability: Annotated[
-        Optional[ComputeCapability],
+        Optional[Union[ComputeCapability, float, str]],
         Field(description="The minimum compute capability of the GPU (e.g., 7.5)"),
     ] = None
+
+    _force_type = validator(
+        "count", "memory", "total_memory", "compute_capability", allow_reuse=True
+    )(force_type)
 
     @classmethod
     def __get_validators__(cls):
@@ -166,13 +176,17 @@ class GPU(ForbidExtra):
 
     @validator("name", pre=True)
     def _validate_name(cls, v: Any) -> Any:
-        if isinstance(v, str):
+        if not isinstance(v, list):
             return [v]
         return v
 
 
 class Disk(ForbidExtra):
-    size: Annotated[RangeMemory, Field(description="The disk size (e.g., 100GB)")]
+    size: Annotated[
+        Union[Range[Memory], float, int, str], Field(description="The disk size (e.g., 100GB)")
+    ]
+
+    _force_type = validator("size", allow_reuse=True)(force_type)
 
     @classmethod
     def __get_validators__(cls):
@@ -187,19 +201,26 @@ class Disk(ForbidExtra):
 
 
 class Resources(ForbidExtra):
-    cpu: Annotated[Optional[RangeInt], Field(description="The number of CPU cores")] = RangeInt(
-        min=2
-    )
+    cpu: Annotated[
+        Optional[Union[Range[int], int, str]], Field(description="The number of CPU cores")
+    ] = Range[int](min=2)
     memory: Annotated[
-        Optional[RangeMemory], Field(description="The RAM size (e.g., 8GB)")
-    ] = RangeMemory(min="8GB")
+        Optional[Union[Range[Memory], float, int, str]],
+        Field(description="The RAM size (e.g., 8GB)"),
+    ] = Range[Memory](min="8GB")
     shm_size: Annotated[
-        Optional[Memory],
+        Optional[Union[Memory, float, int, str]],
         Field(
             description="The size of shared memory (e.g., 8GB). "
             "If you are using parallel communicating processes (e.g., dataloaders in PyTorch), "
             "you may need to configure this."
         ),
     ] = None
-    gpu: Annotated[Optional[GPU], Field(description="The GPU resources")] = None
-    disk: Annotated[Disk, Field(description="The disk resources")] = None
+    gpu: Annotated[Optional[Union[GPU, int, str]], Field(description="The GPU resources")] = None
+    disk: Annotated[
+        Optional[Union[Disk, float, int, str]], Field(description="The disk resources")
+    ] = None
+
+    _force_type = validator("cpu", "memory", "shm_size", "gpu", "disk", allow_reuse=True)(
+        force_type
+    )
