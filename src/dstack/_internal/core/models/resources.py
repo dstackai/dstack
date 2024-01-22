@@ -1,21 +1,21 @@
-from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Generic, List, Optional, Tuple, Type, TypeVar, Union
 
-from pydantic import Field, parse_obj_as, root_validator, validator
+from pydantic import Field, root_validator, validator
 from pydantic.generics import GenericModel
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import ForbidExtra
 
 # TODO(egor-s): add docstrings for API
-# TODO(egor-s): polish json schema
 
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Union[int, float])
 
 
 class Range(GenericModel, Generic[T]):
-    min: Optional[T]
-    max: Optional[T]
+    min: Optional[Union[T, float, int, str]]
+    max: Optional[Union[T, float, int, str]]
+    _type: Type[T]
 
     class Config:
         extra = "forbid"
@@ -38,9 +38,17 @@ class Range(GenericModel, Generic[T]):
         return v
 
     @root_validator()
-    def min_ge_max(cls, values):
+    def _post_validate(cls, values):
         min = values.get("min")
+        if min is not None and not isinstance(min, cls._type):
+            raise ValueError(f"Invalid min type")
+
         max = values.get("max")
+        if max is not None and not isinstance(max, cls._type):
+            raise ValueError(f"Invalid max type")
+
+        if min is None and max is None:
+            raise ValueError("Invalid range: ..")
         if min is not None and max is not None and min > max:
             raise ValueError(f"Invalid range order: {min}..{max}")
         return values
@@ -63,17 +71,17 @@ class Memory(float):
         yield cls.validate
 
     @classmethod
-    def validate(cls, v: Any) -> float:
+    def validate(cls, v: Any) -> "Memory":
         if isinstance(v, (float, int)):
             return cls(v)
         if isinstance(v, str):
             v = v.replace(" ", "").lower()
             if v.endswith("tb"):
-                return cls(v[:-2]) * 1024
+                return cls(float(v[:-2]) * 1024)
             if v.endswith("gb"):
                 return cls(v[:-2])
             if v.endswith("mb"):
-                return cls(v[:-2]) / 1024
+                return cls(float(v[:-2]) / 1024)
             return cls(v)
         raise ValueError(f"Invalid memory size: {v}")
 
@@ -102,16 +110,22 @@ class ComputeCapability(Tuple[int, int]):
         return f"{self[0]}.{self[1]}"
 
 
+class RangeInt(Range[int]):
+    _type = int
+
+
+class RangeMemory(Range[Memory]):
+    _type = Memory
+
+
 class GPU(ForbidExtra):
     name: Annotated[Optional[List[str]], Field(description="The GPU name or list of names")] = None
-    count: Annotated[Range[int], Field(description="The number of GPUs")] = parse_obj_as(
-        Range[int], 1
-    )
+    count: Annotated[RangeInt, Field(description="The number of GPUs")] = RangeInt(min=1, max=1)
     memory: Annotated[
-        Optional[Range[Memory]], Field(description="The VRAM size (e.g., 16GB)")
+        Optional[RangeMemory], Field(description="The VRAM size (e.g., 16GB)")
     ] = None
     total_memory: Annotated[
-        Optional[Range[Memory]], Field(description="The total VRAM size (e.g., 32GB)")
+        Optional[RangeMemory], Field(description="The total VRAM size (e.g., 32GB)")
     ] = None
     compute_capability: Annotated[
         Optional[ComputeCapability],
@@ -140,7 +154,7 @@ class GPU(ForbidExtra):
                     if any(not name for name in spec["name"]):
                         raise ValueError(f"GPU name can not be empty: {v}")
                 elif any(c.isalpha() for c in token):  # memory must have a unit
-                    if "memory" is spec:
+                    if "memory" in spec:
                         raise ValueError(f"GPU spec memory conflict: {v}")
                     spec["memory"] = token
                 else:  # count otherwise
@@ -158,7 +172,7 @@ class GPU(ForbidExtra):
 
 
 class Disk(ForbidExtra):
-    size: Annotated[Range[Memory], Field(description="The disk size (e.g., 100GB)")]
+    size: Annotated[RangeMemory, Field(description="The disk size (e.g., 100GB)")]
 
     @classmethod
     def __get_validators__(cls):
@@ -173,12 +187,12 @@ class Disk(ForbidExtra):
 
 
 class Resources(ForbidExtra):
-    cpu: Annotated[
-        Optional[Range[int]], Field(description="The number of CPU cores")
-    ] = parse_obj_as(Range[int], "2..")
+    cpu: Annotated[Optional[RangeInt], Field(description="The number of CPU cores")] = RangeInt(
+        min=2
+    )
     memory: Annotated[
-        Optional[Range[Memory]], Field(description="The RAM size (e.g., 8GB)")
-    ] = parse_obj_as(Range[Memory], "8GB..")
+        Optional[RangeMemory], Field(description="The RAM size (e.g., 8GB)")
+    ] = RangeMemory(min="8GB")
     shm_size: Annotated[
         Optional[Memory],
         Field(
