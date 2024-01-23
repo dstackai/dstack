@@ -22,20 +22,19 @@ Orchestrate GPU workloads effortlessly on any cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source toolkit and orchestration engine for running GPU workloads 
-on any cloud. 
+`dstack` is an open-source toolkit and orchestration engine for running GPU workloads. 
+It's designed for development, training, and deployment of gen AI models on any cloud.
 
 Supported providers: AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, and DataCrunch.
 
 ## Latest news ✨
 
+- [2024/01] [dstack 0.14.0rc1: OpenAI-compatible endpoints](https://dstack.ai/blog/2024/01/19/openai-endpoints-preview/) (Preview)
 - [2023/12] [dstack 0.13.0: Disk size, CUDA 12.1, Mixtral, and more](https://dstack.ai/blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more/) (Release)
 - [2023/11] [dstack 0.12.3: Vast.ai integration](https://dstack.ai/blog/2023/11/21/vastai/) (Release)
 - [2023/10] [dstack 0.12.2: TensorDock integration](https://dstack.ai/blog/2023/10/31/tensordock/) (Release)
 - [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/examples/llama-index/) (Example)
 - [2023/08] [Fine-tuning with QLoRA](https://dstack.ai/examples/qlora/) (Example)
-- [2023/07] [Deploying with TGI](https://dstack.ai/examples/tgi) (Example)
-- [2023/07] [Deploying with vLLM](https://dstack.ai/examples/vllm) (Example)
 
 ## Installation
 
@@ -76,6 +75,29 @@ The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
 
 > **Note**
 > It's also possible to run the server via [Docker](https://hub.docker.com/r/dstackai/dstack).
+
+### CLI & API
+
+Once the server is up, you can use either `dstack`'s CLI or API to run workloads.
+Below is a live demo of how it works with the CLI.
+
+### Dev environments
+
+Dev environments allow you to quickly provision a machine with a pre-configured environment, resources, IDE, code, etc.
+
+<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif" width="650"/>
+
+### Tasks
+
+Tasks make it very easy to run any scripts, be it for training, data processing, or web apps. They allow you to pre-configure the environment, resources, code, etc.
+
+<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="650"/>
+
+### Services
+
+Services make it easy to deploy models and apps cost-effectively as public endpoints, allowing you to use any frameworks.
+
+<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service.gif" width="650"/>
 
 ## More information
 

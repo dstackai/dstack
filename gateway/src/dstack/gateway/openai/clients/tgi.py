@@ -6,6 +6,7 @@ from typing import AsyncIterator, Dict, List, Optional
 
 import httpx
 import jinja2
+import jinja2.sandbox
 
 from dstack.gateway.errors import GatewayError
 from dstack.gateway.openai.clients import ChatCompletionsClient
@@ -31,8 +32,16 @@ class TGIChatCompletions(ChatCompletionsClient):
             headers={} if host is None else {"Host": host},
             timeout=60,
         )
-        self.chat_template = jinja2.Template(chat_template)
         self.eos_token = eos_token
+
+        try:
+            jinja_env = jinja2.sandbox.ImmutableSandboxedEnvironment(
+                trim_blocks=True, lstrip_blocks=True
+            )
+            jinja_env.globals["raise_exception"] = raise_exception
+            self.chat_template = jinja_env.from_string(chat_template)
+        except jinja2.TemplateError as e:
+            raise GatewayError(f"Failed to compile chat template: {e}")
 
     async def generate(self, request: ChatCompletionsRequest) -> ChatCompletionsResponse:
         payload = self.get_payload(request)
@@ -123,10 +132,14 @@ class TGIChatCompletions(ChatCompletionsClient):
                     yield chunk
 
     def get_payload(self, request: ChatCompletionsRequest) -> Dict:
-        inputs = self.chat_template.render(
-            messages=request.messages,
-            add_generation_prompt=True,
-        )
+        try:
+            inputs = self.chat_template.render(
+                messages=request.messages,
+                add_generation_prompt=True,
+            )
+        except jinja2.TemplateError as e:
+            raise GatewayError(f"Failed to render chat template: {e}")
+
         stop = ([request.stop] if isinstance(request.stop, str) else request.stop) or []
         if self.eos_token not in stop:
             stop.append(self.eos_token)
@@ -178,3 +191,7 @@ class AsyncClientWrapper(httpx.AsyncClient):
             asyncio.get_running_loop().create_task(self.aclose())
         except Exception:
             pass
+
+
+def raise_exception(message: str):
+    raise jinja2.TemplateError(message)
