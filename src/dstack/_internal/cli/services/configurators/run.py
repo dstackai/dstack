@@ -3,6 +3,9 @@ import re
 import subprocess
 from typing import Dict, List, Optional, Tuple, Type
 
+from pydantic import parse_obj_as
+
+import dstack._internal.core.models.resources as resources
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import (
@@ -31,12 +34,33 @@ class BaseRunConfigurator:
             dest="envs",
             metavar="KEY=VALUE",
         )
+        parser.add_argument(
+            "--gpu",
+            type=gpu_spec,
+            help="Request GPU for the run. "
+            "The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
+            dest="gpu_spec",
+            metavar="SPEC",
+        )
+        parser.add_argument(
+            "--disk",
+            type=disk_spec,
+            help="Request the size range of disk for the run. Example [code]--disk 100GB..[/].",
+            metavar="RANGE",
+            dest="disk_spec",
+        )
 
     @classmethod
     def apply(cls, args: argparse.Namespace, unknown: List[str], conf: BaseConfiguration):
         if args.envs:
             for k, v in args.envs:
                 conf.env[k] = v
+        if args.gpu_spec:
+            gpu = (conf.resources.gpu or resources.GPU()).dict()
+            gpu.update(args.gpu_spec)
+            conf.resources.gpu = resources.GPU.parse_obj(gpu)
+        if args.disk_spec:
+            conf.resources.disk = args.disk_spec
 
         cls.interpolate_run_args(conf.setup, unknown)
 
@@ -113,6 +137,14 @@ def env_var(v: str) -> Tuple[str, str]:
         raise ValueError(v)
     key, value = r.groups()
     return key, value
+
+
+def gpu_spec(v: str) -> Dict:
+    return resources.GPU.parse(v)
+
+
+def disk_spec(v: str) -> resources.Disk:
+    return parse_obj_as(resources.Disk, v)
 
 
 def port_mapping(v: str) -> PortMapping:
