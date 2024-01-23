@@ -18,6 +18,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, SpotPolicy
 from dstack._internal.core.models.repos.base import Repo
+from dstack._internal.core.models.resources import Resources
 from dstack._internal.core.models.runs import JobSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
 from dstack._internal.core.models.runs import Run as RunModel
@@ -311,6 +312,7 @@ class RunCollection:
         configuration_path: Optional[str] = None,
         repo: Optional[Repo] = None,
         backends: Optional[List[BackendType]] = None,
+        resources: Optional[Resources] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
         max_duration: Optional[Union[int, str]] = None,
@@ -327,6 +329,7 @@ class RunCollection:
             configuration_path: The path to the configuration file, relative to the root directory of the repo.
             repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): A repo to mount to the run.
             backends: A list of allowed backend for provisioning.
+            resources: The requirements to run the configuration. Overrides the configuration's resources.
             spot_policy: A spot policy for provisioning.
             retry_policy (RetryPolicy): A retry policy.
             max_duration: The max instance running duration in seconds.
@@ -350,6 +353,7 @@ class RunCollection:
             repo=repo,
             configuration_path=configuration_path,
             backends=backends,
+            resources=resources,
             spot_policy=spot_policy,
             retry_policy=retry_policy,
             max_duration=max_duration,
@@ -365,6 +369,7 @@ class RunCollection:
         repo: Repo,
         configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
+        resources: Optional[Resources] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
         max_duration: Optional[Union[int, str]] = None,
@@ -388,6 +393,10 @@ class RunCollection:
 
         if configuration_path is None:
             configuration_path = "(python)"
+
+        if resources is not None:
+            configuration = configuration.copy(deep=True)
+            configuration.resources = resources
 
         profile = Profile(
             name="(python)",

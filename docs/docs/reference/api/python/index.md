@@ -20,12 +20,12 @@ task = Task(
         "text-generation-launcher --trust-remote-code --quantize gptq",
     ],
     ports=["80"],
+    resources=Resources(gpu=GPU(memory="24GB")),
 )
 
 run = client.runs.submit(
     run_name="my-awesome-run",  # If not specified, a random name is assigned 
     configuration=task,
-    resources=Resources(gpu=GPU(memory="24GB")),
     repo=None, # Specify to mount additional files
 )
 
@@ -115,7 +115,7 @@ finally:
 
 ### `dstack.api.Resources` { ##dstack.api.Resources data-toc-label="Resources" }
 
-::: dstack.api._ProfileResources
+::: dstack.api.Resources
     options:
       show_bases: false
       show_root_heading: false
@@ -124,7 +124,7 @@ finally:
 
 ### `dstack.api.GPU` { ##dstack.api.GPU data-toc-label="GPU" }
 
-::: dstack.api._ProfileGPU
+::: dstack.api.GPU
     options:
       show_bases: false
       show_root_heading: false
@@ -133,7 +133,7 @@ finally:
 
 ### `dstack.api.Disk` { ##dstack.api.Disk data-toc-label="Disk" }
 
-::: dstack.api._ProfileDisk
+::: dstack.api.Disk
     options:
       show_bases: false
       show_root_heading: false

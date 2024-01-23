@@ -119,6 +119,17 @@ class ComputeCapability(Tuple[int, int]):
 
 
 class GPU(ForbidExtra):
+    """
+    The GPU spec
+
+    Attributes:
+        name (Optional[List[str]]): The name of the GPU (e.g., `"A100"` or `"H100"`)
+        count (Optional[Range[int]]): The number of GPUs
+        memory (Optional[Range[Memory]]): The size of a single GPU memory (e.g., `"16GB"`)
+        total_memory (Optional[Range[Memory]]): The total size of all GPUs memory (e.g., `"32GB"`)
+        compute_capability (Optional[float]): The minimum compute capability of the GPU (e.g., `7.5`)
+    """
+
     name: Annotated[
         Optional[Union[List[str], str]], Field(description="The GPU name or list of names")
     ] = None
@@ -182,6 +193,13 @@ class GPU(ForbidExtra):
 
 
 class Disk(ForbidExtra):
+    """
+    The disk spec
+
+    Attributes:
+        size (Range[Memory]): The size of the disk (e.g., `"100GB"`)
+    """
+
     size: Annotated[
         Union[Range[Memory], float, int, str], Field(description="The disk size (e.g., 100GB)")
     ]
@@ -201,6 +219,17 @@ class Disk(ForbidExtra):
 
 
 class Resources(ForbidExtra):
+    """
+    The minimum resources requirements for the run.
+
+    Attributes:
+        cpu (Optional[Range[int]]): The number of CPUs
+        memory (Optional[Range[Memory]]): The size of RAM memory (e.g., `"16GB"`)
+        gpu (Optional[GPU]): The GPU spec
+        shm_size (Optional[Range[Memory]]): The of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this.
+        disk (Optional[Disk]): The disk spec
+    """
+
     cpu: Annotated[
         Optional[Union[Range[int], int, str]], Field(description="The number of CPU cores")
     ] = Range[int](min=2)

@@ -165,6 +165,7 @@ class TaskConfiguration(BaseConfigurationWithPorts):
         entrypoint (Optional[str]): The Docker entrypoint
         registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
+        resources (Optional[Resources]): The requirements to run the configuration.
     """
 
     type: Literal["task"] = "task"
@@ -182,6 +183,7 @@ class ServiceConfiguration(BaseConfiguration):
         entrypoint (Optional[str]): The Docker entrypoint
         registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
+        resources (Optional[Resources]): The requirements to run the configuration.
     """
 
     type: Literal["service"] = "service"
