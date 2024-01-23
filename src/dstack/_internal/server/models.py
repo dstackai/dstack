@@ -246,7 +246,7 @@ class PoolModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    name: Mapped[str] = mapped_column(String(50), unique=True)
+    name: Mapped[str] = mapped_column(String(50))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
@@ -279,7 +279,7 @@ class InstanceModel(BaseModel):
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
 
-    termination_policy: Mapped[TerminationPolicy] = mapped_column(String(50))
+    termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(50))
     termination_idle_time: Mapped[Optional[str]] = mapped_column(String(50))
 
     job_provisioning_data: Mapped[str] = mapped_column(String(4000))

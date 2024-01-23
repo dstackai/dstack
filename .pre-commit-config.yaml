@@ -1,4 +1,8 @@
 repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.14
+    hooks:
+      - id: ruff
   - repo: https://github.com/psf/black
     rev: 22.12.0
     hooks:
@@ -10,3 +14,11 @@ repos:
       - id: isort
         name: isort (python)
         args: ['--settings-file', 'pyconfig.toml']
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+    - id: mypy
+      args: ['--strict', '--follow-imports=skip', '--ignore-missing-imports', '--python-version=3.8']
+      files: '.*pools?\.py'
+      exclude: 'versions|src/tests'
+      additional_dependencies: [types-PyYAML]

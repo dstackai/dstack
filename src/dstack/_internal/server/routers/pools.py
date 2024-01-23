@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Sequence, Tuple
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +7,7 @@ import dstack._internal.core.models.pools as models
 import dstack._internal.server.schemas.pools as schemas
 import dstack._internal.server.services.pools as pools
 from dstack._internal.server.db import get_session
-from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
 from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
 from dstack._internal.server.services.runs import (
@@ -19,7 +19,7 @@ from dstack._internal.server.services.runs import (
 router = APIRouter(prefix="/api/project/{project_name}/pool", tags=["pool"])
 
 
-@router.post("/list")
+@router.post("/list")  # type: ignore[misc]
 async def list_pool(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
@@ -28,12 +28,22 @@ async def list_pool(
     return await pools.list_project_pool(session=session, project=project)
 
 
-@router.post("/delete")
+@router.post("/remove")  # type: ignore[misc]
+async def remove_instance(
+    body: schemas.RemoveInstanceRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+) -> None:
+    _, project_model = user_project
+    await pools.remove_instance(session, project_model, body.pool_name, body.instance_name)
+
+
+@router.post("/delete")  # type: ignore[misc]
 async def delete_pool(
     body: schemas.DeletePoolRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-):
+) -> None:
     pool_name = body.name
     _, project_model = user_project
 
@@ -60,32 +70,32 @@ async def delete_pool(
     await pools.delete_pool(session, project_model, pool_name)
 
 
-@router.post("/create")
+@router.post("/create")  # type: ignore[misc]
 async def create_pool(
     body: schemas.CreatePoolRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-):
+) -> None:
     _, project = user_project
     await pools.create_pool_model(session=session, project=project, name=body.name)
 
 
-@router.post("/show")
+@router.post("/show")  # type: ignore[misc]
 async def how_pool(
     body: schemas.CreatePoolRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-):
+) -> Sequence[models.Instance]:
     _, project = user_project
     return await pools.show_pool(session, project, pool_name=body.name)
 
 
-@router.post("/add")
+@router.post("/add")  # type: ignore[misc]
 async def add_instance(
     body: AddRemoteInstanceRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-):
+) -> None:
     _, project = user_project
     await pools.add(
         session,

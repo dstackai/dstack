@@ -1,8 +1,8 @@
 """add pools
 
-Revision ID: 73a959f64596
+Revision ID: 6a084acc1211
 Revises: d3e8af4786fa
-Create Date: 2024-01-16 09:57:28.183650
+Create Date: 2024-01-25 10:23:18.983726
 
 """
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "73a959f64596"
+revision = "6a084acc1211"
 down_revision = "d3e8af4786fa"
 branch_labels = None
 depends_on = None
@@ -35,7 +35,6 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_pools")),
-        sa.UniqueConstraint("name", name=op.f("uq_pools_name")),
     )
     op.create_table(
         "instances",
@@ -66,7 +65,7 @@ def upgrade() -> None:
         sa.Column("status_message", sa.String(length=50), nullable=True),
         sa.Column("started_at", sa.DateTime(), nullable=True),
         sa.Column("finished_at", sa.DateTime(), nullable=True),
-        sa.Column("termination_policy", sa.String(length=50), nullable=False),
+        sa.Column("termination_policy", sa.String(length=50), nullable=True),
         sa.Column("termination_idle_time", sa.String(length=50), nullable=True),
         sa.Column("job_provisioning_data", sa.String(length=4000), nullable=False),
         sa.Column("offer", sa.String(length=4000), nullable=False),

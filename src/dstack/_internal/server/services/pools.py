@@ -1,6 +1,8 @@
 import asyncio
+from contextlib import asynccontextmanager, contextmanager
 from datetime import timezone
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Union
+from uuid import UUID
 
 from pydantic import parse_raw_as
 from sqlalchemy import select
@@ -11,6 +13,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceState,
     InstanceType,
     Resources,
 )
@@ -33,6 +36,21 @@ async def list_project_pool(session: AsyncSession, project: ProjectModel) -> Lis
     return [pool_model_to_pool(p) for p in pools]
 
 
+async def get_pool(
+    session: AsyncSession, project: ProjectModel, pool_name: str
+) -> Optional[PoolModel]:
+    pool = (
+        await session.scalars(
+            select(PoolModel).where(
+                PoolModel.name == pool_name,
+                PoolModel.project_id == project.id,
+                PoolModel.deleted == False,
+            )
+        )
+    ).one_or_none()
+    return pool
+
+
 def pool_model_to_pool(pool_model: PoolModel) -> Pool:
     return Pool(
         name=pool_model.name,
@@ -42,6 +60,14 @@ def pool_model_to_pool(pool_model: PoolModel) -> Pool:
 
 
 async def create_pool_model(session: AsyncSession, project: ProjectModel, name: str) -> PoolModel:
+    pools = await session.scalars(
+        select(PoolModel).where(
+            PoolModel.name == name, PoolModel.project == project, PoolModel.deleted == False
+        )
+    )
+    if pools.all():
+        raise ValueError("duplicate pool name")
+
     pool = PoolModel(
         name=name,
         project_id=project.id,
@@ -59,10 +85,32 @@ async def list_project_pool_models(
     pools = await session.scalars(
         select(PoolModel).where(PoolModel.project_id == project.id, PoolModel.deleted == False)
     )
-    return pools.all()
+    return pools.all()  # type: ignore[no-any-return]
 
 
-async def delete_pool(session: AsyncSession, project: ProjectModel, pool_name: str):
+async def remove_instance(
+    session: AsyncSession, project: ProjectModel, pool_name: str, instance_name: str
+) -> None:
+    pool = (
+        await session.scalars(
+            select(PoolModel).where(
+                PoolModel.name == pool_name,
+                PoolModel.project == project,
+                PoolModel.deleted == False,
+            )
+        )
+    ).one()
+    terminated = False
+    for instance in pool.instances:
+        if instance.name == instance_name:
+            instance.status = InstanceStatus.TERMINATING
+            terminated = True
+    if not terminated:
+        logger.warning("Couldn't fined instance to terminate")
+    await session.commit()
+
+
+async def delete_pool(session: AsyncSession, project: ProjectModel, pool_name: str) -> None:
     """delete the pool and set the default pool to project"""
 
     default_pool: Optional[PoolModel] = None
@@ -95,7 +143,7 @@ async def list_deleted_pools(
             PoolModel.project_id == project_model.id, PoolModel.deleted == True
         )
     )
-    return pools.all()
+    return pools.all()  # type: ignore[no-any-return]
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
@@ -151,10 +199,11 @@ async def get_pool_instances(
     result = res.unique().scalars().one_or_none()
     if result is None:
         return []
-    return result.instances
+    instances: List[InstanceModel] = result.instances
+    return instances
 
 
-async def get_instances_by_pool_id(session, pool_id: str) -> List[InstanceModel]:
+async def get_instances_by_pool_id(session: AsyncSession, pool_id: str) -> List[InstanceModel]:
     res = await session.execute(
         select(PoolModel)
         .where(
@@ -165,10 +214,11 @@ async def get_instances_by_pool_id(session, pool_id: str) -> List[InstanceModel]
     result = res.unique().scalars().one_or_none()
     if result is None:
         return []
-    return result.instances
+    instances: List[InstanceModel] = result.instances
+    return instances
 
 
-_GENERATE_POOL_NAME_LOCK = {}
+_GENERATE_POOL_NAME_LOCK: Dict[str, asyncio.Lock] = {}
 
 
 async def generate_instance_name(
@@ -193,7 +243,7 @@ async def add(
     instance_name: Optional[str],
     host: str,
     port: str,
-):
+) -> None:
 
     instance_name = instance_name
     if instance_name is None:
@@ -225,6 +275,7 @@ async def add(
         ssh_port=22,
         dockerized=False,
         backend_data="",
+        pool_id=str(pool.id),
     )
     offer = InstanceOfferWithAvailability(
         backend=BackendType.LOCAL,

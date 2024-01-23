@@ -9,16 +9,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceType, Resources
-from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.runs import JobErrorCode, JobProvisioningData, JobStatus, RunSpec
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobErrorCode,
+    JobProvisioningData,
+    JobStatus,
+    RunSpec,
+)
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
     BackendModel,
     GatewayComputeModel,
     GatewayModel,
+    InstanceModel,
     JobModel,
+    PoolModel,
     ProjectModel,
     RepoModel,
     RunModel,
@@ -226,6 +234,7 @@ def get_job_provisioning_data() -> JobProvisioningData:
         ssh_port=22,
         dockerized=False,
         backend_data=None,
+        pool_id="",
     )
 
 
@@ -271,3 +280,43 @@ async def create_gateway_compute(
     session.add(gateway_compute)
     await session.commit()
     return gateway_compute
+
+
+async def create_pool(
+    session: AsyncSession,
+    project: ProjectModel,
+    pool_name: Optional[str] = None,
+) -> PoolModel:
+
+    pool_name = pool_name if pool_name is not None else DEFAULT_POOL_NAME
+    pool = PoolModel(
+        name=pool_name,
+        project=project,
+        project_id=project.id,
+    )
+    session.add(pool)
+    await session.commit()
+    return pool
+
+
+async def create_instance(
+    session: AsyncSession,
+    project: ProjectModel,
+    pool: PoolModel,
+    status: InstanceStatus,
+) -> InstanceModel:
+    im = InstanceModel(
+        name="test_instance",
+        pool=pool,
+        project=project,
+        status=status,
+        job_provisioning_data='{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "instance_id": "running_instance.id", "pool_id": "1b2b4c57-5851-487f-b92e-948f946dfa49", "hostname": "running_instance.ip", "region": "running_instance.location", "price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, "backend_data": null}',
+        offer='{"backend": "datacrunch", "instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "region": "en", "price": 0.1, "availability": "available"}',
+    )
+    session.add(im)
+    await session.commit()
+
+    # pool.instances.append(im)
+    # await session.commit()
+
+    return im

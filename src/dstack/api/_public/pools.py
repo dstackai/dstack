@@ -1,22 +1,23 @@
 from typing import List
 
+from dstack._internal.core.models.pools import Pool
 from dstack.api.server import APIClient
 
 
-class Instance:
-    def __init__(self, api_client: APIClient, instance):
+class PoolInstance:
+    def __init__(self, api_client: APIClient, pool: Pool):
         self._api_client = api_client
-        self._instance = instance
+        self._pool = pool
 
     @property
     def name(self) -> str:
-        return self._instance.name
+        return self._pool.name
 
     def __str__(self) -> str:
-        return f"<Instance '{self.name}'>"
+        return f"<PoolInstance '{self.name}'>"
 
     def __repr__(self) -> str:
-        return f"<Instance '{self.name}'>"
+        return f"<PoolInstance '{self.name}'>"
 
 
 class PoolCollection:
@@ -28,13 +29,13 @@ class PoolCollection:
         self._api_client = api_client
         self._project = project
 
-    def list(self) -> List[Instance]:
+    def list(self) -> List[PoolInstance]:
         """
         List available pool in the project
 
         Returns:
             pools
         """
-        list_raw_instances = self._api_client.pool.list(project_name=self._project)
-        list_instances = [Instance(self._api_client, instance) for instance in list_raw_instances]
-        return list_instances
+        list_raw_pool = self._api_client.pool.list(project_name=self._project)
+        list_pool = [PoolInstance(self._api_client, instance) for instance in list_raw_pool]
+        return list_pool

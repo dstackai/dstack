@@ -3,7 +3,7 @@ import itertools
 import math
 import uuid
 from datetime import timezone
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
 
 import pydantic
 from sqlalchemy import select, update
@@ -24,8 +24,10 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
+from dstack._internal.core.models.resources import GPU, ComputeCapability, Memory, Range, Resources
 from dstack._internal.core.models.runs import (
     GpusRequirements,
+    InstanceStatus,
     Job,
     JobPlan,
     JobProvisioningData,
@@ -40,8 +42,16 @@ from dstack._internal.core.models.runs import (
     ServiceModelInfo,
 )
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.server.models import JobModel, PoolModel, ProjectModel, RunModel, UserModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    JobModel,
+    PoolModel,
+    ProjectModel,
+    RunModel,
+    UserModel,
+)
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.docker import parse_image_name
 from dstack._internal.server.services.jobs import (
@@ -53,7 +63,7 @@ from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
-from dstack._internal.server.services.pools import create_pool_model, list_project_pool, show_pool
+from dstack._internal.server.services.pools import create_pool_model
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
@@ -81,7 +91,7 @@ async def list_user_runs(
             project=project,
             repo_id=repo_id,
         )
-        runs.extend(map(run_model_to_run, project_runs))
+        runs.extend(project_runs)
     return sorted(runs, key=lambda r: r.submitted_at, reverse=True)
 
 
@@ -89,7 +99,7 @@ async def list_project_runs(
     session: AsyncSession,
     project: ProjectModel,
     repo_id: Optional[str],
-) -> List[RunModel]:
+) -> List[Run]:
     filters = [
         RunModel.project_id == project.id,
         RunModel.deleted == False,
@@ -141,57 +151,59 @@ async def get_run(
 
 
 async def get_run_plan_by_requirements(
-    project: ProjectModel, profile: Profile
-) -> Tuple[Requirements, List[Tuple[Backend, InstanceOfferWithAvailability]]]:
+    project: ProjectModel,
+    profile: Profile,
+    requirements: Requirements,
+    exclude_not_available=False,
+) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends = await backends_services.get_project_backends(project=project)
     if profile.backends is not None:
         backends = [b for b in backends if b.TYPE in profile.backends]
 
-    spot_policy = profile.spot_policy or SpotPolicy.AUTO  # TODO: improve
-    requirements = Requirements(
-        cpus=profile.resources.cpu,
-        memory_mib=profile.resources.memory,
-        gpus=None,
-        shm_size_mib=profile.resources.shm_size,
-        max_price=profile.max_price,
-        spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
-    )
-    if profile.resources.gpu:
-        requirements.gpus = GpusRequirements(
-            count=profile.resources.gpu.count,
-            memory_mib=profile.resources.gpu.memory,
-            name=profile.resources.gpu.name,
-            total_memory_mib=profile.resources.gpu.total_memory,
-            compute_capability=profile.resources.gpu.compute_capability,
-        )
-
     offers = await backends_services.get_instance_offers(
         backends=backends,
         requirements=requirements,
-        exclude_not_available=False,
+        exclude_not_available=exclude_not_available,
     )
 
-    return requirements, offers
+    return offers
 
 
 async def create_instance(
-    project: ProjectModel, user: UserModel, pool_name: str, instance_name: str, profile: Profile
-):
-    _, offers = await get_run_plan_by_requirements(project, profile)
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    pool_name: str,
+    instance_name: str,
+    profile: Profile,
+    requirements: Requirements,
+) -> Optional[InstanceModel]:
+    offers = await get_run_plan_by_requirements(
+        project, profile, requirements, exclude_not_available=True
+    )
+
+    if not offers:
+        return
 
     ssh_key = SSHKeys(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
     )
+    image = parse_image_name(get_default_image(get_default_python_verison()))
     instance_config = InstanceConfiguration(
         instance_name=instance_name,
         pool_name=pool_name,
         ssh_keys=[ssh_key],
         job_docker_config=DockerConfig(
-            image=parse_image_name(get_default_image(get_default_python_verison())),
+            image=image,
             registry_auth=None,
         ),
     )
+
+    pool = await pools_services.get_pool(session, project, pool_name)
+
+    if pool is None:
+        pool = await create_pool_model(session, project, pool_name)
 
     for backend, instance_offer in offers:
 
@@ -219,23 +231,33 @@ async def create_instance(
                 repr(e),
             )
             continue
-        else:
-            job_provisioning_data = JobProvisioningData(
-                backend=backend.TYPE,
-                instance_type=instance_offer.instance,
-                instance_id=launched_instance_info.instance_id,
-                pool_id=pool_name,
-                hostname=launched_instance_info.ip_address,
-                region=launched_instance_info.region,
-                price=instance_offer.price,
-                username=launched_instance_info.username,
-                ssh_port=launched_instance_info.ssh_port,
-                dockerized=launched_instance_info.dockerized,
-                backend_data=launched_instance_info.backend_data,
-            )
 
-            return (job_provisioning_data, instance_offer)
-    return (None, None)
+        job_provisioning_data = JobProvisioningData(
+            backend=backend.TYPE,
+            instance_type=instance_offer.instance,
+            instance_id=launched_instance_info.instance_id,
+            pool_id=str(pool.id),
+            hostname=launched_instance_info.ip_address,
+            region=launched_instance_info.region,
+            price=instance_offer.price,
+            username=launched_instance_info.username,
+            ssh_port=launched_instance_info.ssh_port,
+            dockerized=launched_instance_info.dockerized,
+            backend_data=launched_instance_info.backend_data,
+        )
+
+        im = InstanceModel(
+            name=instance_name,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.STARTING,
+            job_provisioning_data=job_provisioning_data.json(),
+            offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
+        )
+        session.add(im)
+        await session.commit()
+
+        return im
 
 
 async def get_run_plan(
@@ -289,6 +311,7 @@ async def submit_run(
     )
     if repo is None:
         raise RepoDoesNotExistError.with_id(run_spec.repo_id)
+
     backends = await backends_services.get_project_backends(project)
     if len(backends) == 0:
         raise ServerClientError("No backends configured")
@@ -329,6 +352,7 @@ async def submit_run(
     jobs = get_jobs_from_run_spec(run_spec)
     if run_spec.configuration.type == "service":
         await gateways.register_service_jobs(session, project, run_spec.run_name, jobs)
+
     for job in jobs:
         job.job_spec.pool_name = pool_name
         job_model = create_job_model_for_new_submission(

@@ -207,6 +207,15 @@ async def _process_job(job_id: UUID):
                     run_model,
                     job_model,
                 )
+
+                if success:
+                    instance_name: str = job_provisioning_data.instance_id
+                    pool_name = str(job.job_spec.pool_name)
+                    instances = await get_pool_instances(session, project, pool_name)
+                    for inst in instances:
+                        if inst.name == instance_name:
+                            inst.status = InstanceStatus.READY
+
             if not success:  # kill the job
                 logger.warning(
                     *job_log(

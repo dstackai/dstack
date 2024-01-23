@@ -3,7 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.runs import RunSpec
+from dstack._internal.core.models.runs import Requirements, RunSpec
 
 
 class ListRunsRequest(BaseModel):
@@ -21,11 +21,13 @@ class GetRunPlanRequest(BaseModel):
 
 class GetOffersRequest(BaseModel):
     profile: Profile
+    requirements: Requirements
 
 
 class CreateInstanceRequest(BaseModel):
     pool_name: str
     profile: Profile
+    requirements: Requirements
 
 
 class AddRemoteInstanceRequest(BaseModel):

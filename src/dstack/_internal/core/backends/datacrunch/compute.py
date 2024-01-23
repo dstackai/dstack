@@ -5,7 +5,7 @@ from dstack._internal.core.backends.base.compute import InstanceConfiguration, g
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
 from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -99,6 +99,7 @@ class DataCrunchCompute(Compute):
         image_name = "2088da25-bb0d-41cc-a191-dccae45d96fd"
 
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+
         instance = self.api_client.deploy_instance(
             instance_type=instance_offer.instance.name,
             ssh_key_ids=ssh_ids,

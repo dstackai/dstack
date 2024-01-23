@@ -1,16 +1,26 @@
 import datetime as dt
 import uuid
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.pools as services_pools
 import dstack._internal.server.services.projects as services_projects
+import dstack._internal.server.services.runs as runs
 import dstack._internal.server.services.users as services_users
+from dstack._internal.core.models import resources
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import InstanceType, Resources
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOfferWithAvailability,
+    InstanceType,
+    LaunchedInstanceInfo,
+    Resources,
+)
 from dstack._internal.core.models.pools import Instance, Pool
-from dstack._internal.core.models.runs import InstanceStatus
+from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.runs import InstanceStatus, Requirements
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.testing.common import create_project, create_user
@@ -68,7 +78,7 @@ def test_convert_instance():
         status=InstanceStatus.PENDING,
         project_id=str(uuid.uuid4()),
         pool=None,
-        job_provisioning_data='{"backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+        job_provisioning_data='{"pool_id":"123", "backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
         offer='{"price":"LOCAL", "price":1.0, "backend":"local", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
     )
 
@@ -104,7 +114,7 @@ async def test_show_pool(session: AsyncSession, test_db):
         project=project,
         pool=pool,
         status=InstanceStatus.PENDING,
-        job_provisioning_data='{"backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+        job_provisioning_data='{"pool_id":"123", "backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
         offer='{"price":"LOCAL", "price":1.0, "backend":"local", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
     )
     session.add(im)
@@ -162,3 +172,84 @@ async def test_generate_instance_name(session: AsyncSession, test_db):
     car, _, cdr = name.partition("-")
     assert len(car) > 0
     assert len(cdr) > 0
+
+
+@pytest.mark.asyncio
+async def test_pool_double_name(session: AsyncSession, test_db):
+    user = await create_user(session=session)
+    project = await create_project(session=session, owner=user)
+    pool1 = await services_pools.create_pool_model(
+        session=session, project=project, name="test_pool"
+    )
+    with pytest.raises(ValueError):
+
+        pool2 = await services_pools.create_pool_model(
+            session=session, project=project, name="test_pool"
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_cloud_instance(session: AsyncSession, test_db):
+    user = await create_user(session)
+    project = await create_project(session, user)
+
+    profile = Profile(name="test_profile")
+
+    requirements = Requirements(resources=resources.Resources(cpu=1), spot=True)
+
+    offer = InstanceOfferWithAvailability(
+        backend=BackendType.DATACRUNCH,
+        instance=InstanceType(
+            name="instance", resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[])
+        ),
+        region="en",
+        price=0.1,
+        availability=InstanceAvailability.AVAILABLE,
+    )
+
+    launched_instance = LaunchedInstanceInfo(
+        instance_id="running_instance.id",
+        ip_address="running_instance.ip",
+        region="running_instance.location",
+        ssh_port=22,
+        username="root",
+        dockerized=True,
+        backend_data=None,
+    )
+
+    class DummyBackend:
+        TYPE = BackendType.DATACRUNCH
+
+        def compute(self):
+            return self
+
+        def create_instance(self, *args, **kwargs):
+            return launched_instance
+
+    offers = [(DummyBackend(), offer)]
+
+    with patch("dstack._internal.server.services.runs.get_run_plan_by_requirements") as reqs:
+        reqs.return_value = offers
+        await runs.create_instance(
+            session,
+            project,
+            user,
+            profile=profile,
+            pool_name="test_pool",
+            instance_name="test_instance",
+            requirements=requirements,
+        )
+
+    pool = await services_pools.get_pool(session, project, "test_pool")
+    assert pool is not None
+    instance = pool.instances[0]
+
+    assert instance.name == "test_instance"
+    assert instance.deleted == False
+    assert instance.deleted_at == None
+
+    # assert instance.job_provisioning_data == '{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "instance_id": "running_instance.id", "pool_id": "1b2b4c57-5851-487f-b92e-948f946dfa49", "hostname": "running_instance.ip", "region": "running_instance.location", "price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, "backend_data": null}'
+    assert (
+        instance.offer
+        == '{"backend": "datacrunch", "instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "region": "en", "price": 0.1, "availability": "available"}'
+    )

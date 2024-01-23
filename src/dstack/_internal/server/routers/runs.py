@@ -69,13 +69,11 @@ async def get_offers(
     body: GetOffersRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Tuple[Requirements, List[InstanceOfferWithAvailability]]:
+) -> List[InstanceOfferWithAvailability]:
     _, project = user_project
-    reqs, offers = await runs.get_run_plan_by_requirements(
-        project=project,
-        profile=body.profile,
-    )
-    return (reqs, [instance for _, instance in offers])
+    offers = await runs.get_run_plan_by_requirements(project, body.profile, body.requirements)
+    instances = [instance for _, instance in offers]
+    return instances
 
 
 @project_router.post("/create_instance")
@@ -89,11 +87,13 @@ async def create_instance(
         session=session, project=project, pool_name=body.pool_name
     )
     await runs.create_instance(
+        session=session,
         project=project,
         user=user,
         pool_name=body.pool_name,
         instance_name=instance_name,
         profile=body.profile,
+        requirements=body.requirements,
     )
 
 

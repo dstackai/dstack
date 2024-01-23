@@ -19,12 +19,14 @@ from dstack._internal.core.models.profiles import (
     Profile,
     TerminationPolicy,
 )
+from dstack._internal.core.models.resources import Range, Resources
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
     JobErrorCode,
     JobProvisioningData,
     JobStatus,
+    Requirements,
     Run,
     RunSpec,
 )
@@ -39,6 +41,8 @@ from dstack._internal.server.services.logging import job_log
 from dstack._internal.server.services.pools import (
     get_pool_instances,
     instance_model_to_instance,
+    list_project_pool,
+    list_project_pool_models,
     show_pool,
 )
 from dstack._internal.server.services.runs import run_model_to_run
@@ -83,7 +87,7 @@ async def _process_job(job_id: UUID):
         )
 
 
-def check_relevance(profile: Profile, instance_model: InstanceModel) -> bool:
+def check_relevance(profile: Profile, resources: Resources, instance_model: InstanceModel) -> bool:
 
     jpd: JobProvisioningData = parse_raw_as(
         JobProvisioningData, instance_model.job_provisioning_data
@@ -95,17 +99,22 @@ def check_relevance(profile: Profile, instance_model: InstanceModel) -> bool:
     instance = instance_model_to_instance(instance_model)
 
     if profile.backends is not None and instance.backend not in profile.backends:
+        logger.warning(f"no backnd select ")
         return False
 
-    instance_resources = jpd.instance_type.resources
+    # instance_resources = jpd.instance_type.resources
 
-    if profile.resources.cpu is not None and profile.resources.cpu < instance_resources.cpus:
-        return False
+    # TODO: full check requirements
+    # if isinstance(requirements.resources.cpu, Range):
+    #     if  requirements.resources.cpu.min < int(instance_resources.cpus):
+    #         return False
 
-    # TODO: full check
-    if isinstance(profile.resources.gpu, int):
-        if profile.resources.gpu < len(instance_resources.gpus):
-            return False
+    # if isinstance(requirements.resources.gpu, Range):
+    #     if  requirements.resources.gpu.min < int(instance_resources.cpus):
+    #         return False
+    # if isinstance(int(requirements.resources.gpu), int):
+    #     if requirements.resources.gpu < len(instance_resources.gpus):
+    #         return False
 
     return True
     # TODO: memory, shm_size, disk
@@ -125,28 +134,40 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     # check default pool
     pool = project_model.default_pool
     if pool is None:
-        pool = PoolModel(
-            name=DEFAULT_POOL_NAME,
-            project=project_model,
-        )
-        session.add(pool)
-        await session.commit()
+        pools = await list_project_pool_models(session, job_model.project)
+        for pool_item in pools:
+            if pool_item.id == job_model.project.default_pool_id:
+                pool = pool_item
+            if pool_item.name == DEFAULT_POOL_NAME:
+                pool = pool_item
+        if pool is None:
+            pool = PoolModel(
+                name=DEFAULT_POOL_NAME,
+                project=project_model,
+            )
+            session.add(pool)
+            await session.commit()
+            await session.refresh(pool)
+
         if pool.id is not None:
             project_model.default_pool_id = pool.id
 
-    profile = parse_raw_as(RunSpec, run_model.run_spec).profile
+    run_spec = parse_raw_as(RunSpec, run_model.run_spec)
+    profile = run_spec.profile
     run_pool = profile.pool_name
     if run_pool is None:
         run_pool = pool.name
 
     # pool capacity
+
     pool_instances = await get_pool_instances(session, project_model, run_pool)
     available_instanses = (p for p in pool_instances if p.status == InstanceStatus.READY)
     relevant_instances: List[InstanceModel] = []
     for instance in available_instanses:
-        if check_relevance(profile, instance):
+        if check_relevance(profile, run_spec.configuration.resources, instance):
             relevant_instances.append(instance)
 
+    logger.info(*job_log(f"num relevance {len(relevant_instances)}", job_model))
     if relevant_instances:
 
         sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
@@ -183,6 +204,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         backends=backends,
         project_ssh_public_key=project_model.ssh_public_key,
         project_ssh_private_key=project_model.ssh_private_key,
+        pool_id=pool.id,
     )
     if job_provisioning_data is not None and offer is not None:
         logger.info(*job_log("now is provisioning", job_model))
@@ -221,9 +243,11 @@ async def _run_job(
     backends: List[Backend],
     project_ssh_public_key: str,
     project_ssh_private_key: str,
+    pool_id: UUID,
 ) -> Tuple[Optional[JobProvisioningData], Optional[InstanceOfferWithAvailability]]:
     if run.run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
+
     try:
         requirements = job.job_spec.requirements
         offers = await backends_services.get_instance_offers(
@@ -232,6 +256,7 @@ async def _run_job(
     except BackendError as e:
         logger.warning(*job_log("failed to get instance offers: %s", job_model, repr(e)))
         return (None, None)
+
     for backend, offer in offers:
         logger.debug(
             *job_log(
@@ -265,6 +290,7 @@ async def _run_job(
             )
             continue
         else:
+
             job_provisioning_data = JobProvisioningData(
                 backend=backend.TYPE,
                 instance_type=offer.instance,
@@ -277,6 +303,7 @@ async def _run_job(
                 dockerized=launched_instance_info.dockerized,
                 ssh_proxy=launched_instance_info.ssh_proxy,
                 backend_data=launched_instance_info.backend_data,
+                pool_id=str(pool_id),
             )
 
             return (job_provisioning_data, offer)

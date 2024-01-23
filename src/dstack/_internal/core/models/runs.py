@@ -23,8 +23,8 @@ class AppSpec(BaseModel):
     port: int
     map_to_port: Optional[int]
     app_name: str
-    url_path: Optional[str]
-    url_query_params: Optional[Dict[str, str]]
+    url_path: Optional[str] = None
+    url_query_params: Optional[Dict[str, str]] = None
 
 
 class JobStatus(str, Enum):

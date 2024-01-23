@@ -360,12 +360,12 @@ class RunCollection:
         return self.exec_plan(run_plan, repo, reserve_ports=reserve_ports)
 
     def get_offers(
-        self, profile: Profile
-    ) -> Tuple[Requirements, List[InstanceOfferWithAvailability]]:
-        return self._api_client.runs.get_offers(self._project, profile)
+        self, profile: Profile, requirements: Requirements
+    ) -> List[InstanceOfferWithAvailability]:
+        return self._api_client.runs.get_offers(self._project, profile, requirements)
 
-    def create_instance(self, pool_name: str, profile: Profile):
-        self._api_client.runs.create_instance(self._project, pool_name, profile)
+    def create_instance(self, pool_name: str, profile: Profile, requirements: Requirements):
+        self._api_client.runs.create_instance(self._project, pool_name, profile, requirements)
 
     def get_plan(
         self,
@@ -411,6 +411,9 @@ class RunCollection:
             max_duration=max_duration,
             max_price=max_price,
             pool_name=pool_name,
+            creation_policy=None,
+            termination_idle_time=None,
+            termination_policy=None,
         )
         run_spec = RunSpec(
             run_name=run_name,

@@ -39,7 +39,7 @@ class TestProcessFinishedJobs:
             run=run,
             status=JobStatus.DONE,
             job_provisioning_data=JobProvisioningData(
-                backend=BackendType.LOCAL,
+                backend=BackendType.AWS,
                 instance_type=InstanceType(
                     name="local", resources=Resources(cpus=1, memory_mib=1024, gpus=[], spot=False)
                 ),
@@ -50,6 +50,8 @@ class TestProcessFinishedJobs:
                 username="root",
                 ssh_port=22,
                 dockerized=False,
+                pool_id="",
+                backend_data=None,
             ),
         )
         with patch(f"{MODULE}.terminate_job_submission_instance") as terminate:

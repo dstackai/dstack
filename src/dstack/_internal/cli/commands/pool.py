@@ -2,6 +2,8 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+import yaml
+from pydantic import parse_obj_as
 from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
@@ -9,25 +11,27 @@ from dstack._internal.cli.services.configurators.profile import (
     apply_profile_args,
     register_profile_args,
 )
+from dstack._internal.cli.services.configurators.run import BaseRunConfigurator
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.core.errors import CLIError, ServerClientError
+from dstack._internal.core.models.configurations import parse as parse_configuration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.pools import Instance, Pool
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
+from dstack._internal.core.models.resources import GPU, Resources
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
-from dstack.api.utils import load_profile
+from dstack.api.utils import load_configuration, load_profile
 
 logger = get_logger(__name__)
-NOTSET = object()
 
 
-def print_pool_table(pools: Sequence[Pool], verbose):
+def print_pool_table(pools: Sequence[Pool], verbose: bool) -> None:
     table = Table(box=None)
     table.add_column("NAME")
     table.add_column("DEFAULT")
@@ -45,11 +49,12 @@ def print_pool_table(pools: Sequence[Pool], verbose):
     console.print()
 
 
-def print_instance_table(instances: Sequence[Instance]):
+def print_instance_table(instances: Sequence[Instance]) -> None:
     table = Table(box=None)
     table.add_column("INSTANCE ID")
     table.add_column("BACKEND")
     table.add_column("INSTANCE TYPE")
+    table.add_column("STATUS")
     table.add_column("PRICE")
 
     for instance in instances:
@@ -57,6 +62,7 @@ def print_instance_table(instances: Sequence[Instance]):
             instance.instance_id,
             instance.backend,
             instance.instance_type.resources.pretty_format(),
+            instance.status,
             f"{instance.price:.02f}",
         ]
         table.add_row(*row)
@@ -71,7 +77,7 @@ def print_offers_table(
     requirements: Requirements,
     instance_offers: Sequence[InstanceOfferWithAvailability],
     offers_limit: int = 3,
-):
+) -> None:
 
     pretty_req = requirements.pretty_format(resources_only=True)
     max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
@@ -151,13 +157,14 @@ def print_offers_table(
         console.print()
 
 
-class PoolCommand(APIBaseCommand):
+class PoolCommand(APIBaseCommand):  # type: ignore[misc]
     NAME = "pool"
     DESCRIPTION = "Pool management"
 
-    def _register(self):
+    def _register(self) -> None:
         super()._register()
         self._parser.set_defaults(subfunc=self._list)
+
         subparsers = self._parser.add_subparsers(dest="action")
 
         # list
@@ -223,28 +230,48 @@ class PoolCommand(APIBaseCommand):
             "--remote-port", help="Remote runner port", dest="remote_port", default=10999
         )
         add_parser.add_argument("--name", dest="instance_name", help="The name of the instance")
-        add_parser.set_defaults(subfunc=self._add)
         register_profile_args(add_parser)
+        BaseRunConfigurator.register(add_parser)
+        add_parser.set_defaults(subfunc=self._add)
 
-    def _list(self, args: argparse.Namespace):
+        # remove
+        remove_parser = subparsers.add_parser(
+            "remove",
+            help="Remove instance from the pool",
+            formatter_class=self._parser.formatter_class,
+        )
+        remove_parser.add_argument(
+            "--pool", dest="pool_name", help="The name of the pool", required=True
+        )
+        remove_parser.add_argument(
+            "--name", dest="instance_name", help="The name of the instance", required=True
+        )
+        remove_parser.set_defaults(subfunc=self._remove)
+
+    def _list(self, args: argparse.Namespace) -> None:
         pools = self.api.client.pool.list(self.api.project)
         print_pool_table(pools, verbose=getattr(args, "verbose", False))
 
-    def _create(self, args: argparse.Namespace):
+    def _create(self, args: argparse.Namespace) -> None:
         self.api.client.pool.create(self.api.project, args.pool_name)
 
-    def _delete(self, args: argparse.Namespace):
+    def _delete(self, args: argparse.Namespace) -> None:
         self.api.client.pool.delete(self.api.project, args.pool_name, args.force)
 
-    def _show(self, args: argparse.Namespace):
+    def _remove(self, args: argparse.Namespace) -> None:
+        self.api.client.pool.remove(self.api.project, args.pool_name, args.instance_name)
+
+    def _show(self, args: argparse.Namespace) -> None:
         instances = self.api.client.pool.show(self.api.project, args.pool_name)
         print_instance_table(instances)
 
-    def _add(self, args: argparse.Namespace):
+    def _add(self, args: argparse.Namespace) -> None:
+
         super()._command(args)
 
         pool_name: str = DEFAULT_POOL_NAME if args.pool_name is None else args.pool_name
 
+        # Add remote instance
         if args.remote:
             self.api.client.pool.add(
                 self.api.project, pool_name, args.instance_name, args.remote_host, args.remote_port
@@ -254,15 +281,24 @@ class PoolCommand(APIBaseCommand):
         repo = self.api.repos.load(Path.cwd())
         self.api.ssh_identity_file = ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
 
+        # TODO: read requirements from repo configuration
+        # conf = parse_configuration(yaml.safe_load(conf_path.open()))
+        # resources = conf.resources
+
         profile = load_profile(Path.cwd(), args.profile)
         apply_profile_args(args, profile)
 
         profile.pool_name = pool_name
 
-        with console.status("Getting instances..."):
-            requirements, offers = self.api.runs.get_offers(profile)
+        requirements = Requirements(
+            resources=Resources(gpu=parse_obj_as(GPU, args.gpu_spec)),
+            max_price=args.max_price,
+            spot=(args.spot_policy == SpotPolicy.SPOT),
+        )
 
-        print(pool_name, profile, requirements, offers)
+        with console.status("Getting instances..."):
+            offers = self.api.runs.get_offers(profile, requirements)
+
         print_offers_table(pool_name, profile, requirements, offers)
         if not args.yes and not confirm_ask("Continue?"):
             console.print("\nExiting...")
@@ -270,11 +306,11 @@ class PoolCommand(APIBaseCommand):
 
         try:
             with console.status("Submitting instance..."):
-                self.api.runs.create_instance(pool_name, profile)
+                self.api.runs.create_instance(pool_name, profile, requirements)
         except ServerClientError as e:
             raise CLIError(e.msg)
 
-    def _command(self, args: argparse.Namespace):
+    def _command(self, args: argparse.Namespace) -> None:
         super()._command(args)
         # TODO handle 404 and other errors
         args.subfunc(args)

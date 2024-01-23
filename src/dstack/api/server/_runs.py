@@ -31,14 +31,18 @@ class RunsAPIClient(APIClientGroup):
         return parse_obj_as(Run, resp.json())
 
     def get_offers(
-        self, project_name: str, profile: Profile
-    ) -> Tuple[Requirements, List[InstanceOfferWithAvailability]]:
-        body = GetOffersRequest(profile=profile)
+        self, project_name: str, profile: Profile, requirements: Requirements
+    ) -> List[InstanceOfferWithAvailability]:
+        body = GetOffersRequest(profile=profile, requirements=requirements)
         resp = self._request(f"/api/project/{project_name}/runs/get_offers", body=body.json())
-        return parse_obj_as(Tuple[Requirements, List[InstanceOfferWithAvailability]], resp.json())
+        return parse_obj_as(List[InstanceOfferWithAvailability], resp.json())
 
-    def create_instance(self, project_name: str, pool_name: str, profile: Profile):
-        body = CreateInstanceRequest(pool_name=pool_name, profile=profile)
+    def create_instance(
+        self, project_name: str, pool_name: str, profile: Profile, requirements: Requirements
+    ):
+        body = CreateInstanceRequest(
+            pool_name=pool_name, profile=profile, requirements=requirements
+        )
         self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
 
     def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:

@@ -100,11 +100,12 @@ class ShimClient:
             return None
 
     def submit(self, username: str, password: str, image_name: str):
+        post_body = DockerImageBody(
+            username=username, password=password, image_name=image_name
+        ).dict()
         resp = requests.post(
             self._url("/api/submit"),
-            json=DockerImageBody(
-                username=username, password=password, image_name=image_name
-            ).dict(),
+            json=post_body,
         )
         resp.raise_for_status()
 
