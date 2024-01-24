@@ -1,4 +1,4 @@
-import requests
+import httpx
 
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.runs import Job, JobProvisioningData
@@ -7,9 +7,9 @@ GATEWAY_MANAGEMENT_PORT = 8000
 
 
 class GatewayClient:
-    def __init__(self, port: int = GATEWAY_MANAGEMENT_PORT):
-        self.base_url = f"http://localhost:{port}"
-        self.s = requests.Session()
+    def __init__(self, uds: str):
+        self.base_url = f"http://gateway"
+        self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds))
 
     def register_service(self, project: str, job: Job, job_provisioning_data: JobProvisioningData):
         payload = {
@@ -55,6 +55,13 @@ class GatewayClient:
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
+
+    def info(self) -> dict:
+        resp = self.s.get(self._url("/"))
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+        return resp.json()
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/{path.lstrip('/')}"
