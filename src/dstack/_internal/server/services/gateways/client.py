@@ -1,3 +1,5 @@
+from typing import Optional
+
 import httpx
 
 from dstack._internal.core.errors import GatewayError
@@ -7,9 +9,14 @@ GATEWAY_MANAGEMENT_PORT = 8000
 
 
 class GatewayClient:
-    def __init__(self, uds: str):
-        self.base_url = f"http://gateway"
-        self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds))
+    def __init__(self, uds: Optional[str] = None, port: Optional[int] = None):
+        if uds is None and port is None:
+            raise ValueError("Either uds or port should be specified")
+        if uds is not None and port is not None:
+            raise ValueError("Either uds or port should be specified, not both")
+
+        self.base_url = f"http://gateway" if uds else f"http://localhost:{port}"
+        self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds) if uds else None)
 
     def register_service(self, project: str, job: Job, job_provisioning_data: JobProvisioningData):
         payload = {
