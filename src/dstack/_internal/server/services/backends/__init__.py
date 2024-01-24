@@ -68,6 +68,15 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.server.services.backends.configurators.kubernetes import (
+        KubernetesConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(KubernetesConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.server.services.backends.configurators.lambdalabs import (
         LambdaConfigurator,
     )
@@ -249,7 +258,6 @@ async def get_project_backends(project: ProjectModel) -> List[Backend]:
     backends = [b for _, b in backends_with_models]
     if LOCAL_BACKEND_ENABLED:
         backends.append(LocalBackend())
-    backends.append(KubernetesBackend())
     return backends
 
 

@@ -1,9 +1,15 @@
 from typing import Dict, List, Optional
 
 import kubernetes
+import yaml
 
 
-def get_api(kubeconfig: Dict) -> kubernetes.client.CoreV1Api:
+def get_api_from_config_data(kubeconfig_data: str) -> kubernetes.client.CoreV1Api:
+    config_dict = yaml.load(kubeconfig_data, yaml.FullLoader)
+    return get_api_from_config_dict(config_dict)
+
+
+def get_api_from_config_dict(kubeconfig: Dict) -> kubernetes.client.CoreV1Api:
     api_client = kubernetes.config.new_client_from_config_dict(config_dict=kubeconfig)
     return kubernetes.client.CoreV1Api(api_client=api_client)
 

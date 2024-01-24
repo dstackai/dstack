@@ -11,6 +11,7 @@ from dstack._internal.core.models.backends.aws import AnyAWSCreds
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.datacrunch import AnyDataCrunchCreds
+from dstack._internal.core.models.backends.kubernetes import KubernetesNetworkingConfig
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
 from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.backends.vastai import AnyVastAICreds
@@ -70,6 +71,21 @@ class GCPConfig(ForbidExtra):
     creds: AnyGCPCreds = Field(..., discriminator="type")
 
 
+class KubeconfigConfig(ForbidExtra):
+    filename: str
+    data: Optional[str] = None
+
+    @root_validator
+    def fill_data(cls, values):
+        return _fill_data(values)
+
+
+class KubernetesConfig(ForbidExtra):
+    type: Literal["kubernetes"] = "kubernetes"
+    networking: KubernetesNetworkingConfig
+    kubeconfig: KubeconfigConfig
+
+
 class LambdaConfig(ForbidExtra):
     type: Literal["lambda"] = "lambda"
     regions: Optional[List[str]] = None
@@ -119,6 +135,7 @@ AnyBackendConfig = Union[
     AzureConfig,
     DataCrunchConfig,
     GCPConfig,
+    KubernetesConfig,
     LambdaConfig,
     NebiusConfig,
     TensorDockConfig,

@@ -3,6 +3,7 @@ import tempfile
 import time
 from typing import List, Optional
 
+import yaml
 from kubernetes import client
 
 from dstack._internal.core.backends.base.compute import (
@@ -10,7 +11,7 @@ from dstack._internal.core.backends.base.compute import (
     get_docker_commands,
     get_instance_name,
 )
-from dstack._internal.core.backends.kubernetes.client import get_api
+from dstack._internal.core.backends.kubernetes.client import get_api_from_config_data
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -31,7 +32,7 @@ logger = get_logger(__name__)
 class KubernetesCompute(Compute):
     def __init__(self, config: KubernetesConfig):
         self.config = config
-        self.api = get_api(config.kubeconfig)
+        self.api = get_api_from_config_data(config.kubeconfig.data)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -276,6 +277,7 @@ def _wait_for_pod_ready(
                 return True
 
         except client.ApiException as e:
+            print(e.status)
             if e.status == 404:
                 # Pod not found, it might be initializing
                 pass
