@@ -20,16 +20,8 @@ class SSHAutoTunnel:
         ) as f:
             f.write(id_rsa)
 
-        self._start_cmd = [
-            "ssh",
-            "-i",
-            self.id_rsa,
-            "-M",
-            "-S",
-            self.control_sock_path,
-            "-f",
-            "-N",
-        ]
+        self._start_cmd = ["ssh", "-i", self.id_rsa, "-f", "-N"]
+        self._start_cmd += ["-M", "-S", self.control_sock_path]
         for key, value in options.items():
             self._start_cmd += ["-o", f"{key}={value}"]
         self._start_cmd += args
