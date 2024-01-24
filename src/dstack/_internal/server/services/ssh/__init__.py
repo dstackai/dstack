@@ -66,6 +66,7 @@ class SSHAutoTunnel:
         await proc.wait()
         if proc.returncode != 0:
             # TODO(egor-s): check stderr
+            # TODO(egor-s): make robust, retry
             raise SSHError(proc.returncode)
         if self._keep_alive_task is None:
             self._keep_alive_task = asyncio.create_task(self._keep_alive())
@@ -96,6 +97,7 @@ class SSHAutoTunnel:
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode != 0:
+            # TODO(egor-s): make robust, retry
             raise SSHError(stderr.decode())
         return stdout.decode()
 
@@ -104,7 +106,8 @@ class SSHAutoTunnel:
             while True:
                 if not await self.check():
                     logger.debug("SSH tunnel `%s` is down, restarting", self.user_host)
+                    # TODO(egor-s): make robust, retry
                     await self.start()
-                await asyncio.sleep(5)
+                await asyncio.sleep(60)
         except asyncio.CancelledError:
             pass
