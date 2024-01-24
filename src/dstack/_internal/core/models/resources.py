@@ -187,7 +187,7 @@ class GPU(ForbidExtra):
 
     @validator("name", pre=True)
     def _validate_name(cls, v: Any) -> Any:
-        if not isinstance(v, list):
+        if v is not None and not isinstance(v, list):
             return [v]
         return v
 
