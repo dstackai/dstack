@@ -65,7 +65,7 @@ class Range(GenericModel, Generic[T]):
         min = self.min if self.min is not None else ""
         max = self.max if self.max is not None else ""
         if min == max:
-            return min
+            return f"{min}"
         return f"{min}..{max}"
 
 

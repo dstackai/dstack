@@ -72,6 +72,9 @@ class TestIntRange:
         with pytest.raises(ValidationError):
             parse_obj_as(Range[int], "3..1")
 
+    def test__str__(self):
+        assert isinstance(str(parse_obj_as(Range[int], "1")), str)
+
 
 class TestMemoryRange:
     def test_mb(self):
