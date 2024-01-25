@@ -29,8 +29,7 @@ or `train.dstack.yml` are both acceptable).
     ```yaml
     type: dev-environment
 
-    python: "3.11" # (Optional) If not specified, your local version is used
-    
+    python: "3.11"
     ide: vscode
     ```
 
@@ -45,16 +44,17 @@ or `train.dstack.yml` are both acceptable).
     ```yaml
     type: task
 
-    python: "3.11" # (Optional) If not specified, your local version is used
-    
+    python: "3.11"
+    env:
+      - HF_HUB_ENABLE_HF_TRANSFER=1
     commands:
-      - pip install -r requirements.txt
-      - python train.py
+      - pip install -r fine-tuning/qlora/requirements.txt
+      - python fine-tuning/qlora/train.py
     ```
 
     </div>
 
-    Ensure `requirements.txt` and `train.py` are in your folder; you can take them from our [`examples`](https://github.com/dstackai/dstack-examples/tree/main/fine-tuning/qlora).
+    Ensure `requirements.txt` and `train.py` are in your folder. You can take them from [`dstack-examples`](https://github.com/dstackai/dstack-examples/tree/main/fine-tuning/qlora).
 
 === "Service"
 
@@ -66,22 +66,19 @@ or `train.dstack.yml` are both acceptable).
     type: service
 
     image: ghcr.io/huggingface/text-generation-inference:latest
-    
-    env: 
-      - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ 
-    
+    env:
+      - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
     port: 80
-    
     commands:
-      - text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code
+      - text-generation-launcher --port 80 --trust-remote-code
     ```
-    
+
     </div>
 
 ## Run configuration
 
 Run a configuration using the [`dstack run`](reference/cli/index.md#dstack-run) command, followed by the working directory path (e.g., `.`), the path to the
-configuration file, and  run options (e.g., configuring hardware resources, spot policy, etc.)
+configuration file, and run options (e.g., configuring hardware resources, spot policy, etc.)
 
 <div class="termy">
 

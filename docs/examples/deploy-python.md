@@ -139,7 +139,7 @@ run.refresh()
 
 ## Source code
     
-The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+The complete, ready-to-run code is available in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
 
 ```shell
 git clone https://github.com/dstackai/dstack-examples
