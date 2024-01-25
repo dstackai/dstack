@@ -5,6 +5,7 @@ import tempfile
 from typing import Any, Dict, List, Optional
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -61,13 +62,12 @@ class SSHAutoTunnel:
 
     async def start(self):
         proc = await asyncio.create_subprocess_exec(
-            *self._start_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            *self._start_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
         )
-        await proc.wait()
+        _, stderr = await proc.communicate()
         if proc.returncode != 0:
-            # TODO(egor-s): check stderr
             # TODO(egor-s): make robust, retry
-            raise SSHError(proc.returncode)
+            raise get_ssh_error(stderr)
         if self._keep_alive_task is None:
             self._keep_alive_task = asyncio.create_task(self._keep_alive())
         logger.debug("SSH tunnel `%s` is up", self.user_host)

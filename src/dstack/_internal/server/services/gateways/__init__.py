@@ -16,15 +16,18 @@ from dstack._internal.core.errors import GatewayError, ResourceNotExistsError, S
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
-from dstack._internal.core.services.ssh.exec import ssh_execute_command
 from dstack._internal.server import settings
 from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
 from dstack._internal.server.services.backends import (
     get_project_backend_by_type_or_error,
     get_project_backends_with_models,
 )
-from dstack._internal.server.services.gateways.ssh import gateway_tunnel_client
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.server.services.gateways.connection import (
+    GatewayConnection,
+    gateway_tunnel_client,
+)
+from dstack._internal.server.services.gateways.pool import gateway_connections_pool
+from dstack._internal.server.utils.common import gather_map_async, run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
@@ -125,6 +128,8 @@ async def create_gateway(
         await session.commit()
         raise
 
+    # TODO(egor-s): add connection to the pool
+
     return gateway_model_to_gateway(gateway)
 
 
@@ -155,6 +160,7 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
         if isinstance(error, Exception):
             continue  # ignore error, but keep gateway
         if gateway.gateway_compute is not None:
+            # TODO(egor-s): remove from the pool
             gateway.gateway_compute.deleted = True
             session.add(gateway.gateway_compute)
         await session.delete(gateway)
@@ -270,7 +276,7 @@ async def register_service_jobs(
     else:
         raise ServerClientError("Domain is required for gateway")
 
-    await run_async(
+    await run_async(  # TODO(egor-s): use connections pool
         _gateway_preflight,
         project.name,
         job.job_spec.gateway.hostname,
@@ -295,40 +301,47 @@ def _gateway_preflight(
         raise GatewayError(f"Gateway is not working")
 
 
-async def update_gateways(session: AsyncSession):
-    if settings.SKIP_GATEWAY_UPDATE:
-        logger.debug("Skipping gateway update due to DSTACK_SKIP_GATEWAY_UPDATE env variable")
-        return
-
+async def init_gateways(session: AsyncSession):
     res = await session.execute(
         select(GatewayComputeModel).where(GatewayComputeModel.deleted == False)
     )
     gateway_computes = res.scalars().all()
+
+    for gateway, error in await gather_map_async(
+        gateway_computes,
+        lambda g: gateway_connections_pool.add(g.ip_address, g.ssh_private_key),
+        return_exceptions=True,
+    ):
+        if isinstance(error, Exception):
+            logger.warning(f"Failed to connect to gateway %s: %s", gateway.ip_address, error)
+            continue
+
+    if settings.SKIP_GATEWAY_UPDATE:
+        logger.debug("Skipping gateway update due to DSTACK_SKIP_GATEWAY_UPDATE env variable")
+        return
 
     build = get_dstack_runner_version()
     if build == "latest":
         logger.debug("Skipping gateway update due to `latest` version being used")
         return
 
-    aws = [run_async(_update_gateway, gateway, build) for gateway in gateway_computes]
-    for error, gateway in zip(
-        await asyncio.gather(*aws, return_exceptions=True), gateway_computes
+    for conn, error in await gather_map_async(
+        await gateway_connections_pool.all(),
+        lambda c: _update_gateway(c, build),
+        return_exceptions=True,
     ):
         if isinstance(error, Exception):
-            logger.warning(f"Failed to update gateway %s: %s", gateway.ip_address, error)
+            logger.warning(f"Failed to update gateway %s: %s", conn.ip_address, error)
             continue
 
 
-def _update_gateway(gateway_compute: GatewayComputeModel, build: str):
-    logger.debug("Updating gateway %s", gateway_compute.ip_address)
-    stdout = ssh_execute_command(
-        host=f"ubuntu@{gateway_compute.ip_address}",
-        id_rsa=gateway_compute.ssh_private_key,
-        command=f"/bin/sh dstack/update.sh {get_dstack_gateway_wheel(build)} {build}",
-        options=["-o", "ConnectTimeout=5"],
+async def _update_gateway(connection: GatewayConnection, build: str):
+    logger.debug("Updating gateway %s", connection.ip_address)
+    stdout = await connection.tunnel.exec(
+        f"/bin/sh dstack/update.sh {get_dstack_gateway_wheel(build)} {build}"
     )
     if "Update successfully completed" in stdout:
-        logger.info("Gateway %s updated", gateway_compute.ip_address)
+        logger.info("Gateway %s updated", connection.ip_address)
 
 
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:

@@ -21,6 +21,7 @@ class GatewayConnection:
     """
 
     def __init__(self, ip_address: str, id_rsa: str, server_port: int):
+        self.ip_address = ip_address
         args = ["-L", "{temp_dir}/gateway:localhost:%d" % GATEWAY_MANAGEMENT_PORT]
         args += ["-R", f"localhost:8001:localhost:{server_port}"]
         self.tunnel = SSHAutoTunnel(
@@ -37,3 +38,5 @@ class GatewayConnection:
             args,
         )
         self.client = GatewayClient(uds=os.path.join(self.tunnel.temp_dir, "gateway"))
+
+    # TODO(egor-s): lock, start, stop, exec

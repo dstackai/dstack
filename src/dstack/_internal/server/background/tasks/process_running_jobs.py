@@ -27,7 +27,7 @@ from dstack._internal.server.models import (
     RunModel,
 )
 from dstack._internal.server.services import logs as logs_services
-from dstack._internal.server.services.gateways.ssh import gateway_tunnel_client
+from dstack._internal.server.services.gateways.connection import gateway_tunnel_client
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -457,7 +457,7 @@ def _register_service(
     gateway_ssh_private_key: str,
 ):
     try:
-        with gateway_tunnel_client(
+        with gateway_tunnel_client(  # TODO(egor-s): use connection from the pool
             job.job_spec.gateway.hostname, id_rsa=gateway_ssh_private_key
         ) as gateway_client:
             gateway_client.register_service(
