@@ -27,7 +27,7 @@ class GatewayConnectionsPool:
             await start_task
             return True
         except Exception:
-            with self._lock:
+            async with self._lock:
                 self._connections.pop(hostname, None)
             raise
 
