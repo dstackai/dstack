@@ -23,6 +23,7 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.utils.common import parse_memory
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -39,15 +40,16 @@ class KubernetesCompute(Compute):
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
-        # TODO: Use self.client.list_node()?
-        return [
-            InstanceOfferWithAvailability(
+        nodes = self.api.list_node()
+        instance_offers = []
+        for node in nodes.items:
+            instance_offer = InstanceOfferWithAvailability(
                 backend=BackendType.KUBERNETES,
                 instance=InstanceType(
-                    name="k8s-instance",
+                    name=node.metadata.name,
                     resources=Resources(
-                        cpus=2,
-                        memory_mib=8192,
+                        cpus=node.status.capacity["cpu"],
+                        memory_mib=int(parse_memory(node.status.capacity["memory"], as_untis="M")),
                         gpus=[],
                         spot=False,
                     ),
@@ -56,7 +58,8 @@ class KubernetesCompute(Compute):
                 region="local",
                 availability=InstanceAvailability.AVAILABLE,
             )
-        ]
+            instance_offers.append(instance_offer)
+        return instance_offers[:1]
 
     def run_job(
         self,

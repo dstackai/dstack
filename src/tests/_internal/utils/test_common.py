@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
 from freezegun import freeze_time
 
-from dstack._internal.utils.common import pretty_date
+from dstack._internal.utils.common import parse_memory, pretty_date
 
 
 @freeze_time(datetime(2023, 10, 4, 12, 0, tzinfo=timezone.utc))
@@ -69,3 +70,17 @@ class TestPrettyDate:
     def test_epoch_timestamp(self):
         epoch_time = 1609459200  # January 1, 2021
         assert pretty_date(epoch_time) == "3 years ago"
+
+
+class TestParseMemory:
+    @pytest.mark.parametrize(
+        "memory,as_units,expected",
+        [
+            ("1024Ki", "M", 1),
+            ("512Ki", "M", 0.5),
+            ("2Gi", "M", 2048),
+            ("1024Ki", "K", 1024),
+        ],
+    )
+    def test_parses_memory(self, memory, as_units, expected):
+        assert parse_memory(memory, as_untis=as_units) == expected
