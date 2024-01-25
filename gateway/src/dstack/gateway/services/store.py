@@ -79,7 +79,9 @@ class Store(BaseModel):
             if domain in self.entrypoints:
                 if self.entrypoints[domain] == (project, module):
                     return
-                raise GatewayError(f"Domain {domain} is already registered")
+                raise GatewayError(
+                    f"Domain {domain} is already registered for {self.entrypoints[domain]}"
+                )
 
             logger.info("%s: registering entrypoint %s", project, domain)
             await self.nginx.register_entrypoint(domain, f"/api/{module}/{project}")

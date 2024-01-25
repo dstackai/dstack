@@ -293,7 +293,7 @@ async def register_service_jobs(
         logger.debug("Running service preflight: %s", job.job_spec.gateway.hostname)
         await run_async(
             conn.client.preflight,
-            project,
+            project.name,
             job.job_spec.gateway.hostname,
             project.ssh_private_key,
             job.job_spec.gateway.options,

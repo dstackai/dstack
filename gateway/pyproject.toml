@@ -15,6 +15,7 @@ dependencies = [
     "httpx",
     "jinja2",
     "uvicorn",
+    "aiocache",
 ]
 
 [tool.setuptools.package-data]

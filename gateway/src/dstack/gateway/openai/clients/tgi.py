@@ -1,13 +1,12 @@
-import asyncio
 import datetime
 import json
 import uuid
 from typing import AsyncIterator, Dict, List, Optional
 
-import httpx
 import jinja2
 import jinja2.sandbox
 
+from dstack.gateway.common import AsyncClientWrapper
 from dstack.gateway.errors import GatewayError
 from dstack.gateway.openai.clients import ChatCompletionsClient
 from dstack.gateway.openai.schemas import (
@@ -183,14 +182,6 @@ class TGIChatCompletions(ChatCompletionsClient):
             if text.endswith(stop_token):
                 return text[: -len(stop_token)]
         return text
-
-
-class AsyncClientWrapper(httpx.AsyncClient):
-    def __del__(self):
-        try:
-            asyncio.get_running_loop().create_task(self.aclose())
-        except Exception:
-            pass
 
 
 def raise_exception(message: str):
