@@ -38,5 +38,3 @@ class GatewayConnection:
             args,
         )
         self.client = GatewayClient(uds=os.path.join(self.tunnel.temp_dir, "gateway"))
-
-    # TODO(egor-s): lock, start, stop, exec

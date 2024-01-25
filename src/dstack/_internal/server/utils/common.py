@@ -6,7 +6,6 @@ from typing_extensions import ParamSpec
 
 P = ParamSpec("P")
 R = TypeVar("R")
-T = TypeVar("T")
 
 
 async def run_async(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
@@ -14,9 +13,16 @@ async def run_async(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> 
     return await asyncio.get_running_loop().run_in_executor(None, func_with_args)
 
 
+ItemT = TypeVar("ItemT")
+ResultT = TypeVar("ResultT")
+
+
 async def gather_map_async(
-    items: Sequence[T], func: Callable[[T], Awaitable[R]], *, return_exceptions: bool = False
-) -> List[Tuple[T, Union[R, Exception]]]:
+    items: Sequence[ItemT],
+    func: Callable[[ItemT], Awaitable[ResultT]],
+    *,
+    return_exceptions: bool = False
+) -> List[Tuple[ItemT, Union[ResultT, Exception]]]:
     """
     A parallel wrapper around asyncio.gather that returns a list of tuples (item, result).
     Args:

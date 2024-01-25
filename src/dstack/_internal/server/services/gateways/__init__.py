@@ -1,9 +1,8 @@
 import asyncio
-import os
 from datetime import timezone
 from typing import List, Optional, Sequence
 
-import requests
+import httpx
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +11,12 @@ from dstack._internal.core.backends.base.compute import (
     get_dstack_gateway_wheel,
     get_dstack_runner_version,
 )
-from dstack._internal.core.errors import GatewayError, ResourceNotExistsError, ServerClientError
+from dstack._internal.core.errors import (
+    GatewayError,
+    ResourceNotExistsError,
+    ServerClientError,
+    SSHError,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import Job
@@ -22,16 +26,17 @@ from dstack._internal.server.services.backends import (
     get_project_backend_by_type_or_error,
     get_project_backends_with_models,
 )
-from dstack._internal.server.services.gateways.connection import (
-    GatewayConnection,
-    gateway_tunnel_client,
-)
+from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.utils.common import gather_map_async, run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+GATEWAY_CONNECT_ATTEMPTS = 5
+GATEWAY_CONNECT_DELAY = 10
 
 
 async def list_project_gateways(session: AsyncSession, project: ProjectModel) -> List[Gateway]:
@@ -97,7 +102,7 @@ async def create_gateway(
             region,
             project.name,
         )
-        gateway_compute = GatewayComputeModel(
+        gateway.gateway_compute = GatewayComputeModel(
             backend_id=backend_model.id,
             ip_address=info.ip_address,
             region=info.region,
@@ -105,17 +110,7 @@ async def create_gateway(
             ssh_private_key=gateway_ssh_private_key,
             ssh_public_key=gateway_ssh_public_key,
         )
-        session.add(gateway_compute)
-        await session.commit()
-        await session.refresh(gateway_compute)
-        await session.execute(
-            update(GatewayModel)
-            .where(
-                GatewayModel.project_id == project.id,
-                GatewayModel.name == name,
-            )
-            .values(gateway_compute_id=gateway_compute.id)
-        )
+        session.add(gateway)
         await session.commit()
         await session.refresh(gateway)
     except Exception:  # rollback, release reserved name
@@ -128,7 +123,22 @@ async def create_gateway(
         await session.commit()
         raise
 
-    # TODO(egor-s): add connection to the pool
+    for attempt in range(GATEWAY_CONNECT_ATTEMPTS):
+        try:
+            await gateway_connections_pool.add(
+                gateway.gateway_compute.ip_address, gateway_ssh_private_key
+            )
+            break
+        except SSHError as e:
+            if attempt < GATEWAY_CONNECT_ATTEMPTS - 1:
+                logger.debug(
+                    "Failed to connect to gateway %s: %s", gateway.gateway_compute.ip_address, e
+                )
+                await asyncio.sleep(GATEWAY_CONNECT_DELAY)
+            else:
+                logger.error(
+                    "Failed to connect to gateway %s: %s", gateway.gateway_compute.ip_address, e
+                )
 
     return gateway_model_to_gateway(gateway)
 
@@ -160,7 +170,7 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
         if isinstance(error, Exception):
             continue  # ignore error, but keep gateway
         if gateway.gateway_compute is not None:
-            # TODO(egor-s): remove from the pool
+            await gateway_connections_pool.remove(gateway.gateway_compute.ip_address)
             gateway.gateway_compute.deleted = True
             session.add(gateway.gateway_compute)
         await session.delete(gateway)
@@ -276,29 +286,22 @@ async def register_service_jobs(
     else:
         raise ServerClientError("Domain is required for gateway")
 
-    await run_async(  # TODO(egor-s): use connections pool
-        _gateway_preflight,
-        project.name,
-        job.job_spec.gateway.hostname,
-        gateway.gateway_compute.ssh_private_key,
-        project.ssh_private_key,
-        job.job_spec.gateway.options,
-    )
+    if (conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)) is None:
+        raise ServerClientError(f"Gateway is not connected")
 
-
-def _gateway_preflight(
-    project: str,
-    domain: str,
-    gateway_ssh_private_key: str,
-    project_ssh_private_key: str,
-    options: dict,
-):
-    logger.debug("Running service preflight: %s", domain)
     try:
-        with gateway_tunnel_client(domain, gateway_ssh_private_key) as client:
-            client.preflight(project, domain, project_ssh_private_key, options)
-    except requests.RequestException:
-        raise GatewayError(f"Gateway is not working")
+        logger.debug("Running service preflight: %s", job.job_spec.gateway.hostname)
+        await run_async(
+            conn.client.preflight,
+            project,
+            job.job_spec.gateway.hostname,
+            project.ssh_private_key,
+            job.job_spec.gateway.options,
+        )
+    except SSHError:
+        raise ServerClientError(f"Gateway tunnel is not working")
+    except httpx.RequestError as e:
+        raise GatewayError(f"Gateway is not working: {e}")
 
 
 async def init_gateways(session: AsyncSession):

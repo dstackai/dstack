@@ -23,8 +23,13 @@ class GatewayConnectionsPool:
                 return False
             self._connections[hostname] = GatewayConnection(hostname, id_rsa, self.server_port)
             start_task = self._connections[hostname].tunnel.start()
-        await start_task
-        return True
+        try:
+            await start_task
+            return True
+        except Exception:
+            with self._lock:
+                self._connections.pop(hostname, None)
+            raise
 
     async def remove(self, hostname: str) -> bool:
         async with self._lock:

@@ -4,7 +4,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.models.runs import JobSpec, JobStatus
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import GatewayModel, JobModel
-from dstack._internal.server.services.gateways import gateway_tunnel_client
+from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs import (
     TERMINATING_PROCESSING_JOBS_IDS,
     TERMINATING_PROCESSING_JOBS_LOCK,
@@ -61,13 +61,19 @@ async def _process_job(job_id):
                 .options(joinedload(GatewayModel.gateway_compute))
             )
             gateway = res.scalar_one()
-            await run_async(
-                _unregister_service,
-                job_model.project.name,
-                job_spec.gateway.hostname,
-                gateway.gateway_compute.ssh_private_key,
-            )
-            logger.debug(*job_log("service is unregistered", job_model))
+            if (
+                conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
+            ) is None:
+                logger.warning("Gateway is not connected: %s", gateway.gateway_compute.ip_address)
+            try:
+                await run_async(
+                    conn.client.unregister_service,
+                    job_model.project.name,
+                    job_spec.gateway.hostname,
+                )
+                logger.debug(*job_log("service is unregistered", job_model))
+            except Exception as e:
+                logger.warning("failed to unregister service: %s", e)
         try:
             if job_submission.job_provisioning_data is not None:
                 await terminate_job_submission_instance(
@@ -81,20 +87,3 @@ async def _process_job(job_id):
             logger.error(*job_log("failed to terminate job instance: %s", job_model, e))
         job_model.last_processed_at = get_current_datetime()
         await session.commit()
-
-
-def _unregister_service(
-    project: str,
-    public_domain: str,
-    gateway_ssh_private_key: str,
-):
-    try:
-        with gateway_tunnel_client(
-            public_domain, id_rsa=gateway_ssh_private_key
-        ) as gateway_client:
-            gateway_client.unregister_service(
-                project=project,
-                public_domain=public_domain,
-            )
-    except Exception as e:
-        logger.warning("failed to unregister service: %s", e)

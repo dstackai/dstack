@@ -16,7 +16,7 @@ class GatewayClient:
             raise ValueError("Either uds or port should be specified, not both")
 
         self.base_url = f"http://gateway" if uds else f"http://localhost:{port}"
-        self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds) if uds else None)
+        self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds) if uds else None, timeout=30)
 
     def register_service(self, project: str, job: Job, job_provisioning_data: JobProvisioningData):
         payload = {
