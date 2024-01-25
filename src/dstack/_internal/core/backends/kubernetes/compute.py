@@ -3,7 +3,6 @@ import tempfile
 import time
 from typing import List, Optional
 
-import yaml
 from kubernetes import client
 
 from dstack._internal.core.backends.base.compute import (
@@ -27,6 +26,9 @@ from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+DEFAULT_NAMESPACE = "default"
 
 
 class KubernetesCompute(Compute):
@@ -79,7 +81,7 @@ class KubernetesCompute(Compute):
             jump_pod_port=self.config.networking.ssh_port,
         )
         response = self.api.create_namespaced_pod(
-            namespace="default",
+            namespace=DEFAULT_NAMESPACE,
             body=client.V1Pod(
                 metadata=client.V1ObjectMeta(
                     name=instance_name,
@@ -103,9 +105,9 @@ class KubernetesCompute(Compute):
             ),
         )
         response = self.api.create_namespaced_service(
-            namespace="default",
+            namespace=DEFAULT_NAMESPACE,
             body=client.V1Service(
-                metadata=client.V1ObjectMeta(name=f"{instance_name}-service"),
+                metadata=client.V1ObjectMeta(name=_get_pod_service_name(instance_name)),
                 spec=client.V1ServiceSpec(
                     type="ClusterIP",
                     selector={"app.kubernetes.io/name": instance_name},
@@ -132,7 +134,22 @@ class KubernetesCompute(Compute):
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
-        pass
+        try:
+            self.api.delete_namespaced_service(
+                name=_get_pod_service_name(instance_id),
+                namespace=DEFAULT_NAMESPACE,
+                body=client.V1DeleteOptions(),
+            )
+        except client.ApiException as e:
+            if e.status != 404:
+                raise
+        try:
+            self.api.delete_namespaced_pod(
+                name=instance_id, namespace=DEFAULT_NAMESPACE, body=client.V1DeleteOptions()
+            )
+        except client.ApiException as e:
+            if e.status != 404:
+                raise
 
 
 def _setup_jump_pod(
@@ -152,7 +169,7 @@ def _setup_jump_pod(
     )
     _wait_for_pod_ready(
         api=api,
-        pod_name=f"{project_name}-ssh-jump-pod",
+        pod_name=_get_jump_pod_name(project_name),
     )
     _add_authorized_key_to_jump_pod(
         jump_pod_host=jump_pod_host,
@@ -170,8 +187,8 @@ def _create_jump_pod_service_if_not_exists(
 ):
     try:
         api.read_namespaced_service(
-            name=f"{project_name}-ssh-jump-pod-service",
-            namespace="default",
+            name=_get_jump_pod_service_name(project_name),
+            namespace=DEFAULT_NAMESPACE,
         )
     except client.ApiException as e:
         if e.status == 404:
@@ -193,9 +210,9 @@ def _create_jump_pod_service(
 ):
     # TODO use restricted ssh-forwarding-only user for jump pod instead of root.
     commands = _get_jump_pod_commands(authorized_keys=[project_ssh_public_key])
-    pod_name = f"{project_name}-ssh-jump-pod"
+    pod_name = _get_jump_pod_name(project_name)
     response = api.create_namespaced_pod(
-        namespace="default",
+        namespace=DEFAULT_NAMESPACE,
         body=client.V1Pod(
             metadata=client.V1ObjectMeta(
                 name=pod_name,
@@ -220,9 +237,9 @@ def _create_jump_pod_service(
         ),
     )
     response = api.create_namespaced_service(
-        namespace="default",
+        namespace=DEFAULT_NAMESPACE,
         body=client.V1Service(
-            metadata=client.V1ObjectMeta(name=f"{pod_name}-service"),
+            metadata=client.V1ObjectMeta(name=_get_jump_pod_service_name(project_name)),
             spec=client.V1ServiceSpec(
                 type="NodePort",
                 selector={"app.kubernetes.io/name": pod_name},
@@ -261,36 +278,25 @@ def _get_jump_pod_commands(authorized_keys: List[str]) -> List[str]:
 def _wait_for_pod_ready(
     api: client.CoreV1Api,
     pod_name: str,
-    namespace: str = "default",
     timeout_seconds: int = 300,
 ):
     start_time = time.time()
-
     while True:
         try:
-            pod = api.read_namespaced_pod(name=pod_name, namespace=namespace)
-
-            # Check if the pod is ready
+            pod = api.read_namespaced_pod(name=pod_name, namespace=DEFAULT_NAMESPACE)
+        except client.ApiException as e:
+            if e.status != 404:
+                raise
+        else:
             if pod.status.phase == "Running" and all(
                 container_status.ready for container_status in pod.status.container_statuses
             ):
                 return True
-
-        except client.ApiException as e:
-            print(e.status)
-            if e.status == 404:
-                # Pod not found, it might be initializing
-                pass
-            raise e
-
         elapsed_time = time.time() - start_time
-
         if elapsed_time >= timeout_seconds:
-            logger.warning("Timeout waiting for pod %s to be ready.", pod_name)
+            logger.warning("Timeout waiting for pod %s to be ready", pod_name)
             return False
-
-        # Sleep for a short interval before checking again
-        time.sleep(5)
+        time.sleep(1)
 
 
 def _add_authorized_key_to_jump_pod(
@@ -330,3 +336,15 @@ def _run_ssh_command(hostname: str, port: int, ssh_private_key: str, command: st
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+
+
+def _get_jump_pod_name(project_name: str) -> str:
+    return f"{project_name}-ssh-jump-pod"
+
+
+def _get_jump_pod_service_name(project_name: str) -> str:
+    return f"{project_name}-ssh-jump-pod-service"
+
+
+def _get_pod_service_name(pod_name: str) -> str:
+    return f"{pod_name}-service"
