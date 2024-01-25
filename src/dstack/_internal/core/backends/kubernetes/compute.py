@@ -10,6 +10,7 @@ from dstack._internal.core.backends.base.compute import (
     get_docker_commands,
     get_instance_name,
 )
+from dstack._internal.core.backends.base.offers import match_requirements
 from dstack._internal.core.backends.kubernetes.client import get_api_from_config_data
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
 from dstack._internal.core.models.backends.base import BackendType
@@ -58,8 +59,8 @@ class KubernetesCompute(Compute):
                 region="local",
                 availability=InstanceAvailability.AVAILABLE,
             )
-            instance_offers.append(instance_offer)
-        return instance_offers[:1]
+            instance_offers.extend(match_requirements([instance_offer], requirements))
+        return instance_offers
 
     def run_job(
         self,

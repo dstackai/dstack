@@ -70,6 +70,29 @@ def catalog_item_to_offer(
     )
 
 
+def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
+    gpu_count = len(offer.instance.resources.gpus)
+    gpu_name = None
+    gpu_memory = None
+    if gpu_count > 0:
+        gpu = offer.instance.resources.gpus[0]
+        gpu_name = gpu.name
+        gpu_memory = gpu.memory_mib / 1024
+    return gpuhunt.CatalogItem(
+        provider=offer.backend.value,
+        instance_name=offer.instance.name,
+        location=offer.region,
+        price=offer.price,
+        cpu=offer.instance.resources.cpus,
+        memory=offer.instance.resources.memory_mib / 1024,
+        gpu_count=gpu_count,
+        gpu_name=gpu_name,
+        gpu_memory=gpu_memory,
+        spot=offer.instance.resources.spot,
+        disk_size=offer.instance.resources.disk.size_mib,
+    )
+
+
 def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFilter:
     q = gpuhunt.QueryFilter()
     if req is None:
@@ -92,3 +115,15 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
         if req.gpus.compute_capability is not None:
             q.min_compute_capability = req.gpus.compute_capability
     return q
+
+
+def match_requirements(
+    offers: List[InstanceOffer], requirements: Optional[Requirements]
+) -> List[InstanceOffer]:
+    query_filter = requirements_to_query_filter(requirements)
+    filtered_offers = []
+    for offer in offers:
+        catalog_item = offer_to_catalog_item(offer)
+        if gpuhunt.matches(catalog_item, q=query_filter):
+            filtered_offers.append(offer)
+    return filtered_offers
