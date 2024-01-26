@@ -24,6 +24,7 @@ class GatewayClient:
             "app_port": job.job_spec.gateway.service_port,
             "ssh_host": f"{job_provisioning_data.username}@{job_provisioning_data.hostname}",
             "ssh_port": job_provisioning_data.ssh_port,
+            "auth": job.job_spec.gateway.auth,
             "options": job.job_spec.gateway.options,
         }
         if job_provisioning_data.dockerized:

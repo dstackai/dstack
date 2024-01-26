@@ -110,6 +110,7 @@ class Gateway(BaseModel):
     public_port: int = 80
     secure: bool = False
 
+    auth: bool = True
     options: dict = {}
 
 
