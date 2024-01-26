@@ -192,6 +192,7 @@ nav:
         - vLLM: examples/vllm.md
         - Text Embedding Interface: examples/tei.md
         - SDXL: examples/sdxl.md
+        - Infinity: examples/infinity.md
     - RAG:
         - Llama Index: examples/llama-index.md
   - Discord: https://discord.gg/u8SmfwPpMd

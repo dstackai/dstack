@@ -72,7 +72,7 @@ from openai import OpenAI
 
 
 client = OpenAI(
-  base_url="https://gateway.example.com",
+  base_url="https://gateway.<gateway domain>",
   api_key="none"
 )
 

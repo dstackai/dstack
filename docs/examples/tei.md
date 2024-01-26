@@ -39,7 +39,7 @@ $ dstack run . -f deployment/tae/serve.dstack.yml --gpu 24GB
 ## Access the endpoint
     
 Once the service is up, you can query it at 
-`https://<run name>.<gatewy domain>` (using the domain set up for the gateway):
+`https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
 <div class="termy">
 
@@ -60,14 +60,13 @@ $ curl https://yellow-cat-1.example.com \
     (with [`--env`](../docs/reference/cli/index.md#dstack-run) in `dstack run` or 
     using [`env`](../docs/reference/dstack.yml.md#service) in the configuration file).
     
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . -f text-embeddings-inference/serve.dstack.yml \ 
-        --env HUGGING_FACE_HUB_TOKEN=&lt;token&gt; \
-        --gpu 24GB
-    ```
-    </div>
+[//]: # (    <div class="termy">)
+[//]: # (    ```shell)
+[//]: # (    $ dstack run . -f text-embeddings-inference/serve.dstack.yml \ )
+[//]: # (        --env HUGGING_FACE_HUB_TOKEN=&lt;token&gt; \)
+[//]: # (        --gpu 24GB)
+[//]: # (    ```)
+[//]: # (    </div>)
 
 [//]: # (## Use embeddings API)
 
