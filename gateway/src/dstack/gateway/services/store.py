@@ -59,7 +59,9 @@ class Store(BaseModel):
                 await run_async(tunnel.start)
                 stack.push_async_callback(supress_exc_async(run_async, tunnel.stop))
 
-                await self.nginx.register_service(service.public_domain, tunnel.sock_path)
+                await self.nginx.register_service(
+                    project, service.public_domain, tunnel.sock_path, auth=service.auth
+                )
                 stack.push_async_callback(
                     supress_exc_async(self.nginx.unregister_domain, service.public_domain)
                 )

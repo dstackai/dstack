@@ -1,18 +1,20 @@
+import importlib.resources
 import logging
 import re
 import subprocess
 import tempfile
 from asyncio import Lock
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Optional, Set
 
+import jinja2
 from pydantic import BaseModel
 
 from dstack.gateway.common import run_async
 from dstack.gateway.errors import GatewayError
 
 CONFIGS_DIR = Path("/etc/nginx/sites-enabled")
+GATEWAY_PORT = 8000
 logger = logging.getLogger(__name__)
 
 
@@ -25,26 +27,26 @@ class Nginx(BaseModel):
     domains: Set[str] = set()
     _lock: Lock = Lock()
 
-    async def register_service(self, domain: str, sock_path: str):
+    async def register_service(self, project: str, domain: str, sock_path: str, auth: bool):
         logger.info("Registering service %s", domain)
         async with self._lock:
             if domain in self.domains:
                 raise GatewayError("Domain is already registered")
             self.write_conf(
-                self.get_service_conf(domain, f"unix:{sock_path}"),
+                self.get_service_conf(project, domain, f"unix:{sock_path}", auth),
                 CONFIGS_DIR / f"443-{domain}.conf",
             )
             self.domains.add(domain)
             await run_async(self.reload)
 
-    async def register_entrypoint(self, domain: str, prefix: str, port: int = 8000):
+    async def register_entrypoint(self, domain: str, prefix: str):
         logger.info("Registering entrypoint %s", domain)
         async with self._lock:
             if domain in self.domains:
                 raise GatewayError("Domain is already registered")
             await run_async(self.run_certbot, domain)
             self.write_conf(
-                self.get_entrypoint_conf(domain, prefix, port),
+                self.get_entrypoint_conf(domain, prefix),
                 CONFIGS_DIR / f"443-{domain}.conf",
             )
             self.domains.add(domain)
@@ -63,74 +65,33 @@ class Nginx(BaseModel):
             await run_async(self.reload)
 
     @classmethod
-    def get_service_conf(cls, domain: str, server: str, upstream: Optional[str] = None) -> dict:
+    def get_service_conf(
+        cls, project: str, domain: str, server: str, auth: bool, upstream: Optional[str] = None
+    ) -> str:
         if upstream is None:
             upstream = re.sub(r"[^a-z0-9_.\-]", "_", server, flags=re.IGNORECASE)
-        return {
-            f"upstream {upstream}": {
-                "server": server,
-            },
-            "server": {
-                "server_name": domain,
-                "location /": {
-                    # the first location is required, always fallback to the @-location
-                    "try_files": "/nonexistent @$http_upgrade",
-                },
-                "location @websocket": {
-                    "proxy_pass": f"http://{upstream}",
-                    "proxy_set_header X-Real-IP": "$remote_addr",
-                    "proxy_set_header Host": "$host",
-                    # web socket related headers
-                    "proxy_http_version": "1.1",
-                    "proxy_set_header Upgrade": "$http_upgrade",
-                    "proxy_set_header Connection": '"Upgrade"',
-                },
-                "location @": {
-                    "proxy_pass": f"http://{upstream}",
-                    "proxy_set_header X-Real-IP": "$remote_addr",
-                    "proxy_set_header Host": "$host",
-                },
-                "listen": "80",
-                **cls.get_ssl_conf(domain),
-            },
-        }
+        template = importlib.resources.read_text(
+            "dstack.gateway.resources.nginx", "service.jinja2"
+        )
+        return jinja2.Template(template).render(
+            upstream=upstream,
+            server=server,
+            domain=domain,
+            auth=auth,
+            port=GATEWAY_PORT,
+            project=project,
+        )
 
     @classmethod
-    def get_entrypoint_conf(cls, domain: str, prefix: str, port: int) -> dict:
-        return {
-            "server": {
-                "server_name": domain,
-                "location /": {
-                    "proxy_pass": f"http://localhost:{port}/{prefix.strip('/')}/",
-                    "proxy_set_header X-Real-IP": "$remote_addr",
-                    "proxy_set_header Host": "$host",
-                },
-                "listen": "80",
-                **cls.get_ssl_conf(domain),
-            },
-        }
-
-    @staticmethod
-    def get_ssl_conf(domain: str) -> dict:
-        return {
-            "listen 443": "ssl",
-            "ssl_certificate": f"/etc/letsencrypt/live/{domain}/fullchain.pem",
-            "ssl_certificate_key": f"/etc/letsencrypt/live/{domain}/privkey.pem",
-            "include": "/etc/letsencrypt/options-ssl-nginx.conf",
-            "ssl_dhparam": "/etc/letsencrypt/ssl-dhparams.pem",
-            # do not force https for localhost
-            # we rely on ordered dict (3.8+)
-            "set $force_https": "1",
-            'if ($scheme = "https")': {
-                "set $force_https": "0",
-            },
-            "if ($remote_addr = 127.0.0.1)": {
-                "set $force_https": "0",
-            },
-            "if ($force_https)": {
-                "return": "301 https://$host$request_uri",
-            },
-        }
+    def get_entrypoint_conf(cls, domain: str, prefix: str) -> str:
+        template = importlib.resources.read_text(
+            "dstack.gateway.resources.nginx", "entrypoint.jinja2"
+        )
+        return jinja2.Template(template).render(
+            domain=domain,
+            port=GATEWAY_PORT,
+            prefix=prefix,
+        )
 
     @staticmethod
     def reload():
@@ -140,25 +101,9 @@ class Nginx(BaseModel):
             raise GatewayError("Failed to reload nginx")
 
     @classmethod
-    def format_conf(
-        cls, o: Union[Dict[str, Any], List[Tuple[str, Any]]], *, indent: int = 2, depth: int = 0
-    ) -> str:
-        pad = " " * depth * indent
-        text = ""
-        pairs = o.items() if isinstance(o, dict) else o
-        for key, value in pairs:
-            if isinstance(value, (dict, list)):
-                text += pad + key + " {\n"
-                text += cls.format_conf(value, indent=indent, depth=depth + 1)
-                text += pad + "}\n"
-            else:
-                text += pad + f"{key} {value};\n"
-        return text
-
-    @classmethod
-    def write_conf(cls, conf: dict, conf_path: Path):
+    def write_conf(cls, conf: str, conf_path: Path):
         temp = tempfile.NamedTemporaryFile("w")
-        temp.write(cls.format_conf(conf))
+        temp.write(conf)
         temp.flush()
         temp.seek(0)
         r = subprocess.run(["sudo", "cp", temp.name, conf_path])
