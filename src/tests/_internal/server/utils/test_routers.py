@@ -1,7 +1,6 @@
 from typing import Optional
 
 import pytest
-
 from dstack._internal.server.utils.routers import check_client_server_compatibility
 
 

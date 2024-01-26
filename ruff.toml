@@ -1,4 +1,5 @@
 target-version = "py38"
+line-length = 99
 
 [lint]
 select = ['E', 'F']

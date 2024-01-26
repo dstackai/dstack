@@ -4,8 +4,6 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -25,6 +23,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_run_spec,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class TestProcessSubmittedJobs:

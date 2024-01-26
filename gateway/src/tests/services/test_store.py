@@ -2,7 +2,6 @@ from typing import Dict, Optional
 from unittest.mock import Mock, patch
 
 import pytest
-
 from dstack.gateway.openai.store import OpenAIStore
 from dstack.gateway.schemas import Service
 from dstack.gateway.services.nginx import Nginx

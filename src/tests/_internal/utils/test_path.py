@@ -1,7 +1,6 @@
 from pathlib import PurePath
 
 import pytest
-
 from dstack._internal.utils.path import resolve_relative_path
 
 

@@ -2,7 +2,6 @@ import argparse
 from typing import List, Tuple
 
 import pytest
-
 from dstack._internal.cli.services.configurators.run import run_configurators_mapping
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import (

@@ -2,8 +2,6 @@ from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from dstack._internal.core.models.runs import JobStatus
 from dstack._internal.server.background.tasks.process_pending_jobs import process_pending_jobs
 from dstack._internal.server.testing.common import (
@@ -13,6 +11,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class TestProcessPendingJobs:

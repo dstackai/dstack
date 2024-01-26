@@ -2,14 +2,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server import settings
 from dstack._internal.server.main import app
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import create_project, create_user, get_auth_headers
+from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 client = TestClient(app)
 
