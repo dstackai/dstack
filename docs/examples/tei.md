@@ -7,21 +7,17 @@ This example demonstrates how to use [TEI](https://github.com/huggingface/text-e
 
 To deploy a text embeddings model as a service using TEI, define the following configuration file:
 
-<div editor-title="text-embeddings-inference/serve.dstack.yml"> 
+<div editor-title="deployment/tae/serve.dstack.yml"> 
 
 ```yaml
 type: service
 
 image: ghcr.io/huggingface/text-embeddings-inference:latest
-
 env:
   - MODEL_ID=thenlper/gte-base
-
-port: 8000
-
 commands: 
-  - text-embeddings-router --hostname 0.0.0.0 --port 8000
-
+  - text-embeddings-router --port 80
+port: 80
 ```
 
 </div>
@@ -35,23 +31,20 @@ commands:
 <div class="termy">
 
 ```shell
-$ dstack run . -f text-embeddings-inference/embeddings.dstack.yml --gpu 24GB
+$ dstack run . -f deployment/tae/serve.dstack.yml --gpu 24GB
 ```
 
 </div>
 
-!!! info "Endpoint URL"
-    Once the service is deployed, its endpoint will be available at 
-    `https://<run-name>.<domain-name>` (using the domain set up for the gateway).
-
-    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
-
-Once the service is up, you can query it:
+## Access the endpoint
+    
+Once the service is up, you can query it at 
+`https://<run name>.<gatewy domain>` (using the domain set up for the gateway):
 
 <div class="termy">
 
 ```shell
-$ curl https://yellow-cat-1.mydomain.com \
+$ curl https://yellow-cat-1.example.com \
     -X POST \
     -H 'Content-Type: application/json' \
     -d '{"inputs":"What is Deep Learning?"}'
@@ -100,7 +93,7 @@ $ curl https://yellow-cat-1.mydomain.com \
 [//]: # ()
 [//]: # (# Specify your service url)
 
-[//]: # (EMBEDDINGS_URL = "https://tall-octopus-1.mydomain.com")
+[//]: # (EMBEDDINGS_URL = "https://tall-octopus-1.example.com")
 
 [//]: # ()
 [//]: # (embedding=HuggingFaceInferenceAPIEmbeddings&#40;)
@@ -231,5 +224,13 @@ $ curl https://yellow-cat-1.mydomain.com \
 
 [//]: # (    you'll have to split your texts into batches and add them to vector store via `vectorstore.add_texts&#40;&#41;`.)
 
-!!! info "Source code"
-    The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+## Source code
+
+The complete, ready-to-run code is available in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
+
+## What's next?
+
+1. Check the [Text Generation Inference](tgi.md) and [vLLM](vllm.md) examples
+2. Read about [services](../docs/concepts/services.md)
+3. Browse all [examples](index.md)
+4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

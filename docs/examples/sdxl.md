@@ -204,13 +204,9 @@ $ dstack run . -f stable-diffusion-xl/api.dstack.yml
 
 </div>
 
-!!! info "Endpoint URL"
-    Once the service is deployed, its endpoint will be available at 
-    `https://<run-name>.<domain-name>` (using the domain set up for the gateway).
-
-    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
-
-Once the service is up, you can query the endpoint:
+## Access the endpoint
+Once the service is up, you can query it at 
+`https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
 <div class="termy">
 
@@ -224,7 +220,7 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
 
 ## Source code
     
-The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+The complete, ready-to-run code is available in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
 
 ## What's next?
 

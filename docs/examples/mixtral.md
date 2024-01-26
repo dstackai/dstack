@@ -8,6 +8,58 @@ with `dstack`'s [services](../docs/concepts/services.md).
 To deploy Mixtral as a service, you have to define the corresponding configuration file.
 Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
 
+=== "TGI `fp16`"
+
+    <div editor-title="llms/mixtral/tgi.dstack.yml"> 
+
+    ```yaml
+    type: service
+    
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    env:
+      - MODEL_ID=mistralai/Mixtral-8x7B-Instruct-v0.1
+    commands:
+      - text-generation-launcher 
+        --port 80
+        --trust-remote-code
+        --num-shard 2 # Should match the number of GPUs 
+    port: 80
+
+    # Optional mapping for OpenAI-compatible endpoint
+    model:
+      type: chat
+      name: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
+      format: tgi
+    ```
+
+    </div>
+
+=== "TGI `int4`"
+
+    <div editor-title="llms/mixtral/tgi-gptq.dstack.yml"> 
+
+    ```yaml
+    type: service
+
+    image: ghcr.io/huggingface/text-generation-inference:latest 
+    env:
+      - MODEL_ID=TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ 
+    commands:
+      - text-generation-launcher
+        --port 80
+        --trust-remote-code
+        --quantize gptq
+    port: 80
+
+    # Optional mapping for OpenAI-compatible endpoint
+    model:
+      type: chat
+      name: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
+      format: tgi
+    ```
+
+    </div>
+
 === "vLLM `fp16`"
 
     <div editor-title="llms/mixtral/vllm.dstack.yml"> 
@@ -30,57 +82,11 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
 
     </div>
 
-=== "TGI `fp16`"
+    !!! info "NOTE:"
+        The [model mapping](../docs/concepts/services.md#model-mapping) to access the model via the 
+        gateway's OpenAI-compatible endpoint is not yet supported for vLLM.
 
-    <div editor-title="llms/mixtral/tgi.dstack.yml"> 
-
-    ```yaml
-    type: service
-    # This configuration deploys Mixtral in fp16 using TGI
-    
-    image: ghcr.io/huggingface/text-generation-inference:latest
-    
-    env:
-      - MODEL_ID=mistralai/Mixtral-8x7B-Instruct-v0.1
-    
-    commands:
-      - text-generation-launcher 
-        --hostname 0.0.0.0 
-        --port 8000 
-        --trust-remote-code
-        --num-shard 2 # Should match the number of GPUs
-    
-    port: 8000
-    ```
-
-    </div>
-
-=== "TGI `int4`"
-
-    <div editor-title="llms/mixtral/tgi-gptq.dstack.yml"> 
-
-    ```yaml
-    type: service
-    # This configuration deploys Mixtral in int4 using TGI
-    
-    image: ghcr.io/huggingface/text-generation-inference:latest
-    
-    env:
-      - MODEL_ID=TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
-    
-    commands:
-      - text-generation-launcher 
-        --hostname 0.0.0.0 
-        --port 8000 
-        --trust-remote-code 
-        --quantize gptq
-    
-    port: 8000
-    ```
-
-    </div>
-
-> vLLM's support for quantized Mixtral is not yet stable. 
+        Also, support for quantized Mixtral in vLLM is not yet stable.
 
 ## Run the configuration
 
@@ -88,21 +94,12 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
     Before running a service, make sure to set up a [gateway](../docs/concepts/services.md#set-up-a-gateway).
     However, it's not required when using dstack Cloud, as it's set up automatically.
 
-!!! info "Resources"
-    For `fp16`, deployment of Mixtral, ensure a minimum total GPU memory of `100GB` and disk size of `200GB`.
-    Also, make sure to adjust the `--tensor-parallel-size` and `--num-shard` parameters in the YAML configuration to align
-    with the number of GPUs used.
-    For `int4`, request at least `25GB` of GPU memory.
+For `fp16`, deployment of Mixtral, ensure a minimum total GPU memory of `100GB` and disk size of `200GB`.
+For `int4`, request at least `25GB` of GPU memory.
 
-=== "vLLM `fp16`"
-
-    <div class="termy">
+[//]: # (    Also, make sure to adjust the `--tensor-parallel-size` and `--num-shard` parameters in the YAML configuration to align)
+[//]: # (    with the number of GPUs used.)
     
-    ```shell
-    $ dstack run . -f llms/mixtral/vllm.dstack.yml --gpu "80GB:2" --disk 200GB
-    ```
-    
-    </div>
 
 === "TGI `fp16`"
 
@@ -124,33 +121,45 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
     
     </div>
 
-!!! info "Endpoint URL"
-    Once the service is deployed, its endpoint will be available at 
-    `https://<run-name>.<domain-name>` (using the domain set up for the gateway).
+=== "vLLM `fp16`"
 
-    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . -f llms/mixtral/vllm.dstack.yml --gpu "80GB:2" --disk 200GB
+    ```
+    
+    </div>
 
-[//]: # (Once the service is up, you can query it via it's OpenAI compatible endpoint:)
-[//]: # (<div class="termy">)
-[//]: # ()
-[//]: # (```shell)
-[//]: # ($ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \)
-[//]: # (    -H "Content-Type: application/json" \)
-[//]: # (    -d '{)
-[//]: # (          "model": "mistralai/Mixtral-8X7B-Instruct-v0.1",)
-[//]: # (          "prompt": "Hello!",)
-[//]: # (          "max_tokens": 25,)
-[//]: # (        }')
-[//]: # (```)
-[//]: # ()
-[//]: # (</div>)
+## Access the endpoint
 
-[//]: # (!!! info "OpenAI-compatible API")
-[//]: # (    Since vLLM provides an OpenAI-compatible endpoint, feel free to access it using various OpenAI-compatible tools like)
-[//]: # (    Chat UI, LangChain, Llama Index, etc. )
+Once the service is up, you'll be able to access it at `https://<run name>.<gateway domain>`.
+
+#### OpenAI interface
+
+In case the service has the [model mapping](../docs/concepts/services.md#model-mapping) configured, you will also be able 
+to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
+
+```python
+from openai import OpenAI
+
+
+client = OpenAI(
+  base_url="https://gateway.example.com",
+  api_key="none"
+)
+
+completion = client.chat.completions.create(
+  model="mistralai/Mixtral-8x7B-Instruct-v0.1",
+  messages=[
+    {"role": "user", "content": "Compose a poem that explains the concept of recursion in programming."}
+  ]
+)
+
+print(completion.choices[0].message)
+```
 
 ??? info "Hugging Face Hub token"
-
     To use a model with gated access, ensure configuring the `HUGGING_FACE_HUB_TOKEN` environment variable 
     (with [`--env`](../docs/reference/cli/index.md#dstack-run) in `dstack run` or 
     using [`env`](../docs/reference/dstack.yml.md#service) in the configuration file).
@@ -164,11 +173,11 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
 
 ## Source code
     
-The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+The complete, ready-to-run code is available in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
 
 ## What's next?
 
-1. Check the [vLLM](tgi.md) and [Text Generation Inference](tgi.md) examples
+1. Check the [Text Generation Inference](tgi.md) and [vLLM](vllm.md) examples
 2. Read about [services](../docs/concepts/services.md)
 3. Browse [examples](index.md)
 4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

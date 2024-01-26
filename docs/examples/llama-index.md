@@ -98,7 +98,7 @@ The data is in the vector database! Now we can proceed with the part where we in
 This example assumes we're using an LLM deployed using [TGI](tgi.md).
 
 Once you deployed the model, make sure to set the `TGI_ENDPOINT_URL` environment variable 
-to its URL, e.g. `https://<run-name>.<domain-name>` (or `http://localhost:<port>` if it's deployed 
+to its URL, e.g. `https://<run name>.<gateway domain>` (or `http://localhost:<port>` if it's deployed 
 as a task). We'll use this environment variable below.
 
 <div class="termy">
@@ -214,7 +214,7 @@ using `dstack`. For more in-depth information, we encourage you to explore the d
 
 ## Source code
 
-The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+The complete, ready-to-run code is available in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
 
 ## What's next?
 

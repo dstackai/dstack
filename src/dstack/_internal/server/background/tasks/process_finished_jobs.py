@@ -60,20 +60,23 @@ async def _process_job(job_id):
                 )
                 .options(joinedload(GatewayModel.gateway_compute))
             )
-            gateway = res.scalar_one()
-            if (
-                conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
-            ) is None:
-                logger.warning("Gateway is not connected: %s", gateway.gateway_compute.ip_address)
-            try:
-                await run_async(
-                    conn.client.unregister_service,
-                    job_model.project.name,
-                    job_spec.gateway.hostname,
-                )
-                logger.debug(*job_log("service is unregistered", job_model))
-            except Exception as e:
-                logger.warning("failed to unregister service: %s", e)
+            gateway = res.scalar()
+            if gateway is not None:
+                if (
+                    conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
+                ) is None:
+                    logger.warning(
+                        "Gateway is not connected: %s", gateway.gateway_compute.ip_address
+                    )
+                try:
+                    await run_async(
+                        conn.client.unregister_service,
+                        job_model.project.name,
+                        job_spec.gateway.hostname,
+                    )
+                    logger.debug(*job_log("service is unregistered", job_model))
+                except Exception as e:
+                    logger.warning("failed to unregister service: %s", e)
         try:
             if job_submission.job_provisioning_data is not None:
                 await terminate_job_submission_instance(

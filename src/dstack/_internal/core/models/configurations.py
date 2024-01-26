@@ -79,6 +79,17 @@ class Artifact(ForbidExtra):
 
 
 class ModelInfo(ForbidExtra):
+    """
+    Mapping of the model for the OpenAI-compatible endpoint.
+
+    Attributes:
+        type (str): The type of the model, e.g. "chat"
+        name (str): The name of the model. This name will be used both to load model configuration from the HuggingFace Hub and in the OpenAI-compatible endpoint.
+        format (str): The format of the model, e.g. "tgi" if the model is served with HuggingFace's Text Generation Inference.
+        chat_template (Optional[str]): The custom prompt template for the model. If not specified, the default prompt template the HuggingFace Hub configuration will be used.
+        eos_token (Optional[str]): The custom end of sentence token. If not specified, the default custom end of sentence token from the HuggingFace Hub configuration will be used.
+    """
+
     type: Annotated[Literal["chat"], Field(description="The type of the model")]
     name: Annotated[str, Field(description="The name of the model")]
     format: Annotated[Literal["tgi"], Field(description="The serving format")]
@@ -184,6 +195,7 @@ class ServiceConfiguration(BaseConfiguration):
         registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
         resources (Optional[Resources]): The requirements to run the configuration.
+        model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
         auth (bool): Enable the authorization. Defaults to `True`.
     """
 
@@ -194,7 +206,8 @@ class ServiceConfiguration(BaseConfiguration):
         Field(description="The port, that application listens to or the mapping"),
     ]
     model: Annotated[
-        Optional[ModelInfo], Field(description="The model info for OpenAI interface")
+        Optional[ModelInfo],
+        Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
     ] = None
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
 

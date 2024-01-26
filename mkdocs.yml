@@ -81,7 +81,6 @@ plugins:
         'examples/finetuning-llama-2.md': 'examples/qlora.md'
         'examples/text-generation-inference.md': 'examples/tgi.md'
         'examples/stable-diffusion-xl.md': 'examples/sdxl.md'
-        'examples/vllm.md': 'examples/vllm.md'
         'learn/mixtral.md': 'examples/mixtral.md'
         'learn/tei.md': 'examples/tei.md'
         'learn/llama-index.md': 'examples/llama-index.md'
@@ -189,14 +188,14 @@ nav:
     - Fine-tuning:
         - QLoRA: examples/qlora.md
     - Deployment:
-        - vLLM: examples/vllm.md
         - Text Generation Inference: examples/tgi.md
+        - vLLM: examples/vllm.md
         - Text Embedding Interface: examples/tei.md
         - SDXL: examples/sdxl.md
     - RAG:
         - Llama Index: examples/llama-index.md
+  - Discord: https://discord.gg/u8SmfwPpMd
 #  - Blog:
 #      - blog/index.md
-  - Discord: https://discord.gg/u8SmfwPpMd
   - Platform: platform.md
   - GitHub: https://github.com/dstackai/dstack

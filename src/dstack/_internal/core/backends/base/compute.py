@@ -235,7 +235,7 @@ def get_latest_runner_build() -> Optional[str]:
 
 
 def get_dstack_gateway_wheel(build: str) -> str:
-    channel = "release" if version.__is_release__ else "stgn"
+    channel = "release" if settings.DSTACK_RELEASE else "stgn"
     return f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}/dstack_gateway-{build}-py3-none-any.whl"
 
 

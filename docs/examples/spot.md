@@ -4,7 +4,7 @@ Cloud instances come in three types: `reserved` (for long-term commitments at a 
 more expensive), and `spot` (cheapest, provided when available, but can be taken away when requested by someone else).
 
 There are three cloud providers that offer spot instances: AWS, GCP, and Azure. 
-Once you've [configured](../docs/config/server.md) any of these, you can use spot instances 
+Once you've [configured](../docs/installation/index.md) any of these, you can use spot instances 
 for [dev environments](../docs/concepts/dev-environments.md), [tasks](../docs/concepts/tasks.md), and 
 [services](../docs/concepts/services.md).
 

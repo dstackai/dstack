@@ -29,7 +29,7 @@ Supported providers: AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, and DataCrunc
 
 ## Latest news ✨
 
-- [2024/01] [dstack 0.14.0rc1: OpenAI-compatible endpoints](https://dstack.ai/blog/2024/01/19/openai-endpoints-preview/) (Preview)
+- [2024/01] [dstack 0.14.0: OpenAI-compatible endpoints preview](https://dstack.ai/blog/2024/01/19/openai-endpoints-preview/) (Release)
 - [2023/12] [dstack 0.13.0: Disk size, CUDA 12.1, Mixtral, and more](https://dstack.ai/blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more/) (Release)
 - [2023/11] [dstack 0.12.3: Vast.ai integration](https://dstack.ai/blog/2023/11/21/vastai/) (Release)
 - [2023/10] [dstack 0.12.2: TensorDock integration](https://dstack.ai/blog/2023/10/31/tensordock/) (Release)

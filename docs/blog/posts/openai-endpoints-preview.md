@@ -1,24 +1,23 @@
 ---
-title: "dstack 0.14.0rc1: OpenAI-compatible endpoints preview"
+title: "dstack 0.14.0: OpenAI-compatible endpoints preview"
 date: 2024-01-19
 description: "Making it easier to deploy custom LLMs as OpenAI-compatible endpoints."
 slug: "openai-endpoints-preview"
 categories:
-  - Previews
+  - Releases
 ---
 
-# dstack 0.14.0rc1: OpenAI-compatible endpoints preview
+# dstack 0.14.0: OpenAI-compatible endpoints preview
 
 __Making it easier to deploy custom LLMs as OpenAI-compatible endpoints.__
 
 The `service` configuration deploys any application as a public endpoint. For instance, you can use HuggingFace's 
-[TGI](https://github.com/huggingface/text-generation-inference) or frameworks to deploy 
-custom LLMs. While this is simple and customizable, using different frameworks and LLMs complicates 
-the integration of LLMs.
+[TGI](https://github.com/huggingface/text-generation-inference) or other frameworks to deploy custom LLMs. 
+While this is simple and customizable, using different frameworks and LLMs complicates the integration of LLMs.
 
 <!-- more -->
 
-With the upcoming `dstack 0.14.0`, we are extending the `service` configuration in `dstack` to enable you to optionally map your
+With `dstack 0.14.0`, we are extending the `service` configuration in `dstack` to enable you to optionally map your
 custom LLM to an OpenAI-compatible endpoint.
 
 Here's how it works: you define a `service` (as before) and include the `model` property with 
@@ -42,7 +41,7 @@ model:
   format: tgi
 ```
 
-When you deploy this service using `dstack run`, `dstack` will automatically publish the OpenAI-compatible endpoint,
+When you deploy the service using `dstack run`, `dstack` will automatically publish the OpenAI-compatible endpoint,
 converting the prompt and response format between your LLM and OpenAI interface.
 
 ```python
@@ -63,32 +62,20 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message)
 ```
 
-!!! info "NOTE:"
-    By default, dstack loads the model's `chat_template` and `eos_token` from Hugging Face. However, you can override them using
-    the corresponding properties under `model`.
-
 Here's a live demo of how it works:
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-openai-python.gif" style="width:100%; max-width: 800px;" />
 
-## Try the preview
-
-To try the preview of this new upcoming feature, make sure to install `0.14.0rc1` and restart your server.
-
-```shell
-pip install "dstack[all]==0.14.0rc1"
-```
+For more details on how to use the new feature, be sure to check the updated documentation on [services](../../docs/concepts/services.md),
+and the [TGI](../../examples/tgi.md) example.
 
 ## Migration guide
 
-Note: In order to use the new feature, it's important to delete your existing gateway (if any)
-using `dstack gateway delete` and then create it again with `dstack gateway create`.
-
-## Why does this matter?
-
-With `dstack`, you can train and deploy models using any cloud providers, easily leveraging GPU availability across
-providers, spot instances, multiple regions, and more.
+Note: After you update to `0.14.0`, it's important to delete your existing gateways (if any)
+using `dstack gateway delete` and create them again with `dstack gateway create`.
 
 ## Feedback
 
-Do you have any questions or need assistance? Feel free to join our [Discord server](https://discord.gg/u8SmfwPpMd).
+In case you have any questions, experience bugs, or need help, 
+drop us a message on our [Discord server](https://discord.gg/u8SmfwPpMd) or submit it as a 
+[GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
