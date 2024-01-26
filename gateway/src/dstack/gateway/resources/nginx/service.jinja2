@@ -25,6 +25,9 @@ server {
   {% if auth %}
   location = /auth {
     internal;
+    if ($remote_addr = 127.0.0.1) {
+      return 200;
+    }
     proxy_pass http://localhost:{{ port }}/auth/{{ project }};
     proxy_pass_request_body off;
     proxy_set_header Content-Length "";
