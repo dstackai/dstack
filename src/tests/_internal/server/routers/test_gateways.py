@@ -142,7 +142,9 @@ class TestCreateGateway:
         backend = await create_backend(session, project.id)
         with patch(
             "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m:
+        ) as m, patch(
+            "dstack._internal.server.services.gateways.gateway_connections_pool.add"
+        ) as pool_add:
             aws = Mock()
             m.return_value = [(backend, aws)]
             aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
@@ -158,6 +160,7 @@ class TestCreateGateway:
             )
             m.assert_called_once()
             aws.compute.return_value.create_gateway.assert_called_once()
+            pool_add.assert_called_once()
         assert response.status_code == 200
         assert response.json() == {
             "name": "test",
@@ -180,7 +183,11 @@ class TestCreateGateway:
         backend = await create_backend(session, project.id)
         with patch(
             "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m, patch("dstack._internal.server.services.gateways.random_names.generate_name") as g:
+        ) as m, patch(
+            "dstack._internal.server.services.gateways.random_names.generate_name"
+        ) as g, patch(
+            "dstack._internal.server.services.gateways.gateway_connections_pool.add"
+        ) as pool_add:
             g.return_value = "random-name"
             aws = Mock()
             m.return_value = [(backend, aws)]
@@ -198,6 +205,7 @@ class TestCreateGateway:
             g.assert_called_once()
             m.assert_called_once()
             aws.compute.return_value.create_gateway.assert_called_once()
+            pool_add.assert_called_once()
         assert response.status_code == 200
         assert response.json() == {
             "name": "random-name",
