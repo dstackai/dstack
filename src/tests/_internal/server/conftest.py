@@ -1,4 +1,5 @@
 import pytest_asyncio
+
 from dstack._internal.server.db import Database, override_db
 from dstack._internal.server.models import BaseModel
 

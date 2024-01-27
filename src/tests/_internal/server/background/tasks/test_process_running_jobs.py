@@ -3,6 +3,8 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceType, Resources
@@ -17,7 +19,6 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def get_job_provisioning_data(dockerized: bool) -> JobProvisioningData:
@@ -146,9 +147,7 @@ class TestProcessRunningJobs:
             "dstack._internal.server.services.runner.ssh.RunnerTunnel"
         ) as RunnerTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock, patch.object(
-            settings, "SERVER_DIR_PATH", tmp_path
-        ):
+        ) as RunnerClientMock, patch.object(settings, "SERVER_DIR_PATH", tmp_path):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
                 job_states=[JobStateEvent(timestamp=1, state=JobStatus.RUNNING)],

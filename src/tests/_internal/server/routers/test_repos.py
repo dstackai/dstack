@@ -1,6 +1,10 @@
 import json
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import CodeModel, RepoModel
@@ -11,9 +15,6 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
 )
-from fastapi.testclient import TestClient
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 client = TestClient(app)
 

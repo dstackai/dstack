@@ -18,7 +18,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, SpotPolicy
 from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.core.models.resources import Resources, ResourcesSpec
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobSpec, RunPlan, RunSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
 from dstack._internal.core.models.runs import Run as RunModel

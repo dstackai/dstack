@@ -91,7 +91,7 @@ def update_ssh_config(path: PathLike, host: str, options: Dict[str, str]):
         if os.path.exists(path):
             with open(path, "r") as f:
                 for line in f:
-                    m = re.match(rf"^Host\s+(\S+)$", line.strip())
+                    m = re.match(r"^Host\s+(\S+)$", line.strip())
                     if m is not None:
                         copy_mode = m.group(1) != host
                     if copy_mode:

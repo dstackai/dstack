@@ -1,4 +1,5 @@
 import pytest
+
 from dstack._internal.utils.interpolator import VariablesInterpolator
 
 

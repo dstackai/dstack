@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from dstack._internal.utils.common import parse_memory, pretty_date
 from freezegun import freeze_time
+
+from dstack._internal.utils.common import parse_memory, pretty_date
 
 
 @freeze_time(datetime(2023, 10, 4, 12, 0, tzinfo=timezone.utc))

@@ -78,7 +78,7 @@ class SSHTunnel(BaseModel):
 
     def stop(self):
         logger.info("Stopping SSH tunnel for %s", self.sock_path)
-        r = subprocess.run(self.exit_cmd, timeout=5, capture_output=True)
+        subprocess.run(self.exit_cmd, timeout=5, capture_output=True)
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     # TODO(egor-s): retry ssh tunnel

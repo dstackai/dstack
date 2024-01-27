@@ -49,7 +49,6 @@ logger = get_logger(__name__)
 
 
 def create_app() -> FastAPI:
-
     if settings.SENTRY_DSN is not None:
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
@@ -78,7 +77,7 @@ async def lifespan(app: FastAPI):
                 os.path.expanduser("~"), "~", 1
             )
             if not config_loaded:
-                with console.status(f"Initializing the default configuration..."):
+                with console.status("Initializing the default configuration..."):
                     await server_config_manager.init_config(session=session)
                 console.print(
                     f"[code]✓[/] Initialized the default configuration at [code]{server_config_dir}[/]"

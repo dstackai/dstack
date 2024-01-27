@@ -3,11 +3,12 @@ from unittest.mock import patch
 from uuid import UUID
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from dstack._internal.server import settings
 from dstack._internal.server.schemas.runner import LogEvent
 from dstack._internal.server.services.logs import write_logs
 from dstack._internal.server.testing.common import create_project
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class TestWriteLogs:

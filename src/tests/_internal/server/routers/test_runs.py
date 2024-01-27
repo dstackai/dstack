@@ -5,6 +5,10 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -25,9 +29,6 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
 )
-from fastapi.testclient import TestClient
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 client = TestClient(app)
 
@@ -262,7 +263,7 @@ def get_dev_env_run_dict(
 class TestListRuns:
     @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post(f"/api/runs/list")
+        response = client.post("/api/runs/list")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
@@ -293,7 +294,7 @@ class TestListRuns:
         )
         job_spec = JobSpec.parse_raw(job.job_spec_data)
         response = client.post(
-            f"/api/runs/list",
+            "/api/runs/list",
             headers=get_auth_headers(user.token),
             json={},
         )
@@ -650,6 +651,8 @@ class TestDeleteRuns:
         assert response.status_code == 200
         await session.refresh(run)
         assert run.deleted
+        await session.refresh(job)
+        assert job.status == JobStatus.FAILED
 
     @pytest.mark.asyncio
     async def test_returns_400_if_runs_active(self, test_db, session: AsyncSession):
@@ -668,7 +671,7 @@ class TestDeleteRuns:
             repo=repo,
             user=user,
         )
-        job = await create_job(
+        await create_job(
             session=session,
             run=run,
         )

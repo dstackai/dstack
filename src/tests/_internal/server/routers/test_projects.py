@@ -3,6 +3,10 @@ from unittest.mock import patch
 from uuid import UUID
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import MemberModel, ProjectModel
@@ -13,9 +17,6 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
 )
-from fastapi.testclient import TestClient
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 client = TestClient(app)
 
@@ -136,7 +137,7 @@ class TestCreateProject:
         response = client.post(
             "/api/projects/create",
             headers=get_auth_headers(user.token),
-            json={"project_name": f"project4"},
+            json={"project_name": "project4"},
         )
         assert response.status_code == 400
         assert response.json() == {

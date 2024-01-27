@@ -112,7 +112,7 @@ def create_runner_firewall_rules(
     network: str = "global/networks/default",
 ):
     firewall_rule = compute_v1.Firewall()
-    firewall_rule.name = f"dstack-ssh-in-" + network.replace("/", "-")
+    firewall_rule.name = "dstack-ssh-in-" + network.replace("/", "-")
     firewall_rule.direction = "INGRESS"
 
     allowed_ssh_port = compute_v1.Allowed()

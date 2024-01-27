@@ -3,11 +3,5 @@ repos:
     rev: v0.1.14
     hooks:
       - id: ruff
-      - id: ruff
-        name: sort-imports
-        args: ['--select=I', '--fix']
-  - repo: https://github.com/psf/black
-    rev: 22.12.0
-    hooks:
-      - id: black
-        args: ['--config', 'pyconfig.toml']
+        args: ['--fix']
+      - id: ruff-format

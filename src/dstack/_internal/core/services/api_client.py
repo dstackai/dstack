@@ -11,5 +11,5 @@ def get_api_client(project_name: Optional[str] = None) -> Tuple[APIClient, str]:
     if project is None:
         if project_name is not None:
             raise ConfigurationError(f"Project {project_name} is not configured")
-        raise ConfigurationError(f"No default project, specify project name")
+        raise ConfigurationError("No default project, specify project name")
     return APIClient(project.url, project.token), project.name

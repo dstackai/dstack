@@ -2,6 +2,10 @@ import json
 from unittest.mock import Mock, patch
 
 import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
@@ -13,9 +17,6 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
 )
-from fastapi.testclient import TestClient
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 client = TestClient(app)
 
@@ -642,7 +643,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ) as authenticate_mock:  # noqa: F841
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -815,7 +816,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ) as authenticate_mock:  # noqa: F841
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -865,7 +866,7 @@ class TestUpdateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ) as authenticate_mock:  # noqa: F841
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/update",

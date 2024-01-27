@@ -2,15 +2,13 @@ target-version = "py38"
 line-length = 99
 
 [lint]
-select = ['E', 'F']
+select = ['E', 'F', 'I']
 ignore =[
-  'E402',
   'E501',
-  'E711',
-  'E712',
   'E741',
   'F401',
-  'F541',
-  'F841',
-  'F901',
 ]
+
+[lint.isort]
+known-first-party = ["dstack"]
+known-third-party = ["mkdocs_gen_files"]

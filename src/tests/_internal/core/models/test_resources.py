@@ -1,6 +1,7 @@
 import pytest
-from dstack._internal.core.models.resources import GPU, ComputeCapability, GPUSpec, Memory, Range
 from pydantic import ValidationError, parse_obj_as
+
+from dstack._internal.core.models.resources import ComputeCapability, GPUSpec, Memory, Range
 
 
 class TestMemory:
