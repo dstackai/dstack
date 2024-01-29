@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from dstack._internal.core.backends.kubernetes import KubernetesBackend
+from dstack._internal.core.backends.kubernetes.client import get_api_from_config_data
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import BackendType
@@ -13,7 +14,13 @@ from dstack._internal.core.models.backends.kubernetes import (
     KubernetesStoredConfig,
 )
 from dstack._internal.server.models import BackendModel, ProjectModel
-from dstack._internal.server.services.backends.configurators.base import Configurator
+from dstack._internal.server.services.backends.configurators.base import (
+    Configurator,
+    raise_invalid_credentials_error,
+)
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class KubernetesConfigurator(Configurator):
@@ -26,7 +33,12 @@ class KubernetesConfigurator(Configurator):
     def get_config_values(
         self, config: KubernetesConfigInfoWithCredsPartial
     ) -> KubernetesConfigValues:
-        # TODO: validate kubeconfig
+        try:
+            api = get_api_from_config_data(config.kubeconfig.data)
+            api.list_node()
+        except Exception as e:
+            logger.debug("Invalid kubeconfig: %s", str(e))
+            raise_invalid_credentials_error(fields=[["kubeconfig"]])
         return KubernetesConfigValues()
 
     def create_backend(
