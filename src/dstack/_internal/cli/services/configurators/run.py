@@ -56,9 +56,9 @@ class BaseRunConfigurator:
             for k, v in args.envs:
                 conf.env[k] = v
         if args.gpu_spec:
-            gpu = (conf.resources.gpu or resources.GPU()).dict()
+            gpu = (conf.resources.gpu or resources.GPUSpec()).dict()
             gpu.update(args.gpu_spec)
-            conf.resources.gpu = resources.GPU.parse_obj(gpu)
+            conf.resources.gpu = resources.GPUSpec.parse_obj(gpu)
         if args.disk_spec:
             conf.resources.disk = args.disk_spec
 
@@ -140,11 +140,11 @@ def env_var(v: str) -> Tuple[str, str]:
 
 
 def gpu_spec(v: str) -> Dict:
-    return resources.GPU.parse(v)
+    return resources.GPUSpec.parse(v)
 
 
-def disk_spec(v: str) -> resources.Disk:
-    return parse_obj_as(resources.Disk, v)
+def disk_spec(v: str) -> resources.DiskSpec:
+    return parse_obj_as(resources.DiskSpec, v)
 
 
 def port_mapping(v: str) -> PortMapping:

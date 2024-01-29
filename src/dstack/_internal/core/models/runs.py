@@ -14,7 +14,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos import AnyRunRepoData
-from dstack._internal.core.models.resources import Resources
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import pretty_resources
 
@@ -81,7 +81,7 @@ class DiskRequirements(BaseModel):
 
 class Requirements(BaseModel):
     # TODO: Make requirements' fields required
-    resources: Resources
+    resources: ResourcesSpec
     max_price: Optional[float]
     spot: Optional[bool]
 
