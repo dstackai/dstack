@@ -1,5 +1,6 @@
 import subprocess
 import tempfile
+import threading
 import time
 from typing import List, Optional
 
@@ -29,7 +30,8 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-
+RUNNER_SSH_PORT = 10022
+JUMP_POD_SSH_PORT = 22
 DEFAULT_NAMESPACE = "default"
 
 
@@ -74,16 +76,20 @@ class KubernetesCompute(Compute):
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
-        # TODO: Setup jump pod in a separate thread to avoid long-running run_job
-        _setup_jump_pod(
-            api=self.api,
-            project_name=run.project_name,
-            project_ssh_public_key=project_ssh_public_key.strip(),
-            project_ssh_private_key=project_ssh_private_key.strip(),
-            user_ssh_public_key=run.run_spec.ssh_key_pub.strip(),
-            jump_pod_host=self.config.networking.ssh_host,
-            jump_pod_port=self.config.networking.ssh_port,
-        )
+        # Setup jump pod in a separate thread to avoid long-running run_job.
+        # In case the thread fails, the job will be failed and resubmitted.
+        threading.Thread(
+            target=_setup_jump_pod,
+            kwargs={
+                "api": self.api,
+                "project_name": run.project_name,
+                "project_ssh_public_key": project_ssh_public_key.strip(),
+                "project_ssh_private_key": project_ssh_private_key.strip(),
+                "user_ssh_public_key": run.run_spec.ssh_key_pub.strip(),
+                "jump_pod_host": self.config.networking.ssh_host,
+                "jump_pod_port": self.config.networking.ssh_port,
+            },
+        ).start()
         response = self.api.create_namespaced_pod(
             namespace=DEFAULT_NAMESPACE,
             body=client.V1Pod(
@@ -100,7 +106,7 @@ class KubernetesCompute(Compute):
                             args=["-c", " && ".join(commands)],
                             ports=[
                                 client.V1ContainerPort(
-                                    container_port=10022,
+                                    container_port=RUNNER_SSH_PORT,
                                 )
                             ],
                         )
@@ -115,7 +121,7 @@ class KubernetesCompute(Compute):
                 spec=client.V1ServiceSpec(
                     type="ClusterIP",
                     selector={"app.kubernetes.io/name": instance_name},
-                    ports=[client.V1ServicePort(port=10022)],
+                    ports=[client.V1ServicePort(port=RUNNER_SSH_PORT)],
                 ),
             ),
         )
@@ -125,7 +131,7 @@ class KubernetesCompute(Compute):
             ip_address=service_ip,
             region="local",
             username="root",
-            ssh_port=10022,
+            ssh_port=RUNNER_SSH_PORT,
             dockerized=False,
             ssh_proxy=SSHConnectionParams(
                 hostname=self.config.networking.ssh_host,
@@ -232,7 +238,7 @@ def _create_jump_pod_service(
                         args=["-c", " && ".join(commands)],
                         ports=[
                             client.V1ContainerPort(
-                                container_port=22,
+                                container_port=JUMP_POD_SSH_PORT,
                             )
                         ],
                     )
@@ -249,8 +255,8 @@ def _create_jump_pod_service(
                 selector={"app.kubernetes.io/name": pod_name},
                 ports=[
                     client.V1ServicePort(
-                        port=22,
-                        target_port=22,
+                        port=JUMP_POD_SSH_PORT,
+                        target_port=JUMP_POD_SSH_PORT,
                         node_port=jump_pod_port,
                     )
                 ],
@@ -273,7 +279,7 @@ def _get_jump_pod_commands(authorized_keys: List[str]) -> List[str]:
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
         # start sshd
-        "/usr/sbin/sshd -p 22 -o PermitUserEnvironment=yes",
+        f"/usr/sbin/sshd -p {JUMP_POD_SSH_PORT} -o PermitUserEnvironment=yes",
         "sleep infinity",
     ]
     return commands

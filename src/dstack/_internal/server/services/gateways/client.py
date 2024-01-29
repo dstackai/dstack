@@ -15,13 +15,24 @@ class GatewayClient:
         payload = {
             "public_domain": job.job_spec.gateway.hostname,
             "app_port": job.job_spec.gateway.service_port,
-            "ssh_host": f"{job_provisioning_data.username}@{job_provisioning_data.hostname}",
-            "ssh_port": job_provisioning_data.ssh_port,
             "options": job.job_spec.gateway.options,
         }
-        if job_provisioning_data.dockerized:
-            payload["docker_ssh_host"] = f"root@localhost"
-            payload["docker_ssh_port"] = 10022
+        ssh_proxy = job_provisioning_data.ssh_proxy
+        if ssh_proxy is None:
+            payload["ssh_host"] = (
+                f"{job_provisioning_data.username}@{job_provisioning_data.hostname}",
+            )
+            payload["ssh_port"] = (job_provisioning_data.ssh_port,)
+            if job_provisioning_data.dockerized:
+                payload["docker_ssh_host"] = f"root@localhost"
+                payload["docker_ssh_port"] = 10022
+        else:
+            payload["ssh_host"] = f"{ssh_proxy.username}@{ssh_proxy.hostname}"
+            payload["ssh_port"] = ssh_proxy.port
+            payload[
+                "docker_ssh_host"
+            ] = f"{job_provisioning_data.username}@{job_provisioning_data.hostname}"
+            payload["docker_ssh_port"] = job_provisioning_data.ssh_port
         resp = self.s.post(self._url(f"/api/registry/{project}/register"), json=payload)
         if resp.status_code == 400:
             raise gateway_error(resp.json())
