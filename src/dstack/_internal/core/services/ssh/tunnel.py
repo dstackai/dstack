@@ -38,13 +38,17 @@ class SSHTunnel:
         for port_remote, port_local in self.ports.items():
             command += ["-L", f"{port_local}:localhost:{port_remote}"]
         command += [self.host]
-        # TODO: using stderr=subprocess.PIPE may block subprocess.run.
+        # Using stderr=subprocess.PIPE may block subprocess.run.
         # Redirect stderr to file to get ssh error message
-        r = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            r = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=f)
+        with open(f.name, "r+b") as f:
+            error = f.read()
+        os.remove(f.name)
         if r.returncode == 0:
             return
-        logger.debug("SSH tunnel failed")
-        raise get_ssh_error(b"")
+        logger.debug("SSH tunnel failed: %s", error)
+        raise get_ssh_error(error)
 
     def close(self):
         command = ["ssh", "-S", self.control_sock_path, "-O", "exit", self.host]
