@@ -2,7 +2,7 @@
 
 Follow this guide to install the open-source version of `dstack` server.
 
-## Set up the server `
+## Set up the server
 
 === "pip"
 
@@ -294,6 +294,35 @@ There are two ways to configure GCP: using a service account or using the defaul
 
 ??? info "Required GCP permissions"
     The `Service Account User` and `Compute Admin` roles are sufficient for `dstack` to work.
+
+<!-- #### Kubernetes
+
+`dstack` supports all Kubernetes clusters including local (e.g. kind) and managed (e.g. EKS).
+To configure the Kubernetes backend, all you need to do is to specify the path to your kubeconfig file:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: kubernetes
+    kubeconfig:
+      filename: ~/.kube/config
+    networking:
+      ssh_host: "52.17.197.110"
+      ssh_port: 32000
+```
+</div>
+
+You may also need to configure `networking`.
+`dstack` will use `ssh_host` and `ssh_port` to connect to jobs running in the cluster.
+Make sure the `dstack` server can reach `ssh_host:ssh_port`.
+It may require editing cluster firewall rules to open the port.
+
+!!! info "NOTE:"
+    As of now, the Kubernetes backend does not support GPU workloads and creation of gateways.
+    The support is coming soon. -->
 
 #### Lambda
 
