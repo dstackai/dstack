@@ -23,7 +23,6 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    InstanceState,
     LaunchedGatewayInfo,
     LaunchedInstanceInfo,
 )
@@ -83,25 +82,6 @@ class AWSCompute(Compute):
                 InstanceOfferWithAvailability(**offer.dict(), availability=availability)
             )
         return availability_offers
-
-    def get_instance_state(self, instance_id: str, region: str) -> InstanceState:
-        client = self.session.client("ec2", region_name=region)
-        try:
-            response = client.describe_instances(InstanceIds=[instance_id])
-            state = response["Reservations"][0]["Instances"][0]["State"]["Name"]
-        except botocore.exceptions.ClientError as e:
-            if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
-                return InstanceState.NOT_FOUND
-            else:
-                raise e
-        return {
-            "pending": InstanceState.PROVISIONING,
-            "running": InstanceState.RUNNING,
-            "shutting-down": InstanceState.STOPPING,
-            "terminated": InstanceState.TERMINATED,
-            "stopping": InstanceState.STOPPING,
-            "stopped": InstanceState.STOPPED,
-        }[state]
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

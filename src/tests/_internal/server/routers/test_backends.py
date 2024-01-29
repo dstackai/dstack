@@ -30,6 +30,7 @@ class TestListBackendTypes:
             "azure",
             "datacrunch",
             "gcp",
+            "kubernetes",
             "lambda",
             "nebius",
             "tensordock",

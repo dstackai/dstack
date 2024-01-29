@@ -12,7 +12,6 @@ from dstack._internal import settings
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
-    InstanceState,
     LaunchedGatewayInfo,
     LaunchedInstanceInfo,
 )
@@ -44,9 +43,6 @@ class Compute(ABC):
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
-        pass
-
-    def get_instance_state(self, instance_id: str, region: str) -> InstanceState:
         pass
 
     def create_gateway(

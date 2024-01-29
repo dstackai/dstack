@@ -182,6 +182,7 @@ def _stop_runner(
         user=job_submission.job_provisioning_data.username,
         ports=ports,
         id_rsa=server_ssh_private_key,
+        ssh_proxy=job_submission.job_provisioning_data.ssh_proxy,
     ):
         runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
         logger.debug("Stopping runner %s", job_submission.job_provisioning_data.hostname)

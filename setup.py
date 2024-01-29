@@ -100,9 +100,11 @@ GCP_DEPS = [
 
 DATACRUNCH_DEPS = ["datacrunch"]
 
+KUBERNETES_DEPS = ["kubernetes"]
+
 LAMBDA_DEPS = AWS_DEPS
 
-ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS
+ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS
 
 
 setup(
@@ -135,6 +137,7 @@ setup(
         "azure": AZURE_DEPS,
         "datacrunch": DATACRUNCH_DEPS,
         "gcp": GCP_DEPS,
+        "kubernetes": KUBERNETES_DEPS,
         "lambda": LAMBDA_DEPS,
     },
     classifiers=[

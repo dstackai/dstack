@@ -7,7 +7,11 @@ from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration, RegistryAuth
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability, InstanceType
+from dstack._internal.core.models.instances import (
+    InstanceOfferWithAvailability,
+    InstanceType,
+    SSHConnectionParams,
+)
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import Resources
@@ -139,7 +143,8 @@ class JobProvisioningData(BaseModel):
     price: float
     username: str
     ssh_port: int  # could be different from 22 for some backends
-    dockerized: bool  # True if JumpProxy is needed
+    dockerized: bool  # True if backend starts shim
+    ssh_proxy: Optional[SSHConnectionParams]
     backend_data: Optional[str]  # backend-specific data in json
 
 

@@ -11,7 +11,6 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    InstanceState,
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
@@ -59,21 +58,6 @@ class DataCrunchCompute(Compute):
             )
 
         return availability_offers
-
-    def get_instance_state(self, instance_id: str, region: str) -> InstanceState:
-        instance = self.api_client.client.instances.get_by_id(instance_id)
-
-        # TODO 404 NOT_FOUND = "not_found"
-        # TODO other statuses
-
-        state_map = {
-            "provisioning": InstanceState.PROVISIONING,
-            "running": InstanceState.RUNNING,
-            "offline": InstanceState.STOPPED,
-            "discontinued": InstanceState.TERMINATED,
-        }
-        status = state_map.get(instance.status, InstanceState.NOT_FOUND)
-        return status
 
     def run_job(
         self,

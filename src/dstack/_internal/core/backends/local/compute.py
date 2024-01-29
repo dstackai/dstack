@@ -6,7 +6,6 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
-    InstanceState,
     InstanceType,
     LaunchedInstanceInfo,
     Resources,
@@ -33,9 +32,6 @@ class LocalCompute(Compute):
                 availability=InstanceAvailability.AVAILABLE,
             )
         ]
-
-    def get_instance_state(self, instance_id: str, region: str) -> InstanceState:
-        return InstanceState.RUNNING
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

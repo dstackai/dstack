@@ -53,9 +53,10 @@ def runner_ssh_tunnel(
                         user=job_provisioning_data.username,
                         ports=get_runner_ports(ports=ports),
                         id_rsa=ssh_private_key,
+                        ssh_proxy=job_provisioning_data.ssh_proxy,
                     ) as tun:
                         return func(*args, ports=tun.ports, **ssh_kwargs, **kwargs)
-                except SSHError as e:
+                except SSHError:
                     pass  # error is logged in the tunnel
                 except requests.RequestException as e:
                     if last:

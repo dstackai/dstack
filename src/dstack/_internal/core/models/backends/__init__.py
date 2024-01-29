@@ -27,6 +27,12 @@ from dstack._internal.core.models.backends.gcp import (
     GCPConfigInfoWithCredsPartial,
     GCPConfigValues,
 )
+from dstack._internal.core.models.backends.kubernetes import (
+    KubernetesConfigInfo,
+    KubernetesConfigInfoWithCreds,
+    KubernetesConfigInfoWithCredsPartial,
+    KubernetesConfigValues,
+)
 from dstack._internal.core.models.backends.lambdalabs import (
     LambdaConfigInfo,
     LambdaConfigInfoWithCreds,
@@ -57,6 +63,7 @@ AnyConfigInfoWithoutCreds = Union[
     AzureConfigInfo,
     DataCrunchConfigInfo,
     GCPConfigInfo,
+    KubernetesConfigInfo,
     LambdaConfigInfo,
     NebiusConfigInfo,
     TensorDockConfigInfo,
@@ -68,6 +75,7 @@ AnyConfigInfoWithCreds = Union[
     AzureConfigInfoWithCreds,
     DataCrunchConfigInfoWithCreds,
     GCPConfigInfoWithCreds,
+    KubernetesConfigInfoWithCreds,
     LambdaConfigInfoWithCreds,
     NebiusConfigInfoWithCreds,
     TensorDockConfigInfoWithCreds,
@@ -79,6 +87,7 @@ AnyConfigInfoWithCredsPartial = Union[
     AzureConfigInfoWithCredsPartial,
     DataCrunchConfigInfoWithCredsPartial,
     GCPConfigInfoWithCredsPartial,
+    KubernetesConfigInfoWithCredsPartial,
     LambdaConfigInfoWithCredsPartial,
     NebiusConfigInfoWithCredsPartial,
     TensorDockConfigInfoWithCredsPartial,
@@ -93,6 +102,7 @@ AnyConfigValues = Union[
     AzureConfigValues,
     DataCrunchConfigValues,
     GCPConfigValues,
+    KubernetesConfigValues,
     LambdaConfigValues,
     NebiusConfigValues,
     TensorDockConfigValues,

@@ -7,6 +7,7 @@ from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.base import Backend
+from dstack._internal.core.backends.kubernetes import KubernetesBackend
 from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import (
     BackendInvalidCredentialsError,
@@ -63,6 +64,15 @@ try:
     from dstack._internal.server.services.backends.configurators.gcp import GCPConfigurator
 
     _CONFIGURATOR_CLASSES.append(GCPConfigurator)
+except ImportError:
+    pass
+
+try:
+    from dstack._internal.server.services.backends.configurators.kubernetes import (
+        KubernetesConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(KubernetesConfigurator)
 except ImportError:
     pass
 
