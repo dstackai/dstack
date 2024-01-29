@@ -16,6 +16,7 @@ from dstack._internal.core.backends.kubernetes.client import get_api_from_config
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    Disk,
     InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
@@ -55,10 +56,17 @@ class KubernetesCompute(Compute):
                         memory_mib=int(parse_memory(node.status.capacity["memory"], as_untis="M")),
                         gpus=[],
                         spot=False,
+                        disk=Disk(
+                            size_mib=int(
+                                parse_memory(
+                                    node.status.capacity["ephemeral-storage"], as_untis="M"
+                                )
+                            )
+                        ),
                     ),
                 ),
                 price=0,
-                region="local",
+                region="-",
                 availability=InstanceAvailability.AVAILABLE,
             )
             instance_offers.extend(match_requirements([instance_offer], requirements))
@@ -109,6 +117,10 @@ class KubernetesCompute(Compute):
                                     container_port=RUNNER_SSH_PORT,
                                 )
                             ],
+                            # TODO: Pass cpu, memory, gpu as requests.
+                            # Beware that node capacity != allocatable, so
+                            # if the node has 2xCPU – then cpu=2 request will probably fail.
+                            resources=client.V1ResourceRequirements(requests={}),
                         )
                     ]
                 ),
