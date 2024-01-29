@@ -19,6 +19,7 @@ class ServiceJobConfigurator(JobConfigurator):
             gateway_name=None,  # TODO configurable
             service_port=self.run_spec.configuration.port.container_port,
             public_port=self.run_spec.configuration.port.local_port,
+            auth=self.run_spec.configuration.auth,
             options=options,
         )
 

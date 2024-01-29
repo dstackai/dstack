@@ -1,7 +1,8 @@
 from typing import Annotated, AsyncIterator
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from dstack.gateway.errors import GatewayError
 from dstack.gateway.openai.schemas import (
@@ -11,8 +12,19 @@ from dstack.gateway.openai.schemas import (
     ModelsResponse,
 )
 from dstack.gateway.openai.store import OpenAIStore, get_store
+from dstack.gateway.services.auth import AuthProvider, get_auth
 
-router = APIRouter()
+
+async def auth_required(
+    project: str,
+    auth: AuthProvider = Depends(get_auth),
+    token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
+):
+    if not await auth.has_access(project, token.credentials):
+        raise HTTPException(status_code=403)
+
+
+router = APIRouter(dependencies=[Depends(auth_required)])
 
 
 @router.get("/{project}/models")

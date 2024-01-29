@@ -60,8 +60,9 @@ BASE_DEPS = [
     "docker>=6.0.0",
     "dnspython",
     "grpcio>=1.50",  # indirect
-    "gpuhunt==0.0.3",
+    "gpuhunt==0.0.4",
     "sentry-sdk[fastapi]",
+    "httpx",
 ]
 
 AWS_DEPS = [

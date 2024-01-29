@@ -24,7 +24,7 @@ from dstack._internal.server.routers import (
     users,
 )
 from dstack._internal.server.services.config import ServerConfigManager
-from dstack._internal.server.services.gateways import update_gateways
+from dstack._internal.server.services.gateways import gateway_connections_pool, init_gateways
 from dstack._internal.server.services.projects import get_or_create_default_project
 from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
@@ -33,6 +33,7 @@ from dstack._internal.server.settings import (
     DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT,
     DSTACK_UPDATE_DEFAULT_PROJECT,
     SERVER_CONFIG_FILE_PATH,
+    SERVER_PORT,
     SERVER_URL,
 )
 from dstack._internal.server.utils.logging import configure_logging
@@ -86,7 +87,9 @@ async def lifespan(app: FastAPI):
                     f"Applying server configuration from [code]{server_config_dir}[/]..."
                 )
                 await server_config_manager.apply_config(session=session)
-        await update_gateways(session=session)
+        console.print(f"Connecting to gateways...")
+        gateway_connections_pool.server_port = SERVER_PORT
+        await init_gateways(session=session)
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
@@ -106,6 +109,7 @@ async def lifespan(app: FastAPI):
         await func(app)
     yield
     scheduler.shutdown()
+    await gateway_connections_pool.remove_all()
 
 
 _ON_STARTUP_HOOKS = []

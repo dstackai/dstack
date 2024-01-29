@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 import dstack.gateway.openai.store as openai_store
 import dstack.gateway.version
+from dstack.gateway.auth.routes import router as auth_router
 from dstack.gateway.logging import configure_logging
 from dstack.gateway.openai.routes import router as openai_router
 from dstack.gateway.registry.routes import router as registry_router
@@ -36,6 +37,7 @@ configure_logging(logging.DEBUG)
 app = FastAPI(lifespan=lifespan)
 app.include_router(registry_router, prefix="/api/registry")
 app.include_router(openai_router, prefix="/api/openai")
+app.include_router(auth_router, prefix="/auth")
 
 
 @app.get("/")

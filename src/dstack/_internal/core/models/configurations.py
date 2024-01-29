@@ -196,6 +196,7 @@ class ServiceConfiguration(BaseConfiguration):
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
         resources (Optional[Resources]): The requirements to run the configuration.
         model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
+        auth (bool): Enable the authorization. Defaults to `True`.
     """
 
     type: Literal["service"] = "service"
@@ -208,6 +209,7 @@ class ServiceConfiguration(BaseConfiguration):
         Optional[ModelInfo],
         Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
     ] = None
+    auth: Annotated[bool, Field(description="Enable the authorization")] = True
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
