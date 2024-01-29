@@ -2,7 +2,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 
 def get_dstack_dir() -> Path:
@@ -58,51 +58,51 @@ def pretty_date(time: Union[datetime, int] = False) -> str:
 
 
 def pretty_resources(
-    cpus: Optional[int] = None,
-    memory: Optional[int] = None,
-    gpu_count: Optional[int] = None,
-    gpu_name: Optional[str] = None,
-    gpu_memory: Optional[int] = None,
-    total_gpu_memory: Optional[float] = None,
-    compute_capability: Optional[Tuple[int, int]] = None,
-    disk_size: Optional[int] = None,
+    cpus: Optional[Any] = None,
+    memory: Optional[Any] = None,
+    gpu_count: Optional[Any] = None,
+    gpu_name: Optional[Any] = None,
+    gpu_memory: Optional[Any] = None,
+    total_gpu_memory: Optional[Any] = None,
+    compute_capability: Optional[Any] = None,
+    disk_size: Optional[Any] = None,
 ) -> str:
     """
-    >>> pretty_resources(4, 16*1024)
+    >>> pretty_resources(cpus=4, memory="16GB")
     '4xCPU, 16GB'
-    >>> pretty_resources(4, 16*1024, 1)
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1)
     '4xCPU, 16GB, 1xGPU'
-    >>> pretty_resources(4, 16*1024, 1, 'A100')
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_name='A100')
     '4xCPU, 16GB, 1xA100'
-    >>> pretty_resources(4, 16*1024, 1, 'A100', 40*1024)
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_name='A100', gpu_memory="40GB")
     '4xCPU, 16GB, 1xA100 (40GB)'
-    >>> pretty_resources(4, 16*1024, 1, total_gpu_memory=80*1024)
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1, total_gpu_memory="80GB")
     '4xCPU, 16GB, 1xGPU (total 80GB)'
-    >>> pretty_resources(4, 16*1024, 2, 'A100', 40*1024, 80*1024)
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=2, gpu_name='A100', gpu_memory="40GB", total_gpu_memory="80GB")
     '4xCPU, 16GB, 2xA100 (40GB, total 80GB)'
-    >>> pretty_resources(gpu_count=1, compute_capability=(8, 0))
+    >>> pretty_resources(gpu_count=1, compute_capability="8.0")
     '1xGPU (8.0)'
     """
     parts = []
     if cpus is not None:
         parts.append(f"{cpus}xCPU")
     if memory is not None:
-        parts.append(f"{memory / 1024:g}GB")
+        parts.append(f"{memory}")
     if gpu_count:
         gpu_parts = []
-        if gpu_memory:
-            gpu_parts.append(f"{gpu_memory / 1024:g}GB")
-        if total_gpu_memory:
-            gpu_parts.append(f"total {total_gpu_memory / 1024:g}GB")
-        if compute_capability:
-            gpu_parts.append(f"%d.%d" % compute_capability)
+        if gpu_memory is not None:
+            gpu_parts.append(f"{gpu_memory}")
+        if total_gpu_memory is not None:
+            gpu_parts.append(f"total {total_gpu_memory}")
+        if compute_capability is not None:
+            gpu_parts.append(f"{compute_capability}")
 
         gpu = f"{gpu_count}x{gpu_name or 'GPU'}"
         if gpu_parts:
             gpu += f" ({', '.join(gpu_parts)})"
         parts.append(gpu)
     if disk_size:
-        parts.append(f"{disk_size / 1024:g}GB (disk)")
+        parts.append(f"{disk_size} (disk)")
     return ", ".join(parts)
 
 

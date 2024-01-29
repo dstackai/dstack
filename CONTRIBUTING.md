@@ -21,16 +21,10 @@
     ```
     pip install -r requirements_dev.txt
     ```
-5. (Optional) Build the frontend:
-    ```
-    ./scripts/build_frontend.sh
-    ```
 5. (Recommended) Install pre-commits:
     ```
     pre-commit install
     ```
-
-For more information on frontend development, see [hub/README.md](hub/README.md).
 
 ## Contributing process
 

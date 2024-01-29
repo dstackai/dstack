@@ -3,6 +3,7 @@ from typing import Annotated, AsyncIterator
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from dstack.gateway.errors import GatewayError
 from dstack.gateway.openai.schemas import (
     ChatCompletionsChunk,
     ChatCompletionsRequest,
@@ -25,14 +26,17 @@ async def get_models(
 async def post_chat_completions(
     project: str, body: ChatCompletionsRequest, store: Annotated[OpenAIStore, Depends(get_store)]
 ):
-    client = await store.get_chat_client(project, body.model)
-    if not body.stream:
-        return await client.generate(body)
-    else:
-        return StreamingResponse(
-            stream_chunks(client.stream(body)),
-            media_type="text/event-stream",
-        )
+    try:
+        client = await store.get_chat_client(project, body.model)
+        if not body.stream:
+            return await client.generate(body)
+        else:
+            return StreamingResponse(
+                stream_chunks(client.stream(body)),
+                media_type="text/event-stream",
+            )
+    except GatewayError as e:
+        raise e.http()
 
 
 async def stream_chunks(chunks: AsyncIterator[ChatCompletionsChunk]) -> AsyncIterator[bytes]:

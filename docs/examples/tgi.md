@@ -12,17 +12,25 @@ To deploy an LLM as a service using TGI, you have to define the following config
 type: service
 
 image: ghcr.io/huggingface/text-generation-inference:latest
-
 env:
-  - MODEL_ID=NousResearch/Llama-2-7b-hf
-
-port: 8000
-
-commands: 
-  - text-generation-launcher --hostname 0.0.0.0 --port 8000 --trust-remote-code
+  - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+port: 80
+commands:
+  - text-generation-launcher --port 80 --trust-remote-code
+  
+# Optional mapping for OpenAI interface
+model:
+  type: chat
+  name: mistralai/Mistral-7B-Instruct-v0.1
+  format: tgi
 ```
 
 </div>
+
+!!! info "Model mapping"
+    Note the `model` property is optional and is only required
+    if you're running a chat model and want to access it via an OpenAI-compatible endpoint.
+    For more details on how to use it feature, check the documentation on [services](../docs/concepts/services.md).
 
 ## Run the configuration
 
@@ -38,28 +46,45 @@ $ dstack run . -f text-generation-inference/serve.dstack.yml --gpu 24GB
 
 </div>
 
-!!! info "Endpoint URL"
-    Once the service is deployed, its endpoint will be available at 
-    `https://<run-name>.<domain-name>` (using the domain set up for the gateway).
+### Access the endpoint
 
-    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
-
-Once the service is up, you can query it:
+Once the service is up, you'll be able to 
+access it at `https://<run name>.<gateway domain>`.
 
 <div class="termy">
 
 ```shell
-$ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
-    -H 'Content-Type: application/json' \
-    -d '{
-          "inputs": "What is Deep Learning?",
-          "parameters": {
-            "max_new_tokens": 20
-          }
-        }'
+$ curl https://yellow-cat-1.example.com/generate \
+    -X POST \
+    -d '{"inputs":"&lt;s&gt;[INST] What is your favourite condiment?[/INST]"}' \
+    -H 'Content-Type: application/json'
 ```
 
 </div>
+
+#### OpenAI interface
+
+Because we've configured the model mapping, it will also be possible 
+to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
+
+```python
+from openai import OpenAI
+
+
+client = OpenAI(
+  base_url="https://gateway.<gateway domain>",
+  api_key="none"
+)
+
+completion = client.chat.completions.create(
+  model="mistralai/Mistral-7B-Instruct-v0.1",
+  messages=[
+    {"role": "user", "content": "Compose a poem that explains the concept of recursion in programming."}
+  ]
+)
+
+print(completion.choices[0].message)
+```
 
 !!! info "Hugging Face Hub token"
 
@@ -76,13 +101,9 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
     ```
     </div>
 
-### Quantization
+## Quantization
 
-An LLM typically requires twice the GPU memory compared to its parameter count. For instance, a model with `13B` parameters
-needs around `26GB` of GPU memory. To decrease memory usage and fit the model on a smaller GPU, consider using
-quantization, which TGI offers as `bitsandbytes` and `gptq` methods. 
-
-Here's an example of the Llama 2 13B model tailored for a `24GB` GPU (A10 or L4):
+Here's an example of using TGI with quantization:
 
 <div editor-title="text-generation-inference/serve.dstack.yml"> 
 
@@ -90,26 +111,25 @@ Here's an example of the Llama 2 13B model tailored for a `24GB` GPU (A10 or L4)
 type: service
 
 image: ghcr.io/huggingface/text-generation-inference:latest
-
 env:
-  - MODEL_ID=TheBloke/Llama-2-13B-GPTQ
+  - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ
+port: 80
+commands:
+  - text-generation-launcher --port 80 --trust-remote-code --quantize gptq
 
-port: 8000
-
-commands: 
-  - text-generation-launcher --hostname 0.0.0.0 --port 8000 --trust-remote-code --quantize gptq
+model:
+  type: chat
+  name: TheBloke/Llama-2-13B-chat-GPTQ
+  format: tgi
+  chat_template: "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ '<s>[INST] ' + content.strip() + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content.strip() + ' </s>' }}{% endif %}{% endfor %}"
+  eos_token: "</s>"
 ```
 
 </div>
 
-A similar approach allows running the Llama 2 70B model on an `40GB` GPU (A100).
-
-To calculate the exact GPU memory required for a specific model with different quantization methods, you can use the
-[hf-accelerate/memory-model-usage](https://huggingface.co/spaces/hf-accelerate/model-memory-usage) Space.
-
 ## Source code
     
-The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+The complete, ready-to-run code is available in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
 
 ## What's next?
 

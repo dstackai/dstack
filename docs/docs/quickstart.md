@@ -1,48 +1,64 @@
 # Quickstart
 
+## Initialize a repo
+
+To use `dstack`'s CLI in a folder, first run [`dstack init`](reference/cli/index.md#dstack-init) within that folder.
+
+<div class="termy">
+
+```shell
+$ mkdir quickstart && cd quickstart
+$ dstack init
+```
+
+</div>
+
+Your folder can be a regular local folder or a Git repo.
+
 ## Define a configuration
 
-First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `train.dstack.yml`
-are both acceptable).
+Define what you want to run as a YAML file. The filename must end with `.dstack.yml` (e.g., `.dstack.yml`
+or `train.dstack.yml` are both acceptable).
 
 === "Dev environment"
+
+    Dev environments allow you to quickly provision a machine with a pre-configured environment, resources, IDE, code, etc.
 
     <div editor-title=".dstack.yml"> 
 
     ```yaml
     type: dev-environment
 
-    python: "3.11" # (Optional) If not specified, your local version is used
-    
+    python: "3.11"
     ide: vscode
     ```
 
     </div>
 
-    A dev environments is a perfect tool for interactive experimentation with your IDE.
-    It allows to pre-configure the Python version or a Docker image, etc.
-    Go to [Dev environments](concepts/dev-environments.md) to learn more.
-
 === "Task"
+
+    Tasks make it very easy to run any scripts, be it for training, data processing, or web apps. They allow you to pre-configure the environment, resources, code, etc.
 
     <div editor-title="train.dstack.yml"> 
 
     ```yaml
     type: task
 
-    python: "3.11" # (Optional) If not specified, your local version is used
-    
+    python: "3.11"
+    env:
+      - HF_HUB_ENABLE_HF_TRANSFER=1
     commands:
-      - pip install -r requirements.txt
-      - python train.py
+      - pip install -r fine-tuning/qlora/requirements.txt
+      - python fine-tuning/qlora/train.py
     ```
 
     </div>
 
-    A task may run training scripts, batch jobs, or web apps. It allows to specify the commands, ports, 
-    and pre-configure the Python version or a Docker image, etc. Go to [Tasks](concepts/tasks.md) to learn more.
+    Ensure `requirements.txt` and `train.py` are in your folder. You can take them from [`dstack-examples`](https://github.com/dstackai/dstack-examples/tree/main/fine-tuning/qlora).
 
 === "Service"
+
+    Services make it easy to deploy models and apps cost-effectively as public endpoints, allowing you to use any frameworks.
 
     <div editor-title="serve.dstack.yml"> 
 
@@ -50,25 +66,19 @@ are both acceptable).
     type: service
 
     image: ghcr.io/huggingface/text-generation-inference:latest
-    
-    env: 
-      - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ 
-    
+    env:
+      - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
     port: 80
-    
     commands:
-      - text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code
+      - text-generation-launcher --port 80 --trust-remote-code
     ```
-    
-    </div>
 
-    A service makes it very easy to deploy models or web apps. It allows to specify the commands, 
-    and the Python version or a Docker image, etc. Go to [Services](concepts/services.md) to learn more.
+    </div>
 
 ## Run configuration
 
-To run a configuration, use the `dstack run` command followed by the working directory path, 
-configuration file path, and any other options (e.g., for requesting hardware resources).
+Run a configuration using the [`dstack run`](reference/cli/index.md#dstack-run) command, followed by the working directory path (e.g., `.`), the path to the
+configuration file, and run options (e.g., configuring hardware resources, spot policy, etc.)
 
 <div class="termy">
 
@@ -92,8 +102,8 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 
 </div>
 
-No need to worry about copying code, setting up environment, IDE, etc. `dstack` handles it all 
-automatically.
+The `dstack run` command automatically uploads your code, including any local uncommitted changes. 
+To exclude any files from uploading, use `.gitignore`.
 
 ## What's next?
 

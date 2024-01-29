@@ -34,18 +34,19 @@ class Resources(BaseModel):
     description: str = ""
 
     def pretty_format(self) -> str:
-        if not self.gpus:
-            return pretty_resources(
-                cpus=self.cpus, memory=self.memory_mib, disk_size=self.disk.size_mib
+        resources = {
+            "cpus": self.cpus,
+            "memory": f"{self.memory_mib / 1024:g}GB",
+            "disk_size": f"{self.disk.size_mib / 1024:g}GB",
+        }
+        if self.gpus:
+            gpu = self.gpus[0]
+            resources.update(
+                gpu_name=gpu.name,
+                gpu_count=len(self.gpus),
+                gpu_memory=f"{gpu.memory_mib / 1024:g}GB",
             )
-        return pretty_resources(
-            cpus=self.cpus,
-            memory=self.memory_mib,
-            gpu_count=len(self.gpus),
-            gpu_name=self.gpus[0].name,
-            gpu_memory=self.gpus[0].memory_mib,
-            disk_size=self.disk.size_mib,
-        )
+        return pretty_resources(**resources)
 
 
 class InstanceType(BaseModel):

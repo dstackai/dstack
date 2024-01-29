@@ -17,26 +17,6 @@ class SpotPolicy(str, Enum):
     AUTO = "auto"
 
 
-def parse_memory(v: Optional[Union[int, str]]) -> Optional[int]:
-    """
-    Converts human-readable sizes (MB and GB) to megabytes
-    >>> parse_memory("512MB")
-    512
-    >>> parse_memory("1 GB")
-    1024
-    """
-    if v is None:
-        return None
-    if isinstance(v, str):
-        m = re.fullmatch(r"(\d+) *([mg]b)?", v.strip().lower())
-        if not m:
-            raise ValueError(f"Invalid memory size: {v}")
-        v = int(m.group(1))
-        if m.group(2) == "gb":
-            v = v * 1024
-    return int(v)
-
-
 def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     if v is None:
         return None
@@ -61,124 +41,6 @@ def parse_max_duration(v: Union[int, str]) -> int:
     if v == "off":
         return v
     return parse_duration(v)
-
-
-class ProfileGPU(ForbidExtra):
-    """
-    The GPU spec
-
-    Attributes:
-        name (Optional[str]): The name of the GPU (e.g., `"A100"` or `"H100"`)
-        count (int): The minimum number of GPUs
-        memory (Optional[str]): The minimum size of a single GPU memory (e.g., `"16GB"`)
-        total_memory (Optional[str]): The minimum total size of all GPUs memory (e.g., `"32GB"`)
-        compute_capability (float): The minimum compute capability of the GPU (e.g., `7.5`)
-    """
-
-    name: Annotated[
-        Optional[str],
-        Field(description='The name of the GPU (e.g., "A100" or "H100")'),
-    ]
-    count: Annotated[
-        int,
-        Field(description="The minimum number of GPUs"),
-    ] = 1
-    memory: Annotated[
-        Optional[Union[int, str]],
-        Field(description='The minimum size of a single GPU memory (e.g., "16GB")'),
-    ]
-    total_memory: Annotated[
-        Optional[Union[int, str]],
-        Field(description='The minimum total size of all GPUs memory (e.g., "32GB")'),
-    ]
-    compute_capability: Annotated[
-        Optional[Union[float, str, Tuple[int, int]]],
-        Field(description="The minimum compute capability of the GPU (e.g., 7.5)"),
-    ]
-    _validate_mem = validator("memory", "total_memory", pre=True, allow_reuse=True)(parse_memory)
-
-    @validator("name")
-    def _validate_name(cls, name: Optional[str]) -> Optional[str]:
-        if name is None:
-            return None
-        return name.upper()
-
-    @validator("compute_capability", pre=True)
-    def _validate_cc(
-        cls, v: Optional[Union[float, str, Tuple[int, int]]]
-    ) -> Optional[Tuple[int, int]]:
-        if isinstance(v, float):
-            v = str(v)
-        if isinstance(v, str):
-            m = re.fullmatch(r"(\d+)\.(\d+)", v)
-            if not m:
-                raise ValueError(f"Invalid compute capability: {v}")
-            v = (int(m.group(1)), int(m.group(2)))
-        return v
-
-
-class ProfileDisk(ForbidExtra):
-    """
-    The disk spec
-
-    Attributes:
-        size (str): The minimum size of the disk (e.g., `"100GB"`)
-    """
-
-    size: Annotated[
-        Optional[Union[int, str]],
-        Field(description='The minimum size of the disk (e.g., "100GB")'),
-    ]
-    _validate_size = validator("size", pre=True, allow_reuse=True)(parse_memory)
-
-
-class ProfileResources(ForbidExtra):
-    """
-    The minimum resources requirements for the run.
-
-    Attributes:
-        cpu (Optional[int]): The minimum number of CPUs
-        memory (Optional[str]): The minimum size of RAM memory (e.g., `"16GB"`)
-        gpu (Optional[GPU]): The GPU spec
-        shm_size (Optional[str]): The size of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this.
-        disk (Optional[Disk]): The disk spec
-    """
-
-    cpu: Annotated[Optional[int], Field(description="The minimum number of CPUs")] = 2
-    memory: Annotated[
-        Optional[Union[int, str]],
-        Field(description='The minimum size of RAM memory (e.g., "16GB")'),
-    ] = parse_memory("8GB")
-    gpu: Annotated[
-        Optional[Union[int, ProfileGPU]],
-        Field(description="The minimum number of GPUs or a GPU spec"),
-    ]
-    shm_size: Annotated[
-        Optional[Union[int, str]],
-        Field(
-            description='The size of shared memory (e.g., "8GB"). If you are using parallel communicating processes ('
-            "e.g., dataloaders in PyTorch), you may need to configure this."
-        ),
-    ]
-    disk: Annotated[
-        Optional[Union[int, str, ProfileDisk]],
-        Field(description="The minimum size of disk or a disk spec"),
-    ] = ProfileDisk(size=parse_memory("100GB"))
-    _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
-
-    @validator("gpu", pre=True)
-    def _validate_gpu(cls, v: Optional[Union[int, ProfileGPU]]) -> Optional[ProfileGPU]:
-        if isinstance(v, int):
-            v = ProfileGPU(count=v)
-        return v
-
-    @validator("disk", pre=True)
-    def _validate_disk(cls, v: Optional[Union[int, str, ProfileDisk]]) -> Optional[ProfileDisk]:
-        if isinstance(v, int):
-            v = ProfileDisk(size=v)
-        if isinstance(v, str):
-            v = ProfileDisk(size=parse_memory(v))
-        return v
 
 
 class ProfileRetryPolicy(ForbidExtra):
@@ -211,10 +73,6 @@ class Profile(ForbidExtra):
         Optional[List[BackendType]],
         Field(description='The backends to consider for provisionig (e.g., "[aws, gcp]")'),
     ]
-    resources: Annotated[
-        ProfileResources,
-        Field(description="The minimum resources of the instance to be provisioned"),
-    ] = ProfileResources()
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(

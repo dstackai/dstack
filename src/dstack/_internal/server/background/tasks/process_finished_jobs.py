@@ -60,13 +60,14 @@ async def _process_job(job_id):
                 )
                 .options(joinedload(GatewayModel.gateway_compute))
             )
-            gateway = res.scalar_one()
-            await run_async(
-                _unregister_service,
-                job_model.project.name,
-                job_spec.gateway.hostname,
-                gateway.gateway_compute.ssh_private_key,
-            )
+            gateway = res.scalar()
+            if gateway is not None:
+                await run_async(
+                    _unregister_service,
+                    job_model.project.name,
+                    job_spec.gateway.hostname,
+                    gateway.gateway_compute.ssh_private_key,
+                )
             logger.debug(*job_log("service is unregistered", job_model))
         try:
             if job_submission.job_provisioning_data is not None:

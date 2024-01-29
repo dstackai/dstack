@@ -110,6 +110,8 @@ class APIClient:
                     kwargs = detail[0]
                     code = kwargs.pop("code")
                     raise _server_client_errors[code](**kwargs)
+            if resp.status_code == 422:
+                logger.debug("Server validation error: %s", resp.text)
             resp.raise_for_status()
         return resp
 

@@ -54,6 +54,7 @@ def poll_logs(
     project: ProjectModel,
     request: PollLogsRequest,
 ) -> JobSubmissionLogs:
+    # TODO Respect request.limit to support pagination
     if request.diagnose:
         log_file_path = _get_runner_log_file_path(
             project_name=project.name,
@@ -79,6 +80,8 @@ def poll_logs(
                     break
     except IOError:
         pass
+    if request.descending:
+        logs = list(reversed(logs))
     return JobSubmissionLogs(logs=logs)
 
 

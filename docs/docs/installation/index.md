@@ -423,7 +423,7 @@ To configure the client on a different machine or for other projects, use [`dsta
 <div class="termy">
 
 ```shell
-$ dstack config --server &lt;your server adddress&gt; --project &lt;your project name&gt; --token &lt;your user token&gt;
+$ dstack config --url &lt;your server adddress&gt; --project &lt;your project name&gt; --token &lt;your user token&gt;
     
 Configurated is updated at ~/.dstack/config.yml
 ```

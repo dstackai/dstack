@@ -130,25 +130,11 @@ class JobConfigurator(ABC):
 
     def _requirements(self) -> Requirements:
         spot_policy = self._spot_policy()
-        r = Requirements(
-            cpus=self.run_spec.profile.resources.cpu,
-            memory_mib=self.run_spec.profile.resources.memory,
-            gpus=None,
-            shm_size_mib=self.run_spec.profile.resources.shm_size,
+        return Requirements(
+            resources=self.run_spec.configuration.resources,
             max_price=self.run_spec.profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
         )
-        if self.run_spec.profile.resources.gpu:
-            r.gpus = GpusRequirements(
-                count=self.run_spec.profile.resources.gpu.count,
-                memory_mib=self.run_spec.profile.resources.gpu.memory,
-                name=self.run_spec.profile.resources.gpu.name,
-                total_memory_mib=self.run_spec.profile.resources.gpu.total_memory,
-                compute_capability=self.run_spec.profile.resources.gpu.compute_capability,
-            )
-        if self.run_spec.profile.resources.disk:
-            r.disk = DiskRequirements(size_mib=self.run_spec.profile.resources.disk.size)
-        return r
 
     def _working_dir(self) -> str:
         return self.run_spec.working_dir

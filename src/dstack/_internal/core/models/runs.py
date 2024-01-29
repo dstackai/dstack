@@ -14,6 +14,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.repos import AnyRunRepoData
+from dstack._internal.core.models.resources import Resources
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import pretty_resources
 
@@ -80,28 +81,23 @@ class DiskRequirements(BaseModel):
 
 class Requirements(BaseModel):
     # TODO: Make requirements' fields required
-    cpus: Optional[int]
-    memory_mib: Optional[int]
-    gpus: Optional[GpusRequirements]
-    shm_size_mib: Optional[int]
+    resources: Resources
     max_price: Optional[float]
     spot: Optional[bool]
-    disk: Optional[DiskRequirements]
 
     def pretty_format(self, resources_only: bool = False):
-        resources = dict(cpus=self.cpus, memory=self.memory_mib)
-        if self.gpus:
+        resources = dict(cpus=self.resources.cpu, memory=self.resources.memory)
+        if self.resources.gpu:
+            gpu = self.resources.gpu
             resources.update(
-                gpu_name=self.gpus.name,
-                gpu_count=self.gpus.count,
-                gpu_memory=self.gpus.memory_mib,
-                total_gpu_memory=self.gpus.total_memory_mib,
-                compute_capability=self.gpus.compute_capability,
+                gpu_name=",".join(gpu.name) if gpu.name else None,
+                gpu_count=gpu.count,
+                gpu_memory=gpu.memory,
+                total_gpu_memory=gpu.total_memory,
+                compute_capability=gpu.compute_capability,
             )
-        if self.disk:
-            resources.update(
-                disk_size=self.disk.size_mib,
-            )
+        if self.resources.disk:
+            resources.update(disk_size=self.resources.disk.size)
         res = pretty_resources(**resources)
         if not resources_only:
             if self.spot is not None:

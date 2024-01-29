@@ -12,15 +12,12 @@ To deploy an LLM as a service using vLLM, you have to define the following confi
 type: service
 
 python: "3.11"
-
 env:
   - MODEL=NousResearch/Llama-2-7b-hf
-
-port: 8000
-
 commands:
   - pip install vllm
   - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
 ```
 
 </div>
@@ -39,18 +36,15 @@ $ dstack run . -f vllm/serve.dstack.yml --gpu 24GB
 
 </div>
 
-!!! info "Endpoint URL"
-    Once the service is deployed, its endpoint will be available at 
-    `https://<run-name>.<domain-name>` (using the domain set up for the gateway).
+## Access the endpoint
 
-    If you wish to customize the run name, you can use the `-n` argument with the `dstack run` command.
-
-Once the service is up, you can query it:
+Once the service is up, you can query it at 
+`https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
 <div class="termy">
 
 ```shell
-$ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
+$ curl -X POST --location https://yellow-cat-1.example.com/v1/completions \
     -H "Content-Type: application/json" \
     -d '{
           "model": "NousResearch/Llama-2-7b-hf",
@@ -77,7 +71,7 @@ $ curl -X POST --location https://yellow-cat-1.mydomain.com/v1/completions \
 
 ## Source code
     
-The complete, ready-to-run code is available in [dstackai/dstack-examples](https://github.com/dstackai/dstack-examples).
+The complete, ready-to-run code is available in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
 
 ## What's next?
 

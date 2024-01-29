@@ -39,7 +39,7 @@ projects:
 </div>
 
 Regions and other settings are optional. Learn more on what credential types are supported 
-via [Clouds](../../docs/config/server.md).
+via [Clouds](../../docs/installation/index.md).
 
 ## Enhanced API
 
@@ -97,7 +97,7 @@ This means you'll need to delete `~/.dstack` and configure `dstack` from scratch
 
 1. `pip install "dstack[all]==0.12.0"`
 2. Delete `~/.dstack`
-3. Configure clouds via `~/.dstack/server/config.yml` (see the [new guide](../../docs/config/server.md))
+3. Configure clouds via `~/.dstack/server/config.yml` (see the [new guide](../../docs/installation/index.md))
 4. Run `dstack server`
 
 The [documentation](../../docs/index.md) and [examples](../../examples/index.md) are updated.
