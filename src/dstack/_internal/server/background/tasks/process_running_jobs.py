@@ -2,22 +2,16 @@ from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
 
-import requests
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import GatewayError
+from dstack._internal.core.errors import GatewayError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
-from dstack._internal.core.models.runs import (
-    Job,
-    JobErrorCode,
-    JobProvisioningData,
-    JobStatus,
-    Run,
-)
+from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, Run
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     GatewayModel,
@@ -27,7 +21,7 @@ from dstack._internal.server.models import (
     RunModel,
 )
 from dstack._internal.server.services import logs as logs_services
-from dstack._internal.server.services.gateways.ssh import gateway_tunnel_client
+from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -224,13 +218,20 @@ async def _process_job(job_id: UUID):
             try:
                 if (gateway := res.scalar_one_or_none()) is None:
                     raise GatewayError("Gateway is not found")
-                await run_async(
-                    _register_service,
-                    project.name,
-                    job,
-                    job_provisioning_data,
-                    gateway.gateway_compute.ssh_private_key,
-                )
+                if (
+                    conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
+                ) is None:
+                    raise GatewayError("Gateway is not connected")
+
+                try:
+                    await run_async(
+                        conn.client.register_service,
+                        project.name,
+                        job,
+                        job_provisioning_data,
+                    )
+                except (httpx.RequestError, SSHError) as e:
+                    raise GatewayError(str(e))
                 logger.debug(
                     *job_log(
                         "service is registered: %s, age=%s",
@@ -448,25 +449,6 @@ def _submit_job_to_runner(
 
     job_model.status = JobStatus.RUNNING
     # do not log here, because the runner will send a new status
-
-
-def _register_service(
-    project: str,
-    job: Job,
-    job_provisioning_data: JobProvisioningData,
-    gateway_ssh_private_key: str,
-):
-    try:
-        with gateway_tunnel_client(
-            job.job_spec.gateway.hostname, id_rsa=gateway_ssh_private_key
-        ) as gateway_client:
-            gateway_client.register_service(
-                project=project,
-                job=job,
-                job_provisioning_data=job_provisioning_data,
-            )
-    except requests.RequestException as e:
-        raise GatewayError(str(e))
 
 
 def _get_runner_timeout_interval(backend_type: BackendType) -> timedelta:

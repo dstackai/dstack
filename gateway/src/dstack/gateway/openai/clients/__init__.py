@@ -15,4 +15,4 @@ class ChatCompletionsClient(ABC):
 
     @abstractmethod
     async def stream(self, request: ChatCompletionsRequest) -> AsyncIterator[ChatCompletionsChunk]:
-        pass
+        yield

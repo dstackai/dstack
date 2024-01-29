@@ -59,7 +59,9 @@ class Store(BaseModel):
                 await run_async(tunnel.start)
                 stack.push_async_callback(supress_exc_async(run_async, tunnel.stop))
 
-                await self.nginx.register_service(service.public_domain, tunnel.sock_path)
+                await self.nginx.register_service(
+                    project, service.public_domain, tunnel.sock_path, auth=service.auth
+                )
                 stack.push_async_callback(
                     supress_exc_async(self.nginx.unregister_domain, service.public_domain)
                 )
@@ -79,7 +81,9 @@ class Store(BaseModel):
             if domain in self.entrypoints:
                 if self.entrypoints[domain] == (project, module):
                     return
-                raise GatewayError(f"Domain {domain} is already registered")
+                raise GatewayError(
+                    f"Domain {domain} is already registered for {self.entrypoints[domain]}"
+                )
 
             logger.info("%s: registering entrypoint %s", project, domain)
             await self.nginx.register_entrypoint(domain, f"/api/{module}/{project}")
