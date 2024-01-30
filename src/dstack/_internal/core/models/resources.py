@@ -1,4 +1,4 @@
-from typing import Any, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from pydantic import Field, root_validator, validator
 from pydantic.generics import GenericModel
@@ -105,7 +105,6 @@ DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
 
 
 class GPUSpec(ForbidExtra):
-    # TODO(egor-s): replace JSON schema
     """
     The GPU spec
 
@@ -163,7 +162,6 @@ class GPUSpec(ForbidExtra):
 
 
 class DiskSpec(ForbidExtra):
-    # TODO(egor-s): replace JSON schema
     """
     The disk spec
 
@@ -186,7 +184,6 @@ class DiskSpec(ForbidExtra):
 
 
 class ResourcesSpec(ForbidExtra):
-    # TODO(egor-s): replace JSON schema
     """
     The minimum resources requirements for the run.
 
@@ -197,6 +194,14 @@ class ResourcesSpec(ForbidExtra):
         shm_size (Optional[Range[Memory]]): The of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this.
         disk (Optional[DiskSpec]): The disk spec
     """
+
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            schema.clear()
+            # replace strict schema with a more permissive one
+            for field, value in ResourcesSpecSchema.schema().items():
+                schema[field] = value
 
     cpu: Range[int] = DEFAULT_CPU_COUNT
     memory: Range[Memory] = DEFAULT_MEMORY_SIZE
