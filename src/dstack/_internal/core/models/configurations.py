@@ -7,6 +7,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.gateways import AnyModel
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -76,26 +77,6 @@ class Artifact(ForbidExtra):
             description="Must be set to `true` if the artifact files must be saved in real-time"
         ),
     ] = False
-
-
-class ModelInfo(ForbidExtra):
-    """
-    Mapping of the model for the OpenAI-compatible endpoint.
-
-    Attributes:
-        type (str): The type of the model, e.g. "chat"
-        name (str): The name of the model. This name will be used both to load model configuration from the HuggingFace Hub and in the OpenAI-compatible endpoint.
-        format (str): The format of the model, e.g. "tgi" if the model is served with HuggingFace's Text Generation Inference.
-        chat_template (Optional[str]): The custom prompt template for the model. If not specified, the default prompt template the HuggingFace Hub configuration will be used.
-        eos_token (Optional[str]): The custom end of sentence token. If not specified, the default custom end of sentence token from the HuggingFace Hub configuration will be used.
-    """
-
-    type: Annotated[Literal["chat"], Field(description="The type of the model")]
-    name: Annotated[str, Field(description="The name of the model")]
-    format: Annotated[Literal["tgi"], Field(description="The serving format")]
-
-    chat_template: Optional[str] = None  # TODO(egor-s): use discriminator and root model
-    eos_token: Optional[str] = None
 
 
 class BaseConfiguration(ForbidExtra):
@@ -206,7 +187,7 @@ class ServiceConfiguration(BaseConfiguration):
         Field(description="The port, that application listens to or the mapping"),
     ]
     model: Annotated[
-        Optional[ModelInfo],
+        Optional[AnyModel],
         Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
     ] = None
     auth: Annotated[bool, Field(description="Enable the authorization")] = True

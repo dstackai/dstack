@@ -3,22 +3,32 @@ from typing import Annotated, Literal, Union
 from pydantic import BaseModel, Field
 
 
-class ChatModel(BaseModel):
-    type: Literal["chat"] = "chat"
+class BaseChatModel(BaseModel):
+    type: Literal["chat"]
     name: str
+    format: str
+
+
+class TGIChatModel(BaseChatModel):
     format: Literal["tgi"]
     chat_template: str
     eos_token: str
 
 
-ANY_MODEL = Union[ChatModel]
+class OpenAIChatModel(BaseChatModel):
+    format: Literal["openai"]
+    prefix: str
+
+
+ChatModel = Annotated[Union[TGIChatModel, OpenAIChatModel], Field(discriminator="format")]
+AnyModel = Union[ChatModel]  # embeddings and etc.
 
 
 class OpenAIOptions(BaseModel):
-    model: Annotated[ANY_MODEL, Field(discriminator="type")]
+    model: AnyModel  # TODO(egor-s): add discriminator by type
 
 
 class ServiceModel(BaseModel):
-    model: ANY_MODEL
+    model: AnyModel
     domain: str
     created: int
