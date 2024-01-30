@@ -15,7 +15,7 @@ class GatewayClient:
         if uds is not None and port is not None:
             raise ValueError("Either uds or port should be specified, not both")
 
-        self.base_url = f"http://gateway" if uds else f"http://localhost:{port}"
+        self.base_url = "http://gateway" if uds else f"http://localhost:{port}"
         self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds) if uds else None, timeout=30)
 
     def register_service(self, project: str, job: Job, job_provisioning_data: JobProvisioningData):
@@ -27,12 +27,12 @@ class GatewayClient:
         }
         ssh_proxy = job_provisioning_data.ssh_proxy
         if ssh_proxy is None:
-            payload["ssh_host"] = (
-                f"{job_provisioning_data.username}@{job_provisioning_data.hostname}",
-            )
-            payload["ssh_port"] = (job_provisioning_data.ssh_port,)
+            payload[
+                "ssh_host"
+            ] = f"{job_provisioning_data.username}@{job_provisioning_data.hostname}"
+            payload["ssh_port"] = job_provisioning_data.ssh_port
             if job_provisioning_data.dockerized:
-                payload["docker_ssh_host"] = f"root@localhost"
+                payload["docker_ssh_host"] = "root@localhost"
                 payload["docker_ssh_port"] = 10022
         else:
             payload["ssh_host"] = f"{ssh_proxy.username}@{ssh_proxy.hostname}"
