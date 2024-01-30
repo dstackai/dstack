@@ -2,8 +2,10 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional
 
+# TODO: update import as KNOWN_GPUS becomes public
+from gpuhunt._internal.constraints import KNOWN_GPUS
 from kubernetes import client
 
 from dstack._internal.core.backends.base.compute import (
@@ -17,6 +19,7 @@ from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
+    Gpu,
     InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
@@ -34,6 +37,9 @@ logger = get_logger(__name__)
 RUNNER_SSH_PORT = 10022
 JUMP_POD_SSH_PORT = 22
 DEFAULT_NAMESPACE = "default"
+
+GPU_NAME_TO_GPU_INFO = {gpu.name: gpu for gpu in KNOWN_GPUS}
+GPU_NAMES = GPU_NAME_TO_GPU_INFO.keys()
 
 
 class KubernetesCompute(Compute):
@@ -54,7 +60,7 @@ class KubernetesCompute(Compute):
                     resources=Resources(
                         cpus=node.status.capacity["cpu"],
                         memory_mib=int(parse_memory(node.status.capacity["memory"], as_untis="M")),
-                        gpus=[],
+                        gpus=_get_gpus_from_node_labels(node.metadata.labels),
                         spot=False,
                         disk=Disk(
                             size_mib=int(
@@ -172,6 +178,31 @@ class KubernetesCompute(Compute):
         except client.ApiException as e:
             if e.status != 404:
                 raise
+
+
+def _get_gpus_from_node_labels(labels: Dict) -> List[Gpu]:
+    # We rely on https://github.com/NVIDIA/gpu-feature-discovery to detect gpus.
+    # Note that "nvidia.com/gpu.product" is not a short gpu name like "T4" or "A100" but a product name
+    # from nvidia-smi like "Tesla-T4" or "A100-SXM4-40GB".
+    # Thus, we convert the product name to a known gpu name.
+    gpu_count = labels.get("nvidia.com/gpu.count")
+    gpu_product = labels.get("nvidia.com/gpu.product")
+    if gpu_count is None or gpu_product is None:
+        return []
+    gpu_count = int(gpu_count)
+    gpu_name = None
+    for known_gpu_name in GPU_NAMES:
+        if known_gpu_name.lower() in gpu_product.lower().split("-"):
+            gpu_name = known_gpu_name
+            break
+    if gpu_name is None:
+        return []
+    gpu_info = GPU_NAME_TO_GPU_INFO[gpu_name]
+    gpu_memory = gpu_info.memory * 1024
+    # A100 may come in two variants
+    if "40GB" in gpu_product:
+        gpu_memory = 40 * 1024
+    return [Gpu(name=gpu_name, memory_mib=gpu_memory) for _ in range(gpu_count)]
 
 
 def _setup_jump_pod(
