@@ -7,7 +7,6 @@ from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.backends.base import Backend
-from dstack._internal.core.backends.kubernetes import KubernetesBackend
 from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import (
     BackendInvalidCredentialsError,
