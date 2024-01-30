@@ -9,7 +9,7 @@ from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import ForbidExtra
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
-from dstack._internal.core.models.resources import Resources
+from dstack._internal.core.models.resources import ResourcesSpec
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -118,8 +118,8 @@ class BaseConfiguration(ForbidExtra):
     ] = {}
     setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
     resources: Annotated[
-        Resources, Field(description="The resources requirements to run the configuration")
-    ] = Resources()
+        ResourcesSpec, Field(description="The resources requirements to run the configuration")
+    ] = ResourcesSpec()
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -176,7 +176,7 @@ class TaskConfiguration(BaseConfigurationWithPorts):
         entrypoint (Optional[str]): The Docker entrypoint
         registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        resources (Optional[Resources]): The requirements to run the configuration.
+        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
     """
 
     type: Literal["task"] = "task"
@@ -194,7 +194,7 @@ class ServiceConfiguration(BaseConfiguration):
         entrypoint (Optional[str]): The Docker entrypoint
         registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        resources (Optional[Resources]): The requirements to run the configuration.
+        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
         model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
         auth (bool): Enable the authorization. Defaults to `True`.
     """

@@ -18,7 +18,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, SpotPolicy
 from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.core.models.resources import Resources
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
 from dstack._internal.core.models.runs import Run as RunModel
@@ -313,7 +313,7 @@ class RunCollection:
         configuration_path: Optional[str] = None,
         repo: Optional[Repo] = None,
         backends: Optional[List[BackendType]] = None,
-        resources: Optional[Resources] = None,
+        resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
         max_duration: Optional[Union[int, str]] = None,
@@ -370,7 +370,7 @@ class RunCollection:
         repo: Repo,
         configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
-        resources: Optional[Resources] = None,
+        resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
         max_duration: Optional[Union[int, str]] = None,

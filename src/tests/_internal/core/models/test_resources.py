@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError, parse_obj_as
 
-from dstack._internal.core.models.resources import GPU, ComputeCapability, Memory, Range
+from dstack._internal.core.models.resources import ComputeCapability, GPUSpec, Memory, Range
 
 
 class TestMemory:
@@ -101,32 +101,32 @@ class TestMemoryRange:
 
 class TestGPU:
     def test_count(self):
-        assert parse_obj_as(GPU, "1") == parse_obj_as(GPU, {"count": 1})
+        assert parse_obj_as(GPUSpec, "1") == parse_obj_as(GPUSpec, {"count": 1})
 
     def test_name(self):
-        assert parse_obj_as(GPU, "A100") == parse_obj_as(GPU, {"name": ["A100"]})
+        assert parse_obj_as(GPUSpec, "A100") == parse_obj_as(GPUSpec, {"name": ["A100"]})
 
     def test_memory(self):
-        assert parse_obj_as(GPU, "16GB") == parse_obj_as(GPU, {"memory": "16GB"})
+        assert parse_obj_as(GPUSpec, "16GB") == parse_obj_as(GPUSpec, {"memory": "16GB"})
 
     def test_names_count(self):
-        assert parse_obj_as(GPU, "A10,A10G:2") == parse_obj_as(
-            GPU, {"name": ["A10", "A10G"], "count": 2}
+        assert parse_obj_as(GPUSpec, "A10,A10G:2") == parse_obj_as(
+            GPUSpec, {"name": ["A10", "A10G"], "count": 2}
         )
 
     def test_empty_name(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(GPU, "A100,:2")
+            parse_obj_as(GPUSpec, "A100,:2")
 
     def test_empty_token(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(GPU, "A100:")
+            parse_obj_as(GPUSpec, "A100:")
 
     def test_conflict(self):
         with pytest.raises(ValidationError):
-            parse_obj_as(GPU, "A100:2:3")
+            parse_obj_as(GPUSpec, "A100:2:3")
 
     def test_memory_range(self):
-        assert parse_obj_as(GPU, "16GB..32") == parse_obj_as(
-            GPU, {"memory": {"min": 16, "max": 32}}
+        assert parse_obj_as(GPUSpec, "16GB..32") == parse_obj_as(
+            GPUSpec, {"memory": {"min": 16, "max": 32}}
         )
