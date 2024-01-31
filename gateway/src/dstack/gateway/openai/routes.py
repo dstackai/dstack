@@ -46,6 +46,7 @@ async def post_chat_completions(
             return StreamingResponse(
                 stream_chunks(client.stream(body)),
                 media_type="text/event-stream",
+                headers={"X-Accel-Buffering": "no"},
             )
     except GatewayError as e:
         raise e.http()
