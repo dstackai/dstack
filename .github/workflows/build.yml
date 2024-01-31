@@ -153,7 +153,7 @@ jobs:
           aws s3 cp . "s3://dstack-runner-downloads-stgn/latest/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
 
   generate-json-schema:
-    needs: [ python-test ]
+    # needs: [ python-test ]
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -171,6 +171,7 @@ jobs:
       - name: Upload json schema to S3
         run: |
           VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
+          pip freeze
           aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/configuration.json" --acl public-read --debug
           aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/latest/schemas/configuration.json" --acl public-read
           aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/profiles.json" --acl public-read
