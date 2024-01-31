@@ -171,7 +171,7 @@ jobs:
       - name: Upload json schema to S3
         run: |
           VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
-          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/configuration.json" --acl public-read
+          aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/configuration.json" --acl public-read --debug
           aws s3 cp configuration.json "s3://dstack-runner-downloads-stgn/latest/schemas/configuration.json" --acl public-read
           aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/$VERSION/schemas/profiles.json" --acl public-read
           aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/latest/schemas/profiles.json" --acl public-read
