@@ -298,7 +298,7 @@ There are two ways to configure GCP: using a service account or using the defaul
 <!-- #### Kubernetes
 
 `dstack` supports all Kubernetes clusters including local (e.g. kind) and managed (e.g. EKS).
-To configure the Kubernetes backend, all you need to do is to specify the path to your kubeconfig file:
+To configure the Kubernetes backend, specify the path to your kubeconfig file:
 
 <div editor-title="~/.dstack/server/config.yml">
 
@@ -313,15 +313,109 @@ projects:
       ssh_host: "52.17.197.110"
       ssh_port: 32000
 ```
+
 </div>
 
 You may also need to configure `networking`.
-`dstack` will use `ssh_host` and `ssh_port` to connect to jobs running in the cluster.
-Make sure the `dstack` server can reach `ssh_host:ssh_port`.
-It may require editing cluster firewall rules to open the port.
+`dstack` deploys a special Pod called Jump Pod that is published as a [NodePort service](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) on `ssh_port`.
+`dstack` uses this Pod as an SSH proxy to access all other Services running in the cluster.
+You need to ensure that the `dstack` server and your dev machine can access `ssh_host:ssh_port`.
+This may require editing firewall rules to open `ssh_port`.
+The `ssh_host` parameter can be set to the public IP of any node.
+The `Cluster setup` section below shows how to set up `networking` for some popular Kubernetes deployments.
+
+##### Cluster setup
+
+`dstack` detects GPUs on cluster nodes using labels set by the [NVIDIA's gpu-feature-discovery plugin](https://github.com/NVIDIA/gpu-feature-discovery), i.e. `nvidia.com/gpu.product`, `nvidia.com/gpu.count`, etc.
+You need to ensure that all GPU nodes have this labels set. If you install [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html), the nodes will be labeled automatically.
+
+Besides GPU labeling, you only need to ensure that cluster networking allows `dstack` to access the Jump Pod.
+The specifics of it vary between different Kubernetes deployments. Here's some examples:
+
+=== "Kind"
+
+    [kind](https://kind.sigs.k8s.io/) (a.k.a. Kubernetes in Docker) is a tool for running local Kubernetes clusters using Docker containers as nodes. kind was primarily designed for testing Kubernetes itself, but may be used for local development or CI.
+
+    To make a kind cluster work with `dstack`, configure the cluster with `extraPortMappings` parameter to forward `ssh_port` to nodes:
+
+    <div editor-title="kind-config.yml"> 
+
+    ```yaml
+
+    kind: Cluster
+    apiVersion: kind.x-k8s.io/v1alpha4
+    nodes:
+    - role: control-plane
+      extraPortMappings:
+      # `ssh_port` is set to 32000 as an example
+      - containerPort: 32000
+        hostPort: 32000
+
+    ```
+
+    </div>
+
+    Then create the cluster:
+
+    ```shell
+    kind create cluster --config kind-config.yaml
+    ```
+
+    And configure the Kubernetes backend:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: kubernetes
+        kubeconfig:
+          filename: ~/.kube/config
+        networking:
+          ssh_host: localhost
+          ssh_port: 32000
+    ```
+
+    </div>
+
+=== "EKS"
+    
+    [Amazon Elastic Kubernetes Service](https://aws.amazon.com/eks/) (Amazon EKS) is a managed Kubernetes service to run Kubernetes in the AWS cloud and on-premises data centers.
+
+    To make an EKS cluster work with `dstack`, add an ingress rule to the cluster's security group that allows traffic on `ssh_port`:
+
+    ```shell
+    aws ec2 authorize-security-group-ingress --group-id YOUR_SECURITY_GROUP_ID --protocol tcp --port 32000 --cidr 0.0.0.0/0
+    ```
+
+    You also need a public IP of any cluster node to specify `ssh_host`. Run `kubectl` to get it:
+
+    ```shell
+    kubectl get nodes -o wide
+    ```
+
+    And configure the Kubernetes backend:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: kubernetes
+        kubeconfig:
+          filename: ~/.kube/config
+        networking:
+          ssh_host: "52.17.197.110"
+          ssh_port: 32000
+    ```
+
+    </div>
+
 
 !!! info "NOTE:"
-    As of now, the Kubernetes backend does not support GPU workloads and creation of gateways.
+    As of now, the Kubernetes backend does not support creation of gateways.
     The support is coming soon. -->
 
 #### Lambda
