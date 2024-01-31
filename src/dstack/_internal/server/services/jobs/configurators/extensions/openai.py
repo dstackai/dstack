@@ -1,19 +1,23 @@
 import requests
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.configurations import ModelInfo
+from dstack._internal.core.models.gateways import AnyModel
 
 
-def complete_model(model_info: ModelInfo) -> dict:
+def complete_model(model_info: AnyModel) -> dict:
     model_info = model_info.copy(deep=True)
-    # TODO(egor-s): support more types and formats
 
-    if model_info.chat_template is None or model_info.eos_token is None:
-        tokenizer_config = get_tokenizer_config(model_info.name)
-        if model_info.chat_template is None:
-            model_info.chat_template = tokenizer_config["chat_template"]  # TODO(egor-s): default
-        if model_info.eos_token is None:
-            model_info.eos_token = tokenizer_config["eos_token"]  # TODO(egor-s): default
+    if model_info.type == "chat" and model_info.format == "tgi":
+        if model_info.chat_template is None or model_info.eos_token is None:
+            tokenizer_config = get_tokenizer_config(model_info.name)
+            if model_info.chat_template is None:
+                model_info.chat_template = tokenizer_config[
+                    "chat_template"
+                ]  # TODO(egor-s): default
+            if model_info.eos_token is None:
+                model_info.eos_token = tokenizer_config["eos_token"]  # TODO(egor-s): default
+    elif model_info.type == "chat" and model_info.format == "openai":
+        pass  # nothing to do
 
     return {"model": model_info.dict()}
 

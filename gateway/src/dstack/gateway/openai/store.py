@@ -7,6 +7,7 @@ from pydantic import BaseModel, ValidationError
 
 from dstack.gateway.errors import GatewayError, NotFoundError
 from dstack.gateway.openai.clients import ChatCompletionsClient
+from dstack.gateway.openai.clients.openai import OpenAIChatCompletions
 from dstack.gateway.openai.clients.tgi import TGIChatCompletions
 from dstack.gateway.openai.models import OpenAIOptions, ServiceModel
 from dstack.gateway.openai.schemas import Model
@@ -80,6 +81,11 @@ class OpenAIStore(BaseModel, StoreSubscriber):
                     host=service.domain,
                     chat_template=service.model.chat_template,
                     eos_token=service.model.eos_token,
+                )
+            elif service.model.format == "openai":
+                return OpenAIChatCompletions(
+                    base_url=f"http://localhost/{service.model.prefix.lstrip('/')}",
+                    host=service.domain,
                 )
             else:
                 raise GatewayError(f"Unsupported model format: {service.model.format}")
