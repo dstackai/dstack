@@ -1,9 +1,8 @@
-from typing import List, Optional
+from typing import List
 
 from dstack._internal.core.backends.kubernetes import KubernetesBackend
 from dstack._internal.core.backends.kubernetes.client import get_api_from_config_data
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
-from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.kubernetes import (
     AnyKubernetesConfigInfo,

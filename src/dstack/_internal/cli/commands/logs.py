@@ -4,7 +4,6 @@ from pathlib import Path
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.services.ssh.ports import PortUsedError
 
 
 class LogsCommand(APIBaseCommand):

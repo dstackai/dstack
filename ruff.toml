@@ -6,7 +6,6 @@ select = ['E', 'F', 'I']
 ignore =[
   'E501',
   'E741',
-  'F401',
 ]
 
 [lint.isort]

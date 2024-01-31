@@ -6,7 +6,6 @@ import botocore.client
 import botocore.exceptions
 
 import dstack._internal.core.backends.aws.resources as aws_resources
-import dstack.version as version
 from dstack._internal import settings
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base.compute import (

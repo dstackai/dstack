@@ -6,7 +6,6 @@ Create Date: 2023-11-03 16:46:57.057973
 
 """
 import sqlalchemy as sa
-import sqlalchemy_utils
 from alembic import op
 
 from dstack._internal.core.models.runs import JobStatus

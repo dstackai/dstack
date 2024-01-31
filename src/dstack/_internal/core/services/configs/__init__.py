@@ -7,7 +7,6 @@ import filelock
 import yaml
 from pydantic import ValidationError
 from rich import print
-from rich.prompt import Confirm
 
 from dstack._internal.cli.utils.common import colors, confirm_ask
 from dstack._internal.core.models.config import GlobalConfig, ProjectConfig, RepoConfig

@@ -1,12 +1,8 @@
 import json
 from typing import List
 
-from requests import HTTPError
-
-from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.lambdalabs import LambdaBackend, api_client
 from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
-from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import (
     BackendType,
     ConfigElementValue,

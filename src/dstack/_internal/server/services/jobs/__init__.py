@@ -4,7 +4,6 @@ import socket
 from datetime import timezone
 from typing import Dict, List, Optional
 
-from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import SSHError

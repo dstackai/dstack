@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 
 import dstack._internal.core.services.configs as configs
-from dstack._internal.core.errors import ConfigurationError, DstackError
+from dstack._internal.core.errors import ConfigurationError
 from dstack.api.server import APIClient
 
 

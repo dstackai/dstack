@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1

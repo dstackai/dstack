@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional
+from typing import List
 
 from dstack._internal.core.backends.aws import AWSBackend, auth
 from dstack._internal.core.backends.aws.config import AWSConfig

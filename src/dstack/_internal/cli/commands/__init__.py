@@ -1,15 +1,12 @@
 import argparse
 import os
 from abc import ABC, abstractmethod
-from pathlib import Path
 
 from rich_argparse import RichHelpFormatter
 
-import dstack._internal.core.services.api_client as api_client_service
 from dstack._internal.cli.utils.common import configure_logging
 from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack.api import Client
-from dstack.api.server import APIClient
 
 
 class BaseCommand(ABC):

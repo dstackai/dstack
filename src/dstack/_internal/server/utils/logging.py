@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import sys
 
 from dstack._internal.server import settings

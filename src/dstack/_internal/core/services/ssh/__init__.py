@@ -1,5 +1,3 @@
-from typing import re
-
 from dstack._internal.core.errors import (
     SSHConnectionRefusedError,
     SSHError,
