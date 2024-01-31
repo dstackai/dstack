@@ -159,6 +159,11 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     runs-on: ubuntu-latest
     steps:
+      - name: Print Python
+        run: python --version
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
       - uses: actions/checkout@v3
       - name: Install AWS
         run: pip install awscli
