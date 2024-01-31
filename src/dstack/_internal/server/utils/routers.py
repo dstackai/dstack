@@ -66,11 +66,9 @@ def check_client_server_compatibility(
     Returns `JSONResponse` with error if client/server versions are incompatible.
     Returns `None` otherwise.
     """
-    if server_version is None:
+    if client_version is None or server_version is None:
         return None
     parsed_server_version = version.parse(server_version)
-    if client_version is None:
-        return error_incompatible_versions(client_version, server_version, ask_cli_update=True)
     # latest allows client to bypass compatibility check (e.g. frontend)
     if client_version == "latest":
         return None
