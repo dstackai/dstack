@@ -13,20 +13,14 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_NAME,
-    CreationPolicy,
-    Profile,
-    TerminationPolicy,
-)
-from dstack._internal.core.models.resources import Range, Resources
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
     JobErrorCode,
     JobProvisioningData,
     JobStatus,
-    Requirements,
     Run,
     RunSpec,
 )
@@ -41,9 +35,7 @@ from dstack._internal.server.services.logging import job_log
 from dstack._internal.server.services.pools import (
     get_pool_instances,
     instance_model_to_instance,
-    list_project_pool,
     list_project_pool_models,
-    show_pool,
 )
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
@@ -87,37 +79,61 @@ async def _process_job(job_id: UUID):
         )
 
 
-def check_relevance(profile: Profile, resources: Resources, instance_model: InstanceModel) -> bool:
+def check_relevance(
+    profile: Profile, resources: ResourcesSpec, instance_model: InstanceModel
+) -> bool:
 
     jpd: JobProvisioningData = parse_raw_as(
         JobProvisioningData, instance_model.job_provisioning_data
     )
 
+    # TODO: remove on prod
     if LOCAL_BACKEND_ENABLED and jpd.backend == BackendType.LOCAL:
         return True
 
     instance = instance_model_to_instance(instance_model)
 
     if profile.backends is not None and instance.backend not in profile.backends:
-        logger.warning(f"no backnd select ")
+        logger.warning(f"no backend select ")
         return False
 
-    # instance_resources = jpd.instance_type.resources
+    instance_resources: ResourcesSpec = parse_raw_as(
+        ResourcesSpec, instance_model.resource_spec_data
+    )
 
-    # TODO: full check requirements
-    # if isinstance(requirements.resources.cpu, Range):
-    #     if  requirements.resources.cpu.min < int(instance_resources.cpus):
-    #         return False
+    if resources.cpu.min > instance_resources.cpu.min:
+        return False
 
-    # if isinstance(requirements.resources.gpu, Range):
-    #     if  requirements.resources.gpu.min < int(instance_resources.cpus):
-    #         return False
-    # if isinstance(int(requirements.resources.gpu), int):
-    #     if requirements.resources.gpu < len(instance_resources.gpus):
-    #         return False
+    if resources.gpu is not None:
+
+        if instance_resources.gpu is None:
+            return False
+
+        if resources.gpu.count.min > instance_resources.gpu.count.min:
+            return False
+
+        if resources.gpu.memory.min > instance_resources.gpu.memory.min:
+            return False
+
+        # TODO: compare GPU names
+
+    if resources.memory.min > instance_resources.memory.min:
+        return False
+
+    if resources.shm_size is not None:
+        if instance_resources.shm_size is None:
+            return False
+
+        if resources.shm_size > instance_resources.shm_size:
+            return False
+
+    if resources.disk is not None:
+        if instance_resources.disk is None:
+            return False
+        if resources.disk.size.min > instance_resources.disk.size.min:
+            return False
 
     return True
-    # TODO: memory, shm_size, disk
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
@@ -216,7 +232,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             name=job.job_spec.job_name,
             project=project_model,
             pool=pool,
-            status=InstanceStatus.CREATING,
+            status=InstanceStatus.BUSY,
             job_provisioning_data=job_provisioning_data.json(),
             offer=offer.json(),
             termination_policy=profile.termination_policy,

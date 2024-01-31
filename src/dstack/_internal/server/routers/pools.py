@@ -7,7 +7,7 @@ import dstack._internal.core.models.pools as models
 import dstack._internal.server.schemas.pools as schemas
 import dstack._internal.server.services.pools as pools
 from dstack._internal.server.db import get_session
-from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel, UserModel
+from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
 from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
 from dstack._internal.server.services.runs import (
@@ -99,7 +99,8 @@ async def add_instance(
     _, project = user_project
     await pools.add(
         session,
-        project,
+        project=project,
+        resources=body.resources,
         pool_name=body.pool_name,
         instance_name=body.instance_name,
         host=body.host,

@@ -1,8 +1,6 @@
 import asyncio
-from contextlib import asynccontextmanager, contextmanager
 from datetime import timezone
-from typing import Dict, List, Optional, Sequence, Union
-from uuid import UUID
+from typing import Dict, List, Optional, Sequence
 
 from pydantic import parse_raw_as
 from sqlalchemy import select
@@ -11,14 +9,15 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    Gpu,
     InstanceAvailability,
     InstanceOfferWithAvailability,
-    InstanceState,
     InstanceType,
     Resources,
 )
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel
 from dstack._internal.utils import random_names
@@ -238,6 +237,7 @@ async def generate_instance_name(
 
 async def add(
     session: AsyncSession,
+    resources: ResourcesSpec,
     project: ProjectModel,
     pool_name: str,
     instance_name: Optional[str],
@@ -262,11 +262,19 @@ async def add(
     if pool is None:
         pool = await create_pool_model(session, project, pool_name)
 
+    gpus = []
+    if resources.gpu is not None:
+        gpus = [
+            Gpu(name=resources.gpu.name, memory_mib=resources.gpu.memory)
+        ] * resources.gpu.count.min
+
+    instance_resource = Resources(
+        cpus=resources.cpu.min, memory_mib=resources.memory.min, gpus=gpus, spot=False
+    )
+
     local = JobProvisioningData(
         backend=BackendType.LOCAL,
-        instance_type=InstanceType(
-            name="local", resources=Resources(cpus=0, memory_mib=0, gpus=[], spot=False)
-        ),
+        instance_type=InstanceType(name="local", resources=instance_resource),
         instance_id=instance_name,
         hostname=host,
         region="",
@@ -276,12 +284,13 @@ async def add(
         dockerized=False,
         backend_data="",
         pool_id=str(pool.id),
+        ssh_proxy=None,
     )
     offer = InstanceOfferWithAvailability(
         backend=BackendType.LOCAL,
         instance=InstanceType(
             name="instance",
-            resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+            resources=instance_resource,
         ),
         region="",
         price=0.0,
@@ -295,6 +304,7 @@ async def add(
         status=InstanceStatus.PENDING,
         job_provisioning_data=local.json(),
         offer=offer.json(),
+        resource_spec_data=resources.json(),
     )
     session.add(im)
     await session.commit()

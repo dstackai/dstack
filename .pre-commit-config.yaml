@@ -22,3 +22,11 @@ repos:
       files: '.*pools?\.py'
       exclude: 'versions|src/tests'
       additional_dependencies: [types-PyYAML]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.14
+    hooks:
+      - id: ruff
+        name: ruff autofix
+        args: ['--fix', '--select', 'F401']
+        files: 'runs?\.py|pools?\.py'
+        exclude: 'versions|src/tests'

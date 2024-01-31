@@ -191,7 +191,7 @@ class ResourcesSpec(ForbidExtra):
         cpu (Optional[Range[int]]): The number of CPUs
         memory (Optional[Range[Memory]]): The size of RAM memory (e.g., `"16GB"`)
         gpu (Optional[GPUSpec]): The GPU spec
-        shm_size (Optional[Range[Memory]]): The of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this.
+        shm_size (Optional[Range[Memory]]): The size of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this.
         disk (Optional[DiskSpec]): The disk spec
     """
 

@@ -7,7 +7,7 @@ from abc import ABC
 from copy import copy
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 import requests
 from websocket import WebSocketApp

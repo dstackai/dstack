@@ -12,6 +12,7 @@ from dstack._internal.core.models.instances import InstanceType, Resources
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     JobErrorCode,
@@ -304,6 +305,7 @@ async def create_instance(
     project: ProjectModel,
     pool: PoolModel,
     status: InstanceStatus,
+    resources: ResourcesSpec,
 ) -> InstanceModel:
     im = InstanceModel(
         name="test_instance",
@@ -312,6 +314,7 @@ async def create_instance(
         status=status,
         job_provisioning_data='{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "instance_id": "running_instance.id", "pool_id": "1b2b4c57-5851-487f-b92e-948f946dfa49", "hostname": "running_instance.ip", "region": "running_instance.location", "price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, "backend_data": null}',
         offer='{"backend": "datacrunch", "instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "region": "en", "price": 0.1, "availability": "available"}',
+        resource_spec_data=resources.json(),
     )
     session.add(im)
     await session.commit()

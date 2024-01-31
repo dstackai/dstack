@@ -283,4 +283,7 @@ class InstanceModel(BaseModel):
     termination_idle_time: Mapped[Optional[str]] = mapped_column(String(50))
 
     job_provisioning_data: Mapped[str] = mapped_column(String(4000))
+
     offer: Mapped[str] = mapped_column(String(4000))
+
+    resource_spec_data: Mapped[Optional[str]] = mapped_column(String(4000))

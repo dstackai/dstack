@@ -195,7 +195,7 @@ async def test_create_cloud_instance(session: AsyncSession, test_db):
 
     profile = Profile(name="test_profile")
 
-    requirements = Requirements(resources=resources.Resources(cpu=1), spot=True)
+    requirements = Requirements(resources=resources.ResourcesSpec(cpu=1), spot=True)
 
     offer = InstanceOfferWithAvailability(
         backend=BackendType.DATACRUNCH,

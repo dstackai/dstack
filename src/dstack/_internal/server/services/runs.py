@@ -23,10 +23,8 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
-from dstack._internal.core.models.resources import GPU, ComputeCapability, Memory, Range, Resources
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.runs import (
-    GpusRequirements,
     InstanceStatus,
     Job,
     JobPlan,
@@ -244,6 +242,7 @@ async def create_instance(
             ssh_port=launched_instance_info.ssh_port,
             dockerized=launched_instance_info.dockerized,
             backend_data=launched_instance_info.backend_data,
+            ssh_proxy=None,
         )
 
         im = InstanceModel(

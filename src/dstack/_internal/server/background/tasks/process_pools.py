@@ -3,16 +3,14 @@ from typing import Dict
 from uuid import UUID
 
 from pydantic import parse_raw_as
-from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, JobStatus
+from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel
+from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.jobs import PROCESSING_POOL_IDS, PROCESSING_POOL_LOCK
-from dstack._internal.server.services.logging import job_log
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils.common import run_async

@@ -28,6 +28,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_run_spec,
 )
+from dstack.api._public.resources import Resources as MakeResources
 
 
 class TestProcessSubmittedJobs:
@@ -212,7 +213,8 @@ class TestProcessSubmittedJobs:
                 pool = pool_item
         if pool is None:
             pool = await create_pool(session, project)
-        im = await create_instance(session, project, pool, InstanceStatus.READY)
+        resources = MakeResources(cpu=2, memory="12GB")
+        await create_instance(session, project, pool, InstanceStatus.READY, resources)
         await session.refresh(pool)
         run = await create_run(
             session,
@@ -223,7 +225,8 @@ class TestProcessSubmittedJobs:
         job_provisioning_data = JobProvisioningData(
             backend=BackendType.LOCAL,
             instance_type=InstanceType(
-                name="local", resources=Resources(cpus=1, memory_mib=1024, gpus=[], spot=False)
+                name="local",
+                resources=Resources(cpus=2, memory_mib=12 * 1024, gpus=[], spot=False),
             ),
             instance_id="0000-0000",
             hostname="localhost",
@@ -234,12 +237,17 @@ class TestProcessSubmittedJobs:
             dockerized=False,
             pool_id="",
             backend_data=None,
+            ssh_proxy=None,
         )
-        job = await create_job(
-            session,
-            run=run,
-            job_provisioning_data=job_provisioning_data,
-        )
+        with patch(
+            "dstack._internal.server.services.jobs.configurators.base.get_default_python_verison"
+        ) as PyVersion:
+            PyVersion.return_value = "3.10"
+            job = await create_job(
+                session,
+                run=run,
+                job_provisioning_data=job_provisioning_data,
+            )
         await process_submitted_jobs()
         await session.refresh(job)
         assert job is not None

@@ -2,8 +2,6 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-import yaml
-from pydantic import parse_obj_as
 from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
@@ -11,22 +9,29 @@ from dstack._internal.cli.services.configurators.profile import (
     apply_profile_args,
     register_profile_args,
 )
-from dstack._internal.cli.services.configurators.run import BaseRunConfigurator
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.core.errors import CLIError, ServerClientError
-from dstack._internal.core.models.configurations import parse as parse_configuration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
-from dstack._internal.core.models.resources import GPU, Resources
+from dstack._internal.core.models.resources import (
+    DEFAULT_CPU_COUNT,
+    DEFAULT_MEMORY_SIZE,
+    DiskLike,
+    GPULike,
+    IntRangeLike,
+    MemoryLike,
+    MemoryRangeLike,
+)
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
-from dstack.api.utils import load_configuration, load_profile
+from dstack.api._public.resources import Resources
+from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
 
@@ -157,6 +162,56 @@ def print_offers_table(
         console.print()
 
 
+def register_resource_args(parser: argparse.ArgumentParser) -> None:
+    resources_group = parser.add_argument_group("Resources")
+    resources_group.add_argument(
+        "--cpu",
+        type=IntRangeLike,
+        help=f"Request the CPU count. Default: '{DEFAULT_CPU_COUNT.min}..'",
+        dest="cpu",
+        metavar="SPEC",
+        default=DEFAULT_CPU_COUNT,
+    )
+
+    resources_group.add_argument(
+        "--memory",
+        type=MemoryRangeLike,
+        help="Request the size of RAM. "
+        f"The format is [code]SIZE[/]:[code]MB|GB|TB[/]. Default: {DEFAULT_MEMORY_SIZE.min}",
+        dest="memory",
+        metavar="SIZE",
+        default=DEFAULT_MEMORY_SIZE,
+    )
+
+    resources_group.add_argument(
+        "--shared-memory",
+        type=MemoryLike,
+        help="Request the size of Shared Memory. The format is [code]SIZE[/]:[code]MB|GB|TB[/].",
+        dest="shared_memory",
+        default=None,
+        metavar="SIZE",
+    )
+
+    resources_group.add_argument(
+        "--gpu",
+        type=GPULike,
+        help="Request GPU for the run. "
+        "The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
+        dest="gpu",
+        default=None,
+        metavar="SPEC",
+    )
+
+    resources_group.add_argument(
+        "--disk",
+        type=DiskLike,
+        help="Request the size of disk for the run. Example [code]--disk 100GB[/].",
+        dest="disk",
+        metavar="SIZE",
+        default=None,
+    )
+
+
 class PoolCommand(APIBaseCommand):  # type: ignore[misc]
     NAME = "pool"
     DESCRIPTION = "Pool management"
@@ -167,7 +222,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
 
         subparsers = self._parser.add_subparsers(dest="action")
 
-        # list
+        # list pools
         list_parser = subparsers.add_parser(
             "list",
             help="List pools",
@@ -177,14 +232,14 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         list_parser.add_argument("-v", "--verbose", help="Show more information")
         list_parser.set_defaults(subfunc=self._list)
 
-        # create
+        # create pool
         create_parser = subparsers.add_parser(
             "create", help="Create pool", formatter_class=self._parser.formatter_class
         )
         create_parser.add_argument("-n", "--name", dest="pool_name", help="The name of the pool")
         create_parser.set_defaults(subfunc=self._create)
 
-        # delete
+        # delete pool
         delete_parser = subparsers.add_parser(
             "delete", help="Delete pool", formatter_class=self._parser.formatter_class
         )
@@ -196,7 +251,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         )
         delete_parser.set_defaults(subfunc=self._delete)
 
-        # show
+        # show pool instances
         show_parser = subparsers.add_parser(
             "show",
             help="Show pool instances",
@@ -208,7 +263,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         )
         show_parser.set_defaults(subfunc=self._show)
 
-        # add
+        # add instance
         add_parser = subparsers.add_parser(
             "add", help="Add instance to pool", formatter_class=self._parser.formatter_class
         )
@@ -231,10 +286,10 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         )
         add_parser.add_argument("--name", dest="instance_name", help="The name of the instance")
         register_profile_args(add_parser)
-        BaseRunConfigurator.register(add_parser)
+        register_resource_args(add_parser)
         add_parser.set_defaults(subfunc=self._add)
 
-        # remove
+        # remove instance
         remove_parser = subparsers.add_parser(
             "remove",
             help="Remove instance from the pool",
@@ -271,30 +326,38 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
 
         pool_name: str = DEFAULT_POOL_NAME if args.pool_name is None else args.pool_name
 
+        resources = Resources(
+            cpu=args.cpu,
+            memory=args.memory,
+            gpu=args.gpu,
+            shm_size=args.shared_memory,
+            disk=args.disk,
+        )
+        requirements = Requirements(
+            resources=resources,
+            max_price=args.max_price,
+            spot=(args.spot_policy == SpotPolicy.SPOT),
+        )
+
         # Add remote instance
         if args.remote:
             self.api.client.pool.add(
-                self.api.project, pool_name, args.instance_name, args.remote_host, args.remote_port
+                self.api.project,
+                resources,
+                pool_name,
+                args.instance_name,
+                args.remote_host,
+                args.remote_port,
             )
             return
 
         repo = self.api.repos.load(Path.cwd())
         self.api.ssh_identity_file = ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
 
-        # TODO: read requirements from repo configuration
-        # conf = parse_configuration(yaml.safe_load(conf_path.open()))
-        # resources = conf.resources
-
         profile = load_profile(Path.cwd(), args.profile)
         apply_profile_args(args, profile)
 
         profile.pool_name = pool_name
-
-        requirements = Requirements(
-            resources=Resources(gpu=parse_obj_as(GPU, args.gpu_spec)),
-            max_price=args.max_price,
-            spot=(args.spot_policy == SpotPolicy.SPOT),
-        )
 
         with console.status("Getting instances..."):
             offers = self.api.runs.get_offers(profile, requirements)

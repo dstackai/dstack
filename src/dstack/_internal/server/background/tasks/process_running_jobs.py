@@ -172,6 +172,14 @@ async def _process_job(job_id: UUID):
                     )
                     job_model.status = JobStatus.FAILED
                     job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
+
+                instance_name: str = job_provisioning_data.instance_id
+                pool_name = str(job.job_spec.pool_name)
+                instances = await get_pool_instances(session, project, pool_name)
+                for inst in instances:
+                    if inst.name == instance_name:
+                        inst.status = InstanceStatus.READY  # TODO: or fail?
+
         else:  # fails are not acceptable
             if initial_status == JobStatus.PULLING:
                 logger.debug(
@@ -208,7 +216,7 @@ async def _process_job(job_id: UUID):
                     job_model,
                 )
 
-                if success:
+                if success and job_model.status == JobStatus.DONE:
                     instance_name: str = job_provisioning_data.instance_id
                     pool_name = str(job.job_spec.pool_name)
                     instances = await get_pool_instances(session, project, pool_name)
@@ -234,6 +242,14 @@ async def _process_job(job_id: UUID):
                             status=JobStatus.PENDING,
                         )
                         session.add(new_job_model)
+
+                        instance_name: str = job_provisioning_data.instance_id
+                        pool_name = str(job.job_spec.pool_name)
+                        instances = await get_pool_instances(session, project, pool_name)
+                        for inst in instances:
+                            if inst.name == instance_name:
+                                inst.status = InstanceStatus.READY
+
                 # job will be terminated by process_finished_jobs
 
         if (

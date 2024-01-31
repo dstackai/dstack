@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, RunSpec
 
 
@@ -35,7 +36,7 @@ class AddRemoteInstanceRequest(BaseModel):
     instance_name: Optional[str]
     host: str
     port: str
-    # TODO: define runner spec (gpu, cpu, etc)
+    resources: ResourcesSpec
 
 
 class SubmitRunRequest(BaseModel):
