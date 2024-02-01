@@ -112,7 +112,7 @@ LOCATIONS = [
         "default_zone": "australia-southeast1-c",
     },
 ]
-REGIONS = [r for l in LOCATIONS for r in l["regions"]]
+REGIONS = [r for loc in LOCATIONS for r in loc["regions"]]
 DEFAULT_REGIONS = REGIONS
 MAIN_REGION = "us-east1"
 

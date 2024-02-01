@@ -108,7 +108,7 @@ async def get_run(
         .where(
             RunModel.project_id == project.id,
             RunModel.run_name == run_name,
-            RunModel.deleted == False,  #  noqa: E712
+            RunModel.deleted == False,
         )
         .options(joinedload(RunModel.user))
     )
