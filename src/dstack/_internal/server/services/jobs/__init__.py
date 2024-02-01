@@ -113,7 +113,6 @@ async def stop_job(
                     job_submission,
                     project.ssh_private_key,
                 )
-
                 # delay termination for 15 seconds to allow the runner to stop gracefully
                 # delay_job_instance_termination(job_model)
             except SSHError:

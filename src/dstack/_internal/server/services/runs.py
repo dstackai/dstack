@@ -156,7 +156,6 @@ async def get_run_plan_by_requirements(
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
 
     backends = await backends_services.get_project_backends(project=project)
-
     if profile.backends is not None:
         backends = [b for b in backends if b.TYPE in profile.backends]
 

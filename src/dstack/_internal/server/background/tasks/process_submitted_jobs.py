@@ -79,6 +79,9 @@ async def _process_job(job_id: UUID):
         )
 
 
+from icecream import ic
+
+
 def check_relevance(
     profile: Profile, resources: ResourcesSpec, instance_model: InstanceModel
 ) -> bool:
@@ -103,9 +106,11 @@ def check_relevance(
         ResourcesSpec, instance_model.resource_spec_data
     )
 
+    ic(resources.cpu.min, instance_resources.cpu.min)
     if resources.cpu.min > instance_resources.cpu.min:
         return False
 
+    ic(resources.gpu)
     if resources.gpu is not None:
 
         if instance_resources.gpu is None:
@@ -119,6 +124,7 @@ def check_relevance(
 
         # TODO: compare GPU names
 
+    ic(resources.memory, instance_resources.memory.min)
     if resources.memory.min > instance_resources.memory.min:
         return False
 
@@ -180,6 +186,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     pool_instances = await get_pool_instances(session, project_model, run_pool)
     available_instanses = (p for p in pool_instances if p.status == InstanceStatus.READY)
+    ic(available_instanses)
     relevant_instances: List[InstanceModel] = []
     for instance in available_instanses:
         if check_relevance(profile, run_spec.configuration.resources, instance):
