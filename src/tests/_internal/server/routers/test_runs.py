@@ -252,6 +252,7 @@ def get_dev_env_run_dict(
             "job_provisioning_data": None,
         },
         "cost": 0,
+        "service": None,
     }
 
 
@@ -328,6 +329,7 @@ class TestListRuns:
                     "job_provisioning_data": None,
                 },
                 "cost": 0,
+                "service": None,
             }
         ]
 
