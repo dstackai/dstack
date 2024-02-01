@@ -9,7 +9,7 @@ from dstack._internal.core.services.ssh.ports import PortUsedError
 
 class LogsCommand(APIBaseCommand):
     NAME = "logs"
-    DESCRIPTION = "Show run logs"
+    DESCRIPTION = "Show logs"
 
     def _register(self):
         super()._register()

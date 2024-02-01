@@ -80,5 +80,5 @@ class ConfigCommand(BaseCommand):
             )
             config_manager.save()
         console.print(
-            f"Configuration updated at [{colors['code']}]{config_manager.config_filepath}[/{colors['code']}]."
+            f"Configuration updated at [{colors['code']}]{config_manager.config_filepath}[/{colors['code']}]"
         )

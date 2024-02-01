@@ -140,4 +140,4 @@ def update_default_project(
                 name=project_name, url=url, token=token, default=set_it_as_default
             )
             config_manager.save()
-            print(f"Configuration updated at [{colors['code']}]{config_dir}[/{colors['code']}].")
+            print(f"Configuration updated at [{colors['code']}]{config_dir}[/{colors['code']}]")

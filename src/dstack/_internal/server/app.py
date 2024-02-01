@@ -78,18 +78,19 @@ async def lifespan(app: FastAPI):
                 os.path.expanduser("~"), "~", 1
             )
             if not config_loaded:
+                with console.status(f"Initializing the default configuration..."):
+                    await server_config_manager.init_config(session=session)
                 console.print(
-                    f"Initializing the default configuration at [code]{server_config_dir}[/]..."
+                    f"[code]✓[/] Initialized the default configuration at [code]{server_config_dir}[/]"
                 )
-                await server_config_manager.init_config(session=session)
             else:
-                console.print(
-                    f"Applying server configuration from [code]{server_config_dir}[/]..."
-                )
-                await server_config_manager.apply_config(session=session)
-        console.print(f"Connecting to gateways...")
+                with console.status(f"Applying [code]{server_config_dir}[/]..."):
+                    await server_config_manager.apply_config(session=session)
+                console.print(f"[code]✓[/] Applied [code]{server_config_dir}[/]")
         gateway_connections_pool.server_port = SERVER_PORT
-        await init_gateways(session=session)
+        with console.status("Initializing gateways..."):
+            await init_gateways(session=session)
+        console.print("[code]✓[/] Initialized gateways")
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
@@ -101,10 +102,10 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
+    console.print(f"\nThe admin token is [code]{admin.token}[/]")
     console.print(
-        f"The dstack server [code]{dstack_version}[/] is running at [code]{SERVER_URL}[/]"
+        f"The dstack server [code]{dstack_version}[/] is running at [code]{SERVER_URL}[/]\n"
     )
-    console.print(f"The admin token is [code]{admin.token}[/].")
     for func in _ON_STARTUP_HOOKS:
         await func(app)
     yield

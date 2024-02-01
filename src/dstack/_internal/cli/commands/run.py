@@ -30,7 +30,7 @@ NOTSET = object()
 
 class RunCommand(APIBaseCommand):
     NAME = "run"
-    DESCRIPTION = "Run .dstack.yml configuration"
+    DESCRIPTION = "Run a configuration"
     DEFAULT_HELP = False
 
     def _register(self):

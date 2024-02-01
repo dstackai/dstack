@@ -8,7 +8,7 @@ from dstack._internal.core.models.backends.base import BackendType
 
 class GatewayCommand(APIBaseCommand):
     NAME = "gateway"
-    DESCRIPTION = "Manage project gateways"
+    DESCRIPTION = "Manage gateways"
 
     def _register(self):
         super()._register()

@@ -29,7 +29,7 @@ class TestConfig:
         assert exit_code == 0, capsys.readouterr().out
         assert (
             capsys.readouterr().out.replace("\n", "")
-            == f"Configuration updated at {cli_config_path}."
+            == f"Configuration updated at {cli_config_path}"
         )
         assert yaml.load(cli_config_path.read_text(), yaml.FullLoader) == {
             "projects": [
