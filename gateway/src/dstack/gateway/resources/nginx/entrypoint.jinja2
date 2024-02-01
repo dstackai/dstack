@@ -4,6 +4,7 @@ server {
     proxy_pass http://localhost:{{ port }}/{{ prefix.strip('/') }}/;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header Host $host;
+    proxy_read_timeout 300s;
   }
   listen 80;
   listen 443 ssl;
