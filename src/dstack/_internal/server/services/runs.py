@@ -70,7 +70,7 @@ async def list_project_runs(
 ) -> List[Run]:
     filters = [
         RunModel.project_id == project.id,
-        RunModel.deleted == False,  # noqa: E712
+        RunModel.deleted == False,
     ]
     if repo_id is not None:
         repo = await repos_services.get_repo_model(

@@ -73,7 +73,7 @@ class AWSConfigurator(Configurator):
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
             auth.authenticate(creds=config.creds, region=MAIN_REGION)
-        except:  # noqa: E722
+        except Exception:
             if isinstance(config.creds, AWSAccessKeyCreds):
                 raise_invalid_credentials_error(
                     fields=[

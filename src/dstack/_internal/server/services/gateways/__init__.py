@@ -310,7 +310,7 @@ async def register_service_jobs(
 
 async def init_gateways(session: AsyncSession):
     res = await session.execute(
-        select(GatewayComputeModel).where(GatewayComputeModel.deleted == False)  # noqa: E712
+        select(GatewayComputeModel).where(GatewayComputeModel.deleted == False)
     )
     gateway_computes = res.scalars().all()
 

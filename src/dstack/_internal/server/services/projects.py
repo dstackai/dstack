@@ -169,7 +169,7 @@ async def list_user_project_models(
         select(ProjectModel).where(
             MemberModel.project_id == ProjectModel.id,
             MemberModel.user_id == user.id,
-            ProjectModel.deleted == False,  # noqa: E712
+            ProjectModel.deleted == False,
         )
     )
     return list(res.scalars().all())
@@ -180,10 +180,10 @@ async def list_user_owned_project_models(
 ) -> List[ProjectModel]:
     filters = [
         ProjectModel.owner_id == user.id,
-        ProjectModel.deleted == False,  # noqa: E712
+        ProjectModel.deleted == False,
     ]
     if not include_deleted:
-        filters.append(ProjectModel.deleted == False)  # noqa: E712
+        filters.append(ProjectModel.deleted == False)
     res = await session.execute(select(ProjectModel).where(*filters))
     return list(res.scalars().all())
 
@@ -192,7 +192,7 @@ async def list_project_models(
     session: AsyncSession,
 ) -> List[ProjectModel]:
     res = await session.execute(
-        select(ProjectModel).where(ProjectModel.deleted == False),  # noqa: E712
+        select(ProjectModel).where(ProjectModel.deleted == False),
     )
     return list(res.scalars().all())
 
@@ -204,7 +204,7 @@ async def get_project_model_by_name(
     res = await session.execute(
         select(ProjectModel).where(
             ProjectModel.name == project_name,
-            ProjectModel.deleted == False,  # noqa: E712
+            ProjectModel.deleted == False,
         )
     )
     return res.scalar()
@@ -217,7 +217,7 @@ async def get_project_model_by_name_or_error(
     res = await session.execute(
         select(ProjectModel).where(
             ProjectModel.name == project_name,
-            ProjectModel.deleted == False,  # noqa: E712
+            ProjectModel.deleted == False,
         )
     )
     return res.scalar_one()
@@ -230,7 +230,7 @@ async def get_project_model_by_id_or_error(
     res = await session.execute(
         select(ProjectModel).where(
             ProjectModel.id == project_id,
-            ProjectModel.deleted == False,  # noqa: E712
+            ProjectModel.deleted == False,
         )
     )
     return res.scalar_one()

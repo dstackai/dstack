@@ -49,7 +49,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install dependencies
-        run: pip install '.[all]' -r requirements_dev.txt
+        run: pip install -U '.[all]' -r requirements_dev.txt
       - name: Run pytest
         run: pytest src/tests
 
