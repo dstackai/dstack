@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from pydantic import UUID4, BaseModel, Field
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration, RegistryAuth
@@ -65,18 +65,6 @@ class JobErrorCode(str, Enum):
 
     def pretty_repr(self) -> str:
         return " ".join(self.value.split("_")).capitalize()
-
-
-class GpusRequirements(BaseModel):
-    count: Optional[int]
-    memory_mib: Optional[int]
-    name: Optional[str]
-    total_memory_mib: Optional[int]
-    compute_capability: Optional[Tuple[int, int]]
-
-
-class DiskRequirements(BaseModel):
-    size_mib: Optional[int]
 
 
 class Requirements(BaseModel):
@@ -192,6 +180,17 @@ class RunSpec(BaseModel):
     ssh_key_pub: str
 
 
+class ServiceModelInfo(BaseModel):
+    name: str
+    base_url: str
+    type: str
+
+
+class ServiceInfo(BaseModel):
+    url: str
+    model: Optional[ServiceModelInfo] = None
+
+
 class Run(BaseModel):
     id: UUID4
     project_name: str
@@ -202,6 +201,7 @@ class Run(BaseModel):
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission]
     cost: float = 0
+    service: Optional[ServiceInfo] = None
 
 
 class JobPlan(BaseModel):

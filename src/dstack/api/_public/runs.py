@@ -86,14 +86,7 @@ class Run(ABC):
     def service_url(self) -> str:
         if self._run.run_spec.configuration.type != "service":
             raise ValueError("The run is not a service")
-        gateway = self._run.jobs[0].job_spec.gateway
-        if gateway.secure:
-            url = f"https://{gateway.hostname}"
-        else:
-            url = f"http://{gateway.hostname}"
-            if gateway.public_port != 80:
-                url += f":{gateway.public_port}"
-        return url
+        return self._run.service.url
 
     def _attached_logs(
         self,

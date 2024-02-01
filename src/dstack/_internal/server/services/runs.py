@@ -21,6 +21,8 @@ from dstack._internal.core.models.runs import (
     Run,
     RunPlan,
     RunSpec,
+    ServiceInfo,
+    ServiceModelInfo,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
@@ -307,6 +309,7 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
         latest_job_submission=latest_job_submission,
     )
     run.cost = _get_run_cost(run)
+    run.service = _get_run_service(run)
     return run
 
 
@@ -354,3 +357,31 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
         return 0
     duration_hours = job_submission.duration.total_seconds() / 3600
     return job_submission.job_provisioning_data.price * duration_hours
+
+
+def _get_run_service(run: Run) -> Optional[ServiceInfo]:
+    if run.run_spec.configuration.type != "service":
+        return None
+
+    gateway = run.jobs[0].job_spec.gateway
+    model = None
+    if run.run_spec.configuration.model is not None:
+        domain = gateway.hostname.split(".", maxsplit=1)[1]
+        model = ServiceModelInfo(
+            name=run.run_spec.configuration.model.name,
+            base_url=f"https://gateway.{domain}",
+            type=run.run_spec.configuration.model.type,
+        )
+
+    omit_port = (gateway.secure and gateway.public_port == 443) or (
+        not gateway.secure and gateway.public_port == 80
+    )
+    return ServiceInfo(
+        url="%s://%s%s"
+        % (
+            "https" if gateway.secure else "http",
+            gateway.hostname,
+            "" if omit_port else f":{gateway.public_port}",
+        ),
+        model=model,
+    )

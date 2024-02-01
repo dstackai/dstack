@@ -13,9 +13,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import (
     AppSpec,
-    DiskRequirements,
     Gateway,
-    GpusRequirements,
     JobSpec,
     Requirements,
     RetryPolicy,
