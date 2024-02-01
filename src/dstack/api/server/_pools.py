@@ -4,6 +4,7 @@ from pydantic import parse_obj_as
 
 import dstack._internal.server.schemas.pools as schemas_pools
 from dstack._internal.core.models.pools import Instance, Pool
+from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
 from dstack.api.server._group import APIClientGroup
@@ -35,20 +36,26 @@ class PoolAPIClient(APIClientGroup):  # type: ignore[misc]
         )
         self._request(f"/api/project/{project_name}/pool/remove", body=body.json())
 
-    def add(
+    def set_default(self, project_name: str, pool_name: str) -> bool:
+        body = schemas_pools.SetDefaultPoolRequest(pool_name=pool_name)
+        result = self._request(f"/api/project/{project_name}/pool/set-default", body=body.json())
+        return bool(result.json())
+
+    def add_remote(
         self,
         project_name: str,
         resources: ResourcesSpec,
-        pool_name: str,
+        profile: Profile,
         instance_name: Optional[str],
         host: str,
         port: str,
-    ) -> None:
+    ) -> bool:
         body = AddRemoteInstanceRequest(
-            pool_name=pool_name,
+            profile=profile,
             instance_name=instance_name,
             host=host,
             port=port,
             resources=resources,
         )
-        self._request(f"/api/project/{project_name}/pool/add", body=body.json())
+        result = self._request(f"/api/project/{project_name}/pool/add_remote", body=body.json())
+        return bool(result.json())

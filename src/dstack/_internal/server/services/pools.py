@@ -16,7 +16,7 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.pools import Instance, Pool
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel
@@ -65,7 +65,7 @@ async def create_pool_model(session: AsyncSession, project: ProjectModel, name: 
         )
     )
     if pools.all():
-        raise ValueError("duplicate pool name")
+        raise ValueError("duplicate pool name")  # TODO: return error with description
 
     pool = PoolModel(
         name=name,
@@ -73,8 +73,11 @@ async def create_pool_model(session: AsyncSession, project: ProjectModel, name: 
     )
     session.add(pool)
     await session.commit()
-    project.default_pool = pool  # TODO: add CLI flag --set-default
-    await session.commit()
+
+    if project.default_pool is None:
+        project.default_pool = pool
+        await session.commit()
+
     return pool
 
 
@@ -85,6 +88,25 @@ async def list_project_pool_models(
         select(PoolModel).where(PoolModel.project_id == project.id, PoolModel.deleted == False)
     )
     return pools.all()  # type: ignore[no-any-return]
+
+
+async def set_default_pool(session: AsyncSession, project: ProjectModel, pool_name: str) -> bool:
+    pool = (
+        await session.scalars(
+            select(PoolModel).where(
+                PoolModel.name == pool_name,
+                PoolModel.project == project,
+                PoolModel.deleted == False,
+            )
+        )
+    ).one_or_none()
+
+    if pool is None:
+        return False
+    project.default_pool = pool
+
+    await session.commit()
+    return True
 
 
 async def remove_instance(
@@ -235,17 +257,17 @@ async def generate_instance_name(
                 return name
 
 
-async def add(
+async def add_remote(
     session: AsyncSession,
     resources: ResourcesSpec,
     project: ProjectModel,
-    pool_name: str,
+    profile: Profile,
     instance_name: Optional[str],
     host: str,
     port: str,
-) -> None:
+) -> bool:
 
-    instance_name = instance_name
+    pool_name = profile.pool_name
     if instance_name is None:
         instance_name = await generate_instance_name(session, project, pool_name)
 
@@ -273,7 +295,7 @@ async def add(
     )
 
     local = JobProvisioningData(
-        backend=BackendType.LOCAL,
+        backend=BackendType.REMOTE,
         instance_type=InstanceType(name="local", resources=instance_resource),
         instance_id=instance_name,
         hostname=host,
@@ -287,7 +309,7 @@ async def add(
         ssh_proxy=None,
     )
     offer = InstanceOfferWithAvailability(
-        backend=BackendType.LOCAL,
+        backend=BackendType.REMOTE,
         instance=InstanceType(
             name="instance",
             resources=instance_resource,
@@ -305,6 +327,10 @@ async def add(
         job_provisioning_data=local.json(),
         offer=offer.json(),
         resource_spec_data=resources.json(),
+        termination_policy=profile.termination_policy,
+        termination_idle_time=str(profile.termination_idle_time),
     )
     session.add(im)
     await session.commit()
+
+    return True

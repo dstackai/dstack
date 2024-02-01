@@ -9,7 +9,7 @@ from dstack._internal.cli.services.configurators.profile import (
     apply_profile_args,
     register_profile_args,
 )
-from dstack._internal.cli.utils.common import confirm_ask, console
+from dstack._internal.cli.utils.common import colors, confirm_ask, console
 from dstack._internal.core.errors import CLIError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -17,15 +17,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
-from dstack._internal.core.models.resources import (
-    DEFAULT_CPU_COUNT,
-    DEFAULT_MEMORY_SIZE,
-    DiskLike,
-    GPULike,
-    IntRangeLike,
-    MemoryLike,
-    MemoryRangeLike,
-)
+from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import pretty_date
@@ -166,7 +158,6 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
     resources_group = parser.add_argument_group("Resources")
     resources_group.add_argument(
         "--cpu",
-        type=IntRangeLike,
         help=f"Request the CPU count. Default: '{DEFAULT_CPU_COUNT.min}..'",
         dest="cpu",
         metavar="SPEC",
@@ -175,7 +166,6 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
 
     resources_group.add_argument(
         "--memory",
-        type=MemoryRangeLike,
         help="Request the size of RAM. "
         f"The format is [code]SIZE[/]:[code]MB|GB|TB[/]. Default: {DEFAULT_MEMORY_SIZE.min}",
         dest="memory",
@@ -185,7 +175,6 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
 
     resources_group.add_argument(
         "--shared-memory",
-        type=MemoryLike,
         help="Request the size of Shared Memory. The format is [code]SIZE[/]:[code]MB|GB|TB[/].",
         dest="shared_memory",
         default=None,
@@ -194,7 +183,6 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
 
     resources_group.add_argument(
         "--gpu",
-        type=GPULike,
         help="Request GPU for the run. "
         "The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
         dest="gpu",
@@ -204,7 +192,6 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
 
     resources_group.add_argument(
         "--disk",
-        type=DiskLike,
         help="Request the size of disk for the run. Example [code]--disk 100GB[/].",
         dest="disk",
         metavar="SIZE",
@@ -303,6 +290,17 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         )
         remove_parser.set_defaults(subfunc=self._remove)
 
+        # pool set-default
+        set_default_parser = subparsers.add_parser(
+            "set-default",
+            help="Set the project's default pool",
+            formatter_class=self._parser.formatter_class,
+        )
+        set_default_parser.add_argument(
+            "--pool", dest="pool_name", help="The name of the pool", required=True
+        )
+        set_default_parser.set_defaults(subfunc=self._set_default)
+
     def _list(self, args: argparse.Namespace) -> None:
         pools = self.api.client.pool.list(self.api.project)
         print_pool_table(pools, verbose=getattr(args, "verbose", False))
@@ -315,6 +313,13 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
 
     def _remove(self, args: argparse.Namespace) -> None:
         self.api.client.pool.remove(self.api.project, args.pool_name, args.instance_name)
+
+    def _set_default(self, args: argparse.Namespace) -> None:
+        result = self.api.client.pool.set_default(self.api.project, args.pool_name)
+        if not result:
+            console.print(
+                f"[{colors['error']}]Failed to set default pool {args.pool_name!r}[/{colors['code']}]"
+            )
 
     def _show(self, args: argparse.Namespace) -> None:
         instances = self.api.client.pool.show(self.api.project, args.pool_name)
@@ -339,25 +344,28 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             spot=(args.spot_policy == SpotPolicy.SPOT),
         )
 
+        profile = load_profile(Path.cwd(), args.profile)
+        apply_profile_args(args, profile)
+        profile.pool_name = pool_name
+
         # Add remote instance
         if args.remote:
-            self.api.client.pool.add(
+            result = self.api.client.pool.add_remote(
                 self.api.project,
                 resources,
-                pool_name,
+                profile,
                 args.instance_name,
                 args.remote_host,
                 args.remote_port,
             )
+            if not result:
+                console.print(
+                    f"[{colors['error']}]Failed to add remote instance {args.instance_name!r}[/{colors['code']}]"
+                )
             return
 
         repo = self.api.repos.load(Path.cwd())
         self.api.ssh_identity_file = ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
-
-        profile = load_profile(Path.cwd(), args.profile)
-        apply_profile_args(args, profile)
-
-        profile.pool_name = pool_name
 
         with console.status("Getting instances..."):
             offers = self.api.runs.get_offers(profile, requirements)

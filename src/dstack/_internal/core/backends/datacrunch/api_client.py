@@ -56,6 +56,7 @@ class DataCrunchAPIClient:
             if instance is not None and instance.status == "running":
                 return instance
             time.sleep(WAIT_FOR_INSTANCE_INTERVAL)
+        return
 
     def deploy_instance(
         self,
@@ -68,7 +69,7 @@ class DataCrunchAPIClient:
         disk_size,
         is_spot=True,
         location="FIN-01",
-    ):
+    ) -> Instance:
         try:
             instance = self.client.instances.create(
                 instance_type=instance_type,

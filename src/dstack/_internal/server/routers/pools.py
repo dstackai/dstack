@@ -38,6 +38,16 @@ async def remove_instance(
     await pools.remove_instance(session, project_model, body.pool_name, body.instance_name)
 
 
+@router.post("/set-default")  # type: ignore[misc]
+async def set_default_pool(
+    body: schemas.SetDefaultPoolRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+) -> bool:
+    _, project_model = user_project
+    return await pools.set_default_pool(session, project_model, body.pool_name)
+
+
 @router.post("/delete")  # type: ignore[misc]
 async def delete_pool(
     body: schemas.DeletePoolRequest,
@@ -90,19 +100,20 @@ async def how_pool(
     return await pools.show_pool(session, project, pool_name=body.name)
 
 
-@router.post("/add")  # type: ignore[misc]
+@router.post("/add_remote")  # type: ignore[misc]
 async def add_instance(
     body: AddRemoteInstanceRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> None:
+) -> bool:
     _, project = user_project
-    await pools.add(
+    result = await pools.add_remote(
         session,
         project=project,
         resources=body.resources,
-        pool_name=body.pool_name,
+        profile=body.profile,
         instance_name=body.instance_name,
         host=body.host,
         port=body.port,
     )
+    return result

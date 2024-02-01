@@ -6,14 +6,20 @@ from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.services import backends as backends_services
-from dstack._internal.server.services.jobs import PROCESSING_POOL_IDS, PROCESSING_POOL_LOCK
+from dstack._internal.server.services.jobs import (
+    PROCESSING_POOL_IDS,
+    PROCESSING_POOL_LOCK,
+    terminate_job_provisioning_data_instance,
+)
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils.common import run_async
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
@@ -104,3 +110,27 @@ async def terminate(instance_id: UUID) -> None:
         await run_async(
             backend.compute().terminate_instance, jpd.instance_id, jpd.region, jpd.backend_data
         )
+
+
+async def _terminate_old_instance() -> None:
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            select(InstanceModel)
+            .where(
+                InstanceModel.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE,
+                InstanceModel.deleted == False,
+                InstanceModel.job == None,
+            )
+            .options()
+        )
+        instances = res.scalars().all()
+
+        for instance in instances:
+            if instance.finished_at + instance.termination_idle_time > get_current_datetime():
+                instance_type = parse_raw_as(
+                    JobProvisioningData, instance.job_provisioning_data
+                ).backend
+                await terminate_job_provisioning_data_instance(
+                    project=instance.project, job_provisioning_data=instance.job_provisioning_data
+                )
+        await session.commit()

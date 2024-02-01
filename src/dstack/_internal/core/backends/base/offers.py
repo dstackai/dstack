@@ -27,6 +27,7 @@ def get_catalog_offers(
     q = requirements_to_query_filter(requirements)
     q.provider = [provider]
     offers = []
+
     catalog = catalog if catalog is not None else gpuhunt.default_catalog()
     for item in catalog.query(**asdict(q)):
         if locations is not None and item.location not in locations:

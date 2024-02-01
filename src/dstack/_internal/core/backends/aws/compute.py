@@ -14,6 +14,7 @@ from dstack._internal.core.backends.base.compute import (
     InstanceConfiguration,
     get_gateway_user_data,
     get_instance_name,
+    get_instance_user_data,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -87,7 +88,7 @@ class AWSCompute(Compute):
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ):
+    ) -> None:
         client = self.session.client("ec2", region_name=region)
         try:
             client.terminate_instances(InstanceIds=[instance_id])
@@ -110,10 +111,10 @@ class AWSCompute(Compute):
         iam_client = self.session.client("iam", region_name=instance_offer.region)
 
         tags = [
-            {"Key": "Name", "Value": run.run_spec.run_name},
+            {"Key": "Name", "Value": instance_config.instance_name},
             {"Key": "owner", "Value": "dstack"},
             {"Key": "dstack_project", "Value": project_id},
-            {"Key": "dstack_user", "Value": run.user},
+            {"Key": "dstack_user", "Value": instance_config.user},
         ]
         try:
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
@@ -127,13 +128,8 @@ class AWSCompute(Compute):
                     iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
                         iam_client, project_id
                     ),
-                    user_data=get_user_data(
-                        backend=BackendType.AWS,
-                        image_name=job.job_spec.image_name,
-                        authorized_keys=[
-                            run.run_spec.ssh_key_pub.strip(),
-                            project_ssh_public_key.strip(),
-                        ],
+                    user_data=get_instance_user_data(
+                        authorized_keys=instance_config.get_public_keys(),
                     ),
                     tags=tags,
                     security_group_id=aws_resources.create_security_group(ec2_client, project_id),
@@ -198,6 +194,7 @@ class AWSCompute(Compute):
                             run.run_spec.ssh_key_pub.strip(),
                             project_ssh_public_key.strip(),
                         ],
+                        registry_auth_required=job.job_spec.registry_auth is not None,
                     ),
                     tags=tags,
                     security_group_id=aws_resources.create_security_group(ec2_client, project_id),
@@ -266,7 +263,7 @@ class AWSCompute(Compute):
         )
 
 
-def _has_quota(quotas: Dict[str, float], instance_name: str) -> bool:
+def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
     if instance_name.startswith("p"):
         return quotas.get("P/OnDemand", 0) > 0
     if instance_name.startswith("g"):

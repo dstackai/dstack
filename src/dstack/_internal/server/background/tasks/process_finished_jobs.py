@@ -2,16 +2,14 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobSpec, JobStatus
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import GatewayModel, InstanceModel, JobModel
+from dstack._internal.server.models import GatewayModel, JobModel
 from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs import (
     TERMINATING_PROCESSING_JOBS_IDS,
     TERMINATING_PROCESSING_JOBS_LOCK,
     job_model_to_job_submission,
-    terminate_job_submission_instance,
 )
 from dstack._internal.server.services.logging import job_log
 from dstack._internal.server.services.pools import get_instances_by_pool_id
@@ -42,7 +40,6 @@ async def process_finished_jobs():
             TERMINATING_PROCESSING_JOBS_IDS.add(job_model.id)
     try:
         await _process_job(job_id=job_model.id)
-        await _terminate_old_instance()
     finally:
         TERMINATING_PROCESSING_JOBS_IDS.remove(job_model.id)
 
@@ -50,7 +47,11 @@ async def process_finished_jobs():
 async def _process_job(job_id):
     async with get_session_ctx() as session:
         res = await session.execute(
-            select(JobModel).where(JobModel.id == job_id).options(joinedload(JobModel.project))
+            select(JobModel)
+            .where(JobModel.id == job_id)
+            .options(joinedload(JobModel.project))
+            .options(joinedload(JobModel.instance))
+            .options(joinedload(JobModel.run))
         )
         job_model = res.scalar_one()
         job_submission = job_model_to_job_submission(job_model)
@@ -90,36 +91,20 @@ async def _process_job(job_id):
                         if instance.name == jpd.instance_id:
                             instance.finished_at = get_current_datetime()
                             instance.status = InstanceStatus.READY
-                else:
-                    await terminate_job_submission_instance(
-                        project=job_model.project,
-                        job_submission=job_submission,
-                    )
+                # else:
+                #     if job_model.instance is not None and job_model.instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE:
+                #         await terminate_job_provisioning_data_instance(
+                #         project=job_model.project,
+                #         job_provisioning_data=job_submission.job_provisioning_data,
+                #     )
             job_model.removed = True
+            if job_model.instance is not None:
+                job_model.used_instance_id = job_model.instance.id
+                job_model.instance.status = InstanceStatus.READY
+                job_model.instance = None
             logger.info(*job_log("marked as removed", job_model))
         except Exception as e:
             job_model.removed = False
             logger.error(*job_log("failed to terminate job instance: %s", job_model, e))
         job_model.last_processed_at = get_current_datetime()
-        await session.commit()
-
-
-async def _terminate_old_instance():
-    async with get_session_ctx() as session:
-        res = await session.execute(
-            select(InstanceModel)
-            .where(
-                InstanceModel.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE,
-                InstanceModel.deleted == False,
-            )
-            .options()
-        )
-        instances = res.scalars().all()
-
-        for instance in instances:
-            if instance.finished_at + instance.termination_idle_time > get_current_datetime():
-                await terminate_job_submission_instance(
-                    project=instance.project,
-                    job_submission=job_submission,
-                )
         await session.commit()

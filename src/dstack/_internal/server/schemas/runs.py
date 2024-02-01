@@ -32,11 +32,11 @@ class CreateInstanceRequest(BaseModel):
 
 
 class AddRemoteInstanceRequest(BaseModel):
-    pool_name: str
     instance_name: Optional[str]
     host: str
     port: str
     resources: ResourcesSpec
+    profile: Profile
 
 
 class SubmitRunRequest(BaseModel):

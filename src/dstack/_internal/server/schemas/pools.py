@@ -17,3 +17,7 @@ class ShowPoolRequest(BaseModel):  # type: ignore[misc]
 class RemoveInstanceRequest(BaseModel):  # type: ignore[misc]
     pool_name: str
     instance_name: str
+
+
+class SetDefaultPoolRequest(BaseModel):  # type: ignore[misc]
+    pool_name: str

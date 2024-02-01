@@ -119,7 +119,7 @@ class SSHAttach:
                 self.tunnel.open()
                 atexit.register(self.detach)
                 break
-            except SSHError:
+            except SSHError as e:
                 if i < max_retries - 1:
                     time.sleep(1)
         else:

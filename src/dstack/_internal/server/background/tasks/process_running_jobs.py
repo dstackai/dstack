@@ -1,10 +1,8 @@
-from asyncio.proactor_events import _ProactorBasePipeTransport
 from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
 
 import httpx
-import requests
 from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,17 +11,8 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.errors import GatewayError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
-from dstack._internal.core.models.instances import InstanceState
 from dstack._internal.core.models.repos import RemoteRepoCreds
-from dstack._internal.core.models.runs import (
-    InstanceStatus,
-    Job,
-    JobErrorCode,
-    JobProvisioningData,
-    JobSpec,
-    JobStatus,
-    Run,
-)
+from dstack._internal.core.models.runs import Job, JobErrorCode, JobSpec, JobStatus, Run
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     GatewayModel,
@@ -41,7 +30,6 @@ from dstack._internal.server.services.jobs import (
     job_model_to_job_submission,
 )
 from dstack._internal.server.services.logging import job_log
-from dstack._internal.server.services.pools import get_pool_instances
 from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
@@ -86,7 +74,9 @@ async def process_running_jobs():
 
 async def _process_job(job_id: UUID):
     async with get_session_ctx() as session:
-        res = await session.execute(select(JobModel).where(JobModel.id == job_id))
+        res = await session.execute(
+            select(JobModel).where(JobModel.id == job_id).options(joinedload(JobModel.instance))
+        )
         job_model = res.scalar_one()
         res = await session.execute(
             select(RunModel)
@@ -151,15 +141,8 @@ async def _process_job(job_id: UUID):
                     repo_creds,
                 )
 
-            if success:
-                instance_name: str = job_provisioning_data.instance_id
-                pool_name = str(job.job_spec.pool_name)
-                instances = await get_pool_instances(session, project, pool_name)
-                for inst in instances:
-                    if inst.name == instance_name:
-                        inst.status = InstanceStatus.BUSY
-
-            if not success:  # check timeout
+            if not success:
+                # check timeout
                 if job_submission.age > _get_runner_timeout_interval(
                     job_provisioning_data.backend
                 ):
@@ -172,13 +155,8 @@ async def _process_job(job_id: UUID):
                     )
                     job_model.status = JobStatus.FAILED
                     job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
-
-                instance_name: str = job_provisioning_data.instance_id
-                pool_name = str(job.job_spec.pool_name)
-                instances = await get_pool_instances(session, project, pool_name)
-                for inst in instances:
-                    if inst.name == instance_name:
-                        inst.status = InstanceStatus.READY  # TODO: or fail?
+                    job_model.used_instance_id = job_model.instance.id
+                    job_model.instance = None
 
         else:  # fails are not acceptable
             if initial_status == JobStatus.PULLING:
@@ -216,14 +194,6 @@ async def _process_job(job_id: UUID):
                     job_model,
                 )
 
-                if success and job_model.status == JobStatus.DONE:
-                    instance_name: str = job_provisioning_data.instance_id
-                    pool_name = str(job.job_spec.pool_name)
-                    instances = await get_pool_instances(session, project, pool_name)
-                    for inst in instances:
-                        if inst.name == instance_name:
-                            inst.status = InstanceStatus.READY
-
             if not success:  # kill the job
                 logger.warning(
                     *job_log(
@@ -234,6 +204,8 @@ async def _process_job(job_id: UUID):
                 )
                 job_model.status = JobStatus.FAILED
                 job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
+                job_model.used_instance_id = job_model.instance.id
+                job_model.instance = None
                 if job.is_retry_active():
                     if job_submission.job_provisioning_data.instance_type.resources.spot:
                         new_job_model = create_job_model_for_new_submission(
@@ -242,13 +214,6 @@ async def _process_job(job_id: UUID):
                             status=JobStatus.PENDING,
                         )
                         session.add(new_job_model)
-
-                        instance_name: str = job_provisioning_data.instance_id
-                        pool_name = str(job.job_spec.pool_name)
-                        instances = await get_pool_instances(session, project, pool_name)
-                        for inst in instances:
-                            if inst.name == instance_name:
-                                inst.status = InstanceStatus.READY
 
                 # job will be terminated by process_finished_jobs
 

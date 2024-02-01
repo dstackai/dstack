@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import (
     Job,
     JobErrorCode,
@@ -112,8 +113,9 @@ async def stop_job(
                     job_submission,
                     project.ssh_private_key,
                 )
+
                 # delay termination for 15 seconds to allow the runner to stop gracefully
-                delay_job_instance_termination(job_model)
+                # delay_job_instance_termination(job_model)
             except SSHError:
                 logger.debug(*job_log("failed to stop runner", job_model))
         # process_finished_jobs will terminate the instance in the background
@@ -124,20 +126,20 @@ async def stop_job(
         logger.info(*job_log("%s by user", job_model, new_status.value))
 
 
-async def terminate_job_submission_instance(
+async def terminate_job_provisioning_data_instance(
     project: ProjectModel,
-    job_submission: JobSubmission,
+    job_provisioning_data: JobProvisioningData,
 ):
     backend = await get_project_backend_by_type(
         project=project,
-        backend_type=job_submission.job_provisioning_data.backend,
+        backend_type=job_provisioning_data.backend,
     )
-    logger.debug("Terminating runner instance %s", job_submission.job_provisioning_data.hostname)
+    logger.debug("Terminating runner instance %s", job_provisioning_data.hostname)
     await run_async(
         backend.compute().terminate_instance,
-        job_submission.job_provisioning_data.instance_id,
-        job_submission.job_provisioning_data.region,
-        job_submission.job_provisioning_data.backend_data,
+        job_provisioning_data.instance_id,
+        job_provisioning_data.region,
+        job_provisioning_data.backend_data,
     )
 
 

@@ -8,13 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceType, Resources
-from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
+from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, JobStatus
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.schemas.runner import HealthcheckResponse, JobStateEvent, PullResponse
 from dstack._internal.server.services.jobs.configurators.base import get_default_python_verison
 from dstack._internal.server.testing.common import (
+    create_instance,
     create_job,
+    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -285,12 +287,20 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        instance = await create_instance(
+            session,
+            project,
+            await create_pool(session, project),
+            InstanceStatus.READY,
+            Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.PULLING,
             job_provisioning_data=job_provisioning_data,
+            instance=instance,
         )
         with patch(
             "dstack._internal.server.services.runner.ssh.RunnerTunnel"

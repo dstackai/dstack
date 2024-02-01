@@ -154,7 +154,9 @@ async def get_run_plan_by_requirements(
     requirements: Requirements,
     exclude_not_available=False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+
     backends = await backends_services.get_project_backends(project=project)
+
     if profile.backends is not None:
         backends = [b for b in backends if b.TYPE in profile.backends]
 
@@ -196,6 +198,7 @@ async def create_instance(
             image=image,
             registry_auth=None,
         ),
+        user=user.name,
     )
 
     pool = await pools_services.get_pool(session, project, pool_name)
@@ -245,13 +248,31 @@ async def create_instance(
             ssh_proxy=None,
         )
 
+        # types of queries
+        # 1. Get all available instance
+        # 2. Get job's instance (process job)
+        # 3. Get instance's jobs history
+
         im = InstanceModel(
             name=instance_name,
             project=project,
             pool=pool,
             status=InstanceStatus.STARTING,
+            # job_id: Optional[FK] (current job)
+            # ip address
+            # ssh creds: user, port, dockerized
+            # real resources + spot (exact) / instance offer
+            # backend + backend data
+            # region
+            # price (for querying)
+            # termination policy
+            # creation policy
             job_provisioning_data=job_provisioning_data.json(),
+            # TODO: instance provisioning
             offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
+            resource_spec_data=requirements.resources.json(),
+            termination_policy=profile.termination_policy,
+            termination_idle_time=str(profile.termination_idle_time),
         )
         session.add(im)
         await session.commit()
@@ -401,11 +422,13 @@ async def stop_runs(
         new_status = JobStatus.ABORTED
 
     res = await session.execute(
-        select(JobModel).where(
+        select(JobModel)
+        .where(
             JobModel.project_id == project.id,
             JobModel.run_name.in_(runs_names),
             JobModel.status.not_in(JobStatus.finished_statuses()),
         )
+        .options(joinedload(JobModel.instance))
     )
     job_models = res.scalars().all()
     for job_model in job_models:

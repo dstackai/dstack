@@ -311,6 +311,7 @@ async def get_instance_offers(
         ]
         for backend, backend_offers in zip(backends, await asyncio.gather(*tasks))
     ]
+
     # Merge preserving order for every backend
     offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)
     # Put NOT_AVAILABLE and NO_QUOTA instances at the end, do not sort by price

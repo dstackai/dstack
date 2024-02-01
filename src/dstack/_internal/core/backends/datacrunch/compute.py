@@ -1,7 +1,11 @@
 from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import InstanceConfiguration, get_shim_commands
+from dstack._internal.core.backends.base.compute import (
+    InstanceConfiguration,
+    get_instance_shim_commands,
+    get_shim_commands,
+)
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
 from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
@@ -39,9 +43,7 @@ class DataCrunchCompute(Compute):
     def _get_offers_with_availability(
         self, offers: List[InstanceOffer]
     ) -> List[InstanceOfferWithAvailability]:
-        raw_availabilities: List[
-            Dict
-        ] = self.api_client.client.instances.get_availabilities()  # type: ignore
+        raw_availabilities: List[Dict] = self.api_client.client.instances.get_availabilities()  # type: ignore
 
         region_availabilities = {}
         for location in raw_availabilities:
@@ -81,7 +83,7 @@ class DataCrunchCompute(Compute):
                 )
             )
 
-        commands = get_shim_commands(
+        commands = get_instance_shim_commands(
             authorized_keys=public_keys,
         )
 
@@ -164,10 +166,13 @@ class DataCrunchCompute(Compute):
         )
 
         commands = get_shim_commands(
+            backend=BackendType.DATACRUNCH,
+            image_name=job.job_spec.image_name,
             authorized_keys=[
                 run.run_spec.ssh_key_pub.strip(),
                 project_ssh_public_key.strip(),
             ],
+            registry_auth_required=job.job_spec.registry_auth is not None,
         )
 
         startup_script = " ".join([" && ".join(commands)])
@@ -212,5 +217,5 @@ class DataCrunchCompute(Compute):
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ):
+    ) -> None:
         self.api_client.delete_instance(instance_id)

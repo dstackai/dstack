@@ -1,8 +1,8 @@
 """add pools
 
-Revision ID: 309e4be6671b
+Revision ID: 718bf16e84c5
 Revises: d3e8af4786fa
-Create Date: 2024-01-31 10:35:34.977788
+Create Date: 2024-02-01 18:01:47.612769
 
 """
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "309e4be6671b"
+revision = "718bf16e84c5"
 down_revision = "d3e8af4786fa"
 branch_labels = None
 depends_on = None
@@ -46,7 +46,7 @@ def upgrade() -> None:
         sa.Column(
             "project_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False
         ),
-        sa.Column("pool_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=True),
+        sa.Column("pool_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
         sa.Column(
             "status",
             sa.Enum(
@@ -69,6 +69,9 @@ def upgrade() -> None:
         sa.Column("termination_idle_time", sa.String(length=50), nullable=True),
         sa.Column("job_provisioning_data", sa.String(length=4000), nullable=False),
         sa.Column("offer", sa.String(length=4000), nullable=False),
+        sa.Column("resource_spec_data", sa.String(length=4000), nullable=True),
+        sa.Column("job_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=True),
+        sa.ForeignKeyConstraint(["job_id"], ["jobs.id"], name=op.f("fk_instances_job_id_jobs")),
         sa.ForeignKeyConstraint(
             ["pool_id"], ["pools.id"], name=op.f("fk_instances_pool_id_pools")
         ),
@@ -80,6 +83,15 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_instances")),
     )
+    with op.batch_alter_table("jobs", schema=None) as batch_op:
+        batch_op.add_column(
+            sa.Column(
+                "used_instance_id",
+                sqlalchemy_utils.types.uuid.UUIDType(binary=False),
+                nullable=True,
+            )
+        )
+
     with op.batch_alter_table("projects", schema=None) as batch_op:
         batch_op.add_column(
             sa.Column(
@@ -107,6 +119,9 @@ def downgrade() -> None:
             batch_op.f("fk_projects_default_pool_id_pools"), type_="foreignkey"
         )
         batch_op.drop_column("default_pool_id")
+
+    with op.batch_alter_table("jobs", schema=None) as batch_op:
+        batch_op.drop_column("used_instance_id")
 
     op.drop_table("instances")
     op.drop_table("pools")

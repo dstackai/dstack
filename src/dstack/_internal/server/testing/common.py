@@ -198,6 +198,7 @@ async def create_job(
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     error_code: Optional[JobErrorCode] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
+    instance: Optional[InstanceModel] = None,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = get_job_specs_from_run_spec(run_spec)[0]
@@ -214,6 +215,7 @@ async def create_job(
         error_code=error_code,
         job_spec_data=job_spec.json(),
         job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
+        instance=instance if instance is not None else None,
     )
     session.add(job)
     await session.commit()

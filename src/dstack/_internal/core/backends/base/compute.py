@@ -1,7 +1,7 @@
 import os
 import re
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import git
 import requests
@@ -40,8 +40,9 @@ class InstanceConfiguration(BaseModel):
     instance_name: str  # unique in pool
     ssh_keys: List[SSHKeys]
     job_docker_config: Optional[DockerConfig]
+    user: Optional[str]
 
-    def get_public_keys(self):
+    def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]
 
 
@@ -76,7 +77,7 @@ class Compute(ABC):
     @abstractmethod
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ):
+    ) -> None:
         pass
 
     def create_gateway(
@@ -94,11 +95,17 @@ def get_instance_name(run: Run, job: Job) -> str:
 
 
 def get_user_data(
+    backend: BackendType,
+    image_name: str,
     authorized_keys: List[str],
+    registry_auth_required: bool,
     cloud_config_kwargs: Optional[dict] = None,
 ) -> str:
     commands = get_shim_commands(
+        backend=backend,
+        image_name=image_name,
         authorized_keys=authorized_keys,
+        registry_auth_required=registry_auth_required,
     )
     return get_cloud_config(
         runcmd=[["sh", "-c", " && ".join(commands)]],
@@ -108,19 +115,24 @@ def get_user_data(
 
 
 def get_shim_commands(
+    backend: BackendType,
+    image_name: str,
     authorized_keys: List[str],
+    registry_auth_required: bool,
 ) -> List[str]:
     build = get_dstack_runner_version()
     env = {
+        "DSTACK_BACKEND": backend.value,
         "DSTACK_RUNNER_LOG_LEVEL": "6",
         "DSTACK_RUNNER_VERSION": build,
+        "DSTACK_IMAGE_NAME": image_name,
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
         "DSTACK_HOME": "/root/.dstack",
     }
     commands = get_dstack_shim(build)
     for k, v in env.items():
         commands += [f'export "{k}={v}"']
-    commands += get_run_shim_script()
+    commands += get_run_shim_script(registry_auth_required)
     return commands
 
 
@@ -139,20 +151,18 @@ def get_dstack_shim(build: str) -> List[str]:
     if settings.DSTACK_VERSION is not None:
         bucket = "dstack-runner-downloads"
 
-    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
-
-    if os.getenv("DEV_DSTACK_RUNNER", None) is not None:
-        url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-shim"
-
     return [
-        f'sudo curl --output /usr/local/bin/dstack-shim "{url}"',
+        f'sudo curl --output /usr/local/bin/dstack-shim "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"',
         "sudo chmod +x /usr/local/bin/dstack-shim",
     ]
 
 
-def get_run_shim_script() -> List[str]:
+def get_run_shim_script(registry_auth_required: bool) -> List[str]:
     dev_flag = "" if settings.DSTACK_VERSION is not None else "--dev"
-    return [f"nohup dstack-shim {dev_flag} docker --keep-container >/root/shim.log 2>&1 &"]
+    with_auth_flag = "--with-auth" if registry_auth_required else ""
+    return [
+        f"nohup dstack-shim {dev_flag} docker {with_auth_flag} --keep-container >/root/shim.log 2>&1 &"
+    ]
 
 
 def get_gateway_user_data(authorized_key: str) -> str:
@@ -210,14 +220,8 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
     bucket = "dstack-runner-downloads-stgn"
     if settings.DSTACK_VERSION is not None:
         bucket = "dstack-runner-downloads"
-
-    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
-
-    if os.getenv("DEV_DSTACK_RUNNER", None) is not None:
-        url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-runner"
-
     commands += [
-        f"curl --output {runner} {url}",
+        f'curl --output {runner} "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',
         f"chmod +x {runner}",
         f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
@@ -277,3 +281,100 @@ def get_dstack_gateway_commands() -> List[str]:
         f"/home/ubuntu/dstack/blue/bin/pip install {get_dstack_gateway_wheel(build)}",
         "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
     ]
+
+
+def get_instance_user_data(
+    authorized_keys: List[str],
+    cloud_config_kwargs: Optional[Dict[Any, Any]] = None,
+) -> str:
+    commands = get_instance_shim_commands(
+        authorized_keys=authorized_keys,
+    )
+    return get_cloud_config(
+        runcmd=[["sh", "-c", " && ".join(commands)]],
+        ssh_authorized_keys=authorized_keys,
+        **(cloud_config_kwargs or {}),
+    )
+
+
+def get_instance_shim_commands(
+    authorized_keys: List[str],
+) -> List[str]:
+    build = get_dstack_runner_version()
+    env = {
+        "DSTACK_RUNNER_LOG_LEVEL": "6",
+        "DSTACK_RUNNER_VERSION": build,
+        "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
+        "DSTACK_HOME": "/root/.dstack",
+    }
+    commands = get_instance_dstack_shim(build)
+    for k, v in env.items():
+        commands += [f'export "{k}={v}"']
+    commands += get_instance_run_shim_script()
+    return commands
+
+
+def get_instance_dstack_shim(build: str) -> List[str]:
+    bucket = "dstack-runner-downloads-stgn"
+    if settings.DSTACK_VERSION is not None:
+        bucket = "dstack-runner-downloads"
+
+    # TODO: use official build
+    # url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
+    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-shim"
+
+    return [
+        f'sudo curl --output /usr/local/bin/dstack-shim "{url}"',
+        "sudo chmod +x /usr/local/bin/dstack-shim",
+    ]
+
+
+def get_instance_docker_commands(authorized_keys: List[str]) -> List[str]:
+    authorized_keys_body = "\n".join(authorized_keys).strip()
+    commands = [
+        # note: &> redirection doesn't work in /bin/sh
+        # check in sshd is here, install if not
+        (
+            "if ! command -v sshd >/dev/null 2>&1; then { "
+            "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server; "
+            "} || { "
+            "yum -y install openssh-server; "
+            "}; fi"
+        ),
+        # prohibit password authentication
+        'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
+        # create ssh dirs and add public key
+        "mkdir -p /run/sshd ~/.ssh",
+        "chmod 700 ~/.ssh",
+        f"echo '{authorized_keys_body}' > ~/.ssh/authorized_keys",
+        "chmod 600 ~/.ssh/authorized_keys",
+        # preserve environment variables for SSH clients
+        "env >> ~/.ssh/environment",
+        'echo "export PATH=$PATH" >> ~/.profile',
+        # regenerate host keys
+        "rm -rf /etc/ssh/ssh_host_*",
+        "ssh-keygen -A > /dev/null",
+        # start sshd
+        "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
+    ]
+    build = get_dstack_runner_version()
+    runner = "/usr/local/bin/dstack-runner"
+    bucket = "dstack-runner-downloads-stgn"
+    if settings.DSTACK_VERSION is not None:
+        bucket = "dstack-runner-downloads"
+
+    # TODO: use official build
+    # url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
+    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-runner"
+
+    commands += [
+        f"curl --output {runner} {url}",
+        f"chmod +x {runner}",
+        f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
+    ]
+    return commands
+
+
+def get_instance_run_shim_script() -> List[str]:
+    dev_flag = "" if settings.DSTACK_VERSION is not None else "--dev"
+    return [f"nohup dstack-shim {dev_flag} docker --keep-container >/root/shim.log 2>&1 &"]

@@ -97,6 +97,8 @@ def check_relevance(
         logger.warning(f"no backend select ")
         return False
 
+    # use gpuhunt
+
     instance_resources: ResourcesSpec = parse_raw_as(
         ResourcesSpec, instance_model.resource_spec_data
     )
@@ -189,7 +191,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
         instance = sorted_instances[0]
 
+        # need lock
         instance.status = InstanceStatus.BUSY
+        instance.job = job_model
 
         logger.info(*job_log("now is provisioning", job_model))
         job_model.job_provisioning_data = instance.job_provisioning_data
@@ -237,6 +241,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             offer=offer.json(),
             termination_policy=profile.termination_policy,
             termination_idle_time=profile.termination_idle_time,
+            job=job_model,
         )
         session.add(im)
 

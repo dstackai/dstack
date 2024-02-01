@@ -11,6 +11,7 @@ from dstack._internal.core.backends.base.compute import (
     InstanceConfiguration,
     get_gateway_user_data,
     get_instance_name,
+    get_instance_user_data,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -42,12 +43,13 @@ class GCPCompute(Compute):
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
+
         offers = get_catalog_offers(
             backend=BackendType.GCP,
             requirements=requirements,
             extra_filter=_supported_instances_and_zones(self.config.regions),
         )
-        quotas = defaultdict(dict)
+        quotas: Dict[str, Dict[str, float]] = defaultdict(dict)
         for region in self.regions_client.list(project=self.config.project_id):
             for quota in region.quotas:
                 quotas[region.name][quota.metric] = quota.limit - quota.usage
@@ -73,7 +75,7 @@ class GCPCompute(Compute):
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ):
+    ) -> None:
         try:
             self.instances_client.delete(
                 project=self.config.project_id, zone=region, instance=instance_id
@@ -114,9 +116,7 @@ class GCPCompute(Compute):
                     gpus=instance_offer.instance.resources.gpus,
                 ),
                 spot=instance_offer.instance.resources.spot,
-                user_data=get_user_data(
-                    backend=BackendType.GCP,
-                    image_name=instance_config.job_docker_config.image.image,
+                user_data=get_instance_user_data(
                     authorized_keys=instance_config.get_public_keys(),
                 ),
                 labels={
@@ -188,6 +188,7 @@ class GCPCompute(Compute):
                         run.run_spec.ssh_key_pub.strip(),
                         project_ssh_public_key.strip(),
                     ],
+                    registry_auth_required=job.job_spec.registry_auth is not None,
                 ),
                 labels={
                     "owner": "dstack",
@@ -274,8 +275,6 @@ class GCPCompute(Compute):
 def _supported_instances_and_zones(
     regions: List[str],
 ) -> Optional[Callable[[InstanceOffer], bool]]:
-    regions = set(regions)
-
     def _filter(offer: InstanceOffer) -> bool:
         # strip zone
         if offer.region[:-2] not in regions:
@@ -299,7 +298,7 @@ def _supported_instances_and_zones(
     return _filter
 
 
-def _has_gpu_quota(quotas: Dict[str, int], resources: Resources) -> bool:
+def _has_gpu_quota(quotas: Dict[str, float], resources: Resources) -> bool:
     if not resources.gpus:
         return True
     gpu = resources.gpus[0]
