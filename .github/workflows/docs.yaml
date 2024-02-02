@@ -2,6 +2,9 @@ name: Deploy Docs
 
 on:
   workflow_dispatch:
+    release_tag:
+      description: "dstack version"
+      required: true
 
 jobs:
   docs-deploy:
@@ -13,10 +16,10 @@ jobs:
           python-version: 3.11
       - name: Build
         run: |
-          pip install -e .
+          pip install dstack==${{ inputs.release_tag }}
           pip install pillow cairosvg
           sudo apt-get install -y libcairo2-dev libfreetype6-dev libffi-dev libjpeg-dev libpng-dev libz-dev
-          pip install mkdocs-material "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files "mkdocstrings[python]" --upgrade
+          pip install mkdocs-material "mkdocs-material[imaging]" mkdocs-material-extensions mkdocs-redirects mkdocs-gen-files "mkdocstrings[python]" mkdocs-render-swagger-plugin --upgrade
           pip install git+https://${{ secrets.GH_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
           mkdocs build
       - name: Deploy
