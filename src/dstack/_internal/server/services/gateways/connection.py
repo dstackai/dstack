@@ -34,7 +34,6 @@ class GatewayConnection:
                 "StreamLocalBindUnlink": "yes",
                 "ConnectTimeout": 1,
                 "ServerAliveInterval": 60,
-                "Port": 32000,
             },
             args,
         )

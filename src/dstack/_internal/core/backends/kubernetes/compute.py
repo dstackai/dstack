@@ -17,6 +17,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import match_requirements
 from dstack._internal.core.backends.kubernetes.client import get_api_from_config_data
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
+from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -188,7 +189,7 @@ class KubernetesCompute(Compute):
         project_id: str,
     ) -> LaunchedGatewayInfo:
         commands = _get_gateway_commands(authorized_keys=[ssh_key_pub])
-        response = self.api.create_namespaced_pod(
+        pod_response = self.api.create_namespaced_pod(
             namespace=DEFAULT_NAMESPACE,
             body=client.V1Pod(
                 metadata=client.V1ObjectMeta(
@@ -215,33 +216,48 @@ class KubernetesCompute(Compute):
                 ),
             ),
         )
-        response = self.api.create_namespaced_service(
+        service_response = self.api.create_namespaced_service(
             namespace=DEFAULT_NAMESPACE,
             body=client.V1Service(
-                metadata=client.V1ObjectMeta(name=_get_pod_service_name(instance_name)),
+                metadata=client.V1ObjectMeta(
+                    name=_get_pod_service_name(instance_name),
+                    # annotations={
+                    #     "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+                    #     "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
+                    #     "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip"
+                    # }
+                ),
                 spec=client.V1ServiceSpec(
-                    type="NodePort",
+                    type="LoadBalancer",
                     selector={"app.kubernetes.io/name": instance_name},
                     ports=[
                         client.V1ServicePort(
                             name="ssh",
                             port=22,
                             target_port=22,
-                            node_port=self.config.networking.ssh_port,
                         ),
                         client.V1ServicePort(
                             name="http",
                             port=80,
                             target_port=80,
-                            node_port=32001,
+                        ),
+                        client.V1ServicePort(
+                            name="https",
+                            port=443,
+                            target_port=443,
                         ),
                     ],
                 ),
             ),
         )
+        hostname = _wait_for_load_balancer_hostname(
+            api=self.api, service_name=_get_pod_service_name(instance_name)
+        )
+        if hostname is None:
+            raise GatewayError("Failed to get gateway hostname")
         return LaunchedGatewayInfo(
             instance_id=instance_name,
-            ip_address=self.config.networking.ssh_host,
+            ip_address=hostname,
             region="-",
         )
 
@@ -415,6 +431,28 @@ def _wait_for_pod_ready(
         if elapsed_time >= timeout_seconds:
             logger.warning("Timeout waiting for pod %s to be ready", pod_name)
             return False
+        time.sleep(1)
+
+
+def _wait_for_load_balancer_hostname(
+    api: client.CoreV1Api,
+    service_name: str,
+    timeout_seconds: int = 120,
+) -> Optional[str]:
+    start_time = time.time()
+    while True:
+        try:
+            service = api.read_namespaced_service(name=service_name, namespace=DEFAULT_NAMESPACE)
+        except client.ApiException as e:
+            if e.status != 404:
+                raise
+        else:
+            if service.status.load_balancer.ingress is not None:
+                return service.status.load_balancer.ingress[0].hostname
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= timeout_seconds:
+            logger.warning("Timeout waiting for load balancer %s to get ip", service_name)
+            return None
         time.sleep(1)
 
 
