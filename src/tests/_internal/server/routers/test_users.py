@@ -58,7 +58,7 @@ class TestGetUser:
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
-    async def test_returns_404_if_not_global_admin(self, test_db, session):
+    async def test_returns_400_if_not_global_admin(self, test_db, session):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         other_user = await create_user(session=session, name="other_user", token="1234")
         response = client.post(
@@ -66,7 +66,7 @@ class TestGetUser:
             headers=get_auth_headers(user.token),
             json={"username": other_user.name},
         )
-        assert response.status_code == 404
+        assert response.status_code == 400
 
     @pytest.mark.asyncio
     async def test_returns_logged_in_user(self, test_db, session):

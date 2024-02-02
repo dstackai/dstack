@@ -3,6 +3,7 @@ from typing import List, Optional, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.runs import Run, RunPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -15,7 +16,6 @@ from dstack._internal.server.schemas.runs import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
-from dstack._internal.server.utils.routers import error_not_found
 
 root_router = APIRouter(
     prefix="/api/runs",
@@ -54,7 +54,7 @@ async def get_run(
         run_name=body.run_name,
     )
     if run is None:
-        raise error_not_found()
+        raise ResourceNotExistsError()
     return run
 
 
