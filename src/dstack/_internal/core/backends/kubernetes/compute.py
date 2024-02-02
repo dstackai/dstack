@@ -11,6 +11,7 @@ from kubernetes import client
 from dstack._internal.core.backends.base.compute import (
     Compute,
     get_docker_commands,
+    get_dstack_gateway_commands,
     get_instance_name,
 )
 from dstack._internal.core.backends.base.offers import match_requirements
@@ -178,6 +179,71 @@ class KubernetesCompute(Compute):
         except client.ApiException as e:
             if e.status != 404:
                 raise
+
+    def create_gateway(
+        self,
+        instance_name: str,
+        ssh_key_pub: str,
+        region: str,
+        project_id: str,
+    ) -> LaunchedGatewayInfo:
+        commands = _get_gateway_commands(authorized_keys=[ssh_key_pub])
+        response = self.api.create_namespaced_pod(
+            namespace=DEFAULT_NAMESPACE,
+            body=client.V1Pod(
+                metadata=client.V1ObjectMeta(
+                    name=instance_name,
+                    labels={"app.kubernetes.io/name": instance_name},
+                ),
+                spec=client.V1PodSpec(
+                    containers=[
+                        client.V1Container(
+                            name=f"{instance_name}-container",
+                            image="ubuntu:22.04",
+                            command=["/bin/sh"],
+                            args=["-c", " && ".join(commands)],
+                            ports=[
+                                client.V1ContainerPort(
+                                    container_port=80,
+                                ),
+                                client.V1ContainerPort(
+                                    container_port=22,
+                                ),
+                            ],
+                        )
+                    ]
+                ),
+            ),
+        )
+        response = self.api.create_namespaced_service(
+            namespace=DEFAULT_NAMESPACE,
+            body=client.V1Service(
+                metadata=client.V1ObjectMeta(name=_get_pod_service_name(instance_name)),
+                spec=client.V1ServiceSpec(
+                    type="NodePort",
+                    selector={"app.kubernetes.io/name": instance_name},
+                    ports=[
+                        client.V1ServicePort(
+                            name="ssh",
+                            port=22,
+                            target_port=22,
+                            node_port=self.config.networking.ssh_port,
+                        ),
+                        client.V1ServicePort(
+                            name="http",
+                            port=80,
+                            target_port=80,
+                            node_port=32001,
+                        ),
+                    ],
+                ),
+            ),
+        )
+        return LaunchedGatewayInfo(
+            instance_id=instance_name,
+            ip_address=self.config.networking.ssh_host,
+            region="-",
+        )
 
 
 def _get_gpus_from_node_labels(labels: Dict) -> List[Gpu]:
@@ -368,6 +434,43 @@ def _add_authorized_key_to_jump_pod(
             "fi"
         ),
     )
+
+
+def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
+    authorized_keys_content = "\n".join(authorized_keys).strip()
+    gateway_commands = " && ".join(get_dstack_gateway_commands())
+    commands = [
+        # install packages
+        "apt-get update && apt-get install -y sudo wget openssh-server nginx python3.10-venv libaugeas0",
+        # install docker-systemctl-replacement
+        "wget https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/master/files/docker/systemctl3.py -O /usr/bin/systemctl",
+        "chmod + /usr/bin/systemctl",
+        # install certbot
+        "python3 -m venv /root/certbotvenv/",
+        "/root/certbotvenv/bin/pip install certbot-nginx",
+        "ln -s /root/certbotvenv/bin/certbot /usr/bin/certbot",
+        # prohibit password authentication
+        'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
+        # set up ubuntu user
+        "adduser ubuntu",
+        "usermod -aG sudo ubuntu",
+        "echo 'ubuntu ALL=(ALL:ALL) NOPASSWD: ALL' | tee /etc/sudoers.d/ubuntu",
+        # create ssh dirs and add public key
+        "mkdir -p /run/sshd /home/ubuntu/.ssh",
+        "chmod 700 /home/ubuntu/.ssh",
+        f"echo '{authorized_keys_content}' > /home/ubuntu/.ssh/authorized_keys",
+        "chmod 600 /home/ubuntu/.ssh/authorized_keys",
+        "chown -R ubuntu:ubuntu /home/ubuntu/.ssh",
+        # regenerate host keys
+        "rm -rf /etc/ssh/ssh_host_*",
+        "ssh-keygen -A > /dev/null",
+        # start sshd
+        "/usr/sbin/sshd -p 22 -o PermitUserEnvironment=yes",
+        # run gateway
+        f"su ubuntu -c '{gateway_commands}'",
+        "sleep infinity",
+    ]
+    return commands
 
 
 def _run_ssh_command(hostname: str, port: int, ssh_private_key: str, command: str):

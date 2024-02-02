@@ -27,7 +27,9 @@ class GatewayCommand(APIBaseCommand):
             "create", help="Add a gateway", formatter_class=self._parser.formatter_class
         )
         create_parser.set_defaults(subfunc=self._create)
-        create_parser.add_argument("--backend", choices=["aws", "gcp", "azure"], required=True)
+        create_parser.add_argument(
+            "--backend", choices=["aws", "azure", "gcp", "kubernetes"], required=True
+        )
         create_parser.add_argument("--region", required=True)
         create_parser.add_argument(
             "--set-default", action="store_true", help="Set as default gateway for the project"

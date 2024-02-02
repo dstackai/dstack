@@ -153,7 +153,7 @@ def get_gateway_user_data(authorized_key: str) -> str:
 
 
 def get_docker_commands(authorized_keys: List[str]) -> List[str]:
-    authorized_keys = "\n".join(authorized_keys).strip()
+    authorized_keys_content = "\n".join(authorized_keys).strip()
     commands = [
         # note: &> redirection doesn't work in /bin/sh
         # check in sshd is here, install if not
@@ -169,7 +169,7 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
         # create ssh dirs and add public key
         "mkdir -p /run/sshd ~/.ssh",
         "chmod 700 ~/.ssh",
-        f"echo '{authorized_keys}' > ~/.ssh/authorized_keys",
+        f"echo '{authorized_keys_content}' > ~/.ssh/authorized_keys",
         "chmod 600 ~/.ssh/authorized_keys",
         # preserve environment variables for SSH clients
         "env >> ~/.ssh/environment",
