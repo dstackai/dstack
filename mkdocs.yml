@@ -179,11 +179,12 @@ nav:
           - Services: docs/concepts/services.md
       - Reference:
           - CLI: docs/reference/cli/index.md
-          - API: docs/reference/api/python/index.md
+          - API:
+              - Python API: docs/reference/api/python/index.md
+              - REST API: docs/reference/api/rest/index.md
           - .dstack.yml: docs/reference/dstack.yml.md
           - server/config.yml: docs/reference/server/config.yml.md
           - profiles.yml: docs/reference/profiles.yml.md
-          - REST API: docs/reference/api/rest/index.md
   - Examples:
     - examples/index.md
     - LLMs:
