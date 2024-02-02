@@ -107,7 +107,7 @@ class RunnerTunnel(SSHTunnel):
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
                 "ExitOnForwardFailure": "yes",
-                "ConnectTimeout": "1",
+                "ConnectTimeout": "3",
                 # "ControlPersist": f"{disconnect_delay}s",
                 "Port": str(ssh_port),
             }
