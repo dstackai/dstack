@@ -80,13 +80,18 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
             availability,
             style=None if i == 1 else "grey58",
         )
-    if len(job_plan.offers) == offers_limit:
-        offers.add_row("", "...", style="grey58")
+    if job_plan.total_offers > len(job_plan.offers):
+        offers.add_row("", "...", style="secondary")
 
     console.print(props)
     console.print()
     if len(job_plan.offers) > 0:
         console.print(offers)
+        if job_plan.total_offers > len(job_plan.offers):
+            console.print(
+                f"[secondary] Shown {len(job_plan.offers)} of {job_plan.total_offers} offers, "
+                f"${job_plan.max_price:g} max[/]"
+            )
         console.print()
 
 

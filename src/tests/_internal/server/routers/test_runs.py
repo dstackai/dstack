@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
 from unittest.mock import Mock, patch
 from uuid import UUID
 
@@ -39,6 +39,8 @@ def get_dev_env_run_plan_dict(
     run_name: str = "dry-run",
     repo_id: str = "test_repo",
     offers: List[InstanceOfferWithAvailability] = [],
+    total_offers: int = 0,
+    max_price: Optional[float] = None,
 ) -> Dict:
     return {
         "project_name": project_name,
@@ -126,6 +128,8 @@ def get_dev_env_run_plan_dict(
                     "working_dir": ".",
                 },
                 "offers": [json.loads(o.json()) for o in offers],
+                "total_offers": total_offers,
+                "max_price": max_price,
             }
         ],
     }
@@ -370,6 +374,8 @@ class TestGetRunPlan:
             username=user.name,
             repo_id=repo.name,
             offers=offers,
+            total_offers=1,
+            max_price=1.0,
         )
         body = {"run_spec": run_plan_dict["run_spec"]}
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:

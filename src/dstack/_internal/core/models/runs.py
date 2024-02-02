@@ -207,6 +207,8 @@ class Run(BaseModel):
 class JobPlan(BaseModel):
     job_spec: JobSpec
     offers: List[InstanceOfferWithAvailability]
+    total_offers: int
+    max_price: Optional[float]
 
 
 class RunPlan(BaseModel):

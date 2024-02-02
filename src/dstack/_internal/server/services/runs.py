@@ -143,6 +143,8 @@ async def get_run_plan(
         job_plan = JobPlan(
             job_spec=job.job_spec,
             offers=offers[:50],
+            total_offers=len(offers),
+            max_price=max((offer.price for offer in offers), default=None),
         )
         job_plans.append(job_plan)
     run_spec.run_name = run_name  # restore run_name
