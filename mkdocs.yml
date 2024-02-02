@@ -95,6 +95,7 @@ plugins:
   - gen-files:
       scripts:  # always relative to mkdocs.yml
         - scripts/docs/gen_cli_reference.py
+        - scripts/docs/gen_openapi_reference.py
         - scripts/docs/gen_schema_reference.py
   - mkdocstrings:
       handlers:
@@ -102,6 +103,7 @@ plugins:
           options:
             docstring_style: google
             show_source: false
+  - render_swagger
 
 # Extensions
 markdown_extensions:
@@ -181,6 +183,7 @@ nav:
           - .dstack.yml: docs/reference/dstack.yml.md
           - server/config.yml: docs/reference/server/config.yml.md
           - profiles.yml: docs/reference/profiles.yml.md
+          - REST API: docs/reference/api/rest/index.md
   - Examples:
     - examples/index.md
     - LLMs:
