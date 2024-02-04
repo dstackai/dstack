@@ -50,7 +50,7 @@ BASE_DEPS = [
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
     "alembic>=1.10.2",
-    "apscheduler",
+    "apscheduler<4",
     "aiosqlite",
     "aiohttp",
     "websocket-client",
