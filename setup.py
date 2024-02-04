@@ -63,6 +63,7 @@ BASE_DEPS = [
     "gpuhunt==0.0.4",
     "sentry-sdk[fastapi]",
     "httpx",
+    "APScheduler<4" # indirect
 ]
 
 AWS_DEPS = [
