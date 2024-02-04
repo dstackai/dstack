@@ -168,12 +168,8 @@ async def list_deleted_pools(
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
-    offer: InstanceOfferWithAvailability = parse_raw_as(
-        InstanceOfferWithAvailability, instance_model.offer
-    )
-    jpd: JobProvisioningData = parse_raw_as(
-        JobProvisioningData, instance_model.job_provisioning_data
-    )
+    offer: InstanceOfferWithAvailability = parse_raw_as(InstanceOfferWithAvailability, instance_model.offer)  # type: ignore[operator]
+    jpd: JobProvisioningData = parse_raw_as(JobProvisioningData, instance_model.job_provisioning_data)  # type: ignore[operator]
 
     instance = Instance(
         backend=offer.backend,

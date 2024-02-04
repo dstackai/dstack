@@ -13,7 +13,7 @@ from dstack.api.server._group import APIClientGroup
 class PoolAPIClient(APIClientGroup):  # type: ignore[misc]
     def list(self, project_name: str) -> List[Pool]:
         resp = self._request(f"/api/project/{project_name}/pool/list")
-        result: List[Pool] = parse_obj_as(List[Pool], resp.json())
+        result: List[Pool] = parse_obj_as(List[Pool], resp.json())  # type: ignore[operator]
         return result
 
     def delete(self, project_name: str, pool_name: str, force: bool) -> None:
@@ -27,7 +27,7 @@ class PoolAPIClient(APIClientGroup):  # type: ignore[misc]
     def show(self, project_name: str, pool_name: str) -> List[Instance]:
         body = schemas_pools.ShowPoolRequest(name=pool_name)
         resp = self._request(f"/api/project/{project_name}/pool/show", body=body.json())
-        result: List[Instance] = parse_obj_as(List[Instance], resp.json())
+        result: List[Instance] = parse_obj_as(List[Instance], resp.json())  # type: ignore[operator]
         return result
 
     def remove(self, project_name: str, pool_name: str, instance_name: str) -> None:

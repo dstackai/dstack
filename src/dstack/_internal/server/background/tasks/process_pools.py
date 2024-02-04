@@ -69,7 +69,7 @@ async def check_shim(instance_id: UUID) -> None:
             )
         ).one()
         ssh_private_key = instance.project.ssh_private_key
-        job_provisioning_data = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
+        job_provisioning_data = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)  # type: ignore[operator]
 
         instance_health = instance_healthcheck(ssh_private_key, job_provisioning_data)
 
@@ -100,7 +100,7 @@ async def terminate(instance_id: UUID) -> None:
                 .options(joinedload(InstanceModel.project))
             )
         ).one()
-        jpd = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
+        jpd = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)  # type: ignore[operator]
         BACKEND_TYPE = jpd.backend
         backends = await backends_services.get_project_backends(project=instance.project)
         backend = next((b for b in backends if b.TYPE in BACKEND_TYPE), None)
@@ -127,7 +127,7 @@ async def _terminate_old_instance() -> None:
 
         for instance in instances:
             if instance.finished_at + instance.termination_idle_time > get_current_datetime():
-                instance_type = parse_raw_as(
+                instance_type = parse_raw_as(  # type: ignore[operator]
                     JobProvisioningData, instance.job_provisioning_data
                 ).backend
                 await terminate_job_provisioning_data_instance(

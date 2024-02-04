@@ -7,13 +7,13 @@ from dstack._internal.core.models.instances import InstanceType
 from dstack._internal.core.models.runs import InstanceStatus
 
 
-class Pool(BaseModel):  # type: ignore[misc]
+class Pool(BaseModel):  # type: ignore[misc,valid-type]
     name: str
     default: bool
     created_at: datetime.datetime
 
 
-class Instance(BaseModel):  # type: ignore[misc]
+class Instance(BaseModel):  # type: ignore[misc,valid-type]
     backend: BackendType
     instance_type: InstanceType
     instance_id: str
