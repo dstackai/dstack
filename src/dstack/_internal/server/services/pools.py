@@ -305,22 +305,9 @@ async def add_remote(
 
     pool_model = await get_or_create_default_pool_by_name(session, project, profile.pool_name)
 
-    pool_name = profile.pool_name
+    profile.pool_name = pool_model.name
     if instance_name is None:
-        instance_name = await generate_instance_name(session, project, pool_name)
-
-    pool = (
-        await session.scalars(
-            select(PoolModel).where(
-                PoolModel.name == pool_name,
-                PoolModel.project_id == project.id,
-                PoolModel.deleted == False,
-            )
-        )
-    ).one_or_none()
-
-    if pool is None:
-        pool = await create_pool_model(session, project, pool_name)
+        instance_name = await generate_instance_name(session, project, profile.pool_name)
 
     gpus = []
     if resources.gpu is not None:
@@ -343,7 +330,7 @@ async def add_remote(
         ssh_port=22,
         dockerized=False,
         backend_data="",
-        pool_id=str(pool.id),
+        pool_id=str(pool_model.id),
         ssh_proxy=None,
     )
     offer = InstanceOfferWithAvailability(
@@ -360,7 +347,7 @@ async def add_remote(
     im = InstanceModel(
         name=instance_name,
         project=project,
-        pool=pool,
+        pool=pool_model,
         status=InstanceStatus.PENDING,
         job_provisioning_data=local.json(),
         offer=offer.json(),
