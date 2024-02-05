@@ -454,4 +454,6 @@ def _submit_job_to_runner(
 def _get_runner_timeout_interval(backend_type: BackendType) -> timedelta:
     if backend_type == BackendType.LAMBDA:
         return timedelta(seconds=1200)
+    if backend_type == BackendType.KUBERNETES:
+        return timedelta(seconds=1200)
     return timedelta(seconds=600)
