@@ -1,7 +1,7 @@
 import os
 import re
 from abc import ABC, abstractmethod
-from functools import cache
+from functools import lru_cache
 from typing import List, Optional
 
 import git
@@ -105,7 +105,7 @@ def get_dstack_runner_version() -> str:
     if settings.DSTACK_VERSION is not None:
         return settings.DSTACK_VERSION
     version = os.environ.get("DSTACK_RUNNER_VERSION", None)
-    if version is None and settings.DSTACK_:
+    if version is None and settings.DSTACK_USE_LATEST_FROM_BRANCH:
         version = get_latest_runner_build()
     return version or "latest"
 
@@ -196,7 +196,7 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
     return commands
 
 
-@cache  # Restart the server to find the latest build
+@lru_cache()  # Restart the server to find the latest build
 def get_latest_runner_build() -> Optional[str]:
     owner_repo = "dstackai/dstack"
     workflow_id = "build.yml"
@@ -244,6 +244,7 @@ def get_dstack_gateway_wheel(build: str) -> str:
         r = requests.get(f"{base_url}/latest-version")
         r.raise_for_status()
         build = r.text.strip()
+        logger.debug("Found the latest gateway build: %s", build)
     return f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
 
 
