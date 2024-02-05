@@ -35,7 +35,7 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-GATEWAY_CONNECT_ATTEMPTS = 5
+GATEWAY_CONNECT_ATTEMPTS = 9
 GATEWAY_CONNECT_DELAY = 10
 
 
@@ -69,6 +69,7 @@ async def create_gateway(
     backend_type: BackendType,
     region: str,
 ) -> Gateway:
+    # TODO: Gateay creation may take significant time. Make it asynchronous.
     for backend_model, backend in await get_project_backends_with_models(project):
         if backend_model.type == backend_type:
             break
@@ -123,6 +124,9 @@ async def create_gateway(
         await session.commit()
         raise
 
+    # Give gateway sufficient time to become available.
+    # In the case of gateway being accessed via domain (e.g. Kubernetes LB),
+    # it may take sime time before the domain can be resolved.
     for attempt in range(GATEWAY_CONNECT_ATTEMPTS):
         try:
             await gateway_connections_pool.add(
