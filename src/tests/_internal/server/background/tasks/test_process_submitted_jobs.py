@@ -199,7 +199,7 @@ class TestProcessSubmittedJobs:
         assert not project.default_pool.instances
 
     @pytest.mark.asyncio
-    async def test_job_whith_instance(self, test_db, session: AsyncSession):
+    async def test_job_with_instance(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)
         repo = await create_repo(

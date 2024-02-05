@@ -392,6 +392,7 @@ def filter_pool_instances(
         resources=resources,
         max_price=profile.max_price,
         spot={
+            None: None,
             SpotPolicy.AUTO: None,
             SpotPolicy.SPOT: True,
             SpotPolicy.ONDEMAND: False,
