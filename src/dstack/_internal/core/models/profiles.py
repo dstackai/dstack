@@ -108,7 +108,8 @@ class Profile(ForbidExtra):
     pool_name: Annotated[
         Optional[str],
         Field(description="The name of the pool. If not set, dstack will use the default name."),
-    ] = DEFAULT_POOL_NAME
+    ] = None
+    instance_name: Annotated[Optional[str], Field(description="The name of the instance")]
     creation_policy: Annotated[
         Optional[CreationPolicy], Field(description="The policy for using instances from the pool")
     ]

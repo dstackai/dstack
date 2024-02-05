@@ -51,32 +51,36 @@ async def get_pool(
 
 
 def pool_model_to_pool(pool_model: PoolModel) -> Pool:
+    total = len(pool_model.instances)
+    available = sum(instance.status.is_available() for instance in pool_model.instances)
     return Pool(
         name=pool_model.name,
         default=pool_model.project.default_pool_id == pool_model.id,
         created_at=pool_model.created_at.replace(tzinfo=timezone.utc),
+        total_instances=total,
+        available_instances=available,
     )
 
 
 async def create_pool_model(session: AsyncSession, project: ProjectModel, name: str) -> PoolModel:
     pools = await session.scalars(
-        select(PoolModel).where(
-            PoolModel.name == name, PoolModel.project == project, PoolModel.deleted == False
-        )
+        select(PoolModel)
+        .where(PoolModel.name == name, PoolModel.project == project, PoolModel.deleted == False)
+        .options(joinedload(PoolModel.instances))
     )
-    if pools.all():
+    if pools.unique().all():
         raise ValueError("duplicate pool name")  # TODO: return error with description
 
     pool = PoolModel(
         name=name,
         project_id=project.id,
     )
-    session.add(pool)
-    await session.commit()
 
     if project.default_pool is None:
         project.default_pool = pool
-        await session.commit()
+
+    session.add(pool)
+    await session.commit()
 
     return pool
 
@@ -85,9 +89,11 @@ async def list_project_pool_models(
     session: AsyncSession, project: ProjectModel
 ) -> Sequence[PoolModel]:
     pools = await session.scalars(
-        select(PoolModel).where(PoolModel.project_id == project.id, PoolModel.deleted == False)
+        select(PoolModel)
+        .where(PoolModel.project_id == project.id, PoolModel.deleted == False)
+        .options(joinedload(PoolModel.instances))
     )
-    return pools.all()  # type: ignore[no-any-return]
+    return pools.unique().all()  # type: ignore[no-any-return]
 
 
 async def set_default_pool(session: AsyncSession, project: ProjectModel, pool_name: str) -> bool:

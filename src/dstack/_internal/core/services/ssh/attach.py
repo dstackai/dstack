@@ -4,8 +4,6 @@ import subprocess
 import time
 from typing import Optional, Tuple
 
-from icecream import ic
-
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.configs import ConfigManager
@@ -101,7 +99,6 @@ class SSHAttach:
             }
         else:
             self.container_config = None
-        ic(self.container_config)
         self.ssh_config_path = str(ConfigManager().dstack_ssh_config_path)
 
     def attach(self):

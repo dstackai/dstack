@@ -19,11 +19,13 @@ from dstack._internal.core.backends.base.compute import (
     SSHKeys,
 )
 from dstack._internal.core.errors import BackendError, RepoDoesNotExistError, ServerClientError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -61,8 +63,13 @@ from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
-from dstack._internal.server.services.pools import create_pool_model
+from dstack._internal.server.services.pools import (
+    create_pool_model,
+    get_pool_instances,
+    instance_model_to_instance,
+)
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
@@ -257,6 +264,9 @@ async def create_instance(
             project=project,
             pool=pool,
             status=InstanceStatus.STARTING,
+            backend=backend.TYPE,
+            region=instance_offer.region,
+            price=instance_offer.price,
             # job_id: Optional[FK] (current job)
             # ip address
             # ssh creds: user, port, dockerized
@@ -285,31 +295,62 @@ async def get_run_plan(
     user: UserModel,
     run_spec: RunSpec,
 ) -> RunPlan:
+    pool_instances = await get_pool_instances(session, project, run_spec.profile.pool_name)
+    pool_offers = []
+
+    if run_spec.profile.creation_policy == CreationPolicy.REUSE:
+        requirements = Requirements(
+            resources=run_spec.configuration.resources,
+            max_price=run_spec.profile.max_price,
+            spot=None,
+        )
+        if run_spec.profile.instance_name is not None:
+            for instance in pool_instances:
+                if instance.name == run_spec.profile.instance_name and check_relevance(
+                    run_spec.profile, requirements.resources, instance
+                ):
+                    offer = pydantic.parse_raw_as(InstanceOfferWithAvailability, instance.offer)
+                    pool_offers.append(offer)
+        else:
+            for instance in pool_instances:
+                if check_relevance(run_spec.profile, requirements.resources, instance):
+                    offer = pydantic.parse_raw_as(InstanceOfferWithAvailability, instance.offer)
+                    pool_offers.append(offer)
+
     backends = await backends_services.get_project_backends(project=project)
     if run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run_spec.profile.backends]
+
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
     jobs = get_jobs_from_run_spec(run_spec)
     job_plans = []
+
+    creation_policy = run_spec.profile.creation_policy
+
     for job in jobs:
-        # TODO: use the job.pool_name to select an offer
-        requirements = job.job_spec.requirements
-        offers = await backends_services.get_instance_offers(
-            backends=backends,
-            requirements=requirements,
-            exclude_not_available=False,
-        )
-        for backend, offer in offers:
-            offer.backend = backend.TYPE
-        offers = [offer for _, offer in offers]
+        job_offers = []
+        job_offers.extend(pool_offers)
+
+        if creation_policy is None or creation_policy == CreationPolicy.REUSE_OR_CREATE:
+            requirements = job.job_spec.requirements
+            offers = await backends_services.get_instance_offers(
+                backends=backends,
+                requirements=requirements,
+                exclude_not_available=False,
+            )
+            for backend, offer in offers:
+                offer.backend = backend.TYPE
+            job_offers.extend(offer for _, offer in offers)
+
         job_plan = JobPlan(
             job_spec=job.job_spec,
-            offers=offers[:50],
-            total_offers=len(offers),
-            max_price=max((offer.price for offer in offers), default=None),
+            offers=job_offers[:50],
+            total_offers=len(job_offers),
+            max_price=max((offer.price for offer in job_offers), default=None),
         )
         job_plans.append(job_plan)
+
     run_spec.run_name = run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name, user=user.name, run_spec=run_spec, job_plans=job_plans
@@ -590,3 +631,62 @@ async def abort_runs_of_pool(session: AsyncSession, project_model: ProjectModel,
             active_run_names.append(run.run_spec.run_name)
 
     await stop_runs(session, project_model, active_run_names, abort=True)
+
+
+def check_relevance(
+    profile: Profile, resources: ResourcesSpec, instance_model: InstanceModel
+) -> bool:
+
+    jpd: JobProvisioningData = pydantic.parse_raw_as(
+        JobProvisioningData, instance_model.job_provisioning_data
+    )
+
+    # TODO: remove on prod
+    if LOCAL_BACKEND_ENABLED and jpd.backend == BackendType.LOCAL:
+        return True
+
+    instance = instance_model_to_instance(instance_model)
+
+    if profile.backends is not None and instance.backend not in profile.backends:
+        logger.warning(f"no backend select ")
+        return False
+
+    # use gpuhunt
+
+    instance_resources: ResourcesSpec = pydantic.parse_raw_as(
+        ResourcesSpec, instance_model.resource_spec_data
+    )
+
+    if resources.cpu.min > instance_resources.cpu.min:
+        return False
+
+    if resources.gpu is not None:
+
+        if instance_resources.gpu is None:
+            return False
+
+        if resources.gpu.count.min > instance_resources.gpu.count.min:
+            return False
+
+        if resources.gpu.memory.min > instance_resources.gpu.memory.min:
+            return False
+
+        # TODO: compare GPU names
+
+    if resources.memory.min > instance_resources.memory.min:
+        return False
+
+    if resources.shm_size is not None:
+        if instance_resources.shm_size is None:
+            return False
+
+        if resources.shm_size > instance_resources.shm_size:
+            return False
+
+    if resources.disk is not None:
+        if instance_resources.disk is None:
+            return False
+        if resources.disk.size.min > instance_resources.disk.size.min:
+            return False
+
+    return True

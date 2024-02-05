@@ -8,13 +8,11 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -32,13 +30,8 @@ from dstack._internal.server.services.jobs import (
     SUBMITTED_PROCESSING_JOBS_LOCK,
 )
 from dstack._internal.server.services.logging import job_log
-from dstack._internal.server.services.pools import (
-    get_pool_instances,
-    instance_model_to_instance,
-    list_project_pool_models,
-)
-from dstack._internal.server.services.runs import run_model_to_run
-from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
+from dstack._internal.server.services.pools import get_pool_instances, list_project_pool_models
+from dstack._internal.server.services.runs import check_relevance, run_model_to_run
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
@@ -77,71 +70,6 @@ async def _process_job(job_id: UUID):
             session=session,
             job_model=job_model,
         )
-
-
-from icecream import ic
-
-
-def check_relevance(
-    profile: Profile, resources: ResourcesSpec, instance_model: InstanceModel
-) -> bool:
-
-    jpd: JobProvisioningData = parse_raw_as(
-        JobProvisioningData, instance_model.job_provisioning_data
-    )
-
-    # TODO: remove on prod
-    if LOCAL_BACKEND_ENABLED and jpd.backend == BackendType.LOCAL:
-        return True
-
-    instance = instance_model_to_instance(instance_model)
-
-    if profile.backends is not None and instance.backend not in profile.backends:
-        logger.warning(f"no backend select ")
-        return False
-
-    # use gpuhunt
-
-    instance_resources: ResourcesSpec = parse_raw_as(
-        ResourcesSpec, instance_model.resource_spec_data
-    )
-
-    ic(resources.cpu.min, instance_resources.cpu.min)
-    if resources.cpu.min > instance_resources.cpu.min:
-        return False
-
-    ic(resources.gpu)
-    if resources.gpu is not None:
-
-        if instance_resources.gpu is None:
-            return False
-
-        if resources.gpu.count.min > instance_resources.gpu.count.min:
-            return False
-
-        if resources.gpu.memory.min > instance_resources.gpu.memory.min:
-            return False
-
-        # TODO: compare GPU names
-
-    ic(resources.memory, instance_resources.memory.min)
-    if resources.memory.min > instance_resources.memory.min:
-        return False
-
-    if resources.shm_size is not None:
-        if instance_resources.shm_size is None:
-            return False
-
-        if resources.shm_size > instance_resources.shm_size:
-            return False
-
-    if resources.disk is not None:
-        if instance_resources.disk is None:
-            return False
-        if resources.disk.size.min > instance_resources.disk.size.min:
-            return False
-
-    return True
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
@@ -185,8 +113,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     # pool capacity
 
     pool_instances = await get_pool_instances(session, project_model, run_pool)
-    available_instanses = (p for p in pool_instances if p.status == InstanceStatus.READY)
-    ic(available_instanses)
+    available_instanses = [p for p in pool_instances if p.status == InstanceStatus.READY]
     relevant_instances: List[InstanceModel] = []
     for instance in available_instanses:
         if check_relevance(profile, run_spec.configuration.resources, instance):
@@ -247,8 +174,11 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             job_provisioning_data=job_provisioning_data.json(),
             offer=offer.json(),
             termination_policy=profile.termination_policy,
-            termination_idle_time=profile.termination_idle_time,
+            termination_idle_time="300",  # TODO: fix deserailize
             job=job_model,
+            backend=offer.backend,
+            price=offer.price,
+            region=offer.region,
         )
         session.add(im)
 

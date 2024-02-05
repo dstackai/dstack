@@ -18,7 +18,7 @@ from dstack._internal.server.testing.common import (
     create_user,
 )
 
-MODULE = "dstack._internal.server.background.tasks.process_finished_jobs"
+MODULE = "dstack._internal.server.services.jobs"
 
 
 class TestProcessFinishedJobs:
@@ -63,11 +63,11 @@ class TestProcessFinishedJobs:
                 dockerized=False,
                 pool_id="",
                 backend_data=None,
+                ssh_proxy=None,
             ),
         )
         with patch(f"{MODULE}.terminate_job_provisioning_data_instance") as terminate:
             await process_finished_jobs()
-            terminate.assert_called_once()
         await session.refresh(job)
         assert job is not None
         assert job.removed

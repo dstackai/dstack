@@ -32,12 +32,20 @@ def print_pool_table(pools: Sequence[Pool], verbose: bool) -> None:
     table = Table(box=None)
     table.add_column("NAME")
     table.add_column("DEFAULT")
+    table.add_column("INSTANCES")
     if verbose:
         table.add_column("CREATED")
 
     sorted_pools = sorted(pools, key=lambda r: r.name)
     for pool in sorted_pools:
-        row = [pool.name, "default" if pool.default else ""]
+        default_mark = "default" if pool.default else ""
+        color = (
+            colors["success"]
+            if pool.total_instances == pool.available_instances
+            else colors["error"]
+        )
+        health = f"[{color}]{pool.available_instances}/{pool.total_instances}[/{color}]"
+        row = [pool.name, default_mark, health]
         if verbose:
             row.append(pretty_date(pool.created_at))
         table.add_row(*row)
@@ -48,18 +56,20 @@ def print_pool_table(pools: Sequence[Pool], verbose: bool) -> None:
 
 def print_instance_table(instances: Sequence[Instance]) -> None:
     table = Table(box=None)
-    table.add_column("INSTANCE ID")
+    table.add_column("INSTANCE NAME")
     table.add_column("BACKEND")
     table.add_column("INSTANCE TYPE")
     table.add_column("STATUS")
     table.add_column("PRICE")
 
     for instance in instances:
+        status_mark = "success" if instance.status.is_available() else "warning"
+        color = colors[status_mark]
         row = [
             instance.instance_id,
             instance.backend,
             instance.instance_type.resources.pretty_format(),
-            instance.status,
+            f"[{color}]{instance.status}[/{color}]",
             f"{instance.price:.02f}",
         ]
         table.add_row(*row)
@@ -246,7 +256,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             formatter_class=self._parser.formatter_class,
         )
         show_parser.add_argument(
-            "--name", "-n", dest="pool_name", help="The name of the pool", required=True
+            "--pool", dest="pool_name", help="The name of the pool", required=True
         )
         show_parser.set_defaults(subfunc=self._show)
 

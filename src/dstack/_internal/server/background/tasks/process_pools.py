@@ -1,3 +1,4 @@
+import datetime
 from datetime import timedelta
 from typing import Dict
 from uuid import UUID
@@ -19,7 +20,7 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.common import get_current_datetime, parse_pretty_duration
 from dstack._internal.utils.logging import get_logger
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
@@ -126,11 +127,20 @@ async def _terminate_old_instance() -> None:
         instances = res.scalars().all()
 
         for instance in instances:
-            if instance.finished_at + instance.termination_idle_time > get_current_datetime():
-                instance_type = parse_raw_as(  # type: ignore[operator]
+            if instance.finished_at is None:
+                continue
+
+            delta = datetime.timedelta(
+                seconds=parse_pretty_duration(instance.termination_idle_time)
+            )
+            if instance.finished_at + delta > get_current_datetime():
+                jpd: JobProvisioningData = parse_raw_as(  # type: ignore[operator]
                     JobProvisioningData, instance.job_provisioning_data
                 ).backend
                 await terminate_job_provisioning_data_instance(
-                    project=instance.project, job_provisioning_data=instance.job_provisioning_data
+                    project=instance.project, job_provisioning_data=jpd
                 )
+                instance.deleted = True
+                instance.deleted_at = get_current_datetime()
+
         await session.commit()

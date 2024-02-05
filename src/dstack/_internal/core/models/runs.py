@@ -1,9 +1,9 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence
 
 from pydantic import UUID4, BaseModel, Field
-from typing_extensions import Annotated, Literal
+from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration, RegistryAuth
@@ -239,3 +239,6 @@ class InstanceStatus(str, Enum):
 
     def is_started(self):
         return not self.is_finished()
+
+    def is_available(self) -> bool:
+        return self in (self.READY, self.BUSY)

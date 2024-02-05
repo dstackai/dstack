@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.14
+    rev: v0.2.0
     hooks:
       - id: ruff
   - repo: https://github.com/psf/black
@@ -23,7 +23,7 @@ repos:
       exclude: 'versions|src/tests'
       additional_dependencies: [types-PyYAML, types-requests, pydantic, sqlalchemy]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.14
+    rev: v0.2.0
     hooks:
       - id: ruff
         name: ruff autofix

@@ -11,6 +11,8 @@ class Pool(BaseModel):  # type: ignore[misc,valid-type]
     name: str
     default: bool
     created_at: datetime.datetime
+    total_instances: int
+    available_instances: int
 
 
 class Instance(BaseModel):  # type: ignore[misc,valid-type]

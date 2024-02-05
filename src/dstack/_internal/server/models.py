@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Integer,
     MetaData,
@@ -285,6 +286,11 @@ class InstanceModel(BaseModel):
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(50))
     termination_idle_time: Mapped[Optional[str]] = mapped_column(String(50))
 
+    backend: Mapped[BackendType] = mapped_column(Enum(BackendType))
+    backend_data: Mapped[Optional[str]] = mapped_column(String(4000))
+    region: Mapped[str] = mapped_column(String(2000))
+    price: Mapped[float] = mapped_column(Float)
+
     job_provisioning_data: Mapped[str] = mapped_column(String(4000))
 
     offer: Mapped[str] = mapped_column(String(4000))
@@ -299,9 +305,9 @@ class InstanceModel(BaseModel):
     # ip address
     # ssh creds: user, port, dockerized
     # real resources + spot (exact) / instance offer
-    # backend + backend data
-    # region
-    # price (for querying)
+    # + backend + backend data
+    # + region
+    # + price (for querying)
     # + # termination policy
     # creation policy
     # job_provisioning_data=job_provisioning_data.json(),

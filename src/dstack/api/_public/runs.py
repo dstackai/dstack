@@ -17,7 +17,13 @@ from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
-from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, SpotPolicy
+from dstack._internal.core.models.profiles import (
+    CreationPolicy,
+    Profile,
+    ProfileRetryPolicy,
+    SpotPolicy,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import JobSpec
@@ -381,6 +387,10 @@ class RunCollection:
         working_dir: Optional[str] = None,
         run_name: Optional[str] = None,
         pool_name: Optional[str] = None,
+        instance_name: Optional[str] = None,
+        creation_policy: Optional[CreationPolicy] = None,
+        termination_policy: Optional[TerminationPolicy] = None,
+        termination_policy_idle: Optional[Union[int, str]] = None,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`
@@ -411,9 +421,10 @@ class RunCollection:
             max_duration=max_duration,
             max_price=max_price,
             pool_name=pool_name,
-            creation_policy=None,
-            termination_idle_time=None,
-            termination_policy=None,
+            instance_name=instance_name,
+            creation_policy=creation_policy,
+            termination_policy=termination_policy,
+            termination_idle_time=None,  # TODO: fix deserialize
         )
         run_spec = RunSpec(
             run_name=run_name,

@@ -1,8 +1,8 @@
 """add pools
 
-Revision ID: 98b9e40f03b0
+Revision ID: dad000707a2c
 Revises: d3e8af4786fa
-Create Date: 2024-02-04 17:25:03.945051
+Create Date: 2024-02-05 07:42:58.102664
 
 """
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "98b9e40f03b0"
+revision = "dad000707a2c"
 down_revision = "d3e8af4786fa"
 branch_labels = None
 depends_on = None
@@ -67,6 +67,28 @@ def upgrade() -> None:
         sa.Column("finished_at", sa.DateTime(), nullable=True),
         sa.Column("termination_policy", sa.String(length=50), nullable=True),
         sa.Column("termination_idle_time", sa.String(length=50), nullable=True),
+        sa.Column(
+            "backend",
+            sa.Enum(
+                "AWS",
+                "AZURE",
+                "DATACRUNCH",
+                "DSTACK",
+                "GCP",
+                "KUBERNETES",
+                "LAMBDA",
+                "LOCAL",
+                "REMOTE",
+                "NEBIUS",
+                "TENSORDOCK",
+                "VASTAI",
+                name="backendtype",
+            ),
+            nullable=False,
+        ),
+        sa.Column("backend_data", sa.String(length=4000), nullable=True),
+        sa.Column("region", sa.String(length=2000), nullable=False),
+        sa.Column("price", sa.Float(), nullable=False),
         sa.Column("job_provisioning_data", sa.String(length=4000), nullable=False),
         sa.Column("offer", sa.String(length=4000), nullable=False),
         sa.Column("resource_spec_data", sa.String(length=4000), nullable=True),

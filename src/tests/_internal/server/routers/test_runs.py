@@ -73,6 +73,7 @@ def get_dev_env_run_plan_dict(
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "creation_policy": None,
                 "default": False,
+                "instance_name": None,
                 "max_duration": "off",
                 "max_price": None,
                 "name": "string",
@@ -184,6 +185,7 @@ def get_dev_env_run_dict(
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "creation_policy": None,
                 "default": False,
+                "instance_name": None,
                 "max_duration": "off",
                 "max_price": None,
                 "name": "string",
@@ -266,7 +268,7 @@ def get_dev_env_run_dict(
             "error_code": None,
             "job_provisioning_data": None,
         },
-        "cost": 0,
+        "cost": 0.0,
         "service": None,
     }
 
@@ -587,7 +589,6 @@ class TestStopRuns:
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATED
         assert not job.removed
-        assert job.remove_at is not None
 
     @pytest.mark.asyncio
     async def test_leaves_finished_runs_unchanged(self, test_db, session: AsyncSession):

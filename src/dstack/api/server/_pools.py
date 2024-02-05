@@ -22,7 +22,7 @@ class PoolAPIClient(APIClientGroup):  # type: ignore[misc]
 
     def create(self, project_name: str, pool_name: str) -> None:
         body = schemas_pools.CreatePoolRequest(name=pool_name)
-        self._request(f"/api/project/{project_name}/pool/remove", body=body.json())
+        self._request(f"/api/project/{project_name}/pool/create", body=body.json())
 
     def show(self, project_name: str, pool_name: str) -> List[Instance]:
         body = schemas_pools.ShowPoolRequest(name=pool_name)

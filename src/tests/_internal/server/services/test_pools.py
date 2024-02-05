@@ -40,12 +40,22 @@ async def test_pool(session: AsyncSession, test_db):
         status=InstanceStatus.PENDING,
         job_provisioning_data="",
         offer="",
+        region="",
+        price=1,
+        backend=BackendType.LOCAL,
     )
     session.add(im)
     await session.commit()
+    await session.refresh(pool)
 
     core_model_pool = services_pools.pool_model_to_pool(pool)
-    assert core_model_pool == Pool(name="test_pool", default=True, created_at=pool.created_at)
+    assert core_model_pool == Pool(
+        name="test_pool",
+        default=True,
+        created_at=pool.created_at.replace(tzinfo=dt.timezone.utc),  # ???
+        total_instances=1,
+        available_instances=0,
+    )
 
     list_pools = await services_pools.list_project_pool(session=session, project=project)
     assert list_pools == [services_pools.pool_model_to_pool(pool)]
@@ -116,6 +126,9 @@ async def test_show_pool(session: AsyncSession, test_db):
         status=InstanceStatus.PENDING,
         job_provisioning_data='{"pool_id":"123", "backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
         offer='{"price":"LOCAL", "price":1.0, "backend":"local", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+        region="eu-west",
+        price=1,
+        backend=BackendType.LOCAL,
     )
     session.add(im)
     await session.commit()
@@ -137,6 +150,9 @@ async def test_get_pool_instances(session: AsyncSession, test_db):
         status=InstanceStatus.PENDING,
         job_provisioning_data='{"backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
         offer='{"price":"LOCAL", "price":1.0, "backend":"local", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
+        region="eu-west",
+        price=1,
+        backend=BackendType.LOCAL,
     )
     session.add(im)
     await session.commit()
@@ -162,6 +178,9 @@ async def test_generate_instance_name(session: AsyncSession, test_db):
         status=InstanceStatus.PENDING,
         job_provisioning_data="",
         offer="",
+        backend=BackendType.REMOTE,
+        region="",
+        price=0,
     )
     session.add(im)
     await session.commit()
