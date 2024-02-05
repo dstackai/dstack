@@ -1,7 +1,5 @@
-import json
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
-from uuid import UUID
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession

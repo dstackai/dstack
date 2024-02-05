@@ -1,6 +1,6 @@
 from typing import Tuple
 
-from fastapi import Depends, Security, status
+from fastapi import Depends, Security
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession

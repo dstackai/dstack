@@ -66,7 +66,7 @@ class Client:
         """
         if server_url is not None and user_token is not None:
             if project_name is None:
-                raise ConfigurationError(f"The project name is not specified")
+                raise ConfigurationError("The project name is not specified")
             api_client = APIClient(server_url, user_token)
         else:
             api_client, project_name = api_client_service.get_api_client(project_name=project_name)

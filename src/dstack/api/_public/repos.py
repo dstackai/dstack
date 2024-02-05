@@ -132,7 +132,7 @@ class RepoCollection:
             repo_config = config.get_repo_config(repo_dir)
             if repo_config is None:
                 raise ConfigurationError(
-                    f"The repo is not initialized. Run `dstack init` to initialize the repo."
+                    "The repo is not initialized. Run `dstack init` to initialize the repo."
                 )
             repo = load_repo(repo_config)
             try:
@@ -140,7 +140,7 @@ class RepoCollection:
             except requests.HTTPError as e:
                 if "404" in e.args[0]:
                     raise ConfigurationError(
-                        f"The repo is not initialized. Run `dstack init` to initialize the repo."
+                        "The repo is not initialized. Run `dstack init` to initialize the repo."
                     )
                 raise
         else:

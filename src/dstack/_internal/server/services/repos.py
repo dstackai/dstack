@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import sqlalchemy.exc
 from fastapi import UploadFile
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError

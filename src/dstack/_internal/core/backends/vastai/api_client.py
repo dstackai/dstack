@@ -1,4 +1,3 @@
-import shlex
 import threading
 import time
 from typing import List, Optional, Union
@@ -29,7 +28,7 @@ class VastAIAPIClient:
         self.instances_cache: List[dict] = []
 
     def get_bundle(self, bundle_id: Union[str, int]) -> Optional[dict]:
-        resp = self.s.post(self._url(f"/bundles/"), json={"id": {"eq": bundle_id}})
+        resp = self.s.post(self._url("/bundles/"), json={"id": {"eq": bundle_id}})
         resp.raise_for_status()
         data = resp.json()
         offers = data["offers"]
@@ -103,7 +102,7 @@ class VastAIAPIClient:
     def get_instances(self, cache_ttl: float = 3.0) -> List[dict]:
         with self.lock:
             if time.time() - self.instances_cache_ts > cache_ttl:
-                resp = self.s.get(self._url(f"/instances/"))
+                resp = self.s.get(self._url("/instances/"))
                 resp.raise_for_status()
                 data = resp.json()
                 self.instances_cache_ts = time.time()

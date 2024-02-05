@@ -21,7 +21,7 @@ def get_configuration(
             "The quantize argument can be one of the following: 'awq', 'eetq', 'gptq', or 'bitsandbytes'."
         )
     env["MODEL_ID"] = model_name
-    launcher_command = f"text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code"
+    launcher_command = "text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code"
     if quantize:
         launcher_command += f" --quantize {quantize}"
     if dtype:

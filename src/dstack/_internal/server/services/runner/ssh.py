@@ -20,14 +20,14 @@ def runner_ssh_tunnel(
     ports: List[int], retries: int = 3, retry_interval: float = 1
 ) -> Callable[[Callable[P, bool]], Callable[Concatenate[str, JobProvisioningData, P], bool]]:
     def decorator(
-        func: Callable[P, bool]
+        func: Callable[P, bool],
     ) -> Callable[Concatenate[str, JobProvisioningData, P], bool]:
         @functools.wraps(func)
         def wrapper(
             ssh_private_key: str,
             job_provisioning_data: JobProvisioningData,
             *args: P.args,
-            **kwargs: P.kwargs
+            **kwargs: P.kwargs,
         ) -> bool:
             """
             Returns:

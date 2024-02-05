@@ -3,7 +3,7 @@ from typing import List, Optional
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import console
-from dstack._internal.core.models.instances import InstanceAvailability, InstanceType, Resources
+from dstack._internal.core.models.instances import InstanceAvailability, InstanceType
 from dstack._internal.core.models.runs import RunPlan
 from dstack._internal.utils.common import pretty_date
 from dstack.api import Run

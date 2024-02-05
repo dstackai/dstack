@@ -35,13 +35,13 @@
 
 ## Making changes
 
-We use [`black`](https://github.com/psf/black) to format Python code and [`isort`](https://pycqa.github.io/isort/index.html) to sort Python imports. Before committing your changes, run:
+We use [`ruff`](https://docs.astral.sh/ruff/) to format Python code and to sort Python imports. Before committing your changes, run:
 
-1. `isort --settings-file pyconfig.toml cli `
-2. `black --config pyconfig.toml cli`
+1. `ruff --fix src`
+2. `ruff format src`
 
 
-There are also helper pre-commits installed for [`black`](https://black.readthedocs.io/en/stable/integrations/source_version_control.html) and [`isort`](https://pycqa.github.io/isort/docs/configuration/pre-commit.html) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
+There are also helper pre-commits installed for [`ruff`](https://docs.astral.sh/ruff/integrations/#pre-commit) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
 
 ## Adding a new backend
 

@@ -21,7 +21,7 @@ async def gather_map_async(
     items: Sequence[ItemT],
     func: Callable[[ItemT], Awaitable[ResultT]],
     *,
-    return_exceptions: bool = False
+    return_exceptions: bool = False,
 ) -> List[Tuple[ItemT, Union[ResultT, Exception]]]:
     """
     A parallel wrapper around asyncio.gather that returns a list of tuples (item, result).

@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from typing import List, Optional
 
 from dstack._internal.core.backends.base.compute import Compute, get_dstack_runner_version
@@ -46,12 +45,7 @@ class LocalCompute(Compute):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
-        authorized_keys = "\\n".join(
-            [
-                run.run_spec.ssh_key_pub.strip(),
-                project_ssh_public_key.strip(),
-            ]
-        )
+        authorized_keys = f"{run.run_spec.ssh_key_pub.strip()}\\n{project_ssh_public_key.strip()}"
         logger.info(
             "Running job in LocalBackend. To start processing, run: `"
             f"DSTACK_BACKEND=local "

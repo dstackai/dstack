@@ -40,7 +40,7 @@ class ConfigCommand(BaseCommand):
         if args.remove:
             config_manager.delete_project(args.project)
             config_manager.save()
-            console.print(f"[grey58]OK[/]")
+            console.print("[grey58]OK[/]")
             return
 
         if not args.url:

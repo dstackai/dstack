@@ -4,7 +4,6 @@ from fastapi import APIRouter
 
 from dstack._internal.core.models.runs import Run
 from dstack._internal.core.models.secrets import Secret
-from dstack._internal.server.schemas.runs import SubmitRunRequest
 from dstack._internal.server.schemas.secrets import (
     AddSecretRequest,
     DeleteSecretsRequest,

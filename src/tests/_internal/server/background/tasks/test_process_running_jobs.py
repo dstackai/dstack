@@ -147,9 +147,7 @@ class TestProcessRunningJobs:
             "dstack._internal.server.services.runner.ssh.RunnerTunnel"
         ) as RunnerTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock, patch.object(
-            settings, "SERVER_DIR_PATH", tmp_path
-        ):
+        ) as RunnerClientMock, patch.object(settings, "SERVER_DIR_PATH", tmp_path):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
                 job_states=[JobStateEvent(timestamp=1, state=JobStatus.RUNNING)],

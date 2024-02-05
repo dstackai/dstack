@@ -2,8 +2,12 @@ from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 
-from dstack._internal.core.models.repos.local import LocalRepo, LocalRepoInfo, LocalRunRepoData
-from dstack._internal.core.models.repos.remote import (
+from dstack._internal.core.models.repos.local import (  # noqa: F401
+    LocalRepo,
+    LocalRepoInfo,
+    LocalRunRepoData,
+)
+from dstack._internal.core.models.repos.remote import (  # noqa: F401
     RemoteRepo,
     RemoteRepoCreds,
     RemoteRepoInfo,

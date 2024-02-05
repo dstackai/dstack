@@ -2,7 +2,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 
 def get_dstack_dir() -> Path:

@@ -1,7 +1,6 @@
 import asyncio
 from typing import Dict, List, Optional
 
-from dstack._internal.core.errors import SSHError
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.utils.logging import get_logger
 

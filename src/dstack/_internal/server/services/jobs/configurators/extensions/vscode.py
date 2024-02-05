@@ -20,8 +20,8 @@ class VSCodeDesktop:
             target = f'~/.vscode-server/bin/"{self.version}"'
             commands.extend(
                 [
-                    f'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
-                    f"mkdir -p /tmp",
+                    'if [ $(uname -m) = "aarch64" ]; then arch="arm64"; else arch="x64"; fi',
+                    "mkdir -p /tmp",
                     f'wget -q --show-progress "{url}" -O "/tmp/{archive}"',
                     f"mkdir -vp {target}",
                     f'tar --no-same-owner -xz --strip-components=1 -C {target} -f "/tmp/{archive}"',
@@ -35,8 +35,8 @@ class VSCodeDesktop:
 
     def get_print_readme_commands(self) -> List[str]:
         return [
-            f"echo To open in VS Code Desktop, use link below:",
-            f"echo ''",
+            "echo To open in VS Code Desktop, use link below:",
+            "echo ''",
             f"echo '  vscode://vscode-remote/ssh-remote+{self.run_name}/workflow'",  # TODO use $REPO_DIR
-            f"echo ''",
+            "echo ''",
         ]

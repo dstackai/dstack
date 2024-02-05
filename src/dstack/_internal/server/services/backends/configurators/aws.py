@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional
+from typing import List
 
 from dstack._internal.core.backends.aws import AWSBackend, auth
 from dstack._internal.core.backends.aws.config import AWSConfig
@@ -73,7 +73,7 @@ class AWSConfigurator(Configurator):
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
             auth.authenticate(creds=config.creds, region=MAIN_REGION)
-        except:
+        except Exception:
             if isinstance(config.creds, AWSAccessKeyCreds):
                 raise_invalid_credentials_error(
                     fields=[
