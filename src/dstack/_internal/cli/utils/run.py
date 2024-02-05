@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from rich.table import Table
 
-from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.common import colors, console
 from dstack._internal.core.models.instances import InstanceAvailability, InstanceType
 from dstack._internal.core.models.runs import RunPlan
 from dstack._internal.utils.common import pretty_date
@@ -78,10 +78,10 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
             "yes" if r.spot else "no",
             f"${offer.price:g}",
             availability,
-            style=None if i == 1 else "grey58",
+            style=None if i == 1 else colors["secondary"],
         )
     if job_plan.total_offers > len(job_plan.offers):
-        offers.add_row("", "...", style="secondary")
+        offers.add_row("", "...", style=colors["secondary"])
 
     console.print(props)
     console.print()

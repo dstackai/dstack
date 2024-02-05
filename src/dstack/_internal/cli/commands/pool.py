@@ -152,10 +152,10 @@ def print_offers_table(
             "yes" if r.spot else "no",
             f"${offer.price:g}",
             availability,
-            style=None if i == 1 else "grey58",
+            style=None if i == 1 else colors["secondary"],
         )
     if len(print_offers) > offers_limit:
-        offers_table.add_row("", "...", style="grey58")
+        offers_table.add_row("", "...", style=colors["secondary"])
 
     console.print(props)
     console.print()
