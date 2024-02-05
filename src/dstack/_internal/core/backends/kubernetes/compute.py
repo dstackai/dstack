@@ -92,6 +92,9 @@ class KubernetesCompute(Compute):
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
+        # Before running a job, ensure a jump pod service is running.
+        # There is a one jump pod per Kubernetes backend that is used
+        # as an ssh proxy jump to connect to all other services in Kubernetes.
         # Setup jump pod in a separate thread to avoid long-running run_job.
         # In case the thread fails, the job will be failed and resubmitted.
         threading.Thread(
@@ -106,7 +109,7 @@ class KubernetesCompute(Compute):
                 "jump_pod_port": self.config.networking.ssh_port,
             },
         ).start()
-        response = self.api.create_namespaced_pod(
+        pod_response = self.api.create_namespaced_pod(
             namespace=DEFAULT_NAMESPACE,
             body=client.V1Pod(
                 metadata=client.V1ObjectMeta(
@@ -134,7 +137,7 @@ class KubernetesCompute(Compute):
                 ),
             ),
         )
-        response = self.api.create_namespaced_service(
+        service_response = self.api.create_namespaced_service(
             namespace=DEFAULT_NAMESPACE,
             body=client.V1Service(
                 metadata=client.V1ObjectMeta(name=_get_pod_service_name(instance_name)),
@@ -145,7 +148,7 @@ class KubernetesCompute(Compute):
                 ),
             ),
         )
-        service_ip = response.spec.cluster_ip
+        service_ip = service_response.spec.cluster_ip
         return LaunchedInstanceInfo(
             instance_id=instance_name,
             ip_address=service_ip,
@@ -188,6 +191,15 @@ class KubernetesCompute(Compute):
         region: str,
         project_id: str,
     ) -> LaunchedGatewayInfo:
+        # Gateway creation is currently limited to Kubernetes with Load Balancer support.
+        # If the cluster does not support Load Balancer, the service will be provisioned but
+        # the external IP/hostname will never be allocated.
+
+        # TODO: This implementation is only tested on EKS. Test other managed Kubernetes.
+
+        # TODO: By default EKS creates a Classic Load Balancer for Load Balancer services.
+        # Consider deploying an NLB. It seems it requires some extra configuration on the cluster:
+        # https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
         commands = _get_gateway_commands(authorized_keys=[ssh_key_pub])
         pod_response = self.api.create_namespaced_pod(
             namespace=DEFAULT_NAMESPACE,
@@ -205,10 +217,13 @@ class KubernetesCompute(Compute):
                             args=["-c", " && ".join(commands)],
                             ports=[
                                 client.V1ContainerPort(
+                                    container_port=22,
+                                ),
+                                client.V1ContainerPort(
                                     container_port=80,
                                 ),
                                 client.V1ContainerPort(
-                                    container_port=22,
+                                    container_port=443,
                                 ),
                             ],
                         )
@@ -221,11 +236,6 @@ class KubernetesCompute(Compute):
             body=client.V1Service(
                 metadata=client.V1ObjectMeta(
                     name=_get_pod_service_name(instance_name),
-                    # annotations={
-                    #     "service.beta.kubernetes.io/aws-load-balancer-type": "external",
-                    #     "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
-                    #     "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip"
-                    # }
                 ),
                 spec=client.V1ServiceSpec(
                     type="LoadBalancer",
@@ -254,7 +264,11 @@ class KubernetesCompute(Compute):
             api=self.api, service_name=_get_pod_service_name(instance_name)
         )
         if hostname is None:
-            raise GatewayError("Failed to get gateway hostname")
+            self.terminate_instance(instance_name, region="-")
+            raise GatewayError(
+                "Failed to get gateway hostname. "
+                "Ensure the Kubernetes cluster supports Load Balancer services."
+            )
         return LaunchedGatewayInfo(
             instance_id=instance_name,
             ip_address=hostname,
@@ -346,7 +360,7 @@ def _create_jump_pod_service(
     # TODO use restricted ssh-forwarding-only user for jump pod instead of root.
     commands = _get_jump_pod_commands(authorized_keys=[project_ssh_public_key])
     pod_name = _get_jump_pod_name(project_name)
-    response = api.create_namespaced_pod(
+    pod_response = api.create_namespaced_pod(
         namespace=DEFAULT_NAMESPACE,
         body=client.V1Pod(
             metadata=client.V1ObjectMeta(
@@ -371,7 +385,7 @@ def _create_jump_pod_service(
             ),
         ),
     )
-    response = api.create_namespaced_service(
+    service_response = api.create_namespaced_service(
         namespace=DEFAULT_NAMESPACE,
         body=client.V1Service(
             metadata=client.V1ObjectMeta(name=_get_jump_pod_service_name(project_name)),
@@ -481,7 +495,7 @@ def _get_gateway_commands(authorized_keys: List[str]) -> List[str]:
         # install packages
         "apt-get update && apt-get install -y sudo wget openssh-server nginx python3.10-venv libaugeas0",
         # install docker-systemctl-replacement
-        "wget https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/master/files/docker/systemctl3.py -O /usr/bin/systemctl",
+        "wget https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/b18d67e521f0d1cf1d705dbb8e0416bef23e377c/files/docker/systemctl3.py -O /usr/bin/systemctl",
         "chmod + /usr/bin/systemctl",
         # install certbot
         "python3 -m venv /root/certbotvenv/",
