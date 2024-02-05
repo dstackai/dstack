@@ -115,7 +115,7 @@ class TestListAndGetGateways:
             json={"name": "missing"},
             headers=get_auth_headers(user.token),
         )
-        assert response.status_code == 404
+        assert response.status_code == 400
 
 
 class TestCreateGateway:
