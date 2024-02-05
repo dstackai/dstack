@@ -9,8 +9,8 @@ from dstack._internal.server.services.jobs.configurators.extensions.vscode impor
 DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
 
 INSTALL_IPYKERNEL = (
-    f"(echo pip install ipykernel... && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
-    f'echo "no pip, ipykernel was not installed"'
+    "(echo pip install ipykernel... && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
+    'echo "no pip, ipykernel was not installed"'
 )
 
 

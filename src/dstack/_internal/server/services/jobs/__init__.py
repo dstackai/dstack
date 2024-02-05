@@ -4,12 +4,10 @@ import socket
 from datetime import timezone
 from typing import Dict, List, Optional
 
-from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.configurations import ConfigurationType
-from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import (
     Job,
     JobErrorCode,

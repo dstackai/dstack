@@ -123,7 +123,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     logger.info(*job_log(f"num relevance {len(relevant_instances)}", job_model))
     if relevant_instances:
-
         sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
         instance = sorted_instances[0]
 
@@ -250,7 +249,6 @@ async def _run_job(
             )
             continue
         else:
-
             job_provisioning_data = JobProvisioningData(
                 backend=backend.TYPE,
                 instance_type=offer.instance,

@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 
-from dstack import version
-
 DSTACK_DIR_PATH = Path("~/.dstack/").expanduser()
 
 SERVER_DIR_PATH = Path(os.getenv("DSTACK_SERVER_DIR", DSTACK_DIR_PATH / "server"))

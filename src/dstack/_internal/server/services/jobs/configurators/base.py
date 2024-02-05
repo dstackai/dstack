@@ -88,7 +88,7 @@ class JobConfigurator(ABC):
             entrypoint = ["/bin/sh", "-i", "-c"]
             commands = [_join_shell_commands(self._shell_commands())]
         else:  # custom docker image without commands
-            raise NotImplemented()  # TODO read docker image manifest
+            raise NotImplementedError()  # TODO read docker image manifest
         return entrypoint + commands
 
     def _app_specs(self) -> List[AppSpec]:

@@ -29,7 +29,6 @@ logger = get_logger(__name__)
 
 
 async def process_pools() -> None:
-
     async with get_session_ctx() as session:
         async with PROCESSING_POOL_LOCK:
             res = await session.scalars(
@@ -92,7 +91,6 @@ def instance_healthcheck(*, ports: Dict[int, int]) -> bool:
 
 
 async def terminate(instance_id: UUID) -> None:
-
     async with get_session_ctx() as session:
         instance = (
             await session.scalars(
@@ -120,7 +118,7 @@ async def _terminate_old_instance() -> None:
             .where(
                 InstanceModel.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE,
                 InstanceModel.deleted == False,
-                InstanceModel.job == None,
+                InstanceModel.job == None,  # noqa: E711
             )
             .options()
         )

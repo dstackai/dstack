@@ -69,7 +69,7 @@ LOCATIONS = [
     ("(Asia Pacific) East Asia", "eastasia"),
     ("(South America) Brazil South", "brazilsouth"),
 ]
-LOCATION_VALUES = [l[1] for l in LOCATIONS]
+LOCATION_VALUES = [loc[1] for loc in LOCATIONS]
 DEFAULT_LOCATIONS = LOCATION_VALUES
 MAIN_LOCATION = "eastus"
 
@@ -269,8 +269,8 @@ class AzureConfigurator(Configurator):
 
     def _get_locations_element(self, selected: List[str]) -> ConfigMultiElement:
         element = ConfigMultiElement()
-        for l in LOCATION_VALUES:
-            element.values.append(ConfigElementValue(value=l, label=l))
+        for loc in LOCATION_VALUES:
+            element.values.append(ConfigElementValue(value=loc, label=loc))
         element.selected = selected
         return element
 

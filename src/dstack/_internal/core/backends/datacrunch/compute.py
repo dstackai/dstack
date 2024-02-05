@@ -9,7 +9,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
 from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
-from dstack._internal.core.errors import BackendError, NoCapacityError
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -43,7 +43,7 @@ class DataCrunchCompute(Compute):
     def _get_offers_with_availability(
         self, offers: List[InstanceOffer]
     ) -> List[InstanceOfferWithAvailability]:
-        raw_availabilities: List[Dict] = self.api_client.client.instances.get_availabilities()  # type: ignore
+        raw_availabilities: List[Dict] = self.api_client.client.instances.get_availabilities()
 
         region_availabilities = {}
         for location in raw_availabilities:

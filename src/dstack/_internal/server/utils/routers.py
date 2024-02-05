@@ -1,11 +1,10 @@
 from typing import Dict, List, Optional
 
-from fastapi import HTTPException, Request, Response, status
+from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from packaging import version
 
 from dstack._internal.core.errors import ServerClientError
-from dstack._internal.server import settings
 
 
 def error_detail(msg: str, code: Optional[str] = None, **kwargs) -> Dict:

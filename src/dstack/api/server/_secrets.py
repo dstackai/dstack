@@ -19,7 +19,7 @@ class SecretsAPIClient(APIClientGroup):
         return parse_obj_as(List[Secret], resp.json())
 
     def get(self, project_name: str, repo_id: str, secret_name: str) -> Secret:
-        raise NotImplemented()
+        raise NotImplementedError()
         body = GetSecretsRequest(repo_id=repo_id)
         resp = self._request(f"/api/project/{project_name}/secrets/get", body=body.json())
         return parse_obj_as(Secret, resp.json())

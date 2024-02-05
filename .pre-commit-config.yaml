@@ -3,17 +3,14 @@ repos:
     rev: v0.2.0
     hooks:
       - id: ruff
-  - repo: https://github.com/psf/black
-    rev: 22.12.0
-    hooks:
-      - id: black
-        args: ['--config', 'pyconfig.toml']
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
-        name: isort (python)
-        args: ['--settings-file', 'pyconfig.toml']
+        name: ruff autofix F401
+        args: ['--fix', '--select', 'F401']
+        files: 'process_.*\.py|runs?\.py|pools?\.py'
+        exclude: 'versions|src/tests'
+      - id: ruff
+        name: ruff common
+        args: ['--fix']
+      - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.8.0
     hooks:
@@ -22,11 +19,3 @@ repos:
       files: '.*pools?\.py'
       exclude: 'versions|src/tests'
       additional_dependencies: [types-PyYAML, types-requests, pydantic, sqlalchemy]
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.2.0
-    hooks:
-      - id: ruff
-        name: ruff autofix
-        args: ['--fix', '--select', 'F401']
-        files: 'process_.*\.py|runs?\.py|pools?\.py'
-        exclude: 'versions|src/tests'

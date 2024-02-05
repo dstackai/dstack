@@ -29,7 +29,7 @@ client = TestClient(app)
 class TestListAndGetGateways:
     @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post(f"/api/project/main/gateways/list")
+        response = client.post("/api/project/main/gateways/list")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
@@ -281,7 +281,7 @@ class TestDefaultGateway:
     async def test_default_gateway_is_missing(self, test_db, session: AsyncSession):
         project = await create_project(session)
         backend = await create_backend(session, project.id)
-        gateway = await create_gateway(session, project.id, backend.id)
+        await create_gateway(session, project.id, backend.id)
 
         res = await get_project_default_gateway(session, project)
         assert res is None

@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional
 
 import requests
 from typing_extensions import Protocol

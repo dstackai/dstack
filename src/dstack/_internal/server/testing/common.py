@@ -290,7 +290,6 @@ async def create_pool(
     project: ProjectModel,
     pool_name: Optional[str] = None,
 ) -> PoolModel:
-
     pool_name = pool_name if pool_name is not None else DEFAULT_POOL_NAME
     pool = PoolModel(
         name=pool_name,

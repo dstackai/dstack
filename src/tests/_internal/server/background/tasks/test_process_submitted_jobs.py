@@ -17,7 +17,7 @@ from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, Pr
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, JobStatus
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 from dstack._internal.server.models import JobModel
-from dstack._internal.server.services.pools import list_project_pool, list_project_pool_models
+from dstack._internal.server.services.pools import list_project_pool_models
 from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
@@ -260,7 +260,7 @@ class TestProcessSubmittedJobs:
         assert jm.job_name == "test-run-0"
         assert jm.submission_num == 0
         assert jm.status == JobStatus.PROVISIONING
-        assert jm.error_code == None
+        assert jm.error_code is None
         assert (
             jm.job_spec_data
             == r"""{"job_num": 0, "job_name": "test-run-0", "app_specs": [], "commands": ["/bin/bash", "-i", "-c", "(echo pip install ipykernel... && pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo \"no pip, ipykernel was not installed\" && echo '' && echo To open in VS Code Desktop, use link below: && echo '' && echo '  vscode://vscode-remote/ssh-remote+test-run/workflow' && echo '' && echo 'To connect via SSH, use: `ssh test-run`' && echo '' && echo -n 'To exit, press Ctrl+C.' && tail -f /dev/null"], "env": {}, "gateway": null, "home_dir": "/root", "image_name": "dstackai/base:py3.10-0.4rc4-cuda-12.1", "max_duration": 21600, "registry_auth": null, "requirements": {"resources": {"cpu": {"min": 2, "max": null}, "memory": {"min": 8.0, "max": null}, "shm_size": null, "gpu": null, "disk": null}, "max_price": null, "spot": false}, "retry_policy": {"retry": false, "limit": null}, "working_dir": ".", "pool_name": null}"""

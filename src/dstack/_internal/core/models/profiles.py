@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 from pydantic import Field, confloat, root_validator, validator
 from typing_extensions import Annotated, Literal

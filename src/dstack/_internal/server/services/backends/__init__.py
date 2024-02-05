@@ -1,6 +1,5 @@
 import asyncio
 import heapq
-import time
 from typing import List, Optional, Tuple, Type, Union
 
 from sqlalchemy import delete, update
@@ -24,7 +23,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
 )
-from dstack._internal.core.models.runs import Job, Requirements
+from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import Configurator
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED

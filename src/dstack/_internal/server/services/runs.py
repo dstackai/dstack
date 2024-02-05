@@ -158,7 +158,6 @@ async def get_run_plan_by_requirements(
     requirements: Requirements,
     exclude_not_available=False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
-
     backends = await backends_services.get_project_backends(project=project)
     if profile.backends is not None:
         backends = [b for b in backends if b.TYPE in profile.backends]
@@ -210,7 +209,6 @@ async def create_instance(
         pool = await create_pool_model(session, project, pool_name)
 
     for backend, instance_offer in offers:
-
         logger.debug(
             "trying %s in %s/%s for $%0.4f per hour",
             instance_offer.instance.name,

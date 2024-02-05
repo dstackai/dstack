@@ -82,7 +82,7 @@ class DataCrunchAPIClient:
                 location=location,
                 os_volume={"name": "OS volume", "size": disk_size},
             )
-        except APIException as e:
+        except APIException:
             raise NoCapacityError()
 
         return instance

@@ -26,11 +26,9 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import JobSpec
+from dstack._internal.core.models.runs import JobSpec, Requirements, RunPlan, RunSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
-from dstack._internal.core.models.runs import Requirements
 from dstack._internal.core.models.runs import Run as RunModel
-from dstack._internal.core.models.runs import RunPlan, RunSpec
 from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock

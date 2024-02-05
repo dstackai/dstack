@@ -197,14 +197,9 @@ async def test_generate_instance_name(session: AsyncSession, test_db):
 async def test_pool_double_name(session: AsyncSession, test_db):
     user = await create_user(session=session)
     project = await create_project(session=session, owner=user)
-    pool1 = await services_pools.create_pool_model(
-        session=session, project=project, name="test_pool"
-    )
+    await services_pools.create_pool_model(session=session, project=project, name="test_pool")
     with pytest.raises(ValueError):
-
-        pool2 = await services_pools.create_pool_model(
-            session=session, project=project, name="test_pool"
-        )
+        await services_pools.create_pool_model(session=session, project=project, name="test_pool")
 
 
 @pytest.mark.asyncio
@@ -265,7 +260,7 @@ async def test_create_cloud_instance(session: AsyncSession, test_db):
 
     assert instance.name == "test_instance"
     assert instance.deleted == False
-    assert instance.deleted_at == None
+    assert instance.deleted_at is None
 
     # assert instance.job_provisioning_data == '{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "instance_id": "running_instance.id", "pool_id": "1b2b4c57-5851-487f-b92e-948f946dfa49", "hostname": "running_instance.ip", "region": "running_instance.location", "price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, "backend_data": null}'
     assert (

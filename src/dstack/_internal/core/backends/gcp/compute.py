@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
@@ -29,7 +29,6 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.server.models import ProjectModel, UserModel
-from dstack._internal.utils.random_names import generate_name
 
 
 class GCPCompute(Compute):
@@ -43,7 +42,6 @@ class GCPCompute(Compute):
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
-
         offers = get_catalog_offers(
             backend=BackendType.GCP,
             requirements=requirements,
@@ -90,7 +88,6 @@ class GCPCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> LaunchedInstanceInfo:
-
         project_id = project.name
         instance_name = instance_config.instance_name
 

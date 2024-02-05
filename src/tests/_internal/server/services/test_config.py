@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,10 +12,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel
 from dstack._internal.server.services.config import AzureConfig, ServerConfigManager
 from dstack._internal.server.testing.common import (
-    create_backend,
     create_project,
-    create_user,
-    get_auth_headers,
 )
 
 

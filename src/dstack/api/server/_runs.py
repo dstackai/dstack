@@ -21,7 +21,7 @@ from dstack.api.server._group import APIClientGroup
 class RunsAPIClient(APIClientGroup):
     def list(self, project_name: Optional[str], repo_id: Optional[str]) -> List[Run]:
         body = ListRunsRequest(project_name=project_name, repo_id=repo_id)
-        resp = self._request(f"/api/runs/list", body=body.json())
+        resp = self._request("/api/runs/list", body=body.json())
         return parse_obj_as(List[Run], resp.json())
 
     def get(self, project_name: str, run_name: str) -> Run:

@@ -302,7 +302,6 @@ async def add_remote(
     host: str,
     port: str,
 ) -> bool:
-
     pool_model = await get_or_create_default_pool_by_name(session, project, profile.pool_name)
 
     profile.pool_name = pool_model.name

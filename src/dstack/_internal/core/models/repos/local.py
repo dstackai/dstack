@@ -2,7 +2,6 @@ import tarfile
 from pathlib import Path
 from typing import BinaryIO, Optional
 
-from pydantic import BaseModel
 from typing_extensions import Literal
 
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo

@@ -85,7 +85,6 @@ def print_offers_table(
     instance_offers: Sequence[InstanceOfferWithAvailability],
     offers_limit: int = 3,
 ) -> None:
-
     pretty_req = requirements.pretty_format(resources_only=True)
     max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
     max_duration = (
@@ -340,7 +339,6 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         print_instance_table(instances)
 
     def _add(self, args: argparse.Namespace) -> None:
-
         super()._command(args)
 
         resources = Resources(

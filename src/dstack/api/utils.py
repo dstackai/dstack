@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 import yaml
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.configurations import AnyRunConfiguration, BaseConfiguration
+from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.configurations import parse as parse_configuration
 from dstack._internal.core.models.profiles import Profile, ProfilesConfig
 from dstack._internal.utils.path import PathLike, path_in_dir
@@ -52,7 +52,7 @@ def load_configuration(
     repo_dir = Path(repo_dir)
     work_dir = repo_dir / (work_dir or ".")
     if not path_in_dir(work_dir, repo_dir):
-        raise ConfigurationError(f"Working directory is outside of the repo")
+        raise ConfigurationError("Working directory is outside of the repo")
 
     if configuration_file is None:
         configuration_path = work_dir / ".dstack.yml"
@@ -61,7 +61,7 @@ def load_configuration(
     else:
         configuration_path = repo_dir / configuration_file
         if not path_in_dir(configuration_path, repo_dir):
-            raise ConfigurationError(f"Configuration file is outside of the repo")
+            raise ConfigurationError("Configuration file is outside of the repo")
 
     try:
         with open(configuration_path, "r") as f:

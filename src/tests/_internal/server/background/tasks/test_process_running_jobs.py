@@ -12,7 +12,6 @@ from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningDat
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.schemas.runner import HealthcheckResponse, JobStateEvent, PullResponse
-from dstack._internal.server.services.jobs.configurators.base import get_default_python_verison
 from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
@@ -151,9 +150,7 @@ class TestProcessRunningJobs:
             "dstack._internal.server.services.runner.ssh.RunnerTunnel"
         ) as RunnerTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock, patch.object(
-            settings, "SERVER_DIR_PATH", tmp_path
-        ):
+        ) as RunnerClientMock, patch.object(settings, "SERVER_DIR_PATH", tmp_path):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
                 job_states=[JobStateEvent(timestamp=1, state=JobStatus.RUNNING)],

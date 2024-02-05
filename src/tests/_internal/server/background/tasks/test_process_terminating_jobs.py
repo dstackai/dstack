@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,7 +65,7 @@ class TestProcessFinishedJobs:
                 ssh_proxy=None,
             ),
         )
-        with patch(f"{MODULE}.terminate_job_provisioning_data_instance") as terminate:
+        with patch(f"{MODULE}.terminate_job_provisioning_data_instance"):
             await process_finished_jobs()
         await session.refresh(job)
         assert job is not None
