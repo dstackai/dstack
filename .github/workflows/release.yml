@@ -248,3 +248,4 @@ jobs:
         run: |
           WHEEL=dstack_gateway-${{ env.VERSION }}-py3-none-any.whl
           aws s3 cp dist/$WHEEL "s3://dstack-gateway-downloads/release/$WHEEL"
+          echo "${{ env.VERSION }}" > aws s3 cp - "s3://dstack-gateway-downloads/release/latest-version"
