@@ -16,7 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.pools import Instance, Pool
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
+from dstack._internal.core.models.profiles import Profile, SpotPolicy
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.core.services.configs import ConfigManager
@@ -265,7 +265,9 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             "add", help="Add instance to pool", formatter_class=self._parser.formatter_class
         )
         add_parser.add_argument(
-            "--pool", dest="pool_name", help="The name of the pool", required=True
+            "--pool",
+            dest="pool_name",
+            help="The name of the pool. If not set, the default pool will be used",
         )
         add_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
@@ -293,7 +295,9 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             formatter_class=self._parser.formatter_class,
         )
         remove_parser.add_argument(
-            "--pool", dest="pool_name", help="The name of the pool", required=True
+            "--pool",
+            dest="pool_name",
+            help="The name of the pool. If not set, the default pool will be used",
         )
         remove_parser.add_argument(
             "--name", dest="instance_name", help="The name of the instance", required=True
@@ -339,8 +343,6 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
 
         super()._command(args)
 
-        pool_name: str = DEFAULT_POOL_NAME if args.pool_name is None else args.pool_name
-
         resources = Resources(
             cpu=args.cpu,
             memory=args.memory,
@@ -356,7 +358,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
 
         profile = load_profile(Path.cwd(), args.profile)
         apply_profile_args(args, profile)
-        profile.pool_name = pool_name
+        profile.pool_name = args.pool_name
 
         # Add remote instance
         if args.remote:
@@ -378,7 +380,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         self.api.ssh_identity_file = ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
 
         with console.status("Getting instances..."):
-            offers = self.api.runs.get_offers(profile, requirements)
+            pool_name, offers = self.api.runs.get_offers(profile, requirements)
 
         print_offers_table(pool_name, profile, requirements, offers)
         if not args.yes and not confirm_ask("Continue?"):

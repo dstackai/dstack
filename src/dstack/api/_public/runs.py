@@ -7,7 +7,7 @@ from abc import ABC
 from copy import copy
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import requests
 from websocket import WebSocketApp
@@ -367,7 +367,7 @@ class RunCollection:
 
     def get_offers(
         self, profile: Profile, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    ) -> Tuple[str, List[InstanceOfferWithAvailability]]:
         return self._api_client.runs.get_offers(self._project, profile, requirements)
 
     def create_instance(self, pool_name: str, profile: Profile, requirements: Requirements):

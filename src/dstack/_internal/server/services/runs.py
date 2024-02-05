@@ -24,7 +24,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
+from dstack._internal.core.models.profiles import CreationPolicy, Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     InstanceStatus,
@@ -45,7 +45,6 @@ from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
-    PoolModel,
     ProjectModel,
     RunModel,
     UserModel,
@@ -65,6 +64,7 @@ from dstack._internal.server.services.jobs.configurators.base import (
 )
 from dstack._internal.server.services.pools import (
     create_pool_model,
+    get_or_create_default_pool_by_name,
     get_pool_instances,
     instance_model_to_instance,
 )
@@ -384,18 +384,7 @@ async def submit_run(
     else:
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
-    pool_name = (
-        DEFAULT_POOL_NAME if run_spec.profile.pool_name is None else run_spec.profile.pool_name
-    )
-
-    # create pool
-    pools = (
-        await session.scalars(
-            select(PoolModel).where(PoolModel.name == pool_name, PoolModel.deleted == False)
-        )
-    ).all()
-    if not pools:
-        await create_pool_model(session, project, pool_name)
+    pool = await get_or_create_default_pool_by_name(session, project, run_spec.profile.pool_name)
 
     run_model = RunModel(
         id=uuid.uuid4(),
@@ -414,7 +403,7 @@ async def submit_run(
         await gateways.register_service_jobs(session, project, run_spec.run_name, jobs)
 
     for job in jobs:
-        job.job_spec.pool_name = pool_name
+        job.job_spec.pool_name = pool.name
         job_model = create_job_model_for_new_submission(
             run_model=run_model,
             job=job,

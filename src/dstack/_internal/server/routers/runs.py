@@ -20,7 +20,10 @@ from dstack._internal.server.schemas.runs import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
-from dstack._internal.server.services.pools import generate_instance_name
+from dstack._internal.server.services.pools import (
+    generate_instance_name,
+    get_or_create_default_pool_by_name,
+)
 
 root_router = APIRouter(
     prefix="/api/runs",
@@ -68,11 +71,17 @@ async def get_offers(
     body: GetOffersRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> List[InstanceOfferWithAvailability]:
+) -> Tuple[str, List[InstanceOfferWithAvailability]]:
     _, project = user_project
+
+    active_pool = await get_or_create_default_pool_by_name(
+        session, project, body.profile.pool_name
+    )
+
     offers = await runs.get_run_plan_by_requirements(project, body.profile, body.requirements)
     instances = [instance for _, instance in offers]
-    return instances
+
+    return active_pool.name, instances
 
 
 @project_router.post("/create_instance")

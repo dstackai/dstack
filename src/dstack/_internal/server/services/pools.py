@@ -50,6 +50,29 @@ async def get_pool(
     return pool
 
 
+async def get_or_create_default_pool_by_name(
+    session: AsyncSession, project: ProjectModel, pool_name: Optional[str]
+) -> PoolModel:
+    active_pool = None
+    if pool_name is None:
+        default_pool = None
+        pools = [
+            pool
+            for pool in (await list_project_pool_models(session, project))
+            if project.default_pool == pool
+        ]
+        if pools:
+            default_pool = pools[0]
+        if not default_pool:
+            default_pool = await create_pool_model(session, project, DEFAULT_POOL_NAME)
+        active_pool = default_pool
+    else:
+        active_pool = await get_pool(session, project, pool_name)
+        if active_pool is None:
+            active_pool = await create_pool_model(session, project, DEFAULT_POOL_NAME)
+    return active_pool
+
+
 def pool_model_to_pool(pool_model: PoolModel) -> Pool:
     total = len(pool_model.instances)
     available = sum(instance.status.is_available() for instance in pool_model.instances)
@@ -268,6 +291,8 @@ async def add_remote(
     host: str,
     port: str,
 ) -> bool:
+
+    pool_model = await get_or_create_default_pool_by_name(session, project, profile.pool_name)
 
     pool_name = profile.pool_name
     if instance_name is None:

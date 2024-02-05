@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from pydantic import parse_obj_as
 
@@ -31,10 +31,10 @@ class RunsAPIClient(APIClientGroup):
 
     def get_offers(
         self, project_name: str, profile: Profile, requirements: Requirements
-    ) -> List[InstanceOfferWithAvailability]:
+    ) -> Tuple[str, List[InstanceOfferWithAvailability]]:
         body = GetOffersRequest(profile=profile, requirements=requirements)
         resp = self._request(f"/api/project/{project_name}/runs/get_offers", body=body.json())
-        return parse_obj_as(List[InstanceOfferWithAvailability], resp.json())
+        return parse_obj_as(Tuple[str, List[InstanceOfferWithAvailability]], resp.json())
 
     def create_instance(
         self, project_name: str, pool_name: str, profile: Profile, requirements: Requirements

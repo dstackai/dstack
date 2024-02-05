@@ -87,7 +87,7 @@ class RunCommand(APIBaseCommand):
         self._parser.add_argument(
             "--pool",
             dest="pool_name",
-            help="The name of the pool",
+            help="The name of the pool. If not set, the default pool will be used",
         )
         self._parser.add_argument(
             "--reuse",
