@@ -291,7 +291,7 @@ async def register_service_jobs(
         raise ServerClientError("Domain is required for gateway")
 
     if (conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)) is None:
-        raise ServerClientError(f"Gateway is not connected")
+        raise ServerClientError("Gateway is not connected")
 
     try:
         logger.debug("Running service preflight: %s", job.job_spec.gateway.hostname)
@@ -303,7 +303,7 @@ async def register_service_jobs(
             job.job_spec.gateway.options,
         )
     except SSHError:
-        raise ServerClientError(f"Gateway tunnel is not working")
+        raise ServerClientError("Gateway tunnel is not working")
     except httpx.RequestError as e:
         raise GatewayError(f"Gateway is not working: {e}")
 
@@ -320,7 +320,7 @@ async def init_gateways(session: AsyncSession):
         return_exceptions=True,
     ):
         if isinstance(error, Exception):
-            logger.warning(f"Failed to connect to gateway %s: %s", gateway.ip_address, error)
+            logger.warning("Failed to connect to gateway %s: %s", gateway.ip_address, error)
             continue
 
     if settings.SKIP_GATEWAY_UPDATE:
@@ -328,9 +328,6 @@ async def init_gateways(session: AsyncSession):
         return
 
     build = get_dstack_runner_version()
-    if build == "latest":
-        logger.debug("Skipping gateway update due to `latest` version being used")
-        return
 
     for conn, error in await gather_map_async(
         await gateway_connections_pool.all(),
@@ -338,7 +335,7 @@ async def init_gateways(session: AsyncSession):
         return_exceptions=True,
     ):
         if isinstance(error, Exception):
-            logger.warning(f"Failed to update gateway %s: %s", conn.ip_address, error)
+            logger.warning("Failed to update gateway %s: %s", conn.ip_address, error)
             continue
 
 

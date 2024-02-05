@@ -1,13 +1,13 @@
 import os
 import re
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from typing import List, Optional
 
 import git
 import requests
 import yaml
 
-from dstack import version
 from dstack._internal import settings
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -104,7 +104,10 @@ def get_shim_commands(
 def get_dstack_runner_version() -> str:
     if settings.DSTACK_VERSION is not None:
         return settings.DSTACK_VERSION
-    return os.environ.get("DSTACK_RUNNER_VERSION", None) or get_latest_runner_build() or "latest"
+    version = os.environ.get("DSTACK_RUNNER_VERSION", None)
+    if version is None and settings.DSTACK_USE_LATEST_FROM_BRANCH:
+        version = get_latest_runner_build()
+    return version or "latest"
 
 
 def get_cloud_config(**config) -> str:
@@ -193,12 +196,16 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
     return commands
 
 
+@lru_cache()  # Restart the server to find the latest build
 def get_latest_runner_build() -> Optional[str]:
     owner_repo = "dstackai/dstack"
     workflow_id = "build.yml"
     version_offset = 150
 
-    repo = git.Repo(os.path.abspath(os.path.dirname(__file__)), search_parent_directories=True)
+    try:
+        repo = git.Repo(os.path.abspath(os.path.dirname(__file__)), search_parent_directories=True)
+    except git.InvalidGitRepositoryError:
+        return None
     for remote in repo.remotes:
         if re.search(rf"[@/]github\.com[:/]{owner_repo}\.", remote.url):
             break
@@ -222,7 +229,7 @@ def get_latest_runner_build() -> Optional[str]:
         try:
             if repo.is_ancestor(run["head_sha"], head):
                 ver = str(run["run_number"] + version_offset)
-                logger.debug(f"Found the latest runner build: %s", ver)
+                logger.debug("Found the latest runner build: %s", ver)
                 return ver
         except git.GitCommandError as e:
             if "Not a valid commit name" not in e.stderr:
@@ -232,13 +239,17 @@ def get_latest_runner_build() -> Optional[str]:
 
 def get_dstack_gateway_wheel(build: str) -> str:
     channel = "release" if settings.DSTACK_RELEASE else "stgn"
-    return f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}/dstack_gateway-{build}-py3-none-any.whl"
+    base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
+    if build == "latest":
+        r = requests.get(f"{base_url}/latest-version")
+        r.raise_for_status()
+        build = r.text.strip()
+        logger.debug("Found the latest gateway build: %s", build)
+    return f"{base_url}/dstack_gateway-{build}-py3-none-any.whl"
 
 
 def get_dstack_gateway_commands() -> List[str]:
     build = get_dstack_runner_version()
-    if build == "latest":
-        raise ValueError("`latest` is not appropriate version for a gateway")
     return [
         "mkdir -p /home/ubuntu/dstack",
         "python3 -m venv /home/ubuntu/dstack/blue",
