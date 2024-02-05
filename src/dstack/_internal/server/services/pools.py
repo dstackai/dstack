@@ -2,23 +2,30 @@ import asyncio
 from datetime import timezone
 from typing import Dict, List, Optional, Sequence
 
+import gpuhunt
 from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.backends.base.offers import (
+    offer_to_catalog_item,
+    requirements_to_query_filter,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Gpu,
     InstanceAvailability,
+    InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
     Resources,
 )
 from dstack._internal.core.models.pools import Instance, Pool
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData
+from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
+from dstack._internal.server import settings
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel
 from dstack._internal.utils import random_names
 from dstack._internal.utils.common import get_current_datetime
@@ -197,8 +204,12 @@ async def list_deleted_pools(
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
-    offer: InstanceOfferWithAvailability = parse_raw_as(InstanceOfferWithAvailability, instance_model.offer)  # type: ignore[operator]
-    jpd: JobProvisioningData = parse_raw_as(JobProvisioningData, instance_model.job_provisioning_data)  # type: ignore[operator]
+    offer: InstanceOfferWithAvailability = parse_raw_as(  # type: ignore[operator]
+        InstanceOfferWithAvailability, instance_model.offer
+    )
+    jpd: JobProvisioningData = parse_raw_as(  # type: ignore[operator]
+        JobProvisioningData, instance_model.job_provisioning_data
+    )
 
     instance = Instance(
         backend=offer.backend,
@@ -361,3 +372,47 @@ async def add_remote(
     await session.commit()
 
     return True
+
+
+def filter_pool_instances(
+    pool_instances: List[InstanceModel],
+    profile: Profile,
+    resources: ResourcesSpec,
+    *,
+    status: Optional[InstanceStatus] = None,
+) -> List[InstanceModel]:
+    """
+    Filter instances by `instance_name`, `backends`, `resources`, `spot_policy`, `max_price`, `status`
+    """
+    instances: List[InstanceModel] = []
+    candidates: List[InstanceModel] = []
+    for instance in pool_instances:
+        if profile.instance_name is not None and instance.name != profile.instance_name:
+            continue
+        if status is not None and instance.status != status:
+            continue
+
+        # TODO: remove on prod
+        if settings.LOCAL_BACKEND_ENABLED and instance.backend == BackendType.LOCAL:
+            instances.append(instance)
+            continue
+
+        if profile.backends is not None and instance.backend not in profile.backends:
+            continue
+        candidates.append(instance)
+
+    requirements = Requirements(
+        resources=resources,
+        max_price=profile.max_price,
+        spot={
+            SpotPolicy.AUTO: None,
+            SpotPolicy.SPOT: True,
+            SpotPolicy.ONDEMAND: False,
+        }[profile.spot_policy],
+    )
+    query_filter = requirements_to_query_filter(requirements)
+    for instance in candidates:
+        catalog_item = offer_to_catalog_item(parse_raw_as(InstanceOffer, instance.offer))  # type: ignore[operator]
+        if gpuhunt.matches(catalog_item, query_filter):
+            instances.append(instance)
+    return instances

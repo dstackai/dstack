@@ -30,8 +30,12 @@ from dstack._internal.server.services.jobs import (
     SUBMITTED_PROCESSING_JOBS_LOCK,
 )
 from dstack._internal.server.services.logging import job_log
-from dstack._internal.server.services.pools import get_pool_instances, list_project_pool_models
-from dstack._internal.server.services.runs import check_relevance, run_model_to_run
+from dstack._internal.server.services.pools import (
+    filter_pool_instances,
+    get_pool_instances,
+    list_project_pool_models,
+)
+from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
@@ -113,11 +117,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     # pool capacity
 
     pool_instances = await get_pool_instances(session, project_model, run_pool)
-    available_instanses = [p for p in pool_instances if p.status == InstanceStatus.READY]
-    relevant_instances: List[InstanceModel] = []
-    for instance in available_instanses:
-        if check_relevance(profile, run_spec.configuration.resources, instance):
-            relevant_instances.append(instance)
+    relevant_instances = filter_pool_instances(
+        pool_instances, profile, run_spec.configuration.resources, status=InstanceStatus.READY
+    )
 
     logger.info(*job_log(f"num relevance {len(relevant_instances)}", job_model))
     if relevant_instances:
