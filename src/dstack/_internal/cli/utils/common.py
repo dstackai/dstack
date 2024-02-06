@@ -11,7 +11,7 @@ from rich.traceback import Traceback
 
 from dstack._internal.core.errors import CLIError, DstackError
 
-colors = {
+_colors = {
     "secondary": "grey58",
     "success": "green",
     "warning": "yellow",
@@ -19,7 +19,7 @@ colors = {
     "code": "bold sea_green3",
 }
 
-console = Console(theme=Theme(colors))
+console = Console(theme=Theme(_colors))
 
 
 def cli_error(e: DstackError) -> CLIError:

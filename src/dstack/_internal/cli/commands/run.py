@@ -13,7 +13,7 @@ from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
     run_configurators_mapping,
 )
-from dstack._internal.cli.utils.common import colors, confirm_ask, console
+from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
@@ -129,13 +129,13 @@ class RunCommand(APIBaseCommand):
 
         if creation_policy == CreationPolicy.REUSE and termination_policy_idle is not None:
             console.print(
-                f'[{colors["warning"]}]If the flag --reuse is set, the argument --idle-duration will be skipped[/]'
+                "[warning]If the flag --reuse is set, the argument --idle-duration will be skipped[/]"
             )
             termination_policy = TerminationPolicy.DONT_DESTROY
 
         if args.instance_name is not None and termination_policy_idle is not None:
             console.print(
-                f'[{colors["warning"]}]--idle-duration won\'t be applied to the instance {args.instance_name!r}[/]'
+                f"[warning]--idle-duration won't be applied to the instance {args.instance_name!r}[/]"
             )
             termination_policy = TerminationPolicy.DONT_DESTROY
 
