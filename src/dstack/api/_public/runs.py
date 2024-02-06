@@ -9,11 +9,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
-import requests
 from websocket import WebSocketApp
 
 import dstack.api as api
-from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, SpotPolicy
@@ -477,10 +476,8 @@ class RunCollection:
         try:
             run = self._api_client.runs.get(self._project, run_name)
             return self._model_to_run(run)
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code != 404:
-                raise
-        return None
+        except ResourceNotExistsError:
+            return None
 
     def _model_to_run(self, run: RunModel) -> Run:
         return Run(
