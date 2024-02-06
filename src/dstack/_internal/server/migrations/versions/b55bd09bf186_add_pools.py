@@ -1,8 +1,8 @@
 """add pools
 
-Revision ID: dad000707a2c
+Revision ID: b55bd09bf186
 Revises: d3e8af4786fa
-Create Date: 2024-02-05 07:42:58.102664
+Create Date: 2024-02-06 08:44:44.235928
 
 """
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "dad000707a2c"
+revision = "b55bd09bf186"
 down_revision = "d3e8af4786fa"
 branch_labels = None
 depends_on = None
@@ -93,6 +93,7 @@ def upgrade() -> None:
         sa.Column("offer", sa.String(length=4000), nullable=False),
         sa.Column("resource_spec_data", sa.String(length=4000), nullable=True),
         sa.Column("job_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=True),
+        sa.Column("last_job_processed_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(["job_id"], ["jobs.id"], name=op.f("fk_instances_job_id_jobs")),
         sa.ForeignKeyConstraint(
             ["pool_id"], ["pools.id"], name=op.f("fk_instances_pool_id_pools")

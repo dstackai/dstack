@@ -124,9 +124,11 @@ class Profile(ForbidExtra):
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
     )
-    _validate_termination_idle_time = validator(
-        "termination_idle_time", pre=True, allow_reuse=True
-    )(parse_max_duration)
+
+    # TODO: fix deserialization
+    # _validate_termination_idle_time = validator(
+    #     "termination_idle_time", pre=True, allow_reuse=True
+    # )(parse_max_duration)
 
 
 class ProfilesConfig(ForbidExtra):

@@ -27,6 +27,7 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.server import settings
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel
+from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -111,6 +112,7 @@ async def create_pool_model(session: AsyncSession, project: ProjectModel, name: 
 
     session.add(pool)
     await session.commit()
+    await session.refresh(pool)
 
     return pool
 
@@ -347,6 +349,8 @@ async def add_remote(
         name=instance_name,
         project=project,
         pool=pool_model,
+        created_at=common_utils.get_current_datetime(),
+        started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PENDING,
         job_provisioning_data=local.json(),
         offer=offer.json(),

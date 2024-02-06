@@ -23,7 +23,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import CreationPolicy, Profile
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -158,7 +158,8 @@ async def get_run_plan_by_requirements(
     requirements: Requirements,
     exclude_not_available=False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
-    backends = await backends_services.get_project_backends(project=project)
+    backends: List[Backend] = await backends_services.get_project_backends(project=project)
+
     if profile.backends is not None:
         backends = [b for b in backends if b.TYPE in profile.backends]
 
@@ -258,6 +259,8 @@ async def create_instance(
             name=instance_name,
             project=project,
             pool=pool,
+            created_at=common_utils.get_current_datetime(),
+            started_at=common_utils.get_current_datetime(),
             status=InstanceStatus.STARTING,
             backend=backend.TYPE,
             region=instance_offer.region,
@@ -290,30 +293,43 @@ async def get_run_plan(
     user: UserModel,
     run_spec: RunSpec,
 ) -> RunPlan:
-    pool_instances = await get_pool_instances(session, project, run_spec.profile.pool_name)
-    pool_offers = []
+    profile = run_spec.profile
 
-    if run_spec.profile.creation_policy == CreationPolicy.REUSE:
-        for instance in filter_pool_instances(
-            pool_instances, run_spec.profile, run_spec.configuration.resources
-        ):
-            pool_offers.append(
-                pydantic.parse_raw_as(InstanceOfferWithAvailability, instance.offer)
-            )
+    # TODO: get_or_create_default_pool
+
+    pool_name = profile.pool_name
+    if profile.pool_name is None:
+        try:
+            pool_name = project.default_pool.name
+        except Exception as e:
+            pool_name = DEFAULT_POOL_NAME  # TODO: get pool from project
+
+    pool_instances = [
+        instance
+        for instance in (await get_pool_instances(session, project, pool_name))
+        if not instance.deleted
+    ]
+
+    pool_offers: List[InstanceOfferWithAvailability] = []
+
+    for instance in filter_pool_instances(
+        pool_instances, profile, run_spec.configuration.resources
+    ):
+        pool_offers.append(pydantic.parse_raw_as(InstanceOfferWithAvailability, instance.offer))
 
     backends = await backends_services.get_project_backends(project=project)
-    if run_spec.profile.backends is not None:
-        backends = [b for b in backends if b.TYPE in run_spec.profile.backends]
+    if profile.backends is not None:
+        backends = [b for b in backends if b.TYPE in profile.backends]
 
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
     jobs = get_jobs_from_run_spec(run_spec)
     job_plans = []
 
-    creation_policy = run_spec.profile.creation_policy
+    creation_policy = profile.creation_policy
 
     for job in jobs:
-        job_offers = []
+        job_offers: List[InstanceOfferWithAvailability] = []
         job_offers.extend(pool_offers)
 
         if creation_policy is None or creation_policy == CreationPolicy.REUSE_OR_CREATE:
@@ -334,6 +350,8 @@ async def get_run_plan(
             max_price=max((offer.price for offer in job_offers), default=None),
         )
         job_plans.append(job_plan)
+
+    run_spec.profile.termination_idle_time = None
 
     run_spec.run_name = run_name  # restore run_name
     run_plan = RunPlan(
@@ -367,6 +385,9 @@ async def submit_run(
         )
     else:
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
+
+    # TODO: fix deserialize
+    run_spec.profile.termination_idle_time = "300s"
 
     pool = await get_or_create_default_pool_by_name(session, project, run_spec.profile.pool_name)
 
@@ -497,6 +518,9 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
             jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
 
     run_spec = RunSpec.parse_raw(run_model.run_spec)
+
+    # TODO: fix deserialization
+    run_spec.profile.termination_idle_time = None
 
     latest_job_submission = None
     if include_job_submissions:

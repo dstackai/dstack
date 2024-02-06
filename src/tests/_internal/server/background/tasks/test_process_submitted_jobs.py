@@ -17,11 +17,12 @@ from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, Pr
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, JobStatus
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 from dstack._internal.server.models import JobModel
-from dstack._internal.server.services.pools import list_project_pool_models
+from dstack._internal.server.services.pools import (
+    get_or_create_default_pool_by_name,
+)
 from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
-    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -206,13 +207,7 @@ class TestProcessSubmittedJobs:
             session,
             project_id=project.id,
         )
-        pools = await list_project_pool_models(session, project)
-        pool = None
-        for pool_item in pools:
-            if pool_item == DEFAULT_POOL_NAME:
-                pool = pool_item
-        if pool is None:
-            pool = await create_pool(session, project)
+        pool = await get_or_create_default_pool_by_name(session, project, pool_name=None)
         resources = MakeResources(cpu=2, memory="12GB")
         await create_instance(session, project, pool, InstanceStatus.READY, resources)
         await session.refresh(pool)

@@ -99,6 +99,9 @@ async def terminate(instance_id: UUID) -> None:
                 .options(joinedload(InstanceModel.project))
             )
         ).one()
+
+        # TODO: need lock
+
         jpd = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)  # type: ignore[operator]
         BACKEND_TYPE = jpd.backend
         backends = await backends_services.get_project_backends(project=instance.project)
@@ -110,8 +113,17 @@ async def terminate(instance_id: UUID) -> None:
             backend.compute().terminate_instance, jpd.instance_id, jpd.region, jpd.backend_data
         )
 
+        instance.deleted = True
+        instance.deleted_at = get_current_datetime()
+        instance.finished_at = get_current_datetime()
+        instance.status = InstanceStatus.TERMINATED
 
-async def _terminate_old_instance() -> None:
+        logger.info("instance %s terminated", instance.name)
+
+        await session.commit()
+
+
+async def terminate_idle_instance() -> None:
     async with get_session_ctx() as session:
         res = await session.execute(
             select(InstanceModel)
@@ -120,25 +132,40 @@ async def _terminate_old_instance() -> None:
                 InstanceModel.deleted == False,
                 InstanceModel.job == None,  # noqa: E711
             )
-            .options()
+            .options(joinedload(InstanceModel.project))
         )
         instances = res.scalars().all()
 
+        # TODO: need lock
+
         for instance in instances:
-            if instance.finished_at is None:
+            if instance.last_job_processed_at is None:
                 continue
 
             delta = datetime.timedelta(
                 seconds=parse_pretty_duration(instance.termination_idle_time)
             )
-            if instance.finished_at + delta > get_current_datetime():
-                jpd: JobProvisioningData = parse_raw_as(  # type: ignore[operator]
+            if instance.last_job_processed_at.replace(
+                tzinfo=datetime.timezone.utc
+            ) + delta < get_current_datetime().replace(tzinfo=datetime.timezone.utc):
+                jpd: JobProvisioningData = parse_raw_as(
                     JobProvisioningData, instance.job_provisioning_data
-                ).backend
+                )
                 await terminate_job_provisioning_data_instance(
                     project=instance.project, job_provisioning_data=jpd
                 )
                 instance.deleted = True
                 instance.deleted_at = get_current_datetime()
+                instance.finished_at = get_current_datetime()
+                instance.status = InstanceStatus.TERMINATED
+
+                idle_time = get_current_datetime().replace(
+                    tzinfo=datetime.timezone.utc
+                ) - instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+                logger.info(
+                    "instance %s terminated by termination policy: idle time %ss",
+                    instance.name,
+                    str(idle_time.seconds),
+                )
 
         await session.commit()

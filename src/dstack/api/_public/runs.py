@@ -388,7 +388,7 @@ class RunCollection:
         instance_name: Optional[str] = None,
         creation_policy: Optional[CreationPolicy] = None,
         termination_policy: Optional[TerminationPolicy] = None,
-        termination_policy_idle: Optional[Union[int, str]] = None,
+        termination_policy_idle: Union[int, str] = 5 * 60,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`
@@ -422,7 +422,7 @@ class RunCollection:
             instance_name=instance_name,
             creation_policy=creation_policy,
             termination_policy=termination_policy,
-            termination_idle_time=None,  # TODO: fix deserialize
+            termination_idle_time=None,  # TODO: fix deserialization
         )
         run_spec = RunSpec(
             run_name=run_name,

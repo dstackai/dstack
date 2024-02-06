@@ -17,11 +17,7 @@ from dstack._internal.cli.utils.common import colors, confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
-from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_NAME,
-    CreationPolicy,
-    TerminationPolicy,
-)
+from dstack._internal.core.models.profiles import CreationPolicy, TerminationPolicy
 from dstack._internal.core.models.runs import JobErrorCode
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import parse_pretty_duration
@@ -118,7 +114,7 @@ class RunCommand(APIBaseCommand):
             self._parser.print_help()
             return
 
-        termination_policy_idle = 5 * 60
+        termination_policy_idle = 5 * 60  # 5 minutes by default
         termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
 
         if args.idle_duration is not None:
@@ -135,14 +131,12 @@ class RunCommand(APIBaseCommand):
             console.print(
                 f'[{colors["warning"]}]If the flag --reuse is set, the argument --idle-duration will be skipped[/]'
             )
-            termination_policy_idle = None
             termination_policy = TerminationPolicy.DONT_DESTROY
 
         if args.instance_name is not None and termination_policy_idle is not None:
             console.print(
                 f'[{colors["warning"]}]--idle-duration won\'t be applied to the instance {args.instance_name!r}[/]'
             )
-            termination_policy_idle = None
             termination_policy = TerminationPolicy.DONT_DESTROY
 
         super()._command(args)
@@ -165,8 +159,6 @@ class RunCommand(APIBaseCommand):
             known, unknown = parser.parse_known_args(args.unknown)
             configurator.apply(known, unknown, conf)
 
-            pool_name = DEFAULT_POOL_NAME if args.pool_name is None else args.pool_name
-
             with console.status("Getting run plan..."):
                 run_plan = self.api.runs.get_plan(
                     configuration=conf,
@@ -179,11 +171,11 @@ class RunCommand(APIBaseCommand):
                     max_price=profile.max_price,
                     working_dir=args.working_dir,
                     run_name=args.run_name,
-                    pool_name=pool_name,
+                    pool_name=args.pool_name,
                     instance_name=args.instance_name,
                     creation_policy=creation_policy,
                     termination_policy=termination_policy,
-                    termination_policy_idle=f"{termination_policy_idle}s",
+                    termination_policy_idle=termination_policy_idle,
                 )
         except ConfigurationError as e:
             raise CLIError(str(e))

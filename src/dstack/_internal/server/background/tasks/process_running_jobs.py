@@ -156,6 +156,7 @@ async def _process_job(job_id: UUID):
                     job_model.status = JobStatus.FAILED
                     job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
                     job_model.used_instance_id = job_model.instance.id
+                    job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
                     job_model.instance = None
 
         else:  # fails are not acceptable
@@ -205,6 +206,7 @@ async def _process_job(job_id: UUID):
                 job_model.status = JobStatus.FAILED
                 job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
                 job_model.used_instance_id = job_model.instance.id
+                job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
                 job_model.instance = None
                 if job.is_retry_active():
                     if job_submission.job_provisioning_data.instance_type.resources.spot:

@@ -90,6 +90,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     # check default pool
     pool = project_model.default_pool
     if pool is None:
+        # TODO: get_or_create_default_pool...
         pools = await list_project_pool_models(session, job_model.project)
         for pool_item in pools:
             if pool_item.id == job_model.project.default_pool_id:
@@ -168,14 +169,16 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_model.status = JobStatus.PROVISIONING
 
         im = InstanceModel(
-            name=job.job_spec.job_name,
+            name=job.job_spec.job_name,  # TODO: make new name
             project=project_model,
             pool=pool,
+            created_at=common_utils.get_current_datetime(),
+            started_at=common_utils.get_current_datetime(),
             status=InstanceStatus.BUSY,
             job_provisioning_data=job_provisioning_data.json(),
             offer=offer.json(),
             termination_policy=profile.termination_policy,
-            termination_idle_time="300",  # TODO: fix deserailize
+            termination_idle_time=str(profile.termination_idle_time),
             job=job_model,
             backend=offer.backend,
             price=offer.price,

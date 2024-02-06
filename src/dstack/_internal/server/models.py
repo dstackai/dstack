@@ -280,6 +280,7 @@ class InstanceModel(BaseModel):
     status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
     status_message: Mapped[Optional[str]] = mapped_column(String(50))
 
+    # VM
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
 
@@ -300,6 +301,7 @@ class InstanceModel(BaseModel):
     # current job
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
     job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance")
+    last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # + # job_id: Optional[FK] (current job)
     # ip address

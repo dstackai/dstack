@@ -101,6 +101,7 @@ async def _process_job(job_id):
             if job_model.instance is not None:
                 job_model.used_instance_id = job_model.instance.id
                 job_model.instance.status = InstanceStatus.READY
+                job_model.instance.last_job_processed_at = get_current_datetime()
                 job_model.instance = None
             logger.info(*job_log("marked as removed", job_model))
         except Exception as e:

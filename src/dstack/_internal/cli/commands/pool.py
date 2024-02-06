@@ -16,7 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
 )
 from dstack._internal.core.models.pools import Instance, Pool
-from dstack._internal.core.models.profiles import Profile, SpotPolicy
+from dstack._internal.core.models.profiles import Profile, SpotPolicy, TerminationPolicy
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.core.services.configs import ConfigManager
@@ -358,6 +358,12 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         apply_profile_args(args, profile)
         profile.pool_name = args.pool_name
 
+        # TODO: add full support
+        termination_policy_idle = 5 * 60  # 5 minutes by default
+        termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+        profile.termination_idle_time = str(termination_policy_idle)
+        profile.termination_policy = termination_policy
+
         # Add remote instance
         if args.remote:
             result = self.api.client.pool.add_remote(
@@ -386,7 +392,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             return
 
         try:
-            with console.status("Submitting instance..."):
+            with console.status("Creating instance..."):
                 self.api.runs.create_instance(pool_name, profile, requirements)
         except ServerClientError as e:
             raise CLIError(e.msg)
