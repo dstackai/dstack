@@ -301,7 +301,7 @@ async def get_run_plan(
     if profile.pool_name is None:
         try:
             pool_name = project.default_pool.name
-        except Exception as e:
+        except Exception:
             pool_name = DEFAULT_POOL_NAME  # TODO: get pool from project
 
     pool_instances = [

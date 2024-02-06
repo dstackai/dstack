@@ -91,7 +91,7 @@ async def create_pool(
 
 
 @router.post("/show")  # type: ignore[misc]
-async def how_pool(
+async def show_pool(
     body: schemas.CreatePoolRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
