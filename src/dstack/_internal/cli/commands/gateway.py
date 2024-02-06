@@ -60,7 +60,7 @@ class GatewayCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        # TODO handle 404 and other errors
+        # TODO handle errors
         args.subfunc(args)
 
     def _list(self, args: argparse.Namespace):
