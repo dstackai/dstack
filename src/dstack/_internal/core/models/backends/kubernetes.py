@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 
 from pydantic import BaseModel
 from typing_extensions import Literal
@@ -7,8 +7,8 @@ from dstack._internal.core.models.common import ForbidExtra
 
 
 class KubernetesNetworkingConfig(ForbidExtra):
-    ssh_host: str
-    ssh_port: int
+    ssh_host: Optional[str]
+    ssh_port: Optional[int]
 
 
 class KubernetesConfigInfo(BaseModel):
