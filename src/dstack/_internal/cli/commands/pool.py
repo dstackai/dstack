@@ -9,7 +9,7 @@ from dstack._internal.cli.services.configurators.profile import (
     apply_profile_args,
     register_profile_args,
 )
-from dstack._internal.cli.utils.common import colors, confirm_ask, console
+from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.core.errors import CLIError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -26,186 +26,6 @@ from dstack.api._public.resources import Resources
 from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
-
-
-def print_pool_table(pools: Sequence[Pool], verbose: bool) -> None:
-    table = Table(box=None)
-    table.add_column("NAME")
-    table.add_column("DEFAULT")
-    table.add_column("INSTANCES")
-    if verbose:
-        table.add_column("CREATED")
-
-    sorted_pools = sorted(pools, key=lambda r: r.name)
-    for pool in sorted_pools:
-        default_mark = "default" if pool.default else ""
-        color = (
-            colors["success"]
-            if pool.total_instances == pool.available_instances
-            else colors["error"]
-        )
-        health = f"[{color}]{pool.available_instances}/{pool.total_instances}[/{color}]"
-        row = [pool.name, default_mark, health]
-        if verbose:
-            row.append(pretty_date(pool.created_at))
-        table.add_row(*row)
-
-    console.print(table)
-    console.print()
-
-
-def print_instance_table(instances: Sequence[Instance]) -> None:
-    table = Table(box=None)
-    table.add_column("INSTANCE NAME")
-    table.add_column("BACKEND")
-    table.add_column("INSTANCE TYPE")
-    table.add_column("STATUS")
-    table.add_column("PRICE")
-
-    for instance in instances:
-        status_mark = "success" if instance.status.is_available() else "warning"
-        color = colors[status_mark]
-        row = [
-            instance.instance_id,
-            instance.backend,
-            instance.instance_type.resources.pretty_format(),
-            f"[{color}]{instance.status}[/{color}]",
-            f"{instance.price:.02f}",
-        ]
-        table.add_row(*row)
-
-    console.print(table)
-    console.print()
-
-
-def print_offers_table(
-    pool_name: str,
-    profile: Profile,
-    requirements: Requirements,
-    instance_offers: Sequence[InstanceOfferWithAvailability],
-    offers_limit: int = 3,
-) -> None:
-    pretty_req = requirements.pretty_format(resources_only=True)
-    max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
-    max_duration = (
-        f"{profile.max_duration / 3600:g}h" if isinstance(profile.max_duration, int) else "-"
-    )
-
-    # TODO: improve retry policy
-    # retry_policy = profile.retry_policy
-    # retry_policy = (
-    #     (f"{retry_policy.limit / 3600:g}h" if retry_policy.limit else "yes")
-    #     if retry_policy.retry
-    #     else "no"
-    # )
-
-    # TODO: improve spot policy
-    if requirements.spot is None:
-        spot_policy = "auto"
-    elif requirements.spot:
-        spot_policy = "spot"
-    else:
-        spot_policy = "on-demand"
-
-    def th(s: str) -> str:
-        return f"[bold]{s}[/bold]"
-
-    props = Table(box=None, show_header=False)
-    props.add_column(no_wrap=True)  # key
-    props.add_column()  # value
-
-    props.add_row(th("Pool name"), pool_name)
-    props.add_row(th("Min resources"), pretty_req)
-    props.add_row(th("Max price"), max_price)
-    props.add_row(th("Max duration"), max_duration)
-    props.add_row(th("Spot policy"), spot_policy)
-    # props.add_row(th("Retry policy"), retry_policy)
-
-    offers_table = Table(box=None)
-    offers_table.add_column("#")
-    offers_table.add_column("BACKEND")
-    offers_table.add_column("REGION")
-    offers_table.add_column("INSTANCE")
-    offers_table.add_column("RESOURCES")
-    offers_table.add_column("SPOT")
-    offers_table.add_column("PRICE")
-    offers_table.add_column()
-
-    print_offers = instance_offers[:offers_limit]
-
-    for i, offer in enumerate(print_offers, start=1):
-        r = offer.instance.resources
-
-        availability = ""
-        if offer.availability in {
-            InstanceAvailability.NOT_AVAILABLE,
-            InstanceAvailability.NO_QUOTA,
-        }:
-            availability = offer.availability.value.replace("_", " ").title()
-        offers_table.add_row(
-            f"{i}",
-            offer.backend,
-            offer.region,
-            offer.instance.name,
-            r.pretty_format(),
-            "yes" if r.spot else "no",
-            f"${offer.price:g}",
-            availability,
-            style=None if i == 1 else colors["secondary"],
-        )
-    if len(print_offers) > offers_limit:
-        offers_table.add_row("", "...", style=colors["secondary"])
-
-    console.print(props)
-    console.print()
-    if len(print_offers) > 0:
-        console.print(offers_table)
-        console.print()
-
-
-def register_resource_args(parser: argparse.ArgumentParser) -> None:
-    resources_group = parser.add_argument_group("Resources")
-    resources_group.add_argument(
-        "--cpu",
-        help=f"Request the CPU count. Default: '{DEFAULT_CPU_COUNT.min}..'",
-        dest="cpu",
-        metavar="SPEC",
-        default=DEFAULT_CPU_COUNT,
-    )
-
-    resources_group.add_argument(
-        "--memory",
-        help="Request the size of RAM. "
-        f"The format is [code]SIZE[/]:[code]MB|GB|TB[/]. Default: {DEFAULT_MEMORY_SIZE.min}",
-        dest="memory",
-        metavar="SIZE",
-        default=DEFAULT_MEMORY_SIZE,
-    )
-
-    resources_group.add_argument(
-        "--shared-memory",
-        help="Request the size of Shared Memory. The format is [code]SIZE[/]:[code]MB|GB|TB[/].",
-        dest="shared_memory",
-        default=None,
-        metavar="SIZE",
-    )
-
-    resources_group.add_argument(
-        "--gpu",
-        help="Request GPU for the run. "
-        "The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
-        dest="gpu",
-        default=None,
-        metavar="SPEC",
-    )
-
-    resources_group.add_argument(
-        "--disk",
-        help="Request the size of disk for the run. Example [code]--disk 100GB[/].",
-        dest="disk",
-        metavar="SIZE",
-        default=None,
-    )
 
 
 class PoolCommand(APIBaseCommand):  # type: ignore[misc]
@@ -232,7 +52,9 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         create_parser = subparsers.add_parser(
             "create", help="Create pool", formatter_class=self._parser.formatter_class
         )
-        create_parser.add_argument("-n", "--name", dest="pool_name", help="The name of the pool")
+        create_parser.add_argument(
+            "-n", "--name", dest="pool_name", help="The name of the pool", required=True
+        )
         create_parser.set_defaults(subfunc=self._create)
 
         # delete pool
@@ -330,9 +152,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
     def _set_default(self, args: argparse.Namespace) -> None:
         result = self.api.client.pool.set_default(self.api.project, args.pool_name)
         if not result:
-            console.print(
-                f"[{colors['error']}]Failed to set default pool {args.pool_name!r}[/{colors['code']}]"
-            )
+            console.print(f"[error]Failed to set default pool {args.pool_name!r}[/]")
 
     def _show(self, args: argparse.Namespace) -> None:
         instances = self.api.client.pool.show(self.api.project, args.pool_name)
@@ -375,9 +195,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
                 args.remote_port,
             )
             if not result:
-                console.print(
-                    f"[{colors['error']}]Failed to add remote instance {args.instance_name!r}[/{colors['code']}]"
-                )
+                console.print(f"[error]Failed to add remote instance {args.instance_name!r}[/]")
             return
 
         repo = self.api.repos.load(Path.cwd())
@@ -401,3 +219,178 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         super()._command(args)
         # TODO handle 404 and other errors
         args.subfunc(args)
+
+
+def print_pool_table(pools: Sequence[Pool], verbose: bool) -> None:
+    table = Table(box=None)
+    table.add_column("NAME")
+    table.add_column("DEFAULT")
+    table.add_column("INSTANCES")
+    if verbose:
+        table.add_column("CREATED")
+
+    sorted_pools = sorted(pools, key=lambda r: r.name)
+    for pool in sorted_pools:
+        default_mark = "default" if pool.default else ""
+        style = "success" if pool.total_instances == pool.available_instances else "error"
+        health = f"[{style}]{pool.available_instances}/{pool.total_instances}[/]"
+        row = [pool.name, default_mark, health]
+        if verbose:
+            row.append(pretty_date(pool.created_at))
+        table.add_row(*row)
+
+    console.print(table)
+    console.print()
+
+
+def print_instance_table(instances: Sequence[Instance]) -> None:
+    table = Table(box=None)
+    table.add_column("INSTANCE NAME")
+    table.add_column("BACKEND")
+    table.add_column("INSTANCE TYPE")
+    table.add_column("STATUS")
+    table.add_column("PRICE")
+
+    for instance in instances:
+        style = "success" if instance.status.is_available() else "warning"
+        row = [
+            instance.instance_id,
+            instance.backend,
+            instance.instance_type.resources.pretty_format(),
+            f"[{style}]{instance.status.value}[/]",
+            f"{instance.price:.02f}",
+        ]
+        table.add_row(*row)
+
+    console.print(table)
+    console.print()
+
+
+def print_offers_table(
+    pool_name: str,
+    profile: Profile,
+    requirements: Requirements,
+    instance_offers: Sequence[InstanceOfferWithAvailability],
+    offers_limit: int = 3,
+) -> None:
+    pretty_req = requirements.pretty_format(resources_only=True)
+    max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
+    max_duration = (
+        f"{profile.max_duration / 3600:g}h" if isinstance(profile.max_duration, int) else "-"
+    )
+
+    # TODO: improve retry policy
+    # retry_policy = profile.retry_policy
+    # retry_policy = (
+    #     (f"{retry_policy.limit / 3600:g}h" if retry_policy.limit else "yes")
+    #     if retry_policy.retry
+    #     else "no"
+    # )
+
+    # TODO: improve spot policy
+    if requirements.spot is None:
+        spot_policy = "auto"
+    elif requirements.spot:
+        spot_policy = "spot"
+    else:
+        spot_policy = "on-demand"
+
+    def th(s: str) -> str:
+        return f"[bold]{s}[/bold]"
+
+    props = Table(box=None, show_header=False)
+    props.add_column(no_wrap=True)  # key
+    props.add_column()  # value
+
+    props.add_row(th("Pool name"), pool_name)
+    props.add_row(th("Min resources"), pretty_req)
+    props.add_row(th("Max price"), max_price)
+    props.add_row(th("Max duration"), max_duration)
+    props.add_row(th("Spot policy"), spot_policy)
+    # props.add_row(th("Retry policy"), retry_policy)
+
+    offers_table = Table(box=None)
+    offers_table.add_column("#")
+    offers_table.add_column("BACKEND")
+    offers_table.add_column("REGION")
+    offers_table.add_column("INSTANCE")
+    offers_table.add_column("RESOURCES")
+    offers_table.add_column("SPOT")
+    offers_table.add_column("PRICE")
+    offers_table.add_column()
+
+    print_offers = instance_offers[:offers_limit]
+
+    for i, offer in enumerate(print_offers, start=1):
+        r = offer.instance.resources
+
+        availability = ""
+        if offer.availability in {
+            InstanceAvailability.NOT_AVAILABLE,
+            InstanceAvailability.NO_QUOTA,
+        }:
+            availability = offer.availability.value.replace("_", " ").title()
+        offers_table.add_row(
+            f"{i}",
+            offer.backend,
+            offer.region,
+            offer.instance.name,
+            r.pretty_format(),
+            "yes" if r.spot else "no",
+            f"${offer.price:g}",
+            availability,
+            style=None if i == 1 else "secondary",
+        )
+    if len(print_offers) > offers_limit:
+        offers_table.add_row("", "...", style="secondary")
+
+    console.print(props)
+    console.print()
+    if len(print_offers) > 0:
+        console.print(offers_table)
+        console.print()
+
+
+def register_resource_args(parser: argparse.ArgumentParser) -> None:
+    resources_group = parser.add_argument_group("Resources")
+    resources_group.add_argument(
+        "--cpu",
+        help=f"Request the CPU count. Default: {DEFAULT_CPU_COUNT}",
+        dest="cpu",
+        metavar="SPEC",
+        default=DEFAULT_CPU_COUNT,
+    )
+
+    resources_group.add_argument(
+        "--memory",
+        help="Request the size of RAM. "
+        f"The format is [code]SIZE[/]:[code]MB|GB|TB[/]. Default: {DEFAULT_MEMORY_SIZE}",
+        dest="memory",
+        metavar="SIZE",
+        default=DEFAULT_MEMORY_SIZE,
+    )
+
+    resources_group.add_argument(
+        "--shared-memory",
+        help="Request the size of Shared Memory. The format is [code]SIZE[/]:[code]MB|GB|TB[/].",
+        dest="shared_memory",
+        default=None,
+        metavar="SIZE",
+    )
+
+    resources_group.add_argument(
+        "--gpu",
+        help="Request GPU for the run. "
+        "The format is [code]NAME[/]:[code]COUNT[/]:[code]MEMORY[/] (all parts are optional)",
+        dest="gpu",
+        default=None,
+        metavar="SPEC",
+    )
+
+    resources_group.add_argument(
+        "--disk",
+        help="Request the size of disk for the run. Example [code]--disk 100GB[/].",
+        dest="disk",
+        metavar="SIZE",
+        default=None,
+    )

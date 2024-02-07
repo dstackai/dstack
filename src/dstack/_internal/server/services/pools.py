@@ -82,8 +82,13 @@ async def get_or_create_default_pool_by_name(
 
 
 def pool_model_to_pool(pool_model: PoolModel) -> Pool:
-    total = len(pool_model.instances)
-    available = sum(instance.status.is_available() for instance in pool_model.instances)
+    total = 0
+    available = 0
+    for instance in pool_model.instances:
+        if not instance.deleted:
+            total += 1
+            if instance.status.is_available():
+                available += 1
     return Pool(
         name=pool_model.name,
         default=pool_model.project.default_pool_id == pool_model.id,
@@ -165,7 +170,7 @@ async def remove_instance(
             instance.status = InstanceStatus.TERMINATING
             terminated = True
     if not terminated:
-        logger.warning("Couldn't fined instance to terminate")
+        logger.warning("Couldn't find instance to terminate")
     await session.commit()
 
 
@@ -227,33 +232,20 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
 async def show_pool(
     session: AsyncSession, project: ProjectModel, pool_name: str
 ) -> Sequence[Instance]:
-    pool = (
-        await session.scalars(
-            select(PoolModel).where(
-                PoolModel.name == pool_name,
-                PoolModel.project_id == project.id,
-                PoolModel.deleted == False,
-            )
-        )
-    ).one_or_none()
-    if pool is not None:
-        instances = [instance_model_to_instance(i) for i in pool.instances]
-        return instances
-    else:
-        return []
+    """Show active instances in the pool. If the pool doesn't exist, return an empty list."""
+    pool_instances = await get_pool_instances(session, project, pool_name)
+    return [instance_model_to_instance(i) for i in pool_instances if not i.deleted]
 
 
 async def get_pool_instances(
     session: AsyncSession, project: ProjectModel, pool_name: str
 ) -> List[InstanceModel]:
     res = await session.execute(
-        select(PoolModel)
-        .where(
+        select(PoolModel).where(
             PoolModel.name == pool_name,
             PoolModel.project_id == project.id,
             PoolModel.deleted == False,
         )
-        .options(joinedload(PoolModel.instances))
     )
     result = res.unique().scalars().one_or_none()
     if result is None:

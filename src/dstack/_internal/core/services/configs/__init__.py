@@ -8,7 +8,7 @@ import yaml
 from pydantic import ValidationError
 from rich import print
 
-from dstack._internal.cli.utils.common import colors, confirm_ask
+from dstack._internal.cli.utils.common import confirm_ask
 from dstack._internal.core.models.config import GlobalConfig, ProjectConfig, RepoConfig
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.utils.common import get_dstack_dir
@@ -127,9 +127,7 @@ def update_default_project(
             (
                 default_project is None
                 or default
-                or confirm_ask(
-                    f"Update the default project in [{colors['code']}]{config_dir}[/{colors['code']}]?"
-                )
+                or confirm_ask(f"Update the default project in [code]{config_dir}[/]?")
             )
             if not no_default
             else False
@@ -139,4 +137,4 @@ def update_default_project(
                 name=project_name, url=url, token=token, default=set_it_as_default
             )
             config_manager.save()
-            print(f"Configuration updated at [{colors['code']}]{config_dir}[/{colors['code']}]")
+            print(f"Configuration updated at [code]{config_dir}[/]")
