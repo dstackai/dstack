@@ -38,6 +38,8 @@ async def process_pools() -> None:
                             InstanceStatus.CREATING,
                             InstanceStatus.STARTING,
                             InstanceStatus.TERMINATING,
+                            InstanceStatus.READY,
+                            InstanceStatus.BUSY,
                         ]
                     ),
                     InstanceModel.id.not_in(PROCESSING_POOL_IDS),
@@ -51,7 +53,12 @@ async def process_pools() -> None:
 
     try:
         for inst in instances:
-            if inst.status in (InstanceStatus.CREATING, InstanceStatus.STARTING):
+            if inst.status in (
+                InstanceStatus.CREATING,
+                InstanceStatus.STARTING,
+                InstanceStatus.READY,
+                InstanceStatus.BUSY,
+            ):
                 await check_shim(inst.id)
             if inst.status == InstanceStatus.TERMINATING:
                 await terminate(inst.id)
@@ -76,9 +83,13 @@ async def check_shim(instance_id: UUID) -> None:
         logger.info("check instance %s status: %s", instance.name, instance_health)
 
         if instance_health:
-            instance.status = InstanceStatus.READY
-            await session.commit()
-            return
+            if instance.status in (InstanceStatus.CREATING, InstanceStatus.STARTING):
+                instance.status = InstanceStatus.READY
+                await session.commit()
+        else:
+            if instance.status in (InstanceStatus.READY, InstanceStatus.BUSY):
+                instance.status = InstanceStatus.FAILED
+                await session.commit()
 
 
 @runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)  # type: ignore[misc]
@@ -139,15 +150,16 @@ async def terminate_idle_instance() -> None:
         # TODO: need lock
 
         for instance in instances:
-            if instance.last_job_processed_at is None:
-                continue
+            last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
+            if instance.last_job_processed_at is not None:
+                last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+
+            current_time = get_current_datetime().replace(tzinfo=datetime.timezone.utc)
 
             delta = datetime.timedelta(
                 seconds=parse_pretty_duration(instance.termination_idle_time)
             )
-            if instance.last_job_processed_at.replace(
-                tzinfo=datetime.timezone.utc
-            ) + delta < get_current_datetime().replace(tzinfo=datetime.timezone.utc):
+            if last_time + delta < current_time:
                 jpd: JobProvisioningData = parse_raw_as(
                     JobProvisioningData, instance.job_provisioning_data
                 )
@@ -159,9 +171,7 @@ async def terminate_idle_instance() -> None:
                 instance.finished_at = get_current_datetime()
                 instance.status = InstanceStatus.TERMINATED
 
-                idle_time = get_current_datetime().replace(
-                    tzinfo=datetime.timezone.utc
-                ) - instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+                idle_time = current_time - last_time
                 logger.info(
                     "instance %s terminated by termination policy: idle time %ss",
                     instance.name,

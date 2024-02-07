@@ -425,6 +425,7 @@ def _process_running(
         last_job_state = resp.job_states[-1]
         job_model.status = last_job_state.state
         if job_model.status == JobStatus.DONE:
+            job_model.run.status = JobStatus.DONE
             delay_job_instance_termination(job_model)
         logger.info(*job_log("now is %s", job_model, job_model.status.value))
     return True
