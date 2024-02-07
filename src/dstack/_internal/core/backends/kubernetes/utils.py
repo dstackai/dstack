@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import kubernetes
 import yaml
@@ -14,7 +14,20 @@ def get_api_from_config_dict(kubeconfig: Dict) -> kubernetes.client.CoreV1Api:
     return kubernetes.client.CoreV1Api(api_client=api_client)
 
 
+def get_cluster_public_ip(api_client: kubernetes.client.CoreV1Api) -> Optional[str]:
+    """
+    Returns public IP of any cluster node.
+    """
+    public_ips = get_cluster_public_ips(api_client)
+    if len(public_ips) == 0:
+        return None
+    return public_ips[0]
+
+
 def get_cluster_public_ips(api_client: kubernetes.client.CoreV1Api) -> List[str]:
+    """
+    Returns public IPs of all cluster nodes.
+    """
     public_ips = []
     for node in api_client.list_node().items:
         addresses = node.status.addresses
