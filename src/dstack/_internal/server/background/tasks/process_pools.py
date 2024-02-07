@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Dict
 from uuid import UUID
 
-from pydantic import parse_raw_as  # type: ignore[attr-defined]
+from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 

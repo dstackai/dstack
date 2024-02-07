@@ -3,7 +3,7 @@ from datetime import timezone
 from typing import Dict, List, Optional, Sequence
 
 import gpuhunt
-from pydantic import parse_raw_as  # type: ignore[attr-defined]
+from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload

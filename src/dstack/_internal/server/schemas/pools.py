@@ -1,4 +1,4 @@
-from pydantic import BaseModel  # type: ignore[attr-defined]
+from pydantic import BaseModel
 
 
 class DeletePoolRequest(BaseModel):  # type: ignore[misc]

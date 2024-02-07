@@ -150,13 +150,11 @@ def get_cloud_config(**config) -> str:
 
 
 def get_dstack_shim(build: str) -> List[str]:
-    # TODO: use official url
-    # bucket = "dstack-runner-downloads-stgn"
-    # if settings.DSTACK_VERSION is not None:
-    #     bucket = "dstack-runner-downloads"
-    # url =f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
+    bucket = "dstack-runner-downloads-stgn"
+    if settings.DSTACK_VERSION is not None:
+        bucket = "dstack-runner-downloads"
 
-    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-shim"
+    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
 
     return [
         f'sudo curl --connect-timeout 60 --max-time 240 --retry 1 --output /usr/local/bin/dstack-shim "{url}"',
@@ -225,14 +223,12 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
 
     runner = "/usr/local/bin/dstack-runner"
 
-    # TODO: use official url
-    # build = get_dstack_runner_version()
-    # bucket = "dstack-runner-downloads-stgn"
-    # if settings.DSTACK_VERSION is not None:
-    #     bucket = "dstack-runner-downloads"
-    # url = f'https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64'
+    build = get_dstack_runner_version()
+    bucket = "dstack-runner-downloads-stgn"
+    if settings.DSTACK_VERSION is not None:
+        bucket = "dstack-runner-downloads"
 
-    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-runner"
+    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
 
     commands += [
         f'curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} "{url}"',
@@ -337,13 +333,11 @@ def get_instance_shim_commands(
 
 
 def get_instance_dstack_shim(build: str) -> List[str]:
-    # TODO: use official build
-    # bucket = "dstack-runner-downloads-stgn"
-    # if settings.DSTACK_VERSION is not None:
-    #     bucket = "dstack-runner-downloads"
-    # url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
+    bucket = "dstack-runner-downloads-stgn"
+    if settings.DSTACK_VERSION is not None:
+        bucket = "dstack-runner-downloads"
 
-    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-shim"
+    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
 
     return [
         f'sudo curl --connect-timeout 60 --max-time 240 --retry 1 --output /usr/local/bin/dstack-shim "{url}"',
@@ -382,14 +376,12 @@ def get_instance_docker_commands(authorized_keys: List[str]) -> List[str]:
 
     runner = "/usr/local/bin/dstack-runner"
 
-    # TODO: use official build
-    # build = get_dstack_runner_version()
-    # bucket = "dstack-runner-downloads-stgn"
-    # if settings.DSTACK_VERSION is not None:
-    #     bucket = "dstack-runner-downloads"
-    # url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
+    build = get_dstack_runner_version()
+    bucket = "dstack-runner-downloads-stgn"
+    if settings.DSTACK_VERSION is not None:
+        bucket = "dstack-runner-downloads"
 
-    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-runner"
+    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
 
     commands += [
         f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} {url}",

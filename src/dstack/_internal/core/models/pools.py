@@ -1,6 +1,6 @@
 import datetime
 
-from pydantic import BaseModel  # type: ignore[attr-defined]
+from pydantic import BaseModel
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceType

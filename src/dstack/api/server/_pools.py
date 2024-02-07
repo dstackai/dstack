@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import parse_obj_as  # type: ignore[attr-defined]
+from pydantic import parse_obj_as
 
 import dstack._internal.server.schemas.pools as schemas_pools
 from dstack._internal.core.models.pools import Instance, Pool
