@@ -232,7 +232,7 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
     #     bucket = "dstack-runner-downloads"
     # url = f'https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64'
 
-    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-shim"
+    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-runner"
 
     commands += [
         f'curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} "{url}"',
