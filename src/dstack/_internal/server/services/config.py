@@ -82,8 +82,8 @@ class KubeconfigConfig(ForbidExtra):
 
 class KubernetesConfig(ForbidExtra):
     type: Literal["kubernetes"] = "kubernetes"
-    networking: KubernetesNetworkingConfig
     kubeconfig: KubeconfigConfig
+    networking: Optional[KubernetesNetworkingConfig]
 
 
 class LambdaConfig(ForbidExtra):
@@ -293,7 +293,12 @@ class _ConfigInfoWithCreds(BaseModel):
 
 
 def _config_to_internal_config(backend_config: BackendConfig) -> AnyConfigInfoWithCreds:
-    config_info = _ConfigInfoWithCreds.parse_obj(backend_config.dict())
+    backend_config_dict = backend_config.dict()
+    # Allow to not specify networking
+    if backend_config.type == "kubernetes":
+        if backend_config.networking is None:
+            backend_config_dict["networking"] = {}
+    config_info = _ConfigInfoWithCreds.parse_obj(backend_config_dict)
     if backend_config.type == "azure":
         config_info.__root__.locations = backend_config.regions
     return config_info.__root__

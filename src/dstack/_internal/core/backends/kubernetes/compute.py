@@ -15,9 +15,12 @@ from dstack._internal.core.backends.base.compute import (
     get_instance_name,
 )
 from dstack._internal.core.backends.base.offers import match_requirements
-from dstack._internal.core.backends.kubernetes.client import get_api_from_config_data
 from dstack._internal.core.backends.kubernetes.config import KubernetesConfig
-from dstack._internal.core.errors import GatewayError
+from dstack._internal.core.backends.kubernetes.utils import (
+    get_api_from_config_data,
+    get_cluster_public_ip,
+)
+from dstack._internal.core.errors import BackendError, GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -97,16 +100,29 @@ class KubernetesCompute(Compute):
         # as an ssh proxy jump to connect to all other services in Kubernetes.
         # Setup jump pod in a separate thread to avoid long-running run_job.
         # In case the thread fails, the job will be failed and resubmitted.
+        jump_pod_hostname = self.config.networking.ssh_host
+        if jump_pod_hostname is None:
+            jump_pod_hostname = get_cluster_public_ip(self.api)
+            if jump_pod_hostname is None:
+                raise BackendError(
+                    "Failed to acquire an IP for jump pod automatically. "
+                    "Specify ssh_host for Kubernetes backend."
+                )
+        jump_pod_port = _create_jump_pod_service_if_not_exists(
+            api=self.api,
+            project_name=run.project_name,
+            project_ssh_public_key=project_ssh_public_key.strip(),
+            jump_pod_port=self.config.networking.ssh_port,
+        )
         threading.Thread(
-            target=_setup_jump_pod,
+            target=_continue_setup_jump_pod,
             kwargs={
                 "api": self.api,
                 "project_name": run.project_name,
-                "project_ssh_public_key": project_ssh_public_key.strip(),
                 "project_ssh_private_key": project_ssh_private_key.strip(),
                 "user_ssh_public_key": run.run_spec.ssh_key_pub.strip(),
-                "jump_pod_host": self.config.networking.ssh_host,
-                "jump_pod_port": self.config.networking.ssh_port,
+                "jump_pod_host": jump_pod_hostname,
+                "jump_pod_port": jump_pod_port,
             },
         ).start()
         self.api.create_namespaced_pod(
@@ -157,9 +173,9 @@ class KubernetesCompute(Compute):
             ssh_port=RUNNER_SSH_PORT,
             dockerized=False,
             ssh_proxy=SSHConnectionParams(
-                hostname=self.config.networking.ssh_host,
+                hostname=jump_pod_hostname,
                 username="root",
-                port=self.config.networking.ssh_port,
+                port=jump_pod_port,
             ),
             backend_data=None,
         )
@@ -295,21 +311,14 @@ def _get_gpus_from_node_labels(labels: Dict) -> List[Gpu]:
     return [Gpu(name=gpu_name, memory_mib=gpu_memory) for _ in range(gpu_count)]
 
 
-def _setup_jump_pod(
+def _continue_setup_jump_pod(
     api: client.CoreV1Api,
     project_name: str,
-    project_ssh_public_key: str,
     project_ssh_private_key: str,
     user_ssh_public_key: str,
     jump_pod_host: str,
     jump_pod_port: int,
 ):
-    _create_jump_pod_service_if_not_exists(
-        api=api,
-        project_name=project_name,
-        project_ssh_public_key=project_ssh_public_key,
-        jump_pod_port=jump_pod_port,
-    )
     _wait_for_pod_ready(
         api=api,
         pod_name=_get_jump_pod_name(project_name),
@@ -326,16 +335,16 @@ def _create_jump_pod_service_if_not_exists(
     api: client.CoreV1Api,
     project_name: str,
     project_ssh_public_key: str,
-    jump_pod_port: int,
-):
+    jump_pod_port: Optional[int],
+) -> int:
     try:
-        api.read_namespaced_service(
+        service = api.read_namespaced_service(
             name=_get_jump_pod_service_name(project_name),
             namespace=DEFAULT_NAMESPACE,
         )
     except client.ApiException as e:
         if e.status == 404:
-            _create_jump_pod_service(
+            service = _create_jump_pod_service(
                 api=api,
                 project_name=project_name,
                 project_ssh_public_key=project_ssh_public_key,
@@ -343,14 +352,15 @@ def _create_jump_pod_service_if_not_exists(
             )
         else:
             raise
+    return service.spec.ports[0].node_port
 
 
 def _create_jump_pod_service(
     api: client.CoreV1Api,
     project_name: str,
     project_ssh_public_key: str,
-    jump_pod_port: int,
-):
+    jump_pod_port: Optional[int],
+) -> client.V1Service:
     # TODO use restricted ssh-forwarding-only user for jump pod instead of root.
     commands = _get_jump_pod_commands(authorized_keys=[project_ssh_public_key])
     pod_name = _get_jump_pod_name(project_name)
@@ -379,7 +389,7 @@ def _create_jump_pod_service(
             ),
         ),
     )
-    api.create_namespaced_service(
+    service_response = api.create_namespaced_service(
         namespace=DEFAULT_NAMESPACE,
         body=client.V1Service(
             metadata=client.V1ObjectMeta(name=_get_jump_pod_service_name(project_name)),
@@ -396,6 +406,7 @@ def _create_jump_pod_service(
             ),
         ),
     )
+    return service_response
 
 
 def _get_jump_pod_commands(authorized_keys: List[str]) -> List[str]:
