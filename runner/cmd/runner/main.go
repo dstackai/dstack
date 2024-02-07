@@ -18,9 +18,9 @@ func main() {
 	App()
 }
 
-func start(tempDir string, homeDir string, workingDir string, httpPort int, logLevel int) error {
+func start(tempDir string, homeDir string, workingDir string, httpPort int, logLevel int, version string) error {
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		return tracerr.Errorf("Failed to create temp directory^ %w", err)
+		return tracerr.Errorf("Failed to create temp directory: %w", err)
 	}
 
 	defaultLogFile, err := log.CreateAppendFile(filepath.Join(tempDir, "default.log"))
@@ -37,7 +37,7 @@ func start(tempDir string, homeDir string, workingDir string, httpPort int, logL
 	log.DefaultEntry.Logger.SetOutput(io.MultiWriter(os.Stdout, defaultLogFile))
 	log.DefaultEntry.Logger.SetLevel(logrus.Level(logLevel))
 
-	server := api.NewServer(tempDir, homeDir, workingDir, fmt.Sprintf(":%d", httpPort))
+	server := api.NewServer(tempDir, homeDir, workingDir, fmt.Sprintf(":%d", httpPort), version)
 
 	log.Trace(context.TODO(), "Starting API server", "port", httpPort)
 	if err := server.Run(); err != nil {

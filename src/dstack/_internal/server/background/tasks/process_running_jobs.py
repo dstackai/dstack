@@ -208,6 +208,7 @@ async def _process_job(job_id: UUID):
                 job_model.used_instance_id = job_model.instance.id
                 job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
                 job_model.instance = None
+
                 if job.is_retry_active():
                     if job_submission.job_provisioning_data.instance_type.resources.spot:
                         new_job_model = create_job_model_for_new_submission(

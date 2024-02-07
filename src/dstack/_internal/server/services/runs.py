@@ -239,7 +239,6 @@ async def create_instance(
             backend=backend.TYPE,
             instance_type=instance_offer.instance,
             instance_id=launched_instance_info.instance_id,
-            pool_id=str(pool.id),
             hostname=launched_instance_info.ip_address,
             region=launched_instance_info.region,
             price=instance_offer.price,
@@ -288,10 +287,7 @@ async def create_instance(
 
 
 async def get_run_plan(
-    session: AsyncSession,
-    project: ProjectModel,
-    user: UserModel,
-    run_spec: RunSpec,
+    session: AsyncSession, project: ProjectModel, user: UserModel, run_spec: RunSpec
 ) -> RunPlan:
     profile = run_spec.profile
 
@@ -301,7 +297,7 @@ async def get_run_plan(
     if profile.pool_name is None:
         try:
             pool_name = project.default_pool.name
-        except Exception as e:
+        except Exception:
             pool_name = DEFAULT_POOL_NAME  # TODO: get pool from project
 
     pool_instances = [

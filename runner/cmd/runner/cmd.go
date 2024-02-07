@@ -56,7 +56,7 @@ func App() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					err := start(paths.tempDir, paths.homeDir, paths.workingDir, httpPort, logLevel)
+					err := start(paths.tempDir, paths.homeDir, paths.workingDir, httpPort, logLevel, Version)
 					if err != nil {
 						return cli.Exit(err, 1)
 					}

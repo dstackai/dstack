@@ -3,7 +3,7 @@ from datetime import timezone
 from typing import Dict, List, Optional, Sequence
 
 import gpuhunt
-from pydantic import parse_raw_as
+from pydantic import parse_raw_as  # type: ignore[attr-defined]
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -206,10 +206,10 @@ async def list_deleted_pools(
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
-    offer: InstanceOfferWithAvailability = parse_raw_as(  # type: ignore[operator]
+    offer: InstanceOfferWithAvailability = parse_raw_as(
         InstanceOfferWithAvailability, instance_model.offer
     )
-    jpd: JobProvisioningData = parse_raw_as(  # type: ignore[operator]
+    jpd: JobProvisioningData = parse_raw_as(
         JobProvisioningData, instance_model.job_provisioning_data
     )
 
@@ -331,7 +331,6 @@ async def add_remote(
         ssh_port=22,
         dockerized=False,
         backend_data="",
-        pool_id=str(pool_model.id),
         ssh_proxy=None,
     )
     offer = InstanceOfferWithAvailability(
@@ -403,7 +402,7 @@ def filter_pool_instances(
     )
     query_filter = requirements_to_query_filter(requirements)
     for instance in candidates:
-        catalog_item = offer_to_catalog_item(parse_raw_as(InstanceOffer, instance.offer))  # type: ignore[operator]
+        catalog_item = offer_to_catalog_item(parse_raw_as(InstanceOffer, instance.offer))
         if gpuhunt.matches(catalog_item, query_filter):
             instances.append(instance)
     return instances

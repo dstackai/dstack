@@ -19,9 +19,11 @@ type ShimServer struct {
 	mu         sync.RWMutex
 
 	runner TaskRunner
+
+	version string
 }
 
-func NewShimServer(address string, runner TaskRunner) *ShimServer {
+func NewShimServer(address string, runner TaskRunner, version string) *ShimServer {
 	mux := http.NewServeMux()
 	s := &ShimServer{
 		HttpServer: &http.Server{
@@ -30,6 +32,8 @@ func NewShimServer(address string, runner TaskRunner) *ShimServer {
 		},
 
 		runner: runner,
+
+		version: version,
 	}
 	mux.HandleFunc("/api/submit", api.JSONResponseHandler("POST", s.SubmitPostHandler))
 	mux.HandleFunc("/api/healthcheck", api.JSONResponseHandler("GET", s.HealthcheckGetHandler))

@@ -106,13 +106,9 @@ async def stop_job(
         job_submission = job_model_to_job_submission(job_model)
         if new_status == JobStatus.TERMINATED and job_model.status == JobStatus.RUNNING:
             try:
-                await run_async(
-                    _stop_runner,
-                    job_submission,
-                    project.ssh_private_key,
-                )
+                await run_async(_stop_runner, job_submission, project.ssh_private_key)
                 # delay termination for 15 seconds to allow the runner to stop gracefully
-                # delay_job_instance_termination(job_model)
+                delay_job_instance_termination(job_model)
             except SSHError:
                 logger.debug(*job_log("failed to stop runner", job_model))
         # process_finished_jobs will terminate the instance in the background
@@ -124,8 +120,7 @@ async def stop_job(
 
 
 async def terminate_job_provisioning_data_instance(
-    project: ProjectModel,
-    job_provisioning_data: JobProvisioningData,
+    project: ProjectModel, job_provisioning_data: JobProvisioningData
 ):
     backend = await get_project_backend_by_type(
         project=project,

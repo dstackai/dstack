@@ -112,6 +112,7 @@ jobs:
           VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
           go build -ldflags "-X '$REPO_NAME/runner/cmd/runner/version.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
           go build -ldflags "-X '$REPO_NAME/runner/cmd/shim/version.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
+          echo $VERSION
       - uses: actions/upload-artifact@v3
         with:
           name: dstack-runner

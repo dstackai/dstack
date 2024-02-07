@@ -30,9 +30,11 @@ type Server struct {
 
 	executor  executor.Executor
 	cancelRun context.CancelFunc
+
+	version string
 }
 
-func NewServer(tempDir string, homeDir string, workingDir string, address string) *Server {
+func NewServer(tempDir string, homeDir string, workingDir string, address string, version string) *Server {
 	mux := http.NewServeMux()
 	s := &Server{
 		srv: &http.Server{
@@ -51,6 +53,8 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 		logsWaitDuration:   30 * time.Second,
 
 		executor: executor.NewRunExecutor(tempDir, homeDir, workingDir),
+
+		version: version,
 	}
 	mux.HandleFunc("/api/healthcheck", api.JSONResponseHandler("GET", s.healthcheckGetHandler))
 	mux.HandleFunc("/api/submit", api.JSONResponseHandler("POST", s.submitPostHandler))

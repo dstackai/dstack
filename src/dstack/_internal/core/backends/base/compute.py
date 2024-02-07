@@ -150,12 +150,16 @@ def get_cloud_config(**config) -> str:
 
 
 def get_dstack_shim(build: str) -> List[str]:
-    bucket = "dstack-runner-downloads-stgn"
-    if settings.DSTACK_VERSION is not None:
-        bucket = "dstack-runner-downloads"
+    # TODO: use official url
+    # bucket = "dstack-runner-downloads-stgn"
+    # if settings.DSTACK_VERSION is not None:
+    #     bucket = "dstack-runner-downloads"
+    # url =f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
+
+    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-shim"
 
     return [
-        f'sudo curl --output /usr/local/bin/dstack-shim "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"',
+        f'sudo --connect-timeout 120 --output /usr/local/bin/dstack-shim "{url}"',
         "sudo chmod +x /usr/local/bin/dstack-shim",
     ]
 
@@ -218,13 +222,20 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
         # start sshd
         "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
     ]
-    build = get_dstack_runner_version()
+
     runner = "/usr/local/bin/dstack-runner"
-    bucket = "dstack-runner-downloads-stgn"
-    if settings.DSTACK_VERSION is not None:
-        bucket = "dstack-runner-downloads"
+
+    # TODO: use official url
+    # build = get_dstack_runner_version()
+    # bucket = "dstack-runner-downloads-stgn"
+    # if settings.DSTACK_VERSION is not None:
+    #     bucket = "dstack-runner-downloads"
+    # url = f'https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64'
+
+    url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-shim"
+
     commands += [
-        f'curl --output {runner} "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',
+        f'curl --connect-timeout 120 --output {runner} "{url}"',
         f"chmod +x {runner}",
         f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
@@ -335,7 +346,7 @@ def get_instance_dstack_shim(build: str) -> List[str]:
     url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-shim"
 
     return [
-        f'sudo curl --output /usr/local/bin/dstack-shim "{url}"',
+        f'sudo curl --connect-timeout 120 --output /usr/local/bin/dstack-shim "{url}"',
         "sudo chmod +x /usr/local/bin/dstack-shim",
     ]
 
@@ -381,7 +392,7 @@ def get_instance_docker_commands(authorized_keys: List[str]) -> List[str]:
     url = "https://da344481-89d9-4f32-bd6a-8e0b47b1eb8c.selstorage.ru/dstack-runner"
 
     commands += [
-        f"curl --output {runner} {url}",
+        f"curl --connect-timeout 120 --output {runner} {url}",
         f"chmod +x {runner}",
         f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]

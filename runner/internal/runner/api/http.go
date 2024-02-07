@@ -20,6 +20,7 @@ func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (
 	defer s.executor.RUnlock()
 	return &schemas.HealthcheckResponse{
 		Service: "dstack-runner",
+		Version: s.version,
 	}, nil
 }
 

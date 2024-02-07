@@ -60,7 +60,6 @@ class TestProcessFinishedJobs:
                 username="root",
                 ssh_port=22,
                 dockerized=False,
-                pool_id="",
                 backend_data=None,
                 ssh_proxy=None,
             ),

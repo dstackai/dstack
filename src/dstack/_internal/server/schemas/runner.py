@@ -63,6 +63,7 @@ class SubmitBody(BaseModel):
 
 class HealthcheckResponse(BaseModel):
     service: str
+    version: str
 
 
 class DockerImageBody(BaseModel):

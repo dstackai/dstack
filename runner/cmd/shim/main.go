@@ -22,7 +22,7 @@ func main() {
 
 	app := &cli.App{
 		Name:    "dstack-shim",
-		Usage:   "Starts dstack-runner or docker container. Kills the VM on exit.",
+		Usage:   "Starts dstack-runner or docker container.",
 		Version: Version,
 		Flags: []cli.Flag{
 			/* Shim Parameters */
@@ -94,10 +94,9 @@ func main() {
 				},
 				Action: func(c *cli.Context) error {
 					if args.Runner.BinaryPath == "" {
-						if err := args.Download("linux"); err != nil {
+						if err := args.DownloadRunner(); err != nil {
 							return cli.Exit(err, 1)
 						}
-						defer func() { _ = os.Remove(args.Runner.BinaryPath) }()
 					}
 
 					args.Runner.TempDir = "/tmp/runner"
@@ -119,7 +118,7 @@ func main() {
 					}
 
 					address := fmt.Sprintf(":%d", args.Shim.HTTPPort)
-					shimServer := api.NewShimServer(address, dockerRunner)
+					shimServer := api.NewShimServer(address, dockerRunner, Version)
 
 					defer func() {
 						shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)

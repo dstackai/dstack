@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Dict
 from uuid import UUID
 
-from pydantic import parse_raw_as
+from pydantic import parse_raw_as  # type: ignore[attr-defined]
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
@@ -69,7 +69,7 @@ async def check_shim(instance_id: UUID) -> None:
             )
         ).one()
         ssh_private_key = instance.project.ssh_private_key
-        job_provisioning_data = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)  # type: ignore[operator]
+        job_provisioning_data = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
 
         instance_health = instance_healthcheck(ssh_private_key, job_provisioning_data)
 
@@ -102,7 +102,7 @@ async def terminate(instance_id: UUID) -> None:
 
         # TODO: need lock
 
-        jpd = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)  # type: ignore[operator]
+        jpd = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
         BACKEND_TYPE = jpd.backend
         backends = await backends_services.get_project_backends(project=instance.project)
         backend = next((b for b in backends if b.TYPE in BACKEND_TYPE), None)

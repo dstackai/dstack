@@ -230,7 +230,6 @@ class TestProcessSubmittedJobs:
             username="root",
             ssh_port=22,
             dockerized=False,
-            pool_id=str(pool.id),
             backend_data=None,
             ssh_proxy=None,
         )
@@ -264,7 +263,7 @@ class TestProcessSubmittedJobs:
             '{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": '
             '{"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": '
             '{"size_mib": 102400}, "description": ""}}, "instance_id": '
-            '"running_instance.id", "pool_id": "1b2b4c57-5851-487f-b92e-948f946dfa49", '
+            '"running_instance.id", "ssh_proxy": null, '
             '"hostname": "running_instance.ip", "region": "running_instance.location", '
             '"price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, '
             '"backend_data": null}'

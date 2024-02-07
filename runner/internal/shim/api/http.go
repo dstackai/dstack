@@ -16,6 +16,7 @@ func (s *ShimServer) HealthcheckGetHandler(w http.ResponseWriter, r *http.Reques
 
 	return &HealthcheckResponse{
 		Service: "dstack-shim",
+		Version: s.version,
 	}, nil
 }
 

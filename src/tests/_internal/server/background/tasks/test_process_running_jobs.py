@@ -38,7 +38,7 @@ def get_job_provisioning_data(dockerized: bool) -> JobProvisioningData:
         ssh_port=22,
         dockerized=dockerized,
         backend_data=None,
-        pool_id="",
+        ssh_proxy=None,
     )
 
 
@@ -113,7 +113,7 @@ class TestProcessRunningJobs:
         ) as RunnerClientMock:
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.healthcheck.return_value = HealthcheckResponse(
-                service="dstack-runner"
+                service="dstack-runner", version="0.0.1.dev2"
             )
             await process_running_jobs()
             RunnerTunnelMock.assert_called_once()
@@ -215,7 +215,7 @@ class TestProcessRunningJobs:
             "dstack._internal.server.services.runner.client.ShimClient"
         ) as ShimClientMock:
             ShimClientMock.return_value.healthcheck.return_value = HealthcheckResponse(
-                service="dstack-shim"
+                service="dstack-shim", version="0.0.1.dev2"
             )
             await process_running_jobs()
             RunnerTunnelMock.assert_called_once()
@@ -256,7 +256,7 @@ class TestProcessRunningJobs:
             "dstack._internal.server.services.runner.client.ShimClient"
         ) as ShimClientMock:
             RunnerTunnelMock.return_value.healthcheck.return_value = HealthcheckResponse(
-                service="dstack-runner"
+                service="dstack-runner", version="0.0.1.dev2"
             )
             await process_running_jobs()
             RunnerTunnelMock.assert_called_once()

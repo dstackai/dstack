@@ -140,16 +140,22 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
         return
 
+    run = run_model_to_run(run_model)
+    job = run.jobs[job_model.job_num]
+
     if profile.creation_policy == CreationPolicy.REUSE:
-        job_model.status = JobStatus.FAILED
-        job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        logger.debug(*job_log("reuse instance failed", job_model))
+        if job.is_retry_active():
+            logger.debug(*job_log("now is pending because retry is active", job_model))
+            job_model.status = JobStatus.PENDING
+        else:
+            job_model.status = JobStatus.FAILED
+            job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
         return
 
     # create a new cloud instance
-    run = run_model_to_run(run_model)
-    job = run.jobs[job_model.job_num]
     backends = await backends_services.get_project_backends(project=run_model.project)
 
     # TODO: create VM (backend.compute().create_instance)
@@ -160,11 +166,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         backends=backends,
         project_ssh_public_key=project_model.ssh_public_key,
         project_ssh_private_key=project_model.ssh_private_key,
-        pool_id=pool.id,
     )
     if job_provisioning_data is not None and offer is not None:
         logger.info(*job_log("now is provisioning", job_model))
-        job_provisioning_data.pool_id = str(pool.id)
+
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
 
@@ -205,7 +210,6 @@ async def _run_job(
     backends: List[Backend],
     project_ssh_public_key: str,
     project_ssh_private_key: str,
-    pool_id: UUID,
 ) -> Tuple[Optional[JobProvisioningData], Optional[InstanceOfferWithAvailability]]:
     if run.run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
@@ -264,7 +268,6 @@ async def _run_job(
                 dockerized=launched_instance_info.dockerized,
                 ssh_proxy=launched_instance_info.ssh_proxy,
                 backend_data=launched_instance_info.backend_data,
-                pool_id=str(pool_id),
             )
 
             return (job_provisioning_data, offer)
