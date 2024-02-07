@@ -93,6 +93,10 @@ class GCPCompute(Compute):
             project_id=self.config.project_id,
         )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+        authorized_keys = [
+            run.run_spec.ssh_key_pub.strip(),
+            project_ssh_public_key.strip(),
+        ]
         for zone in _get_instance_zones(instance_offer):
             request = compute_v1.InsertInstanceRequest()
             request.zone = zone
@@ -112,12 +116,10 @@ class GCPCompute(Compute):
                 user_data=get_user_data(
                     backend=BackendType.GCP,
                     image_name=job.job_spec.image_name,
-                    authorized_keys=[
-                        run.run_spec.ssh_key_pub.strip(),
-                        project_ssh_public_key.strip(),
-                    ],
+                    authorized_keys=authorized_keys,
                     registry_auth_required=job.job_spec.registry_auth is not None,
                 ),
+                authorized_keys=authorized_keys,
                 labels={
                     "owner": "dstack",
                     "dstack_project": project_id,
@@ -179,6 +181,7 @@ class GCPCompute(Compute):
             accelerators=[],
             spot=False,
             user_data=get_gateway_user_data(ssh_key_pub),
+            authorized_keys=[ssh_key_pub],
             labels={
                 "owner": "dstack",
                 "dstack_project": project_id,
