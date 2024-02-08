@@ -5,6 +5,7 @@ from typing import Sequence
 from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec, memory_spec
 from dstack._internal.cli.services.configurators.profile import (
     apply_profile_args,
     register_profile_args,
@@ -147,19 +148,26 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
 
     def _create(self, args: argparse.Namespace) -> None:
         self.api.client.pool.create(self.api.project, args.pool_name)
+        console.print(f"Pool {args.pool_name!r} created")
 
     def _delete(self, args: argparse.Namespace) -> None:
-        self.api.client.pool.delete(self.api.project, args.pool_name, args.force)
+        # TODO(egor-s): ask for confirmation
+        with console.status("Removing pool..."):
+            self.api.client.pool.delete(self.api.project, args.pool_name, args.force)
+        console.print(f"Pool {args.pool_name!r} removed")
 
     def _remove(self, args: argparse.Namespace) -> None:
-        self.api.client.pool.remove(
-            self.api.project, args.pool_name, args.instance_name, args.force
-        )
+        # TODO(egor-s): ask for confirmation
+        with console.status("Removing instance..."):
+            self.api.client.pool.remove(
+                self.api.project, args.pool_name, args.instance_name, args.force
+            )
+        console.print(f"Instance {args.instance_name!r} removed")
 
     def _set_default(self, args: argparse.Namespace) -> None:
         result = self.api.client.pool.set_default(self.api.project, args.pool_name)
         if not result:
-            console.print(f"[error]Failed to set default pool {args.pool_name!r}[/]")
+            console.print(f"Failed to set default pool {args.pool_name!r}", style="error")
 
     def _show(self, args: argparse.Namespace) -> None:
         instances = self.api.client.pool.show(self.api.project, args.pool_name)
@@ -203,6 +211,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             )
             if not result:
                 console.print(f"[error]Failed to add remote instance {args.instance_name!r}[/]")
+            # TODO(egor-s): print on success
             return
 
         with console.status("Getting instances..."):
@@ -367,6 +376,7 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
         dest="cpu",
         metavar="SPEC",
         default=DEFAULT_CPU_COUNT,
+        type=cpu_spec,
     )
 
     resources_group.add_argument(
@@ -376,6 +386,7 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
         dest="memory",
         metavar="SIZE",
         default=DEFAULT_MEMORY_SIZE,
+        type=memory_spec,
     )
 
     resources_group.add_argument(
@@ -393,12 +404,14 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
         dest="gpu",
         default=None,
         metavar="SPEC",
+        type=gpu_spec,
     )
 
     resources_group.add_argument(
         "--disk",
-        help="Request the size of disk for the run. Example [code]--disk 100GB[/].",
+        help="Request the size of disk for the run. Example [code]--disk 100GB..[/].",
         dest="disk",
         metavar="SIZE",
         default=None,
+        type=disk_spec,
     )
