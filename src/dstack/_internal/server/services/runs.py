@@ -317,6 +317,7 @@ async def get_run_plan(
         pool_instances, profile, run_spec.configuration.resources
     ):
         pool_offers.append(pydantic.parse_raw_as(InstanceOfferWithAvailability, instance.offer))
+        # TODO(egor-s): assign availability based on the instance status
 
     backends = await backends_services.get_project_backends(project=project)
     if profile.backends is not None:
@@ -344,6 +345,7 @@ async def get_run_plan(
                 offer.backend = backend.TYPE
             job_offers.extend(offer for _, offer in offers)
 
+        # TODO(egor-s): merge job_offers and pool_offers based on (availability, use/create, price)
         job_plan = JobPlan(
             job_spec=job.job_spec,
             offers=job_offers[:50],
