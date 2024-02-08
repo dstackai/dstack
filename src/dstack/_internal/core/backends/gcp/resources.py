@@ -30,6 +30,7 @@ def create_instance_struct(
     accelerators: List[compute_v1.AcceleratorConfig],
     spot: bool,
     user_data: str,
+    authorized_keys: List[str],
     labels: Dict[str, str],
     tags: List[str],
     instance_name: str,
@@ -75,6 +76,9 @@ def create_instance_struct(
 
     metadata_items = [
         compute_v1.Items(key="user-data", value=user_data),
+        compute_v1.Items(
+            key="ssh-keys", value="\n".join(f"ubuntu:{key}" for key in authorized_keys)
+        ),
     ]
     instance.metadata = compute_v1.Metadata(items=metadata_items)
 
