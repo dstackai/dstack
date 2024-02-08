@@ -20,6 +20,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.errors import BackendError, RepoDoesNotExistError, ServerClientError
 from dstack._internal.core.models.instances import (
+    InstanceAvailability,
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
@@ -316,8 +317,12 @@ async def get_run_plan(
     for instance in filter_pool_instances(
         pool_instances, profile, run_spec.configuration.resources
     ):
-        pool_offers.append(pydantic.parse_raw_as(InstanceOfferWithAvailability, instance.offer))
-        # TODO(egor-s): assign availability based on the instance status
+        offer = pydantic.parse_raw_as(InstanceOfferWithAvailability, instance.offer)
+        if instance.status == InstanceStatus.READY:
+            offer.availability = InstanceAvailability.READY
+        else:
+            offer.availability = InstanceAvailability.BUSY
+        pool_offers.append(offer)
 
     backends = await backends_services.get_project_backends(project=project)
     if profile.backends is not None:

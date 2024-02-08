@@ -68,6 +68,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         if offer.availability in {
             InstanceAvailability.NOT_AVAILABLE,
             InstanceAvailability.NO_QUOTA,
+            InstanceAvailability.READY,
+            InstanceAvailability.BUSY,
         }:
             availability = offer.availability.value.replace("_", " ").title()
         offers.add_row(

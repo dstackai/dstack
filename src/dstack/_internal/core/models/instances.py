@@ -76,6 +76,15 @@ class InstanceAvailability(Enum):
     AVAILABLE = "available"
     NOT_AVAILABLE = "not_available"
     NO_QUOTA = "no_quota"
+    READY = "ready"
+    BUSY = "busy"
+
+    def is_available(self) -> bool:
+        return self in {
+            InstanceAvailability.UNKNOWN,
+            InstanceAvailability.AVAILABLE,
+            InstanceAvailability.READY,
+        }
 
 
 class InstanceOffer(BaseModel):
