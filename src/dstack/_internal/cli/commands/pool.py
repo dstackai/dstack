@@ -20,7 +20,6 @@ from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import Profile, SpotPolicy, TerminationPolicy
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
 from dstack._internal.core.models.runs import Requirements
-from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
 from dstack.api._public.resources import Resources
@@ -206,9 +205,6 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
                 console.print(f"[error]Failed to add remote instance {args.instance_name!r}[/]")
             return
 
-        repo = self.api.repos.load(Path.cwd())
-        self.api.ssh_identity_file = ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
-
         with console.status("Getting instances..."):
             pool_name, offers = self.api.runs.get_offers(profile, requirements)
 
@@ -218,6 +214,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             return
 
         try:
+            # TODO(egor-s): user pub key must be added during the `run`, not `pool add`
             user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
             pub_key = SSHKeys(public=user_pub_key)
             with console.status("Creating instance..."):

@@ -116,6 +116,7 @@ class GCPCompute(Compute):
                 user_data=get_instance_user_data(
                     authorized_keys=instance_config.get_public_keys(),
                 ),
+                authorized_keys=instance_config.get_public_keys(),
                 labels={
                     "owner": "dstack",
                     "dstack_project": project_id,
