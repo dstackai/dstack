@@ -258,7 +258,7 @@ def print_instance_table(instances: Sequence[Instance]) -> None:
             instance.backend,
             instance.instance_type.resources.pretty_format(),
             f"[{style}]{instance.status.value}[/]",
-            f"{instance.price:.02f}",
+            f"${instance.price:.4}",
         ]
         table.add_row(*row)
 
