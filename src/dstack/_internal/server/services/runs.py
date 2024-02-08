@@ -352,8 +352,9 @@ async def get_run_plan(
         )
         job_plans.append(job_plan)
 
-    run_spec.profile.termination_idle_time = None
+    run_spec.profile.termination_idle_time = None  # TODO(egor-s) explain why?
 
+    run_spec.profile.pool_name = pool_name  # write pool name back for the client
     run_spec.run_name = run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name, user=user.name, run_spec=run_spec, job_plans=job_plans

@@ -42,6 +42,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Configuration"), run_plan.run_spec.configuration_path)
     props.add_row(th("Project"), run_plan.project_name)
     props.add_row(th("User"), run_plan.user)
+    props.add_row(th("Pool name"), run_plan.run_spec.profile.pool_name)
     props.add_row(th("Min resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Max duration"), max_duration)
