@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -15,8 +17,9 @@ class ShowPoolRequest(BaseModel):  # type: ignore[misc]
 
 
 class RemoveInstanceRequest(BaseModel):  # type: ignore[misc]
-    pool_name: str
+    pool_name: Optional[str]
     instance_name: str
+    force: bool = False
 
 
 class SetDefaultPoolRequest(BaseModel):  # type: ignore[misc]

@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 
 class SSHKeys(BaseModel):
     public: str
-    private: Optional[str]
+    private: Optional[str] = None
 
 
 class DockerConfig(BaseModel):

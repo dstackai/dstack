@@ -176,6 +176,7 @@ async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
+    ssh_key: SSHKeys,
     pool_name: str,
     instance_name: str,
     profile: Profile,
@@ -188,15 +189,17 @@ async def create_instance(
     if not offers:
         return
 
-    ssh_key = SSHKeys(
+    user_ssh_key = ssh_key
+    project_ssh_key = SSHKeys(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
     )
+
     image = parse_image_name(get_default_image(get_default_python_verison()))
     instance_config = InstanceConfiguration(
         instance_name=instance_name,
         pool_name=pool_name,
-        ssh_keys=[ssh_key],
+        ssh_keys=[user_ssh_key, project_ssh_key],
         job_docker_config=DockerConfig(
             image=image,
             registry_auth=None,
@@ -278,7 +281,7 @@ async def create_instance(
             offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
             resource_spec_data=requirements.resources.json(),
             termination_policy=profile.termination_policy,
-            termination_idle_time=str(profile.termination_idle_time),
+            termination_idle_time=300,  # TODO: fix deserialize
         )
         session.add(im)
         await session.commit()

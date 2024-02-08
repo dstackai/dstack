@@ -12,6 +12,7 @@ from typing import Dict, Iterable, List, Optional, Tuple, Union
 from websocket import WebSocketApp
 
 import dstack.api as api
+from dstack._internal.core.backends.base.compute import SSHKeys
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
@@ -367,8 +368,12 @@ class RunCollection:
     ) -> Tuple[str, List[InstanceOfferWithAvailability]]:
         return self._api_client.runs.get_offers(self._project, profile, requirements)
 
-    def create_instance(self, pool_name: str, profile: Profile, requirements: Requirements):
-        self._api_client.runs.create_instance(self._project, pool_name, profile, requirements)
+    def create_instance(
+        self, pool_name: str, profile: Profile, requirements: Requirements, ssh_key: SSHKeys
+    ):
+        self._api_client.runs.create_instance(
+            self._project, pool_name, profile, requirements, ssh_key
+        )
 
     def get_plan(
         self,

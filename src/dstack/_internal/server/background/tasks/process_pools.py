@@ -20,7 +20,7 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import get_current_datetime, parse_pretty_duration
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
@@ -154,11 +154,11 @@ async def terminate_idle_instance() -> None:
             if instance.last_job_processed_at is not None:
                 last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
 
+            idle_seconds = instance.termination_idle_time
+            delta = datetime.timedelta(seconds=idle_seconds)
+
             current_time = get_current_datetime().replace(tzinfo=datetime.timezone.utc)
 
-            delta = datetime.timedelta(
-                seconds=parse_pretty_duration(instance.termination_idle_time)
-            )
             if last_time + delta < current_time:
                 jpd: JobProvisioningData = parse_raw_as(
                     JobProvisioningData, instance.job_provisioning_data

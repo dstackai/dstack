@@ -183,7 +183,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             job_provisioning_data=job_provisioning_data.json(),
             offer=offer.json(),
             termination_policy=profile.termination_policy,
-            termination_idle_time=str(profile.termination_idle_time),
+            termination_idle_time=300,  # TODO: fix deserialize
             job=job_model,
             backend=offer.backend,
             price=offer.price,

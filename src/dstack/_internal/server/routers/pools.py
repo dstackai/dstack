@@ -35,7 +35,9 @@ async def remove_instance(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> None:
     _, project_model = user_project
-    await pools.remove_instance(session, project_model, body.pool_name, body.instance_name)
+    await pools.remove_instance(
+        session, project_model, body.pool_name, body.instance_name, body.force
+    )
 
 
 @router.post("/set-default")  # type: ignore[misc]

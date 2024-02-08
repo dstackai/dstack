@@ -66,6 +66,9 @@ class PortsLock:
                 d[remote_port] = self.sockets[remote_port].getsockname()[1]
         return d
 
+    def __str__(self) -> str:
+        return f"<PortsLock: {self.dict()}>"
+
     @staticmethod
     def _listen(port: int) -> Optional[socket.socket]:
         try:

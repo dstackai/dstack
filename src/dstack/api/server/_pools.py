@@ -30,9 +30,11 @@ class PoolAPIClient(APIClientGroup):  # type: ignore[misc]
         result: List[Instance] = parse_obj_as(List[Instance], resp.json())
         return result
 
-    def remove(self, project_name: str, pool_name: str, instance_name: str) -> None:
+    def remove(
+        self, project_name: str, pool_name: Optional[str], instance_name: str, force: bool
+    ) -> None:
         body = schemas_pools.RemoveInstanceRequest(
-            pool_name=pool_name, instance_name=instance_name
+            pool_name=pool_name, instance_name=instance_name, force=force
         )
         self._request(f"/api/project/{project_name}/pool/remove", body=body.json())
 

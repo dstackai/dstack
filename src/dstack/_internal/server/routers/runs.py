@@ -98,6 +98,7 @@ async def create_instance(
         session=session,
         project=project,
         user=user,
+        ssh_key=body.ssh_key,
         pool_name=body.pool_name,
         instance_name=instance_name,
         profile=body.profile,

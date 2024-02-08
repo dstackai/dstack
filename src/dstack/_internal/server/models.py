@@ -285,7 +285,7 @@ class InstanceModel(BaseModel):
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
 
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(50))
-    termination_idle_time: Mapped[Optional[str]] = mapped_column(String(50))
+    termination_idle_time: Mapped[int] = mapped_column(Integer)
 
     backend: Mapped[BackendType] = mapped_column(Enum(BackendType))
     backend_data: Mapped[Optional[str]] = mapped_column(String(4000))

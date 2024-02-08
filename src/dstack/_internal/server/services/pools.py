@@ -153,7 +153,11 @@ async def set_default_pool(session: AsyncSession, project: ProjectModel, pool_na
 
 
 async def remove_instance(
-    session: AsyncSession, project: ProjectModel, pool_name: str, instance_name: str
+    session: AsyncSession,
+    project: ProjectModel,
+    pool_name: Optional[str],
+    instance_name: str,
+    force: bool,
 ) -> None:
     pool = (
         await session.scalars(
@@ -163,14 +167,23 @@ async def remove_instance(
                 PoolModel.deleted == False,
             )
         )
-    ).one()
+    ).one_or_none()
+
+    if pool is None:
+        logger.warning("Couldn't find pool")
+        return
+
+    # TODO: need lock
     terminated = False
     for instance in pool.instances:
         if instance.name == instance_name:
-            instance.status = InstanceStatus.TERMINATING
-            terminated = True
+            if force or instance.job_id is None:
+                instance.status = InstanceStatus.TERMINATING
+                terminated = True
+
     if not terminated:
         logger.warning("Couldn't find instance to terminate")
+
     await session.commit()
 
 
@@ -226,6 +239,10 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         status=instance_model.status,
         price=offer.price,
     )
+    if instance_model.job is not None:
+        instance.job_name = instance_model.job.name
+        instance.job_status = instance_model.job.status
+
     return instance
 
 
@@ -347,7 +364,7 @@ async def add_remote(
         offer=offer.json(),
         resource_spec_data=resources.json(),
         termination_policy=profile.termination_policy,
-        termination_idle_time=str(profile.termination_idle_time),
+        termination_idle_time=300,  # TODO: fix deserialize
     )
     session.add(im)
     await session.commit()

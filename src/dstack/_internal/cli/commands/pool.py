@@ -10,6 +10,7 @@ from dstack._internal.cli.services.configurators.profile import (
     register_profile_args,
 )
 from dstack._internal.cli.utils.common import confirm_ask, console
+from dstack._internal.core.backends.base.compute import SSHKeys
 from dstack._internal.core.errors import CLIError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -123,6 +124,11 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         remove_parser.add_argument(
             "--name", dest="instance_name", help="The name of the instance", required=True
         )
+        remove_parser.add_argument(
+            "--force",
+            action="store_true",
+            help="The name of the instance",
+        )
         remove_parser.set_defaults(subfunc=self._remove)
 
         # pool set-default
@@ -147,7 +153,9 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         self.api.client.pool.delete(self.api.project, args.pool_name, args.force)
 
     def _remove(self, args: argparse.Namespace) -> None:
-        self.api.client.pool.remove(self.api.project, args.pool_name, args.instance_name)
+        self.api.client.pool.remove(
+            self.api.project, args.pool_name, args.instance_name, args.force
+        )
 
     def _set_default(self, args: argparse.Namespace) -> None:
         result = self.api.client.pool.set_default(self.api.project, args.pool_name)
@@ -181,7 +189,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         # TODO: add full support
         termination_policy_idle = 5 * 60  # 5 minutes by default
         termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        profile.termination_idle_time = str(termination_policy_idle)
+        profile.termination_idle_time = str(termination_policy_idle)  # TODO: fix serialization
         profile.termination_policy = termination_policy
 
         # Add remote instance
@@ -210,8 +218,10 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             return
 
         try:
+            user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
+            pub_key = SSHKeys(public=user_pub_key)
             with console.status("Creating instance..."):
-                self.api.runs.create_instance(pool_name, profile, requirements)
+                self.api.runs.create_instance(pool_name, profile, requirements, pub_key)
         except ServerClientError as e:
             raise CLIError(e.msg)
 

@@ -2,6 +2,7 @@ from typing import List, Optional, Tuple
 
 from pydantic import parse_obj_as
 
+from dstack._internal.core.backends.base.compute import SSHKeys
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import Requirements, Run, RunPlan, RunSpec
@@ -37,10 +38,15 @@ class RunsAPIClient(APIClientGroup):
         return parse_obj_as(Tuple[str, List[InstanceOfferWithAvailability]], resp.json())
 
     def create_instance(
-        self, project_name: str, pool_name: str, profile: Profile, requirements: Requirements
+        self,
+        project_name: str,
+        pool_name: str,
+        profile: Profile,
+        requirements: Requirements,
+        ssh_key: SSHKeys,
     ):
         body = CreateInstanceRequest(
-            pool_name=pool_name, profile=profile, requirements=requirements
+            pool_name=pool_name, profile=profile, requirements=requirements, ssh_key=ssh_key
         )
         self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
 
