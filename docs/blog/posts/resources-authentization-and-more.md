@@ -1,0 +1,150 @@
+---
+date: 2024-02-08
+description: "Resource configuration, authentication in services, model mapping for vLLM, and other improvements."
+slug: "resources-authentication-and-more"
+categories:
+  - Releases
+---
+
+# dstack 0.15.0: Resources, authentication, and more
+
+__Resource configuration in YAML, authentication in services, and other improvements.__
+
+The latest update brings many improvements, enabling the configuration of resources in YAML files, requiring
+authentication in services, supporting OpenAI-compatible endpoints for vLLM, and more. 
+
+<!-- more -->
+
+## Resource configuration
+
+Previously, if you wanted to request hardware resources, you had to either use the corresponding arguments with
+`dstack run` (e.g. `--gpu GPU_SPEC`) or use `.dstack/profiles.yml`.
+
+With `0.15.0`, it is now possible to configure resources in the YAML configuration file:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+
+python: 3.11
+ide: vscode
+
+# (Optional) Configure `gpu`, `memory`, `disk`, etc 
+resources:
+  gpu: 24GB
+```
+
+</div>
+
+Supported properties include: `gpu`, `cpu`, `memory`, `disk`, and `shm_size`.
+
+If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
+range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
+
+The `gpu` property allows specifying not only memory size but also GPU names
+and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A100), 
+`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB), etc.
+
+It's also possible to configure `gpu` as an object:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+
+python: 3.11
+ide: vscode
+
+# Require 2 GPUs of at least 40GB with CUDA compute compatibility of 7.5
+resources:
+  gpu:
+    count: 2
+    memory: 40GB..
+    compute_capability: 7.5
+```
+
+</div>
+
+For more details on `resources` schema, refer to the [Reference](../../docs/reference/dstack.yml.md).
+
+## Authentication in services
+
+Previously, when deploying a service, the public endpoint didn't support authentication, 
+meaning anyone with access to the gateway could call it.
+
+With `0.15.0`, by default, service endpoints require the `Authentication` header with `"Bearer <dstack token>"`. 
+
+<div class="termy">
+
+```shell
+$ curl https://yellow-cat-1.example.com/generate \
+    -X POST \
+    -d '{"inputs":"&lt;s&gt;[INST] What is your favourite condiment?[/INST]"}' \
+    -H 'Content-Type: application/json' \
+    -H 'Authentication: "Bearer &lt;dstack token&gt;"'
+```
+
+</div>
+
+Authentication can be disabled by setting `auth` to `false` in the service configuration file.
+
+#### OpenAI interface
+
+In case the service has [model mapping](../../docs/concepts/services.md#model-mapping) configured, 
+the OpenAI-compatible endpoint requires authentication.
+
+```python
+from openai import OpenAI
+
+
+client = OpenAI(
+  base_url="https://gateway.example.com",
+  api_key="<dstack token>"
+)
+
+completion = client.chat.completions.create(
+  model="mistralai/Mistral-7B-Instruct-v0.1",
+  messages=[
+    {"role": "user", "content": "Compose a poem that explains the concept of recursion in programming."}
+  ]
+)
+
+print(completion.choices[0].message)
+```
+
+## Model mapping for vLLM
+
+Last but not least, we've added one more format for [model mapping](../../docs/concepts/services.md#model-mapping): `openai`.
+
+For example, if you run vLLM using the OpenAI mode, it's possible to configure model mapping for it.
+
+```yaml
+type: service
+
+python: "3.11"
+env:
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
+
+resources:
+  gpu: 24GB
+
+model:
+  format: openai
+  type: chat
+  name: NousResearch/Llama-2-7b-chat-hf
+```
+
+When we run such a service, it will be possible to access the model at  
+`https://gateway.<gateway domain>` via the OpenAI-compatible interface 
+and using your `dstack` user token.
+
+## Feedback
+
+In case you have any questions, experience bugs, or need help, 
+drop us a message on our [Discord server](https://discord.gg/u8SmfwPpMd) or submit it as a 
+[GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).

@@ -1039,19 +1039,6 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         display: none;
     }
 
-    .md-tabs__item:nth-child(5) a {
-        border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
-        border-width: 1.5px;
-        border-style: solid;
-        background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        padding: 7px 25px;
-        height: 40px;
-        margin-top: 16px;
-        font-size: 17.5px;
-    }
-
     .md-tabs__item:nth-child(6) {
         padding-right: 0.5rem;
         margin-left: auto;
@@ -1069,7 +1056,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         visibility: visible;
     }
 
-    .md-tabs__item:nth-child(4) .md-tabs__link:after {
+    .md-tabs__item:nth-child(5) .md-tabs__link:after {
         content: url('data:image/svg+xml,<svg width="16" height="16" viewBox="1 1 27 27" xmlns="http://www.w3.org/2000/svg" fill="rgba(0,0,0,0.87)" stroke="rgba(0,0,0,0.87)" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round"><path d="M23.5 23.5h-15v-15h4.791V6H6v20h20v-7.969h-2.5z"/><path d="M17.979 6l3.016 3.018-6.829 6.829 1.988 1.987 6.83-6.828L26 14.02V6z"/></svg>');
         line-height: 14px;
         padding-left: 3px;
@@ -1141,7 +1128,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 @media screen and (min-width: 76.25em) {
     .md-search .md-search__inner {
-        padding-top: 0.55rem;
+        padding-top: 0.58rem;
         margin-right: 0.8rem;
     }
 

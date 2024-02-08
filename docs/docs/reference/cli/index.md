@@ -55,7 +55,7 @@ $ dstack run . --help
 </div>
 
 ??? info ".gitignore"
-When running anything via CLI, `dstack` uses the exact version of code from your project directory.
+    When running anything via CLI, `dstack` uses the exact version of code from your project directory.
 
     If there are large files, consider creating a `.gitignore` file to exclude them for better performance.
 

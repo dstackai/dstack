@@ -17,44 +17,26 @@ are both acceptable).
 ```yaml
 type: task
 
-python: "3.11" # (Optional) If not specified, your local version is used
-
+python: "3.11"
+env:
+  - HF_HUB_ENABLE_HF_TRANSFER=1
 commands:
-  - pip install -r requirements.txt
-  - python train.py
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+# (Optional) Configure `gpu`, `memory`, `disk`, etc
+resources:
+  gpu: 80GB
 ```
 
 </div>
-
-A task can configure ports:
-
-<div editor-title="serve.dstack.yml"> 
-
-```yaml
-type: task
-
-ports:
-  - 7860
-
-python: "3.11" # (Optional) If not specified, your local version is used.
-
-commands:
-  - pip install -r requirements.txt
-  - gradio app.py
-```
-
-</div>
-
-When running a task, `dstack` forwards the remote ports to `localhost` for secure 
-and convenient access.
 
 By default, `dstack` uses its own Docker images to run dev environments, 
 which are pre-configured with Python, Conda, and essential CUDA drivers.
 
 !!! info "Configuration options"
     Configuration file allows you to specify a custom Docker image, ports, environment variables, and many other 
-    options.
-    For more details, refer to the [Reference](../reference/dstack.yml.md#task).
+    options. For more details, refer to the [Reference](../reference/dstack.yml.md#task).
 
 ### Run the configuration
 
@@ -64,7 +46,7 @@ configuration file path, and any other options (e.g., for requesting hardware re
 <div class="termy">
 
 ```shell
-$ dstack run . -f train.dstack.yml --gpu A100
+$ dstack run . -f train.dstack.yml
 
  BACKEND     REGION         RESOURCES                     SPOT  PRICE
  tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
@@ -84,41 +66,71 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 </div>
 
 !!! info "Run options"
-    The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
-    and many other options (incl. spot instances, disk size, max price, max duration, retry policy, etc.).
+    The `dstack run` command allows you to use specify the spot policy (e.g. `--spot-auto`, `--spot`, or `--on-demand`), 
+    max duration of the run (e.g. `--max-duration 1h`), and many other options.
     For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
 
-??? info "Port mapping"
-    When running a task, `dstack` forwards the remote ports to `localhost` for secure 
-    and convenient access.
-    You can override local ports via `--port`:
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . -f serve.dstack.yml --port 8080:7860
-    ```
-    
-    </div>
-    
-    This will forward the task's port `7860` to `localhost:8080`.
+### Configure ports
 
-### Parametrize tasks
-
-You can parameterize tasks with user arguments using `${{ run.args }}` in the configuration.
-
-Example:
+A task can configure ports. In this case, if the task is running an application on a port, `dstack run` 
+will securely allow you to access this port from your local machine through port forwarding.
 
 <div editor-title="train.dstack.yml"> 
 
 ```yaml
 type: task
 
-python: "3.11" # (Optional) If not specified, your local version is used
-
+python: "3.11"
+env:
+  - HF_HUB_ENABLE_HF_TRANSFER=1
 commands:
-  - pip install -r requirements.txt
-  - python train.py ${{ run.args }}
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - tensorboard --logdir results/runs &
+  - python fine-tuning/qlora/train.py
+ports:
+  - 6000
+
+# (Optional) Configure `gpu`, `memory`, `disk`, etc
+resources:
+  gpu: 80GB
+```
+
+</div>
+
+When running it, `dstack run` forwards `6000` port to `localhost:6000`, enabling secure access. 
+
+??? info "Override port mapping"
+    By default, `dstack` uses the same ports on your local machine for port forwarding. However, you can override local ports using `--port`:
+    
+    <div class="termy">
+    
+    ```shell
+    $ dstack run . -f train.dstack.yml --port 6000:6001
+    ```
+    
+    </div>
+    
+    This will forward the task's port `6000` to `localhost:6001`.
+
+### Parametrize tasks
+
+You can parameterize tasks with user arguments using `${{ run.args }}` in the configuration.
+
+<div editor-title="train.dstack.yml"> 
+
+```yaml
+type: task
+
+python: "3.11"
+env:
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py ${{ run.args }}
+
+# (Optional) Configure `gpu`, `memory`, `disk`, etc
+resources:
+  gpu: 80GB
 ```
 
 </div>
@@ -128,7 +140,7 @@ Now, you can pass your arguments to the `dstack run` command:
 <div class="termy">
 
 ```shell
-$ dstack run . -f train.dstack.yml --gpu A100 --train_batch_size=1 --num_train_epochs=100
+$ dstack run . -f train.dstack.yml --train_batch_size=1 --num_train_epochs=100
 ```
 
 </div>
@@ -153,7 +165,10 @@ $ dstack run . -f train.dstack.yml --retry-limit 3h
 
 For more details on the `dstack run` command, refer to the [Reference](../reference/cli/index.md#dstack-run).
 
-[//]: # (Using the API)
+## Using the API
+
+Submitting and managing tasks is also possible programmatically via the [Python API](../reference/api/python/index.md) or 
+[REST API](../reference/api/rest/index.md).
 
 ## What's next?
 

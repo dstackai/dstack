@@ -234,6 +234,17 @@
     -webkit-text-fill-color: transparent;
 }
 
+.md-header__buttons {
+    padding-top: 11px;
+}
+
+.md-header__buttons .md-button-secondary {
+    border-width: 2px;
+    font-weight: 700 !important;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
 .md-header__buttons .md-button-secondary:hover,
 .tx-container .md-button-secondary:hover {
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);

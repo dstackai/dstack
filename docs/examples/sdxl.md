@@ -12,7 +12,7 @@ generation and refinement.
 
 Here's the list of libraries that our example will require:
 
-<div editor-title="stable-diffusion-xl/requirements.txt">
+<div editor-title="deployment/sdxl/requirements.txt">
 
 ```text
 transformers
@@ -169,21 +169,21 @@ For production purposes, the optimal approach to serve an application is by usin
 
 Here's the configuration that uses services:
 
-<div editor-title="stable-diffusion-xl/api.dstack.yml"> 
+<div editor-title="deployment/sdxl/serve.dstack.yml"> 
 
 ```yaml
 type: service
 
-# (Optional) If not specified, it will use your local version
 python: "3.11"
-
-port: 8000
-
 commands: 
   - apt-get update 
   - apt-get install libgl1 -y
   - pip install -r stable-diffusion-xl/requirements.txt
   - uvicorn stable-diffusion-xl.main:app --port 8000
+port: 8000
+
+resources:
+  gpu: 16GB
 ```
 
 </div>
@@ -199,7 +199,7 @@ After the gateway is configured, go ahead run the service.
 <div class="termy">
 
 ```shell
-$ dstack run . -f stable-diffusion-xl/api.dstack.yml
+$ dstack run . -f deployment/sdxl/serve.dstack.yml
 ```
 
 </div>
@@ -208,11 +208,15 @@ $ dstack run . -f stable-diffusion-xl/api.dstack.yml
 Once the service is up, you can query it at 
 `https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
+!!! info "Authentication"
+    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
+
 <div class="termy">
 
 ```shell
 $ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
     -H 'Content-Type: application/json' \
+    -H 'Authentication: "Bearer &lt;dstack token&gt;"' \
     -d '{ "prompt": "A cat in a hat" }'
 ```
 

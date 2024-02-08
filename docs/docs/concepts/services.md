@@ -1,6 +1,6 @@
 # Services
 
-Services make it easy to deploy models and apps as public endpoints, allowing you to use any
+Services make it easy to deploy models and apps as public endpoints, while giving you the flexibility to use any
 frameworks.
 
 ??? info "Prerequisites"
@@ -53,6 +53,10 @@ env:
 port: 80
 commands:
   - text-generation-launcher --port 80 --trust-remote-code
+
+# (Optional) Configure `gpu`, `memory`, `disk`, etc
+resources:
+  gpu: 80GB
 ```
 
 </div>
@@ -84,6 +88,11 @@ port: 80
 commands:
   - text-generation-launcher --port 80 --trust-remote-code
   
+# (Optional) Configure `gpu`, `memory`, `disk`, etc
+resources:
+  gpu: 80GB
+  
+# (Optional) Enable the OpenAI-compatible endpoint   
 model:
   type: chat
   name: mistralai/Mistral-7B-Instruct-v0.1
@@ -95,7 +104,10 @@ model:
 In this case, with such a configuration, once the service is up, you'll be able to access the model at
 `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
 
-#### Chat template
+The `format` supports only `tgi` (Text Generation Inference) 
+and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-compatible mode).
+
+##### Chat template
 
 By default, `dstack` loads the [chat template](https://huggingface.co/docs/transformers/main/en/chat_templating) 
 from the model's repository. If it is not present there, manual configuration is required.
@@ -110,6 +122,11 @@ port: 80
 commands:
   - text-generation-launcher --port 80 --trust-remote-code --quantize gptq
 
+# (Optional) Configure `gpu`, `memory`, `disk`, etc
+resources:
+  gpu: 80GB
+  
+# (Optional) Enable the OpenAI-compatible endpoint
 model:
   type: chat
   name: TheBloke/Llama-2-13B-chat-GPTQ
@@ -123,8 +140,7 @@ model:
     
     1. Doesn't work if your `chat_template` uses `bos_token`. As a workaround, replace `bos_token` inside `chat_template` with the token content itself.
     2. Doesn't work if `eos_token` is defined in the model repository as a dictionary. As a workaround, set `eos_token` manually, as shown in the example above (see Chat template).
-    3. Only works if you're using Text Generation Inference. Support for vLLM and other serving frameworks is coming later.
- 
+
     If you encounter any other issues, please make sure to file a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 ## Run the configuration
@@ -135,7 +151,7 @@ configuration file path, and any other options (e.g., for requesting hardware re
 <div class="termy">
 
 ```shell
-$ dstack run . -f serve.dstack.yml --gpu A100
+$ dstack run . -f serve.dstack.yml
 
  BACKEND     REGION         RESOURCES                     SPOT  PRICE
  tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
@@ -153,14 +169,18 @@ Service is published at https://yellow-cat-1.example.com
 </div>
 
 !!! info "Run options"
-    The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
-    and many other options (incl. spot instances, disk size, max price, max duration, retry policy, etc.).
+    The `dstack run` command allows you to use specify the spot policy (e.g. `--spot-auto`, `--spot`, or `--on-demand`), 
+    max duration of the run (e.g. `--max-duration 1h`), and many other options.
     For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
 
 ### Service endpoint
 
-Once the service is up, you'll be able to 
-access it at `https://<run name>.<gateway domain>`.
+Once the service is up, you'll be able to access it at `https://<run name>.<gateway domain>`.
+
+#### Authentication
+    
+By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`. 
+Authentication can be disabled by setting `auth` to `false` in the service configuration file.
 
 <div class="termy">
 
@@ -168,7 +188,8 @@ access it at `https://<run name>.<gateway domain>`.
 $ curl https://yellow-cat-1.example.com/generate \
     -X POST \
     -d '{"inputs":"&lt;s&gt;[INST] What is your favourite condiment?[/INST]"}' \
-    -H 'Content-Type: application/json'
+    -H 'Content-Type: application/json' \
+    -H 'Authentication: "Bearer &lt;dstack token&gt;"'
 ```
 
 </div>
@@ -184,7 +205,7 @@ from openai import OpenAI
 
 client = OpenAI(
   base_url="https://gateway.example.com",
-  api_key="none"
+  api_key="<dstack token>"
 )
 
 completion = client.chat.completions.create(

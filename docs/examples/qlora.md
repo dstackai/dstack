@@ -203,27 +203,25 @@ if __name__ == "__main__":
 
 Here's the configuration that runs the training task via `dstack`:
 
-<div editor-title="llama-2/train.dstack.yml"> 
+<div editor-title="finetuning/qlora/train.dstack.yml"> 
 
 ```yaml
 type: task
 
-# (Optional) When not specified, your local Python version is used
 python: "3.11"
-
 env: 
   - HF_HUB_ENABLE_HF_TRANSFER=1
   # (Required) Specify your Hugging Face token to publish the fine-tuned model
   - HUGGING_FACE_HUB_TOKEN=
-
+commands:
+  - pip install -r llama-2/requirements.txt
+  - tensorboard --logdir results/runs &
+  - python llama-2/train.py --merge_and_push ${{ run.args }}
 ports:
   - 6006
 
-commands:
-  - echo "Installing requirements..."
-  - pip -q install -r llama-2/requirements.txt
-  - tensorboard --logdir results/runs &
-  - python llama-2/train.py --merge_and_push ${{ run.args }}
+resources:
+  gpu: 16GB..24GB
 ```
 
 </div>
@@ -235,7 +233,7 @@ Here's how you run it with `dstack`:
 <div class="termy">
 
 ```shell
-$ dstack run . -f llama-2/train.dstack.yml --gpu 16GB --num_train_epochs 10
+$ dstack run . -f finetuning/qlora/train.dstack.yml --num_train_epochs 10
 
 Installing requirements...
 TensorBoard 2.14.0 at http://127.0.0.1:6006/ (Press CTRL+C to quit)
