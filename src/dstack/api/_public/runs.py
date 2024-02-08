@@ -17,6 +17,7 @@ from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsEr
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
@@ -370,8 +371,8 @@ class RunCollection:
 
     def create_instance(
         self, pool_name: str, profile: Profile, requirements: Requirements, ssh_key: SSHKeys
-    ):
-        self._api_client.runs.create_instance(
+    ) -> Instance:
+        return self._api_client.runs.create_instance(
             self._project, pool_name, profile, requirements, ssh_key
         )
 

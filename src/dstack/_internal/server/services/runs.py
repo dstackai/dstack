@@ -23,6 +23,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
+from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
 from dstack._internal.core.models.runs import (
     InstanceStatus,
@@ -65,6 +66,7 @@ from dstack._internal.server.services.pools import (
     filter_pool_instances,
     get_or_create_default_pool_by_name,
     get_pool_instances,
+    instance_model_to_instance,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.utils.common import run_async
@@ -181,7 +183,7 @@ async def create_instance(
     instance_name: str,
     profile: Profile,
     requirements: Requirements,
-) -> Optional[InstanceModel]:
+) -> Optional[Instance]:
     offers = await get_run_plan_by_requirements(
         project, profile, requirements, exclude_not_available=True
     )
@@ -286,7 +288,7 @@ async def create_instance(
         session.add(im)
         await session.commit()
 
-        return im
+        return instance_model_to_instance(im)
 
 
 async def get_run_plan(

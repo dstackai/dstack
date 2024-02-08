@@ -3,8 +3,9 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.errors import ResourceNotExistsError, ServerClientError
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.runs import Run, RunPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -89,12 +90,12 @@ async def create_instance(
     body: CreateInstanceRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-):
+) -> Instance:
     user, project = user_project
     instance_name = await generate_instance_name(
         session=session, project=project, pool_name=body.pool_name
     )
-    await runs.create_instance(
+    instance = await runs.create_instance(
         session=session,
         project=project,
         user=user,
@@ -104,6 +105,9 @@ async def create_instance(
         profile=body.profile,
         requirements=body.requirements,
     )
+    if instance is None:
+        raise ServerClientError(msg="Failed to create an instance")
+    return instance
 
 
 @project_router.post("/get_plan")

@@ -213,14 +213,15 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             console.print("\nExiting...")
             return
 
+        # TODO(egor-s): user pub key must be added during the `run`, not `pool add`
+        user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
+        pub_key = SSHKeys(public=user_pub_key)
         try:
-            # TODO(egor-s): user pub key must be added during the `run`, not `pool add`
-            user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
-            pub_key = SSHKeys(public=user_pub_key)
             with console.status("Creating instance..."):
-                self.api.runs.create_instance(pool_name, profile, requirements, pub_key)
+                instance = self.api.runs.create_instance(pool_name, profile, requirements, pub_key)
         except ServerClientError as e:
             raise CLIError(e.msg)
+        print_instance_table([instance])
 
     def _command(self, args: argparse.Namespace) -> None:
         super()._command(args)
