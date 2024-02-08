@@ -200,7 +200,8 @@ class ResourcesSpec(ForbidExtra):
         def schema_extra(schema: Dict[str, Any]):
             schema.clear()
             # replace strict schema with a more permissive one
-            for field, value in ResourcesSpecSchema.schema().items():
+            ref_template = "#/definitions/ResourcesSpec/definitions/{model}"
+            for field, value in ResourcesSpecSchema.schema(ref_template=ref_template).items():
                 schema[field] = value
 
     cpu: Range[int] = DEFAULT_CPU_COUNT
