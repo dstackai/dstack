@@ -5,6 +5,7 @@ from typing import Sequence
 from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec, memory_spec
 from dstack._internal.cli.services.configurators.profile import (
     apply_profile_args,
     register_profile_args,
@@ -25,7 +26,6 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
 from dstack._internal.core.models.runs import Requirements
-from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
 from dstack.api._public.resources import Resources
@@ -153,19 +153,26 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
 
     def _create(self, args: argparse.Namespace) -> None:
         self.api.client.pool.create(self.api.project, args.pool_name)
+        console.print(f"Pool {args.pool_name!r} created")
 
     def _delete(self, args: argparse.Namespace) -> None:
-        self.api.client.pool.delete(self.api.project, args.pool_name, args.force)
+        # TODO(egor-s): ask for confirmation
+        with console.status("Removing pool..."):
+            self.api.client.pool.delete(self.api.project, args.pool_name, args.force)
+        console.print(f"Pool {args.pool_name!r} removed")
 
     def _remove(self, args: argparse.Namespace) -> None:
-        self.api.client.pool.remove(
-            self.api.project, args.pool_name, args.instance_name, args.force
-        )
+        # TODO(egor-s): ask for confirmation
+        with console.status("Removing instance..."):
+            self.api.client.pool.remove(
+                self.api.project, args.pool_name, args.instance_name, args.force
+            )
+        console.print(f"Instance {args.instance_name!r} removed")
 
     def _set_default(self, args: argparse.Namespace) -> None:
         result = self.api.client.pool.set_default(self.api.project, args.pool_name)
         if not result:
-            console.print(f"[error]Failed to set default pool {args.pool_name!r}[/]")
+            console.print(f"Failed to set default pool {args.pool_name!r}", style="error")
 
     def _show(self, args: argparse.Namespace) -> None:
         instances = self.api.client.pool.show(self.api.project, args.pool_name)
@@ -208,10 +215,8 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             )
             if not result:
                 console.print(f"[error]Failed to add remote instance {args.instance_name!r}[/]")
+            # TODO(egor-s): print on success
             return
-
-        repo = self.api.repos.load(Path.cwd())
-        self.api.ssh_identity_file = ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
 
         with console.status("Getting instances..."):
             pool_name, offers = self.api.runs.get_offers(profile, requirements)
@@ -221,13 +226,15 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             console.print("\nExiting...")
             return
 
+        # TODO(egor-s): user pub key must be added during the `run`, not `pool add`
+        user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
+        pub_key = SSHKey(public=user_pub_key)
         try:
-            user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
-            pub_key = SSHKey(public=user_pub_key)
             with console.status("Creating instance..."):
-                self.api.runs.create_instance(pool_name, profile, requirements, pub_key)
+                instance = self.api.runs.create_instance(pool_name, profile, requirements, pub_key)
         except ServerClientError as e:
             raise CLIError(e.msg)
+        print_instance_table([instance])
 
     def _command(self, args: argparse.Namespace) -> None:
         super()._command(args)
@@ -373,6 +380,7 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
         dest="cpu",
         metavar="SPEC",
         default=DEFAULT_CPU_COUNT,
+        type=cpu_spec,
     )
 
     resources_group.add_argument(
@@ -382,6 +390,7 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
         dest="memory",
         metavar="SIZE",
         default=DEFAULT_MEMORY_SIZE,
+        type=memory_spec,
     )
 
     resources_group.add_argument(
@@ -399,12 +408,14 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
         dest="gpu",
         default=None,
         metavar="SPEC",
+        type=gpu_spec,
     )
 
     resources_group.add_argument(
         "--disk",
-        help="Request the size of disk for the run. Example [code]--disk 100GB[/].",
+        help="Request the size of disk for the run. Example [code]--disk 100GB..[/].",
         dest="disk",
         metavar="SIZE",
         default=None,
+        type=disk_spec,
     )

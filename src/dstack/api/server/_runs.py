@@ -3,6 +3,7 @@ from typing import List, Optional, Tuple
 from pydantic import parse_obj_as
 
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
+from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import Requirements, Run, RunPlan, RunSpec
 from dstack._internal.server.schemas.runs import (
@@ -43,11 +44,12 @@ class RunsAPIClient(APIClientGroup):
         profile: Profile,
         requirements: Requirements,
         ssh_key: SSHKey,
-    ):
+    ) -> Instance:
         body = CreateInstanceRequest(
             pool_name=pool_name, profile=profile, requirements=requirements, ssh_key=ssh_key
         )
-        self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
+        resp = self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
+        return parse_obj_as(Instance, resp.json())
 
     def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:
         body = GetRunPlanRequest(run_spec=run_spec)
