@@ -16,9 +16,15 @@ both acceptable).
 ```yaml
 type: dev-environment
 
-python: "3.11" # (Optional) If not specified, your local version is used
+# Use either `python` or `image` to configure environment
+python: "3.11"
+# image: ghcr.io/huggingface/text-generation-inference:latest
 
 ide: vscode
+
+# (Optional) Configure `gpu`, `memory`, `disk`, etc
+resources:
+  gpu: 80GB
 ```
 
 </div>
@@ -36,7 +42,7 @@ configuration file path, and any other options (e.g., for requesting hardware re
 <div class="termy">
 
 ```shell
-$ dstack run . -f .dstack.yml --gpu A100
+$ dstack run . -f .dstack.yml
 
  BACKEND     REGION         RESOURCES                     SPOT  PRICE
  tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
@@ -55,8 +61,8 @@ To open in VS Code Desktop, use this link:
 </div>
 
 !!! info "Run options"
-    The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
-    and many other options (incl. spot instances, disk size, max price, max duration, retry policy, etc.).
+    The `dstack run` command allows you to use specify the spot policy (e.g. `--spot-auto`, `--spot`, or `--on-demand`), 
+    max duration of the run (e.g. `--max-duration 1h`), and many other options.
     For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
 
 Once the dev environment is provisioned, click the link to open the environment in your desktop IDE.

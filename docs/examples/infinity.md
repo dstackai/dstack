@@ -19,6 +19,9 @@ env:
 commands:
   - infinity_emb --model-name-or-path $MODEL_ID --port 80
 port: 80
+
+resources:
+  gpu: 16GB
 ```
 
 </div>
@@ -32,7 +35,7 @@ port: 80
 <div class="termy">
 
 ```shell
-$ dstack run . -f infinity/serve.dstack.yml --gpu 16GB
+$ dstack run . -f infinity/serve.dstack.yml
 ```
 
 </div>
@@ -41,6 +44,9 @@ $ dstack run . -f infinity/serve.dstack.yml --gpu 16GB
     
 Once the service is up, you can query it at 
 `https://<run name>.<gateway domain>` (using the domain set up for the gateway):
+
+!!! info "Authentication"
+    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
 
 ### OpenAI interface
 
@@ -51,7 +57,7 @@ so we can directly use `openai` package to interact with the deployed Infinity.
 from openai import OpenAI
 from functools import partial
 
-client = OpenAI(base_url="https://<run name>.<gateway domain>", api_key="dummy")
+client = OpenAI(base_url="https://<run name>.<gateway domain>", api_key="<dstack token>")
 
 client.embeddings.create = partial(
   client.embeddings.create, model="bge-small-en-v1.5"
@@ -59,10 +65,6 @@ client.embeddings.create = partial(
 
 print(client.embeddings.create(input=["A sentence to encode."]))
 ```
-
-### Swagger UI
-
-You can also reach out Swagger UI via `https://<run name>.<gateway domain>/docs` to find out full list of supported APIs.
 
 ## Source code
     

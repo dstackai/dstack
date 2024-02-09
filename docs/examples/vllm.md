@@ -6,18 +6,27 @@ This example demonstrates how to use [vLLM](https://vllm.ai/) with `dstack`'s [s
 
 To deploy an LLM as a service using vLLM, you have to define the following configuration file:
 
-<div editor-title="vllm/serve.dstack.yml"> 
+<div editor-title="deployment/vllm/serve.dstack.yml"> 
 
 ```yaml
 type: service
 
 python: "3.11"
 env:
-  - MODEL=NousResearch/Llama-2-7b-hf
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
 commands:
   - pip install vllm
   - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
 port: 8000
+
+resources:
+  gpu: 24GB
+
+# (Optional) Enable the OpenAI-compatible endpoint
+model:
+  format: openai
+  type: chat
+  name: NousResearch/Llama-2-7b-chat-hf
 ```
 
 </div>
@@ -31,7 +40,7 @@ port: 8000
 <div class="termy">
 
 ```shell
-$ dstack run . -f vllm/serve.dstack.yml --gpu 24GB
+$ dstack run . -f vllm/serve.dstack.yml
 ```
 
 </div>
@@ -41,20 +50,46 @@ $ dstack run . -f vllm/serve.dstack.yml --gpu 24GB
 Once the service is up, you can query it at 
 `https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
-<div class="termy">
+!!! info "Authentication"
+    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
 
-```shell
-$ curl -X POST --location https://yellow-cat-1.example.com/v1/completions \
-    -H "Content-Type: application/json" \
-    -d '{
-          "model": "NousResearch/Llama-2-7b-hf",
-          "prompt": "San Francisco is a",
-          "max_tokens": 7,
-          "temperature": 0
-        }'
+[//]: # (<div class="termy">)
+[//]: # (```shell)
+[//]: # ($ curl -X POST --location https://yellow-cat-1.example.com/v1/completions \)
+[//]: # (    -H "Content-Type: application/json" \)
+[//]: # (    -H 'Authentication: "Bearer &lt;dstack token&gt;"' \)
+[//]: # (    -d '{)
+[//]: # (          "model": "NousResearch/Llama-2-7b-chat-hf",)
+[//]: # (          "prompt": "San Francisco is a",)
+[//]: # (          "max_tokens": 7,)
+[//]: # (          "temperature": 0)
+[//]: # (        }')
+[//]: # (```)
+[//]: # (</div>)
+
+#### OpenAI interface
+
+Because we've configured the model mapping, it will also be possible 
+to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
+
+```python
+from openai import OpenAI
+
+
+client = OpenAI(
+  base_url="https://gateway.<gateway domain>",
+  api_key="<dstack token>"
+)
+
+completion = client.chat.completions.create(
+  model="mistralai/Mistral-7B-Instruct-v0.1",
+  messages=[
+    {"role": "user", "content": "Compose a poem that explains the concept of recursion in programming."}
+  ]
+)
+
+print(completion.choices[0].message)
 ```
-
-</div>
 
 !!! info "Hugging Face Hub token"
 

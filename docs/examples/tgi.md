@@ -6,7 +6,7 @@ This example demonstrates how to use [TGI](https://github.com/huggingface/text-g
 
 To deploy an LLM as a service using TGI, you have to define the following configuration file:
 
-<div editor-title="text-generation-inference/serve.dstack.yml"> 
+<div editor-title="deployment/tgi/serve.dstack.yml"> 
 
 ```yaml
 type: service
@@ -17,12 +17,15 @@ env:
 port: 80
 commands:
   - text-generation-launcher --port 80 --trust-remote-code
+    
+resources:
+  gpu: 24GB
   
-# Optional mapping for OpenAI interface
+# (Optional) Enable the OpenAI-compatible endpoint
 model:
+  format: tgi
   type: chat
   name: mistralai/Mistral-7B-Instruct-v0.1
-  format: tgi
 ```
 
 </div>
@@ -30,7 +33,7 @@ model:
 !!! info "Model mapping"
     Note the `model` property is optional and is only required
     if you're running a chat model and want to access it via an OpenAI-compatible endpoint.
-    For more details on how to use it feature, check the documentation on [services](../docs/concepts/services.md).
+    For more details on how to use this feature, check the documentation on [services](../docs/concepts/services.md).
 
 ## Run the configuration
 
@@ -41,7 +44,7 @@ model:
 <div class="termy">
 
 ```shell
-$ dstack run . -f text-generation-inference/serve.dstack.yml --gpu 24GB
+$ dstack run . -f deployment/tgi/serve.dstack.yml
 ```
 
 </div>
@@ -51,13 +54,17 @@ $ dstack run . -f text-generation-inference/serve.dstack.yml --gpu 24GB
 Once the service is up, you'll be able to 
 access it at `https://<run name>.<gateway domain>`.
 
+!!! info "Authentication"
+    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
+
 <div class="termy">
 
 ```shell
 $ curl https://yellow-cat-1.example.com/generate \
     -X POST \
     -d '{"inputs":"&lt;s&gt;[INST] What is your favourite condiment?[/INST]"}' \
-    -H 'Content-Type: application/json'
+    -H 'Content-Type: application/json' \
+    -H 'Authentication: "Bearer &lt;dstack token&gt;"'
 ```
 
 </div>
@@ -73,7 +80,7 @@ from openai import OpenAI
 
 client = OpenAI(
   base_url="https://gateway.<gateway domain>",
-  api_key="none"
+  api_key="<dstack token>"
 )
 
 completion = client.chat.completions.create(
@@ -116,6 +123,9 @@ env:
 port: 80
 commands:
   - text-generation-launcher --port 80 --trust-remote-code --quantize gptq
+    
+resources:
+  gpu: 24GB
 
 model:
   type: chat

@@ -1,5 +1,4 @@
 ---
-title: "dstack 0.14.0: OpenAI-compatible endpoints preview"
 date: 2024-01-19
 description: "Making it easier to deploy custom LLMs as OpenAI-compatible endpoints."
 slug: "openai-endpoints-preview"

@@ -29,8 +29,15 @@ or `train.dstack.yml` are both acceptable).
     ```yaml
     type: dev-environment
 
+    # Use either `python` or `image` to configure environment
     python: "3.11"
+    # image: ghcr.io/huggingface/text-generation-inference:latest
+    
     ide: vscode
+
+    # (Optional) Configure `gpu`, `memory`, `disk`, etc
+    resources:
+      gpu: 80GB
     ```
 
     </div>
@@ -50,6 +57,10 @@ or `train.dstack.yml` are both acceptable).
     commands:
       - pip install -r fine-tuning/qlora/requirements.txt
       - python fine-tuning/qlora/train.py
+
+    # (Optional) Configure `gpu`, `memory`, `disk`, etc
+    resources:
+      gpu: 80GB
     ```
 
     </div>
@@ -71,6 +82,10 @@ or `train.dstack.yml` are both acceptable).
     port: 80
     commands:
       - text-generation-launcher --port 80 --trust-remote-code
+
+    # (Optional) Configure `gpu`, `memory`, `disk`, etc
+    resources:
+      gpu: 80GB
     ```
 
     </div>
@@ -83,7 +98,7 @@ configuration file, and run options (e.g., configuring hardware resources, spot 
 <div class="termy">
 
 ```shell
-$ dstack run . -f train.dstack.yml --gpu A100
+$ dstack run . -f train.dstack.yml
 
  BACKEND     REGION         RESOURCES                     SPOT  PRICE
  tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595

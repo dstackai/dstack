@@ -199,8 +199,7 @@ nav:
         - Infinity: examples/infinity.md
     - RAG:
         - Llama Index: examples/llama-index.md
+  - Blog:
+      - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd
-#  - Blog:
-#      - blog/index.md
-  - Platform: platform.md
   - GitHub: https://github.com/dstackai/dstack

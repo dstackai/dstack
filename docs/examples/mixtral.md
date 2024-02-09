@@ -25,7 +25,11 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
         --num-shard 2 # Should match the number of GPUs 
     port: 80
 
-    # Optional mapping for OpenAI-compatible endpoint
+    resources:
+      gpu: 80GB:2
+      disk: 200GB
+
+    # (Optional) Enable the OpenAI-compatible endpoint
     model:
       type: chat
       name: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
@@ -51,7 +55,10 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
         --quantize gptq
     port: 80
 
-    # Optional mapping for OpenAI-compatible endpoint
+    resources:
+        gpu: 25GB..50GB 
+
+    # (Optional) Enable the OpenAI-compatible endpoint
     model:
       type: chat
       name: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
@@ -66,27 +73,31 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
 
     ```yaml
     type: service
-    # This configuration deploys Mixtral in fp16 using vLLM
     
     python: "3.11"
-    
     commands:
       - pip install vllm
       - python -m vllm.entrypoints.openai.api_server
         --model mistralai/Mixtral-8X7B-Instruct-v0.1
         --host 0.0.0.0
         --tensor-parallel-size 2 # Should match the number of GPUs
-    
     port: 8000
+
+    resources:
+      gpu: 80GB:2
+      disk: 200GB
+
+    # (Optional) Enable the OpenAI-compatible endpoint
+    model:
+      type: chat
+      name: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
+      format: openai
     ```
 
     </div>
 
     !!! info "NOTE:"
-        The [model mapping](../docs/concepts/services.md#model-mapping) to access the model via the 
-        gateway's OpenAI-compatible endpoint is not yet supported for vLLM.
-
-        Also, support for quantized Mixtral in vLLM is not yet stable.
+        Support for quantized Mixtral in vLLM is not yet stable.
 
 ## Run the configuration
 
@@ -94,46 +105,23 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
     Before running a service, make sure to set up a [gateway](../docs/concepts/services.md#set-up-a-gateway).
     However, it's not required when using dstack Cloud, as it's set up automatically.
 
-For `fp16`, deployment of Mixtral, ensure a minimum total GPU memory of `100GB` and disk size of `200GB`.
-For `int4`, request at least `25GB` of GPU memory.
-
 [//]: # (    Also, make sure to adjust the `--tensor-parallel-size` and `--num-shard` parameters in the YAML configuration to align)
 [//]: # (    with the number of GPUs used.)
-    
 
-=== "TGI `fp16`"
+<div class="termy">
 
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . -f llms/mixtral/tgi.dstack.yml --gpu "80GB:2" --disk 200GB
-    ```
-    
-    </div>
+```shell
+$ dstack run . -f llms/mixtral/tgi.dstack.yml
+```
 
-=== "TGI `int4`"
-
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . -f llms/mixtral/tgi-gptq.dstack.yml --gpu 25GB
-    ```
-    
-    </div>
-
-=== "vLLM `fp16`"
-
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . -f llms/mixtral/vllm.dstack.yml --gpu "80GB:2" --disk 200GB
-    ```
-    
-    </div>
+</div>
 
 ## Access the endpoint
 
 Once the service is up, you'll be able to access it at `https://<run name>.<gateway domain>`.
+
+!!! info "Authentication"
+    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
 
 #### OpenAI interface
 
@@ -146,7 +134,7 @@ from openai import OpenAI
 
 client = OpenAI(
   base_url="https://gateway.example.com",
-  api_key="none"
+  api_key="<dstack token>"
 )
 
 completion = client.chat.completions.create(

@@ -118,6 +118,8 @@ $ curl -X POST --location $TGI_ENDPOINT_URL/generate \
 
 ## Generate response
 
+[//]: # (TODO: Update the example, and make sure to use OpenAI-compatible endpoints)
+
 Once the LLM endpoint is up, we can prompt it through Llama Index to automatically incorporate context from Weaviate.
 
 Since we'll invoke the actual LLM, when configuring `llama_index.ServiceContext`, we must include the LLM configuration.
