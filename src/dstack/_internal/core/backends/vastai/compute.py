@@ -107,6 +107,7 @@ class VastAICompute(Compute):
             username="root",
             ssh_port=int(resp["ports"]["10022/tcp"][0]["HostPort"]),
             dockerized=False,
+            ssh_proxy=None,
             backend_data=None,
         )
 
