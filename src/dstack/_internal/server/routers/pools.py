@@ -1,4 +1,4 @@
-from typing import List, Sequence, Tuple
+from typing import List, Tuple
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import dstack._internal.core.models.pools as models
 import dstack._internal.server.schemas.pools as schemas
 import dstack._internal.server.services.pools as pools
+from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
@@ -94,12 +95,15 @@ async def create_pool(
 
 @router.post("/show")  # type: ignore[misc]
 async def show_pool(
-    body: schemas.CreatePoolRequest,
+    body: schemas.ShowPoolRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
-) -> Sequence[models.Instance]:
+) -> models.PoolInstances:
     _, project = user_project
-    return await pools.show_pool(session, project, pool_name=body.name)
+    instances = await pools.show_pool(session, project, pool_name=body.name)
+    if instances is None:
+        raise ResourceNotExistsError("Pool is not found")
+    return instances
 
 
 @router.post("/add_remote")  # type: ignore[misc]

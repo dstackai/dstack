@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -25,3 +25,8 @@ class Instance(BaseModel):  # type: ignore[misc]
     hostname: str
     status: InstanceStatus
     price: float
+
+
+class PoolInstances(BaseModel):  # type: ignore[misc]
+    name: str
+    instances: List[Instance]

@@ -83,7 +83,9 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             formatter_class=self._parser.formatter_class,
         )
         show_parser.add_argument(
-            "--pool", dest="pool_name", help="The name of the pool", required=True
+            "--pool",
+            dest="pool_name",
+            help="The name of the pool. If not set, the default pool will be used",
         )
         show_parser.set_defaults(subfunc=self._show)
 
@@ -175,8 +177,9 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             console.print(f"Failed to set default pool {args.pool_name!r}", style="error")
 
     def _show(self, args: argparse.Namespace) -> None:
-        instances = self.api.client.pool.show(self.api.project, args.pool_name)
-        print_instance_table(instances)
+        resp = self.api.client.pool.show(self.api.project, args.pool_name)
+        console.print(f" [bold]Pool name[/]  {resp.name}\n")
+        print_instance_table(resp.instances)
 
     def _add(self, args: argparse.Namespace) -> None:
         super()._command(args)
@@ -191,7 +194,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         requirements = Requirements(
             resources=resources,
             max_price=args.max_price,
-            spot=(args.spot_policy == SpotPolicy.SPOT),
+            spot=(args.spot_policy == SpotPolicy.SPOT),  # TODO(egor-s): None if SpotPolicy.AUTO
         )
 
         profile = load_profile(Path.cwd(), args.profile)

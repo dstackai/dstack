@@ -13,7 +13,7 @@ class CreatePoolRequest(BaseModel):  # type: ignore[misc]
 
 
 class ShowPoolRequest(BaseModel):  # type: ignore[misc]
-    name: str
+    name: Optional[str]
 
 
 class RemoveInstanceRequest(BaseModel):  # type: ignore[misc]

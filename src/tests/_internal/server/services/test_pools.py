@@ -134,8 +134,8 @@ async def test_show_pool(session: AsyncSession, test_db):
     session.add(im)
     await session.commit()
 
-    instances = await services_pools.show_pool(session, project, POOL_NAME)
-    assert len(instances) == 1
+    pool_instances = await services_pools.show_pool(session, project, POOL_NAME)
+    assert len(pool_instances.instances) == 1
 
 
 @pytest.mark.asyncio

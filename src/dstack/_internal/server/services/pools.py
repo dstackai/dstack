@@ -21,7 +21,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.pools import Instance, Pool
+from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
@@ -247,11 +247,20 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
 
 
 async def show_pool(
-    session: AsyncSession, project: ProjectModel, pool_name: str
-) -> Sequence[Instance]:
-    """Show active instances in the pool. If the pool doesn't exist, return an empty list."""
-    pool_instances = await get_pool_instances(session, project, pool_name)
-    return [instance_model_to_instance(i) for i in pool_instances if not i.deleted]
+    session: AsyncSession, project: ProjectModel, pool_name: Optional[str]
+) -> Optional[PoolInstances]:
+    """Show active instances in the pool (specified or default). Return None if the pool is not found."""
+    if pool_name is None:
+        pool = project.default_pool
+    else:
+        pool = await get_pool(session, project, pool_name)
+
+    if pool is None:
+        return None
+    return PoolInstances(
+        name=pool.name,
+        instances=[instance_model_to_instance(i) for i in pool.instances if not i.deleted],
+    )
 
 
 async def get_pool_instances(
