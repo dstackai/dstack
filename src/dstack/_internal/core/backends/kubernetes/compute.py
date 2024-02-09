@@ -20,7 +20,7 @@ from dstack._internal.core.backends.kubernetes.utils import (
     get_api_from_config_data,
     get_cluster_public_ip,
 )
-from dstack._internal.core.errors import BackendError, GatewayError
+from dstack._internal.core.errors import ComputeError, GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -104,7 +104,7 @@ class KubernetesCompute(Compute):
         if jump_pod_hostname is None:
             jump_pod_hostname = get_cluster_public_ip(self.api)
             if jump_pod_hostname is None:
-                raise BackendError(
+                raise ComputeError(
                     "Failed to acquire an IP for jump pod automatically. "
                     "Specify ssh_host for Kubernetes backend."
                 )
