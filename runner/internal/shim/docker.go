@@ -19,7 +19,6 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/dstackai/dstack/runner/consts"
-
 	"github.com/ztrue/tracerr"
 )
 

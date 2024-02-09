@@ -3,9 +3,9 @@ package repo
 import (
 	"context"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"os"
 
+	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"

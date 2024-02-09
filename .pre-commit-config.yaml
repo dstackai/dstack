@@ -14,8 +14,9 @@ repos:
       files: '.*pools?\.py'
       exclude: 'versions|src/tests'
       additional_dependencies: [types-PyYAML, types-requests, pydantic<2, sqlalchemy]
-  # - repo: https://github.com/golangci/golangci-lint
-  #   rev: v1.56.0
-  #   hooks:
-  #     - id: golangci-lint-full
-  #     - id: golangci-lint
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.56.0
+    hooks:
+      - id: golangci-lint-full
+        entry: bash -c 'cd runner && golangci-lint run -D depguard --presets import,module,unused "$@"'
+        stages: [manual]

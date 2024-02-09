@@ -1,6 +1,7 @@
 package shim
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
@@ -76,7 +78,16 @@ func downloadRunner(url string) (string, error) {
 	}()
 
 	log.Printf("Downloading runner from %s\n", url)
-	resp, err := http.Get(url)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*600)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}

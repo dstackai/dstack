@@ -1,8 +1,9 @@
 package executor
 
 import (
-	"github.com/dstackai/dstack/runner/internal/schemas"
 	"sync"
+
+	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
 type appendWriter struct {
