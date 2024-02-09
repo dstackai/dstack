@@ -8,7 +8,6 @@ import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
 from dstack._internal.core.backends.base.compute import (
     Compute,
-    InstanceConfiguration,
     get_gateway_user_data,
     get_instance_name,
     get_user_data,
@@ -19,6 +18,7 @@ from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,

@@ -13,13 +13,11 @@ from sqlalchemy.orm import joinedload
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.backends.base import Backend
-from dstack._internal.core.backends.base.compute import (
-    DockerConfig,
-    InstanceConfiguration,
-)
 from dstack._internal.core.errors import BackendError, RepoDoesNotExistError, ServerClientError
 from dstack._internal.core.models.instances import (
+    DockerConfig,
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
     SSHKey,

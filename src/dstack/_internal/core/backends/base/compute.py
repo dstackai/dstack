@@ -7,37 +7,18 @@ from typing import Any, Dict, List, Optional
 import git
 import requests
 import yaml
-from pydantic import BaseModel
 
 from dstack._internal import settings
-from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.instances import (
+    InstanceConfiguration,
     InstanceOfferWithAvailability,
     LaunchedGatewayInfo,
     LaunchedInstanceInfo,
-    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
-from dstack._internal.server.services.docker import DockerImage
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-class DockerConfig(BaseModel):
-    registry_auth: Optional[RegistryAuth]
-    image: Optional[DockerImage]
-
-
-class InstanceConfiguration(BaseModel):
-    project_name: str
-    instance_name: str  # unique in pool
-    ssh_keys: List[SSHKey]
-    job_docker_config: Optional[DockerConfig]
-    user: str  # dstack user name
-
-    def get_public_keys(self) -> List[str]:
-        return [ssh_key.public.strip() for ssh_key in self.ssh_keys]
 
 
 class Compute(ABC):

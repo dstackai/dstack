@@ -302,7 +302,7 @@ class InstanceModel(BaseModel):
 
     # current job
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
-    job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance")
+    job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="immediate")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # + # job_id: Optional[FK] (current job)

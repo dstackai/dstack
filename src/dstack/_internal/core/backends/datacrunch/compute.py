@@ -2,7 +2,6 @@ from typing import Dict, List, Optional
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
-    InstanceConfiguration,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -12,6 +11,7 @@ from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
