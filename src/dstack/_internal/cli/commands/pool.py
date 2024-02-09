@@ -178,7 +178,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
 
     def _show(self, args: argparse.Namespace) -> None:
         resp = self.api.client.pool.show(self.api.project, args.pool_name)
-        console.print(f"[bold]Pool name[/] {resp.name}")
+        console.print(f" [bold]Pool name[/]  {resp.name}\n")
         print_instance_table(resp.instances)
 
     def _add(self, args: argparse.Namespace) -> None:
