@@ -60,6 +60,11 @@ class SSHConnectionParams(BaseModel):
     port: int
 
 
+class SSHKey(BaseModel):
+    public: str
+    private: Optional[str] = None
+
+
 class LaunchedInstanceInfo(BaseModel):
     instance_id: str
     region: str

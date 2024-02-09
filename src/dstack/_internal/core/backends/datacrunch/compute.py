@@ -3,7 +3,6 @@ from typing import Dict, List, Optional
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
     InstanceConfiguration,
-    get_instance_shim_commands,
     get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -16,9 +15,9 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
-from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger("datacrunch.compute")
@@ -67,8 +66,6 @@ class DataCrunchCompute(Compute):
 
     def create_instance(
         self,
-        project: ProjectModel,
-        user: UserModel,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> LaunchedInstanceInfo:
@@ -83,9 +80,7 @@ class DataCrunchCompute(Compute):
                 )
             )
 
-        commands = get_instance_shim_commands(
-            authorized_keys=public_keys,
-        )
+        commands = get_shim_commands(authorized_keys=public_keys)
 
         startup_script = " ".join([" && ".join(commands)])
         script_name = f"dstack-{instance_config.instance_name}.sh"
@@ -151,69 +146,18 @@ class DataCrunchCompute(Compute):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
-        ssh_ids = []
-        ssh_ids.append(
-            self.api_client.get_or_create_ssh_key(
-                name=f"dstack-{job.job_spec.job_name}.key",
-                public_key=run.run_spec.ssh_key_pub.strip(),
-            )
-        )
-        ssh_ids.append(
-            self.api_client.get_or_create_ssh_key(
-                name=f"dstack-{job.job_spec.job_name}.key",
-                public_key=project_ssh_public_key.strip(),
-            )
-        )
-
-        commands = get_shim_commands(
-            backend=BackendType.DATACRUNCH,
-            image_name=job.job_spec.image_name,
-            authorized_keys=[
-                run.run_spec.ssh_key_pub.strip(),
-                project_ssh_public_key.strip(),
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=job.job_spec.job_name,  # TODO: generate name
+            ssh_keys=[
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=project_ssh_public_key.strip()),
             ],
-            registry_auth_required=job.job_spec.registry_auth is not None,
+            job_docker_config=None,
+            user=run.user,
         )
-
-        startup_script = " ".join([" && ".join(commands)])
-        script_name = f"dstack-{job.job_spec.job_name}.sh"
-        startup_script_ids = self.api_client.get_or_create_startup_scrpit(
-            name=script_name, script=startup_script
-        )
-
-        name = job.job_spec.job_name
-
-        # Id of image "Ubuntu 22.04 + CUDA 12.0 + Docker"
-        # from API https://datacrunch.stoplight.io/docs/datacrunch-public/c46ab45dbc508-get-all-image-types
-        image_name = "2088da25-bb0d-41cc-a191-dccae45d96fd"
-
-        disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        instance = self.api_client.deploy_instance(
-            instance_type=instance_offer.instance.name,
-            ssh_key_ids=ssh_ids,
-            startup_script_id=startup_script_ids,
-            hostname=name,
-            description=name,
-            image=image_name,
-            disk_size=disk_size,
-            location=instance_offer.region,
-        )
-
-        running_instance = self.api_client.wait_for_instance(instance.id)
-        if running_instance is None:
-            raise BackendError(f"Wait instance {instance.id!r} timeout")
-
-        launched_instance = LaunchedInstanceInfo(
-            instance_id=running_instance.id,
-            ip_address=running_instance.ip,
-            region=running_instance.location,
-            ssh_port=22,
-            username="root",
-            dockerized=True,
-            backend_data=None,
-        )
-
-        return launched_instance
+        launched_instance_info = self.create_instance(instance_offer, instance_config)
+        return launched_instance_info
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

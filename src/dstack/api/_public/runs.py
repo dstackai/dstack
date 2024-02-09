@@ -12,12 +12,12 @@ from typing import Dict, Iterable, List, Optional, Tuple, Union
 from websocket import WebSocketApp
 
 import dstack.api as api
-from dstack._internal.core.backends.base.compute import SSHKeys
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.profiles import (
+    DEFAULT_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
     ProfileRetryPolicy,
@@ -273,6 +273,7 @@ class Run(ABC):
             if not control_sock_path_and_port_locks:
                 self._ssh_attach.attach()
             self._ports_lock = None
+
         return True
 
     def detach(self):
@@ -369,7 +370,7 @@ class RunCollection:
         return self._api_client.runs.get_offers(self._project, profile, requirements)
 
     def create_instance(
-        self, pool_name: str, profile: Profile, requirements: Requirements, ssh_key: SSHKeys
+        self, pool_name: str, profile: Profile, requirements: Requirements, ssh_key: SSHKey
     ):
         self._api_client.runs.create_instance(
             self._project, pool_name, profile, requirements, ssh_key
@@ -392,7 +393,7 @@ class RunCollection:
         instance_name: Optional[str] = None,
         creation_policy: Optional[CreationPolicy] = None,
         termination_policy: Optional[TerminationPolicy] = None,
-        termination_policy_idle: Union[int, str] = 5 * 60,
+        termination_policy_idle: int = DEFAULT_TERMINATION_IDLE_TIME,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`
@@ -426,7 +427,7 @@ class RunCollection:
             instance_name=instance_name,
             creation_policy=creation_policy,
             termination_policy=termination_policy,
-            termination_idle_time=None,  # TODO: fix deserialization
+            termination_idle_time=termination_policy_idle,
         )
         run_spec = RunSpec(
             run_name=run_name,

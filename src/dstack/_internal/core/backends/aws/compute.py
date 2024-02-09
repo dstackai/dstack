@@ -13,7 +13,6 @@ from dstack._internal.core.backends.base.compute import (
     InstanceConfiguration,
     get_gateway_user_data,
     get_instance_name,
-    get_instance_user_data,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -26,9 +25,9 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedGatewayInfo,
     LaunchedInstanceInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
-from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -99,12 +98,10 @@ class AWSCompute(Compute):
 
     def create_instance(
         self,
-        project: ProjectModel,
-        user: UserModel,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
     ) -> LaunchedInstanceInfo:
-        project_id = project.name
+        project_name = instance_config.project_name
         ec2 = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         iam_client = self.session.client("iam", region_name=instance_offer.region)
@@ -112,7 +109,7 @@ class AWSCompute(Compute):
         tags = [
             {"Key": "Name", "Value": instance_config.instance_name},
             {"Key": "owner", "Value": "dstack"},
-            {"Key": "dstack_project", "Value": project_id},
+            {"Key": "dstack_project", "Value": project_name},
             {"Key": "dstack_user", "Value": instance_config.user},
         ]
         try:
@@ -125,13 +122,13 @@ class AWSCompute(Compute):
                     ),
                     instance_type=instance_offer.instance.name,
                     iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
-                        iam_client, project_id
+                        iam_client, project_name
                     ),
-                    user_data=get_instance_user_data(
-                        authorized_keys=instance_config.get_public_keys(),
-                    ),
+                    user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
                     tags=tags,
-                    security_group_id=aws_resources.create_security_group(ec2_client, project_id),
+                    security_group_id=aws_resources.create_security_group(
+                        ec2_client, project_name
+                    ),
                     spot=instance_offer.instance.resources.spot,
                 )
             )
@@ -163,63 +160,18 @@ class AWSCompute(Compute):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
-        project_id = run.project_name
-        ec2 = self.session.resource("ec2", region_name=instance_offer.region)
-        ec2_client = self.session.client("ec2", region_name=instance_offer.region)
-        iam_client = self.session.client("iam", region_name=instance_offer.region)
-
-        tags = [
-            {"Key": "Name", "Value": get_instance_name(run, job)},
-            {"Key": "owner", "Value": "dstack"},
-            {"Key": "dstack_project", "Value": project_id},
-            {"Key": "dstack_user", "Value": run.user},
-        ]
-        try:
-            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-            response = ec2.create_instances(
-                **aws_resources.create_instances_struct(
-                    disk_size=disk_size,
-                    image_id=aws_resources.get_image_id(
-                        ec2_client, len(instance_offer.instance.resources.gpus) > 0
-                    ),
-                    instance_type=instance_offer.instance.name,
-                    iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
-                        iam_client, project_id
-                    ),
-                    user_data=get_user_data(
-                        backend=BackendType.AWS,
-                        image_name=job.job_spec.image_name,
-                        authorized_keys=[
-                            run.run_spec.ssh_key_pub.strip(),
-                            project_ssh_public_key.strip(),
-                        ],
-                        registry_auth_required=job.job_spec.registry_auth is not None,
-                    ),
-                    tags=tags,
-                    security_group_id=aws_resources.create_security_group(ec2_client, project_id),
-                    spot=instance_offer.instance.resources.spot,
-                )
-            )
-            instance = response[0]
-            instance.wait_until_running()
-            instance.reload()  # populate instance.public_ip_address
-
-            if instance_offer.instance.resources.spot:  # it will not terminate the instance
-                ec2_client.cancel_spot_instance_requests(
-                    SpotInstanceRequestIds=[instance.spot_instance_request_id]
-                )
-            return LaunchedInstanceInfo(
-                instance_id=instance.instance_id,
-                ip_address=instance.public_ip_address,
-                region=instance_offer.region,
-                username="ubuntu",
-                ssh_port=22,
-                dockerized=True,  # because `dstack-shim docker` is used
-                backend_data=None,
-            )
-        except botocore.exceptions.ClientError as e:
-            logger.warning("Got botocore.exceptions.ClientError: %s", e)
-            raise NoCapacityError()
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=project_ssh_public_key.strip()),
+            ],
+            job_docker_config=None,
+            user=run.user,
+        )
+        launched_instance_info = self.create_instance(instance_offer, instance_config)
+        return launched_instance_info
 
     def create_gateway(
         self,

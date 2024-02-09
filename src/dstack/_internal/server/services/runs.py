@@ -16,12 +16,12 @@ from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.base.compute import (
     DockerConfig,
     InstanceConfiguration,
-    SSHKeys,
 )
 from dstack._internal.core.errors import BackendError, RepoDoesNotExistError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
 from dstack._internal.core.models.runs import (
@@ -176,7 +176,7 @@ async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
-    ssh_key: SSHKeys,
+    ssh_key: SSHKey,
     pool_name: str,
     instance_name: str,
     profile: Profile,
@@ -190,15 +190,15 @@ async def create_instance(
         return
 
     user_ssh_key = ssh_key
-    project_ssh_key = SSHKeys(
+    project_ssh_key = SSHKey(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
     )
 
     image = parse_image_name(get_default_image(get_default_python_verison()))
     instance_config = InstanceConfiguration(
+        project_name=project.name,
         instance_name=instance_name,
-        pool_name=pool_name,
         ssh_keys=[user_ssh_key, project_ssh_key],
         job_docker_config=DockerConfig(
             image=image,
@@ -223,8 +223,6 @@ async def create_instance(
         try:
             launched_instance_info: LaunchedInstanceInfo = await run_async(
                 backend.compute().create_instance,
-                project,
-                user,
                 instance_offer,
                 instance_config,
             )
@@ -281,7 +279,7 @@ async def create_instance(
             offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
             resource_spec_data=requirements.resources.json(),
             termination_policy=profile.termination_policy,
-            termination_idle_time=300,  # TODO: fix deserialize
+            termination_idle_time=profile.termination_idle_time,
         )
         session.add(im)
         await session.commit()
@@ -350,8 +348,6 @@ async def get_run_plan(
         )
         job_plans.append(job_plan)
 
-    run_spec.profile.termination_idle_time = None
-
     run_spec.run_name = run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name, user=user.name, run_spec=run_spec, job_plans=job_plans
@@ -384,9 +380,6 @@ async def submit_run(
         )
     else:
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
-
-    # TODO: fix deserialize
-    run_spec.profile.termination_idle_time = "300s"
 
     pool = await get_or_create_default_pool_by_name(session, project, run_spec.profile.pool_name)
 
@@ -517,9 +510,6 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
             jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
 
     run_spec = RunSpec.parse_raw(run_model.run_spec)
-
-    # TODO: fix deserialization
-    run_spec.profile.termination_idle_time = None
 
     latest_job_submission = None
     if include_job_submissions:

@@ -17,7 +17,11 @@ from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
-from dstack._internal.core.models.profiles import CreationPolicy, TerminationPolicy
+from dstack._internal.core.models.profiles import (
+    DEFAULT_TERMINATION_IDLE_TIME,
+    CreationPolicy,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.runs import JobErrorCode
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import parse_pretty_duration
@@ -114,7 +118,7 @@ class RunCommand(APIBaseCommand):
             self._parser.print_help()
             return
 
-        termination_policy_idle = 5 * 60  # 5 minutes by default
+        termination_policy_idle = DEFAULT_TERMINATION_IDLE_TIME
         termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
 
         if args.idle_duration is not None:

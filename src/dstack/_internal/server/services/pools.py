@@ -364,7 +364,7 @@ async def add_remote(
         offer=offer.json(),
         resource_spec_data=resources.json(),
         termination_policy=profile.termination_policy,
-        termination_idle_time=300,  # TODO: fix deserialize
+        termination_idle_time=profile.termination_idle_time,
     )
     session.add(im)
     await session.commit()

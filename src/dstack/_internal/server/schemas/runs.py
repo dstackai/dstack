@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from dstack._internal.core.backends.base.compute import SSHKeys
+from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, RunSpec
@@ -30,7 +30,7 @@ class CreateInstanceRequest(BaseModel):
     pool_name: str
     profile: Profile
     requirements: Requirements
-    ssh_key: SSHKeys
+    ssh_key: SSHKey
 
 
 class AddRemoteInstanceRequest(BaseModel):

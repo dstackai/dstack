@@ -122,7 +122,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         pool_instances, profile, run_spec.configuration.resources, status=InstanceStatus.READY
     )
 
-    logger.info(*job_log(f"num relevance {len(relevant_instances)}", job_model))
     if relevant_instances:
         sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
         instance = sorted_instances[0]
@@ -183,7 +182,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             job_provisioning_data=job_provisioning_data.json(),
             offer=offer.json(),
             termination_policy=profile.termination_policy,
-            termination_idle_time=300,  # TODO: fix deserialize
+            termination_idle_time=profile.termination_idle_time,
             job=job_model,
             backend=offer.backend,
             price=offer.price,

@@ -20,7 +20,7 @@ from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.profiles import TerminationPolicy
+from dstack._internal.core.models.profiles import DEFAULT_TERMINATION_IDLE_TIME, TerminationPolicy
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.runs import InstanceStatus, JobErrorCode, JobStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -285,7 +285,9 @@ class InstanceModel(BaseModel):
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
 
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(50))
-    termination_idle_time: Mapped[int] = mapped_column(Integer)
+    termination_idle_time: Mapped[int] = mapped_column(
+        Integer, default=DEFAULT_TERMINATION_IDLE_TIME
+    )
 
     backend: Mapped[BackendType] = mapped_column(Enum(BackendType))
     backend_data: Mapped[Optional[str]] = mapped_column(String(4000))

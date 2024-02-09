@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from dstack._internal.core.backends.base.compute import Compute, get_dstack_runner_version
+from dstack._internal.core.backends.base.compute import Compute
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -37,9 +37,7 @@ class LocalCompute(Compute):
     ):
         pass
 
-    def create_instance(
-        self, project, user, instance_offer, instance_config
-    ) -> LaunchedInstanceInfo:
+    def create_instance(self, instance_offer, instance_config) -> LaunchedInstanceInfo:
         launched_instance = LaunchedInstanceInfo(
             instance_id="local",
             ip_address="127.0.0.1",
@@ -59,15 +57,6 @@ class LocalCompute(Compute):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
-        authorized_keys = f"{run.run_spec.ssh_key_pub.strip()}\\n{project_ssh_public_key.strip()}"
-        logger.info(
-            "Running job in LocalBackend. To start processing, run: `"
-            f"DSTACK_BACKEND=local "
-            "DSTACK_RUNNER_LOG_LEVEL=6 "
-            f"DSTACK_RUNNER_VERSION={get_dstack_runner_version()} "
-            f"DSTACK_IMAGE_NAME={job.job_spec.image_name} "
-            f'DSTACK_PUBLIC_SSH_KEY="{authorized_keys}" ./shim --dev docker --keep-container`',
-        )
         return LaunchedInstanceInfo(
             instance_id="local",
             ip_address="127.0.0.1",

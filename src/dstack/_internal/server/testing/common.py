@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceType, Resources
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
+from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_NAME,
+    DEFAULT_TERMINATION_IDLE_TIME,
+    Profile,
+)
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -145,8 +149,10 @@ async def create_repo(
 def get_run_spec(
     run_name: str,
     repo_id: str,
-    profile: Optional[Profile] = Profile(name="default"),
+    profile: Optional[Profile] = None,
 ) -> RunSpec:
+    if profile is None:
+        profile = Profile(name="default")
     return RunSpec(
         run_name=run_name,
         repo_id=repo_id,
@@ -319,6 +325,7 @@ async def create_instance(
         price=1,
         region="eu-west",
         backend=BackendType.DATACRUNCH,
+        termination_idle_time=DEFAULT_TERMINATION_IDLE_TIME,
     )
     session.add(im)
     await session.commit()

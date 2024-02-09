@@ -2,8 +2,7 @@ from typing import List, Optional, Tuple
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.backends.base.compute import SSHKeys
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import Requirements, Run, RunPlan, RunSpec
 from dstack._internal.server.schemas.runs import (
@@ -43,7 +42,7 @@ class RunsAPIClient(APIClientGroup):
         pool_name: str,
         profile: Profile,
         requirements: Requirements,
-        ssh_key: SSHKeys,
+        ssh_key: SSHKey,
     ):
         body = CreateInstanceRequest(
             pool_name=pool_name, profile=profile, requirements=requirements, ssh_key=ssh_key

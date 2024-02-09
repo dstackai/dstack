@@ -17,6 +17,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     LaunchedInstanceInfo,
     Resources,
+    SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import Profile
@@ -252,6 +253,7 @@ async def test_create_cloud_instance(session: AsyncSession, test_db):
             pool_name="test_pool",
             instance_name="test_instance",
             requirements=requirements,
+            ssh_key=SSHKey(public=""),
         )
 
     pool = await services_pools.get_pool(session, project, "test_pool")
