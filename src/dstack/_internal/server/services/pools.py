@@ -240,7 +240,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         price=offer.price,
     )
     if instance_model.job is not None:
-        instance.job_name = instance_model.job.name
+        instance.job_name = instance_model.job.job_name
         instance.job_status = instance_model.job.status
 
     return instance

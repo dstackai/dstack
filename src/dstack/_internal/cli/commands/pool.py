@@ -191,7 +191,7 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         requirements = Requirements(
             resources=resources,
             max_price=args.max_price,
-            spot=(args.spot_policy == SpotPolicy.SPOT),
+            spot=(args.spot_policy == SpotPolicy.SPOT),  # TODO(egor-s): None if SpotPolicy.AUTO
         )
 
         profile = load_profile(Path.cwd(), args.profile)
