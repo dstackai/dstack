@@ -3,7 +3,7 @@ from typing import List, Optional
 from pydantic import parse_obj_as
 
 import dstack._internal.server.schemas.pools as schemas_pools
-from dstack._internal.core.models.pools import Instance, Pool
+from dstack._internal.core.models.pools import Pool, PoolInstances
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
@@ -24,11 +24,11 @@ class PoolAPIClient(APIClientGroup):  # type: ignore[misc]
         body = schemas_pools.CreatePoolRequest(name=pool_name)
         self._request(f"/api/project/{project_name}/pool/create", body=body.json())
 
-    def show(self, project_name: str, pool_name: str) -> List[Instance]:
+    def show(self, project_name: str, pool_name: Optional[str]) -> PoolInstances:
         body = schemas_pools.ShowPoolRequest(name=pool_name)
         resp = self._request(f"/api/project/{project_name}/pool/show", body=body.json())
-        result: List[Instance] = parse_obj_as(List[Instance], resp.json())
-        return result
+        pool: PoolInstances = parse_obj_as(PoolInstances, resp.json())
+        return pool
 
     def remove(
         self, project_name: str, pool_name: Optional[str], instance_name: str, force: bool
