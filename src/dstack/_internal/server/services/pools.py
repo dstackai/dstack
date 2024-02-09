@@ -155,19 +155,11 @@ async def set_default_pool(session: AsyncSession, project: ProjectModel, pool_na
 async def remove_instance(
     session: AsyncSession,
     project: ProjectModel,
-    pool_name: Optional[str],
+    pool_name: str,
     instance_name: str,
     force: bool,
 ) -> None:
-    pool = (
-        await session.scalars(
-            select(PoolModel).where(
-                PoolModel.name == pool_name,
-                PoolModel.project == project,
-                PoolModel.deleted == False,
-            )
-        )
-    ).one_or_none()
+    pool = await get_pool(session, project, pool_name)
 
     if pool is None:
         logger.warning("Couldn't find pool")

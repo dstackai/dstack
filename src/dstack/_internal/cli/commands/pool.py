@@ -25,7 +25,7 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
-from dstack._internal.core.models.runs import Requirements
+from dstack._internal.core.models.runs import InstanceStatus, Requirements
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
 from dstack.api._public.resources import Resources
@@ -136,6 +136,9 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             action="store_true",
             help="The name of the instance",
         )
+        remove_parser.add_argument(
+            "-y", "--yes", help="Don't ask for confirmation", action="store_true"
+        )
         remove_parser.set_defaults(subfunc=self._remove)
 
         # pool set-default
@@ -164,10 +167,25 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
         console.print(f"Pool {args.pool_name!r} removed")
 
     def _remove(self, args: argparse.Namespace) -> None:
-        # TODO(egor-s): ask for confirmation
+        pool = self.api.client.pool.show(self.api.project, args.pool_name)
+        pool.instances = [i for i in pool.instances if i.instance_id == args.instance_name]
+        if not pool.instances:
+            raise CLIError(f"Instance {args.instance_name!r} not found in pool {pool.name!r}")
+
+        console.print(f" [bold]Pool name[/]  {pool.name}\n")
+        print_instance_table(pool.instances)
+
+        if not args.force and any(i.status == InstanceStatus.BUSY for i in pool.instances):
+            # TODO(egor-s): implement this logic in the server too
+            raise CLIError("Can't remove busy instance. Use `--force` to remove anyway")
+
+        if not args.yes and not confirm_ask(f"Remove instance {args.instance_name!r}?"):
+            console.print("\nExiting...")
+            return
+
         with console.status("Removing instance..."):
             self.api.client.pool.remove(
-                self.api.project, args.pool_name, args.instance_name, args.force
+                self.api.project, pool.name, args.instance_name, args.force
             )
         console.print(f"Instance {args.instance_name!r} removed")
 
