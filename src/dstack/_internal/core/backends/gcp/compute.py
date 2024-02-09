@@ -141,6 +141,8 @@ class GCPCompute(Compute):
                 username="ubuntu",
                 ssh_port=22,
                 dockerized=True,
+                ssh_proxy=None,
+                backend_data=None,
             )
         raise NoCapacityError()
 

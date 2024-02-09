@@ -15,7 +15,7 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.errors import NoCapacityError
+from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -113,23 +113,47 @@ class AWSCompute(Compute):
             {"Key": "dstack_user", "Value": instance_config.user},
         ]
         try:
+            subnet_id = None
+            vpc_id = None
+            if self.config.vpc is not None:
+                vpc_id = aws_resources.get_vpc_id_by_name(
+                    ec2_client=ec2_client,
+                    vpc_name=self.config.vpc,
+                )
+                if vpc_id is None:
+                    raise ComputeError(
+                        f"No VPC named {self.config.vpc} in region {instance_offer.region}"
+                    )
+                subnet_id = aws_resources.get_subnet_id_for_vpc(
+                    ec2_client=ec2_client,
+                    vpc_id=vpc_id,
+                )
+                if subnet_id is None:
+                    raise ComputeError(
+                        f"Failed to get subnet for VPC {self.config.vpc} in region {instance_offer.region}"
+                    )
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             response = ec2.create_instances(
                 **aws_resources.create_instances_struct(
                     disk_size=disk_size,
                     image_id=aws_resources.get_image_id(
-                        ec2_client, len(instance_offer.instance.resources.gpus) > 0
+                        ec2_client=ec2_client,
+                        cuda=len(instance_offer.instance.resources.gpus) > 0,
                     ),
                     instance_type=instance_offer.instance.name,
                     iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
-                        iam_client, project_name
+                        iam_client=iam_client,
+                        project_id=project_name,
                     ),
                     user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
                     tags=tags,
                     security_group_id=aws_resources.create_security_group(
-                        ec2_client, project_name
+                        ec2_client=ec2_client,
+                        project_id=project_name,
+                        vpc_id=vpc_id,
                     ),
                     spot=instance_offer.instance.resources.spot,
+                    subnet_id=subnet_id,
                 )
             )
             instance = response[0]
@@ -147,6 +171,8 @@ class AWSCompute(Compute):
                 username="ubuntu",
                 ssh_port=22,
                 dockerized=True,  # because `dstack-shim docker` is used
+                ssh_proxy=None,
+                backend_data=None,
             )
         except botocore.exceptions.ClientError as e:
             logger.warning("Got botocore.exceptions.ClientError: %s", e)

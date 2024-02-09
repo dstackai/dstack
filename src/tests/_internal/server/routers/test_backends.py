@@ -964,5 +964,6 @@ class TestGetConfigInfo:
         assert response.json() == {
             "type": "aws",
             "regions": json.loads(backend.config)["regions"],
+            "vpc": None,
             "creds": json.loads(backend.auth),
         }

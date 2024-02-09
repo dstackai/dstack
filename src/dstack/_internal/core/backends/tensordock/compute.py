@@ -99,6 +99,7 @@ class TensorDockCompute(Compute):
             username="user",
             ssh_port={v: k for k, v in resp["port_forwards"].items()}["22"],
             dockerized=True,
+            ssh_proxy=None,
             backend_data=None,
         )
 

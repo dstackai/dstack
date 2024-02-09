@@ -62,6 +62,7 @@ class TestListProjects:
                         "config": {
                             "type": backend.type,
                             "regions": json.loads(backend.config)["regions"],
+                            "vpc": None,
                         },
                     }
                 ],

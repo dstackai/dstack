@@ -143,6 +143,7 @@ def _run_instance(
         username="ubuntu",
         ssh_port=22,
         dockerized=True,
+        ssh_proxy=None,
         backend_data=None,
     )
 

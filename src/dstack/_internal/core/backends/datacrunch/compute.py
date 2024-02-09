@@ -7,7 +7,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
 from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -124,7 +124,7 @@ class DataCrunchCompute(Compute):
 
         running_instance = self.api_client.wait_for_instance(instance.id)
         if running_instance is None:
-            raise BackendError(f"Wait instance {instance.id!r} timeout")
+            raise ComputeError(f"Wait instance {instance.id!r} timeout")
 
         launched_instance = LaunchedInstanceInfo(
             instance_id=running_instance.id,
@@ -133,6 +133,7 @@ class DataCrunchCompute(Compute):
             ssh_port=22,
             username="root",
             dockerized=True,
+            ssh_proxy=None,
             backend_data=None,
         )
 

@@ -10,6 +10,7 @@ from dstack._internal.core.models.common import ForbidExtra
 class AWSConfigInfo(BaseModel):
     type: Literal["aws"] = "aws"
     regions: Optional[List[str]] = None
+    vpc: Optional[str] = None
 
 
 class AWSAccessKeyCreds(ForbidExtra):
