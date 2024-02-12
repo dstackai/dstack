@@ -13,6 +13,7 @@ from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     PullResponse,
     SubmitBody,
+    SubmitStopBody,
 )
 
 REMOTE_SHIM_PORT = 10998
@@ -107,6 +108,11 @@ class ShimClient:
             self._url("/api/submit"),
             json=post_body,
         )
+        resp.raise_for_status()
+
+    def submit_stop(self, force: bool = False):
+        body = SubmitStopBody(force=force)
+        resp = requests.post(self._url("/api/submit_stop"), json=body.dict())
         resp.raise_for_status()
 
     def pull(self):  # TODO return

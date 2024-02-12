@@ -1,7 +1,15 @@
+from typing import Dict
+
+from pydantic import parse_raw_as
 from sqlalchemy import or_, select
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.models.runs import InstanceStatus, JobSpec, JobStatus
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobProvisioningData,
+    JobSpec,
+    JobStatus,
+)
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import GatewayModel, JobModel
 from dstack._internal.server.services.gateways import gateway_connections_pool
@@ -10,6 +18,8 @@ from dstack._internal.server.services.jobs import (
     TERMINATING_PROCESSING_JOBS_LOCK,
 )
 from dstack._internal.server.services.logging import job_log
+from dstack._internal.server.services.runner import client
+from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -90,7 +100,28 @@ async def _process_job(job_id):
             job_model.instance.last_job_processed_at = get_current_datetime()
             job_model.instance = None
 
+        server_ssh_private_key = job_model.project.ssh_private_key
+        job_provisioning_data = parse_raw_as(JobProvisioningData, job_model.job_provisioning_data)
+        await run_async(
+            submit_stop,
+            server_ssh_private_key,
+            job_provisioning_data,
+            job_model,
+        )
+
         job_model.removed = True
         job_model.last_processed_at = get_current_datetime()
         await session.commit()
         logger.info(*job_log("marked as removed", job_model))
+
+
+@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT, client.REMOTE_RUNNER_PORT])
+def submit_stop(job_model: JobModel, ports: Dict[int, int]):
+    shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
+
+    resp = shim_client.healthcheck()
+    if resp is None:
+        logger.debug(*job_log("shim is not available yet", job_model))
+        return False  # shim is not available yet
+
+    shim_client.submit_stop(force=False)

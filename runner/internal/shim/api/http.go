@@ -51,3 +51,20 @@ func (s *ShimServer) PullGetHandler(w http.ResponseWriter, r *http.Request) (int
 		State: string(s.runner.GetState()),
 	}, nil
 }
+
+func (s *ShimServer) SubmitStopPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var body SubmitStopBody
+	if err := api.DecodeJSONBody(w, r, &body, true); err != nil {
+		log.Println("Failed to decode submit stop body", "err", err)
+		return nil, err
+	}
+
+	s.runner.SubmitStop(body.Force)
+
+	return &SubmitStopResponse{
+		State: string(s.runner.GetState()),
+	}, nil
+}

@@ -12,6 +12,7 @@ import (
 type TaskRunner interface {
 	Run(context.Context, shim.DockerImageConfig) error
 	GetState() shim.RunnerStatus
+	SubmitStop(bool)
 }
 
 type ShimServer struct {
@@ -38,5 +39,6 @@ func NewShimServer(address string, runner TaskRunner, version string) *ShimServe
 	mux.HandleFunc("/api/submit", api.JSONResponseHandler("POST", s.SubmitPostHandler))
 	mux.HandleFunc("/api/healthcheck", api.JSONResponseHandler("GET", s.HealthcheckGetHandler))
 	mux.HandleFunc("/api/pull", api.JSONResponseHandler("GET", s.PullGetHandler))
+	mux.HandleFunc("/api/submit_stop", api.JSONResponseHandler("POST", s.SubmitStopPostHandler))
 	return s
 }

@@ -23,9 +23,10 @@ import (
 )
 
 type DockerRunner struct {
-	client       *docker.Client
-	dockerParams DockerParameters
-	state        RunnerStatus
+	client           *docker.Client
+	dockerParams     DockerParameters
+	currentContainer string
+	state            RunnerStatus
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -62,6 +63,8 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 		return err
 	}
 
+	d.currentContainer = containerID
+
 	if !d.dockerParams.DockerKeepContainer() {
 		defer func() {
 			log.Println("Deleting container")
@@ -82,8 +85,41 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 
 	log.Printf("Container finished successfully, id=%s\n", containerID)
 
+	d.currentContainer = ""
 	d.state = Pending
 	return nil
+}
+
+func (d *DockerRunner) SubmitStop(force bool) {
+	if d.currentContainer == "" {
+		return
+	}
+
+	ctx := context.Background()
+
+	stopOptions := container.StopOptions{}
+	if force {
+		timeout := int(0)
+		stopOptions.Timeout = &timeout
+	}
+
+	err := d.client.ContainerStop(ctx, d.currentContainer, stopOptions)
+	if err != nil {
+		log.Printf("Failed to stop container: %s", err)
+	}
+
+	if !d.dockerParams.DockerKeepContainer() {
+		removeOptions := types.ContainerRemoveOptions{
+			RemoveVolumes: true,
+			Force:         true,
+		}
+
+		err = d.client.ContainerRemove(ctx, d.currentContainer, removeOptions)
+		if err != nil {
+			log.Printf("Failed to remove container: %s", err)
+		}
+	}
+
 }
 
 func (d DockerRunner) GetState() RunnerStatus {
