@@ -80,14 +80,19 @@ async def check_shim(instance_id: UUID) -> None:
 
         instance_health = instance_healthcheck(ssh_private_key, job_provisioning_data)
 
-        logger.info("check instance %s status: %s", instance.name, instance_health)
+        logger.debug("check instance %s status: shim health is %s", instance.name, instance_health)
 
         if instance_health:
             if instance.status in (InstanceStatus.CREATING, InstanceStatus.STARTING):
-                instance.status = InstanceStatus.READY
+                instance.status = (
+                    InstanceStatus.READY if instance.job_id is None else InstanceStatus.BUSY
+                )
                 await session.commit()
         else:
             if instance.status in (InstanceStatus.READY, InstanceStatus.BUSY):
+                logger.warning(
+                    "instance %s shim is not available, marked as failed", instance.name
+                )
                 instance.status = InstanceStatus.FAILED
                 await session.commit()
 
