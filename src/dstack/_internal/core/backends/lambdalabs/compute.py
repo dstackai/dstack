@@ -57,13 +57,7 @@ class LambdaCompute(Compute):
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
         commands = get_shim_commands(
-            backend=BackendType.LAMBDA,
-            image_name=job.job_spec.image_name,
-            authorized_keys=[
-                run.run_spec.ssh_key_pub.strip(),
-                project_ssh_public_key.strip(),
-            ],
-            registry_auth_required=job.job_spec.registry_auth is not None,
+            authorized_keys=[run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
         # shim is asssumed to be run under root
         launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"

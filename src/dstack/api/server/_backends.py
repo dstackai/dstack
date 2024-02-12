@@ -21,11 +21,15 @@ class BackendsAPIClient(APIClientGroup):
         resp = self._request("/api/backends/config_values", body=config.json())
         return parse_obj_as(AnyConfigValues, resp.json())
 
-    def create(self, project_name: str, config: AnyConfigInfoWithCreds) -> AnyConfigInfoWithCreds:
+    def create(
+        self, project_name: str, config: AnyConfigInfoWithCreds
+    ) -> AnyConfigInfoWithCredsPartial:
         resp = self._request(f"/api/project/{project_name}/backends/create", body=config.json())
         return parse_obj_as(AnyConfigInfoWithCredsPartial, resp.json())
 
-    def update(self, project_name: str, config: AnyConfigInfoWithCreds) -> AnyConfigInfoWithCreds:
+    def update(
+        self, project_name: str, config: AnyConfigInfoWithCreds
+    ) -> AnyConfigInfoWithCredsPartial:
         resp = self._request(f"/api/project/{project_name}/backends/update", body=config.json())
         return parse_obj_as(AnyConfigInfoWithCredsPartial, resp.json())
 

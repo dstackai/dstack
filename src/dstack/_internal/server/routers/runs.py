@@ -3,12 +3,17 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.errors import ResourceNotExistsError, ServerClientError
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.runs import Run, RunPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
+    CreateInstanceRequest,
     DeleteRunsRequest,
+    GetOffersRequest,
+    GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
     StopRunsRequest,
@@ -16,6 +21,10 @@ from dstack._internal.server.schemas.runs import (
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
+from dstack._internal.server.services.pools import (
+    generate_instance_name,
+    get_or_create_default_pool_by_name,
+)
 
 root_router = APIRouter(
     prefix="/api/runs",
@@ -58,9 +67,52 @@ async def get_run(
     return run
 
 
+@project_router.post("/get_offers")
+async def get_offers(
+    body: GetOffersRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+) -> Tuple[str, List[InstanceOfferWithAvailability]]:
+    _, project = user_project
+
+    active_pool = await get_or_create_default_pool_by_name(
+        session, project, body.profile.pool_name
+    )
+
+    offers = await runs.get_run_plan_by_requirements(project, body.profile, body.requirements)
+    instances = [instance for _, instance in offers]
+
+    return active_pool.name, instances
+
+
+@project_router.post("/create_instance")
+async def create_instance(
+    body: CreateInstanceRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+) -> Instance:
+    user, project = user_project
+    instance_name = await generate_instance_name(
+        session=session, project=project, pool_name=body.pool_name
+    )
+    instance = await runs.create_instance(
+        session=session,
+        project=project,
+        user=user,
+        ssh_key=body.ssh_key,
+        pool_name=body.pool_name,
+        instance_name=instance_name,
+        profile=body.profile,
+        requirements=body.requirements,
+    )
+    if instance is None:
+        raise ServerClientError(msg="Failed to create an instance")
+    return instance
+
+
 @project_router.post("/get_plan")
 async def get_run_plan(
-    body: SubmitRunRequest,
+    body: GetRunPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> RunPlan:

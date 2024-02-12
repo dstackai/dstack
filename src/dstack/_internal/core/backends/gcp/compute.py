@@ -18,12 +18,14 @@ from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
     LaunchedGatewayInfo,
     LaunchedInstanceInfo,
     Resources,
+    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 
@@ -44,7 +46,7 @@ class GCPCompute(Compute):
             requirements=requirements,
             extra_filter=_supported_instances_and_zones(self.config.regions),
         )
-        quotas = defaultdict(dict)
+        quotas: Dict[str, Dict[str, float]] = defaultdict(dict)
         for region in self.regions_client.list(project=self.config.project_id):
             for quota in region.quotas:
                 quotas[region.name][quota.metric] = quota.limit - quota.usage
@@ -70,7 +72,7 @@ class GCPCompute(Compute):
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ):
+    ) -> None:
         try:
             self.instances_client.delete(
                 project=self.config.project_id, zone=region, instance=instance_id
@@ -78,25 +80,21 @@ class GCPCompute(Compute):
         except google.api_core.exceptions.NotFound:
             pass
 
-    def run_job(
+    def create_instance(
         self,
-        run: Run,
-        job: Job,
         instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
+        instance_config: InstanceConfiguration,
     ) -> LaunchedInstanceInfo:
-        project_id = run.project_name
-        instance_name = get_instance_name(run, job)
+        instance_name = instance_config.instance_name
+
+        authorized_keys = instance_config.get_public_keys()
+
         gcp_resources.create_runner_firewall_rules(
             firewalls_client=self.firewalls_client,
             project_id=self.config.project_id,
         )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        authorized_keys = [
-            run.run_spec.ssh_key_pub.strip(),
-            project_ssh_public_key.strip(),
-        ]
+
         for zone in _get_instance_zones(instance_offer):
             request = compute_v1.InsertInstanceRequest()
             request.zone = zone
@@ -113,17 +111,12 @@ class GCPCompute(Compute):
                     gpus=instance_offer.instance.resources.gpus,
                 ),
                 spot=instance_offer.instance.resources.spot,
-                user_data=get_user_data(
-                    backend=BackendType.GCP,
-                    image_name=job.job_spec.image_name,
-                    authorized_keys=authorized_keys,
-                    registry_auth_required=job.job_spec.registry_auth is not None,
-                ),
+                user_data=get_user_data(authorized_keys),
                 authorized_keys=authorized_keys,
                 labels={
                     "owner": "dstack",
-                    "dstack_project": project_id,
-                    "dstack_user": run.user,
+                    "dstack_project": instance_config.project_name,
+                    "dstack_user": instance_config.user,
                 },
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,
@@ -152,6 +145,27 @@ class GCPCompute(Compute):
                 backend_data=None,
             )
         raise NoCapacityError()
+
+    def run_job(
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ) -> LaunchedInstanceInfo:
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=project_ssh_public_key.strip()),
+            ],
+            job_docker_config=None,
+            user=run.user,
+        )
+        launched_instance_info = self.create_instance(instance_offer, instance_config)
+        return launched_instance_info
 
     def create_gateway(
         self,
@@ -207,8 +221,6 @@ class GCPCompute(Compute):
 def _supported_instances_and_zones(
     regions: List[str],
 ) -> Optional[Callable[[InstanceOffer], bool]]:
-    regions = set(regions)
-
     def _filter(offer: InstanceOffer) -> bool:
         # strip zone
         if offer.region[:-2] not in regions:
@@ -232,7 +244,7 @@ def _supported_instances_and_zones(
     return _filter
 
 
-def _has_gpu_quota(quotas: Dict[str, int], resources: Resources) -> bool:
+def _has_gpu_quota(quotas: Dict[str, float], resources: Resources) -> bool:
     if not resources.gpus:
         return True
     gpu = resources.gpus[0]

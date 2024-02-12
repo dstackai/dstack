@@ -22,6 +22,16 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 
 
+def get_default_python_verison() -> str:
+    version_info = sys.version_info
+    return PythonVersion(f"{version_info.major}.{version_info.minor}").value
+
+
+def get_default_image(python_version: str) -> str:
+    # TODO: non-cuda image
+    return f"dstackai/base:py{python_version}-{version.base_image}-cuda-12.1"
+
+
 class JobConfigurator(ABC):
     TYPE: ConfigurationType
 
@@ -43,6 +53,7 @@ class JobConfigurator(ABC):
             requirements=self._requirements(),
             retry_policy=self._retry_policy(),
             working_dir=self._working_dir(),
+            pool_name=self._pool_name(),
         )
         return [job_spec]
 
@@ -113,8 +124,7 @@ class JobConfigurator(ABC):
     def _image_name(self) -> str:
         if self.run_spec.configuration.image is not None:
             return self.run_spec.configuration.image
-        # TODO: non-cuda image
-        return f"dstackai/base:py{self._python()}-{version.base_image}-cuda-12.1"
+        return get_default_image(self._python())
 
     def _max_duration(self) -> Optional[int]:
         if self.run_spec.profile.max_duration is None:
@@ -140,8 +150,10 @@ class JobConfigurator(ABC):
     def _python(self) -> str:
         if self.run_spec.configuration.python is not None:
             return self.run_spec.configuration.python.value
-        version_info = sys.version_info
-        return PythonVersion(f"{version_info.major}.{version_info.minor}").value
+        return get_default_python_verison()
+
+    def _pool_name(self):
+        return self.run_spec.profile.pool_name
 
 
 def _join_shell_commands(commands: List[str], env: Optional[Dict[str, str]] = None) -> str:

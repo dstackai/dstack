@@ -77,14 +77,11 @@ class NebiusCompute(Compute):
                 ),
                 metadata={
                     "user-data": get_user_data(
-                        backend=BackendType.NEBIUS,
-                        image_name=job.job_spec.image_name,
                         authorized_keys=[
                             run.run_spec.ssh_key_pub.strip(),
                             project_ssh_public_key.strip(),
-                        ],
-                        registry_auth_required=job.job_spec.registry_auth is not None,
-                    ),
+                        ]
+                    )
                 },
                 disk_size_gb=disk_size,
                 image_id=image_id,

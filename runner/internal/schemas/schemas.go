@@ -81,6 +81,7 @@ type Gateway struct {
 
 type HealthcheckResponse struct {
 	Service string `json:"service"`
+	Version string `json:"version"`
 }
 
 func (d *RepoData) FormatURL(format string) string {

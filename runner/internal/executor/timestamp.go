@@ -2,9 +2,10 @@ package executor
 
 import (
 	"context"
-	"github.com/dstackai/dstack/runner/internal/log"
 	"sync"
 	"time"
+
+	"github.com/dstackai/dstack/runner/internal/log"
 )
 
 type MonotonicTimestamp struct {

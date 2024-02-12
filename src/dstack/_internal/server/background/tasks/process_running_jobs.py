@@ -3,6 +3,7 @@ from typing import Dict, Optional
 from uuid import UUID
 
 import httpx
+from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -11,7 +12,7 @@ from dstack._internal.core.errors import GatewayError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
-from dstack._internal.core.models.runs import Job, JobErrorCode, JobStatus, Run
+from dstack._internal.core.models.runs import Job, JobErrorCode, JobSpec, JobStatus, Run
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     GatewayModel,
@@ -73,7 +74,9 @@ async def process_running_jobs():
 
 async def _process_job(job_id: UUID):
     async with get_session_ctx() as session:
-        res = await session.execute(select(JobModel).where(JobModel.id == job_id))
+        res = await session.execute(
+            select(JobModel).where(JobModel.id == job_id).options(joinedload(JobModel.instance))
+        )
         job_model = res.scalar_one()
         res = await session.execute(
             select(RunModel)
@@ -89,6 +92,7 @@ async def _process_job(job_id: UUID):
         job = run.jobs[job_model.job_num]
         job_submission = job_model_to_job_submission(job_model)
         job_provisioning_data = job_submission.job_provisioning_data
+
         server_ssh_private_key = project.ssh_private_key
         secrets = {}  # TODO secrets
         repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
@@ -136,7 +140,9 @@ async def _process_job(job_id: UUID):
                     secrets,
                     repo_creds,
                 )
-            if not success:  # check timeout
+
+            if not success:
+                # check timeout
                 if job_submission.age > _get_runner_timeout_interval(
                     job_provisioning_data.backend
                 ):
@@ -149,6 +155,10 @@ async def _process_job(job_id: UUID):
                     )
                     job_model.status = JobStatus.FAILED
                     job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
+                    job_model.used_instance_id = job_model.instance.id
+                    job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
+                    job_model.instance = None
+
         else:  # fails are not acceptable
             if initial_status == JobStatus.PULLING:
                 logger.debug(
@@ -184,6 +194,7 @@ async def _process_job(job_id: UUID):
                     run_model,
                     job_model,
                 )
+
             if not success:  # kill the job
                 logger.warning(
                     *job_log(
@@ -194,6 +205,10 @@ async def _process_job(job_id: UUID):
                 )
                 job_model.status = JobStatus.FAILED
                 job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
+                job_model.used_instance_id = job_model.instance.id
+                job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
+                job_model.instance = None
+
                 if job.is_retry_active():
                     if job_submission.job_provisioning_data.instance_type.resources.spot:
                         new_job_model = create_job_model_for_new_submission(
@@ -202,6 +217,7 @@ async def _process_job(job_id: UUID):
                             status=JobStatus.PENDING,
                         )
                         session.add(new_job_model)
+
                 # job will be terminated by process_finished_jobs
 
         if (
@@ -276,6 +292,7 @@ def _process_provisioning_no_shim(
     Returns:
         is successful
     """
+
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
     resp = runner_client.healthcheck()
     if resp is None:
@@ -308,18 +325,30 @@ def _process_provisioning_with_shim(
     Returns:
         is successful
     """
+    job_spec = parse_raw_as(JobSpec, job_model.job_spec_data)
+
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
+
     resp = shim_client.healthcheck()
     if resp is None:
         logger.debug(*job_log("shim is not available yet", job_model))
         return False  # shim is not available yet
+
     if registry_auth is not None:
         logger.debug(*job_log("authenticating to the registry...", job_model))
         interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
-        shim_client.registry_auth(
+        shim_client.submit(
             username=interpolate(registry_auth.username),
             password=interpolate(registry_auth.password),
+            image_name=job_spec.image_name,
         )
+    else:
+        shim_client.submit(
+            username="",
+            password="",
+            image_name=job_spec.image_name,
+        )
+
     job_model.status = JobStatus.PULLING
     logger.info(*job_log("now is pulling", job_model))
     return True
@@ -396,6 +425,7 @@ def _process_running(
         last_job_state = resp.job_states[-1]
         job_model.status = last_job_state.state
         if job_model.status == JobStatus.DONE:
+            job_model.run.status = JobStatus.DONE
             delay_job_instance_termination(job_model)
         logger.info(*job_log("now is %s", job_model, job_model.status.value))
     return True

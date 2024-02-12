@@ -2,15 +2,15 @@ import os
 import re
 from abc import ABC, abstractmethod
 from functools import lru_cache
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import git
 import requests
 import yaml
 
 from dstack._internal import settings
-from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    InstanceConfiguration,
     InstanceOfferWithAvailability,
     LaunchedGatewayInfo,
     LaunchedInstanceInfo,
@@ -39,10 +39,17 @@ class Compute(ABC):
     ) -> LaunchedInstanceInfo:
         pass
 
+    def create_instance(
+        self,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+    ) -> LaunchedInstanceInfo:
+        raise NotImplementedError()
+
     @abstractmethod
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ):
+    ) -> None:
         pass
 
     def create_gateway(
@@ -60,18 +67,10 @@ def get_instance_name(run: Run, job: Job) -> str:
 
 
 def get_user_data(
-    backend: BackendType,
-    image_name: str,
     authorized_keys: List[str],
-    registry_auth_required: bool,
-    cloud_config_kwargs: Optional[dict] = None,
+    cloud_config_kwargs: Optional[Dict[Any, Any]] = None,
 ) -> str:
-    commands = get_shim_commands(
-        backend=backend,
-        image_name=image_name,
-        authorized_keys=authorized_keys,
-        registry_auth_required=registry_auth_required,
-    )
+    commands = get_shim_commands(authorized_keys)
     return get_cloud_config(
         runcmd=[["sh", "-c", " && ".join(commands)]],
         ssh_authorized_keys=authorized_keys,
@@ -79,25 +78,18 @@ def get_user_data(
     )
 
 
-def get_shim_commands(
-    backend: BackendType,
-    image_name: str,
-    authorized_keys: List[str],
-    registry_auth_required: bool,
-) -> List[str]:
+def get_shim_commands(authorized_keys: List[str]) -> List[str]:
     build = get_dstack_runner_version()
     env = {
-        "DSTACK_BACKEND": backend.value,
         "DSTACK_RUNNER_LOG_LEVEL": "6",
         "DSTACK_RUNNER_VERSION": build,
-        "DSTACK_IMAGE_NAME": image_name,
         "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
         "DSTACK_HOME": "/root/.dstack",
     }
     commands = get_dstack_shim(build)
     for k, v in env.items():
         commands += [f'export "{k}={v}"']
-    commands += get_run_shim_script(registry_auth_required)
+    commands += get_run_shim_script()
     return commands
 
 
@@ -119,18 +111,17 @@ def get_dstack_shim(build: str) -> List[str]:
     if settings.DSTACK_VERSION is not None:
         bucket = "dstack-runner-downloads"
 
+    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
+
     return [
-        f'sudo curl --output /usr/local/bin/dstack-shim "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"',
+        f'sudo curl --connect-timeout 60 --max-time 240 --retry 1 --output /usr/local/bin/dstack-shim "{url}"',
         "sudo chmod +x /usr/local/bin/dstack-shim",
     ]
 
 
-def get_run_shim_script(registry_auth_required: bool) -> List[str]:
+def get_run_shim_script() -> List[str]:
     dev_flag = "" if settings.DSTACK_VERSION is not None else "--dev"
-    with_auth_flag = "--with-auth" if registry_auth_required else ""
-    return [
-        f"nohup dstack-shim {dev_flag} docker {with_auth_flag} --keep-container >/root/shim.log 2>&1 &"
-    ]
+    return [f"nohup dstack-shim {dev_flag} docker --keep-container >/root/shim.log 2>&1 &"]
 
 
 def get_gateway_user_data(authorized_key: str) -> str:
@@ -183,13 +174,18 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
         # start sshd
         "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
     ]
-    build = get_dstack_runner_version()
+
     runner = "/usr/local/bin/dstack-runner"
+
+    build = get_dstack_runner_version()
     bucket = "dstack-runner-downloads-stgn"
     if settings.DSTACK_VERSION is not None:
         bucket = "dstack-runner-downloads"
+
+    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
+
     commands += [
-        f'curl --output {runner} "https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"',
+        f'curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} "{url}"',
         f"chmod +x {runner}",
         f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]

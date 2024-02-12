@@ -132,12 +132,7 @@ class AzureCompute(Compute):
                 # instance_name includes region because Azure may create an instance resource
                 # even when provisioning fails.
                 instance_name=f"{get_instance_name(run, job)}-{instance_offer.region}",
-                user_data=get_user_data(
-                    backend=BackendType.AZURE,
-                    image_name=job.job_spec.image_name,
-                    authorized_keys=ssh_pub_keys,
-                    registry_auth_required=job.job_spec.registry_auth is not None,
-                ),
+                user_data=get_user_data(authorized_keys=ssh_pub_keys),
                 ssh_pub_keys=ssh_pub_keys,
                 spot=instance_offer.instance.resources.spot,
                 disk_size=disk_size,

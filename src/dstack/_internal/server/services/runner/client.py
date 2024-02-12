@@ -9,9 +9,9 @@ import requests.exceptions
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.runs import JobSpec, RunSpec
 from dstack._internal.server.schemas.runner import (
+    DockerImageBody,
     HealthcheckResponse,
     PullResponse,
-    RegistryAuthBody,
     SubmitBody,
 )
 
@@ -99,10 +99,13 @@ class ShimClient:
         except requests.exceptions.RequestException:
             return None
 
-    def registry_auth(self, username: str, password: str):
+    def submit(self, username: str, password: str, image_name: str):
+        post_body = DockerImageBody(
+            username=username, password=password, image_name=image_name
+        ).dict()
         resp = requests.post(
-            self._url("/api/registry_auth"),
-            json=RegistryAuthBody(username=username, password=password).dict(),
+            self._url("/api/submit"),
+            json=post_body,
         )
         resp.raise_for_status()
 

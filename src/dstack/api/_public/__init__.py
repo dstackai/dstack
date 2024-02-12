@@ -6,6 +6,7 @@ from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 from dstack.api._public.backends import BackendCollection
+from dstack.api._public.pools import PoolCollection
 from dstack.api._public.repos import RepoCollection, get_ssh_keypair
 from dstack.api._public.runs import RunCollection
 from dstack.api.server import APIClient
@@ -40,6 +41,7 @@ class Client:
         self._repos = RepoCollection(api_client, project_name)
         self._backends = BackendCollection(api_client, project_name)
         self._runs = RunCollection(api_client, project_name, self)
+        self._pool = PoolCollection(api_client, project_name)
         if ssh_identity_file:
             self.ssh_identity_file = str(ssh_identity_file)
         else:
@@ -95,3 +97,7 @@ class Client:
     @property
     def project(self) -> str:
         return self._project
+
+    @property
+    def pool(self) -> PoolCollection:
+        return self._pool

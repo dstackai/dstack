@@ -5,6 +5,7 @@ from datacrunch import DataCrunchClient
 from datacrunch.exceptions import APIException
 from datacrunch.instances.instances import Instance
 
+from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.utils.ssh import get_public_key_fingerprint
 
 
@@ -55,6 +56,7 @@ class DataCrunchAPIClient:
             if instance is not None and instance.status == "running":
                 return instance
             time.sleep(WAIT_FOR_INSTANCE_INTERVAL)
+        return
 
     def deploy_instance(
         self,
@@ -67,16 +69,20 @@ class DataCrunchAPIClient:
         disk_size,
         is_spot=True,
         location="FIN-01",
-    ):
-        instance = self.client.instances.create(
-            instance_type=instance_type,
-            image=image,
-            ssh_key_ids=ssh_key_ids,
-            hostname=hostname,
-            description=description,
-            startup_script_id=startup_script_id,
-            is_spot=is_spot,
-            location=location,
-            os_volume={"name": "OS volume", "size": disk_size},
-        )
+    ) -> Instance:
+        try:
+            instance = self.client.instances.create(
+                instance_type=instance_type,
+                image=image,
+                ssh_key_ids=ssh_key_ids,
+                hostname=hostname,
+                description=description,
+                startup_script_id=startup_script_id,
+                is_spot=is_spot,
+                location=location,
+                os_volume={"name": "OS volume", "size": disk_size},
+            )
+        except APIException:
+            raise NoCapacityError()
+
         return instance

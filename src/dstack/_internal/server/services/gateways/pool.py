@@ -8,7 +8,7 @@ logger = get_logger(__name__)
 
 
 class GatewayConnectionsPool:
-    def __init__(self):
+    def __init__(self) -> None:
         self._connections: Dict[str, GatewayConnection] = {}
         self._lock = asyncio.Lock()
         self.server_port: Optional[int] = None
@@ -39,7 +39,7 @@ class GatewayConnectionsPool:
         await stop_task
         return True
 
-    async def remove_all(self):
+    async def remove_all(self) -> None:
         async with self._lock:
             await asyncio.gather(
                 *(conn.tunnel.stop() for conn in self._connections.values()),
@@ -54,4 +54,4 @@ class GatewayConnectionsPool:
         return list(self._connections.values())
 
 
-gateway_connections_pool = GatewayConnectionsPool()
+gateway_connections_pool: GatewayConnectionsPool = GatewayConnectionsPool()

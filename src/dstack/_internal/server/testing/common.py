@@ -9,16 +9,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
 from dstack._internal.core.models.instances import InstanceType, Resources
-from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_NAME,
+    DEFAULT_TERMINATION_IDLE_TIME,
+    Profile,
+)
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.runs import JobErrorCode, JobProvisioningData, JobStatus, RunSpec
+from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobErrorCode,
+    JobProvisioningData,
+    JobStatus,
+    RunSpec,
+)
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
     BackendModel,
     GatewayComputeModel,
     GatewayModel,
+    InstanceModel,
     JobModel,
+    PoolModel,
     ProjectModel,
     RepoModel,
     RunModel,
@@ -136,8 +149,10 @@ async def create_repo(
 def get_run_spec(
     run_name: str,
     repo_id: str,
-    profile: Optional[Profile] = Profile(name="default"),
+    profile: Optional[Profile] = None,
 ) -> RunSpec:
+    if profile is None:
+        profile = Profile(name="default")
     return RunSpec(
         run_name=run_name,
         repo_id=repo_id,
@@ -189,6 +204,7 @@ async def create_job(
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     error_code: Optional[JobErrorCode] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
+    instance: Optional[InstanceModel] = None,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = get_job_specs_from_run_spec(run_spec)[0]
@@ -205,6 +221,7 @@ async def create_job(
         error_code=error_code,
         job_spec_data=job_spec.json(),
         job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
+        instance=instance if instance is not None else None,
     )
     session.add(job)
     await session.commit()
@@ -226,6 +243,7 @@ def get_job_provisioning_data() -> JobProvisioningData:
         ssh_port=22,
         dockerized=False,
         backend_data=None,
+        ssh_proxy=None,
     )
 
 
@@ -271,3 +289,47 @@ async def create_gateway_compute(
     session.add(gateway_compute)
     await session.commit()
     return gateway_compute
+
+
+async def create_pool(
+    session: AsyncSession,
+    project: ProjectModel,
+    pool_name: Optional[str] = None,
+) -> PoolModel:
+    pool_name = pool_name if pool_name is not None else DEFAULT_POOL_NAME
+    pool = PoolModel(
+        name=pool_name,
+        project=project,
+        project_id=project.id,
+    )
+    session.add(pool)
+    await session.commit()
+    return pool
+
+
+async def create_instance(
+    session: AsyncSession,
+    project: ProjectModel,
+    pool: PoolModel,
+    status: InstanceStatus,
+    resources: ResourcesSpec,
+) -> InstanceModel:
+    im = InstanceModel(
+        name="test_instance",
+        pool=pool,
+        project=project,
+        status=status,
+        job_provisioning_data='{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "instance_id": "running_instance.id", "ssh_proxy": null, "hostname": "running_instance.ip", "region": "running_instance.location", "price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, "backend_data": null}',
+        offer='{"backend": "datacrunch", "instance": {"name": "instance", "resources": {"cpus": 2, "memory_mib": 12000, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "region": "en", "price": 0.1, "availability": "available"}',
+        price=1,
+        region="eu-west",
+        backend=BackendType.DATACRUNCH,
+        termination_idle_time=DEFAULT_TERMINATION_IDLE_TIME,
+    )
+    session.add(im)
+    await session.commit()
+
+    # pool.instances.append(im)
+    # await session.commit()
+
+    return im

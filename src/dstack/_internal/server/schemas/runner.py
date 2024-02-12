@@ -63,8 +63,10 @@ class SubmitBody(BaseModel):
 
 class HealthcheckResponse(BaseModel):
     service: str
+    version: str
 
 
-class RegistryAuthBody(BaseModel):
+class DockerImageBody(BaseModel):
     username: str
     password: str
+    image_name: str

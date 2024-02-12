@@ -3,10 +3,11 @@ package log
 import (
 	"context"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"github.com/sirupsen/logrus"
 	"io"
 	"os"
+
+	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/sirupsen/logrus"
 )
 
 type loggerKey struct{}

@@ -16,6 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
 from dstack._internal.core.models.runs import JobSpec, JobStatus, RunSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
@@ -70,12 +71,17 @@ def get_dev_env_run_plan_dict(
             "configuration_path": "dstack.yaml",
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
+                "creation_policy": None,
                 "default": False,
+                "instance_name": None,
                 "max_duration": "off",
                 "max_price": None,
                 "name": "string",
+                "pool_name": DEFAULT_POOL_NAME,
                 "retry_policy": {"limit": None, "retry": False},
                 "spot_policy": "spot",
+                "termination_idle_time": 300,
+                "termination_policy": None,
             },
             "repo_code_hash": None,
             "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
@@ -112,6 +118,7 @@ def get_dev_env_run_plan_dict(
                     "job_name": f"{run_name}-0",
                     "job_num": 0,
                     "max_duration": None,
+                    "pool_name": DEFAULT_POOL_NAME,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -176,12 +183,17 @@ def get_dev_env_run_dict(
             "configuration_path": "dstack.yaml",
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
+                "creation_policy": None,
                 "default": False,
+                "instance_name": None,
                 "max_duration": "off",
                 "max_price": None,
                 "name": "string",
+                "pool_name": DEFAULT_POOL_NAME,
                 "retry_policy": {"limit": None, "retry": False},
                 "spot_policy": "spot",
+                "termination_idle_time": 300,
+                "termination_policy": None,
             },
             "repo_code_hash": None,
             "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
@@ -218,6 +230,7 @@ def get_dev_env_run_dict(
                     "job_name": f"{run_name}-0",
                     "job_num": 0,
                     "max_duration": None,
+                    "pool_name": DEFAULT_POOL_NAME,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -255,7 +268,7 @@ def get_dev_env_run_dict(
             "error_code": None,
             "job_provisioning_data": None,
         },
-        "cost": 0,
+        "cost": 0.0,
         "service": None,
     }
 
@@ -576,7 +589,6 @@ class TestStopRuns:
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATED
         assert not job.removed
-        assert job.remove_at is not None
 
     @pytest.mark.asyncio
     async def test_leaves_finished_runs_unchanged(self, test_db, session: AsyncSession):

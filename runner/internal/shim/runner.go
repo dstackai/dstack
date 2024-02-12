@@ -1,14 +1,15 @@
 package shim
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	rt "runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 )
@@ -27,16 +28,17 @@ func (c *CLIArgs) GetDockerCommands() []string {
 	}
 }
 
-func (c *CLIArgs) Download(osName string) error {
-	tempFile, err := os.CreateTemp("", "dstack-runner")
+func (c *CLIArgs) DownloadRunner() error {
+	url := makeDownloadRunnerUrl(c.Runner.Version, c.Runner.DevChannel)
+
+	runnerBinaryPath, err := downloadRunner(url)
 	if err != nil {
 		return gerrors.Wrap(err)
 	}
-	if err = tempFile.Close(); err != nil {
-		return gerrors.Wrap(err)
-	}
-	c.Runner.BinaryPath = tempFile.Name()
-	return gerrors.Wrap(downloadRunner(c.Runner.Version, c.Runner.DevChannel, osName, c.Runner.BinaryPath))
+
+	c.Runner.BinaryPath = runnerBinaryPath
+
+	return nil
 }
 
 func (c *CLIArgs) getRunnerArgs() []string {
@@ -50,42 +52,62 @@ func (c *CLIArgs) getRunnerArgs() []string {
 	}
 }
 
-func downloadRunner(runnerVersion string, useDev bool, osName string, path string) error {
-	// darwin-amd64
-	// darwin-arm64
-	// linux-386
-	// linux-amd64
-	archName := rt.GOARCH
-	if osName == "linux" && archName == "arm64" {
-		archName = "amd64"
-	}
-	var url string
-	if useDev {
-		url = fmt.Sprintf(DstackRunnerURL, DstackStagingBucket, runnerVersion, osName, archName)
-	} else {
-		url = fmt.Sprintf(DstackRunnerURL, DstackReleaseBucket, runnerVersion, osName, archName)
+func makeDownloadRunnerUrl(version string, staging bool) string {
+	bucket := DstackReleaseBucket
+	if staging {
+		bucket = DstackStagingBucket
 	}
 
-	file, err := os.Create(path)
+	osName := "linux"
+	archName := "amd64"
+
+	url := fmt.Sprintf(DstackRunnerURL, bucket, version, osName, archName)
+	return url
+}
+
+func downloadRunner(url string) (string, error) {
+	tempFile, err := os.CreateTemp("", "dstack-runner")
 	if err != nil {
-		return gerrors.Wrap(err)
+		return "", gerrors.Wrap(err)
 	}
-	defer func() { _ = file.Close() }()
+	defer func() {
+		err := tempFile.Close()
+		if err != nil {
+			log.Printf("close file error: %s\n", err)
+		}
+	}()
 
 	log.Printf("Downloading runner from %s\n", url)
-	resp, err := http.Get(url)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*600)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return "", gerrors.Wrap(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+
+	resp, err := http.DefaultClient.Do(req)
+
+	if err != nil {
+		return "", gerrors.Wrap(err)
+	}
+	defer func() {
+		err := resp.Body.Close()
+		log.Printf("close body error: %s\n", err)
+	}()
+
 	if resp.StatusCode != http.StatusOK {
-		return gerrors.Newf("unexpected status code: %s", resp.Status)
+		return "", gerrors.Newf("unexpected status code: %s", resp.Status)
 	}
 
-	_, err = io.Copy(file, resp.Body)
+	_, err = io.Copy(tempFile, resp.Body)
 	if err != nil {
-		return gerrors.Wrap(err)
+		return "", gerrors.Wrap(err)
 	}
 
-	return gerrors.Wrap(file.Chmod(0755))
+	if err := tempFile.Chmod(0755); err != nil {
+		return "", gerrors.Wrap(err)
+	}
+
+	return tempFile.Name(), nil
 }

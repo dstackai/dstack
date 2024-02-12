@@ -1,11 +1,9 @@
 import argparse
-import re
 import subprocess
-from typing import Dict, List, Optional, Tuple, Type
-
-from pydantic import parse_obj_as
+from typing import Dict, List, Optional, Type
 
 import dstack._internal.core.models.resources as resources
+from dstack._internal.cli.services.args import disk_spec, env_var, gpu_spec, port_mapping
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import (
@@ -129,26 +127,6 @@ class ServiceRunConfigurator(BaseRunConfigurator):
         super().apply(args, unknown, conf)
 
         cls.interpolate_run_args(conf.commands, unknown)
-
-
-def env_var(v: str) -> Tuple[str, str]:
-    r = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$", v)
-    if r is None:
-        raise ValueError(v)
-    key, value = r.groups()
-    return key, value
-
-
-def gpu_spec(v: str) -> Dict:
-    return resources.GPUSpec.parse(v)
-
-
-def disk_spec(v: str) -> resources.DiskSpec:
-    return parse_obj_as(resources.DiskSpec, v)
-
-
-def port_mapping(v: str) -> PortMapping:
-    return PortMapping.parse(v)
 
 
 def merge_ports(conf: List[PortMapping], args: List[PortMapping]) -> Dict[int, PortMapping]:

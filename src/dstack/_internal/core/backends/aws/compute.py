@@ -20,10 +20,12 @@ from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     LaunchedGatewayInfo,
     LaunchedInstanceInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
@@ -84,7 +86,7 @@ class AWSCompute(Compute):
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ):
+    ) -> None:
         client = self.session.client("ec2", region_name=region)
         try:
             client.terminate_instances(InstanceIds=[instance_id])
@@ -94,24 +96,21 @@ class AWSCompute(Compute):
             else:
                 raise e
 
-    def run_job(
+    def create_instance(
         self,
-        run: Run,
-        job: Job,
         instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
+        instance_config: InstanceConfiguration,
     ) -> LaunchedInstanceInfo:
-        project_id = run.project_name
+        project_name = instance_config.project_name
         ec2 = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         iam_client = self.session.client("iam", region_name=instance_offer.region)
 
         tags = [
-            {"Key": "Name", "Value": get_instance_name(run, job)},
+            {"Key": "Name", "Value": instance_config.instance_name},
             {"Key": "owner", "Value": "dstack"},
-            {"Key": "dstack_project", "Value": project_id},
-            {"Key": "dstack_user", "Value": run.user},
+            {"Key": "dstack_project", "Value": project_name},
+            {"Key": "dstack_user", "Value": instance_config.user},
         ]
         try:
             subnet_id = None
@@ -144,21 +143,13 @@ class AWSCompute(Compute):
                     instance_type=instance_offer.instance.name,
                     iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
                         iam_client=iam_client,
-                        project_id=project_id,
+                        project_id=project_name,
                     ),
-                    user_data=get_user_data(
-                        backend=BackendType.AWS,
-                        image_name=job.job_spec.image_name,
-                        authorized_keys=[
-                            run.run_spec.ssh_key_pub.strip(),
-                            project_ssh_public_key.strip(),
-                        ],
-                        registry_auth_required=job.job_spec.registry_auth is not None,
-                    ),
+                    user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
                     tags=tags,
                     security_group_id=aws_resources.create_security_group(
                         ec2_client=ec2_client,
-                        project_id=project_id,
+                        project_id=project_name,
                         vpc_id=vpc_id,
                     ),
                     spot=instance_offer.instance.resources.spot,
@@ -186,6 +177,27 @@ class AWSCompute(Compute):
         except botocore.exceptions.ClientError as e:
             logger.warning("Got botocore.exceptions.ClientError: %s", e)
             raise NoCapacityError()
+
+    def run_job(
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ) -> LaunchedInstanceInfo:
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=project_ssh_public_key.strip()),
+            ],
+            job_docker_config=None,
+            user=run.user,
+        )
+        launched_instance_info = self.create_instance(instance_offer, instance_config)
+        return launched_instance_info
 
     def create_gateway(
         self,
@@ -228,7 +240,7 @@ class AWSCompute(Compute):
         )
 
 
-def _has_quota(quotas: Dict[str, float], instance_name: str) -> bool:
+def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
     if instance_name.startswith("p"):
         return quotas.get("P/OnDemand", 0) > 0
     if instance_name.startswith("g"):

@@ -6,11 +6,12 @@ from dstack._internal.cli.commands.config import ConfigCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogsCommand
+from dstack._internal.cli.commands.pool import PoolCommand
 from dstack._internal.cli.commands.ps import PsCommand
 from dstack._internal.cli.commands.run import RunCommand
 from dstack._internal.cli.commands.server import ServerCommand
 from dstack._internal.cli.commands.stop import StopCommand
-from dstack._internal.cli.utils.common import colors, console
+from dstack._internal.cli.utils.common import _colors, console
 from dstack._internal.cli.utils.updates import check_for_updates
 from dstack._internal.core.errors import ClientError, CLIError
 from dstack._internal.utils.logging import get_logger
@@ -21,8 +22,8 @@ logger = get_logger(__name__)
 
 def main():
     RichHelpFormatter.usage_markup = True
-    RichHelpFormatter.styles["code"] = colors["code"]
-    RichHelpFormatter.styles["argparse.args"] = colors["code"]
+    RichHelpFormatter.styles["code"] = _colors["code"]
+    RichHelpFormatter.styles["argparse.args"] = _colors["code"]
     RichHelpFormatter.styles["argparse.groups"] = "bold grey74"
     RichHelpFormatter.styles["argparse.text"] = "grey74"
 
@@ -50,6 +51,7 @@ def main():
     subparsers = parser.add_subparsers(metavar="COMMAND")
     ConfigCommand.register(subparsers)
     GatewayCommand.register(subparsers)
+    PoolCommand.register(subparsers)
     InitCommand.register(subparsers)
     LogsCommand.register(subparsers)
     PsCommand.register(subparsers)

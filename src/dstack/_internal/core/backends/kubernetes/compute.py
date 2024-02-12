@@ -200,13 +200,7 @@ class KubernetesCompute(Compute):
             if e.status != 404:
                 raise
 
-    def create_gateway(
-        self,
-        instance_name: str,
-        ssh_key_pub: str,
-        region: str,
-        project_id: str,
-    ) -> LaunchedGatewayInfo:
+    def create_gateway(self, instance_name: str, ssh_key_pub: str, region: str, project_id: str):
         # Gateway creation is currently limited to Kubernetes with Load Balancer support.
         # If the cluster does not support Load Balancer, the service will be provisioned but
         # the external IP/hostname will never be allocated.

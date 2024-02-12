@@ -1,28 +1,40 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from uuid import UUID
 
+from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError
-from dstack._internal.core.models.instances import LaunchedInstanceInfo
+from dstack._internal.core.models.instances import (
+    InstanceOfferWithAvailability,
+    LaunchedInstanceInfo,
+)
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy
 from dstack._internal.core.models.runs import (
+    InstanceStatus,
     Job,
     JobErrorCode,
     JobProvisioningData,
     JobStatus,
     Run,
+    RunSpec,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.models import InstanceModel, JobModel, PoolModel, RunModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.jobs import (
     SUBMITTED_PROCESSING_JOBS_IDS,
     SUBMITTED_PROCESSING_JOBS_LOCK,
 )
 from dstack._internal.server.services.logging import job_log
+from dstack._internal.server.services.pools import (
+    filter_pool_instances,
+    get_pool_instances,
+    list_project_pool_models,
+)
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
@@ -74,10 +86,79 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
     run_model = res.scalar_one()
     project_model = run_model.project
+
+    # check default pool
+    pool = project_model.default_pool
+    if pool is None:
+        # TODO: get_or_create_default_pool...
+        pools = await list_project_pool_models(session, job_model.project)
+        for pool_item in pools:
+            if pool_item.id == job_model.project.default_pool_id:
+                pool = pool_item
+            if pool_item.name == DEFAULT_POOL_NAME:
+                pool = pool_item
+        if pool is None:
+            pool = PoolModel(
+                name=DEFAULT_POOL_NAME,
+                project=project_model,
+            )
+            session.add(pool)
+            await session.commit()
+            await session.refresh(pool)
+
+        if pool.id is not None:
+            project_model.default_pool_id = pool.id
+
+    run_spec = parse_raw_as(RunSpec, run_model.run_spec)
+    profile = run_spec.profile
+    run_pool = profile.pool_name
+    if run_pool is None:
+        run_pool = pool.name
+
+    # pool capacity
+
+    pool_instances = await get_pool_instances(session, project_model, run_pool)
+    relevant_instances = filter_pool_instances(
+        pool_instances, profile, run_spec.configuration.resources, status=InstanceStatus.READY
+    )
+
+    if relevant_instances:
+        sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
+        instance = sorted_instances[0]
+
+        # need lock
+        instance.status = InstanceStatus.BUSY
+        instance.job = job_model
+
+        logger.info(*job_log("now is provisioning", job_model))
+        job_model.job_provisioning_data = instance.job_provisioning_data
+        job_model.status = JobStatus.PROVISIONING
+        job_model.last_processed_at = common_utils.get_current_datetime()
+
+        await session.commit()
+
+        return
+
     run = run_model_to_run(run_model)
     job = run.jobs[job_model.job_num]
+
+    if profile.creation_policy == CreationPolicy.REUSE:
+        logger.debug(*job_log("reuse instance failed", job_model))
+        if job.is_retry_active():
+            logger.debug(*job_log("now is pending because retry is active", job_model))
+            job_model.status = JobStatus.PENDING
+        else:
+            job_model.status = JobStatus.FAILED
+            job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        job_model.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
+        return
+
+    # create a new cloud instance
     backends = await backends_services.get_project_backends(project=run_model.project)
-    job_provisioning_data = await _run_job(
+
+    # TODO: create VM (backend.compute().create_instance)
+    job_provisioning_data, offer = await _run_job(
         job_model=job_model,
         run=run,
         job=job,
@@ -85,10 +166,30 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         project_ssh_public_key=project_model.ssh_public_key,
         project_ssh_private_key=project_model.ssh_private_key,
     )
-    if job_provisioning_data is not None:
+    if job_provisioning_data is not None and offer is not None:
         logger.info(*job_log("now is provisioning", job_model))
+
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
+
+        im = InstanceModel(
+            name=job.job_spec.job_name,  # TODO: make new name
+            project=project_model,
+            pool=pool,
+            created_at=common_utils.get_current_datetime(),
+            started_at=common_utils.get_current_datetime(),
+            status=InstanceStatus.BUSY,
+            job_provisioning_data=job_provisioning_data.json(),
+            offer=offer.json(),
+            termination_policy=profile.termination_policy,
+            termination_idle_time=profile.termination_idle_time,
+            job=job_model,
+            backend=offer.backend,
+            price=offer.price,
+            region=offer.region,
+        )
+        session.add(im)
+
     else:
         logger.debug(*job_log("provisioning failed", job_model))
         if job.is_retry_active():
@@ -108,16 +209,19 @@ async def _run_job(
     backends: List[Backend],
     project_ssh_public_key: str,
     project_ssh_private_key: str,
-) -> Optional[JobProvisioningData]:
+) -> Tuple[Optional[JobProvisioningData], Optional[InstanceOfferWithAvailability]]:
     if run.run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
+
     try:
+        requirements = job.job_spec.requirements
         offers = await backends_services.get_instance_offers(
-            backends, job, exclude_not_available=True
+            backends, requirements, exclude_not_available=True
         )
     except BackendError as e:
         logger.warning(*job_log("failed to get instance offers: %s", job_model, repr(e)))
-        return None
+        return (None, None)
+
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
     for backend, offer in offers[:15]:
@@ -153,7 +257,7 @@ async def _run_job(
             )
             continue
         else:
-            return JobProvisioningData(
+            job_provisioning_data = JobProvisioningData(
                 backend=backend.TYPE,
                 instance_type=offer.instance,
                 instance_id=launched_instance_info.instance_id,
@@ -166,4 +270,6 @@ async def _run_job(
                 ssh_proxy=launched_instance_info.ssh_proxy,
                 backend_data=launched_instance_info.backend_data,
             )
-    return None
+
+            return (job_provisioning_data, offer)
+    return (None, None)

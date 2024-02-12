@@ -5,17 +5,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceType, Resources
-from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
+from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, JobStatus
 from dstack._internal.server.background.tasks.process_finished_jobs import process_finished_jobs
 from dstack._internal.server.testing.common import (
+    create_instance,
     create_job,
+    create_pool,
     create_project,
     create_repo,
     create_run,
     create_user,
 )
 
-MODULE = "dstack._internal.server.background.tasks.process_finished_jobs"
+MODULE = "dstack._internal.server.services.jobs"
 
 
 class TestProcessFinishedJobs:
@@ -33,12 +35,21 @@ class TestProcessFinishedJobs:
             repo=repo,
             user=user,
         )
+        instance = await create_instance(
+            session,
+            project,
+            await create_pool(session, project),
+            InstanceStatus.READY,
+            Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+        )
+
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.DONE,
+            instance=instance,
             job_provisioning_data=JobProvisioningData(
-                backend=BackendType.LOCAL,
+                backend=BackendType.AWS,
                 instance_type=InstanceType(
                     name="local", resources=Resources(cpus=1, memory_mib=1024, gpus=[], spot=False)
                 ),
@@ -49,11 +60,12 @@ class TestProcessFinishedJobs:
                 username="root",
                 ssh_port=22,
                 dockerized=False,
+                backend_data=None,
+                ssh_proxy=None,
             ),
         )
-        with patch(f"{MODULE}.terminate_job_submission_instance") as terminate:
+        with patch(f"{MODULE}.terminate_job_provisioning_data_instance"):
             await process_finished_jobs()
-            terminate.assert_called_once()
         await session.refresh(job)
         assert job is not None
         assert job.removed

@@ -1,8 +1,9 @@
 import asyncio
 import itertools
+import math
 import uuid
 from datetime import timezone
-from typing import List, Optional
+from typing import List, Optional, Tuple, cast
 
 import pydantic
 from sqlalchemy import select, update
@@ -11,13 +12,27 @@ from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
-from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError
+from dstack._internal.core.backends.base import Backend
+from dstack._internal.core.errors import BackendError, RepoDoesNotExistError, ServerClientError
+from dstack._internal.core.models.instances import (
+    DockerConfig,
+    InstanceAvailability,
+    InstanceConfiguration,
+    InstanceOfferWithAvailability,
+    LaunchedInstanceInfo,
+    SSHKey,
+)
+from dstack._internal.core.models.pools import Instance
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
 from dstack._internal.core.models.runs import (
+    InstanceStatus,
     Job,
     JobPlan,
+    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobSubmission,
+    Requirements,
     Run,
     RunPlan,
     RunSpec,
@@ -25,15 +40,35 @@ from dstack._internal.core.models.runs import (
     ServiceModelInfo,
 )
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.server.models import JobModel, ProjectModel, RunModel, UserModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    JobModel,
+    ProjectModel,
+    RunModel,
+    UserModel,
+)
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
+from dstack._internal.server.services.docker import parse_image_name
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     job_model_to_job_submission,
     stop_job,
 )
+from dstack._internal.server.services.jobs.configurators.base import (
+    get_default_image,
+    get_default_python_verison,
+)
+from dstack._internal.server.services.pools import (
+    create_pool_model,
+    filter_pool_instances,
+    get_or_create_default_pool_by_name,
+    get_pool_instances,
+    instance_model_to_instance,
+)
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
 
@@ -118,35 +153,208 @@ async def get_run(
     return run_model_to_run(run_model)
 
 
-async def get_run_plan(
+async def get_run_plan_by_requirements(
+    project: ProjectModel,
+    profile: Profile,
+    requirements: Requirements,
+    exclude_not_available=False,
+) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+    backends: List[Backend] = await backends_services.get_project_backends(project=project)
+
+    if profile.backends is not None:
+        backends = [b for b in backends if b.TYPE in profile.backends]
+
+    offers = await backends_services.get_instance_offers(
+        backends=backends,
+        requirements=requirements,
+        exclude_not_available=exclude_not_available,
+    )
+
+    return offers
+
+
+async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
-    run_spec: RunSpec,
+    ssh_key: SSHKey,
+    pool_name: str,
+    instance_name: str,
+    profile: Profile,
+    requirements: Requirements,
+) -> Optional[Instance]:
+    offers = await get_run_plan_by_requirements(
+        project, profile, requirements, exclude_not_available=True
+    )
+
+    if not offers:
+        return
+
+    user_ssh_key = ssh_key
+    project_ssh_key = SSHKey(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+
+    image = parse_image_name(get_default_image(get_default_python_verison()))
+    instance_config = InstanceConfiguration(
+        project_name=project.name,
+        instance_name=instance_name,
+        ssh_keys=[user_ssh_key, project_ssh_key],
+        job_docker_config=DockerConfig(
+            image=image,
+            registry_auth=None,
+        ),
+        user=user.name,
+    )
+
+    pool = await pools_services.get_pool(session, project, pool_name)
+
+    if pool is None:
+        pool = await create_pool_model(session, project, pool_name)
+
+    for backend, instance_offer in offers:
+        logger.debug(
+            "trying %s in %s/%s for $%0.4f per hour",
+            instance_offer.instance.name,
+            instance_offer.backend.value,
+            instance_offer.region,
+            instance_offer.price,
+        )
+        try:
+            launched_instance_info: LaunchedInstanceInfo = await run_async(
+                backend.compute().create_instance,
+                instance_offer,
+                instance_config,
+            )
+        except BackendError as e:
+            logger.warning(
+                "%s launch in %s/%s failed: %s",
+                instance_offer.instance.name,
+                instance_offer.backend.value,
+                instance_offer.region,
+                repr(e),
+            )
+            continue
+
+        job_provisioning_data = JobProvisioningData(
+            backend=backend.TYPE,
+            instance_type=instance_offer.instance,
+            instance_id=launched_instance_info.instance_id,
+            hostname=launched_instance_info.ip_address,
+            region=launched_instance_info.region,
+            price=instance_offer.price,
+            username=launched_instance_info.username,
+            ssh_port=launched_instance_info.ssh_port,
+            dockerized=launched_instance_info.dockerized,
+            backend_data=launched_instance_info.backend_data,
+            ssh_proxy=None,
+        )
+
+        # types of queries
+        # 1. Get all available instance
+        # 2. Get job's instance (process job)
+        # 3. Get instance's jobs history
+
+        im = InstanceModel(
+            name=instance_name,
+            project=project,
+            pool=pool,
+            created_at=common_utils.get_current_datetime(),
+            started_at=common_utils.get_current_datetime(),
+            status=InstanceStatus.STARTING,
+            backend=backend.TYPE,
+            region=instance_offer.region,
+            price=instance_offer.price,
+            # job_id: Optional[FK] (current job)
+            # ip address
+            # ssh creds: user, port, dockerized
+            # real resources + spot (exact) / instance offer
+            # backend + backend data
+            # region
+            # price (for querying)
+            # termination policy
+            # creation policy
+            job_provisioning_data=job_provisioning_data.json(),
+            # TODO: instance provisioning
+            offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
+            termination_policy=profile.termination_policy,
+            termination_idle_time=profile.termination_idle_time,
+        )
+        session.add(im)
+        await session.commit()
+
+        return instance_model_to_instance(im)
+
+
+async def get_run_plan(
+    session: AsyncSession, project: ProjectModel, user: UserModel, run_spec: RunSpec
 ) -> RunPlan:
+    profile = run_spec.profile
+
+    # TODO: get_or_create_default_pool
+
+    pool_name = profile.pool_name
+    if profile.pool_name is None:
+        try:
+            pool_name = project.default_pool.name
+        except Exception:
+            pool_name = DEFAULT_POOL_NAME  # TODO: get pool from project
+
+    pool_instances = [
+        instance
+        for instance in (await get_pool_instances(session, project, pool_name))
+        if not instance.deleted
+    ]
+
+    pool_offers: List[InstanceOfferWithAvailability] = []
+
+    for instance in filter_pool_instances(
+        pool_instances, profile, run_spec.configuration.resources
+    ):
+        offer = pydantic.parse_raw_as(InstanceOfferWithAvailability, instance.offer)
+        if instance.status == InstanceStatus.READY:
+            offer.availability = InstanceAvailability.READY
+        else:
+            offer.availability = InstanceAvailability.BUSY
+        pool_offers.append(offer)
+
     backends = await backends_services.get_project_backends(project=project)
-    if run_spec.profile.backends is not None:
-        backends = [b for b in backends if b.TYPE in run_spec.profile.backends]
+    if profile.backends is not None:
+        backends = [b for b in backends if b.TYPE in profile.backends]
+
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
     jobs = get_jobs_from_run_spec(run_spec)
     job_plans = []
+
+    creation_policy = profile.creation_policy
+
     for job in jobs:
-        offers = await backends_services.get_instance_offers(
-            backends=backends,
-            job=job,
-            exclude_not_available=False,
-        )
-        for backend, offer in offers:
-            offer.backend = backend.TYPE
-        offers = [offer for _, offer in offers]
+        job_offers: List[InstanceOfferWithAvailability] = []
+        job_offers.extend(pool_offers)
+
+        if creation_policy is None or creation_policy == CreationPolicy.REUSE_OR_CREATE:
+            requirements = job.job_spec.requirements
+            offers = await backends_services.get_instance_offers(
+                backends=backends,
+                requirements=requirements,
+                exclude_not_available=False,
+            )
+            for backend, offer in offers:
+                offer.backend = backend.TYPE
+            job_offers.extend(offer for _, offer in offers)
+
+        # TODO(egor-s): merge job_offers and pool_offers based on (availability, use/create, price)
         job_plan = JobPlan(
             job_spec=job.job_spec,
-            offers=offers[:50],
-            total_offers=len(offers),
-            max_price=max((offer.price for offer in offers), default=None),
+            offers=job_offers[:50],
+            total_offers=len(job_offers),
+            max_price=max((offer.price for offer in job_offers), default=None),
         )
         job_plans.append(job_plan)
+
+    run_spec.profile.pool_name = pool_name  # write pool name back for the client
     run_spec.run_name = run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name, user=user.name, run_spec=run_spec, job_plans=job_plans
@@ -167,9 +375,11 @@ async def submit_run(
     )
     if repo is None:
         raise RepoDoesNotExistError.with_id(run_spec.repo_id)
+
     backends = await backends_services.get_project_backends(project)
     if len(backends) == 0:
         raise ServerClientError("No backends configured")
+
     if run_spec.run_name is None:
         run_spec.run_name = await _generate_run_name(
             session=session,
@@ -177,6 +387,9 @@ async def submit_run(
         )
     else:
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
+
+    pool = await get_or_create_default_pool_by_name(session, project, run_spec.profile.pool_name)
+
     run_model = RunModel(
         id=uuid.uuid4(),
         project_id=project.id,
@@ -188,10 +401,13 @@ async def submit_run(
         run_spec=run_spec.json(),
     )
     session.add(run_model)
+
     jobs = get_jobs_from_run_spec(run_spec)
     if run_spec.configuration.type == "service":
         await gateways.register_service_jobs(session, project, run_spec.run_name, jobs)
+
     for job in jobs:
+        job.job_spec.pool_name = pool.name
         job_model = create_job_model_for_new_submission(
             run_model=run_model,
             job=job,
@@ -200,6 +416,7 @@ async def submit_run(
         session.add(job_model)
     await session.commit()
     await session.refresh(run_model)
+
     run = run_model_to_run(run_model)
     return run
 
@@ -238,11 +455,13 @@ async def stop_runs(
         new_status = JobStatus.ABORTED
 
     res = await session.execute(
-        select(JobModel).where(
+        select(JobModel)
+        .where(
             JobModel.project_id == project.id,
             JobModel.run_name.in_(runs_names),
             JobModel.status.not_in(JobStatus.finished_statuses()),
         )
+        .options(joinedload(JobModel.instance))
     )
     job_models = res.scalars().all()
     for job_model in job_models:
@@ -296,10 +515,13 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
                 submissions.append(job_model_to_job_submission(job_model))
         if job_spec is not None:
             jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
+
     run_spec = RunSpec.parse_raw(run_model.run_spec)
+
     latest_job_submission = None
     if include_job_submissions:
         latest_job_submission = jobs[0].job_submissions[-1]
+
     run = Run(
         id=run_model.id,
         project_name=run_model.project.name,
@@ -346,7 +568,7 @@ async def _generate_run_name(
 
 
 def _get_run_cost(run: Run) -> float:
-    run_cost = sum(
+    run_cost = math.fsum(
         _get_job_submission_cost(submission)
         for job in run.jobs
         for submission in job.job_submissions
@@ -387,3 +609,18 @@ def _get_run_service(run: Run) -> Optional[ServiceInfo]:
         ),
         model=model,
     )
+
+
+async def abort_runs_of_pool(session: AsyncSession, project_model: ProjectModel, pool_name: str):
+    runs = await list_project_runs(session, project_model, repo_id=None)
+    active_run_names = []
+    for run_model in runs:
+        if run_model.status.is_finished():
+            continue
+
+        run = run_model_to_run(run_model)
+        run_pool_name = run.run_spec.profile.pool_name
+        if run_pool_name == pool_name:
+            active_run_names.append(run.run_spec.run_name)
+
+    await stop_runs(session, project_model, active_run_names, abort=True)

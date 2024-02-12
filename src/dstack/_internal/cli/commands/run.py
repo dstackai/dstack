@@ -17,8 +17,14 @@ from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.models.profiles import (
+    DEFAULT_TERMINATION_IDLE_TIME,
+    CreationPolicy,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.runs import JobErrorCode
 from dstack._internal.core.services.configs import ConfigManager
+from dstack._internal.utils.common import parse_pretty_duration
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
 from dstack.api._public.runs import Run
@@ -78,6 +84,29 @@ class RunCommand(APIBaseCommand):
             type=int,
             default=3,
         )
+        self._parser.add_argument(
+            "--pool",
+            dest="pool_name",
+            help="The name of the pool. If not set, the default pool will be used",
+        )
+        self._parser.add_argument(
+            "--reuse",
+            dest="creation_policy_reuse",
+            action="store_true",
+            help="Reuse instance from pool",
+        )
+        self._parser.add_argument(
+            "--idle-duration",
+            dest="idle_duration",
+            type=str,
+            help="Idle time before instance termination",
+        )
+        self._parser.add_argument(
+            "--instance",
+            dest="instance_name",
+            metavar="NAME",
+            help="Reuse instance from pool with name [code]NAME[/]",
+        )
         register_profile_args(self._parser)
 
     def _command(self, args: argparse.Namespace):
@@ -88,6 +117,31 @@ class RunCommand(APIBaseCommand):
                 BaseRunConfigurator.register(self._parser)
             self._parser.print_help()
             return
+
+        termination_policy_idle = DEFAULT_TERMINATION_IDLE_TIME
+        termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+
+        if args.idle_duration is not None:
+            try:
+                termination_policy_idle = int(args.idle_duration)
+            except ValueError:
+                termination_policy_idle = 60 * parse_pretty_duration(args.idle_duration)
+
+        creation_policy = (
+            CreationPolicy.REUSE if args.creation_policy_reuse else CreationPolicy.REUSE_OR_CREATE
+        )
+
+        if creation_policy == CreationPolicy.REUSE and termination_policy_idle is not None:
+            console.print(
+                "[warning]If the flag --reuse is set, the argument --idle-duration will be skipped[/]"
+            )
+            termination_policy = TerminationPolicy.DONT_DESTROY
+
+        if args.instance_name is not None and termination_policy_idle is not None:
+            console.print(
+                f"[warning]--idle-duration won't be applied to the instance {args.instance_name!r}[/]"
+            )
+            termination_policy = TerminationPolicy.DONT_DESTROY
 
         super()._command(args)
         try:
@@ -121,6 +175,11 @@ class RunCommand(APIBaseCommand):
                     max_price=profile.max_price,
                     working_dir=args.working_dir,
                     run_name=args.run_name,
+                    pool_name=args.pool_name,
+                    instance_name=args.instance_name,
+                    creation_policy=creation_policy,
+                    termination_policy=termination_policy,
+                    termination_policy_idle=termination_policy_idle,
                 )
         except ConfigurationError as e:
             raise CLIError(str(e))
@@ -179,10 +238,16 @@ class RunCommand(APIBaseCommand):
                 else:
                     console.print("[error]Failed to attach, exiting...[/]")
 
-            run.refresh()
-            if run.status.is_finished():
-                _print_fail_message(run)
-                abort_at_exit = False
+            # After reading the logs, the run may not be marked as finished immediately.
+            # Give the run some time to transit into a finished state before aborting it.
+            for _ in range(5):
+                run.refresh()
+                if run.status.is_finished():
+                    if run.status == RunStatus.FAILED:
+                        _print_fail_message(run)
+                    abort_at_exit = False
+                    break
+                time.sleep(1)
         except KeyboardInterrupt:
             try:
                 if not confirm_ask("\nStop the run before detaching?"):

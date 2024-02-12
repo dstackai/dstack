@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Integer,
     MetaData,
@@ -19,8 +20,9 @@ from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.profiles import DEFAULT_TERMINATION_IDLE_TIME, TerminationPolicy
 from dstack._internal.core.models.repos.base import RepoType
-from dstack._internal.core.models.runs import JobErrorCode, JobStatus
+from dstack._internal.core.models.runs import InstanceStatus, JobErrorCode, JobStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.utils.common import get_current_datetime
 
@@ -77,6 +79,13 @@ class ProjectModel(BaseModel):
     )
     default_gateway: Mapped["GatewayModel"] = relationship(
         foreign_keys=[default_gateway_id], lazy="selectin"
+    )
+
+    default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
+        ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"), nullable=True
+    )
+    default_pool: Mapped["PoolModel"] = relationship(
+        foreign_keys=[default_pool_id], lazy="selectin"
     )
 
 
@@ -183,6 +192,8 @@ class JobModel(BaseModel):
     # `removed` is used to ensure that the instance is killed after the job is finished
     removed: Mapped[bool] = mapped_column(Boolean, default=False)
     remove_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
+    used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
 
 
 class GatewayModel(BaseModel):
@@ -230,3 +241,63 @@ class GatewayComputeModel(BaseModel):
     ssh_public_key: Mapped[str] = mapped_column(Text)
 
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
+
+
+class PoolModel(BaseModel):
+    __tablename__ = "pools"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(50))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    instances: Mapped[List["InstanceModel"]] = relationship(back_populates="pool", lazy="selectin")
+
+
+class InstanceModel(BaseModel):
+    __tablename__ = "instances"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(50))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id], single_parent=True)
+
+    pool_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pools.id"))
+    pool: Mapped["PoolModel"] = relationship(back_populates="instances", single_parent=True)
+
+    status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
+
+    # VM
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
+
+    termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(50))
+    termination_idle_time: Mapped[int] = mapped_column(
+        Integer, default=DEFAULT_TERMINATION_IDLE_TIME
+    )
+
+    backend: Mapped[BackendType] = mapped_column(Enum(BackendType))
+    backend_data: Mapped[Optional[str]] = mapped_column(String(4000))
+    region: Mapped[str] = mapped_column(String(2000))
+    price: Mapped[float] = mapped_column(Float)
+
+    job_provisioning_data: Mapped[str] = mapped_column(String(4000))
+
+    offer: Mapped[str] = mapped_column(String(4000))
+
+    # current job
+    job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
+    job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="immediate")
+    last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)

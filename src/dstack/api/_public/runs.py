@@ -7,7 +7,7 @@ from abc import ABC
 from copy import copy
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 from websocket import WebSocketApp
 
@@ -15,10 +15,19 @@ import dstack.api as api
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
-from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, SpotPolicy
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
+from dstack._internal.core.models.pools import Instance
+from dstack._internal.core.models.profiles import (
+    DEFAULT_TERMINATION_IDLE_TIME,
+    CreationPolicy,
+    Profile,
+    ProfileRetryPolicy,
+    SpotPolicy,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import JobSpec, RunPlan, RunSpec
+from dstack._internal.core.models.runs import JobSpec, Requirements, RunPlan, RunSpec
 from dstack._internal.core.models.runs import JobStatus as RunStatus
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.core.services.logs import URLReplacer
@@ -265,6 +274,7 @@ class Run(ABC):
             if not control_sock_path_and_port_locks:
                 self._ssh_attach.attach()
             self._ports_lock = None
+
         return True
 
     def detach(self):
@@ -355,6 +365,18 @@ class RunCollection:
         )
         return self.exec_plan(run_plan, repo, reserve_ports=reserve_ports)
 
+    def get_offers(
+        self, profile: Profile, requirements: Requirements
+    ) -> Tuple[str, List[InstanceOfferWithAvailability]]:
+        return self._api_client.runs.get_offers(self._project, profile, requirements)
+
+    def create_instance(
+        self, pool_name: str, profile: Profile, requirements: Requirements, ssh_key: SSHKey
+    ) -> Instance:
+        return self._api_client.runs.create_instance(
+            self._project, pool_name, profile, requirements, ssh_key
+        )
+
     def get_plan(
         self,
         configuration: AnyRunConfiguration,
@@ -368,6 +390,11 @@ class RunCollection:
         max_price: Optional[float] = None,
         working_dir: Optional[str] = None,
         run_name: Optional[str] = None,
+        pool_name: Optional[str] = None,
+        instance_name: Optional[str] = None,
+        creation_policy: Optional[CreationPolicy] = None,
+        termination_policy: Optional[TerminationPolicy] = None,
+        termination_policy_idle: int = DEFAULT_TERMINATION_IDLE_TIME,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`
@@ -378,10 +405,10 @@ class RunCollection:
         if working_dir is None:
             working_dir = "."
         elif repo.repo_dir is not None:
-            working_dir = Path(repo.repo_dir) / working_dir
-            if not path_in_dir(working_dir, repo.repo_dir):
+            working_dir_path = Path(repo.repo_dir) / working_dir
+            if not path_in_dir(working_dir_path, repo.repo_dir):
                 raise ConfigurationError("Working directory is outside of the repo")
-            working_dir = working_dir.relative_to(repo.repo_dir).as_posix()
+            working_dir = working_dir_path.relative_to(repo.repo_dir).as_posix()
 
         if configuration_path is None:
             configuration_path = "(python)"
@@ -397,6 +424,11 @@ class RunCollection:
             retry_policy=retry_policy,
             max_duration=max_duration,
             max_price=max_price,
+            pool_name=pool_name,
+            instance_name=instance_name,
+            creation_policy=creation_policy,
+            termination_policy=termination_policy,
+            termination_idle_time=termination_policy_idle,
         )
         run_spec = RunSpec(
             run_name=run_name,

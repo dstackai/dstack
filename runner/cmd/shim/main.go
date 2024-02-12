@@ -2,35 +2,29 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
-	"github.com/dstackai/dstack/runner/internal/gerrors"
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
-	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/urfave/cli/v2"
 )
 
 func main() {
-	var backendName string
 	var args shim.CLIArgs
 	args.Docker.SSHPort = 10022
 
 	app := &cli.App{
 		Name:    "dstack-shim",
-		Usage:   "Starts dstack-runner or docker container. Kills the VM on exit.",
+		Usage:   "Starts dstack-runner or docker container.",
 		Version: Version,
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "backend",
-				Usage:       "Cloud backend provider",
-				Required:    true,
-				Destination: &backendName,
-				EnvVars:     []string{"DSTACK_BACKEND"},
-			},
 			/* Shim Parameters */
 			&cli.PathFlag{
 				Name:        "home",
@@ -86,18 +80,6 @@ func main() {
 				Flags: []cli.Flag{
 					/* Docker Parameters */
 					&cli.BoolFlag{
-						Name:        "with-auth",
-						Usage:       "Waits for registry credentials",
-						Destination: &args.Docker.RegistryAuthRequired,
-					},
-					&cli.StringFlag{
-						Name:        "image",
-						Usage:       "Docker image name",
-						Required:    true,
-						Destination: &args.Docker.ImageName,
-						EnvVars:     []string{"DSTACK_IMAGE_NAME"},
-					},
-					&cli.BoolFlag{
 						Name:        "keep-container",
 						Usage:       "Do not delete container on exit",
 						Destination: &args.Docker.KeepContainer,
@@ -112,47 +94,47 @@ func main() {
 				},
 				Action: func(c *cli.Context) error {
 					if args.Runner.BinaryPath == "" {
-						if err := args.Download("linux"); err != nil {
-							return gerrors.Wrap(err)
+						if err := args.DownloadRunner(); err != nil {
+							return cli.Exit(err, 1)
 						}
-						defer func() { _ = os.Remove(args.Runner.BinaryPath) }()
 					}
 
-					log.Printf("Backend: %s\n", backendName)
 					args.Runner.TempDir = "/tmp/runner"
 					args.Runner.HomeDir = "/root"
 					args.Runner.WorkingDir = "/workflow"
 
 					var err error
+
+					// set dstack home path
 					args.Shim.HomeDir, err = getDstackHome(args.Shim.HomeDir)
 					if err != nil {
-						return gerrors.Wrap(err)
+						return cli.Exit(err, 1)
 					}
 					log.Printf("Docker: %+v\n", args)
 
-					server := api.NewShimServer(fmt.Sprintf(":%d", args.Shim.HTTPPort), args.Docker.RegistryAuthRequired)
-					return gerrors.Wrap(server.RunDocker(context.TODO(), &args))
-				},
-			},
-			{
-				Name:  "subprocess",
-				Usage: "Docker-less mode",
-				Action: func(c *cli.Context) error {
-					return gerrors.New("not implemented")
+					dockerRunner, err := shim.NewDockerRunner(args)
+					if err != nil {
+						return cli.Exit(err, 1)
+					}
+
+					address := fmt.Sprintf(":%d", args.Shim.HTTPPort)
+					shimServer := api.NewShimServer(address, dockerRunner, Version)
+
+					defer func() {
+						shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancelShutdown()
+						_ = shimServer.HttpServer.Shutdown(shutdownCtx)
+					}()
+
+					if err := shimServer.HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+						return cli.Exit(err, 1)
+					}
+
+					return nil
 				},
 			},
 		},
 	}
-
-	defer func() {
-		backend, err := backends.NewBackend(context.TODO(), backendName)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err = backend.Terminate(context.TODO()); err != nil {
-			log.Fatal(err)
-		}
-	}()
 
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
@@ -163,9 +145,10 @@ func getDstackHome(flag string) (string, error) {
 	if flag != "" {
 		return flag, nil
 	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		return "", err
 	}
-	return filepath.Join(home, ".dstack"), nil
+	return filepath.Join(home, consts.DSTACK_DIR_PATH), nil
 }

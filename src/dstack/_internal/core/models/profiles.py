@@ -9,12 +9,24 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ForbidExtra
 
 DEFAULT_RETRY_LIMIT = 3600
+DEFAULT_POOL_NAME = "default-pool"
+DEFAULT_TERMINATION_IDLE_TIME = 5 * 60  # 5 minutes by default
 
 
 class SpotPolicy(str, Enum):
     SPOT = "spot"
     ONDEMAND = "on-demand"
     AUTO = "auto"
+
+
+class CreationPolicy(str, Enum):
+    REUSE = "reuse"
+    REUSE_OR_CREATE = "reuse-or-create"
+
+
+class TerminationPolicy(str, Enum):
+    DONT_DESTROY = "dont-destroy"
+    DESTROY_AFTER_IDLE = "destroy-after-idle"
 
 
 def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
@@ -94,6 +106,21 @@ class Profile(ForbidExtra):
     default: Annotated[
         bool, Field(description="If set to true, `dstack run` will use this profile by default.")
     ] = False
+    pool_name: Annotated[
+        Optional[str],
+        Field(description="The name of the pool. If not set, dstack will use the default name."),
+    ] = None
+    instance_name: Annotated[Optional[str], Field(description="The name of the instance")]
+    creation_policy: Annotated[
+        Optional[CreationPolicy], Field(description="The policy for using instances from the pool")
+    ]
+    termination_policy: Annotated[
+        Optional[TerminationPolicy], Field(description="The policy for termination instances")
+    ]
+    termination_idle_time: Annotated[
+        int,
+        Field(description="Seconds to wait before destroying the instance"),
+    ] = DEFAULT_TERMINATION_IDLE_TIME
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration

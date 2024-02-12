@@ -4,7 +4,7 @@ from requests import HTTPError
 
 import dstack.api.server
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.cli.utils.common import colors, confirm_ask, console
+from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.services.configs import ConfigManager
 
@@ -79,6 +79,4 @@ class ConfigCommand(BaseCommand):
                 name=args.project, url=args.url, token=args.token, default=set_it_as_default
             )
             config_manager.save()
-        console.print(
-            f"Configuration updated at [{colors['code']}]{config_manager.config_filepath}[/{colors['code']}]"
-        )
+        console.print(f"Configuration updated at [code]{config_manager.config_filepath}[/]")

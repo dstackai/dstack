@@ -8,12 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceType, Resources
-from dstack._internal.core.models.runs import JobProvisioningData, JobStatus
+from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, JobStatus
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.schemas.runner import HealthcheckResponse, JobStateEvent, PullResponse
 from dstack._internal.server.testing.common import (
+    create_instance,
     create_job,
+    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -36,6 +38,7 @@ def get_job_provisioning_data(dockerized: bool) -> JobProvisioningData:
         ssh_port=22,
         dockerized=dockerized,
         backend_data=None,
+        ssh_proxy=None,
     )
 
 
@@ -110,7 +113,7 @@ class TestProcessRunningJobs:
         ) as RunnerClientMock:
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.healthcheck.return_value = HealthcheckResponse(
-                service="dstack-runner"
+                service="dstack-runner", version="0.0.1.dev2"
             )
             await process_running_jobs()
             RunnerTunnelMock.assert_called_once()
@@ -195,24 +198,31 @@ class TestProcessRunningJobs:
             user=user,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
-        job = await create_job(
-            session=session,
-            run=run,
-            status=JobStatus.PROVISIONING,
-            job_provisioning_data=job_provisioning_data,
-        )
+
+        with patch(
+            "dstack._internal.server.services.jobs.configurators.base.get_default_python_verison"
+        ) as PyVersion:
+            PyVersion.return_value = "3.11"
+            job = await create_job(
+                session=session,
+                run=run,
+                status=JobStatus.PROVISIONING,
+                job_provisioning_data=job_provisioning_data,
+            )
         with patch(
             "dstack._internal.server.services.runner.ssh.RunnerTunnel"
         ) as RunnerTunnelMock, patch(
             "dstack._internal.server.services.runner.client.ShimClient"
         ) as ShimClientMock:
             ShimClientMock.return_value.healthcheck.return_value = HealthcheckResponse(
-                service="dstack-shim"
+                service="dstack-shim", version="0.0.1.dev2"
             )
             await process_running_jobs()
             RunnerTunnelMock.assert_called_once()
             ShimClientMock.return_value.healthcheck.assert_called_once()
-            ShimClientMock.return_value.registry_auth.assert_not_called()
+            ShimClientMock.return_value.submit.assert_called_once_with(
+                username="", password="", image_name="dstackai/base:py3.11-0.4rc4-cuda-12.1"
+            )
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.PULLING
@@ -246,7 +256,7 @@ class TestProcessRunningJobs:
             "dstack._internal.server.services.runner.client.ShimClient"
         ) as ShimClientMock:
             RunnerTunnelMock.return_value.healthcheck.return_value = HealthcheckResponse(
-                service="dstack-runner"
+                service="dstack-runner", version="0.0.1.dev2"
             )
             await process_running_jobs()
             RunnerTunnelMock.assert_called_once()
@@ -274,12 +284,20 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        instance = await create_instance(
+            session,
+            project,
+            await create_pool(session, project),
+            InstanceStatus.READY,
+            Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+        )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.PULLING,
             job_provisioning_data=job_provisioning_data,
+            instance=instance,
         )
         with patch(
             "dstack._internal.server.services.runner.ssh.RunnerTunnel"

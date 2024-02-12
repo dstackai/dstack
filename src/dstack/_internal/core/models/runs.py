@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 from pydantic import UUID4, BaseModel, Field
 from typing_extensions import Annotated
@@ -23,8 +23,8 @@ class AppSpec(BaseModel):
     port: int
     map_to_port: Optional[int]
     app_name: str
-    url_path: Optional[str]
-    url_query_params: Optional[Dict[str, str]]
+    url_path: Optional[str] = None
+    url_query_params: Optional[Dict[str, str]] = None
 
 
 class JobStatus(str, Enum):
@@ -120,6 +120,7 @@ class JobSpec(BaseModel):
     requirements: Requirements
     retry_policy: RetryPolicy
     working_dir: str
+    pool_name: Optional[str]
 
 
 class JobProvisioningData(BaseModel):
@@ -216,3 +217,27 @@ class RunPlan(BaseModel):
     user: str
     run_spec: RunSpec
     job_plans: List[JobPlan]
+
+
+class InstanceStatus(str, Enum):
+    PENDING = "pending"
+    CREATING = "creating"
+    STARTING = "starting"
+    READY = "ready"
+    BUSY = "busy"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
+    FAILED = "failed"
+
+    @property
+    def finished_statuses(cls) -> Sequence["InstanceStatus"]:
+        return (cls.TERMINATED, cls.FAILED)
+
+    def is_finished(self):
+        return self in self.finished_statuses
+
+    def is_started(self):
+        return not self.is_finished()
+
+    def is_available(self) -> bool:
+        return self in (self.READY, self.BUSY)

@@ -141,13 +141,13 @@ class ClientTunnel(SSHTunnel):
         id_rsa_path: PathLike,
         control_sock_path: Optional[str] = None,
     ):
-        self.temp_dir = tempfile.TemporaryDirectory() if not control_sock_path else None
+        if control_sock_path is None:
+            self.temp_dir = tempfile.TemporaryDirectory()
+            control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
         super().__init__(
             host=host,
             id_rsa_path=id_rsa_path,
             ports=ports,
-            control_sock_path=os.path.join(self.temp_dir.name, "control.sock")
-            if not control_sock_path
-            else control_sock_path,
+            control_sock_path=control_sock_path,
             options={},
         )

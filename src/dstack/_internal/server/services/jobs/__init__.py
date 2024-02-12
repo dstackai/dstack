@@ -39,6 +39,10 @@ SUBMITTED_PROCESSING_JOBS_IDS = set()
 RUNNING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 RUNNING_PROCESSING_JOBS_IDS = set()
 
+PROCESSING_POOL_LOCK = asyncio.Lock()
+PROCESSING_POOL_IDS = set()
+
+
 TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 TERMINATING_PROCESSING_JOBS_IDS = set()
 
@@ -102,11 +106,7 @@ async def stop_job(
         job_submission = job_model_to_job_submission(job_model)
         if new_status == JobStatus.TERMINATED and job_model.status == JobStatus.RUNNING:
             try:
-                await run_async(
-                    _stop_runner,
-                    job_submission,
-                    project.ssh_private_key,
-                )
+                await run_async(_stop_runner, job_submission, project.ssh_private_key)
                 # delay termination for 15 seconds to allow the runner to stop gracefully
                 delay_job_instance_termination(job_model)
             except SSHError:
@@ -119,20 +119,19 @@ async def stop_job(
         logger.info(*job_log("%s by user", job_model, new_status.value))
 
 
-async def terminate_job_submission_instance(
-    project: ProjectModel,
-    job_submission: JobSubmission,
+async def terminate_job_provisioning_data_instance(
+    project: ProjectModel, job_provisioning_data: JobProvisioningData
 ):
     backend = await get_project_backend_by_type(
         project=project,
-        backend_type=job_submission.job_provisioning_data.backend,
+        backend_type=job_provisioning_data.backend,
     )
-    logger.debug("Terminating runner instance %s", job_submission.job_provisioning_data.hostname)
+    logger.debug("Terminating runner instance %s", job_provisioning_data.hostname)
     await run_async(
         backend.compute().terminate_instance,
-        job_submission.job_provisioning_data.instance_id,
-        job_submission.job_provisioning_data.region,
-        job_submission.job_provisioning_data.backend_data,
+        job_provisioning_data.instance_id,
+        job_provisioning_data.region,
+        job_provisioning_data.backend_data,
     )
 
 
