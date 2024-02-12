@@ -19,7 +19,7 @@ class Pool(BaseModel):  # type: ignore[misc]
 class Instance(BaseModel):  # type: ignore[misc]
     backend: BackendType
     instance_type: InstanceType
-    instance_id: str  # TODO: rename to name
+    name: str
     job_name: Optional[str] = None
     job_status: Optional[JobStatus] = None
     hostname: str
