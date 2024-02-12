@@ -629,16 +629,16 @@
 
 .plans_card__subtitle {
     margin-bottom: 1.4rem;
-    font-size: 0.98em;
+    font-size: 0.96em;
     line-height: 1.44;
-    color: #696F86;
+    color: black;
 }
 
 .plans_card__buttons_subtitle {
     margin-top: 10px;
     margin-left: 10px;
     color: #202128;
-    font-size: 0.7rem;
+    font-size: 0.6rem;
 }
 
 .plans_card__services {

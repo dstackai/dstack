@@ -117,11 +117,8 @@
                 </h1>
 
                 <p>
-                    dstack is an <strong style="font-weight: 500">open-source</strong> toolkit
-                    for running GPU workloads on any cloud. It
-                    simplifies <strong style="font-weight: 500">development</strong>,
-                    <strong style="font-weight: 500">training</strong>, and
-                    <strong style="font-weight: 500">deployment</strong> of gen AI models.
+                    dstack is an open-source engine for running GPU workloads.
+                    It simplifies development, training, and deployment of gen AI models on any cloud.
                 </p>
             </div>
 
@@ -135,13 +132,18 @@
                         Get support and learn from <br>the community
                     </div>-->
 
-                    <a href="javascript:void(0)" onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});" class="md-button md-button--primary">
-<!--                       style="min-width: 250px">-->
+                    <a href="javascript:void(0)" onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});" class="md-button md-button--primary"
+                       style="min-width: 225px; margin-right: 10px">
                         <span>Get started</span>
                         <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                     </a>
 
-                    <div class="tx-landing__integrations">
+                    <a href="/docs" class="md-button md-button-secondary"
+                       style="min-width: 225px" target="_blank">
+                        Documentation
+                    </a>
+
+                    <!--<div class="tx-landing__integrations">
                         <div class="tx-landing__integrations_text">
                             Use with any cloud GPU providers
                         </div>
@@ -154,7 +156,7 @@
                             <img class="logo-large" src="/assets/images/tensordock-logo.svg" title="TensorDock">
                             <img class="logo-large" src="/assets/images/vastai-logo.svg" title="Vast.ai">
                         </div>
-                    </div>
+                    </div>-->
 
                 </div>
 
@@ -358,13 +360,12 @@
             </div>
 
             <div class="tx-landing__highlights_cta">
-                <a href="/examples">Browse all examples →</a>
+                <a href="/examples">Browse all examples</a>
             </div>
+
         </div>
 
-        <span id="get-started"></span>
-
-        <div class="tx-landing__bottom_cta">
+        <!--<div class="tx-landing__bottom_cta">
             <div class="tx-landing__highlights_text">
                 <h2><span class="gradient">Get started with dstack <br> in under a minute</span></h2>
                 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-server.gif" width="777" style="border-radius: 10px">
@@ -373,7 +374,7 @@
                     or <a href="#" data-tally-open="w7K17R">sign up</a> for the cloud version.
                 </p>
 
-                <a href="/docs" class="md-button md-button--primary">
+                <a href="/docs" class="md-button md-button&#45;&#45;primary">
                     <span>Get started</span>
                     <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                 </a>
@@ -382,7 +383,153 @@
                     Discord
                 </a>
             </div>
+        </div>-->
+
+        <span id="get-started"></span>
+
+        <div class="tx-landing__plans">
+            <div class="tx-landing__highlights_text">
+                <h2>Get started in a minute</h2>
+            </div>
+
+            <div class="tx-landing__plans_cards">
+                <div class="plans_card">
+                    <div class="plans_card__title">Open-source</div>
+                    <div class="plans_card__subtitle">Use with your own cloud accounts. <br><br><br></div>
+
+                    <div class="plans_card__services">
+                        <div class="plans_card__service-item">
+                            <img width="38" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                                 style="padding-top: 5px">
+                            <div class="plans_card__service-name">Amazon Web Services</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="24" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <div class="plans_card__service-name">Azure</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="30" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">Google Cloud Platform</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="23" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
+                            <div class="plans_card__service-name">Lambda</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="23" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
+                            <div class="plans_card__service-name">TensorDock</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="24" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <div class="plans_card__service-name">Vast.ai</div>
+                        </div>
+                    </div>
+
+                    <div class="plans_card__buttons">
+                        <a href="/docs/installation" target="_blank"
+                           class="md-button md-button--primary small">Install open-source</a>
+                        <div class="plans_card__buttons_subtitle">100% free and open-source</div>
+                    </div>
+                </div>
+
+                <div class="plans_card">
+                    <div class="plans_card__title">dstack Cloud</div>
+                    <div class="plans_card__subtitle">
+                        Access GPUs from multiple providers without having to register your own account
+                        with them.
+                    </div>
+
+                    <div class="plans_card__services">
+                        <div class="plans_card__service-item">
+                            <img width="38" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                                 style="padding-top: 5px">
+                            <div class="plans_card__service-name">Amazon Web Services</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="24" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <div class="plans_card__service-name">Azure</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="30" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">Google Cloud Platform</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="23" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
+                            <div class="plans_card__service-name">Lambda</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="23" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
+                            <div class="plans_card__service-name">TensorDock</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="24" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <div class="plans_card__service-name">Vast.ai</div>
+                        </div>
+                    </div>
+
+                    <div class="plans_card__buttons">
+                        <a href="#" target="_blank"
+                           data-tally-open="w7K17R"
+                           class="md-button md-button-secondary small">
+                            <span>Sign up for free</span>
+<!--                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
+                        </a>
+                        <div class="plans_card__buttons_subtitle">Pay per compute. No hidden fees.</div>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <div class="tx-landing__bottom_cta">
+            <div class="tx-landing__highlights_text">
+                <h2>Community</h2>
+                <p class="tx-landing__bottom_cta_text">
+                    Need help, have questions, or simply want to stay updated?
+                </p>
+
+                <!--<a href="/docs" class="md-button md-button-secondary">
+                    <span>Documentation</span>
+                </a>-->
+
+                <a href="https://discord.gg/u8SmfwPpMd" class="md-button md-button-secondary discord">
+                    Join Discord
+                </a>
+            </div>
+        </div>
+
+        <!--<div class="tx-faq">
+            <div class="tx-landing__highlights_text">
+                <h2>FAQ</h2>
+            </div>
+
+            <div class="tx-faq__list">
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        How is the total cost per usage calculated?
+                        <div class="tx-faq__item-title-icon">
+                        </div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        The cloud version of dstack provides GPUs from various verified cloud GPU providers. Each
+                        provider may have its own pricing, and while dstack offers you the minimum available price, you
+                        have control over the maximum price. The prices above are starting prices per GPU. Storage
+                        and CPU are billed separately. If you need more details on the cost breakdown, feel free to
+                        contact <a href="javascript:void(0)" onclick="$crisp.push(['do', 'chat:open'])">support</a>.
+                    </div>
+                </div>
+            </div>
+        </div>-->
     </div>
 </section>
 {% endblock %}
