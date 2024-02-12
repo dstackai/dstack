@@ -124,12 +124,13 @@ class PoolCommand(APIBaseCommand):  # type: ignore[misc]
             formatter_class=self._parser.formatter_class,
         )
         remove_parser.add_argument(
+            "instance_name",
+            help="The name of the instance",
+        )
+        remove_parser.add_argument(
             "--pool",
             dest="pool_name",
             help="The name of the pool. If not set, the default pool will be used",
-        )
-        remove_parser.add_argument(
-            "--name", dest="instance_name", help="The name of the instance", required=True
         )
         remove_parser.add_argument(
             "--force",
