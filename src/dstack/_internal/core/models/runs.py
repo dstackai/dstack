@@ -120,7 +120,7 @@ class JobSpec(BaseModel):
     requirements: Requirements
     retry_policy: RetryPolicy
     working_dir: str
-    pool_name: Optional[str]
+    pool_name: Optional[str]  # TODO: remove pool_name from JobSpec
 
 
 class JobProvisioningData(BaseModel):

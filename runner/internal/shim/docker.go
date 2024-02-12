@@ -23,9 +23,12 @@ import (
 )
 
 type DockerRunner struct {
-	client       *docker.Client
-	dockerParams DockerParameters
-	state        RunnerStatus
+	client           *docker.Client
+	dockerParams     DockerParameters
+	currentContainer string
+	state            RunnerStatus
+
+	cancelRun context.CancelFunc
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -45,6 +48,11 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	var err error
 
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+
+	d.cancelRun = cancel
+	defer cancel()
+
 	log.Println("Pulling image")
 	d.state = Pulling
 	if err = pullImage(ctx, d.client, cfg); err != nil {
@@ -61,6 +69,8 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 		fmt.Printf("createContainer error: %s\n", err.Error())
 		return err
 	}
+
+	d.currentContainer = containerID
 
 	if !d.dockerParams.DockerKeepContainer() {
 		defer func() {
@@ -82,8 +92,29 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 
 	log.Printf("Container finished successfully, id=%s\n", containerID)
 
+	d.currentContainer = ""
 	d.state = Pending
 	return nil
+}
+
+func (d *DockerRunner) Stop(force bool) {
+	if d.currentContainer == "" && d.state == Pulling {
+		d.cancelRun()
+		return
+	}
+
+	ctx := context.Background()
+
+	stopOptions := container.StopOptions{}
+	if force {
+		timeout := int(0)
+		stopOptions.Timeout = &timeout
+	}
+
+	err := d.client.ContainerStop(ctx, d.currentContainer, stopOptions)
+	if err != nil {
+		log.Printf("Failed to stop container: %s", err)
+	}
 }
 
 func (d DockerRunner) GetState() RunnerStatus {
@@ -166,12 +197,14 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 	if err := client.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
 		return tracerr.Wrap(err)
 	}
+
 	waitCh, errorCh := client.ContainerWait(ctx, containerID, "")
 	select {
 	case <-waitCh:
 	case err := <-errorCh:
 		return tracerr.Wrap(err)
 	}
+
 	return nil
 }
 

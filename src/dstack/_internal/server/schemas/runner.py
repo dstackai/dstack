@@ -70,3 +70,7 @@ class DockerImageBody(BaseModel):
     username: str
     password: str
     image_name: str
+
+
+class SubmitStopBody(BaseModel):
+    force: bool = False

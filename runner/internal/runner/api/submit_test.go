@@ -13,7 +13,6 @@ import (
 )
 
 func TestSubmit(t *testing.T) {
-
 	request := httptest.NewRequest("POST", "/api/submit", strings.NewReader("{\"image_name\":\"ubuntu\"}"))
 	responseRecorder := httptest.NewRecorder()
 

@@ -23,8 +23,9 @@ func (ds DummyRunner) Run(context.Context, shim.DockerImageConfig) error {
 	return nil
 }
 
-func TestHealthcheck(t *testing.T) {
+func (ds DummyRunner) Stop(force bool) {}
 
+func TestHealthcheck(t *testing.T) {
 	request := httptest.NewRequest("GET", "/api/healthcheck", nil)
 	responseRecorder := httptest.NewRecorder()
 
