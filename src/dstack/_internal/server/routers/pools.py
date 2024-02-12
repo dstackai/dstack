@@ -41,7 +41,7 @@ async def remove_instance(
     )
 
 
-@router.post("/set-default")
+@router.post("/set_default")
 async def set_default_pool(
     body: schemas.SetDefaultPoolRequest,
     session: AsyncSession = Depends(get_session),

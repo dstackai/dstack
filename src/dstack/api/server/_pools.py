@@ -38,7 +38,7 @@ class PoolAPIClient(APIClientGroup):
 
     def set_default(self, project_name: str, pool_name: str) -> bool:
         body = schemas_pools.SetDefaultPoolRequest(pool_name=pool_name)
-        result = self._request(f"/api/project/{project_name}/pool/set-default", body=body.json())
+        result = self._request(f"/api/project/{project_name}/pool/set_default", body=body.json())
         return bool(result.json())
 
     def add_remote(
