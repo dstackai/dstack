@@ -121,9 +121,9 @@ async def terminate(instance_id: UUID) -> None:
         jpd = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
         BACKEND_TYPE = jpd.backend
         backends = await backends_services.get_project_backends(project=instance.project)
-        backend = next((b for b in backends if b.TYPE in BACKEND_TYPE), None)
+        backend = next((b for b in backends if b.TYPE == BACKEND_TYPE), None)
         if backend is None:
-            raise ValueError(f"there is no backned {BACKEND_TYPE}")
+            raise ValueError(f"there is no backend {BACKEND_TYPE}")
 
         await run_async(
             backend.compute().terminate_instance, jpd.instance_id, jpd.region, jpd.backend_data
