@@ -179,10 +179,16 @@ class RunCommand(APIBaseCommand):
                 else:
                     console.print("[error]Failed to attach, exiting...[/]")
 
-            run.refresh()
-            if run.status.is_finished():
-                _print_fail_message(run)
-                abort_at_exit = False
+            # After reading the logs, the run may not be marked as finished immediately.
+            # Give the run some time to transit into a finished state before aborting it.
+            for _ in range(5):
+                run.refresh()
+                if run.status.is_finished():
+                    if run.status == RunStatus.FAILED:
+                        _print_fail_message(run)
+                    abort_at_exit = False
+                    break
+                time.sleep(1)
         except KeyboardInterrupt:
             try:
                 if not confirm_ask("\nStop the run before detaching?"):
