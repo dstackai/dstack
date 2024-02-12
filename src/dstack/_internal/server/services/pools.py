@@ -225,7 +225,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
 
     instance = Instance(
         backend=offer.backend,
-        instance_id=jpd.instance_id,
+        name=instance_model.name,
         instance_type=jpd.instance_type,
         hostname=jpd.hostname,
         status=instance_model.status,

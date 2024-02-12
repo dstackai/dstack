@@ -76,7 +76,7 @@ def test_convert_instance():
         instance_type=InstanceType(
             name="instance", resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[])
         ),
-        instance_id="test_instance",
+        name="test_instance",
         hostname="hostname_test",
         status=InstanceStatus.PENDING,
         price=1.0,

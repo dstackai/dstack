@@ -124,12 +124,13 @@ class PoolCommand(APIBaseCommand):
             formatter_class=self._parser.formatter_class,
         )
         remove_parser.add_argument(
+            "instance_name",
+            help="The name of the instance",
+        )
+        remove_parser.add_argument(
             "--pool",
             dest="pool_name",
             help="The name of the pool. If not set, the default pool will be used",
-        )
-        remove_parser.add_argument(
-            "--name", dest="instance_name", help="The name of the instance", required=True
         )
         remove_parser.add_argument(
             "--force",
@@ -168,7 +169,7 @@ class PoolCommand(APIBaseCommand):
 
     def _remove(self, args: argparse.Namespace) -> None:
         pool = self.api.client.pool.show(self.api.project, args.pool_name)
-        pool.instances = [i for i in pool.instances if i.instance_id == args.instance_name]
+        pool.instances = [i for i in pool.instances if i.name == args.instance_name]
         if not pool.instances:
             raise CLIError(f"Instance {args.instance_name!r} not found in pool {pool.name!r}")
 
@@ -296,7 +297,7 @@ def print_instance_table(instances: Sequence[Instance]) -> None:
     for instance in instances:
         style = "success" if instance.status.is_available() else "warning"
         row = [
-            instance.instance_id,
+            instance.name,
             instance.backend,
             instance.instance_type.resources.pretty_format(),
             f"[{style}]{instance.status.value}[/]",
