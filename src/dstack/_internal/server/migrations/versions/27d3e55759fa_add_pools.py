@@ -1,8 +1,8 @@
 """add pools
 
-Revision ID: b55bd09bf186
+Revision ID: 27d3e55759fa
 Revises: d3e8af4786fa
-Create Date: 2024-02-06 08:44:44.235928
+Create Date: 2024-02-12 14:27:52.035476
 
 """
 import sqlalchemy as sa
@@ -10,7 +10,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "b55bd09bf186"
+revision = "27d3e55759fa"
 down_revision = "d3e8af4786fa"
 branch_labels = None
 depends_on = None
@@ -66,7 +66,7 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(), nullable=True),
         sa.Column("finished_at", sa.DateTime(), nullable=True),
         sa.Column("termination_policy", sa.String(length=50), nullable=True),
-        sa.Column("termination_idle_time", sa.String(length=50), nullable=True),
+        sa.Column("termination_idle_time", sa.Integer(), nullable=False),
         sa.Column(
             "backend",
             sa.Enum(

@@ -278,7 +278,6 @@ async def create_instance(
             job_provisioning_data=job_provisioning_data.json(),
             # TODO: instance provisioning
             offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
-            resource_spec_data=requirements.resources.json(),
             termination_policy=profile.termination_policy,
             termination_idle_time=profile.termination_idle_time,
         )

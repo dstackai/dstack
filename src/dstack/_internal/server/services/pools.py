@@ -363,7 +363,6 @@ async def add_remote(
         status=InstanceStatus.PENDING,
         job_provisioning_data=local.json(),
         offer=offer.json(),
-        resource_spec_data=resources.json(),
         termination_policy=profile.termination_policy,
         termination_idle_time=profile.termination_idle_time,
     )

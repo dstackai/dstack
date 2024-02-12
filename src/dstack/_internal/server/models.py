@@ -278,7 +278,6 @@ class InstanceModel(BaseModel):
     pool: Mapped["PoolModel"] = relationship(back_populates="instances", single_parent=True)
 
     status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
-    status_message: Mapped[Optional[str]] = mapped_column(String(50))
 
     # VM
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
@@ -298,21 +297,7 @@ class InstanceModel(BaseModel):
 
     offer: Mapped[str] = mapped_column(String(4000))
 
-    resource_spec_data: Mapped[Optional[str]] = mapped_column(String(4000))
-
     # current job
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
     job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="immediate")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-
-    # + # job_id: Optional[FK] (current job)
-    # ip address
-    # ssh creds: user, port, dockerized
-    # real resources + spot (exact) / instance offer
-    # + backend + backend data
-    # + region
-    # + price (for querying)
-    # + # termination policy
-    # creation policy
-    # job_provisioning_data=job_provisioning_data.json(),
-    # TODO: instance provisioning

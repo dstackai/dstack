@@ -98,7 +98,7 @@ def instance_healthcheck(*, ports: Dict[int, int]) -> bool:
     resp = shim_client.healthcheck()
     if resp is None:
         return False  # shim is not available yet
-    return bool(resp.service == "dstack-shim")
+    return resp.service == "dstack-shim"
 
 
 async def terminate(instance_id: UUID) -> None:
