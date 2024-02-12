@@ -8,7 +8,7 @@ from dstack._internal.core.models.instances import InstanceType
 from dstack._internal.core.models.runs import InstanceStatus, JobStatus
 
 
-class Pool(BaseModel):  # type: ignore[misc]
+class Pool(BaseModel):
     name: str
     default: bool
     created_at: datetime.datetime
@@ -16,7 +16,7 @@ class Pool(BaseModel):  # type: ignore[misc]
     available_instances: int
 
 
-class Instance(BaseModel):  # type: ignore[misc]
+class Instance(BaseModel):
     backend: BackendType
     instance_type: InstanceType
     instance_id: str  # TODO: rename to name
@@ -27,6 +27,6 @@ class Instance(BaseModel):  # type: ignore[misc]
     price: float
 
 
-class PoolInstances(BaseModel):  # type: ignore[misc]
+class PoolInstances(BaseModel):
     name: str
     instances: List[Instance]

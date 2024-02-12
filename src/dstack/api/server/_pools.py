@@ -10,7 +10,7 @@ from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
 from dstack.api.server._group import APIClientGroup
 
 
-class PoolAPIClient(APIClientGroup):  # type: ignore[misc]
+class PoolAPIClient(APIClientGroup):
     def list(self, project_name: str) -> List[Pool]:
         resp = self._request(f"/api/project/{project_name}/pool/list")
         result: List[Pool] = parse_obj_as(List[Pool], resp.json())

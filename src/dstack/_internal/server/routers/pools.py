@@ -20,7 +20,7 @@ from dstack._internal.server.services.runs import (
 router = APIRouter(prefix="/api/project/{project_name}/pool", tags=["pool"])
 
 
-@router.post("/list")  # type: ignore[misc]
+@router.post("/list")
 async def list_pool(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
@@ -29,7 +29,7 @@ async def list_pool(
     return await pools.list_project_pool(session=session, project=project)
 
 
-@router.post("/remove")  # type: ignore[misc]
+@router.post("/remove")
 async def remove_instance(
     body: schemas.RemoveInstanceRequest,
     session: AsyncSession = Depends(get_session),
@@ -41,7 +41,7 @@ async def remove_instance(
     )
 
 
-@router.post("/set-default")  # type: ignore[misc]
+@router.post("/set-default")
 async def set_default_pool(
     body: schemas.SetDefaultPoolRequest,
     session: AsyncSession = Depends(get_session),
@@ -51,7 +51,7 @@ async def set_default_pool(
     return await pools.set_default_pool(session, project_model, body.pool_name)
 
 
-@router.post("/delete")  # type: ignore[misc]
+@router.post("/delete")
 async def delete_pool(
     body: schemas.DeletePoolRequest,
     session: AsyncSession = Depends(get_session),
@@ -83,7 +83,7 @@ async def delete_pool(
     await pools.delete_pool(session, project_model, pool_name)
 
 
-@router.post("/create")  # type: ignore[misc]
+@router.post("/create")
 async def create_pool(
     body: schemas.CreatePoolRequest,
     session: AsyncSession = Depends(get_session),
@@ -93,7 +93,7 @@ async def create_pool(
     await pools.create_pool_model(session=session, project=project, name=body.name)
 
 
-@router.post("/show")  # type: ignore[misc]
+@router.post("/show")
 async def show_pool(
     body: schemas.ShowPoolRequest,
     session: AsyncSession = Depends(get_session),
@@ -106,7 +106,7 @@ async def show_pool(
     return instances
 
 
-@router.post("/add_remote")  # type: ignore[misc]
+@router.post("/add_remote")
 async def add_instance(
     body: AddRemoteInstanceRequest,
     session: AsyncSession = Depends(get_session),

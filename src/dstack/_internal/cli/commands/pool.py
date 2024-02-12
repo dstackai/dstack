@@ -34,7 +34,7 @@ from dstack.api.utils import load_profile
 logger = get_logger(__name__)
 
 
-class PoolCommand(APIBaseCommand):  # type: ignore[misc]
+class PoolCommand(APIBaseCommand):
     NAME = "pool"
     DESCRIPTION = "Pool management"
 

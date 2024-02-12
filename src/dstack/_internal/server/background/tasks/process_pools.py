@@ -92,7 +92,7 @@ async def check_shim(instance_id: UUID) -> None:
                 await session.commit()
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)  # type: ignore[misc]
+@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)
 def instance_healthcheck(*, ports: Dict[int, int]) -> bool:
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
     resp = shim_client.healthcheck()

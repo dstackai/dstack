@@ -6,16 +6,8 @@ repos:
         name: ruff common
         args: ['--fix']
       - id: ruff-format
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0
-    hooks:
-    - id: mypy
-      args: ['--strict', '--follow-imports=skip', '--ignore-missing-imports', '--python-version=3.8']
-      files: '.*pools?\.py'
-      exclude: 'versions|src/tests'
-      additional_dependencies: [types-PyYAML, types-requests, pydantic<2, sqlalchemy]
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.56.0
+    rev: v1.56.1
     hooks:
       - id: golangci-lint-full
         entry: bash -c 'cd runner && golangci-lint run -D depguard --presets import,module,unused "$@"'

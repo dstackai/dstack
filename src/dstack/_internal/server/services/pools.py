@@ -130,7 +130,7 @@ async def list_project_pool_models(
         .where(PoolModel.project_id == project.id, PoolModel.deleted == False)
         .options(joinedload(PoolModel.instances))
     )
-    return pools.unique().all()  # type: ignore[no-any-return]
+    return pools.unique().all()
 
 
 async def set_default_pool(session: AsyncSession, project: ProjectModel, pool_name: str) -> bool:
@@ -212,7 +212,7 @@ async def list_deleted_pools(
             PoolModel.project_id == project_model.id, PoolModel.deleted == True
         )
     )
-    return pools.all()  # type: ignore[no-any-return]
+    return pools.all()
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
