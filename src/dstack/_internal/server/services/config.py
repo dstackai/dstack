@@ -29,7 +29,7 @@ logger = get_logger(__name__)
 class AWSConfig(ForbidExtra):
     type: Literal["aws"] = "aws"
     regions: Optional[List[str]] = None
-    vpc: Optional[str] = None
+    vpc_name: Optional[str] = None
     creds: AnyAWSCreds = Field(..., discriminator="type")
 
 
