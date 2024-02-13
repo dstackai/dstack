@@ -25,7 +25,7 @@ In this update, we've added a possibility to create Lambda Cloud projects via th
 All you need to do is provide your Lambda Cloud API key, and specify an S3 bucket and AWS credentials 
 for storing state and artifacts.
 
-[Learn more →](../../docs/reference/backends/lambda.md){ .md-button .md-button--primary }
+[Learn more →](../../docs/installation/index.md#lambda){ .md-button .md-button--primary }
 
 Once the project is configured, feel free to run dev environments and tasks in Lambda Cloud using the `dstack` CLI.
 

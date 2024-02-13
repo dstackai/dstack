@@ -79,7 +79,7 @@ run = client.runs.submit(
 
 The `dstack.api.Run` instance provides methods for various operations including attaching to the run, 
 forwarding ports to `localhost`, retrieving status, stopping, and accessing logs. For more details, refer to 
-the [example](../../examples/deploy-python.md) and [reference](../../docs/reference/api/python/index.md).
+the [reference](../../docs/reference/api/python/index.md).
 
 ## Other changes
 

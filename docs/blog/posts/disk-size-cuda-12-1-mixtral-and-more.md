@@ -82,7 +82,7 @@ Chat UI, LangChain, Llama Index, etc.
 Check the complete [guide](../../examples/mixtral.md) for more details.
 
 Don't forget, with `dstack`, you can use spot instances across
-different clouds and regions. Check out our recent [guide](../../examples/spot.md) on this topic.
+different clouds and regions.
 
 ## Feedback and support
 

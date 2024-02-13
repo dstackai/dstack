@@ -88,9 +88,9 @@ plugins:
         'learn/tgi.md': 'examples/tgi.md'
         'learn/sdxl.md': 'examples/sdxl.md'
         'learn/vllm.md': 'examples/vllm.md'
-        'guides/dev-environments.md': 'concepts/dev-environments.md'
-        'guides/tasks.md': 'concepts/tasks.md'
-        'guides/services.md': 'concepts/services.md'
+        'docs/guides/dev-environments.md': 'docs/concepts/dev-environments.md'
+        'docs/guides/tasks.md': 'docs/concepts/tasks.md'
+        'docs/guides/services.md': 'docs/concepts/services.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml

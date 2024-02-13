@@ -26,7 +26,7 @@ provide your Azure credentials.
 ![dstack-hub-create-azure-project.png](../../assets/images/dstack-hub-create-azure-project.png){ width=800 }
 
 !!! info "NOTE:"
-    For detailed instructions on setting up `dstack` for Azure, refer to the [documentation](../../docs/reference/backends/azure.md).
+    For detailed instructions on setting up `dstack` for Azure, refer to the [documentation](../../docs/installation/index.md#azure).
 
 Once the project is set up, you can define dev environments, pipelines, and apps as code, and easily run them with just
 a single command. `dstack` will automatically provision the infrastructure for you.
