@@ -2,6 +2,7 @@
 
 `dstack` is an open-source toolkit and orchestration engine for running GPU workloads. 
 It works seamlessly with top cloud GPU providers (AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, etc.)
+as well as on-premises servers.
 
 ### Why use dstack?
 

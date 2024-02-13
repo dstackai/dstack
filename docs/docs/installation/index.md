@@ -295,129 +295,6 @@ There are two ways to configure GCP: using a service account or using the defaul
 ??? info "Required GCP permissions"
     The `Service Account User` and `Compute Admin` roles are sufficient for `dstack` to work.
 
-<!-- #### Kubernetes
-
-`dstack` supports all Kubernetes clusters including local (e.g. kind) and managed (e.g. EKS).
-To configure the Kubernetes backend, specify the path to your kubeconfig file:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-  - type: kubernetes
-    kubeconfig:
-      filename: ~/.kube/config
-    networking:
-      ssh_host: "52.17.197.110"
-      ssh_port: 32000
-```
-
-</div>
-
-You may also need to configure `networking`.
-`dstack` deploys a special Pod called Jump Pod that is published as a [NodePort service](https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport) on `ssh_port`.
-`dstack` uses this Pod as an SSH proxy to access all other Services running in the cluster.
-You need to ensure that the `dstack` server and your dev machine can access `ssh_host:ssh_port`.
-This may require editing firewall rules to open `ssh_port`.
-The `ssh_host` parameter can be set to the public IP of any node.
-The `Cluster setup` section below shows how to set up `networking` for some popular Kubernetes deployments.
-
-##### Cluster setup
-
-`dstack` detects GPUs on cluster nodes using labels set by the [NVIDIA's gpu-feature-discovery plugin](https://github.com/NVIDIA/gpu-feature-discovery), i.e. `nvidia.com/gpu.product`, `nvidia.com/gpu.count`, etc.
-You need to ensure that all GPU nodes have this labels set. If you install [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html), the nodes will be labeled automatically.
-
-Besides GPU labeling, you only need to ensure that cluster networking allows `dstack` to access the Jump Pod.
-The specifics of it vary between different Kubernetes deployments. Here's some examples:
-
-=== "Kind"
-
-    [kind](https://kind.sigs.k8s.io/) (a.k.a. Kubernetes in Docker) is a tool for running local Kubernetes clusters using Docker containers as nodes. kind was primarily designed for testing Kubernetes itself, but may be used for local development or CI.
-
-    To make a kind cluster work with `dstack`, configure the cluster with `extraPortMappings` parameter to forward `ssh_port` to nodes:
-
-    <div editor-title="kind-config.yml"> 
-
-    ```yaml
-
-    kind: Cluster
-    apiVersion: kind.x-k8s.io/v1alpha4
-    nodes:
-    - role: control-plane
-      extraPortMappings:
-      # `ssh_port` is set to 32000 as an example
-      - containerPort: 32000
-        hostPort: 32000
-
-    ```
-
-    </div>
-
-    Then create the cluster:
-
-    ```shell
-    kind create cluster --config kind-config.yaml
-    ```
-
-    And configure the Kubernetes backend:
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-      backends:
-      - type: kubernetes
-        kubeconfig:
-          filename: ~/.kube/config
-        networking:
-          ssh_host: localhost
-          ssh_port: 32000
-    ```
-
-    </div>
-
-=== "EKS"
-    
-    [Amazon Elastic Kubernetes Service](https://aws.amazon.com/eks/) (Amazon EKS) is a managed Kubernetes service to run Kubernetes in the AWS cloud and on-premises data centers.
-
-    To make an EKS cluster work with `dstack`, add an ingress rule to the cluster's security group that allows traffic on `ssh_port`:
-
-    ```shell
-    aws ec2 authorize-security-group-ingress --group-id YOUR_SECURITY_GROUP_ID --protocol tcp --port 32000 --cidr 0.0.0.0/0
-    ```
-
-    You also need a public IP of any cluster node to specify `ssh_host`. Run `kubectl` to get it:
-
-    ```shell
-    kubectl get nodes -o wide
-    ```
-
-    And configure the Kubernetes backend:
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-      backends:
-      - type: kubernetes
-        kubeconfig:
-          filename: ~/.kube/config
-        networking:
-          ssh_host: "52.17.197.110"
-          ssh_port: 32000
-    ```
-
-    </div>
-
-
-!!! info "NOTE:"
-    As of now, the Kubernetes backend does not support creation of gateways.
-    The support is coming soon. -->
-
 #### Lambda
 
 Log into your [Lambda Cloud](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
@@ -509,9 +386,97 @@ projects:
 
 </div>
 
+#### Kubernetes
+
+`dstack` supports both managed and self-managed Kubernetes clusters.
+
+??? info "Prerequisite"
+    To use GPUs with Kubernetes, the cluster must be installed with the 
+    [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html).
+    
+    [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
+
+To configure a Kubernetes backend, specify the path to the kubeconfig file, 
+and the port that `dstack` can use for proxying SSH traffic.
+In case of a self-managed cluster, also specify the IP address of any node in the cluster.
+
+[//]: # (TODO: Mention that the Kind context has to be selected via `current-context` )
+
+=== "Self-managed"
+
+    Here's how to configure the backend to use a self-managed cluster.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: kubernetes
+        kubeconfig:
+          filename: ~/.kube/config
+        networking:
+          ssh_host: localhost # The external IP address of any node
+          ssh_port: 32000 # Any port accessible outside of the cluster
+    ```
+
+    </div>
+
+    The port specified to `ssh_port` must be accessible outside of the cluster.
+    
+    For example, if you are using Kind, make sure to add it via `extraPortMappings`:
+
+    <div editor-title="installation/kind-config.yml"> 
+
+    ```yaml
+    kind: Cluster
+    apiVersion: kind.x-k8s.io/v1alpha4
+    nodes:
+    - role: control-plane
+      extraPortMappings:
+      - containerPort: 32000 # Must be same as `ssh_port`
+        hostPort: 32000 # Must be same as `ssh_port`
+    ```
+
+    </div>
+
+[//]: # (TODO: Elaborate on the Kind's IP address on Linux)
+
+=== "Managed"
+    Here's how to configure the backend to use a managed cluster (AWS, GCP, Azure).
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: kubernetes
+        kubeconfig:
+          filename: ~/.kube/config
+        networking:
+          ssh_port: 32000 # Any port accessible outside of the cluster
+    ```
+
+    </div>
+
+    The port specified to `ssh_port` must be accessible outside of the cluster.
+    
+    For example, if you are using EKS, make sure to add it via an ingress rule
+    of the corresponding security group:
+
+    ```shell
+    aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
+    ```
+
+[//]: # (TODO: Ellaborate on gateways, and what backends allow configuring them)
+
+[//]: # (TODO: Should we automatically detect ~/.kube/config)
+
 ### Configure regions
 
-In addition to credentials, each cloud (except TensorDock, Vast AI, and DataCrunch) optionally allows for region configuration.
+In addition to credentials, each backend (except TensorDock, Vast AI, DataCrunch, and Kubernetes) 
+optionally allows for region configuration.
 
 <div editor-title="~/.dstack/server/config.yml">
 
