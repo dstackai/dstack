@@ -115,14 +115,14 @@ class AWSCompute(Compute):
         try:
             subnet_id = None
             vpc_id = None
-            if self.config.vpc is not None:
+            if self.config.vpc_name is not None:
                 vpc_id = aws_resources.get_vpc_id_by_name(
                     ec2_client=ec2_client,
-                    vpc_name=self.config.vpc,
+                    vpc_name=self.config.vpc_name,
                 )
                 if vpc_id is None:
                     raise ComputeError(
-                        f"No VPC named {self.config.vpc} in region {instance_offer.region}"
+                        f"No VPC named {self.config.vpc_name} in region {instance_offer.region}"
                     )
                 subnet_id = aws_resources.get_subnet_id_for_vpc(
                     ec2_client=ec2_client,
@@ -130,7 +130,7 @@ class AWSCompute(Compute):
                 )
                 if subnet_id is None:
                     raise ComputeError(
-                        f"Failed to get subnet for VPC {self.config.vpc} in region {instance_offer.region}"
+                        f"Failed to get subnet for VPC {self.config.vpc_name} in region {instance_offer.region}"
                     )
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             response = ec2.create_instances(
