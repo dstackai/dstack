@@ -272,7 +272,7 @@ class ServerConfigManager:
         yaml.add_representer(list, seq_representer)
 
         with open(settings.SERVER_CONFIG_FILE_PATH, "w+") as f:
-            yaml.dump(config.dict(), f, sort_keys=False)
+            yaml.dump(config.dict(exclude_none=True), f, sort_keys=False)
 
 
 server_config_manager = ServerConfigManager()
