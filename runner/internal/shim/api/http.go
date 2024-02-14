@@ -52,7 +52,7 @@ func (s *ShimServer) PullGetHandler(w http.ResponseWriter, r *http.Request) (int
 	}, nil
 }
 
-func (s *ShimServer) SubmitStopPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+func (s *ShimServer) StopPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -62,7 +62,7 @@ func (s *ShimServer) SubmitStopPostHandler(w http.ResponseWriter, r *http.Reques
 		return nil, err
 	}
 
-	s.runner.SubmitStop(body.Force)
+	s.runner.Stop(body.Force)
 
 	return &SubmitStopResponse{
 		State: string(s.runner.GetState()),

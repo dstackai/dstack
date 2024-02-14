@@ -115,7 +115,7 @@ async def _process_job(job_id):
         logger.info(*job_log("marked as removed", job_model))
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT, client.REMOTE_RUNNER_PORT])
+@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT])
 def submit_stop(job_model: JobModel, ports: Dict[int, int]):
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
 

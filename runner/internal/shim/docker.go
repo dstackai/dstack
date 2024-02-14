@@ -90,7 +90,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	return nil
 }
 
-func (d *DockerRunner) SubmitStop(force bool) {
+func (d *DockerRunner) Stop(force bool) {
 	if d.currentContainer == "" {
 		return
 	}
@@ -107,19 +107,6 @@ func (d *DockerRunner) SubmitStop(force bool) {
 	if err != nil {
 		log.Printf("Failed to stop container: %s", err)
 	}
-
-	if !d.dockerParams.DockerKeepContainer() {
-		removeOptions := types.ContainerRemoveOptions{
-			RemoveVolumes: true,
-			Force:         true,
-		}
-
-		err = d.client.ContainerRemove(ctx, d.currentContainer, removeOptions)
-		if err != nil {
-			log.Printf("Failed to remove container: %s", err)
-		}
-	}
-
 }
 
 func (d DockerRunner) GetState() RunnerStatus {
@@ -202,12 +189,14 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 	if err := client.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
 		return tracerr.Wrap(err)
 	}
+
 	waitCh, errorCh := client.ContainerWait(ctx, containerID, "")
 	select {
 	case <-waitCh:
 	case err := <-errorCh:
 		return tracerr.Wrap(err)
 	}
+
 	return nil
 }
 
