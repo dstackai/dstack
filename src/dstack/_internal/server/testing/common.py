@@ -311,12 +311,16 @@ async def create_instance(
     project: ProjectModel,
     pool: PoolModel,
     status: InstanceStatus = InstanceStatus.READY,
+    created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    finished_at: Optional[datetime] = None,
 ) -> InstanceModel:
     im = InstanceModel(
         name="test_instance",
         pool=pool,
         project=project,
         status=status,
+        created_at=created_at,
+        finished_at=finished_at,
         job_provisioning_data='{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "instance_id": "running_instance.id", "ssh_proxy": null, "hostname": "running_instance.ip", "region": "running_instance.location", "price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, "backend_data": null}',
         offer='{"backend": "datacrunch", "instance": {"name": "instance", "resources": {"cpus": 2, "memory_mib": 12000, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "region": "en", "price": 0.1, "availability": "available"}',
         price=1,

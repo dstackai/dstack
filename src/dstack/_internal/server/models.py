@@ -272,10 +272,10 @@ class InstanceModel(BaseModel):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
-    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id], single_parent=True)
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
 
     pool_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pools.id"))
-    pool: Mapped["PoolModel"] = relationship(back_populates="instances", single_parent=True)
+    pool: Mapped["PoolModel"] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
 
