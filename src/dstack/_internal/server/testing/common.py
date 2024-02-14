@@ -16,7 +16,6 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     JobErrorCode,
@@ -311,8 +310,7 @@ async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
     pool: PoolModel,
-    status: InstanceStatus,
-    resources: ResourcesSpec,
+    status: InstanceStatus = InstanceStatus.READY,
 ) -> InstanceModel:
     im = InstanceModel(
         name="test_instance",
@@ -328,8 +326,4 @@ async def create_instance(
     )
     session.add(im)
     await session.commit()
-
-    # pool.instances.append(im)
-    # await session.commit()
-
     return im

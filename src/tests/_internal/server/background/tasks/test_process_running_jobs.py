@@ -284,12 +284,12 @@ class TestProcessRunningJobs:
             repo=repo,
             user=user,
         )
+        pool = await create_pool(session, project)
         instance = await create_instance(
-            session,
-            project,
-            await create_pool(session, project),
-            InstanceStatus.READY,
-            Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.READY,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
         job = await create_job(

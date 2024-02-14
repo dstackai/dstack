@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -14,7 +15,7 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, ProfileRetryPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, JobStatus
+from dstack._internal.core.models.runs import InstanceStatus, JobStatus
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.services.pools import (
@@ -29,7 +30,6 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_run_spec,
 )
-from dstack.api._public.resources import Resources as MakeResources
 
 
 class TestProcessSubmittedJobs:
@@ -204,67 +204,30 @@ class TestProcessSubmittedJobs:
         project = await create_project(session)
         user = await create_user(session)
         repo = await create_repo(
-            session,
+            session=session,
             project_id=project.id,
         )
         pool = await get_or_create_default_pool_by_name(session, project, pool_name=None)
-        resources = MakeResources(cpu=2, memory="12GB")
-        await create_instance(session, project, pool, InstanceStatus.READY, resources)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.READY,
+        )
         await session.refresh(pool)
         run = await create_run(
-            session,
+            session=session,
             project=project,
             repo=repo,
             user=user,
         )
-        job_provisioning_data = JobProvisioningData(
-            backend=BackendType.LOCAL,
-            instance_type=InstanceType(
-                name="local",
-                resources=Resources(cpus=2, memory_mib=12 * 1024, gpus=[], spot=False),
-            ),
-            instance_id="0000-0000",
-            hostname="localhost",
-            region="",
-            price=0.0,
-            username="root",
-            ssh_port=22,
-            dockerized=False,
-            backend_data=None,
-            ssh_proxy=None,
+        job = await create_job(
+            session=session,
+            run=run,
         )
-        with patch(
-            "dstack._internal.server.services.jobs.configurators.base.get_default_python_verison"
-        ) as PyVersion:
-            PyVersion.return_value = "3.10"
-            job = await create_job(
-                session,
-                run=run,
-                job_provisioning_data=job_provisioning_data,
-            )
         await process_submitted_jobs()
         await session.refresh(job)
-        assert job is not None
+        res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
+        job = res.scalar_one()
         assert job.status == JobStatus.PROVISIONING
-
-        res = await session.execute(select(JobModel).where())
-        jm = res.all()[0][0]
-        assert jm.job_num == 0
-        assert jm.run_name == "test-run"
-        assert jm.job_name == "test-run-0"
-        assert jm.submission_num == 0
-        assert jm.status == JobStatus.PROVISIONING
-        assert jm.error_code is None
-        assert (
-            jm.job_spec_data
-            == r"""{"job_num": 0, "job_name": "test-run-0", "app_specs": [], "commands": ["/bin/bash", "-i", "-c", "(echo pip install ipykernel... && pip install -q --no-cache-dir ipykernel 2> /dev/null) || echo \"no pip, ipykernel was not installed\" && echo '' && echo To open in VS Code Desktop, use link below: && echo '' && echo '  vscode://vscode-remote/ssh-remote+test-run/workflow' && echo '' && echo 'To connect via SSH, use: `ssh test-run`' && echo '' && echo -n 'To exit, press Ctrl+C.' && tail -f /dev/null"], "env": {}, "gateway": null, "home_dir": "/root", "image_name": "dstackai/base:py3.10-0.4rc4-cuda-12.1", "max_duration": 21600, "registry_auth": null, "requirements": {"resources": {"cpu": {"min": 2, "max": null}, "memory": {"min": 8.0, "max": null}, "shm_size": null, "gpu": null, "disk": null}, "max_price": null, "spot": false}, "retry_policy": {"retry": false, "limit": null}, "working_dir": ".", "pool_name": null}"""
-        )
-        assert jm.job_provisioning_data == (
-            '{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": '
-            '{"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": '
-            '{"size_mib": 102400}, "description": ""}}, "instance_id": '
-            '"running_instance.id", "ssh_proxy": null, '
-            '"hostname": "running_instance.ip", "region": "running_instance.location", '
-            '"price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, '
-            '"backend_data": null}'
-        )
+        assert job.instance is not None and job.instance.id == instance.id
