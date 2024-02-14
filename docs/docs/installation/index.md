@@ -388,7 +388,7 @@ projects:
 
 #### Kubernetes
 
-`dstack` supports both managed and self-managed Kubernetes clusters.
+`dstack` supports both self-managed, and managed Kubernetes clusters.
 
 ??? info "Prerequisite"
     To use GPUs with Kubernetes, the cluster must be installed with the 

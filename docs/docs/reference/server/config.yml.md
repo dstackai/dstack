@@ -43,7 +43,7 @@
 
 ##SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
 
-##SCHEMA# dstack._internal.core.models.backends.kubernetes.KubernetesConfig
+##SCHEMA# dstack._internal.server.services.config.KubernetesConfig
 
 ##SCHEMA# dstack._internal.core.models.backends.kubernetes.KubeconfigConfig
 

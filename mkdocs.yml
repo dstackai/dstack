@@ -59,8 +59,11 @@ theme:
 # Plugins
 plugins:
   - blog:
-      blog_dir: blog
+      blog_dir: changelog
+      post_url_format: "{slug}"
       blog_toc: true
+  - blog:
+      blog_dir: blog
   - social:
       cards_layout_options:
         background_color: "black"
@@ -91,6 +94,18 @@ plugins:
         'docs/guides/dev-environments.md': 'docs/concepts/dev-environments.md'
         'docs/guides/tasks.md': 'docs/concepts/tasks.md'
         'docs/guides/services.md': 'docs/concepts/services.md'
+        'blog/2024/02/08/resources-authentication-and-more.md': 'changelog/posts/0.15.0.md'
+        'blog/2024/01/19/openai-endpoints-preview.md': 'changelog/posts/0.14.0.md'
+        'blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more.md': 'changelog/posts/0.13.0.md'
+        'blog/2023/11/21/vastai.md': 'changelog/posts/0.12.3.md'
+        'blog/2023/10/31/tensordock.md': 'changelog/posts/0.12.2.md'
+        'blog/2023/10/18/simplified-cloud-setup.md': 'changelog/posts/0.12.0.md'
+        'blog/2023/08/22/multiple-clouds.md': 'changelog/posts/0.11.0.md'
+        'blog/2023/08/07/services-preview.md': 'changelog/posts/0.10.7.md'
+        'blog/2023/07/14/lambda-cloud-ga-and-docker-support.md': 'changelog/posts/0.10.5.md'
+        'blog/2023/05/22/azure-support-better-ui-and-more.md': 'changelog/posts/0.9.1.md'
+        'blog/2023/04/11/introducing-dstack-hub.md': 'changelog/posts/0.7.0.md'
+        'blog/2023/03/13/gcp-support-just-landed.md': 'changelog/posts/0.2.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -199,7 +214,7 @@ nav:
         - Infinity: examples/infinity.md
     - RAG:
         - Llama Index: examples/llama-index.md
-  - Blog:
-      - blog/index.md
+  - Changelog:
+      - changelog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd
   - GitHub: https://github.com/dstackai/dstack
