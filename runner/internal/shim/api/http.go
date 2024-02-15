@@ -34,7 +34,7 @@ func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (
 	}
 
 	go func(taskParams shim.DockerImageConfig) {
-		err := s.runner.Run(context.TODO(), taskParams)
+		err := s.runner.Run(context.Background(), taskParams)
 		if err != nil {
 			fmt.Printf("failed Run %v", err)
 		}
@@ -48,6 +48,29 @@ func (s *ShimServer) PullGetHandler(w http.ResponseWriter, r *http.Request) (int
 	defer s.mu.RUnlock()
 
 	return &PullResponse{
+		State: string(s.runner.GetState()),
+	}, nil
+}
+
+func (s *ShimServer) StopPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if s.runner.GetState() == shim.Pending {
+		return &StopResponse{
+			State: string(s.runner.GetState()),
+		}, nil
+	}
+
+	var body StopBody
+	if err := api.DecodeJSONBody(w, r, &body, true); err != nil {
+		log.Println("Failed to decode submit stop body", "err", err)
+		return nil, err
+	}
+
+	s.runner.Stop(body.Force)
+
+	return &StopResponse{
 		State: string(s.runner.GetState()),
 	}, nil
 }

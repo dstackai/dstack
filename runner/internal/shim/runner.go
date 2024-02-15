@@ -87,7 +87,6 @@ func downloadRunner(url string) (string, error) {
 	}
 
 	resp, err := http.DefaultClient.Do(req)
-
 	if err != nil {
 		return "", gerrors.Wrap(err)
 	}

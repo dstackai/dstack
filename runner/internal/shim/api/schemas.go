@@ -8,12 +8,20 @@ type DockerTaskBody struct {
 	ImageName string `json:"image_name"`
 }
 
+type StopBody struct {
+	Force bool `json:"force"`
+}
+
 type HealthcheckResponse struct {
 	Service string `json:"service"`
 	Version string `json:"version"`
 }
 
 type PullResponse struct {
+	State string `json:"state"`
+}
+
+type StopResponse struct {
 	State string `json:"state"`
 }
 
