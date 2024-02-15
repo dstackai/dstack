@@ -82,7 +82,6 @@ def test_convert_instance():
         hostname="hostname_test",
         status=InstanceStatus.PENDING,
         region="eu-west-1",
-        started=None,
         created=created,
         price=1.0,
     )
