@@ -1,4 +1,5 @@
 import argparse
+import datetime
 from pathlib import Path
 from typing import Sequence
 
@@ -290,18 +291,29 @@ def print_instance_table(instances: Sequence[Instance]) -> None:
     table = Table(box=None)
     table.add_column("INSTANCE NAME")
     table.add_column("BACKEND")
+    table.add_column("REGION")
     table.add_column("INSTANCE TYPE")
+    table.add_column("SPOT")
     table.add_column("STATUS")
     table.add_column("PRICE")
+    table.add_column("CREATED")
 
     for instance in instances:
         style = "success" if instance.status.is_available() else "warning"
+        created = (
+            pretty_date(instance.created.replace(tzinfo=datetime.timezone.utc))
+            if instance.created is not None
+            else ""
+        )
         row = [
             instance.name,
             instance.backend,
+            instance.region,
             instance.instance_type.resources.pretty_format(),
+            "yes" if instance.instance_type.resources.spot else "no",
             f"[{style}]{instance.status.value}[/]",
             f"${instance.price:.4}",
+            created,
         ]
         table.add_row(*row)
 
