@@ -10,4 +10,4 @@ ignore =[
 
 [lint.isort]
 known-first-party = ["dstack"]
-known-third-party = ["mkdocs_gen_files"]
+known-third-party = ["mkdocs_gen_files", "datacrunch"]
