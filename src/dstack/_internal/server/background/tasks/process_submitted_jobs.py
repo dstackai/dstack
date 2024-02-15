@@ -12,7 +12,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy
+from dstack._internal.core.models.profiles import CreationPolicy
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -23,17 +23,18 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel, PoolModel, RunModel
+from dstack._internal.server.models import InstanceModel, JobModel, RunModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.jobs import (
+    PROCESSING_POOL_LOCK,
     SUBMITTED_PROCESSING_JOBS_IDS,
     SUBMITTED_PROCESSING_JOBS_LOCK,
 )
 from dstack._internal.server.services.logging import job_log
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
+    get_or_create_default_pool_by_name,
     get_pool_instances,
-    list_project_pool_models,
 )
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.utils.common import run_async
@@ -87,57 +88,38 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     run_model = res.scalar_one()
     project_model = run_model.project
 
+    run_spec = parse_raw_as(RunSpec, run_model.run_spec)
+    profile = run_spec.profile
+
     # check default pool
     pool = project_model.default_pool
     if pool is None:
-        # TODO: get_or_create_default_pool...
-        pools = await list_project_pool_models(session, job_model.project)
-        for pool_item in pools:
-            if pool_item.id == job_model.project.default_pool_id:
-                pool = pool_item
-            if pool_item.name == DEFAULT_POOL_NAME:
-                pool = pool_item
-        if pool is None:
-            pool = PoolModel(
-                name=DEFAULT_POOL_NAME,
-                project=project_model,
-            )
-            session.add(pool)
+        pool = await get_or_create_default_pool_by_name(
+            session, project_model, pool_name=profile.pool_name
+        )
+        project_model.default_pool = pool
+
+    async with PROCESSING_POOL_LOCK:
+        # pool capacity
+        pool_instances = await get_pool_instances(session, project_model, pool.name)
+        relevant_instances = filter_pool_instances(
+            pool_instances, profile, run_spec.configuration.resources, status=InstanceStatus.READY
+        )
+
+        if relevant_instances:
+            sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
+            instance = sorted_instances[0]
+            instance.status = InstanceStatus.BUSY
+            instance.job = job_model
+
+            logger.info(*job_log("now is provisioning", job_model))
+            job_model.job_provisioning_data = instance.job_provisioning_data
+            job_model.status = JobStatus.PROVISIONING
+            job_model.last_processed_at = common_utils.get_current_datetime()
+
             await session.commit()
-            await session.refresh(pool)
 
-        if pool.id is not None:
-            project_model.default_pool_id = pool.id
-
-    run_spec = parse_raw_as(RunSpec, run_model.run_spec)
-    profile = run_spec.profile
-    run_pool = profile.pool_name
-    if run_pool is None:
-        run_pool = pool.name
-
-    # pool capacity
-
-    pool_instances = await get_pool_instances(session, project_model, run_pool)
-    relevant_instances = filter_pool_instances(
-        pool_instances, profile, run_spec.configuration.resources, status=InstanceStatus.READY
-    )
-
-    if relevant_instances:
-        sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
-        instance = sorted_instances[0]
-
-        # need lock
-        instance.status = InstanceStatus.BUSY
-        instance.job = job_model
-
-        logger.info(*job_log("now is provisioning", job_model))
-        job_model.job_provisioning_data = instance.job_provisioning_data
-        job_model.status = JobStatus.PROVISIONING
-        job_model.last_processed_at = common_utils.get_current_datetime()
-
-        await session.commit()
-
-        return
+            return
 
     run = run_model_to_run(run_model)
     job = run.jobs[job_model.job_num]

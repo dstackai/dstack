@@ -124,8 +124,6 @@ async def terminate(instance_id: UUID) -> None:
             )
         ).one()
 
-        # TODO: need lock
-
         jpd = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
         BACKEND_TYPE = jpd.backend
         backends = await backends_services.get_project_backends(project=instance.project)
@@ -159,8 +157,6 @@ async def terminate_idle_instance() -> None:
             .options(joinedload(InstanceModel.project))
         )
         instances = res.scalars().all()
-
-        # TODO: need lock
 
         for instance in instances:
             last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)

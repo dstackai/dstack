@@ -27,6 +27,7 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.server import settings
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel
+from dstack._internal.server.services.jobs import PROCESSING_POOL_LOCK
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
 from dstack._internal.utils.common import get_current_datetime
@@ -165,18 +166,18 @@ async def remove_instance(
         logger.warning("Couldn't find pool")
         return
 
-    # TODO: need lock
-    terminated = False
-    for instance in pool.instances:
-        if instance.name == instance_name:
-            if force or instance.job_id is None:
-                instance.status = InstanceStatus.TERMINATING
-                terminated = True
+    async with PROCESSING_POOL_LOCK:
+        terminated = False
+        for instance in pool.instances:
+            if instance.name == instance_name:
+                if force or instance.job_id is None:
+                    instance.status = InstanceStatus.TERMINATING
+                    terminated = True
 
-    if not terminated:
-        logger.warning("Couldn't find instance to terminate")
+        if not terminated:
+            logger.warning("Couldn't find instance to terminate")
 
-    await session.commit()
+        await session.commit()
 
 
 async def delete_pool(session: AsyncSession, project: ProjectModel, pool_name: str) -> None:
