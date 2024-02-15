@@ -124,4 +124,4 @@ def submit_stop(job_model: JobModel, ports: Dict[int, int]):
         logger.debug(*job_log("shim is not available yet", job_model))
         return False  # shim is not available yet
 
-    shim_client.submit_stop(force=False)
+    shim_client.stop(force=False)

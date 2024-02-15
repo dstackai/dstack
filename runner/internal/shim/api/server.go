@@ -19,7 +19,8 @@ type ShimServer struct {
 	HttpServer *http.Server
 	mu         sync.RWMutex
 
-	runner TaskRunner
+	runner              TaskRunner
+	runnerRunCancelFunc *context.CancelFunc
 
 	version string
 }
@@ -39,6 +40,6 @@ func NewShimServer(address string, runner TaskRunner, version string) *ShimServe
 	mux.HandleFunc("/api/submit", api.JSONResponseHandler("POST", s.SubmitPostHandler))
 	mux.HandleFunc("/api/healthcheck", api.JSONResponseHandler("GET", s.HealthcheckGetHandler))
 	mux.HandleFunc("/api/pull", api.JSONResponseHandler("GET", s.PullGetHandler))
-	mux.HandleFunc("/api/submit_stop", api.JSONResponseHandler("POST", s.StopPostHandler))
+	mux.HandleFunc("/api/stop", api.JSONResponseHandler("POST", s.StopPostHandler))
 	return s
 }

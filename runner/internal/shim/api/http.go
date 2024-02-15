@@ -33,12 +33,18 @@ func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (
 		return nil, err
 	}
 
-	go func(taskParams shim.DockerImageConfig) {
-		err := s.runner.Run(context.TODO(), taskParams)
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
+	s.runnerRunCancelFunc = &cancel
+
+	go func(taskParams shim.DockerImageConfig, cancelFunc *context.CancelFunc) {
+		err := s.runner.Run(ctx, taskParams)
 		if err != nil {
 			fmt.Printf("failed Run %v", err)
 		}
-	}(body.TaskParams())
+		*cancelFunc = nil
+	}(body.TaskParams(), s.runnerRunCancelFunc)
 
 	return nil, nil
 }
@@ -55,6 +61,20 @@ func (s *ShimServer) PullGetHandler(w http.ResponseWriter, r *http.Request) (int
 func (s *ShimServer) StopPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	if s.runner.GetState() == shim.Pending {
+		return &SubmitStopResponse{
+			State: string(s.runner.GetState()),
+		}, nil
+	}
+
+	// if s.runner.GetState() == shim.Pulling {
+	// 	(*s.runnerRunCancelFunc)()
+	// 	// TODO: add barrier
+	// 	return &SubmitStopResponse{
+	// 		State: string(s.runner.GetState()),
+	// 	}, nil
+	// }
 
 	var body SubmitStopBody
 	if err := api.DecodeJSONBody(w, r, &body, true); err != nil {

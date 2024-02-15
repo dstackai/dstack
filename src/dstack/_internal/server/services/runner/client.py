@@ -110,9 +110,9 @@ class ShimClient:
         )
         resp.raise_for_status()
 
-    def submit_stop(self, force: bool = False):
+    def stop(self, force: bool = False):
         body = SubmitStopBody(force=force)
-        resp = requests.post(self._url("/api/submit_stop"), json=body.dict())
+        resp = requests.post(self._url("/api/stop"), json=body.dict())
         resp.raise_for_status()
 
     def pull(self):  # TODO return
