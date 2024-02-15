@@ -8,7 +8,7 @@ type DockerTaskBody struct {
 	ImageName string `json:"image_name"`
 }
 
-type SubmitStopBody struct {
+type StopBody struct {
 	Force bool `json:"force"`
 }
 
@@ -21,7 +21,7 @@ type PullResponse struct {
 	State string `json:"state"`
 }
 
-type SubmitStopResponse struct {
+type StopResponse struct {
 	State string `json:"state"`
 }
 

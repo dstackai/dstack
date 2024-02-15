@@ -19,8 +19,7 @@ type ShimServer struct {
 	HttpServer *http.Server
 	mu         sync.RWMutex
 
-	runner              TaskRunner
-	runnerRunCancelFunc *context.CancelFunc
+	runner TaskRunner
 
 	version string
 }

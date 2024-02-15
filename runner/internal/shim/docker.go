@@ -27,6 +27,8 @@ type DockerRunner struct {
 	dockerParams     DockerParameters
 	currentContainer string
 	state            RunnerStatus
+
+	cancelRun context.CancelFunc
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -45,6 +47,11 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 
 func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	var err error
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+
+	d.cancelRun = cancel
+	defer cancel()
 
 	log.Println("Pulling image")
 	d.state = Pulling
@@ -91,7 +98,8 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 }
 
 func (d *DockerRunner) Stop(force bool) {
-	if d.currentContainer == "" {
+	if d.currentContainer == "" && d.state == Pulling {
+		d.cancelRun()
 		return
 	}
 
