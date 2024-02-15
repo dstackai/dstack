@@ -9,15 +9,6 @@ from dstack._internal.server.services.docker import DockerImage
 from dstack._internal.utils.common import pretty_resources
 
 
-class InstanceState(str, Enum):
-    NOT_FOUND = "not_found"
-    PROVISIONING = "provisioning"
-    RUNNING = "running"
-    STOPPED = "stopped"
-    STOPPING = "stopping"
-    TERMINATED = "terminated"
-
-
 class Gpu(BaseModel):
     name: str
     memory_mib: int
