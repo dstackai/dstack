@@ -77,18 +77,24 @@ class PoolCommand(APIBaseCommand):
         delete_parser.set_defaults(subfunc=self._delete)
 
         # show pool instances
-        show_parser = subparsers.add_parser(
-            "show",
+        ps_parser = subparsers.add_parser(
+            "ps",
             help="Show pool instances",
             description="Show instances in the pool",
             formatter_class=self._parser.formatter_class,
         )
-        show_parser.add_argument(
+        ps_parser.add_argument(
             "--pool",
             dest="pool_name",
             help="The name of the pool. If not set, the default pool will be used",
         )
-        show_parser.set_defaults(subfunc=self._show)
+        ps_parser.add_argument(
+            "-w",
+            "--watch",
+            help="Watch instances in realtime",
+            action="store_true",
+        )
+        ps_parser.set_defaults(subfunc=self._ps)
 
         # add instance
         add_parser = subparsers.add_parser(
@@ -196,7 +202,7 @@ class PoolCommand(APIBaseCommand):
         if not result:
             console.print(f"Failed to set default pool {args.pool_name!r}", style="error")
 
-    def _show(self, args: argparse.Namespace) -> None:
+    def _ps(self, args: argparse.Namespace) -> None:
         resp = self.api.client.pool.show(self.api.project, args.pool_name)
         console.print(f" [bold]Pool name[/]  {resp.name}\n")
         print_instance_table(resp.instances)

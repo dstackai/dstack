@@ -183,7 +183,7 @@ class TestPoolUtils:
             hostname="hostname_test",
             status=InstanceStatus.PENDING,
             created=created,
-            region='eu-west-1',
+            region="eu-west-1",
             price=1.0,
         )
 
