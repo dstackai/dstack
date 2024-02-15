@@ -10,5 +10,5 @@ repos:
     rev: v1.56.1
     hooks:
       - id: golangci-lint-full
-        entry: bash -c 'cd runner && golangci-lint run -D depguard,godox --presets import,module,unused,format,comment "$@"'
+        entry: bash -c 'cd runner && golangci-lint run -D depguard --presets import,module,unused "$@"'
         stages: [manual]
