@@ -72,5 +72,5 @@ class DockerImageBody(BaseModel):
     image_name: str
 
 
-class SubmitStopBody(BaseModel):
+class StopBody(BaseModel):
     force: bool = False
