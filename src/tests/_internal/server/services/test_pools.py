@@ -25,6 +25,7 @@ from dstack._internal.core.models.runs import InstanceStatus, Requirements
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.testing.common import create_project, create_user
+from dstack._internal.utils.common import get_current_datetime
 
 
 @pytest.mark.asyncio
@@ -71,6 +72,7 @@ async def test_pool(session: AsyncSession, test_db):
 
 
 def test_convert_instance():
+    created = get_current_datetime()
     expected_instance = Instance(
         backend=BackendType.LOCAL,
         instance_type=InstanceType(
@@ -79,12 +81,14 @@ def test_convert_instance():
         name="test_instance",
         hostname="hostname_test",
         status=InstanceStatus.PENDING,
+        region="eu-west-1",
+        created=created,
         price=1.0,
     )
 
     im = InstanceModel(
         id=str(uuid.uuid4()),
-        created_at=dt.datetime.now(),
+        created_at=created,
         name="test_instance",
         status=InstanceStatus.PENDING,
         project_id=str(uuid.uuid4()),
