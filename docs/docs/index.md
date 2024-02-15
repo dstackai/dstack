@@ -26,7 +26,7 @@ as well as on-premises servers.
 
 ### Where do I start?
 
-1. [Install the server](installation/index.md) (or <a href="#" data-tally-open="w7K17R">sign up</a> with the cloud version)
+1. [Install the server](installation/index.md) (or <a href="https://cloud.dstack.ai">sign up</a> with the cloud version)
 2. Follow [quickstart](quickstart.md)
 3. Browse [examples](../examples/index.md)
 4. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)
