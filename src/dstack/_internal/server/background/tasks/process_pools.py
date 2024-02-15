@@ -94,7 +94,15 @@ async def check_shim(instance_id: UUID) -> None:
                     "instance %s shim is not available, marked as failed", instance.name
                 )
                 instance.status = InstanceStatus.FAILED
-                await session.commit()
+
+            STARTING_TIMEOUT = 60 * 3
+            expire_starting = (
+                instance.created + timedelta(seconds=STARTING_TIMEOUT) < get_current_datetime()
+            )
+            if instance.status == InstanceStatus.STARTING and expire_starting:
+                instance.status = InstanceStatus.FAILED
+
+            await session.commit()
 
 
 @runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)
