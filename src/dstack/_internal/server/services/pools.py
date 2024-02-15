@@ -229,6 +229,8 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance_type=jpd.instance_type,
         hostname=jpd.hostname,
         status=instance_model.status,
+        region=offer.region,
+        created=instance_model.created_at,
         price=offer.price,
     )
     if instance_model.job is not None:
