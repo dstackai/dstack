@@ -1,5 +1,6 @@
 import argparse
 
+from rich.markup import escape
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.commands.config import ConfigCommand
@@ -65,7 +66,7 @@ def main():
         check_for_updates()
         args.func(args)
     except (ClientError, CLIError) as e:
-        console.print(f"[error]{e}[/]")
+        console.print(f"[error]{escape(str(e))}[/]")
         logger.debug(e, exc_info=True)
         exit(1)
 

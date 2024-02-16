@@ -1,6 +1,7 @@
 import asyncio
 import itertools
 import math
+import re
 import uuid
 from datetime import timezone
 from typing import List, Optional, Tuple, cast
@@ -290,6 +291,9 @@ async def create_instance(
 async def get_run_plan(
     session: AsyncSession, project: ProjectModel, user: UserModel, run_spec: RunSpec
 ) -> RunPlan:
+    if run_spec.run_name is not None:
+        _validate_run_name(run_spec.run_name)
+
     profile = run_spec.profile
 
     # TODO: get_or_create_default_pool
@@ -386,6 +390,7 @@ async def submit_run(
             project=project,
         )
     else:
+        _validate_run_name(run_spec.run_name)
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
     pool = await get_or_create_default_pool_by_name(session, project, run_spec.profile.pool_name)
@@ -624,3 +629,11 @@ async def abort_runs_of_pool(session: AsyncSession, project_model: ProjectModel,
             active_run_names.append(run.run_spec.run_name)
 
     await stop_runs(session, project_model, active_run_names, abort=True)
+
+
+# The run_name validation is not performed in pydantic models since
+# the models are reused on the client, and we don't want to
+# tie run_name validation to the client side.
+def _validate_run_name(run_name: str):
+    if not re.match("^[a-z][a-z0-9-]{1,40}$", run_name):
+        raise ServerClientError("run_name should match regex '^[a-z][a-z0-9-]{1,40}$'")
