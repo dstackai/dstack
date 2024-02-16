@@ -315,10 +315,12 @@ def get_subnet_id_for_vpc(
     subnets = _get_subnets_by_vpc_id(ec2_client=ec2_client, vpc_id=vpc_id)
     if len(subnets) == 0:
         return None
-    # Return any subnet id
-    # TODO: consider doing additional check for subnet such as
-    # whether the subnet is public
-    return subnets[0]["SubnetId"]
+    # Return first public subnet
+    for subnet in subnets:
+        subnet_id = subnet["SubnetId"]
+        if _is_public_subnet(ec2_client=ec2_client, subnet_id=subnet_id):
+            return subnet_id
+    return None
 
 
 def _get_subnets_by_vpc_id(
@@ -327,3 +329,19 @@ def _get_subnets_by_vpc_id(
 ) -> List[Dict]:
     response = ec2_client.describe_subnets(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
     return response["Subnets"]
+
+
+def _is_public_subnet(
+    ec2_client: botocore.client.BaseClient,
+    subnet_id: str,
+) -> bool:
+    # Public subnet – The subnet has a direct route to an internet gateway.
+    # Private subnet – The subnet does not have a direct route to an internet gateway.
+    response = ec2_client.describe_route_tables(
+        Filters=[{"Name": "association.subnet-id", "Values": [subnet_id]}]
+    )
+    for route_table in response["RouteTables"]:
+        for route in route_table["Routes"]:
+            if "GatewayId" in route and route["GatewayId"].startswith("igw-"):
+                return True
+    return False
