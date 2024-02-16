@@ -101,14 +101,16 @@ async def _process_job(job_id):
             job_model.instance = None
 
         server_ssh_private_key = job_model.project.ssh_private_key
-        job_provisioning_data = parse_raw_as(JobProvisioningData, job_model.job_provisioning_data)
-        await run_async(
-            submit_stop,
-            server_ssh_private_key,
-            job_provisioning_data,
-            job_model,
-        )
-
+        if job_model.job_provisioning_data is not None:
+            job_provisioning_data = parse_raw_as(
+                JobProvisioningData, job_model.job_provisioning_data
+            )
+            await run_async(
+                submit_stop,
+                server_ssh_private_key,
+                job_provisioning_data,
+                job_model,
+            )
         job_model.removed = True
         job_model.last_processed_at = get_current_datetime()
         await session.commit()
