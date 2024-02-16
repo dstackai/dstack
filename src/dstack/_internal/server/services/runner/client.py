@@ -92,12 +92,14 @@ class ShimClient:
         self.hostname = hostname
         self.port = port
 
-    def healthcheck(self) -> Optional[HealthcheckResponse]:
+    def healthcheck(self, unmask_exeptions: bool = False) -> Optional[HealthcheckResponse]:
         try:
             resp = requests.get(self._url("/api/healthcheck"))
             resp.raise_for_status()
             return HealthcheckResponse.parse_obj(resp.json())
         except requests.exceptions.RequestException:
+            if unmask_exeptions:
+                raise
             return None
 
     def submit(self, username: str, password: str, image_name: str):

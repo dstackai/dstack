@@ -267,6 +267,8 @@ class InstanceModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50))
+
+    # instance
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
@@ -283,19 +285,26 @@ class InstanceModel(BaseModel):
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
 
+    # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(50))
     termination_idle_time: Mapped[int] = mapped_column(
         Integer, default=DEFAULT_TERMINATION_IDLE_TIME
     )
 
+    # connection fail handling
+    fail_count: Mapped[int] = mapped_column(Integer, default=0)
+    fail_reason: Mapped[Optional[str]] = mapped_column(String(4000))
+
+    # backend
     backend: Mapped[BackendType] = mapped_column(Enum(BackendType))
     backend_data: Mapped[Optional[str]] = mapped_column(String(4000))
+
+    # offer
+    offer: Mapped[str] = mapped_column(String(4000))
     region: Mapped[str] = mapped_column(String(2000))
     price: Mapped[float] = mapped_column(Float)
 
     job_provisioning_data: Mapped[str] = mapped_column(String(4000))
-
-    offer: Mapped[str] = mapped_column(String(4000))
 
     # current job
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))

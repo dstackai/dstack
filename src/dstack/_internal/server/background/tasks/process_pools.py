@@ -1,6 +1,7 @@
 import datetime
+from dataclasses import dataclass
 from datetime import timedelta
-from typing import Dict
+from typing import Dict, Optional, Union
 from uuid import UUID
 
 from pydantic import parse_raw_as
@@ -24,6 +25,16 @@ from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
+
+
+@dataclass
+class HealthStatus:
+    healthy: bool
+    reason: str
+
+    def __str__(self):
+        return self.reason
+
 
 logger = get_logger(__name__)
 
@@ -78,40 +89,67 @@ async def check_shim(instance_id: UUID) -> None:
         ssh_private_key = instance.project.ssh_private_key
         job_provisioning_data = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
 
-        instance_health = instance_healthcheck(ssh_private_key, job_provisioning_data)
+        instance_health: Union[Optional[HealthStatus], bool] = instance_healthcheck(
+            ssh_private_key, job_provisioning_data
+        )
+        if isinstance(instance_health, bool) or instance_health is None:
+            health = HealthStatus(healthy=False, reason="SSH or tunnel error")
+        else:
+            health = instance_health
 
-        logger.debug("check instance %s status: shim health is %s", instance.name, instance_health)
+        if health.healthy:
+            logger.debug("check instance %s status: shim health is OK", instance.name)
+            instance.fail_count = 0
+            instance.fail_reason = None
 
-        if instance_health:
             if instance.status in (InstanceStatus.CREATING, InstanceStatus.STARTING):
                 instance.status = (
                     InstanceStatus.READY if instance.job_id is None else InstanceStatus.BUSY
                 )
                 await session.commit()
         else:
+            logger.debug("check instance %s status: shim health: %s", instance.name, health)
+
+            instance.fail_count += 1
+            instance.fail_reason = health.reason
+
             if instance.status in (InstanceStatus.READY, InstanceStatus.BUSY):
                 logger.warning(
                     "instance %s shim is not available, marked as failed", instance.name
                 )
-                instance.status = InstanceStatus.FAILED
+                FAIL_THRESHOLD = 10 * 6 * 20  # instance_healthcheck fails 20 minutes constantly
+                if instance.fail_count > FAIL_THRESHOLD:
+                    instance.status = InstanceStatus.TERMINATING
+                    logger.warning("mark instance %s as TERMINATED", instance.name)
 
-            STARTING_TIMEOUT = 60 * 3
-            expire_starting = (
-                instance.created + timedelta(seconds=STARTING_TIMEOUT) < get_current_datetime()
-            )
-            if instance.status == InstanceStatus.STARTING and expire_starting:
-                instance.status = InstanceStatus.FAILED
+            if instance.status == InstanceStatus.STARTING and instance.started_at is not None:
+                STARTING_TIMEOUT = 10 * 60  # 10 minutes
+                starting_time_threshold = instance.started_at + timedelta(seconds=STARTING_TIMEOUT)
+                expire_starting = starting_time_threshold < get_current_datetime()
+                if expire_starting:
+                    instance.status = InstanceStatus.TERMINATING
 
             await session.commit()
 
 
 @runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)
-def instance_healthcheck(*, ports: Dict[int, int]) -> bool:
+def instance_healthcheck(*, ports: Dict[int, int]) -> HealthStatus:
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
-    resp = shim_client.healthcheck()
-    if resp is None:
-        return False  # shim is not available yet
-    return resp.service == "dstack-shim"
+    try:
+        resp = shim_client.healthcheck(unmask_exeptions=True)
+
+        if resp is None:
+            return HealthStatus(healthy=False, reason="Unknown reason")
+
+        if resp.service == "dstack-shim":
+            return HealthStatus(healthy=True, reason="Service is OK")
+        else:
+            return HealthStatus(
+                healthy=False,
+                reason=f"Service name is {resp.service}, service version: {resp.version}",
+            )
+    except Exception as e:
+        return HealthStatus(healthy=False, reason=f"Exception ({e.__class__.__name__}): {e}")
 
 
 async def terminate(instance_id: UUID) -> None:
