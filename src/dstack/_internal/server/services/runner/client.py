@@ -12,6 +12,7 @@ from dstack._internal.server.schemas.runner import (
     DockerImageBody,
     HealthcheckResponse,
     PullResponse,
+    StopBody,
     SubmitBody,
 )
 
@@ -107,6 +108,11 @@ class ShimClient:
             self._url("/api/submit"),
             json=post_body,
         )
+        resp.raise_for_status()
+
+    def stop(self, force: bool = False):
+        body = StopBody(force=force)
+        resp = requests.post(self._url("/api/stop"), json=body.dict())
         resp.raise_for_status()
 
     def pull(self):  # TODO return
