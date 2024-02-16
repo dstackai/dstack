@@ -298,14 +298,22 @@ async def get_instance_offers(
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
     tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
-    offers_by_backend = [
-        [
-            (backend, offer)
-            for offer in backend_offers
-            if not exclude_not_available or offer.availability.is_available()
-        ]
-        for backend, backend_offers in zip(backends, await asyncio.gather(*tasks))
-    ]
+    offers_by_backend = []
+    for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
+        if isinstance(result, BaseException):
+            logger.error(
+                "Got exception when requesting offers from backend %s",
+                backend.TYPE,
+                exc_info=result,
+            )
+            continue
+        offers_by_backend.append(
+            [
+                (backend, offer)
+                for offer in result
+                if not exclude_not_available or offer.availability.is_available()
+            ]
+        )
     # Merge preserving order for every backend
     offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)
     # Put NOT_AVAILABLE, NO_QUOTA, and BUSY instances at the end, do not sort by price
