@@ -29,9 +29,7 @@ def get_catalog_offers(
     offers = []
 
     catalog = catalog if catalog is not None else gpuhunt.default_catalog()
-    locs = []
     for item in catalog.query(**asdict(q)):
-        locs.append(item.location)
         if locations is not None and item.location not in locations:
             continue
         offer = catalog_item_to_offer(backend, item, requirements)

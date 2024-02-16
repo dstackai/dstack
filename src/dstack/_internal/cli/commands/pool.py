@@ -1,8 +1,11 @@
 import argparse
 import datetime
+import time
 from pathlib import Path
 from typing import Sequence
 
+from rich.console import Group
+from rich.live import Live
 from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
@@ -31,6 +34,9 @@ from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
 from dstack.api._public.resources import Resources
 from dstack.api.utils import load_profile
+
+REFRESH_RATE_PER_SEC = 5
+LIVE_PROVISION_INTERVAL_SECS = 10
 
 logger = get_logger(__name__)
 
@@ -77,18 +83,24 @@ class PoolCommand(APIBaseCommand):
         delete_parser.set_defaults(subfunc=self._delete)
 
         # show pool instances
-        show_parser = subparsers.add_parser(
-            "show",
+        ps_parser = subparsers.add_parser(
+            "ps",
             help="Show pool instances",
             description="Show instances in the pool",
             formatter_class=self._parser.formatter_class,
         )
-        show_parser.add_argument(
+        ps_parser.add_argument(
             "--pool",
             dest="pool_name",
             help="The name of the pool. If not set, the default pool will be used",
         )
-        show_parser.set_defaults(subfunc=self._show)
+        ps_parser.add_argument(
+            "-w",
+            "--watch",
+            help="Watch instances in realtime",
+            action="store_true",
+        )
+        ps_parser.set_defaults(subfunc=self._ps)
 
         # add instance
         add_parser = subparsers.add_parser(
@@ -196,10 +208,26 @@ class PoolCommand(APIBaseCommand):
         if not result:
             console.print(f"Failed to set default pool {args.pool_name!r}", style="error")
 
-    def _show(self, args: argparse.Namespace) -> None:
-        resp = self.api.client.pool.show(self.api.project, args.pool_name)
-        console.print(f" [bold]Pool name[/]  {resp.name}\n")
-        print_instance_table(resp.instances)
+    def _ps(self, args: argparse.Namespace) -> None:
+        pool_name_template = " [bold]Pool name[/]  {}\n"
+        if not args.watch:
+            resp = self.api.client.pool.show(self.api.project, args.pool_name)
+            console.print(pool_name_template.format(resp.name))
+            console.print(print_instance_table(resp.instances))
+            console.print()
+            return
+
+        try:
+            with Live(console=console, refresh_per_second=REFRESH_RATE_PER_SEC) as live:
+                while True:
+                    resp = self.api.client.pool.show(self.api.project, args.pool_name)
+                    group = Group(
+                        pool_name_template.format(resp.name), print_instance_table(resp.instances)
+                    )
+                    live.update(group)
+                    time.sleep(LIVE_PROVISION_INTERVAL_SECS)
+        except KeyboardInterrupt:
+            pass
 
     def _add(self, args: argparse.Namespace) -> None:
         super()._command(args)
@@ -287,12 +315,12 @@ def print_pool_table(pools: Sequence[Pool], verbose: bool) -> None:
     console.print()
 
 
-def print_instance_table(instances: Sequence[Instance]) -> None:
+def print_instance_table(instances: Sequence[Instance]) -> Table:
     table = Table(box=None)
-    table.add_column("INSTANCE NAME")
+    table.add_column("INSTANCE")
     table.add_column("BACKEND")
     table.add_column("REGION")
-    table.add_column("INSTANCE TYPE")
+    table.add_column("RESOURCES")
     table.add_column("SPOT")
     table.add_column("STATUS")
     table.add_column("PRICE")
@@ -317,8 +345,7 @@ def print_instance_table(instances: Sequence[Instance]) -> None:
         ]
         table.add_row(*row)
 
-    console.print(table)
-    console.print()
+    return table
 
 
 def print_offers_table(
