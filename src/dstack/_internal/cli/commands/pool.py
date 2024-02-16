@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 from typing import Sequence
 
+from rich.console import Group
 from rich.live import Live
 from rich.table import Table
 
@@ -208,9 +209,10 @@ class PoolCommand(APIBaseCommand):
             console.print(f"Failed to set default pool {args.pool_name!r}", style="error")
 
     def _ps(self, args: argparse.Namespace) -> None:
+        pool_name_template = " [bold]Pool name[/]  {}\n"
         if not args.watch:
             resp = self.api.client.pool.show(self.api.project, args.pool_name)
-            console.print(f" [bold]Pool name[/]  {resp.name}\n")
+            console.print(pool_name_template.format(resp.name))
             console.print(print_instance_table(resp.instances))
             console.print()
             return
@@ -219,7 +221,10 @@ class PoolCommand(APIBaseCommand):
             with Live(console=console, refresh_per_second=REFRESH_RATE_PER_SEC) as live:
                 while True:
                     resp = self.api.client.pool.show(self.api.project, args.pool_name)
-                    live.update(print_instance_table(resp.instances))
+                    group = Group(
+                        pool_name_template.format(resp.name), print_instance_table(resp.instances)
+                    )
+                    live.update(group)
                     time.sleep(LIVE_PROVISION_INTERVAL_SECS)
         except KeyboardInterrupt:
             pass
