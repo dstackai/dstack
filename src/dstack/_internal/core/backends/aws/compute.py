@@ -131,7 +131,7 @@ class AWSCompute(Compute):
                 )
                 if subnet_id is None:
                     raise ComputeError(
-                        f"Failed to get subnet for VPC {self.config.vpc_name} in region {instance_offer.region}"
+                        f"Failed to find public subnet for VPC {self.config.vpc_name} in region {instance_offer.region}"
                     )
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             response = ec2.create_instances(
