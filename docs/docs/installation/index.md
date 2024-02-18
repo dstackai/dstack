@@ -12,10 +12,10 @@ Follow this guide to install the open-source version of `dstack` server.
     $ pip install "dstack[all]" -U
     $ dstack server
 
-    Applying configuration from ~/.dstack/server/config.yml...
+    Applying ~/.dstack/server/config.yml...
 
-    The server is running at http://127.0.0.1:3000/
     The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
+    The server is running at http://127.0.0.1:3000/
     ```
     
     </div>
@@ -27,10 +27,10 @@ Follow this guide to install the open-source version of `dstack` server.
     ```shell
     $ docker run -p 3000:3000 -v $HOME/.dstack/server/:/root/.dstack/server dstackai/dstack
 
-    Applying configuration from ~/.dstack/server/config.yml...
+    Applying ~/.dstack/server/config.yml...
 
-    The server is running at http://127.0.0.1:3000/.
     The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
+    The server is running at http://127.0.0.1:3000/.
     ```
         
     </div>
@@ -38,7 +38,7 @@ Follow this guide to install the open-source version of `dstack` server.
 !!! info "NOTE:"
     For flexibility, `dstack` server allows you to configure multiple project. The default project is `main`.
 
-### Configure credentials
+### Configure backends
 
 To let `dstack` run workloads in your cloud account(s), you need to configure cloud credentials 
 in `~/.dstack/server/config.yml` under the `backends` property of the respective project.

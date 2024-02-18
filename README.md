@@ -22,10 +22,9 @@ Orchestrate GPU workloads effortlessly on any cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source toolkit and orchestration engine for running GPU workloads. 
-It's designed for development, training, and deployment of gen AI models on any cloud.
-
-Supported providers: AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, and DataCrunch.
+`dstack` is an open-source engine for running GPU workloads on any cloud.
+It works with a wide range of cloud GPU providers (AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, etc.)
+as well as on-premises servers.
 
 ## Latest news ✨
 
@@ -46,7 +45,7 @@ The easiest way to install the server, is via `pip`:
 pip install "dstack[all]" -U
 ```
 
-### Configure credentials
+### Configure backends
 
 If you have default AWS, GCP, or Azure credentials on your machine, the `dstack` server will pick them up automatically.
 
@@ -63,10 +62,10 @@ To start the server, use the `dstack server` command:
 ```shell
 $ dstack server
 
-Applying configuration from ~/.dstack/server/config.yml...
+Applying ~/.dstack/server/config.yml...
 
-The server is running at http://127.0.0.1:3000/
 The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
+The server is running at http://127.0.0.1:3000/
 ```
 
 </div>
@@ -87,15 +86,16 @@ Dev environments allow you to quickly provision a machine with a pre-configured 
 
 ### Tasks
 
-Tasks make it very easy to run any scripts, be it for training, data processing, or web apps. They allow you to pre-configure the environment, resources, code, etc.
+Tasks are perfect for scheduling all kinds of jobs (e.g., training, fine-tuning, processing data, batch inference, etc.)
+as well as running web applications.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="650"/>
 
 ### Services
 
-Services make it easy to deploy models and apps cost-effectively as public endpoints, allowing you to use any frameworks.
+Services make it very easy to deploy any model or web application as a public endpoint.
 
-<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service.gif" width="650"/>
+<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="650"/>
 
 ## More information
 

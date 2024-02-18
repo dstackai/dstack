@@ -1,9 +1,12 @@
 # Tasks
 
-With `dstack`, you can use the CLI or API to run tasks like training scripts, batch jobs, or web apps. 
-Provide the commands, ports, and choose the Python version or a Docker image.
+Tasks are perfect for scheduling all kinds of jobs (e.g., training, fine-tuning, processing data, batch inference, etc.)
+as well as running web applications.
 
-`dstack` handles the execution on configured cloud GPU provider(s) with the necessary resources.
+[//]: # (TODO: Support multi-node)
+
+You simply specify the commands, required environment, and resources, and then submit it. dstack provisions the required
+resources in a configured backend and runs the task.
 
 ## Using the CLI
 
@@ -31,17 +34,16 @@ resources:
 
 </div>
 
-By default, `dstack` uses its own Docker images to run dev environments, 
-which are pre-configured with Python, Conda, and essential CUDA drivers.
+The YAML file allows you to specify your own Docker image, environment variables, 
+resource requirements, etc.
+If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
 
-!!! info "Configuration options"
-    Configuration file allows you to specify a custom Docker image, ports, environment variables, and many other 
-    options. For more details, refer to the [Reference](../reference/dstack.yml.md#task).
+For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml.md).
 
 ### Run the configuration
 
-To run a configuration, use the `dstack run` command followed by the working directory path, 
-configuration file path, and any other options (e.g., for requesting hardware resources).
+To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
+configuration file path, and other options.
 
 <div class="termy">
 
@@ -65,10 +67,11 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 
 </div>
 
-!!! info "Run options"
-    The `dstack run` command allows you to use specify the spot policy (e.g. `--spot-auto`, `--spot`, or `--on-demand`), 
-    max duration of the run (e.g. `--max-duration 1h`), and many other options.
-    For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
+When `dstack` submits the task, it uses the current folder contents.
+
+!!! info "Exclude files"
+    If there are large files or folders you'd like to avoid uploading, 
+    you can list them in either `.gitignore` or `.dstackignore`.
 
 ### Configure ports
 
@@ -147,33 +150,38 @@ $ dstack run . -f train.dstack.yml --train_batch_size=1 --num_train_epochs=100
 
 The `dstack run` command will pass `--train_batch_size=1` and `--num_train_epochs=100` as arguments to `train.py`.
 
-### Configure retry limit
+### Configure policies
 
-By default, if `dstack` is unable to find capacity, `dstack run` will fail. However, you may
-pass the [`--retry-limit`](../reference/cli/index.md#dstack-run) option to `dstack run` to specify the timeframe in which `dstack` should search for
-capacity and automatically resubmit the run.
+For a run, multiple policies can be configured, such as spot policy, retry policy, max duration, max price, etc.
 
-Example:
+By default, if `dstack` is unable to find capacity, `dstack run` will fail. However, the retry policy
+may be used to let `dstack` re-submit the run automatically until it finds capacity. 
 
-<div class="termy">
+Policies can be configured either via [`dstack run`](../reference/cli/index.md#dstack-run)
+or [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+For more details on policies and their defaults, refer to [`.dstack/profiles.yml`](../reference/profiles.yml.md).
 
-```shell
-$ dstack run . -f train.dstack.yml --retry-limit 3h
-```
+## Manage runs
 
-</div>
+### Stop a run
 
-For more details on the `dstack run` command, refer to the [Reference](../reference/cli/index.md#dstack-run).
+Once the run exceeds the max duration,
+or when you use [`dstack stop`](../reference/cli/index.md#dstack-stop), 
+the task and its cloud resources are deleted.
+
+### List runs 
+
+The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
+
+[//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
 
 ## Using the API
 
 Submitting and managing tasks is also possible programmatically via the [Python API](../reference/api/python/index.md) or 
 [REST API](../reference/api/rest/index.md).
 
-## What's next?
-
-1. Check the [QLoRA](../../examples/qlora.md) example
-2. Read about [dev environments](../concepts/dev-environments.md) 
-    and [services](../concepts/services.md)
-3. Browse [examples](../../examples/index.md)
-4. Check the [reference](../reference/dstack.yml.md#task)
+!!! info "What's next?"
+    1. Check the [QLoRA](../../examples/qlora.md) example
+    2. Read about [dev environments](../concepts/dev-environments.md) and [services](../concepts/services.md)
+    3. Browse [examples](../../examples/index.md)
+    4. Check the [reference](../reference/dstack.yml.md)

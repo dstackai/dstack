@@ -1,5 +1,14 @@
 # Quickstart
 
+??? info "Set up the CLI"
+    To use the open-source version, make sure to [install the server](installation/index.md) and configure backends.
+
+    To use the cloud version, install the CLI and run the `dstack config` command:
+    
+    ![](../../assets/images/dstack-cloud-config.png){ width=800 }
+
+    Once the CLI is set up, follow the quickstart.
+
 ## Initialize a repo
 
 To use `dstack`'s CLI in a folder, first run [`dstack init`](reference/cli/index.md#dstack-init) within that folder.
@@ -120,9 +129,8 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 The `dstack run` command automatically uploads your code, including any local uncommitted changes. 
 To exclude any files from uploading, use `.gitignore`.
 
-## What's next?
-
-1. Learn more about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
-    and [services](concepts/services.md)
-2. Browse [examples](../examples/index.md)
-3. Join the [Discord server](https://discord.gg/u8SmfwPpMd)
+!!! info "What's next?"
+    1. Read about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
+        and [services](concepts/services.md)
+    2. Browse [examples](../examples/index.md)
+    3. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

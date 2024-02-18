@@ -1,10 +1,10 @@
 # Dev environments
 
-Before submitting a long-running task or deploying a model, you may want to experiment 
-interactively using your IDE, terminal, or Jupyter notebooks.
+Before submitting a task or deploying a model, you may want to run code interactively.
+Dev environments allow you to do exactly that. 
 
-With `dstack`, you can provision a dev environment with the required cloud resources, 
-code, and environment via a single command.
+You just specify the required environment, resources, and run it. `dstack` provisions the dev environment
+in a configured backend.
 
 ## Define a configuration
 
@@ -18,6 +18,7 @@ type: dev-environment
 
 # Use either `python` or `image` to configure environment
 python: "3.11"
+
 # image: ghcr.io/huggingface/text-generation-inference:latest
 
 ide: vscode
@@ -29,15 +30,16 @@ resources:
 
 </div>
 
-!!! info "Configuration options"
-    You can specify your own Docker image, configure environment variables, etc.
-    If no image is specified, `dstack` uses its own Docker image (pre-configured with Python, Conda, and essential CUDA drivers).
-    For more details, refer to the [Reference](../reference/dstack.yml.md#dev-environment).
+The YAML file allows you to specify your own Docker image, environment variables, 
+resource requirements, etc.
+If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
+
+For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml.md).
 
 ## Run the configuration
 
-To run a configuration, use the `dstack run` command followed by the working directory path, 
-configuration file path, and any other options (e.g., for requesting hardware resources).
+To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
+configuration file path, and other options.
 
 <div class="termy">
 
@@ -51,7 +53,7 @@ $ dstack run . -f .dstack.yml
  
 Continue? [y/n]: y
 
-Provisioning...
+Provisioning `fast-moth-1`...
 ---> 100%
 
 To open in VS Code Desktop, use this link:
@@ -60,28 +62,55 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
-!!! info "Run options"
-    The `dstack run` command allows you to use specify the spot policy (e.g. `--spot-auto`, `--spot`, or `--on-demand`), 
-    max duration of the run (e.g. `--max-duration 1h`), and many other options.
-    For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
+When `dstack` provisions the dev environment, it uses the current folder contents.
 
-Once the dev environment is provisioned, click the link to open the environment in your desktop IDE.
+!!! info "Exclude files"
+    If there are large files or folders you'd like to avoid uploading, 
+    you can list them in either `.gitignore` or `.dstackignore`.
+
+### IDE
+
+To open the dev environment in your desktop IDE, use the link from the output 
+(such as `vscode://vscode-remote/ssh-remote+fast-moth-1/workflow`).
 
 ![](../../assets/images/dstack-vscode-jupyter.png){ width=800 }
 
-!!! info "Port forwarding"
-    When running a dev environment, `dstack` forwards the remote ports to `localhost` for secure 
-    and convenient access.
+### SSH
 
-No need to worry about copying code, setting up environment, IDE, etc. `dstack` handles it all 
-automatically.
+Alternatively, you can connect to the dev environment via SSH:
 
-??? info ".gitignore"
-    When running a dev environment, `dstack` uses the exact version of code from your project directory. 
+<div class="termy">
 
-    If there are large files, consider creating a `.gitignore` file to exclude them for better performance.
+```shell
+$ ssh fast-moth-1
+```
+
+</div>
+
+## Configure policies
+
+For a run, multiple policies can be configured, such as spot policy, retry policy, max duration, max price, etc.
+
+Policies can be configured either via [`dstack run`](../reference/cli/index.md#dstack-run)
+or [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+For more details on policies and their defaults, refer to [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+
+## Manage runs
+
+### Stop a run
+
+Once the run exceeds the max duration,
+or when you use [`dstack stop`](../reference/cli/index.md#dstack-stop), 
+the dev environment and its cloud resources are deleted.
+
+### List runs 
+
+The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
+
+[//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
 
 ## What's next?
 
-1. Browse [examples](../../examples/index.md)
-2. Check the [reference](../reference/dstack.yml.md#dev-environment)
+1. Check out [`.dstack.yml`](../reference/dstack.yml.md), [`dstack run`](../reference/cli/index.md#dstack-run),
+    and [`profiles.yml`](../reference/profiles.yml.md)
+2. Read about [tasks](tasks.md) and [services](tasks.md)
