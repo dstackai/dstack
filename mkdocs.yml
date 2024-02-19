@@ -201,18 +201,19 @@ nav:
               - REST API: docs/reference/api/rest/index.md
   - Examples:
     - examples/index.md
-    - LLMs:
-        - Mixtral 8x7B: examples/mixtral.md
-    - Fine-tuning:
-        - QLoRA: examples/qlora.md
     - Deployment:
         - Text Generation Inference: examples/tgi.md
         - vLLM: examples/vllm.md
+        - Ollama: examples/ollama.md
         - Text Embedding Interface: examples/tei.md
         - SDXL: examples/sdxl.md
         - Infinity: examples/infinity.md
+    - Fine-tuning:
+        - QLoRA: examples/qlora.md
     - RAG:
         - Llama Index: examples/llama-index.md
+    - LLMs:
+        - Mixtral 8x7B: examples/mixtral.md
   - Changelog:
       - changelog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd

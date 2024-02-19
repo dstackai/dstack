@@ -131,20 +131,22 @@ to access the model at `https://gateway.<gateway domain>` via the OpenAI-compati
 ```python
 from openai import OpenAI
 
-
-client = OpenAI(
-  base_url="https://gateway.example.com",
-  api_key="<dstack token>"
-)
+client = OpenAI(base_url="https://gateway.<gateway domain>", api_key="<dstack token>")
 
 completion = client.chat.completions.create(
-  model="mistralai/Mixtral-8x7B-Instruct-v0.1",
-  messages=[
-    {"role": "user", "content": "Compose a poem that explains the concept of recursion in programming."}
-  ]
+    model="mistralai/Mixtral-8x7B-Instruct-v0.1",
+    messages=[
+        {
+            "role": "user",
+            "content": "Compose a poem that explains the concept of recursion in programming.",
+        }
+    ],
+    stream=True,
 )
 
-print(completion.choices[0].message)
+for chunk in completion:
+    print(chunk.choices[0].delta.content, end="")
+print()
 ```
 
 ??? info "Hugging Face Hub token"

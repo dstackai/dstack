@@ -498,7 +498,7 @@ If regions aren't specified, `dstack` will use all available regions.
 
 After you update `~/.dstack/server/config.yml`, make sure to restart the server.
 
-## Set up the client
+## Set up the CLI
 
 The client is configured via `~/.dstack/config.yml` with the server address, user token, and
 the project name. 

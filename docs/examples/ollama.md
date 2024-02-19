@@ -1,32 +1,33 @@
-# vLLM
+# Ollama
 
-This example demonstrates how to use [vLLM](https://vllm.ai/) with `dstack`'s [services](../docs/concepts/services.md) to deploy LLMs.
+This example demonstrates how to use [Ollama](https://ollama.com/) with `dstack`'s [services](../docs/concepts/services.md) to deploy LLMs.
 
 ## Define the configuration
 
 To deploy an LLM as a service using vLLM, you have to define the following configuration file:
 
-<div editor-title="deployment/vllm/serve.dstack.yml"> 
+<div editor-title="deployment/ollama/serve.dstack.yml"> 
 
 ```yaml
 type: service
 
-python: "3.11"
-env:
-  - MODEL=NousResearch/Llama-2-7b-chat-hf
+image: ollama/ollama
 commands:
-  - pip install vllm
-  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
-port: 8000
+  - ollama serve &
+  - sleep 3
+  - ollama pull mixtral
+  - fg
+port: 11434
 
 resources:
-  gpu: 24GB
+  gpu: 48GB..80GB
 
 # (Optional) Enable the OpenAI-compatible endpoint
 model:
-  format: openai
   type: chat
-  name: NousResearch/Llama-2-7b-chat-hf
+  name: mixtral
+  format: openai
+
 ```
 
 </div>
@@ -40,7 +41,7 @@ model:
 <div class="termy">
 
 ```shell
-$ dstack run . -f deployment/vllm/serve.dstack.yml
+$ dstack run . -f deployment/ollama/serve.dstack.yml
 ```
 
 </div>
@@ -77,7 +78,7 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="https://gateway.<gateway domain>", 
-    api_key="<dstack token>"
+    api_key="<dstack token>",
 )
 
 completion = client.chat.completions.create(
@@ -114,7 +115,7 @@ print()
 The complete, ready-to-run code is available in [`dstackai/dstack-examples`](https://github.com/dstackai/dstack-examples).
 
 !!! info "What's next?"
-    1. Check the [Text Generation Inference](tgi.md) example
+    1. Check the [vLLM](vllm.md) and [Text Generation Inference](tgi.md) examples
     2. Read about [services](../docs/concepts/services.md)
     3. Browse [examples](index.md)
     4. Join the [Discord server](https://discord.gg/u8SmfwPpMd)
