@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import (
+    BackendError,
     BackendInvalidCredentialsError,
     BackendNotAvailable,
     ResourceExistsError,
@@ -300,7 +301,14 @@ async def get_instance_offers(
     tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
     offers_by_backend = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
-        if isinstance(result, BaseException):
+        if isinstance(result, BackendError):
+            logger.warning(
+                "Failed to get offers from backend %s: %s",
+                backend.TYPE,
+                repr(result),
+            )
+            continue
+        elif isinstance(result, BaseException):
             logger.error(
                 "Got exception when requesting offers from backend %s",
                 backend.TYPE,
