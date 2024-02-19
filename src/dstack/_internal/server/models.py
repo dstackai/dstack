@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import false
@@ -292,7 +293,7 @@ class InstanceModel(BaseModel):
     )
 
     # connection fail handling
-    fail_count: Mapped[int] = mapped_column(Integer, default=0)
+    fail_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
     fail_reason: Mapped[Optional[str]] = mapped_column(String(4000))
 
     # backend
