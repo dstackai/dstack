@@ -195,15 +195,10 @@ async def _run_job(
     if run.run_spec.profile.backends is not None:
         backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
 
-    try:
-        requirements = job.job_spec.requirements
-        offers = await backends_services.get_instance_offers(
-            backends, requirements, exclude_not_available=True
-        )
-    except BackendError as e:
-        logger.warning(*job_log("failed to get instance offers: %s", job_model, repr(e)))
-        return (None, None)
-
+    requirements = job.job_spec.requirements
+    offers = await backends_services.get_instance_offers(
+        backends, requirements, exclude_not_available=True
+    )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
     for backend, offer in offers[:15]:
@@ -235,6 +230,17 @@ async def _run_job(
                     offer.backend.value,
                     offer.region,
                     repr(e),
+                )
+            )
+            continue
+        except Exception:
+            logger.exception(
+                *job_log(
+                    "got exception when launching %s in %s/%s",
+                    job_model,
+                    offer.instance.name,
+                    offer.backend.value,
+                    offer.region,
                 )
             )
             continue
