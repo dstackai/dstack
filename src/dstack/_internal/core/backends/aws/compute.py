@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import boto3
 import botocore.client
@@ -114,25 +114,11 @@ class AWSCompute(Compute):
             {"Key": "dstack_user", "Value": run.user},
         ]
         try:
-            subnet_id = None
-            vpc_id = None
-            if self.config.vpc_name is not None:
-                vpc_id = aws_resources.get_vpc_id_by_name(
-                    ec2_client=ec2_client,
-                    vpc_name=self.config.vpc_name,
-                )
-                if vpc_id is None:
-                    raise ComputeError(
-                        f"No VPC named {self.config.vpc_name} in region {instance_offer.region}"
-                    )
-                subnet_id = aws_resources.get_subnet_id_for_vpc(
-                    ec2_client=ec2_client,
-                    vpc_id=vpc_id,
-                )
-                if subnet_id is None:
-                    raise ComputeError(
-                        f"Failed to find public subnet for VPC {self.config.vpc_name} in region {instance_offer.region}"
-                    )
+            vpc_id, subnet_id = _get_vpc_id_subnet_id_or_error(
+                ec2_client=ec2_client,
+                vpc_name=self.config.vpc_name,
+                region=instance_offer.region,
+            )
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             response = ec2.create_instances(
                 **aws_resources.create_instances_struct(
@@ -168,7 +154,6 @@ class AWSCompute(Compute):
             instance = response[0]
             instance.wait_until_running()
             instance.reload()  # populate instance.public_ip_address
-
             if instance_offer.instance.resources.spot:  # it will not terminate the instance
                 ec2_client.cancel_spot_instance_requests(
                     SpotInstanceRequestIds=[instance.spot_instance_request_id]
@@ -212,7 +197,8 @@ class AWSCompute(Compute):
                 user_data=get_gateway_user_data(ssh_key_pub),
                 tags=tags,
                 security_group_id=aws_resources.create_gateway_security_group(
-                    ec2_client, project_id
+                    ec2_client=ec2_client,
+                    project_id=project_id,
                 ),
                 spot=False,
             )
@@ -220,7 +206,6 @@ class AWSCompute(Compute):
         instance = response[0]
         instance.wait_until_running()
         instance.reload()  # populate instance.public_ip_address
-
         return LaunchedGatewayInfo(
             instance_id=instance.instance_id,
             region=region,
@@ -241,3 +226,30 @@ def _supported_instances(offer: InstanceOffer) -> bool:
         if offer.instance.name.startswith(family):
             return True
     return False
+
+
+def _get_vpc_id_subnet_id_or_error(
+    ec2_client: botocore.client.BaseClient,
+    vpc_name: Optional[str],
+    region: str,
+) -> Tuple[str, str]:
+    if vpc_name is not None:
+        vpc_id = aws_resources.get_vpc_id_by_name(
+            ec2_client=ec2_client,
+            vpc_name=vpc_name,
+        )
+        if vpc_id is None:
+            raise ComputeError(f"No VPC named {vpc_name} in region {region}")
+    else:
+        vpc_id = aws_resources.get_default_vpc_id(ec2_client=ec2_client)
+        if vpc_id is None:
+            raise ComputeError(f"No default VPC in region {region}")
+    subnet_id = aws_resources.get_subnet_id_for_vpc(
+        ec2_client=ec2_client,
+        vpc_id=vpc_id,
+    )
+    if subnet_id is not None:
+        return vpc_id, subnet_id
+    if vpc_name is not None:
+        raise ComputeError(f"Failed to find public subnet for VPC {vpc_name} in region {region}")
+    raise ComputeError(f"Failed to find public subnet for default VPC in region {region}")

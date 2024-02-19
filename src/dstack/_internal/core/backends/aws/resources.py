@@ -308,6 +308,13 @@ def get_vpc_id_by_name(
     return response["Vpcs"][0]["VpcId"]
 
 
+def get_default_vpc_id(ec2_client: botocore.client.BaseClient) -> Optional[str]:
+    response = ec2_client.describe_vpcs(Filters=[{"Name": "isDefault", "Values": ["true"]}])
+    if "Vpcs" in response and len(response["Vpcs"]) > 0:
+        return response["Vpcs"][0]["VpcId"]
+    return None
+
+
 def get_subnet_id_for_vpc(
     ec2_client: botocore.client.BaseClient,
     vpc_id: str,
@@ -318,7 +325,10 @@ def get_subnet_id_for_vpc(
     # Return first public subnet
     for subnet in subnets:
         subnet_id = subnet["SubnetId"]
-        if _is_public_subnet(ec2_client=ec2_client, subnet_id=subnet_id):
+        is_public_subnet = _is_public_subnet(
+            ec2_client=ec2_client, vpc_id=vpc_id, subnet_id=subnet_id
+        )
+        if is_public_subnet:
             return subnet_id
     return None
 
@@ -333,10 +343,13 @@ def _get_subnets_by_vpc_id(
 
 def _is_public_subnet(
     ec2_client: botocore.client.BaseClient,
+    vpc_id: str,
     subnet_id: str,
 ) -> bool:
     # Public subnet – The subnet has a direct route to an internet gateway.
     # Private subnet – The subnet does not have a direct route to an internet gateway.
+
+    # Check explicitly associated route tables
     response = ec2_client.describe_route_tables(
         Filters=[{"Name": "association.subnet-id", "Values": [subnet_id]}]
     )
@@ -344,4 +357,22 @@ def _is_public_subnet(
         for route in route_table["Routes"]:
             if "GatewayId" in route and route["GatewayId"].startswith("igw-"):
                 return True
+
+    # Main route table controls the routing of all subnetes
+    # that are not explicitly associated with any other route table.
+    if len(response["RouteTables"]) > 0:
+        return False
+
+    # Check implicitly associated main route table
+    response = ec2_client.describe_route_tables(
+        Filters=[
+            {"Name": "association.main", "Values": ["true"]},
+            {"Name": "vpc-id", "Values": [vpc_id]},
+        ]
+    )
+    for route_table in response["RouteTables"]:
+        for route in route_table["Routes"]:
+            if "GatewayId" in route and route["GatewayId"].startswith("igw-"):
+                return True
+
     return False
