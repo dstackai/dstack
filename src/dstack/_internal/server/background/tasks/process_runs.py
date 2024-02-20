@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import itertools
 import uuid
 from typing import Iterable, List, Tuple
@@ -15,9 +16,11 @@ from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
 )
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+PROCESSING_INTERVAL = datetime.timedelta(seconds=5)
 
 
 async def process_runs():
@@ -25,8 +28,8 @@ async def process_runs():
         async with PROCESSING_RUNS_LOCK:
             res = await session.execute(
                 sa.select(RunModel).where(
-                    # TODO(egor-s): filter by processing_finished flag
-                    # TODO(egor-s): filter by last_processed_at
+                    RunModel.processing_finished == False,
+                    RunModel.last_processed_at < get_current_datetime() - PROCESSING_INTERVAL,
                     RunModel.id.not_in(PROCESSING_RUNS_IDS),
                 )
             )
@@ -70,7 +73,7 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
         else:
             raise ValueError(f"Unexpected run status {run.status}")
 
-        # TODO(egor-s) update run.last_processed_at
+        run.last_processed_at = get_current_datetime()
         await session.commit()
 
     return run_id
@@ -152,7 +155,7 @@ async def process_finished_run(session: AsyncSession, run: RunModel):
             job.status = JobStatus.TERMINATED
             # TODO(egor-s): set job.error_code
     # TODO(egor-s): unregister the service
-    # TODO(egor-s): set run.processing_finished flag
+    run.processing_finished = True
 
 
 def group_jobs_by_replica_latest(
@@ -165,12 +168,8 @@ def group_jobs_by_replica_latest(
     Yields:
         latest replicas (replica_num, submission_num, jobs)
     """
-    jobs = sorted(
-        jobs, key=lambda j: (1111, j.submission_num, j.job_num)
-    )  # TODO(egor-s): use j.replica_num
-    for replica_num, all_replica_jobs in itertools.groupby(
-        jobs, key=lambda j: 1111
-    ):  # TODO(egor-s): use j.replica_num
+    jobs = sorted(jobs, key=lambda j: (j.replica_num, j.submission_num, j.job_num))
+    for replica_num, all_replica_jobs in itertools.groupby(jobs, key=lambda j: j.replica_num):
         # take only the latest submission
         # all_replica_jobs is not empty by design, but we need to initialize the variables
         submission_num, replica_jobs = -1, []

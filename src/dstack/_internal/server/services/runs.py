@@ -279,15 +279,17 @@ async def submit_run(
 
     pool = await get_or_create_pool_by_name(session, project, run_spec.profile.pool_name)
 
+    submitted_at = common_utils.get_current_datetime()
     run_model = RunModel(
         id=uuid.uuid4(),
         project_id=project.id,
         repo_id=repo.id,
         user=user,
         run_name=run_spec.run_name,
-        submitted_at=common_utils.get_current_datetime(),
+        submitted_at=submitted_at,
         status=JobStatus.SUBMITTED,
         run_spec=run_spec.json(),
+        last_processed_at=submitted_at,
     )
     session.add(run_model)
 
@@ -324,6 +326,7 @@ def create_job_model_for_new_submission(
         run_name=run_model.run_name,
         job_num=job.job_spec.job_num,
         job_name=job.job_spec.job_name,
+        replica_num=0,  # TODO(egor-s): replace with actual replica number
         submission_num=len(job.job_submissions),
         submitted_at=now,
         last_processed_at=now,

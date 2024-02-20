@@ -169,9 +169,8 @@ class RunModel(BaseModel):
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
     run_spec: Mapped[str] = mapped_column(String(4000))
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="run", lazy="selectin")
-
-    # TODO(egor-s): add last_processed_at
-    # TODO(egor-s): add done or finished flag
+    last_processed_at: Mapped[datetime] = mapped_column(DateTime)
+    processing_finished: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class JobModel(BaseModel):
@@ -200,7 +199,7 @@ class JobModel(BaseModel):
     remove_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
-    # TODO(egor-s): add replica_num
+    replica_num: Mapped[Optional[int]] = mapped_column(Integer)
 
 
 class GatewayModel(BaseModel):

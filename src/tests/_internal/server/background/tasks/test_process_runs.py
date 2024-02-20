@@ -70,15 +70,15 @@ class TestProcessRuns:
     @pytest.mark.asyncio
     async def test_terminate_run_jobs(self, test_db, session: AsyncSession, run: RunModel):
         run.status = JobStatus.TERMINATED
-        # TODO(egor-s): set run.processing_finished
+        run.processing_finished = False
         job = await create_job(session=session, run=run, status=JobStatus.RUNNING)
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATED
         # TODO(egor-s): assert job.error_code
-        # await session.refresh(run)
-        # TODO(egor-s): assert run.processing_finished is True
+        await session.refresh(run)
+        assert run.processing_finished is True
 
     # TODO(egor-s): test_running_to_pending
     # TODO(egor-s): test_running_to_failed

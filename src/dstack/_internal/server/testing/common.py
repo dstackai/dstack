@@ -188,6 +188,7 @@ async def create_run(
         run_name=run_name,
         status=status,
         run_spec=run_spec.json(),
+        last_processed_at=submitted_at,
     )
     session.add(run)
     await session.commit()
@@ -204,6 +205,8 @@ async def create_job(
     error_code: Optional[JobErrorCode] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
     instance: Optional[InstanceModel] = None,
+    job_num: int = 0,
+    replica_num: int = 0,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = get_job_specs_from_run_spec(run_spec)[0]
@@ -211,9 +214,9 @@ async def create_job(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
-        job_num=0,  # TODO(egor-s): make configurable
+        job_num=job_num,
         job_name=run.run_name + "-0",
-        # TODO(egor-s): add replica_num
+        replica_num=replica_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
         last_processed_at=last_processed_at,
