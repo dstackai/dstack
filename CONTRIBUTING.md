@@ -1,52 +1,30 @@
-# dstack contributing guide
+# Contributing to `dstack`
 
-## Development setup
+## 1. Set up your development environment
 
-1. Clone the repo:
-    ```
-    git clone https://github.com/dstackai/dstack && cd dstack
-    ```
-2. (Recommended) Create a virtual environment:
-    ```
-    python3 -m venv venv
-    ```
-    ```
-    source venv/bin/activate
-    ```
-3. Install `dstack` in editable mode:
-    ```
-    pip install -e '.[all]'
-    ```
-4. Install dev dependencies:
-    ```
-    pip install -r requirements_dev.txt
-    ```
-5. (Recommended) Install pre-commits:
-    ```
-    pre-commit install
-    ```
+Follow [contributing/DEVELOPMENT.md](contributing/DEVELOPMENT.md)
 
-## Contributing process
+## 2. Follow the contribution process
 
-1. Look for an existing issue or create a new one.
-2. Fork the repo.
-3. Commit your changes.
-4. Open a PR. [Link the PR to the issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue) if you are solving one.
+1. Look for an [existing issue](https://github.com/dstackai/dstack/issues) or create a [new one](https://github.com/dstackai/dstack/issues/new/choose)
+2. Fork the repo
+3. Commit your changes
+4. Open a PR. [Link the PR to the issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue) (if you are solving one).
 
-## Making changes
+### 2.1 Before pushing your changes
 
 We use [`ruff`](https://docs.astral.sh/ruff/) to format Python code and to sort Python imports. Before committing your changes, run:
 
 1. `ruff --fix src`
 2. `ruff format src`
 
+> There are also helper pre-commits installed for [`ruff`](https://docs.astral.sh/ruff/integrations/#pre-commit) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
 
-There are also helper pre-commits installed for [`ruff`](https://docs.astral.sh/ruff/integrations/#pre-commit) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
+## 3. Add a new backend
 
-## Adding a new backend
+If you'd like to integrate `dstack` with a new cloud 
+provider, follow [contributing/BACKENDS.md](contributing/BACKENDS.md).
 
-Visit [How to add a backend](https://github.com/dstackai/dstack/wiki/How-to-add-a-backend) wiki page to learn how to add a new backend.
+## 4. Share feedback
 
-## P.S.
-
-Feel free to open an issue if you have difficulties contributing to `dstack`.
+Feel free to open an [issue](https://github.com/dstackai/dstack/issues) if you encounter any difficulties contributing to `dstack`.
