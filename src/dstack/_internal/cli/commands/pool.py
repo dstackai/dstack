@@ -243,15 +243,22 @@ class PoolCommand(APIBaseCommand):
             shm_size=args.shared_memory,
             disk=args.disk,
         )
-        requirements = Requirements(
-            resources=resources,
-            max_price=args.max_price,
-            spot=(args.spot_policy == SpotPolicy.SPOT),  # TODO(egor-s): None if SpotPolicy.AUTO
-        )
 
         profile = load_profile(Path.cwd(), args.profile)
         apply_profile_args(args, profile)
         profile.pool_name = args.pool_name
+
+        spot = None
+        if profile.spot_policy == SpotPolicy.SPOT:
+            spot = True
+        if profile.spot_policy == SpotPolicy.ONDEMAND:
+            spot = False
+
+        requirements = Requirements(
+            resources=resources,
+            max_price=args.max_price,
+            spot=spot,
+        )
 
         idle_duration = parse_max_duration(args.idle_duration)
         if idle_duration is None:
@@ -383,7 +390,6 @@ def print_offers_table(
     #     else "no"
     # )
 
-    # TODO: improve spot policy
     if requirements.spot is None:
         spot_policy = "auto"
     elif requirements.spot:
