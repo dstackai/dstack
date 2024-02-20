@@ -14,13 +14,17 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
+    LaunchedInstanceInfo,
     Resources,
+    SSHKey,
 )
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
-from dstack._internal.core.models.runs import JobSpec, JobStatus, RunSpec
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
+from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.runs import JobSpec, JobStatus, Requirements, RunSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.schemas.runs import CreateInstanceRequest
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_job,
@@ -734,3 +738,88 @@ class TestDeleteRuns:
         assert len(res.scalars().all()) == 1
         res = await session.execute(select(JobModel))
         assert len(res.scalars().all()) == 1
+
+
+class TestCreateInstance:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        response = client.post(
+            f"/api/project/{project.name}/runs/create_instance",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_create_instance(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        request = CreateInstanceRequest(
+            pool_name=DEFAULT_POOL_NAME,
+            profile=Profile(name="test_profile"),
+            requirements=Requirements(resources=ResourcesSpec(cpu=1)),
+            ssh_key=SSHKey(public="test_public_key"),
+        )
+
+        with patch(
+            "dstack._internal.server.services.runs.get_run_plan_by_requirements"
+        ) as run_plan_by_req:
+            offers = InstanceOfferWithAvailability(
+                backend=BackendType.AWS,
+                instance=InstanceType(
+                    name="instance",
+                    resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                ),
+                region="eu",
+                price=1.0,
+                availability=InstanceAvailability.AVAILABLE,
+            )
+            instance_info = LaunchedInstanceInfo(
+                instance_id="test_instance",
+                region="eu",
+                ip_address="127.0.0.1",
+                username="ubuntu",
+                ssh_port=22,
+                dockerized=False,
+            )
+            backend = Mock()
+            backend.compute.return_value.get_offers.return_value = [offers]
+            backend.compute.return_value.create_instance.return_value = instance_info
+            backend.TYPE = BackendType.AWS
+            run_plan_by_req.return_value = [(backend, offers)]
+
+            response = client.post(
+                f"/api/project/{project.name}/runs/create_instance",
+                headers=get_auth_headers(user.token),
+                json=request.dict(),
+            )
+            assert response.status_code == 200
+
+            result = response.json()
+            expected = {
+                "backend": "aws",
+                "instance_type": {
+                    "name": "instance",
+                    "resources": {
+                        "cpus": 1,
+                        "memory_mib": 512,
+                        "gpus": [],
+                        "spot": False,
+                        "disk": {"size_mib": 102400},
+                        "description": "",
+                    },
+                },
+                "name": result["name"],
+                "job_name": None,
+                "job_status": None,
+                "hostname": "127.0.0.1",
+                "status": "starting",
+                "created": result["created"],
+                "region": "eu",
+                "price": 1.0,
+            }
+            assert result == expected

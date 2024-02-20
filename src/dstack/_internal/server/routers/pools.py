@@ -110,7 +110,7 @@ async def show_pool(
 async def add_instance(
     body: AddRemoteInstanceRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ) -> bool:
     _, project = user_project
     result = await pools.add_remote(

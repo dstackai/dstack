@@ -63,7 +63,7 @@ class TestProcessFinishedJobs:
                 ssh_proxy=None,
             ),
         )
-        with patch(f"{MODULE}.terminate_job_provisioning_data_instance"):
+        with patch("dstack._internal.server.background.tasks.process_finished_jobs.submit_stop"):
             await process_finished_jobs()
         await session.refresh(job)
         assert job is not None
