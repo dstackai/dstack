@@ -18,7 +18,7 @@ from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
-    DEFAULT_TERMINATION_IDLE_TIME,
+    DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
     ProfileRetryPolicy,
@@ -394,7 +394,7 @@ class RunCollection:
         instance_name: Optional[str] = None,
         creation_policy: Optional[CreationPolicy] = None,
         termination_policy: Optional[TerminationPolicy] = None,
-        termination_policy_idle: int = DEFAULT_TERMINATION_IDLE_TIME,
+        termination_policy_idle: int = DEFAULT_RUN_TERMINATION_IDLE_TIME,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`

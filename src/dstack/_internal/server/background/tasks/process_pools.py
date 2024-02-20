@@ -115,7 +115,7 @@ async def check_shim(instance_id: UUID) -> None:
 
             if instance.status in (InstanceStatus.READY, InstanceStatus.BUSY):
                 logger.warning(
-                    "instance %s shim is not available, marked as failed", instance.name
+                    "instance %s: shim has become unavailable, marked as failed", instance.name
                 )
                 FAIL_THRESHOLD = 10 * 6 * 20  # instance_healthcheck fails 20 minutes constantly
                 if instance.fail_count > FAIL_THRESHOLD:

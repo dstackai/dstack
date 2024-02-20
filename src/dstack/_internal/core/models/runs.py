@@ -227,7 +227,6 @@ class InstanceStatus(str, Enum):
     BUSY = "busy"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
-    FAILED = "failed"
 
     @property
     def finished_statuses(cls) -> Sequence["InstanceStatus"]:
