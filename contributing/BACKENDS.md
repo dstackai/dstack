@@ -1,96 +1,165 @@
-# How to add a new backend
+# How to add a Backend to dstack.ai
+## Introduction
 
-## Overview
+Welcome to the Integration Guide for adding a backend by intergrating new cloud providers to gpuhunt and extending the capabilities of dstack.<br> 
+This document is designed to assist developers and contributors in integrating additional cloud computing resources into dstack.
+
+
+## Overview of Steps
 
 1. Add cloud provider to `gpuhunt`
-    1. Add `src/gpuhunt/providers/<name>.py`
-    2. Define class attribute `NAME` and implement
-2. Add Backend, Compute, and configuration models in `dstack`
+2. Integrating a Cloud Provider into dstackai/dstack
 
-## dstackai/gpuhunt
+## Adding a cloud provider to dstackai/gpuhunt
+To integrate a new cloud provider into `gpuhunt`, follow these steps:
 
-Clone and open https://github.com/dstackai/gpuhunt. Create `<YourName>Provider` class
-in `src/gpuhunt/providers/<yourprovider>.py`.
+1. **Clone the Repository**: Start by cloning the `gpuhunt` repository from GitHub:
+```bash
+https://github.com/dstackai/gpuhunt.git
+```
+ 2. **Create the Provider Class**: Navigate to the `providers` directory and create a new Python file for your provider:
+- Path: `src/gpuhunt/providers/<yourprovider>.py`
+- Replace `<yourprovider>` with the name of your cloud provider.
 
-Your class must inherit `AbstractProvider`, have `NAME` class variable, and implement `get` method. Use
-optional `query_filter` to speed up the query. Use `balance_resources` if your backend provides fine-grained control on
-resources like RAM and CPU to prevent under-optimal configurations (i.e., A100 80GB with 1 GB of RAM).
+3. **Implement the Provider Class**: Your class should meet the following criteria:
 
-`get` method is called during catalog generation for `offline` providers and every query for `online` providers.
+- **Inherit from `AbstractProvider`**: Ensure your class extends the `AbstractProvider` base class.
+  ```python
+  from gpuhunt.providers import AbstractProvider
 
-> There are two types of providers in `gpuhunt`:
->1. `offline` — providers that take a lot of time to get all offers. A catalog is precomputed and stored as csv file
->2. `online` — providers that take a few seconds to get all offers. A catalog is computed in a real-time as needed
+  class <YourName>Provider(AbstractProvider):
+  ```
 
-If your provider is `offline`, also add data quality tests to `src/integrity_tests/test_<yourprovider>.py` to verify
-generated csv files before publication.
+- **Define the `NAME` Class Variable**: This should be a unique identifier for your provider.
 
-## dstackai/dstack
+  ```python
+  NAME = 'your_provider_name'
+  ```
 
-Clone and open https://github.com/dstackai/dstack. Follow `CONTRIBUTING.md` to setup your environment.
+- **Implement the `get` Method**: This method is responsible for fetching the available GPU resources from your cloud provider. Implement it according to the `AbstractProvider` interface.
 
-Add your dependencies to `setup.py` in a separate `<yourprovider>` section. Also, update `all` section.
+  ```python
+  def get(self, query_filter=None):
+      # Implementation here
+  ```
+- **Utilize `query_filter`**: (Optional) Use this parameter to speed up the query process by filtering results early on.
 
-Add a new enum entry `BackendType.<YourBackend>` at `src/dstack/_internal/core/models/backends/base.py`.
+- **Apply `balance_resources`**: If your backend offers detailed control over resources (like RAM and CPU), use this method to prevent configurations that are not optimal, such as pairing a high-end GPU with insufficient RAM.
 
-Create `src/dstack/_internal/core/backends/<yourprovider>` directory:
+  ```python
+  def balance_resources(self, configurations):
+      # Implementation to balance or filter configurations
+  ```
 
-- Implement `YourProviderBackend` in `__init__.py`, inherit it from `BaseBackend`.
-    - Define the `TYPE` class variable.
-- Implement `<YourProvider>Compute` in `compute.py`, and inherit it from `Compute`.
-    - Implement `get_offers`. It will be called every time the user wants to provision something. Add availability
-      information if possible.
-    - Implement `run_job`. Here you create a compute resource and run `dstack-shim` or `dstack-runner`.
-    - Implement `terminate_instance`. This method should not raise an error, if there is no such instance.
-- Implement `<YourProvider>Config` in `config.py`, inherit it from `BackendConfig` and `<YourProvider>StoredConfig`.
-  This config is accepted by `<YourProvider>Backend` class.
+4. **Understand Provider Types**:
+- `gpuhunt` distinguishes between two types of providers:
+  1. **`offline`**: These providers take a significant amount of time to retrieve all offers. A catalog is precomputed and stored as a CSV file.
+  2. **`online`**: These providers can fetch all offers within a few seconds. A catalog is computed in real-time as needed.
 
-> There are two types of compute in `dstask`:
->1. `dockerized: False` — the backend runs `dstack-shim`. Later, `dstack-shim` will create a job container
-    with `dstack-runner` in it. This is common for VM.
->2. `dockerized: True` — the backend runs `dstack-runner` inside a docker container.
 
-> Note, that the Compute class interface is subject to changes with the coming pools feature release.
+5. **Data Quality Tests for Offline Providers**:
+- If your provider is classified as `offline`, you should add data quality tests to ensure the integrity of the precomputed CSV files. These tests are located in:
+  ```
+  src/integrity_tests/test_<yourprovider>.py
+  ```
+- Replace `<yourprovider>` with the name of your cloud provider. These tests verify the generated CSV files before publication to ensure accuracy and reliability.
 
-Create configuration models in `src/dstack/_internal/core/models/backends/<yourprovider>.py`. `<YourProvider>ConfigInfo`
-contains everything except for the credentials. You may have multiple models for credentials (i.e., default
-credentials & explicit credentials). Create a model with creds: `<YourProvider>ConfigInfoWithCreds`. Create a model with
-all fields being optional: `<YourProvider>ConfigInfoWithCredsPartial`. Create a model representing UI elements for
-configurator: `<YourProvider>ConfigValues`.
 
-Import all created models to `src/dstack/_internal/core/models/backends/__init__.py`.
+## Integrating a Cloud Provider into dstackai/dstack
 
-Implement `<YourProvider>Configurator`
-in `src/dstack/_internal/server/services/backends/configurators/<yourprovider>.py`
+Integrating a new cloud provider into `dstack` involves several key steps, from setting up your development environment to implementing specific backend configurations. Here’s how to proceed:
 
-Add `<YourProvider>Config` in `src/dstack/_internal/server/services/config.py`. This model represents the YAML
-configuration.
+### Setup and Initial Configuration
 
-Add safe import for your backend in `src/dstack/_internal/server/services/backends/__init__.py`. Update expected
-backends in tests in `src/tests/_internal/server/routers/test_backends.py`.
+1. **Clone the `dstack` Repository**: Begin by cloning the `dstack` repository from GitHub:
+
+```bash
+git clone https://github.com/dstackai/dstack.git
+```
+
+2. **Follow Setup Instructions**: Consult the `CONTRIBUTING.md` document within the repository for instructions on setting up your development environment.
+
+### Modifying `setup.py`
+
+1. **Add Dependencies**: Incorporate any dependencies required by your cloud provider into `setup.py`. Create a separate section named `<yourprovider>` for these dependencies and ensure to update the `all` section to include them.
+
+### Extending Backend Models
+
+1. **Add Backend Type**: Insert a new enumeration entry for your backend in `src/dstack/_internal/core/models/backends/base.py`:
+
+```python
+<YOURBACKEND> = '<your_backend>'
+```
+2. **Create Provider Directory**: Establish a new directory at `src/dstack/_internal/core/backends/<yourprovider> `to house your provider’s backend and compute implementations.
+
+
+3. **Backend Implementation:** 
+In `__init__.py`, implement `YourProviderBackend`, inheriting from `BaseBackend`. Define the `TYPE` class variable to associate your backend with the newly added enum entry.
+
+4. **Compute Implementation:** 
+In `compute.py`, develop `<YourProvider>Compute`, inheriting from `Compute`.<br> 
+You'll need to implement methods like      
+    - `get_offers` It will be called every time the user wants to provision something. Add availability information if possible. 
+	- `run_job` Here you create a compute resource and run `dstack-shim` or `dstack-runner`.
+	- `terminate_instance` This method should not raise an error, if there is no such instance.
+
+5. **Configuration Implementation**:
+- Implement the `<YourProvider>Config` class in `config.py`, inheriting from both `BackendConfig` and `<YourProvider>StoredConfig`. This configuration is accepted by the `<YourProvider>Backend` class.
+
+
+### Configuration Models
+ 1. **Create Configuration Models:**
+
+You may have multiple models for credentials (i.e., default credentials & explicit credentials). 
+ In `src/dstack/_internal/core/models/backends/<yourprovider>.py`, create models for your provider's configuration:
+- `<YourProvider>ConfigInfo:` create a model with all configuration details except credentials.
+- `<YourProvider>ConfigInfoWithCreds`: create a model with credentials.
+- `<YourProvider>ConfigInfoWithCredsPartial`: create a model with all fields optional.
+- `<YourProvider>ConfigValues:` create a model representing UI elements for configurator.
+
+2. **Import Models:**
+Ensure all new models are imported into `src/dstack/_internal/core/models/backends/__init__.py`.
+
+### Finalizing Integration
+1. **Implement Configurator:**
+Develop `<YourProvider>Configurator` in `src/dstack/_internal/server/services/backends/configurators/<yourprovider>.py`.
+
+2. **Add YAML Configuration Model:**
+Insert `<YourProvider>Config` in `src/dstack/_internal/server/services/config.py` to represent the provider’s configuration in YAML.
+
+3. **Ensure Safe Import:** 
+Add a safe import for your backend in `src/dstack/_internal/server/services/backends/__init__.py` and update expected backends in tests within `src/tests/_internal/server/routers/test_backends.py.`
+
+
+Note: There are two types of compute in dstack:
+
+- `dockerized: False` — the backend runs `dstack-shim`. This setup is common for VMs.
+- `dockerized: True`— the backend directly runs `dstack-runner` inside a docker container.
+
+The Compute class interface may undergo changes with the upcoming pools feature release, so keep an eye out for updates.
+
 
 ## Appendix
-
-### Adding VM compute backend
-
-`dstack` expects the following features from your backend:
+### Adding VM Compute Backend
+dstack expects VM backends to have:
 
 - Ubuntu 22.04 LTS
 - Nvidia Drivers 535
 - Docker with Nvidia runtime
 - OpenSSH server
 - External IP & 1 port for SSH (any)
-- cloud-init script (preferable)
+- cloud-init script (preferred)
 - API for creating and terminating instances
 
-To accelerate provisioning — we prebuild VM images with necessary dependencies. You can find configurations
-in `packer/`.
+To speed up provisioning, we prebuild VM images with necessary dependencies, available in `packer/`.
 
-### Adding Docker-only compute backend
-
-`dstack` expects the following features from your backend:
+### Adding Docker-only Compute Backend
+For Docker-only backends, dstack requires:
 
 - Docker with Nvidia runtime
 - External IP & 1 port for SSH (any)
 - Container entrypoint override (~2KB)
 - API for creating and terminating containers
+
+
+
