@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import Dict, Optional, Union
 from uuid import UUID
 
+import requests
 from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -148,8 +149,13 @@ def instance_healthcheck(*, ports: Dict[int, int]) -> HealthStatus:
                 healthy=False,
                 reason=f"Service name is {resp.service}, service version: {resp.version}",
             )
+    except requests.RequestException as e:
+        return HealthStatus(healthy=False, reason=f"Can't request shim: {e}")
     except Exception as e:
-        return HealthStatus(healthy=False, reason=f"Exception ({e.__class__.__name__}): {e}")
+        logger.exception("Unkonw exception from shim.healthcheck: %s", e)
+        return HealthStatus(
+            healthy=False, reason=f"Unkonw exception ({e.__class__.__name__}): {e}"
+        )
 
 
 async def terminate(instance_id: UUID) -> None:
