@@ -211,8 +211,9 @@ async def create_job(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
-        job_num=0,
+        job_num=0,  # TODO(egor-s): make configurable
         job_name=run.run_name + "-0",
+        # TODO(egor-s): add replica_num
         submission_num=submission_num,
         submitted_at=submitted_at,
         last_processed_at=last_processed_at,

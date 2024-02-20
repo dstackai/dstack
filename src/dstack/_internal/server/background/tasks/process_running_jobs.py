@@ -31,6 +31,8 @@ from dstack._internal.server.models import (
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs import (
+    PROCESSING_RUNS_IDS,
+    PROCESSING_RUNS_LOCK,
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
     delay_job_instance_termination,
@@ -55,7 +57,7 @@ logger = get_logger(__name__)
 
 async def process_running_jobs():
     async with get_session_ctx() as session:
-        async with RUNNING_PROCESSING_JOBS_LOCK:
+        async with PROCESSING_RUNS_LOCK, RUNNING_PROCESSING_JOBS_LOCK:
             res = await session.execute(
                 select(JobModel)
                 .where(
@@ -63,6 +65,9 @@ async def process_running_jobs():
                         [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                     ),
                     JobModel.id.not_in(RUNNING_PROCESSING_JOBS_IDS),
+                    JobModel.run_id.not_in(
+                        PROCESSING_RUNS_IDS
+                    ),  # runs processing has higher priority
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)  # TODO process multiple at once
@@ -220,6 +225,7 @@ async def _process_job(job_id: UUID):
                 job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
                 job_model.instance = None
 
+                # TODO(egor-s): move to process_runs
                 if job.is_retry_active():
                     if job_submission.job_provisioning_data.instance_type.resources.spot:
                         new_job_model = create_job_model_for_new_submission(

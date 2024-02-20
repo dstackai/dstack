@@ -291,6 +291,7 @@ async def submit_run(
     )
     session.add(run_model)
 
+    # TODO(egor-s): move jobs creation to process_runs
     jobs = get_jobs_from_run_spec(run_spec)
     if run_spec.configuration.type == "service":
         await gateways.register_service_jobs(session, project, run_spec.run_name, jobs)

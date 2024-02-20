@@ -1,8 +1,9 @@
 import asyncio
 import datetime
 import socket
+import uuid
 from datetime import timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,9 +43,11 @@ RUNNING_PROCESSING_JOBS_IDS = set()
 PROCESSING_POOL_LOCK = asyncio.Lock()
 PROCESSING_POOL_IDS = set()
 
-
 TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 TERMINATING_PROCESSING_JOBS_IDS = set()
+
+PROCESSING_RUNS_LOCK = asyncio.Lock()
+PROCESSING_RUNS_IDS: Set[uuid.UUID] = set()
 
 
 def get_jobs_from_run_spec(run_spec: RunSpec) -> List[Job]:
@@ -89,6 +92,7 @@ async def stop_job(
 ):
     if job_model.status.is_finished():
         return
+    # TODO(egor-s): get run lock?
     async with SUBMITTED_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_LOCK, TERMINATING_PROCESSING_JOBS_LOCK:
         # If the job provisioning is in progress, we have to wait until it's done.
         # We can also consider returning an error when stopping a provisioning job.

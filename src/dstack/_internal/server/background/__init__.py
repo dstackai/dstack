@@ -24,5 +24,6 @@ def start_background_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(process_pending_jobs, IntervalTrigger(seconds=10))
     _scheduler.add_job(process_pools, IntervalTrigger(seconds=10))
     _scheduler.add_job(terminate_idle_instance, IntervalTrigger(seconds=10))
+    # TODO(egor-s): add process_runs
     _scheduler.start()
     return _scheduler

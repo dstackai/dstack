@@ -170,6 +170,9 @@ class RunModel(BaseModel):
     run_spec: Mapped[str] = mapped_column(String(4000))
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="run", lazy="selectin")
 
+    # TODO(egor-s): add last_processed_at
+    # TODO(egor-s): add done or finished flag
+
 
 class JobModel(BaseModel):
     __tablename__ = "jobs"
@@ -197,6 +200,7 @@ class JobModel(BaseModel):
     remove_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
+    # TODO(egor-s): add replica_num
 
 
 class GatewayModel(BaseModel):
