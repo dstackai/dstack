@@ -1,9 +1,10 @@
 import datetime as dt
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobStatus
 from dstack._internal.server.background.tasks.process_pools import (
@@ -189,3 +190,35 @@ class TestIdleTime:
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == "Idle timeout"
+
+
+class TestTerminate:
+    @pytest.mark.skip()
+    @pytest.mark.asyncio
+    async def test_terminate(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        pool = await create_pool(session, project)
+
+        instance = await create_instance(session, project, pool, status=InstanceStatus.TERMINATING)
+
+        reason = "some reason"
+        instance.termination_reason = reason
+        instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
+        await session.commit()
+
+        with patch(
+            "dstack._internal.server.background.tasks.process_pools.backends_services.get_project_backends"
+        ) as get_backends:
+            backend = Mock()
+            backend.TYPE.return_value = BackendType.DATACRUNCH
+            backend.compute.return_value = Mock()
+
+            get_backends.compute.return_value = [backend]
+
+            await process_pools()
+
+        await session.refresh(instance)
+
+        assert instance is not None
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == "some reason"
