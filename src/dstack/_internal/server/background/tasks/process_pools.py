@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import Dict, Optional, Union
 from uuid import UUID
 
+import requests
 from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -26,13 +27,18 @@ from dstack._internal.utils.logging import get_logger
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
+TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
+
+# Terminate instance if the instance has not started within 10 minutes
+STARTING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
+
 
 @dataclass
 class HealthStatus:
     healthy: bool
     reason: str
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.reason
 
 
@@ -99,8 +105,8 @@ async def check_shim(instance_id: UUID) -> None:
 
         if health.healthy:
             logger.debug("check instance %s status: shim health is OK", instance.name)
-            instance.fail_count = 0
-            instance.fail_reason = None
+            instance.termination_deadline = None
+            instance.health_status = None
 
             if instance.status in (InstanceStatus.CREATING, InstanceStatus.STARTING):
                 instance.status = (
@@ -110,24 +116,32 @@ async def check_shim(instance_id: UUID) -> None:
         else:
             logger.debug("check instance %s status: shim health: %s", instance.name, health)
 
-            instance.fail_count += 1
-            instance.fail_reason = health.reason
+            if instance.termination_deadline is None:
+                instance.termination_deadline = (
+                    get_current_datetime() + TERMINATION_DEADLINE_OFFSET
+                )
+            instance.health_status = health.reason
 
             if instance.status in (InstanceStatus.READY, InstanceStatus.BUSY):
-                logger.warning(
-                    "instance %s: shim has become unavailable, marked as failed", instance.name
-                )
-                FAIL_THRESHOLD = 10 * 6 * 20  # instance_healthcheck fails 20 minutes constantly
-                if instance.fail_count > FAIL_THRESHOLD:
+                logger.warning("instance %s shim is not available", instance.name)
+                deadline = instance.termination_deadline.replace(tzinfo=datetime.timezone.utc)
+                if get_current_datetime() > deadline:
                     instance.status = InstanceStatus.TERMINATING
+                    instance.termination_reason = "Termination deadline"
                     logger.warning("mark instance %s as TERMINATED", instance.name)
 
             if instance.status == InstanceStatus.STARTING and instance.started_at is not None:
-                STARTING_TIMEOUT = 10 * 60  # 10 minutes
-                starting_time_threshold = instance.started_at + timedelta(seconds=STARTING_TIMEOUT)
+                starting_time_threshold = instance.started_at.replace(
+                    tzinfo=datetime.timezone.utc
+                ) + timedelta(seconds=STARTING_TIMEOUT_SECONDS)
                 expire_starting = starting_time_threshold < get_current_datetime()
                 if expire_starting:
                     instance.status = InstanceStatus.TERMINATING
+                    logger.warning(
+                        "The Instance %s can't start in %s seconds. Marked as TERMINATED",
+                        instance.name,
+                        STARTING_TIMEOUT_SECONDS,
+                    )
 
             await session.commit()
 
@@ -148,8 +162,13 @@ def instance_healthcheck(*, ports: Dict[int, int]) -> HealthStatus:
                 healthy=False,
                 reason=f"Service name is {resp.service}, service version: {resp.version}",
             )
+    except requests.RequestException as e:
+        return HealthStatus(healthy=False, reason=f"Can't request shim: {e}")
     except Exception as e:
-        return HealthStatus(healthy=False, reason=f"Exception ({e.__class__.__name__}): {e}")
+        logger.exception("Unknown exception from shim.healthcheck: %s", e)
+        return HealthStatus(
+            healthy=False, reason=f"Unknown exception ({e.__class__.__name__}): {e}"
+        )
 
 
 async def terminate(instance_id: UUID) -> None:
@@ -163,11 +182,10 @@ async def terminate(instance_id: UUID) -> None:
         ).one()
 
         jpd = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
-        BACKEND_TYPE = jpd.backend
         backends = await backends_services.get_project_backends(project=instance.project)
-        backend = next((b for b in backends if b.TYPE == BACKEND_TYPE), None)
+        backend = next((b for b in backends if b.TYPE == jpd.backend), None)
         if backend is None:
-            raise ValueError(f"there is no backend {BACKEND_TYPE}")
+            raise ValueError(f"there is no backend {jpd.backend}")
 
         await run_async(
             backend.compute().terminate_instance, jpd.instance_id, jpd.region, jpd.backend_data
@@ -217,6 +235,7 @@ async def terminate_idle_instance() -> None:
                 instance.deleted_at = get_current_datetime()
                 instance.finished_at = get_current_datetime()
                 instance.status = InstanceStatus.TERMINATED
+                instance.termination_reason = "Idle timeout"
 
                 idle_time = current_time - last_time
                 logger.info(

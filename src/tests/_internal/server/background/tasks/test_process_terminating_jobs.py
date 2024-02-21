@@ -17,8 +17,6 @@ from dstack._internal.server.testing.common import (
     create_user,
 )
 
-MODULE = "dstack._internal.server.services.jobs"
-
 
 class TestProcessFinishedJobs:
     @pytest.mark.asyncio
@@ -63,7 +61,7 @@ class TestProcessFinishedJobs:
                 ssh_proxy=None,
             ),
         )
-        with patch(f"{MODULE}.terminate_job_provisioning_data_instance"):
+        with patch("dstack._internal.server.background.tasks.process_finished_jobs.submit_stop"):
             await process_finished_jobs()
         await session.refresh(job)
         assert job is not None

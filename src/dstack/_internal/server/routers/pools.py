@@ -10,7 +10,7 @@ from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
-from dstack._internal.server.security.permissions import ProjectAdmin, ProjectMember
+from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services.runs import (
     abort_runs_of_pool,
     list_project_runs,
@@ -33,7 +33,7 @@ async def list_pool(
 async def remove_instance(
     body: schemas.RemoveInstanceRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> None:
     _, project_model = user_project
     await pools.remove_instance(
@@ -45,7 +45,7 @@ async def remove_instance(
 async def set_default_pool(
     body: schemas.SetDefaultPoolRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> bool:
     _, project_model = user_project
     return await pools.set_default_pool(session, project_model, body.pool_name)
@@ -55,7 +55,7 @@ async def set_default_pool(
 async def delete_pool(
     body: schemas.DeletePoolRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> None:
     pool_name = body.name
     _, project_model = user_project
@@ -87,7 +87,7 @@ async def delete_pool(
 async def create_pool(
     body: schemas.CreatePoolRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> None:
     _, project = user_project
     await pools.create_pool_model(session=session, project=project, name=body.name)
@@ -97,7 +97,7 @@ async def create_pool(
 async def show_pool(
     body: schemas.ShowPoolRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> models.PoolInstances:
     _, project = user_project
     instances = await pools.show_pool(session, project, pool_name=body.name)

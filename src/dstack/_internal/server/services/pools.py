@@ -352,7 +352,7 @@ async def add_remote(
             name="instance",
             resources=instance_resource,
         ),
-        region="",
+        region="",  # TODO: add region
         price=0.0,
         availability=InstanceAvailability.AVAILABLE,
     )
@@ -361,11 +361,14 @@ async def add_remote(
         name=instance_name,
         project=project,
         pool=pool_model,
+        backend=BackendType.REMOTE,
         created_at=common_utils.get_current_datetime(),
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PENDING,
         job_provisioning_data=local.json(),
         offer=offer.json(),
+        region=offer.region,
+        price=offer.price,
         termination_policy=profile.termination_policy,
         termination_idle_time=profile.termination_idle_time,
     )
