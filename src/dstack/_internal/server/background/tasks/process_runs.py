@@ -133,25 +133,34 @@ async def process_active_run(session: AsyncSession, run: RunModel):
             else:
                 pass  # replica is done
 
+    # TODO(egor-s): handle auto-scaling
+
     if not any_replica_ok:
         # TODO(egor-s): handle scale-to-zero
         # TODO(egor-s): consider retry policy
-        run.status = JobStatus.PENDING
+        new_status = JobStatus.PENDING
     elif any_replica_running:
-        run.status = JobStatus.RUNNING
+        new_status = JobStatus.RUNNING
     elif any_replica_starting:
-        run.status = JobStatus.PROVISIONING
+        new_status = JobStatus.PROVISIONING
     elif any_replica_submitted:
-        run.status = JobStatus.SUBMITTED
+        new_status = JobStatus.SUBMITTED
     else:
         # all replicas are ok and done
-        run.status = JobStatus.DONE
+        new_status = JobStatus.DONE
+
+    if run.status != new_status:
+        logger.info(
+            "%s: run status has changed %s -> %s", fmt(run), run.status.value, new_status.value
+        )
+        run.status = new_status
 
 
 async def process_finished_run(session: AsyncSession, run: RunModel):
     """Done, failed, or terminated. Stop all jobs, unregister the service"""
     for job in run.jobs:
         if not job.status.is_finished():
+            logger.info("%s is %s: terminating job %s", fmt(run), run.status.value, job.job_name)
             job.status = JobStatus.TERMINATED
             # TODO(egor-s): set job.error_code
     # TODO(egor-s): unregister the service
@@ -178,3 +187,8 @@ def group_jobs_by_replica_latest(
         ):
             replica_jobs = list(replica_jobs_iter)
         yield replica_num, submission_num, replica_jobs
+
+
+def fmt(run: RunModel) -> str:
+    """Format a run for logging"""
+    return f"({run.id.hex[:6]}){run.run_name}"
