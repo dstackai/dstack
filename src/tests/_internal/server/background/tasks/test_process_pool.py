@@ -221,7 +221,6 @@ class TestIdleTime:
 
 
 class TestTerminate:
-    @pytest.mark.skip()
     @pytest.mark.asyncio
     async def test_terminate(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
@@ -238,10 +237,10 @@ class TestTerminate:
             "dstack._internal.server.background.tasks.process_pools.backends_services.get_project_backends"
         ) as get_backends:
             backend = Mock()
-            backend.TYPE.return_value = BackendType.DATACRUNCH
-            backend.compute.return_value = Mock()
+            backend.TYPE = BackendType.DATACRUNCH
+            backend.compute.return_value.terminate_instance.return_value = Mock()
 
-            get_backends.compute.return_value = [backend]
+            get_backends.return_value = [backend]
 
             await process_pools()
 
@@ -250,3 +249,6 @@ class TestTerminate:
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == "some reason"
+        assert instance.deleted == True
+        assert instance.deleted_at is not None
+        assert instance.finished_at is not None
