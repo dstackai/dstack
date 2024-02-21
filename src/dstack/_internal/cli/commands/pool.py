@@ -23,10 +23,11 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import (
-    DEFAULT_TERMINATION_IDLE_TIME,
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     SpotPolicy,
     TerminationPolicy,
+    parse_max_duration,
 )
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
 from dstack._internal.core.models.runs import InstanceStatus, Requirements
@@ -125,7 +126,10 @@ class PoolCommand(APIBaseCommand):
         add_parser.add_argument(
             "--remote-port", help="Remote runner port", dest="remote_port", default=10999
         )
-        add_parser.add_argument("--name", dest="instance_name", help="The name of the instance")
+        add_parser.add_argument(
+            "--name", dest="instance_name", help="Set the name of the instance"
+        )
+        add_parser.add_argument("--idle-duration", dest="idle_duration", help="Idle duration")
         register_profile_args(add_parser)
         register_resource_args(add_parser)
         add_parser.set_defaults(subfunc=self._add)
@@ -239,20 +243,37 @@ class PoolCommand(APIBaseCommand):
             shm_size=args.shared_memory,
             disk=args.disk,
         )
-        requirements = Requirements(
-            resources=resources,
-            max_price=args.max_price,
-            spot=(args.spot_policy == SpotPolicy.SPOT),  # TODO(egor-s): None if SpotPolicy.AUTO
-        )
 
         profile = load_profile(Path.cwd(), args.profile)
         apply_profile_args(args, profile)
         profile.pool_name = args.pool_name
 
-        termination_policy_idle = DEFAULT_TERMINATION_IDLE_TIME
-        termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        profile.termination_idle_time = termination_policy_idle
-        profile.termination_policy = termination_policy
+        spot = None
+        if profile.spot_policy == SpotPolicy.SPOT:
+            spot = True
+        if profile.spot_policy == SpotPolicy.ONDEMAND:
+            spot = False
+
+        requirements = Requirements(
+            resources=resources,
+            max_price=args.max_price,
+            spot=spot,
+        )
+
+        idle_duration = parse_max_duration(args.idle_duration)
+        if idle_duration is None:
+            profile.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
+            profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+        elif idle_duration == "off":
+            profile.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
+            profile.termination_policy = TerminationPolicy.DONT_DESTROY
+        elif isinstance(idle_duration, int):
+            profile.termination_idle_time = idle_duration
+            profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+        else:
+            raise CLIError(
+                f"Invalid format --idle-duration {args.idle_duration!r}. It must be literal string 'off' or an integer number with an suffix s|m|h|d|w "
+            )
 
         # Add remote instance
         if args.remote:
@@ -369,7 +390,6 @@ def print_offers_table(
     #     else "no"
     # )
 
-    # TODO: improve spot policy
     if requirements.spot is None:
         spot_policy = "auto"
     elif requirements.spot:

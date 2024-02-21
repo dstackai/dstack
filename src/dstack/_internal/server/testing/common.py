@@ -11,7 +11,7 @@ from dstack._internal.core.models.configurations import DevEnvironmentConfigurat
 from dstack._internal.core.models.instances import InstanceType, Resources
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
-    DEFAULT_TERMINATION_IDLE_TIME,
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
 )
 from dstack._internal.core.models.repos.base import RepoType
@@ -327,7 +327,7 @@ async def create_instance(
         price=1,
         region="eu-west",
         backend=BackendType.DATACRUNCH,
-        termination_idle_time=DEFAULT_TERMINATION_IDLE_TIME,
+        termination_idle_time=DEFAULT_POOL_TERMINATION_IDLE_TIME,
     )
     session.add(im)
     await session.commit()

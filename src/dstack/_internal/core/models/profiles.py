@@ -10,7 +10,9 @@ from dstack._internal.core.models.common import ForbidExtra
 
 DEFAULT_RETRY_LIMIT = 3600
 DEFAULT_POOL_NAME = "default-pool"
-DEFAULT_TERMINATION_IDLE_TIME = 5 * 60  # 5 minutes by default
+
+DEFAULT_RUN_TERMINATION_IDLE_TIME = 5 * 60  # 5 minutes
+DEFAULT_POOL_TERMINATION_IDLE_TIME = 72 * 60 * 60  # 3 days
 
 
 class SpotPolicy(str, Enum):
@@ -49,7 +51,7 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     return amount * multiplier
 
 
-def parse_max_duration(v: Union[int, str]) -> int:
+def parse_max_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
     if v == "off":
         return v
     return parse_duration(v)
@@ -120,7 +122,7 @@ class Profile(ForbidExtra):
     termination_idle_time: Annotated[
         int,
         Field(description="Seconds to wait before destroying the instance"),
-    ] = DEFAULT_TERMINATION_IDLE_TIME
+    ] = DEFAULT_RUN_TERMINATION_IDLE_TIME
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
