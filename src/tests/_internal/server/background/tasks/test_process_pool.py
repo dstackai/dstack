@@ -50,6 +50,34 @@ class TestCheckShim:
         assert instance.health_status is None
 
     @pytest.mark.asyncio
+    async def test_check_shim_transitions_starting_on_terminating(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session=session)
+        pool = await create_pool(session, project)
+
+        instance = await create_instance(session, project, pool, status=InstanceStatus.STARTING)
+        instance.started_at = get_current_datetime() + dt.timedelta(minutes=-20)
+        instance.health_status = "ssh connect problem"
+
+        await session.commit()
+
+        health_reason = "Shim problem"
+
+        with patch(
+            "dstack._internal.server.background.tasks.process_pools.instance_healthcheck"
+        ) as healthcheck:
+            healthcheck.return_value = HealthStatus(healthy=False, reason=health_reason)
+            await process_pools()
+
+        await session.refresh(instance)
+
+        assert instance is not None
+        assert instance.status == InstanceStatus.TERMINATING
+        assert instance.termination_deadline is not None
+        assert instance.health_status == health_reason
+
+    @pytest.mark.asyncio
     async def test_check_shim_transitions_creating_on_busy(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)

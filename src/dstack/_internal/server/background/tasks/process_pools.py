@@ -27,6 +27,11 @@ from dstack._internal.utils.logging import get_logger
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
+TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
+
+# Terminate instance if the instance has not started within 10 minutes
+STARTING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
+
 
 @dataclass
 class HealthStatus:
@@ -112,7 +117,9 @@ async def check_shim(instance_id: UUID) -> None:
             logger.debug("check instance %s status: shim health: %s", instance.name, health)
 
             if instance.termination_deadline is None:
-                instance.termination_deadline = get_current_datetime() + timedelta(minutes=20)
+                instance.termination_deadline = (
+                    get_current_datetime() + TERMINATION_DEADLINE_OFFSET
+                )
             instance.health_status = health.reason
 
             if instance.status in (InstanceStatus.READY, InstanceStatus.BUSY):
@@ -124,15 +131,16 @@ async def check_shim(instance_id: UUID) -> None:
                     logger.warning("mark instance %s as TERMINATED", instance.name)
 
             if instance.status == InstanceStatus.STARTING and instance.started_at is not None:
-                starting_timeout = 10 * 60  # 10 minutes
-                starting_time_threshold = instance.started_at + timedelta(seconds=starting_timeout)
+                starting_time_threshold = instance.started_at.replace(
+                    tzinfo=datetime.timezone.utc
+                ) + timedelta(seconds=STARTING_TIMEOUT_SECONDS)
                 expire_starting = starting_time_threshold < get_current_datetime()
                 if expire_starting:
                     instance.status = InstanceStatus.TERMINATING
                     logger.warning(
-                        "The Instance %s canot start in %s seconds. Marked as TERMINATED",
+                        "The Instance %s can't start in %s seconds. Marked as TERMINATED",
                         instance.name,
-                        starting_timeout,
+                        STARTING_TIMEOUT_SECONDS,
                     )
 
             await session.commit()
@@ -157,9 +165,9 @@ def instance_healthcheck(*, ports: Dict[int, int]) -> HealthStatus:
     except requests.RequestException as e:
         return HealthStatus(healthy=False, reason=f"Can't request shim: {e}")
     except Exception as e:
-        logger.exception("Unkonw exception from shim.healthcheck: %s", e)
+        logger.exception("Unknown exception from shim.healthcheck: %s", e)
         return HealthStatus(
-            healthy=False, reason=f"Unkonw exception ({e.__class__.__name__}): {e}"
+            healthy=False, reason=f"Unknown exception ({e.__class__.__name__}): {e}"
         )
 
 

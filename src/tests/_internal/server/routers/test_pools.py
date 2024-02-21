@@ -37,7 +37,6 @@ class TestListPool:
         project = await create_project(session=session, owner=user)
         response = client.post(
             f"/api/project/{project.name}/pool/list",
-            headers=get_auth_headers(user.token),
             json={},
         )
         assert response.status_code == 403
@@ -108,12 +107,8 @@ class TestDeletePool:
     async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
-        )
         response = client.post(
             f"/api/project/{project.name}/pool/delete",
-            headers=get_auth_headers(user.token),
             json=DeletePoolRequest(name=TEST_POOL_NAME, force=False).dict(),
         )
         assert response.status_code == 403
@@ -216,12 +211,8 @@ class TestSetDefaultPool:
     async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
-        )
         response = client.post(
             f"/api/project/{project.name}/pool/set_default",
-            headers=get_auth_headers(user.token),
             json=SetDefaultPoolRequest(pool_name=TEST_POOL_NAME).dict(),
         )
         assert response.status_code == 403
@@ -294,12 +285,8 @@ class TestCreatePool:
     async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
-        )
         response = client.post(
             f"/api/project/{project.name}/pool/create",
-            headers=get_auth_headers(user.token),
             json=CreatePoolRequest(name=TEST_POOL_NAME).dict(),
         )
         assert response.status_code == 403
@@ -361,12 +348,8 @@ class TestShowPool:
     async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
-        )
         response = client.post(
             f"/api/project/{project.name}/pool/show",
-            headers=get_auth_headers(user.token),
             json=CreatePoolRequest(name=TEST_POOL_NAME).dict(),
         )
         assert response.status_code == 403
@@ -443,9 +426,6 @@ class TestAddRemote:
     async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
-        )
         remote = AddRemoteInstanceRequest(
             instance_name="test_instance_name",
             host="localhost",
@@ -455,7 +435,6 @@ class TestAddRemote:
         )
         response = client.post(
             f"/api/project/{project.name}/pool/add_remote",
-            headers=get_auth_headers(user.token),
             json=remote.dict(),
         )
         assert response.status_code == 403
@@ -489,9 +468,6 @@ class TestRemoveInstance:
     async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
-        )
         remote = AddRemoteInstanceRequest(
             instance_name="test_instance_name",
             host="localhost",
@@ -501,7 +477,6 @@ class TestRemoveInstance:
         )
         response = client.post(
             f"/api/project/{project.name}/pool/add_remote",
-            headers=get_auth_headers(user.token),
             json=remote.dict(),
         )
         assert response.status_code == 403
