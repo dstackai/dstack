@@ -84,7 +84,7 @@ async def process_pending_run(session: AsyncSession, run: RunModel):
     pass  # TODO(ego-s): do we need pending status?
 
 
-async def process_active_run(session: AsyncSession, run: RunModel):
+async def process_active_run(session: AsyncSession, run_model: RunModel):
     """
     Run is submitted, starting, or running.
     We handle fails, scaling, and status changes.
@@ -97,7 +97,7 @@ async def process_active_run(session: AsyncSession, run: RunModel):
     any_replica_running = False
 
     # TODO(egor-s): collect replicas count and statuses for auto-scaling
-    for replica_num, submission_num, jobs in group_jobs_by_replica_latest(run.jobs):
+    for replica_num, jobs in group_jobs_by_replica_latest(run_model.jobs):
         any_job_failed = False
         any_job_terminated = False
         any_job_submitted = False
@@ -133,11 +133,19 @@ async def process_active_run(session: AsyncSession, run: RunModel):
             else:
                 pass  # replica is done
 
+    # TODO(egor-s): if any job / any replica failed (can't retry) = run failed
+    # TODO(egor-s): if all jobs in a replica terminated = scaled down (ignore)
+    # TODO(egor-s): if any job failed (can retry) = do retry
     # TODO(egor-s): handle auto-scaling
+
+    # TODO(egor-s): if any job is running = run is running
+    # TODO(egor-s): if any job is starting = run is starting
+    # TODO(egor-s): if any job is submitted = run is submitted
+    # TODO(egor-s): if all jobs are done = run is done
 
     if not any_replica_ok:
         # TODO(egor-s): handle scale-to-zero
-        # TODO(egor-s): consider retry policy
+        # TODO(egor-s): consider retry policy & spot / on-demand
         new_status = JobStatus.PENDING
     elif any_replica_running:
         new_status = JobStatus.RUNNING
@@ -146,14 +154,17 @@ async def process_active_run(session: AsyncSession, run: RunModel):
     elif any_replica_submitted:
         new_status = JobStatus.SUBMITTED
     else:
-        # all replicas are ok and done
+        # all ok replicas are done, but some replicas can be not ok
         new_status = JobStatus.DONE
 
-    if run.status != new_status:
+    if run_model.status != new_status:
         logger.info(
-            "%s: run status has changed %s -> %s", fmt(run), run.status.value, new_status.value
+            "%s: run status has changed %s -> %s",
+            fmt(run_model),
+            run_model.status.value,
+            new_status.value,
         )
-        run.status = new_status
+        run_model.status = new_status
 
 
 async def process_finished_run(session: AsyncSession, run: RunModel):
@@ -167,26 +178,25 @@ async def process_finished_run(session: AsyncSession, run: RunModel):
     run.processing_finished = True
 
 
-def group_jobs_by_replica_latest(
-    jobs: List[JobModel],
-) -> Iterable[Tuple[int, int, List[JobModel]]]:
+def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, List[JobModel]]]:
     """
     Args:
         jobs: unsorted list of jobs
 
     Yields:
-        latest replicas (replica_num, submission_num, jobs)
+        latest jobs in each replica (replica_num, jobs)
     """
-    jobs = sorted(jobs, key=lambda j: (j.replica_num, j.submission_num, j.job_num))
+    jobs = sorted(jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
     for replica_num, all_replica_jobs in itertools.groupby(jobs, key=lambda j: j.replica_num):
-        # take only the latest submission
-        # all_replica_jobs is not empty by design, but we need to initialize the variables
-        submission_num, replica_jobs = -1, []
-        for submission_num, replica_jobs_iter in itertools.groupby(
-            all_replica_jobs, key=lambda j: j.submission_num
+        replica_jobs: List[JobModel] = []
+        for job_num, job_submissions in itertools.groupby(
+            all_replica_jobs, key=lambda j: j.job_num
         ):
-            replica_jobs = list(replica_jobs_iter)
-        yield replica_num, submission_num, replica_jobs
+            # take only the latest submission
+            # the latest `submission_num` doesn't have to be the same for all jobs
+            *_, latest_job_submission = job_submissions
+            replica_jobs.append(latest_job_submission)
+        yield replica_num, replica_jobs
 
 
 def fmt(run: RunModel) -> str:
