@@ -7,9 +7,11 @@ from typing import Iterable, List, Tuple
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.runs import JobStatus
+from dstack._internal.core.models.instances import InstanceOffer
+from dstack._internal.core.models.profiles import ProfileRetryPolicy
+from dstack._internal.core.models.runs import JobErrorCode, JobStatus, RunSpec
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.models import InstanceModel, JobModel, RunModel
 from dstack._internal.server.services.jobs import (
     PROCESSING_RUNS_IDS,
     PROCESSING_RUNS_LOCK,
@@ -21,6 +23,10 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 PROCESSING_INTERVAL = datetime.timedelta(seconds=5)
+JOB_ERROR_CODES_TO_RETRY = {
+    JobErrorCode.INTERRUPTED_BY_NO_CAPACITY,
+    JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+}
 
 
 async def process_runs():
@@ -89,26 +95,34 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
     Run is submitted, starting, or running.
     We handle fails, scaling, and status changes.
     """
+    run_spec = RunSpec.parse_raw(run_model.run_spec)
+    retry_policy = run_spec.profile.retry_policy or ProfileRetryPolicy()
 
-    # TODO(egor-s): consider using Counter instead of a copy-pasting
-    any_replica_ok = False
+    any_replica_failed = False
+    replicas_to_retry: List[Tuple[int, List[JobModel]]] = []
     any_replica_submitted = False
     any_replica_starting = False
     any_replica_running = False
+    any_replica_done = False
 
     # TODO(egor-s): collect replicas count and statuses for auto-scaling
     for replica_num, jobs in group_jobs_by_replica_latest(run_model.jobs):
         any_job_failed = False
-        any_job_terminated = False
+        any_job_failed_retryable = False
         any_job_submitted = False
         any_job_starting = False
         any_job_running = False
+        all_jobs_terminated = True
+        all_jobs_done = True
 
         for job in jobs:
             if job.status == JobStatus.FAILED:
-                any_job_failed = True
-            elif job.status == JobStatus.TERMINATED:
-                any_job_terminated = True
+                if not await is_job_retryable(
+                    session, job, retry_policy
+                ):  # critical, can't recover
+                    any_job_failed = True
+                    break
+                any_job_failed_retryable = True
             elif job.status == JobStatus.SUBMITTED:
                 any_job_submitted = True
             elif job.status in {JobStatus.PROVISIONING, JobStatus.PULLING}:
@@ -116,46 +130,42 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
             elif job.status == JobStatus.RUNNING:
                 any_job_running = True
 
-        if not (any_job_failed or any_job_terminated):
-            replica_ok = True
+            if job.status != JobStatus.DONE:
+                all_jobs_done = False
+            if job.status != JobStatus.TERMINATED:
+                all_jobs_terminated = False
+
+        if any_job_failed:  # critical, can't recover
+            any_replica_failed = True
+            break
+        if any_job_failed_retryable:
+            replicas_to_retry.append((replica_num, jobs))
+        elif all_jobs_terminated:
+            pass  # the replica was scaled down, ignore it
         else:
-            replica_ok = False  # TODO(egor-s)
-            # replica_ok = handle_cluster_node_failure()
+            any_replica_submitted = any_replica_submitted or any_job_submitted
+            any_replica_starting = any_replica_starting or any_job_starting
+            any_replica_running = any_replica_running or any_job_running
+            any_replica_done = any_replica_done or all_jobs_done
 
-        if replica_ok:
-            any_replica_ok = True
-            if any_job_running:
-                any_replica_running = True
-            elif any_job_starting:
-                any_replica_starting = True
-            elif any_job_submitted:
-                any_replica_submitted = True
-            else:
-                pass  # replica is done
-
-    # TODO(egor-s): if any job / any replica failed (can't retry) = run failed
-    # TODO(egor-s): if all jobs in a replica terminated = scaled down (ignore)
-    # TODO(egor-s): if any job failed (can retry) = do retry
-    # TODO(egor-s): handle auto-scaling
-
-    # TODO(egor-s): if any job is running = run is running
-    # TODO(egor-s): if any job is starting = run is starting
-    # TODO(egor-s): if any job is submitted = run is submitted
-    # TODO(egor-s): if all jobs are done = run is done
-
-    if not any_replica_ok:
-        # TODO(egor-s): handle scale-to-zero
-        # TODO(egor-s): consider retry policy & spot / on-demand
-        new_status = JobStatus.PENDING
-    elif any_replica_running:
-        new_status = JobStatus.RUNNING
-    elif any_replica_starting:
-        new_status = JobStatus.PROVISIONING
-    elif any_replica_submitted:
-        new_status = JobStatus.SUBMITTED
+    if any_replica_failed:
+        new_status = JobStatus.FAILED
+    elif not (any_replica_submitted or any_replica_starting or any_replica_running):
+        if any_replica_done:
+            new_status = JobStatus.DONE
+        else:
+            new_status = JobStatus.PENDING
     else:
-        # all ok replicas are done, but some replicas can be not ok
-        new_status = JobStatus.DONE
+        # TODO(egor-s): retry failed replicas while other replicas are active, terminate jobs if needed
+        # TODO(egor-s): perform auto-scaling
+        if any_replica_running:
+            new_status = JobStatus.RUNNING
+        elif any_replica_starting:
+            new_status = JobStatus.PROVISIONING
+        elif any_replica_submitted:
+            new_status = JobStatus.SUBMITTED
+        else:
+            raise ValueError("Unexpected state")
 
     if run_model.status != new_status:
         logger.info(
@@ -202,3 +212,25 @@ def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, Li
 def fmt(run: RunModel) -> str:
     """Format a run for logging"""
     return f"({run.id.hex[:6]}){run.run_name}"
+
+
+async def is_job_retryable(
+    session: AsyncSession, job: JobModel, retry_policy: ProfileRetryPolicy
+) -> bool:
+    if not retry_policy.retry:
+        return False
+    if job.error_code not in JOB_ERROR_CODES_TO_RETRY:
+        return False
+    if (
+        retry_policy.limit is not None
+        and get_current_datetime() - job.submitted_at
+        > datetime.timedelta(seconds=retry_policy.limit)
+    ):
+        return False
+
+    # instance is not loaded by default, so we have to load it explicitly
+    instance = await session.get(InstanceModel, job.used_instance_id)
+    instance_offer = InstanceOffer.parse_raw(instance.offer)
+    if not instance_offer.instance.resources.spot:
+        return False
+    return True

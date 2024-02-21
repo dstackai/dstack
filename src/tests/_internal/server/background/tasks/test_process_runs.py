@@ -126,7 +126,11 @@ class TestProcessRuns:
         run.status = JobStatus.RUNNING
         # job exited with non-zero code
         await create_job(
-            session=session, run=run, status=JobStatus.FAILED, error_code=None, instance=instance
+            session=session,
+            run=run,
+            status=JobStatus.FAILED,
+            error_code=None,
+            instance=instance,
         )
 
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:

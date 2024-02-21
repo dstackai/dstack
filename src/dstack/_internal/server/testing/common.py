@@ -224,7 +224,8 @@ async def create_job(
         error_code=error_code,
         job_spec_data=job_spec.json(),
         job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
-        instance=instance if instance is not None else None,
+        instance=instance,
+        used_instance_id=instance.id if instance is not None else None,
     )
     session.add(job)
     await session.commit()
