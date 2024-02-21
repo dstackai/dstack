@@ -14,7 +14,6 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
-    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import false
@@ -284,7 +283,7 @@ class InstanceModel(BaseModel):
 
     # VM
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
-    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(50))
@@ -292,9 +291,10 @@ class InstanceModel(BaseModel):
         Integer, default=DEFAULT_TERMINATION_IDLE_TIME
     )
 
-    # connection fail handling
-    fail_count: Mapped[int] = mapped_column(Integer, server_default=text("0"))
-    fail_reason: Mapped[Optional[str]] = mapped_column(String(4000))
+    # instance termination handling
+    termination_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    termination_reason: Mapped[Optional[str]] = mapped_column(String(4000))
+    health_status: Mapped[Optional[str]] = mapped_column(String(4000))
 
     # backend
     backend: Mapped[BackendType] = mapped_column(Enum(BackendType))
