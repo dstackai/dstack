@@ -351,7 +351,6 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
     table.add_column("CREATED")
 
     for instance in instances:
-        style = "success" if instance.status.is_available() else "warning"
         created = (
             pretty_date(instance.created.replace(tzinfo=datetime.timezone.utc))
             if instance.created is not None
@@ -364,7 +363,7 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
             instance.instance_type.resources.pretty_format(),
             "yes" if instance.instance_type.resources.spot else "no",
             f"${instance.price:.4}",
-            f"[{style}]{instance.status.value}[/]",
+            instance.status.value,
             created,
         ]
         table.add_row(*row)
