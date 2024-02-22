@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceNotExistsError, ServerClientError
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.runs import Run, RunPlan
 from dstack._internal.server.db import get_session
@@ -13,6 +12,7 @@ from dstack._internal.server.schemas.runs import (
     CreateInstanceRequest,
     DeleteRunsRequest,
     GetOffersRequest,
+    GetOffersResponse,
     GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
@@ -72,7 +72,7 @@ async def get_offers(
     body: GetOffersRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
-) -> Tuple[str, List[InstanceOfferWithAvailability]]:
+) -> GetOffersResponse:
     _, project = user_project
 
     active_pool = await get_or_create_default_pool_by_name(
@@ -82,7 +82,7 @@ async def get_offers(
     offers = await runs.get_run_plan_by_requirements(project, body.profile, body.requirements)
     instances = [instance for _, instance in offers]
 
-    return active_pool.name, instances
+    return GetOffersResponse(pool_name=active_pool.name, instances=instances)
 
 
 @project_router.post("/create_instance")

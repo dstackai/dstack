@@ -15,6 +15,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceRuntime,
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
@@ -54,7 +55,9 @@ class VastAICompute(Compute):
         )
         offers = [
             InstanceOfferWithAvailability(
-                **offer.dict(), availability=InstanceAvailability.AVAILABLE
+                **offer.dict(),
+                availability=InstanceAvailability.AVAILABLE,
+                instance_runtime=InstanceRuntime.RUNNER,
             )
             for offer in offers
         ]

@@ -19,6 +19,7 @@ from dstack._internal.core.errors import CLIError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceRuntime,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool
@@ -292,6 +293,8 @@ class PoolCommand(APIBaseCommand):
 
         with console.status("Getting instances..."):
             pool_name, offers = self.api.runs.get_offers(profile, requirements)
+
+        offers = [o for o in offers if o.instance_runtime == InstanceRuntime.SHIM]
 
         print_offers_table(pool_name, profile, requirements, offers)
         if not args.yes and not confirm_ask("Continue?"):

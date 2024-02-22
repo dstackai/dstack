@@ -85,6 +85,11 @@ class LaunchedInstanceInfo(BaseModel):
     backend_data: Optional[str] = Field(default=None)  # backend-specific data in json
 
 
+class InstanceRuntime(Enum):
+    SHIM = "shim"
+    RUNNER = "runner"
+
+
 class InstanceAvailability(Enum):
     UNKNOWN = "unknown"
     AVAILABLE = "available"
@@ -110,6 +115,7 @@ class InstanceOffer(BaseModel):
 
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
+    instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
 
 
 class LaunchedGatewayInfo(BaseModel):
