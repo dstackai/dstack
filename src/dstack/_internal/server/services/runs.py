@@ -20,6 +20,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
+    InstanceRuntime,
     LaunchedInstanceInfo,
     SSHKey,
 )
@@ -215,6 +216,10 @@ async def create_instance(
         pool = await create_pool_model(session, project, pool_name)
 
     for backend, instance_offer in offers:
+        # cannot create an instance in vastai/k8s. skip
+        if instance_offer.instance_runtime == InstanceRuntime.RUNNER:
+            continue
+
         logger.debug(
             "trying %s in %s/%s for $%0.4f per hour",
             instance_offer.instance.name,
@@ -252,11 +257,6 @@ async def create_instance(
             ssh_proxy=None,
         )
 
-        # types of queries
-        # 1. Get all available instance
-        # 2. Get job's instance (process job)
-        # 3. Get instance's jobs history
-
         im = InstanceModel(
             name=instance_name,
             project=project,
@@ -267,17 +267,7 @@ async def create_instance(
             backend=backend.TYPE,
             region=instance_offer.region,
             price=instance_offer.price,
-            # job_id: Optional[FK] (current job)
-            # ip address
-            # ssh creds: user, port, dockerized
-            # real resources + spot (exact) / instance offer
-            # backend + backend data
-            # region
-            # price (for querying)
-            # termination policy
-            # creation policy
             job_provisioning_data=job_provisioning_data.json(),
-            # TODO: instance provisioning
             offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
             termination_policy=profile.termination_policy,
             termination_idle_time=profile.termination_idle_time,

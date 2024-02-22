@@ -92,9 +92,13 @@ async def check_shim(instance_id: UUID) -> None:
                 .options(joinedload(InstanceModel.project))
             )
         ).one()
-        ssh_private_key = instance.project.ssh_private_key
         job_provisioning_data = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
 
+        # skip check vastai/k8s
+        if not job_provisioning_data.dockerized:
+            return
+
+        ssh_private_key = instance.project.ssh_private_key
         instance_health: Union[Optional[HealthStatus], bool] = instance_healthcheck(
             ssh_private_key, job_provisioning_data
         )

@@ -19,6 +19,7 @@ from dstack._internal.core.errors import CLIError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceRuntime,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool
@@ -293,6 +294,8 @@ class PoolCommand(APIBaseCommand):
         with console.status("Getting instances..."):
             pool_name, offers = self.api.runs.get_offers(profile, requirements)
 
+        offers = [o for o in offers if o.instance_runtime == InstanceRuntime.SHIM]
+
         print_offers_table(pool_name, profile, requirements, offers)
         if not args.yes and not confirm_ask("Continue?"):
             console.print("\nExiting...")
@@ -343,12 +346,11 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
     table.add_column("REGION")
     table.add_column("RESOURCES")
     table.add_column("SPOT")
-    table.add_column("STATUS")
     table.add_column("PRICE")
+    table.add_column("STATUS")
     table.add_column("CREATED")
 
     for instance in instances:
-        style = "success" if instance.status.is_available() else "warning"
         created = (
             pretty_date(instance.created.replace(tzinfo=datetime.timezone.utc))
             if instance.created is not None
@@ -360,8 +362,8 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
             instance.region,
             instance.instance_type.resources.pretty_format(),
             "yes" if instance.instance_type.resources.spot else "no",
-            f"[{style}]{instance.status.value}[/]",
             f"${instance.price:.4}",
+            instance.status.value,
             created,
         ]
         table.add_row(*row)

@@ -10,6 +10,7 @@ from dstack._internal.server.schemas.runs import (
     CreateInstanceRequest,
     DeleteRunsRequest,
     GetOffersRequest,
+    GetOffersResponse,
     GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
@@ -35,7 +36,8 @@ class RunsAPIClient(APIClientGroup):
     ) -> Tuple[str, List[InstanceOfferWithAvailability]]:
         body = GetOffersRequest(profile=profile, requirements=requirements)
         resp = self._request(f"/api/project/{project_name}/runs/get_offers", body=body.json())
-        return parse_obj_as(Tuple[str, List[InstanceOfferWithAvailability]], resp.json())
+        response = parse_obj_as(GetOffersResponse, resp.json())
+        return response.pool_name, response.instances
 
     def create_instance(
         self,

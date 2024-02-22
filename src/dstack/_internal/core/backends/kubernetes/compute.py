@@ -27,6 +27,7 @@ from dstack._internal.core.models.instances import (
     Gpu,
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceRuntime,
     InstanceType,
     LaunchedGatewayInfo,
     LaunchedInstanceInfo,
@@ -79,6 +80,7 @@ class KubernetesCompute(Compute):
                 price=0,
                 region="-",
                 availability=InstanceAvailability.AVAILABLE,
+                instance_runtime=InstanceRuntime.RUNNER,
             )
             instance_offers.extend(match_requirements([instance_offer], requirements))
         return instance_offers

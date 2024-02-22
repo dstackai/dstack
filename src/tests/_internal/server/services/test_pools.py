@@ -275,7 +275,11 @@ class TestCreatePool:
         assert instance.deleted_at is None
 
         # assert instance.job_provisioning_data == '{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "instance_id": "running_instance.id", "ssh_proxy": null, "hostname": "running_instance.ip", "region": "running_instance.location", "price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, "backend_data": null}'
-        assert (
-            instance.offer
-            == '{"backend": "datacrunch", "instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "region": "en", "price": 0.1, "availability": "available"}'
+
+        excepted_offer = (
+            '{"backend": "datacrunch", "instance": {"name": "instance", "resources": '
+            '{"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": '
+            '{"size_mib": 102400}, "description": ""}}, "region": "en", "price": 0.1, '
+            '"availability": "available", "instance_runtime": "shim"}'
         )
+        assert instance.offer == excepted_offer
