@@ -13,7 +13,7 @@ as well as on-premises servers.
 
 ### How does it work?
 
-1. [Install](installation/index.md) the open-source server and configure backends (or <a href="https://cloud.dstack.ai">sign up</a> with the cloud version) 
+1. [Install](installation/index.md) the open-source server and configure backends (or <a href="https://sky.dstack.ai">sign up</a> with the dstack Sky) 
 2. Define configurations such as dev environments, tasks, and services.
 3. Run configurations via the CLI or API. The `dstack` server automatically provisions cloud resources, handles 
    containers, logs, network, and everything else.

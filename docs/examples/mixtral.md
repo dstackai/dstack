@@ -103,7 +103,7 @@ Below are multiple variants: via vLLM (`fp16`), TGI (`fp16`), or TGI (`int4`).
 
 !!! warning "Prerequisites"
     Before running a service, make sure to set up a [gateway](../docs/concepts/services.md#set-up-a-gateway).
-    However, it's not required when using dstack Cloud, as it's set up automatically.
+    However, it's not required when using dstack Sky, as it's set up automatically.
 
 [//]: # (    Also, make sure to adjust the `--tensor-parallel-size` and `--num-shard` parameters in the YAML configuration to align)
 [//]: # (    with the number of GPUs used.)
