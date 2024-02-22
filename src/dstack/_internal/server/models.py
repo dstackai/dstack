@@ -171,6 +171,10 @@ class RunModel(BaseModel):
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="run", lazy="selectin")
     last_processed_at: Mapped[datetime] = mapped_column(DateTime)
     processing_finished: Mapped[bool] = mapped_column(Boolean, default=False)
+    gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("gateways.id", ondelete="SET NULL")
+    )
+    gateway: Mapped[Optional["GatewayModel"]] = relationship()
 
 
 class JobModel(BaseModel):
@@ -222,6 +226,8 @@ class GatewayModel(BaseModel):
         ForeignKey("gateway_computes.id", ondelete="CASCADE")
     )
     gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship(lazy="joined")
+
+    runs: Mapped[List["RunModel"]] = relationship(back_populates="gateway")
 
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_gateways_project_id_name"),)
 

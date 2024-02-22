@@ -112,7 +112,7 @@ class JobSpec(BaseModel):
     app_specs: Optional[List[AppSpec]]
     commands: List[str]
     env: Dict[str, str]
-    gateway: Optional[Gateway]
+    gateway: Optional[Gateway]  # TODO(egor-s): deprecated, remove
     home_dir: Optional[str]
     image_name: str
     max_duration: Optional[int]

@@ -1,9 +1,11 @@
 from typing import Optional
+from urllib.parse import urlparse
 
 import httpx
 
 from dstack._internal.core.errors import GatewayError
-from dstack._internal.core.models.runs import Job, JobProvisioningData
+from dstack._internal.core.models.runs import JobProvisioningData, Run
+from dstack._internal.server.services.gateways.options import get_service_options
 
 GATEWAY_MANAGEMENT_PORT = 8000
 
@@ -18,12 +20,13 @@ class GatewayClient:
         self.base_url = "http://gateway" if uds else f"http://localhost:{port}"
         self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds) if uds else None, timeout=30)
 
-    def register_service(self, project: str, job: Job, job_provisioning_data: JobProvisioningData):
+    def register_service(self, run: Run, job_provisioning_data: JobProvisioningData):
+        conf = run.run_spec.configuration
         payload = {
-            "public_domain": job.job_spec.gateway.hostname,
-            "app_port": job.job_spec.gateway.service_port,
-            "auth": job.job_spec.gateway.auth,
-            "options": job.job_spec.gateway.options,
+            "public_domain": urlparse(run.service.url).hostname,
+            "app_port": conf.port.container_port,
+            "auth": conf.auth,
+            "options": get_service_options(conf),
         }
         ssh_proxy = job_provisioning_data.ssh_proxy
         if ssh_proxy is None:
@@ -41,7 +44,7 @@ class GatewayClient:
                 "docker_ssh_host"
             ] = f"{job_provisioning_data.username}@{job_provisioning_data.hostname}"
             payload["docker_ssh_port"] = job_provisioning_data.ssh_port
-        resp = self.s.post(self._url(f"/api/registry/{project}/register"), json=payload)
+        resp = self.s.post(self._url(f"/api/registry/{run.project_name}/register"), json=payload)
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()

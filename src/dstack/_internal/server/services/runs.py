@@ -58,6 +58,10 @@ from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.docker import parse_image_name
+from dstack._internal.server.services.gateways.options import (
+    complete_service_model,
+    get_service_options,
+)
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     job_model_to_job_submission,
@@ -283,8 +287,9 @@ async def submit_run(
     run_model = RunModel(
         id=uuid.uuid4(),
         project_id=project.id,
+        project=project,
         repo_id=repo.id,
-        user=user,
+        user_id=user.id,
         run_name=run_spec.run_name,
         submitted_at=submitted_at,
         status=JobStatus.SUBMITTED,
@@ -293,11 +298,15 @@ async def submit_run(
     )
     session.add(run_model)
 
-    jobs = get_jobs_from_run_spec(run_spec)
     if run_spec.configuration.type == "service":
-        # TODO(egor-s): write gateway to run_model, not jobs
-        await gateways.register_service_jobs(session, project, run_spec.run_name, jobs)
+        if run_spec.configuration.model is not None:
+            complete_service_model(run_spec.configuration.model)
+            run_model.run_spec = run_spec.json()
+        await gateways.register_service(
+            session, run_model, get_service_options(run_spec.configuration)
+        )
 
+    jobs = get_jobs_from_run_spec(run_spec)
     for job in jobs:
         job.job_spec.pool_name = pool.name
         job_model = create_job_model_for_new_submission(

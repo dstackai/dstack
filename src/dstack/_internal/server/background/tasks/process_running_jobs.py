@@ -2,13 +2,13 @@ from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
 
-import httpx
 from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import GatewayError, SSHError
+import dstack._internal.server.services.gateways as gateways
+from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
@@ -29,7 +29,6 @@ from dstack._internal.server.models import (
     RunModel,
 )
 from dstack._internal.server.services import logs as logs_services
-from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs import (
     PROCESSING_RUNS_IDS,
     PROCESSING_RUNS_LOCK,
@@ -229,31 +228,12 @@ async def _process_job(job_id: UUID):
         if (
             initial_status != job_model.status
             and job_model.status == JobStatus.RUNNING
+            and job_model.job_num == 0  # gateway connects only to the first node
             and run.run_spec.configuration.type == "service"
         ):
-            res = await session.execute(
-                select(GatewayModel).where(
-                    GatewayModel.project_id == project.id,
-                    GatewayModel.name == job.job_spec.gateway.gateway_name,
-                )
-            )
+            gateway = await session.get(GatewayModel, run_model.gateway_id)
             try:
-                if (gateway := res.scalar_one_or_none()) is None:
-                    raise GatewayError("Gateway is not found")
-                if (
-                    conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
-                ) is None:
-                    raise GatewayError("Gateway is not connected")
-
-                try:
-                    await run_async(
-                        conn.client.register_service,
-                        project.name,
-                        job,
-                        job_provisioning_data,
-                    )
-                except (httpx.RequestError, SSHError) as e:
-                    raise GatewayError(str(e))
+                await gateways.register_replica(gateway, run, job_provisioning_data)
                 logger.debug(
                     *job_log(
                         "service is registered: %s, age=%s",
@@ -273,7 +253,6 @@ async def _process_job(job_id: UUID):
                 )
                 job_model.status = JobStatus.FAILED
                 job_model.error_code = JobErrorCode.GATEWAY_ERROR
-                # TODO(egor-s): retry?
 
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()

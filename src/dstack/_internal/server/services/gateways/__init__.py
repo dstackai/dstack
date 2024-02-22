@@ -19,9 +19,14 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
-from dstack._internal.core.models.runs import Job
+from dstack._internal.core.models.runs import JobProvisioningData, Run
 from dstack._internal.server import settings
-from dstack._internal.server.models import GatewayComputeModel, GatewayModel, ProjectModel
+from dstack._internal.server.models import (
+    GatewayComputeModel,
+    GatewayModel,
+    ProjectModel,
+    RunModel,
+)
 from dstack._internal.server.services.backends import (
     get_project_backend_by_type_or_error,
     get_project_backends_with_models,
@@ -257,56 +262,68 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
             return name
 
 
-async def register_service_jobs(
-    session: AsyncSession, project: ProjectModel, run_name: str, jobs: List[Job]
+async def register_service(
+    session: AsyncSession,
+    run_model: RunModel,
+    options: dict,
 ):
-    # TODO(egor-s): add replicas support
-    # we publish only one job
-    job = jobs[0]
-    if job.job_spec.gateway is None:
-        raise ServerClientError("Job spec has no gateway")
+    # TODO(egor-s): allow to configure gateway name
+    gateway_name: Optional[str] = None
 
-    gateway_name = job.job_spec.gateway.gateway_name
     if gateway_name is None:
-        gateway = project.default_gateway
+        gateway = run_model.project.default_gateway
         if gateway is None:
             raise ResourceNotExistsError("Default gateway is not set")
     else:
         gateway = await get_project_gateway_model_by_name(
-            session=session, project=project, name=gateway_name
+            session=session, project=run_model.project, name=gateway_name
         )
         if gateway is None:
             raise ResourceNotExistsError("Gateway does not exist")
-
     if gateway.gateway_compute is None:
         raise ServerClientError("Gateway has no instance associated with it")
 
-    domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
-
-    job.job_spec.gateway.gateway_name = gateway.name
-    if domain is not None:
-        job.job_spec.gateway.secure = True
-        job.job_spec.gateway.public_port = 443
-        job.job_spec.gateway.hostname = f"{run_name}.{domain}"
-    else:
+    wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
+    if wildcard_domain is None:
         raise ServerClientError("Domain is required for gateway")
+
+    run_model.gateway = gateway
+    service_address = f"{run_model.run_name}.{wildcard_domain}"
 
     if (conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)) is None:
         raise ServerClientError("Gateway is not connected")
 
     try:
-        logger.debug("Running service preflight: %s", job.job_spec.gateway.hostname)
+        logger.debug("Running service preflight: %s", service_address)
         await run_async(
             conn.client.preflight,
-            project.name,
-            job.job_spec.gateway.hostname,
-            project.ssh_private_key,
-            job.job_spec.gateway.options,
+            run_model.project.name,
+            service_address,
+            run_model.project.ssh_private_key,
+            options,
         )
     except SSHError:
         raise ServerClientError("Gateway tunnel is not working")
     except httpx.RequestError as e:
         raise GatewayError(f"Gateway is not working: {e}")
+
+
+async def register_replica(
+    gateway: GatewayModel, run: Run, job_provisioning_data: JobProvisioningData
+):
+    if gateway is None:
+        raise GatewayError("Gateway is not found")
+    if (conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)) is None:
+        raise GatewayError("Gateway is not connected")
+
+    try:
+        await run_async(
+            conn.client.register_service,
+            run,
+            job_provisioning_data,
+        )
+    except (httpx.RequestError, SSHError) as e:
+        raise GatewayError(str(e))
 
 
 async def init_gateways(session: AsyncSession):
