@@ -192,7 +192,7 @@ async def set_gateway_wildcard_domain(
     if gateway is None:
         raise ResourceNotExistsError()
     if gateway.backend.type == BackendType.DSTACK:
-        raise ServerClientError("Custom domains for dstack Cloud gateway are not supported")
+        raise ServerClientError("Custom domains for dstack Sky gateway are not supported")
     await session.execute(
         update(GatewayModel)
         .where(

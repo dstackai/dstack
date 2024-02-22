@@ -9,7 +9,7 @@ class BackendType(str, enum.Enum):
     Attributes:
         AWS (BackendType): Amazon Web Services
         AZURE (BackendType): Microsoft Azure
-        DSTACK (BackendType): dstack Cloud
+        DSTACK (BackendType): dstack Sky
         GCP (BackendType): Google Cloud Platform
         DATACRUNCH (BackendType): DataCrunch
         KUBERNETES (BackendType): Kubernetes

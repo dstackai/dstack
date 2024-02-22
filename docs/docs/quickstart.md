@@ -3,9 +3,9 @@
 ??? info "Set up the CLI"
     To use the open-source version, make sure to [install the server](installation/index.md) and configure backends.
 
-    To use the cloud version, install the CLI and run the `dstack config` command:
+    If you're using [dstack Sky](https://sky.dstack.ai), install the CLI and run the `dstack config` command:
     
-    ![](../../assets/images/dstack-cloud-config.png){ width=800 }
+    ![](../assets/images/dstack-cloud-config.png){ width=800 }
 
     Once the CLI is set up, follow the quickstart.
 

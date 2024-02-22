@@ -39,7 +39,7 @@ it's possible to offer the model via the OpenAI-compatible interface.
     In case your service has the [model mapping](#model-mapping) configured, `dstack` will 
     automatically make your model available at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
 
-    If you're using the cloud version of `dstack`, the gateway is set up for you.
+    If you're using [dstack Sky](https://sky.dstack.ai), the gateway is set up for you.
 
 ## Define a configuration
 

@@ -30,7 +30,7 @@ resources:
 
 !!! warning "Gateway"
     Before running a service, ensure that you have configured a [gateway](../docs/concepts/services.md#set-up-a-gateway).
-    If you're using dstack Cloud, the default gateway is configured automatically for you.
+    If you're using [dstack Sky](https://sky.dstack.ai), the default gateway is configured automatically for you.
 
 <div class="termy">
 
