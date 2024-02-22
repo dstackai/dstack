@@ -18,8 +18,8 @@ To integrate a new cloud provider into `gpuhunt`, follow these steps:
 https://github.com/dstackai/gpuhunt.git
 ```
  2. **Create the Provider Class**: Navigate to the `providers` directory and create a new Python file for your provider:
-- Path: `src/gpuhunt/providers/<yourprovider>.py`
-- Replace `<yourprovider>` with the name of your cloud provider.
+- Path: `src/gpuhunt/providers/<YourProvider>.py`
+- Replace `<YourProvider>` with the name of your cloud provider.
 
 3. **Implement the Provider Class**: Your class should meet the following criteria:
 
@@ -33,23 +33,18 @@ https://github.com/dstackai/gpuhunt.git
 - **Define the `NAME` Class Variable**: This should be a unique identifier for your provider.
 
   ```python
-  NAME = 'your_provider_name'
+  NAME = '<YourProvider>_name'
   ```
 
-- **Implement the `get` Method**: This method is responsible for fetching the available GPU resources from your cloud provider. Implement it according to the `AbstractProvider` interface.
+- **Implement the `get` Method**: This method is responsible for fetching the available GPU resources information from your cloud provider. Implement it according to the `AbstractProvider` interface.
 
   ```python
-  def get(self, query_filter=None):
+  def get(self, query_filter: Optional[QueryFilter] = None, balance_resources: bool = True) -> List[RawCatalogItem]:
       # Implementation here
   ```
 - **Utilize `query_filter`**: (Optional) Use this parameter to speed up the query process by filtering results early on.
 
-- **Apply `balance_resources`**: If your backend offers detailed control over resources (like RAM and CPU), use this method to prevent configurations that are not optimal, such as pairing a high-end GPU with insufficient RAM.
-
-  ```python
-  def balance_resources(self, configurations):
-      # Implementation to balance or filter configurations
-  ```
+- **Use `balance_resources`**: If your backend offers detailed control over resources (like RAM and CPU), to prevent configurations that are not optimal, such as pairing a high-end GPU with insufficient RAM (i.e., A100 80GB with 1 GB of RAM).
 
 4. **Understand Provider Types**:
 - `gpuhunt` distinguishes between two types of providers:
@@ -60,9 +55,9 @@ https://github.com/dstackai/gpuhunt.git
 5. **Data Quality Tests for Offline Providers**:
 - If your provider is classified as `offline`, you should add data quality tests to ensure the integrity of the precomputed CSV files. These tests are located in:
   ```
-  src/integrity_tests/test_<yourprovider>.py
+  src/integrity_tests/test_<YourProvider>.py
   ```
-- Replace `<yourprovider>` with the name of your cloud provider. These tests verify the generated CSV files before publication to ensure accuracy and reliability.
+- Replace `<YourProvider>` with the name of your cloud provider. These tests verify the generated CSV files before publication to ensure accuracy and reliability.
 
 
 ## Integrating a Cloud Provider into dstackai/dstack
@@ -81,7 +76,7 @@ git clone https://github.com/dstackai/dstack.git
 
 ### Modifying `setup.py`
 
-1. **Add Dependencies**: Incorporate any dependencies required by your cloud provider into `setup.py`. Create a separate section named `<yourprovider>` for these dependencies and ensure to update the `all` section to include them.
+1. **Add Dependencies**: Incorporate any dependencies required by your cloud provider into `setup.py`. Create a separate section named `<YourProvider>` for these dependencies and ensure to update the `all` section to include them.
 
 ### Extending Backend Models
 
@@ -90,18 +85,18 @@ git clone https://github.com/dstackai/dstack.git
 ```python
 <YOURBACKEND> = '<your_backend>'
 ```
-2. **Create Provider Directory**: Establish a new directory at `src/dstack/_internal/core/backends/<yourprovider> `to house your provider’s backend and compute implementations.
+2. **Create Provider Directory**: Establish a new directory at `src/dstack/_internal/core/backends/<YourProvider> `to house your provider’s backend and compute implementations.
 
 
 3. **Backend Implementation:** 
-In `__init__.py`, implement `YourProviderBackend`, inheriting from `BaseBackend`. Define the `TYPE` class variable to associate your backend with the newly added enum entry.
+In `__init__.py`, implement `<YourProvider>Backend`, inheriting from `BaseBackend`. Define the `TYPE` class variable to associate your backend with the newly added enum entry.
 
 4. **Compute Implementation:** 
 In `compute.py`, develop `<YourProvider>Compute`, inheriting from `Compute`.<br> 
 You'll need to implement methods like      
-    - `get_offers` It will be called every time the user wants to provision something. Add availability information if possible. 
-	- `run_job` Here you create a compute resource and run `dstack-shim` or `dstack-runner`.
-	- `terminate_instance` This method should not raise an error, if there is no such instance.
+  - `get_offers` It will be called every time the user wants to provision something. Add availability information if possible. 
+  - `run_job` Here you create a compute resource and run `dstack-shim` or `dstack-runner`.
+  - `terminate_instance` This method should not raise an error, if there is no such instance.
 
 5. **Configuration Implementation**:
 - Implement the `<YourProvider>Config` class in `config.py`, inheriting from both `BackendConfig` and `<YourProvider>StoredConfig`. This configuration is accepted by the `<YourProvider>Backend` class.
@@ -111,7 +106,7 @@ You'll need to implement methods like
  1. **Create Configuration Models:**
 
 You may have multiple models for credentials (i.e., default credentials & explicit credentials). 
- In `src/dstack/_internal/core/models/backends/<yourprovider>.py`, create models for your provider's configuration:
+ In `src/dstack/_internal/core/models/backends/<YourProvider>.py`, create models for your provider's configuration:
 - `<YourProvider>ConfigInfo:` create a model with all configuration details except credentials.
 - `<YourProvider>ConfigInfoWithCreds`: create a model with credentials.
 - `<YourProvider>ConfigInfoWithCredsPartial`: create a model with all fields optional.
@@ -122,7 +117,7 @@ Ensure all new models are imported into `src/dstack/_internal/core/models/backen
 
 ### Finalizing Integration
 1. **Implement Configurator:**
-Develop `<YourProvider>Configurator` in `src/dstack/_internal/server/services/backends/configurators/<yourprovider>.py`.
+Develop `<YourProvider>Configurator` in `src/dstack/_internal/server/services/backends/configurators/<YourProvider>.py`.
 
 2. **Add YAML Configuration Model:**
 Insert `<YourProvider>Config` in `src/dstack/_internal/server/services/config.py` to represent the provider’s configuration in YAML.
@@ -131,12 +126,7 @@ Insert `<YourProvider>Config` in `src/dstack/_internal/server/services/config.py
 Add a safe import for your backend in `src/dstack/_internal/server/services/backends/__init__.py` and update expected backends in tests within `src/tests/_internal/server/routers/test_backends.py.`
 
 
-Note: There are two types of compute in dstack:
 
-- `dockerized: False` — the backend runs `dstack-shim`. This setup is common for VMs.
-- `dockerized: True`— the backend directly runs `dstack-runner` inside a docker container.
-
-The Compute class interface may undergo changes with the upcoming pools feature release, so keep an eye out for updates.
 
 
 ## Appendix
@@ -150,6 +140,7 @@ dstack expects VM backends to have:
 - External IP & 1 port for SSH (any)
 - cloud-init script (preferred)
 - API for creating and terminating instances
+- Safe imports
 
 To speed up provisioning, we prebuild VM images with necessary dependencies, available in `packer/`.
 
@@ -160,6 +151,12 @@ For Docker-only backends, dstack requires:
 - External IP & 1 port for SSH (any)
 - Container entrypoint override (~2KB)
 - API for creating and terminating containers
+- Safe imports
 
+Note: There are two types of compute in dstack:
 
+- `dockerized: False` — the backend runs `dstack-shim`. This setup is common for VMs.
+- `dockerized: True`— the backend directly runs `dstack-runner` inside a docker container.
+
+The Compute class interface may undergo changes with the upcoming pools feature release, so keep an eye out for updates.
 
