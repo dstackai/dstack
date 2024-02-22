@@ -101,6 +101,12 @@ class PoolCommand(APIBaseCommand):
         add_parser = subparsers.add_parser(
             "add", help="Add instance to pool", formatter_class=self._parser.formatter_class
         )
+        self._parser.add_argument(
+            "--max-offers",
+            help="Number of offers to show in the run plan",
+            type=int,
+            default=3,
+        )
         add_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )
@@ -262,11 +268,17 @@ class PoolCommand(APIBaseCommand):
         with console.status("Getting instances..."):
             pool_offers = self.api.runs.get_offers(profile, requirements)
 
-        offers = [o for o in pool_offers.instances]
-        print_offers_table(pool_offers.pool_name, profile, requirements, offers)
-        if not offers:
+        print_offers_table(
+            pool_name=pool_offers.pool_name,
+            profile=profile,
+            requirements=requirements,
+            instance_offers=pool_offers.instances,
+            offers_limit=args.max_offers,
+        )
+        if not pool_offers.instances:
             console.print("\nThere are no offers with these criteria. Exiting...")
             return
+
         if not args.yes and not confirm_ask("Continue?"):
             console.print("\nExiting...")
             return
@@ -345,7 +357,7 @@ def print_offers_table(
     profile: Profile,
     requirements: Requirements,
     instance_offers: Sequence[InstanceOfferWithAvailability],
-    offers_limit: int = 3,
+    offers_limit: int,
 ) -> None:
     pretty_req = requirements.pretty_format(resources_only=True)
     max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
