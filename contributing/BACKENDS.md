@@ -141,11 +141,10 @@ dstack expects VM backends to have:
 - External IP & 1 port for SSH (any)
 - cloud-init script (preferred)
 - API for creating and terminating instances
-- Safe imports
 
 To speed up provisioning, we prebuild VM images with necessary dependencies, available in `packer/`.
 
-Examples: Microsoft Azure, AWS, Google Cloud Platform
+Examples: `aws`, `azure`, `gcp` etc
 
 ### Adding Docker-only Compute Backend
 For Docker-only backends, dstack requires:
@@ -154,9 +153,8 @@ For Docker-only backends, dstack requires:
 - External IP & 1 port for SSH (any)
 - Container entrypoint override (~2KB)
 - API for creating and terminating containers
-- Safe imports
 
-Examples: Amazon Elastic Container Service(ECS), Google Cloud Run
+Examples: `kubernetes`, `vastai` etc
 
 Note: There are two types of compute in dstack:
 
