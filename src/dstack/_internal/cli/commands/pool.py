@@ -393,8 +393,8 @@ def print_offers_table(
 
     print_offers = instance_offers[:offers_limit]
 
-    for i, offer in enumerate(print_offers, start=1):
-        r = offer.instance.resources
+    for index, offer in enumerate(print_offers, start=1):
+        resources = offer.instance.resources
 
         availability = ""
         if offer.availability in {
@@ -403,15 +403,15 @@ def print_offers_table(
         }:
             availability = offer.availability.value.replace("_", " ").title()
         offers_table.add_row(
-            f"{i}",
+            f"{index}",
             offer.backend,
             offer.region,
             offer.instance.name,
-            r.pretty_format(),
-            "yes" if r.spot else "no",
+            resources.pretty_format(),
+            "yes" if resources.spot else "no",
             f"${offer.price:g}",
             availability,
-            style=None if i == 1 else "secondary",
+            style=None if index == 1 else "secondary",
         )
     if len(print_offers) > offers_limit:
         offers_table.add_row("", "...", style="secondary")
