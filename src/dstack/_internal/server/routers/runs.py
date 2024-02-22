@@ -80,6 +80,7 @@ async def get_offers(
     )
 
     offers = await runs.get_run_plan_by_requirements(project, body.profile, body.requirements)
+
     instances = [instance for _, instance in offers]
 
     return GetOffersResponse(pool_name=active_pool.name, instances=instances)
@@ -112,6 +113,7 @@ async def create_instance(
 
     if instance is None:
         raise ServerClientError(msg="Failed to create an instance")
+
     return instance
 
 
