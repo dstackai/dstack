@@ -89,30 +89,41 @@ async def _process_job(job_id):
                 except Exception as e:
                     logger.warning("failed to unregister service: %s", e)
 
+        job_provisioning_data = None
+        if job_model.job_provisioning_data is not None:
+            job_provisioning_data = parse_raw_as(
+                JobProvisioningData, job_model.job_provisioning_data
+            )
+
         if job_model.instance is not None:
             job_model.used_instance_id = job_model.instance.id
+
             if job_model.instance.status == InstanceStatus.BUSY:
                 job_model.instance.status = InstanceStatus.READY
             elif job_model.instance.status != InstanceStatus.TERMINATED:
                 # instance was CREATING or STARTING (specially for the job)
                 # schedule for termination
                 job_model.instance.status = InstanceStatus.TERMINATING
-            job_model.instance.last_job_processed_at = get_current_datetime()
-            job_model.instance = None
 
-        server_ssh_private_key = job_model.project.ssh_private_key
-        if job_model.job_provisioning_data is not None:
-            job_provisioning_data = parse_raw_as(
-                JobProvisioningData, job_model.job_provisioning_data
-            )
+            job_model.instance.last_job_processed_at = get_current_datetime()
+            if job_provisioning_data is None or job_provisioning_data.dockerized:
+                job_model.instance = None
+            else:
+                # stop vastai/k8s instance immediately
+                job_model.instance.status = InstanceStatus.TERMINATING
+
+        if job_provisioning_data is not None:
+            server_ssh_private_key = job_model.project.ssh_private_key
             await run_async(
                 submit_stop,
                 server_ssh_private_key,
                 job_provisioning_data,
                 job_model,
             )
+
         job_model.removed = True
         job_model.last_processed_at = get_current_datetime()
+
         await session.commit()
         logger.info(*job_log("marked as removed", job_model))
 
