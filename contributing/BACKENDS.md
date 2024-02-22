@@ -93,6 +93,7 @@ In `__init__.py`, implement `<YourProvider>Backend`, inheriting from `BaseBacken
 
 4. **Compute Implementation:** 
 In `compute.py`, develop `<YourProvider>Compute`, inheriting from `Compute`.<br> 
+
 You'll need to implement methods like      
   - `get_offers` It will be called every time the user wants to provision something. Add availability information if possible. 
   - `run_job` Here you create a compute resource and run `dstack-shim` or `dstack-runner`.
@@ -144,6 +145,8 @@ dstack expects VM backends to have:
 
 To speed up provisioning, we prebuild VM images with necessary dependencies, available in `packer/`.
 
+Examples: Microsoft Azure, AWS, Google Cloud Platform
+
 ### Adding Docker-only Compute Backend
 For Docker-only backends, dstack requires:
 
@@ -152,6 +155,8 @@ For Docker-only backends, dstack requires:
 - Container entrypoint override (~2KB)
 - API for creating and terminating containers
 - Safe imports
+
+Examples: Amazon Elastic Container Service(ECS), Google Cloud Run
 
 Note: There are two types of compute in dstack:
 
