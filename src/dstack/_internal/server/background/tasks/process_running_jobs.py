@@ -12,7 +12,14 @@ from dstack._internal.core.errors import GatewayError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
-from dstack._internal.core.models.runs import Job, JobErrorCode, JobSpec, JobStatus, Run
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    Job,
+    JobErrorCode,
+    JobSpec,
+    JobStatus,
+    Run,
+)
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     GatewayModel,
@@ -140,6 +147,10 @@ async def _process_job(job_id: UUID):
                     secrets,
                     repo_creds,
                 )
+                if job_model.instance is not None:
+                    job_model.used_instance_id = job_model.instance.id
+                    if success:
+                        job_model.instance.status = InstanceStatus.BUSY
 
             if not success:
                 # check timeout
