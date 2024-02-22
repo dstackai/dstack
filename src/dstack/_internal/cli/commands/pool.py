@@ -343,8 +343,8 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
     table.add_column("REGION")
     table.add_column("RESOURCES")
     table.add_column("SPOT")
-    table.add_column("STATUS")
     table.add_column("PRICE")
+    table.add_column("STATUS")
     table.add_column("CREATED")
 
     for instance in instances:
@@ -360,8 +360,8 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
             instance.region,
             instance.instance_type.resources.pretty_format(),
             "yes" if instance.instance_type.resources.spot else "no",
-            f"[{style}]{instance.status.value}[/]",
             f"${instance.price:.4}",
+            f"[{style}]{instance.status.value}[/]",
             created,
         ]
         table.add_row(*row)
