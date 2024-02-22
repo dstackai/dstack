@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import time
 from threading import Thread
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, cast
 
 from pydantic import BaseModel
 
@@ -15,12 +15,15 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.lambdalabs.api_client import LambdaAPIClient
 from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
+from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 
@@ -48,6 +51,41 @@ class LambdaCompute(Compute):
         offers_with_availability = self._get_offers_with_availability(offers)
         return offers_with_availability
 
+    def create_instance(
+        self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration
+    ) -> LaunchedInstanceInfo:
+        commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
+        # shim is asssumed to be run under root
+        launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"
+
+        setup_ssh_key = None
+        user_ssh_key = None
+        for ssh_key in instance_config.ssh_keys:
+            if setup_ssh_key is not None and user_ssh_key is not None:
+                break
+            if setup_ssh_key is None and ssh_key.private is not None:
+                setup_ssh_key = ssh_key
+                continue
+            if user_ssh_key is None:
+                user_ssh_key = ssh_key
+
+        if setup_ssh_key is None:
+            raise ConfigurationError("Provide ssh key with private part for instance setup")
+
+        if user_ssh_key is None:
+            user_ssh_key = setup_ssh_key
+
+        return _run_instance(
+            api_client=self.api_client,
+            region=instance_offer.region,
+            instance_type_name=instance_offer.instance.name,
+            user_ssh_public_key=user_ssh_key.public,
+            project_ssh_public_key=setup_ssh_key.public,
+            project_ssh_private_key=cast(str, setup_ssh_key.private),
+            instance_name=instance_config.instance_name,
+            launch_command=launch_command,
+        )
+
     def run_job(
         self,
         run: Run,
@@ -56,21 +94,21 @@ class LambdaCompute(Compute):
         project_ssh_public_key: str,
         project_ssh_private_key: str,
     ) -> LaunchedInstanceInfo:
-        commands = get_shim_commands(
-            authorized_keys=[run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(
+                    public=project_ssh_public_key.strip(), private=project_ssh_private_key.strip()
+                ),
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+            ],
+            job_docker_config=None,
+            user=run.user,
         )
-        # shim is asssumed to be run under root
-        launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"
-        return _run_instance(
-            api_client=self.api_client,
-            region=instance_offer.region,
-            instance_type_name=instance_offer.instance.name,
-            user_ssh_public_key=run.run_spec.ssh_key_pub,
-            project_ssh_public_key=project_ssh_public_key,
-            project_ssh_private_key=project_ssh_private_key,
-            instance_name=get_instance_name(run, job),
-            launch_command=launch_command,
-        )
+
+        launched_instance_info = self.create_instance(instance_offer, instance_config)
+        return launched_instance_info
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
