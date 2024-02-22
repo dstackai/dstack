@@ -260,6 +260,7 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 async def register_service_jobs(
     session: AsyncSession, project: ProjectModel, run_name: str, jobs: List[Job]
 ):
+    # TODO(egor-s): add replicas support
     # we publish only one job
     job = jobs[0]
     if job.job_spec.gateway is None:

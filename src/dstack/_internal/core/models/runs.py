@@ -162,12 +162,6 @@ class Job(BaseModel):
     job_spec: JobSpec
     job_submissions: List[JobSubmission]
 
-    def is_retry_active(self):
-        return self.job_spec.retry_policy.retry and (
-            self.job_spec.retry_policy.limit is None
-            or self.job_submissions[0].age < timedelta(seconds=self.job_spec.retry_policy.limit)
-        )
-
 
 class RunSpec(BaseModel):
     run_name: Optional[str]

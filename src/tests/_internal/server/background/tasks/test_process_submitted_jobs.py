@@ -15,7 +15,7 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, ProfileRetryPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobStatus
+from dstack._internal.core.models.runs import InstanceStatus, JobErrorCode, JobStatus
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.services.pools import (
@@ -118,9 +118,7 @@ class TestProcessSubmittedJobs:
         assert pool_job_provisioning_data == job.job_provisioning_data
 
     @pytest.mark.asyncio
-    async def test_transitions_job_with_retry_to_pending_on_no_capacity(
-        self, test_db, session: AsyncSession
-    ):
+    async def test_fails_job_when_no_capacity(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
         repo = await create_repo(
@@ -153,47 +151,7 @@ class TestProcessSubmittedJobs:
 
         await session.refresh(job)
         assert job is not None
-        assert job.status == JobStatus.PENDING
-
-        await session.refresh(project)
-        assert not project.default_pool.instances
-
-    @pytest.mark.asyncio
-    async def test_transitions_job_with_outdated_retry_to_failed_on_no_capacity(
-        self, test_db, session: AsyncSession
-    ):
-        project = await create_project(session=session)
-        user = await create_user(session=session)
-        repo = await create_repo(
-            session=session,
-            project_id=project.id,
-        )
-        run = await create_run(
-            session=session,
-            project=project,
-            repo=repo,
-            user=user,
-            run_name="test-run",
-            run_spec=get_run_spec(
-                run_name="test-run",
-                repo_id=repo.name,
-                profile=Profile(
-                    name="default",
-                    retry_policy=ProfileRetryPolicy(retry=True, limit=3600),
-                ),
-            ),
-        )
-        job = await create_job(
-            session=session,
-            run=run,
-            submitted_at=datetime(2023, 1, 2, 3, 0, 0, tzinfo=timezone.utc),
-        )
-        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
-            datetime_mock.return_value = datetime(2023, 1, 2, 5, 0, 0, tzinfo=timezone.utc)
-            await process_submitted_jobs()
-
-        await session.refresh(job)
-        assert job is not None
+        assert job.error_code == JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
         assert job.status == JobStatus.FAILED
 
         await session.refresh(project)

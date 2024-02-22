@@ -139,7 +139,17 @@ class TestProcessRuns:
         await session.refresh(run)
         assert run.status == JobStatus.FAILED
 
-    # TODO(egor-s): test_pending_to_submitted
+    @pytest.mark.asyncio
+    async def test_pending_to_submitted(self, test_db, session: AsyncSession, run: RunModel):
+        run.status = JobStatus.PENDING
+        await create_job(session=session, run=run, status=JobStatus.FAILED)
+
+        await process_runs.process_single_run(run.id, [])
+        await session.refresh(run)
+        assert run.status == JobStatus.SUBMITTED
+        assert len(run.jobs) == 2
+        assert run.jobs[0].status == JobStatus.FAILED
+        assert run.jobs[1].status == JobStatus.SUBMITTED
 
 
 # TODO(egor-s): TestProcessRunsMultiNode

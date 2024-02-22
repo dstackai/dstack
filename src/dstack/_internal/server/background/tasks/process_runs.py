@@ -6,6 +6,7 @@ from typing import Iterable, List, Tuple
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.instances import InstanceOffer
 from dstack._internal.core.models.profiles import ProfileRetryPolicy
@@ -17,6 +18,10 @@ from dstack._internal.server.services.jobs import (
     PROCESSING_RUNS_LOCK,
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
+)
+from dstack._internal.server.services.runs import (
+    create_job_model_for_new_submission,
+    run_model_to_run,
 )
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -85,9 +90,34 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
     return run_id
 
 
-async def process_pending_run(session: AsyncSession, run: RunModel):
+async def process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
-    pass  # TODO(ego-s): do we need pending status?
+
+    # TODO(egor-s): consider retry delay
+    # TODO(egor-s): respect min_replicas and auto-scaling
+
+    await session.execute(
+        sa.select(RunModel)
+        .where(RunModel.id == run_model.id)
+        .execution_options(populate_existing=True)
+        .options(joinedload(RunModel.project))
+        .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.repo))
+    )
+    run = run_model_to_run(run_model)
+
+    for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
+        for job_model in job_models:
+            new_job_model = create_job_model_for_new_submission(
+                run_model=run_model,
+                job=run.jobs[job_model.job_num],
+                status=JobStatus.SUBMITTED,
+            )
+            session.add(new_job_model)
+        break  # TODO(egor-s): add replicas support
+
+    run_model.status = JobStatus.SUBMITTED
+    logger.info("%s: run status has changed PENDING -> SUBMITTED", fmt(run_model))
 
 
 async def process_active_run(session: AsyncSession, run_model: RunModel):
@@ -171,8 +201,8 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
         logger.info(
             "%s: run status has changed %s -> %s",
             fmt(run_model),
-            run_model.status.value,
-            new_status.value,
+            run_model.status.name,
+            new_status.name,
         )
         run_model.status = new_status
 
@@ -181,7 +211,7 @@ async def process_finished_run(session: AsyncSession, run: RunModel):
     """Done, failed, or terminated. Stop all jobs, unregister the service"""
     for job in run.jobs:
         if not job.status.is_finished():
-            logger.info("%s is %s: terminating job %s", fmt(run), run.status.value, job.job_name)
+            logger.info("%s is %s: terminating job %s", fmt(run), run.status.name, job.job_name)
             job.status = JobStatus.TERMINATED
             # TODO(egor-s): set job.error_code
     # TODO(egor-s): unregister the service

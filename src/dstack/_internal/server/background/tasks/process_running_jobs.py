@@ -43,7 +43,6 @@ from dstack._internal.server.services.repos import get_code_model, repo_model_to
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
-    create_job_model_for_new_submission,
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
@@ -224,16 +223,6 @@ async def _process_job(job_id: UUID):
                 job_model.used_instance_id = job_model.instance.id
                 job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
                 job_model.instance = None
-
-                # TODO(egor-s): move to process_runs
-                if job.is_retry_active():
-                    if job_submission.job_provisioning_data.instance_type.resources.spot:
-                        new_job_model = create_job_model_for_new_submission(
-                            run_model=run_model,
-                            job=job,
-                            status=JobStatus.PENDING,
-                        )
-                        session.add(new_job_model)
 
                 # job will be terminated by process_finished_jobs
 

@@ -293,9 +293,9 @@ async def submit_run(
     )
     session.add(run_model)
 
-    # TODO(egor-s): move jobs creation to process_runs
     jobs = get_jobs_from_run_spec(run_spec)
     if run_spec.configuration.type == "service":
+        # TODO(egor-s): write gateway to run_model, not jobs
         await gateways.register_service_jobs(session, project, run_spec.run_name, jobs)
 
     for job in jobs:
@@ -527,6 +527,7 @@ async def create_instance(
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:
     jobs: List[Job] = []
     # JobSpec from JobConfigurator doesn't have gateway information for `service` type
+    # TODO(egor-s): consider replicas
     run_jobs = sorted(run_model.jobs, key=lambda j: (j.job_num, j.submission_num))
     for job_num, job_submissions in itertools.groupby(run_jobs):
         job_spec = None
@@ -555,6 +556,7 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
         jobs=jobs,
         latest_job_submission=latest_job_submission,
     )
+    # TODO(egor-s): add replicas support
     run.cost = _get_run_cost(run)
     run.service = _get_run_service(run)
     return run
