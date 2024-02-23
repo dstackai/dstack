@@ -19,8 +19,10 @@ from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 
@@ -49,16 +51,13 @@ class NebiusCompute(Compute):
             for offer in offers
         ]
 
-    def run_job(
+    def create_instance(
         self,
-        run: Run,
-        job: Job,
         instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
+        instance_config: InstanceConfiguration,
     ) -> LaunchedInstanceInfo:
         cuda = len(instance_offer.instance.resources.gpus) > 0
-        security_group_id = self._get_security_group_id(project_name=run.project_name)
+        security_group_id = self._get_security_group_id(project_name=instance_config.project_name)
         subnet_id = self._get_subnet_id(zone=instance_offer.region)
         image_id = self._get_image_id(cuda=cuda)
 
@@ -66,7 +65,7 @@ class NebiusCompute(Compute):
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             resp = self.api_client.compute_instances_create(
                 folder_id=self.config.folder_id,
-                name=get_instance_name(run, job),
+                name=instance_config.instance_name,
                 zone_id=instance_offer.region,
                 platform_id=instance_offer.instance.name,
                 resources_spec=ResourcesSpec(
@@ -76,18 +75,13 @@ class NebiusCompute(Compute):
                     gpus=len(instance_offer.instance.resources.gpus),
                 ),
                 metadata={
-                    "user-data": get_user_data(
-                        authorized_keys=[
-                            run.run_spec.ssh_key_pub.strip(),
-                            project_ssh_public_key.strip(),
-                        ]
-                    )
+                    "user-data": get_user_data(authorized_keys=instance_config.get_public_keys())
                 },
                 disk_size_gb=disk_size,
                 image_id=image_id,
                 subnet_id=subnet_id,
                 security_group_ids=[security_group_id],
-                labels=self._get_labels(project=run.project_name),
+                labels=self._get_labels(project=instance_config.project_name),
             )
         except ForbiddenError as e:
             if instance_offer.instance.name in e.args[0]:
@@ -115,6 +109,28 @@ class NebiusCompute(Compute):
             ssh_proxy=None,
             backend_data=None,
         )
+
+    def run_job(
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ) -> LaunchedInstanceInfo:
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=project_ssh_public_key.strip()),
+            ],
+            job_docker_config=None,
+            user=run.user,
+        )
+
+        launched_instance_info = self.create_instance(instance_offer, instance_config)
+        return launched_instance_info
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
