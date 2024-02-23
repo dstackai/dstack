@@ -5,6 +5,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceRuntime,
     InstanceType,
     LaunchedInstanceInfo,
     Resources,
@@ -29,6 +30,7 @@ class LocalCompute(Compute):
                 region="local",
                 price=0.00,
                 availability=InstanceAvailability.AVAILABLE,
+                instance_runtime=InstanceRuntime.RUNNER,
             )
         ]
 
