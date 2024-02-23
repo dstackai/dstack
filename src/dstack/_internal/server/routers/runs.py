@@ -3,7 +3,7 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ResourceNotExistsError, ServerClientError
+from dstack._internal.core.errors import ComputeError, ResourceNotExistsError, ServerClientError
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.runs import Run, RunPlan
 from dstack._internal.server.db import get_session
@@ -95,16 +95,21 @@ async def create_instance(
     instance_name = await generate_instance_name(
         session=session, project=project, pool_name=body.pool_name
     )
-    instance = await runs.create_instance(
-        session=session,
-        project=project,
-        user=user,
-        ssh_key=body.ssh_key,
-        pool_name=body.pool_name,
-        instance_name=instance_name,
-        profile=body.profile,
-        requirements=body.requirements,
-    )
+
+    try:
+        instance = await runs.create_instance(
+            session=session,
+            project=project,
+            user=user,
+            ssh_key=body.ssh_key,
+            pool_name=body.pool_name,
+            instance_name=instance_name,
+            profile=body.profile,
+            requirements=body.requirements,
+        )
+    except ComputeError as e:
+        raise ServerClientError(str(e))
+
     if instance is None:
         raise ServerClientError(msg="Failed to create an instance")
     return instance
