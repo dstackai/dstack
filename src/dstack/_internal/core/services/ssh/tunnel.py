@@ -32,7 +32,18 @@ class SSHTunnel:
 
     def open(self):
         # ControlMaster and ControlPath are always set
-        command = ["ssh", "-f", "-N", "-M", "-S", self.control_sock_path, "-i", self.id_rsa_path]
+        command = [
+            "ssh",
+            "-o",
+            "IdentitiesOnly=yes",
+            "-f",
+            "-N",
+            "-M",
+            "-S",
+            self.control_sock_path,
+            "-i",
+            self.id_rsa_path,
+        ]
         for k, v in self.options.items():
             command += ["-o", f"{k}={v}"]
         for port_remote, port_local in self.ports.items():
