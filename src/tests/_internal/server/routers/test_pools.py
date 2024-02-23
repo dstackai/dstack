@@ -392,7 +392,7 @@ class TestShowPool:
                     "job_status": None,
                     "hostname": "running_instance.ip",
                     "status": "ready",
-                    "created": "2023-01-02T03:04:00",
+                    "created": "2023-01-02T03:04:00+00:00",
                     "region": "en",
                     "price": 0.1,
                 }
@@ -529,7 +529,7 @@ class TestRemoveInstance:
                     "job_status": None,
                     "hostname": "running_instance.ip",
                     "status": "terminating",
-                    "created": "2023-01-02T03:04:00",
+                    "created": "2023-01-02T03:04:00+00:00",
                     "region": "en",
                     "price": 0.1,
                 }
