@@ -14,7 +14,13 @@ from sqlalchemy.orm import joinedload
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.backends.base import Backend
-from dstack._internal.core.errors import BackendError, RepoDoesNotExistError, ServerClientError
+from dstack._internal.core.errors import (
+    BackendError,
+    ComputeError,
+    RepoDoesNotExistError,
+    ServerClientError,
+)
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     DockerConfig,
     InstanceAvailability,
@@ -73,6 +79,12 @@ from dstack._internal.server.services.projects import list_project_models, list_
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
+
+BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
+    BackendType.AWS,
+    BackendType.DATACRUNCH,
+    BackendType.GCP,
+]
 
 logger = get_logger(__name__)
 
@@ -166,6 +178,9 @@ async def get_run_plan_by_requirements(
     if profile.backends is not None:
         backends = [b for b in backends if b.TYPE in profile.backends]
 
+    # filter backends with create_instance support
+    backends = [b for b in backends if b.TYPE in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]
+
     offers = await backends_services.get_instance_offers(
         backends=backends,
         requirements=requirements,
@@ -192,6 +207,17 @@ async def create_instance(
     if not offers:
         return
 
+    # Backends doesn't suppport create_instance
+    backend_types = set((backend.TYPE for backend, _ in offers))
+    if all(
+        (backend_type not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT)
+        for backend_type in backend_types
+    ):
+        backends = ", ".join(sorted(backend_types))
+        raise ComputeError(
+            f"Backends {backends} doesn't support create_intance. Try to select other backends"
+        )
+
     user_ssh_key = ssh_key
     project_ssh_key = SSHKey(
         public=project.ssh_public_key.strip(),
@@ -214,6 +240,8 @@ async def create_instance(
 
     if pool is None:
         pool = await create_pool_model(session, project, pool_name)
+
+    backends = {backend for backend, _ in offers}
 
     for backend, instance_offer in offers:
         # cannot create an instance in vastai/k8s. skip
@@ -241,6 +269,9 @@ async def create_instance(
                 instance_offer.region,
                 repr(e),
             )
+            continue
+        except NotImplementedError:
+            # skip a backend without create_instance support, continue with next backend and offer
             continue
 
         job_provisioning_data = JobProvisioningData(
