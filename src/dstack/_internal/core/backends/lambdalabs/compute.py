@@ -15,7 +15,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.lambdalabs.api_client import LambdaAPIClient
 from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
-from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.errors import BackendError, ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -162,6 +162,10 @@ def _run_instance(
     )
     instance_id = instances_ids[0]
     instance_info = _wait_for_instance(api_client, instance_id)
+
+    if instance_info is None:
+        raise BackendError("Didn't receive instance_info response")
+
     thread = Thread(
         target=_start_runner,
         kwargs={
@@ -174,6 +178,7 @@ def _run_instance(
         daemon=True,
     )
     thread.start()
+
     return LaunchedInstanceInfo(
         instance_id=instance_id,
         ip_address=instance_info["ip"],
@@ -215,20 +220,20 @@ _WAIT_FOR_INSTANCE_INTERVAL = 10
 def _wait_for_instance(
     api_client: LambdaAPIClient,
     instance_id: str,
-) -> Dict:
+) -> Optional[Dict]:
     for _ in range(_WAIT_FOR_INSTANCE_ATTEMPTS):
         instance_info = _get_instance_info(api_client, instance_id)
-        if instance_info is None or instance_info["status"] != "booting":
+        if instance_info is not None and instance_info["status"] != "booting":
             return instance_info
         time.sleep(_WAIT_FOR_INSTANCE_INTERVAL)
+    return None
 
 
 def _get_instance_info(api_client: LambdaAPIClient, instance_id: str) -> Optional[Dict]:
+    # TODO: use get instance https://cloud.lambdalabs.com/api/v1/docs#operation/getInstance
     instances = api_client.list_instances()
     instance_id_to_instance_map = {i["id"]: i for i in instances}
     instance = instance_id_to_instance_map.get(instance_id)
-    if instance is None:
-        return None
     return instance
 
 

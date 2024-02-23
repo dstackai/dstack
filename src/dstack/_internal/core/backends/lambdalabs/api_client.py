@@ -24,11 +24,10 @@ class LambdaAPIClient:
             return resp.json()["data"]
         resp.raise_for_status()
 
-    def list_instances(self):
+    def list_instances(self) -> List[dict]:
         resp = self._make_request("GET", "/instances")
-        if resp.ok:
-            return resp.json()["data"]
         resp.raise_for_status()
+        return resp.json()["data"]
 
     def launch_instances(
         self,
