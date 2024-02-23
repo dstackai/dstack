@@ -296,6 +296,9 @@ class PoolCommand(APIBaseCommand):
         offers = [o for o in offers if o.instance_runtime == InstanceRuntime.SHIM]
 
         print_offers_table(pool_name, profile, requirements, offers)
+        if not offers:
+            console.print("\nThere are no offers with these criteria. Exiting...")
+            return
         if not args.yes and not confirm_ask("Continue?"):
             console.print("\nExiting...")
             return
