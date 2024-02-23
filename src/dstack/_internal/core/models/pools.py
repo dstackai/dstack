@@ -24,7 +24,7 @@ class Instance(BaseModel):
     job_status: Optional[JobStatus] = None
     hostname: str
     status: InstanceStatus
-    created: Optional[datetime.datetime]
+    created: datetime.datetime
     region: str
     price: float
 

@@ -230,7 +230,7 @@ class InstanceStatus(str, Enum):
 
     @property
     def finished_statuses(cls) -> Sequence["InstanceStatus"]:
-        return (cls.TERMINATED, cls.FAILED)
+        return [cls.TERMINATED]
 
     def is_finished(self):
         return self in self.finished_statuses
@@ -239,4 +239,4 @@ class InstanceStatus(str, Enum):
         return not self.is_finished()
 
     def is_available(self) -> bool:
-        return self in (self.READY, self.BUSY)
+        return self in [self.READY, self.BUSY]

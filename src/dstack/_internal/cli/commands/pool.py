@@ -1,5 +1,4 @@
 import argparse
-import datetime
 import time
 from pathlib import Path
 from typing import Sequence
@@ -351,11 +350,6 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
     table.add_column("CREATED")
 
     for instance in instances:
-        created = (
-            pretty_date(instance.created.replace(tzinfo=datetime.timezone.utc))
-            if instance.created is not None
-            else ""
-        )
         row = [
             instance.name,
             instance.backend,
@@ -364,7 +358,7 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
             "yes" if instance.instance_type.resources.spot else "no",
             f"${instance.price:.4}",
             instance.status.value,
-            created,
+            pretty_date(instance.created),
         ]
         table.add_row(*row)
 
