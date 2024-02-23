@@ -341,7 +341,7 @@ def print_pool_table(pools: Sequence[Pool], verbose: bool) -> None:
 
 def print_instance_table(instances: Sequence[Instance]) -> Table:
     table = Table(box=None)
-    table.add_column("INSTANCE")
+    table.add_column("INSTANCE", no_wrap=True)
     table.add_column("BACKEND")
     table.add_column("REGION")
     table.add_column("RESOURCES")
