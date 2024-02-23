@@ -44,7 +44,7 @@ async def process_runs():
                     RunModel.id.not_in(PROCESSING_RUNS_IDS),
                 )
             )
-            runs: List[RunModel] = res.scalars()
+            runs: List[RunModel] = res.scalars().all()
             PROCESSING_RUNS_IDS.update(run.id for run in runs)
 
     futures = [

@@ -8,6 +8,7 @@ from dstack._internal.server.background.tasks.process_pools import (
     terminate_idle_instance,
 )
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
+from dstack._internal.server.background.tasks.process_runs import process_runs
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 
 _scheduler = AsyncIOScheduler()
@@ -24,6 +25,6 @@ def start_background_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(process_pending_jobs, IntervalTrigger(seconds=10))
     _scheduler.add_job(process_pools, IntervalTrigger(seconds=10))
     _scheduler.add_job(terminate_idle_instance, IntervalTrigger(seconds=10))
-    # TODO(egor-s): add process_runs
+    _scheduler.add_job(process_runs, IntervalTrigger(seconds=2))
     _scheduler.start()
     return _scheduler
