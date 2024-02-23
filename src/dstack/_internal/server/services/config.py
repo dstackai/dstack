@@ -46,7 +46,6 @@ class CudoConfig(ForbidExtra):
     type: Literal["cudo"] = "cudo"
     regions: Optional[List[str]] = None
     creds: AnyCudoCreds
-    project_id: str
 
 
 class DataCrunchConfig(ForbidExtra):
