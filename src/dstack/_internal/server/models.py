@@ -203,7 +203,7 @@ class JobModel(BaseModel):
     remove_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
-    replica_num: Mapped[Optional[int]] = mapped_column(Integer)
+    replica_num: Mapped[int] = mapped_column(Integer)
 
 
 class GatewayModel(BaseModel):
