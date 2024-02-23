@@ -14,6 +14,12 @@ from dstack._internal.core.models.backends.azure import (
     AzureConfigInfoWithCredsPartial,
     AzureConfigValues,
 )
+from dstack._internal.core.models.backends.cudocompute import (
+    CudoComputeConfigInfo,
+    CudoComputeConfigInfoWithCreds,
+    CudoComputeConfigInfoWithCredsPartial,
+    CudoComputeConfigValues,
+)
 from dstack._internal.core.models.backends.datacrunch import (
     DataCrunchConfigInfo,
     DataCrunchConfigInfoWithCreds,
@@ -69,6 +75,7 @@ AnyConfigInfoWithoutCreds = Union[
     TensorDockConfigInfo,
     VastAIConfigInfo,
     DstackConfigInfo,
+    CudoComputeConfigInfo,
 ]
 AnyConfigInfoWithCreds = Union[
     AWSConfigInfoWithCreds,
@@ -81,6 +88,7 @@ AnyConfigInfoWithCreds = Union[
     TensorDockConfigInfoWithCreds,
     VastAIConfigInfoWithCreds,
     DstackConfigInfo,
+    CudoComputeConfigInfoWithCreds,
 ]
 AnyConfigInfoWithCredsPartial = Union[
     AWSConfigInfoWithCredsPartial,
@@ -93,6 +101,7 @@ AnyConfigInfoWithCredsPartial = Union[
     TensorDockConfigInfoWithCredsPartial,
     VastAIConfigInfoWithCredsPartial,
     DstackConfigInfo,
+    CudoComputeConfigInfoWithCredsPartial,
 ]
 AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 
@@ -108,6 +117,7 @@ AnyConfigValues = Union[
     TensorDockConfigValues,
     VastAIConfigValues,
     DstackConfigValues,
+    CudoComputeConfigValues,
 ]
 
 
