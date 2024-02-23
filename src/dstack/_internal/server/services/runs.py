@@ -241,6 +241,9 @@ async def get_offers_by_requirements(
     if profile.backends is not None:
         backends = [b for b in backends if b.TYPE in profile.backends]
 
+    # filter backends with create_instance support
+    backends = [b for b in backends if b.TYPE in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]
+
     offers = await backends_services.get_instance_offers(
         backends=backends,
         requirements=requirements,
@@ -435,6 +438,11 @@ async def create_instance(
         exclude_not_available=True,
     )
 
+    if not offers:
+        raise ServerClientError(
+            "Failed to find offers to create the instance."
+        )  # TODO(sergeyme): ComputeError?
+
     # Raise error if no backends suppport create_instance
     backend_types = set((backend.TYPE for backend, _ in offers))
     if all(
@@ -443,7 +451,7 @@ async def create_instance(
     ):
         backends = ", ".join(sorted(backend_types))
         raise ServerClientError(
-            f"Backends {backends} do not support create_intance. Try to select other backends."
+            f"Backends {backends} do not support create_instance. Try to select other backends."
         )
 
     pool = await pools_services.get_or_create_pool_by_name(session, project, pool_name)
@@ -529,7 +537,7 @@ async def create_instance(
         session.add(im)
         await session.commit()
         return instance_model_to_instance(im)
-    raise ServerClientError("Failed to find offers to create the instance.")
+    raise ServerClientError("Failed to create the instance.")  # TODO(sergeyme): ComputeError?
 
 
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:
