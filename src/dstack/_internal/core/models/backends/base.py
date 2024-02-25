@@ -17,7 +17,6 @@ class BackendType(str, enum.Enum):
         LAMBDA (BackendType): Lambda Cloud
         TENSORDOCK (BackendType): TensorDock Marketplace
         VASTAI (BackendType): Vast.ai Marketplace
-        CUDOCOMPUTE (BackendType): CudoCompute
     """
 
     AWS = "aws"
@@ -33,7 +32,6 @@ class BackendType(str, enum.Enum):
     NEBIUS = "nebius"
     TENSORDOCK = "tensordock"
     VASTAI = "vastai"
-    CUDOCOMPUTE = "cudocompute"
 
 
 class ConfigElementValue(BaseModel):
