@@ -48,6 +48,14 @@ try:
 except ImportError:
     pass
 
+try:
+    from dstack._internal.server.services.backends.configurators.cudo import (
+        CudoConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(CudoConfigurator)
+except ImportError:
+    pass
 
 try:
     from dstack._internal.server.services.backends.configurators.datacrunch import (
@@ -103,15 +111,6 @@ try:
     from dstack._internal.server.services.backends.configurators.vastai import VastAIConfigurator
 
     _CONFIGURATOR_CLASSES.append(VastAIConfigurator)
-except ImportError:
-    pass
-
-try:
-    from dstack._internal.server.services.backends.configurators.cudocompute import (
-        CudoComputeConfigurator,
-    )
-
-    _CONFIGURATOR_CLASSES.append(CudoComputeConfigurator)
 except ImportError:
     pass
 

@@ -2,21 +2,19 @@ import json
 from typing import List
 
 from dstack._internal.core.backends.base import Backend
-from dstack._internal.core.backends.cudocompute import CudoComputeBackend, CudoComputeConfig
-from dstack._internal.core.models.backends import (
-    CudoComputeConfigInfo,
-    CudoComputeConfigInfoWithCreds,
-    CudoComputeConfigInfoWithCredsPartial,
-    CudoComputeConfigValues,
-)
+from dstack._internal.core.backends.cudo import CudoBackend, CudoConfig
 from dstack._internal.core.models.backends.base import (
     BackendType,
     ConfigElementValue,
     ConfigMultiElement,
 )
-from dstack._internal.core.models.backends.cudocompute import (
-    CudoComputeCreds,
-    CudoComputeStoredConfig,
+from dstack._internal.core.models.backends.cudo import (
+    CudoConfigInfo,
+    CudoConfigInfoWithCreds,
+    CudoConfigInfoWithCredsPartial,
+    CudoConfigValues,
+    CudoCreds,
+    CudoStoredConfig,
 )
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends import Configurator
@@ -33,16 +31,14 @@ REGIONS = [
 DEFAULT_REGION = "no-luster-1"
 
 
-class CudoComputeConfigurator(Configurator):
-    TYPE: BackendType = BackendType.CUDOCOMPUTE
+class CudoConfigurator(Configurator):
+    TYPE: BackendType = BackendType.CUDO
 
-    def get_default_configs(self) -> List[CudoComputeConfigInfoWithCreds]:
+    def get_default_configs(self) -> List[CudoConfigInfoWithCreds]:
         return []
 
-    def get_config_values(
-        self, config: CudoComputeConfigInfoWithCredsPartial
-    ) -> CudoComputeConfigValues:
-        config_values = CudoComputeConfigValues()
+    def get_config_values(self, config: CudoConfigInfoWithCredsPartial) -> CudoConfigValues:
+        config_values = CudoConfigValues()
         if config.creds is None:
             return config_values
         config_values.regions = self._get_regions_element(
@@ -51,28 +47,26 @@ class CudoComputeConfigurator(Configurator):
         return config_values
 
     def create_backend(
-        self, project: ProjectModel, config: CudoComputeConfigInfoWithCreds
+        self, project: ProjectModel, config: CudoConfigInfoWithCreds
     ) -> BackendModel:
         if config.regions is None:
             config.regions = REGIONS
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=CudoComputeStoredConfig(
-                **CudoComputeConfigInfo.parse_obj(config).dict()
-            ).json(),
-            auth=CudoComputeCreds.parse_obj(config.creds).json(),
+            config=CudoStoredConfig(**CudoConfigInfo.parse_obj(config).dict()).json(),
+            auth=CudoCreds.parse_obj(config.creds).json(),
         )
 
-    def get_config_info(self, model: BackendModel, include_creds: bool) -> CudoComputeConfigInfo:
+    def get_config_info(self, model: BackendModel, include_creds: bool) -> CudoConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return CudoComputeConfigInfoWithCreds.parse_obj(config)
-        return CudoComputeConfigInfo.parse_obj(config)
+            return CudoConfigInfoWithCreds.parse_obj(config)
+        return CudoConfigInfo.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> Backend:
         config = self._get_backend_config(model)
-        return CudoComputeBackend(config=config)
+        return CudoBackend(config=config)
 
     def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:
         element = ConfigMultiElement(selected=selected)
@@ -80,8 +74,8 @@ class CudoComputeConfigurator(Configurator):
             element.values.append(ConfigElementValue(value=r, label=r))
         return element
 
-    def _get_backend_config(self, model: BackendModel) -> CudoComputeConfig:
-        return CudoComputeConfig(
+    def _get_backend_config(self, model: BackendModel) -> CudoConfig:
+        return CudoConfig(
             **json.loads(model.config),
-            creds=CudoComputeCreds.parse_raw(model.auth),
+            creds=CudoCreds.parse_raw(model.auth),
         )

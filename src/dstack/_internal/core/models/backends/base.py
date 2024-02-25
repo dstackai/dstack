@@ -9,6 +9,7 @@ class BackendType(str, enum.Enum):
     Attributes:
         AWS (BackendType): Amazon Web Services
         AZURE (BackendType): Microsoft Azure
+        CUDO (BackendType): Cudo
         DSTACK (BackendType): dstack Sky
         GCP (BackendType): Google Cloud Platform
         DATACRUNCH (BackendType): DataCrunch
@@ -16,11 +17,11 @@ class BackendType(str, enum.Enum):
         LAMBDA (BackendType): Lambda Cloud
         TENSORDOCK (BackendType): TensorDock Marketplace
         VASTAI (BackendType): Vast.ai Marketplace
-        CUDOCOMPUTE (BackendType): CudoCompute
     """
 
     AWS = "aws"
     AZURE = "azure"
+    CUDO = "cudo"
     DATACRUNCH = "datacrunch"
     DSTACK = "dstack"
     GCP = "gcp"
@@ -31,7 +32,6 @@ class BackendType(str, enum.Enum):
     NEBIUS = "nebius"
     TENSORDOCK = "tensordock"
     VASTAI = "vastai"
-    CUDOCOMPUTE = "cudocompute"
 
 
 class ConfigElementValue(BaseModel):

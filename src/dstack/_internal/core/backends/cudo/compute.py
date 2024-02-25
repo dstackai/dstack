@@ -8,8 +8,8 @@ from dstack._internal.core.backends.base.compute import (
     logger,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.cudocompute.api_client import CudoComputeApiClient
-from dstack._internal.core.backends.cudocompute.config import CudoComputeConfig
+from dstack._internal.core.backends.cudo.api_client import CudoApiClient
+from dstack._internal.core.backends.cudo.config import CudoConfig
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -21,16 +21,16 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import Job, Requirements, Run
 
 
-class CudoComputeCompute(Compute):
-    def __init__(self, config: CudoComputeConfig):
+class CudoCompute(Compute):
+    def __init__(self, config: CudoConfig):
         self.config = config
-        self.api_client = CudoComputeApiClient(config.creds.api_key)
+        self.api_client = CudoApiClient(config.creds.api_key)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
-            backend=BackendType.CUDOCOMPUTE,
+            backend=BackendType.CUDO,
             requirements=requirements,
         )
         offers = [
@@ -77,7 +77,7 @@ class CudoComputeCompute(Compute):
             project_id=self.config.project_id,
             boot_disk_storage_class="STORAGE_CLASS_NETWORK",
             boot_disk_size_gib=disk_size,
-            book_disk_id="dstack_disk_id",
+            book_disk_id=f"{instance_config.instance_name}_disk_id",
             boot_disk_image_id="ubuntu-2204-nvidia-535-docker-v20240214",
             data_center_id=instance_offer.region,
             gpu_model=instance_offer.instance.resources.gpus[0].name,
@@ -85,18 +85,18 @@ class CudoComputeCompute(Compute):
             machine_type=instance_offer.instance.name,
             memory_gib=memory_size,
             vcpus=instance_offer.instance.resources.cpus,
-            vm_id="dstack-vm-id",
+            vm_id=instance_config.instance_name,
             start_script=startup_script,
             password=None,
             customSshKeys=public_keys,
         )
 
-        vm = self.api_client.get_vm("dstack-test", "dstack-vm-id")
-        # Loop as long as the VM state is 'ACTIVE'
+        vm = self.api_client.get_vm(self.config.project_id, instance_config.instance_name)
+        # Wait until VM State is Active. This is necessary to get the ip_address.
         while vm["VM"]["state"] == "ACTIVE":
             time.sleep(1)
             logger.info("Fetching VM state")
-            vm = self.api_client.get_vm("dstack-test", "dstack-vm-id")
+            vm = self.api_client.get_vm(self.config.project_id, instance_config.instance_name)
 
         launched_instance = LaunchedInstanceInfo(
             instance_id=resp_data["id"],

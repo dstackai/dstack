@@ -7,7 +7,7 @@ from dstack._internal.utils.ssh import get_public_key_fingerprint
 API_URL = "https://rest.compute.cudo.org/v1"
 
 
-class CudoComputeApiClient:
+class CudoApiClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
 
@@ -54,7 +54,7 @@ class CudoComputeApiClient:
         resp.raise_for_status()
 
     def terminate_virtual_machine(self, vm_id: str, project_id):
-        resp = self._make_request("POST", f"/projects/{project_id}/vms/dstack-vm-id/terminate")
+        resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
         if resp.ok:
             data = resp.json()
             return data

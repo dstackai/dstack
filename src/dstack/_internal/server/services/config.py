@@ -10,7 +10,7 @@ from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
 from dstack._internal.core.models.backends.aws import AnyAWSCreds
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.backends.cudocompute import AnyCudoComputeCreds
+from dstack._internal.core.models.backends.cudo import AnyCudoCreds
 from dstack._internal.core.models.backends.datacrunch import AnyDataCrunchCreds
 from dstack._internal.core.models.backends.kubernetes import KubernetesNetworkingConfig
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
@@ -42,10 +42,10 @@ class AzureConfig(ForbidExtra):
     creds: AnyAzureCreds = Field(..., discriminator="type")
 
 
-class CudoComputeConfig(ForbidExtra):
-    type: Literal["cudocompute"] = "cudocompute"
+class CudoConfig(ForbidExtra):
+    type: Literal["cudo"] = "cudo"
     regions: Optional[List[str]] = None
-    creds: AnyCudoComputeCreds
+    creds: AnyCudoCreds
     project_id: str
 
 
@@ -142,6 +142,7 @@ class DstackConfig(ForbidExtra):
 AnyBackendConfig = Union[
     AWSConfig,
     AzureConfig,
+    CudoConfig,
     DataCrunchConfig,
     GCPConfig,
     KubernetesConfig,
@@ -150,7 +151,6 @@ AnyBackendConfig = Union[
     TensorDockConfig,
     VastAIConfig,
     DstackConfig,
-    CudoComputeConfig,
 ]
 
 

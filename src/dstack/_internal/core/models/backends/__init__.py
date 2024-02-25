@@ -14,11 +14,11 @@ from dstack._internal.core.models.backends.azure import (
     AzureConfigInfoWithCredsPartial,
     AzureConfigValues,
 )
-from dstack._internal.core.models.backends.cudocompute import (
-    CudoComputeConfigInfo,
-    CudoComputeConfigInfoWithCreds,
-    CudoComputeConfigInfoWithCredsPartial,
-    CudoComputeConfigValues,
+from dstack._internal.core.models.backends.cudo import (
+    CudoConfigInfo,
+    CudoConfigInfoWithCreds,
+    CudoConfigInfoWithCredsPartial,
+    CudoConfigValues,
 )
 from dstack._internal.core.models.backends.datacrunch import (
     DataCrunchConfigInfo,
@@ -67,6 +67,7 @@ from dstack._internal.core.models.backends.vastai import (
 AnyConfigInfoWithoutCreds = Union[
     AWSConfigInfo,
     AzureConfigInfo,
+    CudoConfigInfo,
     DataCrunchConfigInfo,
     GCPConfigInfo,
     KubernetesConfigInfo,
@@ -75,11 +76,11 @@ AnyConfigInfoWithoutCreds = Union[
     TensorDockConfigInfo,
     VastAIConfigInfo,
     DstackConfigInfo,
-    CudoComputeConfigInfo,
 ]
 AnyConfigInfoWithCreds = Union[
     AWSConfigInfoWithCreds,
     AzureConfigInfoWithCreds,
+    CudoConfigInfoWithCreds,
     DataCrunchConfigInfoWithCreds,
     GCPConfigInfoWithCreds,
     KubernetesConfigInfoWithCreds,
@@ -88,11 +89,11 @@ AnyConfigInfoWithCreds = Union[
     TensorDockConfigInfoWithCreds,
     VastAIConfigInfoWithCreds,
     DstackConfigInfo,
-    CudoComputeConfigInfoWithCreds,
 ]
 AnyConfigInfoWithCredsPartial = Union[
     AWSConfigInfoWithCredsPartial,
     AzureConfigInfoWithCredsPartial,
+    CudoConfigInfoWithCredsPartial,
     DataCrunchConfigInfoWithCredsPartial,
     GCPConfigInfoWithCredsPartial,
     KubernetesConfigInfoWithCredsPartial,
@@ -101,7 +102,6 @@ AnyConfigInfoWithCredsPartial = Union[
     TensorDockConfigInfoWithCredsPartial,
     VastAIConfigInfoWithCredsPartial,
     DstackConfigInfo,
-    CudoComputeConfigInfoWithCredsPartial,
 ]
 AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 
@@ -109,6 +109,7 @@ AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 AnyConfigValues = Union[
     AWSConfigValues,
     AzureConfigValues,
+    CudoConfigValues,
     DataCrunchConfigValues,
     GCPConfigValues,
     KubernetesConfigValues,
@@ -117,7 +118,6 @@ AnyConfigValues = Union[
     TensorDockConfigValues,
     VastAIConfigValues,
     DstackConfigValues,
-    CudoComputeConfigValues,
 ]
 
 
