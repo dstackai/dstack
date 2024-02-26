@@ -59,6 +59,7 @@ class SSHAttach:
                 "Port": ssh_port,
                 "User": user,
                 "IdentityFile": id_rsa_path,
+                "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
             }
@@ -68,6 +69,7 @@ class SSHAttach:
                 "Port": ssh_proxy.port,
                 "User": ssh_proxy.username,
                 "IdentityFile": id_rsa_path,
+                "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
             }
@@ -77,6 +79,7 @@ class SSHAttach:
                 "Port": 10022,
                 "User": "root",
                 "IdentityFile": id_rsa_path,
+                "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
                 "ControlPath": self.tunnel.control_sock_path,
@@ -90,6 +93,7 @@ class SSHAttach:
                 "Port": ssh_port,
                 "User": user,
                 "IdentityFile": id_rsa_path,
+                "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
                 "ControlPath": self.tunnel.control_sock_path,
