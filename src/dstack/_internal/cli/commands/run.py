@@ -21,10 +21,10 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
     TerminationPolicy,
+    parse_max_duration,
 )
 from dstack._internal.core.models.runs import JobErrorCode
 from dstack._internal.core.services.configs import ConfigManager
-from dstack._internal.utils.common import parse_pretty_duration
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
 from dstack.api._public.runs import Run
@@ -125,7 +125,7 @@ class RunCommand(APIBaseCommand):
             try:
                 termination_policy_idle = int(args.idle_duration)
             except ValueError:
-                termination_policy_idle = 60 * parse_pretty_duration(args.idle_duration)
+                termination_policy_idle = parse_max_duration(args.idle_duration)
 
         creation_policy = (
             CreationPolicy.REUSE if args.creation_policy_reuse else CreationPolicy.REUSE_OR_CREATE
