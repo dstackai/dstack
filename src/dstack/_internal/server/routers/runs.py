@@ -109,7 +109,7 @@ async def create_instance(
             requirements=body.requirements,
         )
     except ComputeError as e:
-        raise ServerClientError(str(e))
+        raise ServerClientError(msg=str(e))
 
     if instance is None:
         raise ServerClientError(msg="Failed to create an instance")
