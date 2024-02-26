@@ -5,11 +5,14 @@ import tempfile
 from typing import Dict, Optional
 
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 
 logger = get_logger(__name__)
+
+config = ConfigManager()
 
 
 class SSHTunnel:
@@ -34,8 +37,8 @@ class SSHTunnel:
         # ControlMaster and ControlPath are always set
         command = [
             "ssh",
-            "-o",
-            "IdentitiesOnly=yes",
+            "-F",
+            str(config.dstack_ssh_config_path),
             "-f",
             "-N",
             "-M",
@@ -100,7 +103,15 @@ class RunnerTunnel(SSHTunnel):
             control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
         options = {}
         if ssh_proxy is not None:
-            proxy_command = ["ssh", "-i", id_rsa_path, "-W", "%h:%p"]
+            proxy_command = [
+                "ssh",
+                "-F",
+                str(config.dstack_ssh_config_path),
+                "-i",
+                id_rsa_path,
+                "-W",
+                "%h:%p",
+            ]
             proxy_command += [
                 "-o",
                 "StrictHostKeyChecking=no",

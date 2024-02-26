@@ -8,9 +8,12 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
+from dstack._internal.core.services.configs import ConfigManager
 from dstack.gateway.errors import SSHError
 
 logger = logging.getLogger(__name__)
+
+config = ConfigManager()
 
 
 class SSHTunnel(BaseModel):
@@ -39,14 +42,31 @@ class SSHTunnel(BaseModel):
         os.chmod(temp_dir, 0o755)  # grant any user read access
         control_path = f"{temp_dir}/control"
 
-        cmd = ["ssh", "-i", id_rsa_path, "-M", "-S", control_path]
+        cmd = [
+            "ssh",
+            "-F",
+            str(config.dstack_ssh_config_path),
+            "-i",
+            id_rsa_path,
+            "-M",
+            "-S",
+            control_path,
+        ]
         cmd += ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
         cmd += ["-o", "StreamLocalBindMask=0111", "-o", "StreamLocalBindUnlink=yes"]
         cmd += ["-o", "ServerAliveInterval=60"]
         cmd += ["-f", "-N", "-L", f"{_sock_path(temp_dir)}:localhost:{app_port}"]
         if docker_host is not None:
             # use `host` as a jump host
-            proxy = ["ssh", "-i", id_rsa_path, "-W", "%h:%p"]
+            proxy = [
+                "ssh",
+                "-F",
+                str(config.dstack_ssh_config_path),
+                "-i",
+                id_rsa_path,
+                "-W",
+                "%h:%p",
+            ]
             proxy += ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
             proxy += ["-p", str(port), host]
             cmd += ["-o", f"ProxyCommand={shlex.join(proxy)}"]

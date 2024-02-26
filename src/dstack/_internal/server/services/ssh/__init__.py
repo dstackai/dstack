@@ -5,10 +5,13 @@ import tempfile
 from typing import Any, Dict, List, Optional
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+config = ConfigManager()
 
 
 class SSHAutoTunnel:
@@ -21,7 +24,15 @@ class SSHAutoTunnel:
         ) as f:
             f.write(id_rsa)
 
-        self._start_cmd = ["ssh", "-i", self.id_rsa, "-f", "-N"]
+        self._start_cmd = [
+            "ssh",
+            "-F",
+            str(config.dstack_ssh_config_path),
+            "-i",
+            self.id_rsa,
+            "-f",
+            "-N",
+        ]
         self._start_cmd += ["-M", "-S", self.control_sock_path]
         for key, value in options.items():
             self._start_cmd += ["-o", f"{key}={value}"]

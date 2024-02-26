@@ -23,8 +23,11 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.services.configs import ConfigManager
 
 _SHIM_CONFIG_FILEPATH = "/home/ubuntu/.dstack/config.json"
+
+config = ConfigManager()
 
 
 class _ShimConfig(BaseModel):
@@ -272,6 +275,8 @@ def _run_ssh_command(hostname: str, ssh_private_key: str, command: str):
         subprocess.run(
             [
                 "ssh",
+                "-F",
+                str(config.dstack_ssh_config_path),
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-i",
@@ -291,6 +296,8 @@ def _run_scp_command(hostname: str, ssh_private_key: str, source: str, target: s
         subprocess.run(
             [
                 "scp",
+                "-F",
+                str(config.dstack_ssh_config_path),
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-i",
