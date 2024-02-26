@@ -56,8 +56,15 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
             with open(ssh_config_path, "r") as f:
                 content = f.read()
         if include not in content:
-            with open(ssh_config_path, "w") as f:
-                f.write(include + content)
+            try:
+                with open(ssh_config_path, "w") as f:
+                    f.write(include + content)
+            except PermissionError:
+                print(f"Couldn't write to {ssh_config_path} due to a permissions problem")
+                print(f"Please include the following ssh config file manually: {path}")
+                print(
+                    f"You can do that by adding `Include {path}` to the top of {ssh_config_path}"
+                )
 
 
 def get_ssh_config(path: PathLike, host: str) -> Optional[Dict[str, str]]:
