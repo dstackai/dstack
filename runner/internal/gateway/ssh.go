@@ -87,6 +87,6 @@ func (c *SSHControl) Publish(localPort, sockPath string) error {
 
 func (c *SSHControl) Cleanup() {
 	// todo cleanup remote
-	_ = exec.Command("ssh", "-o", "ControlPath="+c.controlPath, "-O", "exit", c.hostname).Run()
+	_ = exec.Command("ssh", "-F", "none", "-o", "ControlPath="+c.controlPath, "-O", "exit", c.hostname).Run()
 	_ = os.RemoveAll(c.localTempDir)
 }
