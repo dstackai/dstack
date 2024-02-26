@@ -15,7 +15,7 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, ProfileRetryPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobErrorCode, JobStatus
+from dstack._internal.core.models.runs import InstanceStatus, JobStatus, JobTerminationReason
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.services.pools import (
@@ -151,7 +151,7 @@ class TestProcessSubmittedJobs:
 
         await session.refresh(job)
         assert job is not None
-        assert job.error_code == JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         assert job.status == JobStatus.FAILED
 
         await session.refresh(project)

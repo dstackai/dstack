@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.background.tasks.process_runs as process_runs
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy
-from dstack._internal.core.models.runs import JobErrorCode, JobStatus, RunStatus
+from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunStatus
 from dstack._internal.server.models import RunModel
 from dstack._internal.server.testing.common import (
     create_instance,
@@ -108,7 +108,7 @@ class TestProcessRuns:
             session=session,
             run=run,
             status=JobStatus.FAILED,
-            error_code=JobErrorCode.INTERRUPTED_BY_NO_CAPACITY,
+            error_code=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
             instance=instance,
         )
 

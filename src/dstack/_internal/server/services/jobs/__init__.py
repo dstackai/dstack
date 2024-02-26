@@ -11,11 +11,11 @@ from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.runs import (
     Job,
-    JobErrorCode,
     JobProvisioningData,
     JobSpec,
     JobStatus,
     JobSubmission,
+    JobTerminationReason,
     RunSpec,
 )
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
@@ -79,7 +79,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         submitted_at=job_model.submitted_at.replace(tzinfo=timezone.utc),
         finished_at=finished_at,
         status=job_model.status,
-        error_code=job_model.error_code,
+        termination_reason=job_model.termination_reason,
         job_provisioning_data=job_provisioning_data,
     )
 
@@ -116,7 +116,7 @@ async def stop_job(
         # process_finished_jobs will terminate the instance in the background
         job_model.status = JobStatus.TERMINATED
         job_model.last_processed_at = get_current_datetime()
-        job_model.error_code = JobErrorCode.TERMINATED_BY_USER
+        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_USER
         await session.commit()
         logger.info(*job_log("%s by user", job_model, job_model.status.value))
 

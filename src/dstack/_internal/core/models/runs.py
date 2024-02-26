@@ -28,7 +28,6 @@ class AppSpec(BaseModel):
 
 
 class JobStatus(str, Enum):
-    PENDING = "pending"
     SUBMITTED = "submitted"
     PROVISIONING = "provisioning"
     PULLING = "pulling"
@@ -59,7 +58,7 @@ class RunTerminationReason(str, Enum):
     ABORTED_BY_USER = "aborted_by_user"
 
 
-class JobErrorCode(str, Enum):
+class JobTerminationReason(str, Enum):
     # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
@@ -151,7 +150,7 @@ class JobSubmission(BaseModel):
     submitted_at: datetime
     finished_at: Optional[datetime]
     status: JobStatus
-    error_code: Optional[JobErrorCode]
+    termination_reason: Optional[JobTerminationReason]
     job_provisioning_data: Optional[JobProvisioningData]
 
     @property

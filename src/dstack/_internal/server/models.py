@@ -27,8 +27,8 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.runs import (
     InstanceStatus,
-    JobErrorCode,
     JobStatus,
+    JobTerminationReason,
     RunStatus,
     RunTerminationReason,
 )
@@ -203,7 +203,9 @@ class JobModel(BaseModel):
     submitted_at: Mapped[datetime] = mapped_column(DateTime)
     last_processed_at: Mapped[datetime] = mapped_column(DateTime)
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
-    error_code: Mapped[Optional[JobErrorCode]] = mapped_column(Enum(JobErrorCode))
+    termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
+        Enum(JobTerminationReason)
+    )
     job_spec_data: Mapped[str] = mapped_column(String(4000))
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
     runner_timestamp: Mapped[Optional[int]] = mapped_column(Integer)

@@ -15,9 +15,9 @@ from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
-    JobErrorCode,
     JobSpec,
     JobStatus,
+    JobTerminationReason,
     Run,
 )
 from dstack._internal.server.db import get_session_ctx
@@ -168,7 +168,9 @@ async def _process_job(job_id: UUID):
                         )
                     )
                     job_model.status = JobStatus.FAILED
-                    job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
+                    job_model.termination_reason = (
+                        JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+                    )
                     job_model.used_instance_id = job_model.instance.id
                     job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
                     job_model.instance = None
@@ -218,7 +220,7 @@ async def _process_job(job_id: UUID):
                     )
                 )
                 job_model.status = JobStatus.FAILED
-                job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
+                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
                 job_model.used_instance_id = job_model.instance.id
                 job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
                 job_model.instance = None
@@ -252,7 +254,7 @@ async def _process_job(job_id: UUID):
                     )
                 )
                 job_model.status = JobStatus.FAILED
-                job_model.error_code = JobErrorCode.GATEWAY_ERROR
+                job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
 
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()

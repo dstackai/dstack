@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.instances import InstanceOffer
 from dstack._internal.core.models.profiles import ProfileRetryPolicy
-from dstack._internal.core.models.runs import JobErrorCode, JobStatus, RunSpec, RunStatus
+from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunSpec, RunStatus
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, RunModel
 from dstack._internal.server.services.jobs import (
@@ -29,8 +29,8 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 PROCESSING_INTERVAL = datetime.timedelta(seconds=5)
 JOB_ERROR_CODES_TO_RETRY = {
-    JobErrorCode.INTERRUPTED_BY_NO_CAPACITY,
-    JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+    JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
 }
 
 
@@ -155,7 +155,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
                 any_job_failed_retryable = True
             elif (
                 job.status in {JobStatus.TERMINATED, JobStatus.ABORTED}
-                and job.error_code != JobErrorCode.SCALED_DOWN
+                and job.termination_reason != JobTerminationReason.SCALED_DOWN
             ):
                 any_job_failed = True
                 break
@@ -168,7 +168,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
 
             if job.status != JobStatus.DONE:
                 all_jobs_done = False
-            if job.error_code != JobErrorCode.SCALED_DOWN:
+            if job.termination_reason != JobTerminationReason.SCALED_DOWN:
                 all_jobs_scaled_down = False
 
         if any_job_failed:  # critical, can't recover
@@ -256,7 +256,7 @@ async def is_job_retryable(
 ) -> bool:
     if not retry_policy.retry:
         return False
-    if job.error_code not in JOB_ERROR_CODES_TO_RETRY:
+    if job.termination_reason not in JOB_ERROR_CODES_TO_RETRY:
         return False
     if (
         retry_policy.limit is not None

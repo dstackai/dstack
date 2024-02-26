@@ -18,9 +18,9 @@ from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.runs import (
     InstanceStatus,
-    JobErrorCode,
     JobProvisioningData,
     JobStatus,
+    JobTerminationReason,
     RunSpec,
     RunStatus,
 )
@@ -203,7 +203,7 @@ async def create_job(
     status: JobStatus = JobStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
-    error_code: Optional[JobErrorCode] = None,
+    error_code: Optional[JobTerminationReason] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
     instance: Optional[InstanceModel] = None,
     job_num: int = 0,

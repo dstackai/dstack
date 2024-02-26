@@ -14,9 +14,9 @@ from dstack._internal.core.models.profiles import CreationPolicy, TerminationPol
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
-    JobErrorCode,
     JobProvisioningData,
     JobStatus,
+    JobTerminationReason,
     Run,
     RunSpec,
 )
@@ -120,7 +120,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     if profile.creation_policy == CreationPolicy.REUSE:
         logger.debug(*job_log("reuse instance failed", job_model))
         job_model.status = JobStatus.FAILED
-        job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
         return

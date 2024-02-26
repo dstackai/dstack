@@ -95,7 +95,7 @@ class TestCheckShim:
         job = await create_job(
             session=session,
             run=run,
-            status=JobStatus.PENDING,
+            status=JobStatus.SUBMITTED,
         )
 
         instance = await create_instance(session, project, pool, status=InstanceStatus.CREATING)
