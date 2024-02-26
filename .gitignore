@@ -12,3 +12,5 @@ dist/
 
 /runner/cmd/shim/shim
 /runner/cmd/runner/runner
+
+/build
