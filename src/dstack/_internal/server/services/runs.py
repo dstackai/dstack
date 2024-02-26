@@ -204,9 +204,6 @@ async def create_instance(
         project, profile, requirements, exclude_not_available=True
     )
 
-    if not offers:
-        return
-
     # Backends doesn't suppport create_instance
     backend_types = set((backend.TYPE for backend, _ in offers))
     if all(
@@ -217,6 +214,9 @@ async def create_instance(
         raise ComputeError(
             f"Backends {backends} doesn't support create_intance. Try to select other backends"
         )
+
+    if not offers:
+        return
 
     user_ssh_key = ssh_key
     project_ssh_key = SSHKey(
