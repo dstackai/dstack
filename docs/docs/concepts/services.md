@@ -244,6 +244,6 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 !!! info "What's next?"
 
     1. Check the [Text Generation Inference](../../examples/tgi.md) and [vLLM](../../examples/vllm.md) examples
-    2. Read about [dev environments](../concepts/dev-environments.md) and [tasks](../concepts/tasks.md)
+    2. Read about [dev environments](../concepts/dev-environments.md), [tasks](../concepts/tasks.md), and [pools](../concepts/pools.md)
     3. Browse [examples](../../examples/index.md)
     4. Check the [reference](../reference/dstack.yml.md)

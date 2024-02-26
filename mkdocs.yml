@@ -191,6 +191,7 @@ nav:
           - Dev environments: docs/concepts/dev-environments.md
           - Tasks: docs/concepts/tasks.md
           - Services: docs/concepts/services.md
+          - Pools: docs/concepts/pools.md
       - Reference:
           - CLI: docs/reference/cli/index.md
           - .dstack.yml: docs/reference/dstack.yml.md

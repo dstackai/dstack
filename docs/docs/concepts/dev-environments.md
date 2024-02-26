@@ -113,4 +113,4 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 
 1. Check out [`.dstack.yml`](../reference/dstack.yml.md), [`dstack run`](../reference/cli/index.md#dstack-run),
     and [`profiles.yml`](../reference/profiles.yml.md)
-2. Read about [tasks](tasks.md) and [services](tasks.md)
+2. Read about [tasks](tasks.md), [services](tasks.md), and [pools](pools.md)

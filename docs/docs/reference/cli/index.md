@@ -117,9 +117,81 @@ $ dstack config --help
 
 </div>
 
+### dstack pool
+
+Pools allow for managing the lifecycle of instances and reusing them across runs. 
+The default pool is created automatically.
+
+##### dstack pool add
+
+The `dstack pool add` command adds an instance to a pool. If no pool name is specified, the instance goes to the default pool.
+
+<div class="termy">
+
+```shell
+$ dstack pool add --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool ps
+
+The `dstack pool ps` command lists all active instances of a pool.
+If no pool name is specified, default pool instances are displayed.
+
+<div class="termy">
+
+```shell
+$ dstack pool ps --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool create
+
+The `dstack pool create` command creates a new pool.
+
+<div class="termy">
+
+```shell
+$ dstack pool create --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool list
+
+The `dstack pool delete` lists all existing pools.
+
+<div class="termy">
+
+```shell
+$ dstack pool delete --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool delete
+
+The `dstack pool delete` command deletes a specified pool.
+
+<div class="termy">
+
+```shell
+$ dstack gateway update --help
+#GENERATE#
+```
+
+</div>
+
 ### dstack gateway
 
-A gateway is required for running services.
+A gateway is required for running services. It handles ingress traffic, authentication, domain mapping, model mapping
+for the OpenAI-compatible endpoint, and so on.
 
 ##### dstack gateway list
 

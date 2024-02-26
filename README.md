@@ -28,9 +28,10 @@ as well as on-premises servers.
 
 ## Latest news ✨
 
-- [2024/01] [dstack 0.15.1: Kubernetes integration preview](https://dstack.ai/changelog/0.15.1/) (Release)
+- [2024/02] [dstack 0.16.0: Pools](https://dstack.ai/changelog/0.16.0/) (Release)
+- [2024/02] [dstack 0.15.1: Kubernetes integration](https://dstack.ai/changelog/0.15.1/) (Release)
 - [2024/01] [dstack 0.15.0: Resources, authentication, and more](https://dstack.ai/changelog/0.15.0/) (Release)
-- [2024/01] [dstack 0.14.0: OpenAI-compatible endpoints preview](https://dstack.ai/changelog/0.14.0/) (Release)
+- [2024/01] [dstack 0.14.0: OpenAI-compatible endpoints](https://dstack.ai/changelog/0.14.0/) (Release)
 - [2023/12] [dstack 0.13.0: Disk size, CUDA 12.1, Mixtral, and more](https://dstack.ai/changelog/0.13.0/) (Release)
 
 ## Installation

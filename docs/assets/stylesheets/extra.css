@@ -335,6 +335,10 @@
     /*-webkit-font-smoothing: auto;*/
 }
 
+.md-sidebar.md-sidebar--secondary .md-typeset code {
+    color: rgba(0,0,0,0.87);
+}
+
 .md-typeset :not(pre) :is(h2,h3,h4) > code {
     color: inherit;
     background: inherit;

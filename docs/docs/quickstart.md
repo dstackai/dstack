@@ -131,6 +131,6 @@ To exclude any files from uploading, use `.gitignore`.
 
 !!! info "What's next?"
     1. Read about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
-        and [services](concepts/services.md)
+        [services](concepts/services.md), and [pools](concepts/pools.md) 
     2. Browse [examples](../examples/index.md)
     3. Join the [Discord server](https://discord.gg/u8SmfwPpMd)
