@@ -25,7 +25,13 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import RepoType
-from dstack._internal.core.models.runs import InstanceStatus, JobErrorCode, JobStatus
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobErrorCode,
+    JobStatus,
+    RunStatus,
+    RunTerminationReason,
+)
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.utils.common import get_current_datetime
 
@@ -166,7 +172,7 @@ class RunModel(BaseModel):
     user: Mapped["UserModel"] = relationship()
     submitted_at: Mapped[datetime] = mapped_column(DateTime)
     run_name: Mapped[str] = mapped_column(String(100))
-    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
+    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
     run_spec: Mapped[str] = mapped_column(String(4000))
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="run", lazy="selectin")
     last_processed_at: Mapped[datetime] = mapped_column(DateTime)
@@ -175,6 +181,9 @@ class RunModel(BaseModel):
         ForeignKey("gateways.id", ondelete="SET NULL")
     )
     gateway: Mapped[Optional["GatewayModel"]] = relationship()
+    termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
+        Enum(RunTerminationReason)
+    )
 
 
 class JobModel(BaseModel):

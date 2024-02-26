@@ -33,8 +33,8 @@ from dstack._internal.core.models.runs import (
     Requirements,
     RunPlan,
     RunSpec,
+    RunStatus,
 )
-from dstack._internal.core.models.runs import JobStatus as RunStatus
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
@@ -229,8 +229,7 @@ class Run(ABC):
             while self.status in (
                 RunStatus.SUBMITTED,
                 RunStatus.PENDING,
-                RunStatus.PROVISIONING,
-                RunStatus.PULLING,
+                RunStatus.STARTING,
             ):
                 time.sleep(5)
                 self.refresh()

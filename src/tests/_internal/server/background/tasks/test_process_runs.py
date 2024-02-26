@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.background.tasks.process_runs as process_runs
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy
-from dstack._internal.core.models.runs import JobErrorCode, JobStatus
+from dstack._internal.core.models.runs import JobErrorCode, JobStatus, RunStatus
 from dstack._internal.server.models import RunModel
 from dstack._internal.server.testing.common import (
     create_instance,
@@ -51,43 +51,43 @@ async def run(session: AsyncSession) -> RunModel:
 class TestProcessRuns:
     @pytest.mark.asyncio
     async def test_submitted_to_starting(self, test_db, session: AsyncSession, run: RunModel):
-        run.status = JobStatus.SUBMITTED
+        run.status = RunStatus.SUBMITTED
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING)
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == JobStatus.PROVISIONING
+        assert run.status == RunStatus.STARTING
 
     @pytest.mark.asyncio
     async def test_starting_to_running(self, test_db, session: AsyncSession, run: RunModel):
-        run.status = JobStatus.PROVISIONING
+        run.status = RunStatus.STARTING
         await create_job(session=session, run=run, status=JobStatus.RUNNING)
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == JobStatus.RUNNING
+        assert run.status == RunStatus.RUNNING
 
     @pytest.mark.asyncio
     async def test_keep_starting(self, test_db, session: AsyncSession, run: RunModel):
-        run.status = JobStatus.PROVISIONING
+        run.status = RunStatus.STARTING
         await create_job(session=session, run=run, status=JobStatus.PULLING)
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == JobStatus.PROVISIONING
+        assert run.status == RunStatus.STARTING
 
     @pytest.mark.asyncio
     async def test_running_to_done(self, test_db, session: AsyncSession, run: RunModel):
-        run.status = JobStatus.RUNNING
+        run.status = RunStatus.RUNNING
         await create_job(session=session, run=run, status=JobStatus.DONE)
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == JobStatus.DONE
+        assert run.status == RunStatus.DONE
 
     @pytest.mark.asyncio
     async def test_terminate_run_jobs(self, test_db, session: AsyncSession, run: RunModel):
-        run.status = JobStatus.TERMINATED
+        run.status = RunStatus.TERMINATED
         run.processing_finished = False
         job = await create_job(session=session, run=run, status=JobStatus.RUNNING)
 
@@ -103,7 +103,7 @@ class TestProcessRuns:
         instance = await create_instance(
             session, project=run.project, pool=run.project.default_pool, spot=True
         )
-        run.status = JobStatus.RUNNING
+        run.status = RunStatus.RUNNING
         await create_job(
             session=session,
             run=run,
@@ -116,14 +116,14 @@ class TestProcessRuns:
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
             await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == JobStatus.PENDING
+        assert run.status == RunStatus.PENDING
 
     @pytest.mark.asyncio
     async def test_retry_running_to_failed(self, test_db, session: AsyncSession, run: RunModel):
         instance = await create_instance(
             session, project=run.project, pool=run.project.default_pool, spot=True
         )
-        run.status = JobStatus.RUNNING
+        run.status = RunStatus.RUNNING
         # job exited with non-zero code
         await create_job(
             session=session,
@@ -137,16 +137,16 @@ class TestProcessRuns:
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
             await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == JobStatus.FAILED
+        assert run.status == RunStatus.FAILED
 
     @pytest.mark.asyncio
     async def test_pending_to_submitted(self, test_db, session: AsyncSession, run: RunModel):
-        run.status = JobStatus.PENDING
+        run.status = RunStatus.PENDING
         await create_job(session=session, run=run, status=JobStatus.FAILED)
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == JobStatus.SUBMITTED
+        assert run.status == RunStatus.SUBMITTED
         assert len(run.jobs) == 2
         assert run.jobs[0].status == JobStatus.FAILED
         assert run.jobs[1].status == JobStatus.SUBMITTED

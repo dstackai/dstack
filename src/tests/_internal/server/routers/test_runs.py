@@ -20,7 +20,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import JobSpec, JobStatus, Requirements, RunSpec
+from dstack._internal.core.models.runs import JobSpec, JobStatus, Requirements, RunSpec, RunStatus
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
@@ -690,12 +690,16 @@ class TestDeleteRuns:
             project=project,
             repo=repo,
             user=user,
+            status=RunStatus.FAILED,
         )
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.FAILED,
         )
+        run.processing_finished = True
+        session.add(run)
+        await session.commit()
         response = client.post(
             f"/api/project/{project.name}/runs/delete",
             headers=get_auth_headers(user.token),

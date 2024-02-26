@@ -22,6 +22,7 @@ from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobStatus,
     RunSpec,
+    RunStatus,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
@@ -171,7 +172,7 @@ async def create_run(
     repo: RepoModel,
     user: UserModel,
     run_name: str = "test-run",
-    status: JobStatus = JobStatus.SUBMITTED,
+    status: RunStatus = RunStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
 ) -> RunModel:

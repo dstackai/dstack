@@ -43,6 +43,8 @@ from dstack._internal.core.models.runs import (
     Run,
     RunPlan,
     RunSpec,
+    RunStatus,
+    RunTerminationReason,
     ServiceInfo,
     ServiceModelInfo,
 )
@@ -63,6 +65,8 @@ from dstack._internal.server.services.gateways.options import (
     get_service_options,
 )
 from dstack._internal.server.services.jobs import (
+    PROCESSING_RUNS_IDS,
+    PROCESSING_RUNS_LOCK,
     get_jobs_from_run_spec,
     job_model_to_job_submission,
     stop_job,
@@ -292,7 +296,7 @@ async def submit_run(
         user_id=user.id,
         run_name=run_spec.run_name,
         submitted_at=submitted_at,
-        status=JobStatus.SUBMITTED,
+        status=RunStatus.SUBMITTED,
         run_spec=run_spec.json(),
         last_processed_at=submitted_at,
     )
@@ -352,27 +356,44 @@ async def stop_runs(
     runs_names: List[str],
     abort: bool,
 ):
-    new_status = JobStatus.TERMINATED
-    if abort:
-        new_status = JobStatus.ABORTED
-
+    """
+    If abort is False, jobs receive a signal to stop and run status will be changed as a reaction to jobs status change.
+    If abort is True, run is marked as TERMINATED and process_runs will stop the jobs.
+    """
     res = await session.execute(
-        select(JobModel)
-        .where(
-            JobModel.project_id == project.id,
-            JobModel.run_name.in_(runs_names),
-            JobModel.status.not_in(JobStatus.finished_statuses()),
+        select(RunModel).where(
+            RunModel.project_id == project.id,
+            RunModel.run_name.in_(runs_names),
+            RunModel.status.not_in(RunStatus.finished_statuses()),
         )
-        .options(joinedload(JobModel.instance))
     )
-    job_models = res.scalars().all()
-    for job_model in job_models:
-        await stop_job(
-            session=session,
-            project=project,
-            job_model=job_model,
-            new_status=new_status,
-        )
+    runs = res.scalars().all()
+    # TODO(egor-s): consider raising an exception if no runs found
+    await asyncio.gather(*(stop_run(session, run, abort) for run in runs))
+
+
+async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
+    while True:
+        async with PROCESSING_RUNS_LOCK:
+            if run.id not in PROCESSING_RUNS_IDS:
+                PROCESSING_RUNS_IDS.add(run.id)
+                break
+        await asyncio.sleep(0.1)
+
+    try:
+        await session.refresh(run)
+        if run.status.is_finished():
+            return
+        if abort:
+            # Jobs will be stopped by `process_runs`
+            run.status = RunStatus.TERMINATED
+            run.termination_reason = RunTerminationReason.ABORTED_BY_USER
+            await session.commit()
+        else:
+            for job in run.jobs:
+                await stop_job(session, run.project, job)
+    finally:
+        PROCESSING_RUNS_IDS.remove(run.id)
 
 
 async def delete_runs(
@@ -386,11 +407,10 @@ async def delete_runs(
         )
     )
     run_models = res.scalars().all()
-    runs = [run_model_to_run(r) for r in run_models]
-    active_runs = [r for r in runs if not r.status.is_finished()]
+    active_runs = [r for r in run_models if not r.processing_finished]
     if len(active_runs) > 0:
         raise ServerClientError(
-            msg=f"Cannot delete active runs: {[r.run_spec.run_name for r in active_runs]}"
+            msg=f"Cannot delete active runs: {[r.run_name for r in active_runs]}"
         )
     await session.execute(
         update(RunModel)
@@ -560,7 +580,7 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
         project_name=run_model.project.name,
         user=run_model.user.name,
         submitted_at=run_model.submitted_at.replace(tzinfo=timezone.utc),
-        status=get_run_status(jobs),
+        status=run_model.status,
         run_spec=run_spec,
         jobs=jobs,
         latest_job_submission=latest_job_submission,
@@ -569,13 +589,6 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
     run.cost = _get_run_cost(run)
     run.service = _get_run_service(run)
     return run
-
-
-def get_run_status(jobs: List[Job]) -> JobStatus:
-    job = jobs[0]
-    if len(job.job_submissions) == 0:
-        return JobStatus.SUBMITTED
-    return job.job_submissions[-1].status
 
 
 _PROJECTS_TO_RUN_NAMES_LOCK = {}

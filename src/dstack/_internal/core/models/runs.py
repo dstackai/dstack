@@ -52,6 +52,13 @@ class RetryPolicy(BaseModel):
     limit: Optional[int]
 
 
+class RunTerminationReason(str, Enum):
+    JOB_FAILED = "job_failed"
+    RETRY_LIMIT_EXCEEDED = "retry_limit_exceeded"
+    STOPPED_BY_USER = "terminated_by_user"
+    ABORTED_BY_USER = "aborted_by_user"
+
+
 class JobErrorCode(str, Enum):
     # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
@@ -59,6 +66,7 @@ class JobErrorCode(str, Enum):
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
     TERMINATED_BY_USER = "terminated_by_user"
     GATEWAY_ERROR = "gateway_error"
+    SCALED_DOWN = "scaled_down"
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"
@@ -186,12 +194,30 @@ class ServiceInfo(BaseModel):
     model: Optional[ServiceModelInfo] = None
 
 
+class RunStatus(str, Enum):
+    PENDING = "pending"
+    SUBMITTED = "submitted"
+    STARTING = "starting"
+    RUNNING = "running"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
+    FAILED = "failed"
+    DONE = "done"
+
+    @classmethod
+    def finished_statuses(cls) -> List["RunStatus"]:
+        return [cls.TERMINATED, cls.FAILED, cls.DONE]
+
+    def is_finished(self):
+        return self in self.finished_statuses()
+
+
 class Run(BaseModel):
     id: UUID4
     project_name: str
     user: str
     submitted_at: datetime
-    status: JobStatus
+    status: RunStatus
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission]

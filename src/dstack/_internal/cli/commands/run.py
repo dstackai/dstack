@@ -214,8 +214,7 @@ class RunCommand(APIBaseCommand):
                 while run.status in (
                     RunStatus.SUBMITTED,
                     RunStatus.PENDING,
-                    RunStatus.PROVISIONING,
-                    RunStatus.PULLING,
+                    RunStatus.STARTING,
                 ):
                     status.update(
                         f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]"
@@ -257,7 +256,7 @@ class RunCommand(APIBaseCommand):
                 # Gently stop the run and wait for it to finish
                 with console.status("Stopping..."):
                     run.stop(abort=False)
-                    while not (run.status.is_finished() or run.status == RunStatus.TERMINATING):
+                    while not run.status.is_finished():
                         time.sleep(2)
                         run.refresh()
                 console.print("Stopped")

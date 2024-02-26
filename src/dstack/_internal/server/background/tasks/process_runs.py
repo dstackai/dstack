@@ -10,7 +10,7 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.instances import InstanceOffer
 from dstack._internal.core.models.profiles import ProfileRetryPolicy
-from dstack._internal.core.models.runs import JobErrorCode, JobStatus, RunSpec
+from dstack._internal.core.models.runs import JobErrorCode, JobStatus, RunSpec, RunStatus
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, RunModel
 from dstack._internal.server.services.jobs import (
@@ -75,9 +75,9 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
         if run is None:
             raise ValueError(f"Run {run_id} not found")
 
-        if run.status == JobStatus.PENDING:
+        if run.status == RunStatus.PENDING:
             await process_pending_run(session, run)
-        elif run.status in {JobStatus.SUBMITTED, JobStatus.PROVISIONING, JobStatus.RUNNING}:
+        elif run.status in {RunStatus.SUBMITTED, RunStatus.STARTING, RunStatus.RUNNING}:
             await process_active_run(session, run)
         elif run.status.is_finished():
             await process_finished_run(session, run)
@@ -116,7 +116,7 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
             session.add(new_job_model)
         break  # TODO(egor-s): add replicas support
 
-    run_model.status = JobStatus.SUBMITTED
+    run_model.status = RunStatus.SUBMITTED
     logger.info("%s: run status has changed PENDING -> SUBMITTED", fmt(run_model))
 
 
@@ -142,7 +142,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
         any_job_submitted = False
         any_job_starting = False
         any_job_running = False
-        all_jobs_terminated = True
+        all_jobs_scaled_down = True
         all_jobs_done = True
 
         for job in jobs:
@@ -153,6 +153,12 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
                     any_job_failed = True
                     break
                 any_job_failed_retryable = True
+            elif (
+                job.status in {JobStatus.TERMINATED, JobStatus.ABORTED}
+                and job.error_code != JobErrorCode.SCALED_DOWN
+            ):
+                any_job_failed = True
+                break
             elif job.status == JobStatus.SUBMITTED:
                 any_job_submitted = True
             elif job.status in {JobStatus.PROVISIONING, JobStatus.PULLING}:
@@ -162,15 +168,15 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
 
             if job.status != JobStatus.DONE:
                 all_jobs_done = False
-            if job.status != JobStatus.TERMINATED:
-                all_jobs_terminated = False
+            if job.error_code != JobErrorCode.SCALED_DOWN:
+                all_jobs_scaled_down = False
 
         if any_job_failed:  # critical, can't recover
             any_replica_failed = True
             break
         if any_job_failed_retryable:
             replicas_to_retry.append((replica_num, jobs))
-        elif all_jobs_terminated:
+        elif all_jobs_scaled_down:
             pass  # the replica was scaled down, ignore it
         else:
             any_replica_submitted = any_replica_submitted or any_job_submitted
@@ -179,21 +185,22 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
             any_replica_done = any_replica_done or all_jobs_done
 
     if any_replica_failed:
-        new_status = JobStatus.FAILED
+        new_status = RunStatus.FAILED
     elif not (any_replica_submitted or any_replica_starting or any_replica_running):
         if any_replica_done:
-            new_status = JobStatus.DONE
+            new_status = RunStatus.DONE
         else:
-            new_status = JobStatus.PENDING
+            # TODO(egor-s): do we need to exit?
+            new_status = RunStatus.PENDING
     else:
         # TODO(egor-s): retry failed replicas while other replicas are active, terminate jobs if needed
         # TODO(egor-s): perform auto-scaling
         if any_replica_running:
-            new_status = JobStatus.RUNNING
+            new_status = RunStatus.RUNNING
         elif any_replica_starting:
-            new_status = JobStatus.PROVISIONING
+            new_status = RunStatus.STARTING
         elif any_replica_submitted:
-            new_status = JobStatus.SUBMITTED
+            new_status = RunStatus.SUBMITTED
         else:
             raise ValueError("Unexpected state")
 

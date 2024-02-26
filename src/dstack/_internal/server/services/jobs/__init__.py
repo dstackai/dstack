@@ -88,11 +88,9 @@ async def stop_job(
     session: AsyncSession,
     project: ProjectModel,
     job_model: JobModel,
-    new_status: JobStatus,
 ):
     if job_model.status.is_finished():
         return
-    # TODO(egor-s): get run lock?
     async with SUBMITTED_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_LOCK, TERMINATING_PROCESSING_JOBS_LOCK:
         # If the job provisioning is in progress, we have to wait until it's done.
         # We can also consider returning an error when stopping a provisioning job.
@@ -108,7 +106,7 @@ async def stop_job(
             return
 
         job_submission = job_model_to_job_submission(job_model)
-        if new_status == JobStatus.TERMINATED and job_model.status == JobStatus.RUNNING:
+        if job_model.status == JobStatus.RUNNING:
             try:
                 await run_async(_stop_runner, job_submission, project.ssh_private_key)
                 # delay termination for 15 seconds to allow the runner to stop gracefully
@@ -116,11 +114,11 @@ async def stop_job(
             except SSHError:
                 logger.debug(*job_log("failed to stop runner", job_model))
         # process_finished_jobs will terminate the instance in the background
-        job_model.status = new_status
+        job_model.status = JobStatus.TERMINATED
         job_model.last_processed_at = get_current_datetime()
         job_model.error_code = JobErrorCode.TERMINATED_BY_USER
         await session.commit()
-        logger.info(*job_log("%s by user", job_model, new_status.value))
+        logger.info(*job_log("%s by user", job_model, job_model.status.value))
 
 
 async def terminate_job_provisioning_data_instance(
