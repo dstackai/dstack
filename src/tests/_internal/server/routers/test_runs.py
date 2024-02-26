@@ -861,3 +861,56 @@ class TestCreateInstance:
                 json=request.dict(),
             )
             assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_backend_does_not_support_create_instance(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        request = CreateInstanceRequest(
+            pool_name=DEFAULT_POOL_NAME,
+            profile=Profile(name="test_profile"),
+            requirements=Requirements(resources=ResourcesSpec(cpu=1)),
+            ssh_key=SSHKey(public="test_public_key"),
+        )
+
+        with patch(
+            "dstack._internal.server.services.runs.get_offers_by_requirements"
+        ) as run_plan_by_req:
+            offers = InstanceOfferWithAvailability(
+                backend=BackendType.AZURE,
+                instance=InstanceType(
+                    name="instance",
+                    resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                ),
+                region="eu",
+                price=1.0,
+                availability=InstanceAvailability.AVAILABLE,
+            )
+
+            backend = Mock()
+            backend.TYPE = BackendType.AZURE
+            backend.compute.return_value.get_offers.return_value = [offers]
+            backend.compute.return_value.create_instance.side_effect = NotImplementedError()
+            run_plan_by_req.return_value = [(backend, offers)]
+
+            response = client.post(
+                f"/api/project/{project.name}/runs/create_instance",
+                headers=get_auth_headers(user.token),
+                json=request.dict(),
+            )
+
+            assert response.status_code == 400
+
+            result = response.json()
+            expected = {
+                "detail": [
+                    {
+                        "msg": "Backends  do not support create_instance. Try to select other backends.",
+                        "code": "error",
+                    }
+                ]
+            }
+            assert result == expected

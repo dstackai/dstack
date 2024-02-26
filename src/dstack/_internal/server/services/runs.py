@@ -438,11 +438,6 @@ async def create_instance(
         exclude_not_available=True,
     )
 
-    if not offers:
-        raise ServerClientError(
-            "Failed to find offers to create the instance."
-        )  # TODO(sergeyme): ComputeError?
-
     # Raise error if no backends suppport create_instance
     backend_types = set((backend.TYPE for backend, _ in offers))
     if all(
@@ -453,6 +448,11 @@ async def create_instance(
         raise ServerClientError(
             f"Backends {backends} do not support create_instance. Try to select other backends."
         )
+
+    if not offers:
+        raise ServerClientError(
+            "Failed to find offers to create the instance."
+        )  # TODO(sergeyme): ComputeError?
 
     pool = await pools_services.get_or_create_pool_by_name(session, project, pool_name)
 
