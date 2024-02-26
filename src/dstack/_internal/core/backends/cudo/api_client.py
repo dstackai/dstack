@@ -11,6 +11,22 @@ class CudoApiClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
 
+    def validate_api_key(self) -> bool:
+        try:
+            self.get_user_details()
+        except requests.HTTPError as e:
+            if e.response.status_code in [401, 403]:
+                return False
+            raise e
+        return True
+
+    def get_user_details(self):
+        resp = self._make_request("GET", "/auth")
+        if resp.ok:
+            data = resp.json()
+            return data
+        resp.raise_for_status()
+
     def create_virtual_machine(
         self,
         project_id: str,

@@ -2,7 +2,7 @@ import json
 from typing import List
 
 from dstack._internal.core.backends.base import Backend
-from dstack._internal.core.backends.cudo import CudoBackend, CudoConfig
+from dstack._internal.core.backends.cudo import CudoBackend, CudoConfig, api_client
 from dstack._internal.core.models.backends.base import (
     BackendType,
     ConfigElementValue,
@@ -18,6 +18,9 @@ from dstack._internal.core.models.backends.cudo import (
 )
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends import Configurator
+from dstack._internal.server.services.backends.configurators.base import (
+    raise_invalid_credentials_error,
+)
 
 REGIONS = [
     "no-luster-1",
@@ -41,6 +44,7 @@ class CudoConfigurator(Configurator):
         config_values = CudoConfigValues()
         if config.creds is None:
             return config_values
+        self._validate_cudo_api_key(config.creds.api_key)
         config_values.regions = self._get_regions_element(
             selected=config.regions or [DEFAULT_REGION]
         )
@@ -79,3 +83,8 @@ class CudoConfigurator(Configurator):
             **json.loads(model.config),
             creds=CudoCreds.parse_raw(model.auth),
         )
+
+    def _validate_cudo_api_key(self, api_key: str):
+        client = api_client.CudoApiClient(api_key=api_key)
+        if not client.validate_api_key():
+            raise_invalid_credentials_error(fields=[["creds", "api_key"]])
