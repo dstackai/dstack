@@ -8,12 +8,9 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from dstack._internal.core.services.configs import ConfigManager
 from dstack.gateway.errors import SSHError
 
 logger = logging.getLogger(__name__)
-
-config = ConfigManager()
 
 
 class SSHTunnel(BaseModel):
@@ -45,7 +42,7 @@ class SSHTunnel(BaseModel):
         cmd = [
             "ssh",
             "-F",
-            str(config.dstack_ssh_config_path),
+            "none",
             "-i",
             id_rsa_path,
             "-M",
@@ -61,7 +58,7 @@ class SSHTunnel(BaseModel):
             proxy = [
                 "ssh",
                 "-F",
-                str(config.dstack_ssh_config_path),
+                "none",
                 "-i",
                 id_rsa_path,
                 "-W",
