@@ -35,13 +35,10 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
-from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.common import parse_memory
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-config = ConfigManager()
 
 RUNNER_SSH_PORT = 10022
 JUMP_POD_SSH_PORT = 22
@@ -543,7 +540,7 @@ def _run_ssh_command(hostname: str, port: int, ssh_private_key: str, command: st
             [
                 "ssh",
                 "-F",
-                str(config.dstack_ssh_config_path),
+                "none",
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-i",

@@ -5,14 +5,11 @@ import tempfile
 from typing import Dict, Optional
 
 from dstack._internal.core.models.instances import SSHConnectionParams
-from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 
 logger = get_logger(__name__)
-
-config = ConfigManager()
 
 
 class SSHTunnel:
@@ -23,6 +20,7 @@ class SSHTunnel:
         ports: Dict[int, int],
         control_sock_path: PathLike,
         options: Dict[str, str],
+        ssh_config_path: str = "none",
     ):
         """
         :param ports: Mapping { remote port -> local port }
@@ -32,13 +30,14 @@ class SSHTunnel:
         self.ports = ports
         self.control_sock_path = control_sock_path
         self.options = options
+        self.ssh_config_path = ssh_config_path
 
     def open(self):
         # ControlMaster and ControlPath are always set
         command = [
             "ssh",
             "-F",
-            str(config.dstack_ssh_config_path),
+            self.ssh_config_path,
             "-f",
             "-N",
             "-M",
@@ -103,15 +102,7 @@ class RunnerTunnel(SSHTunnel):
             control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
         options = {}
         if ssh_proxy is not None:
-            proxy_command = [
-                "ssh",
-                "-F",
-                str(config.dstack_ssh_config_path),
-                "-i",
-                id_rsa_path,
-                "-W",
-                "%h:%p",
-            ]
+            proxy_command = ["ssh", "-i", id_rsa_path, "-W", "%h:%p"]
             proxy_command += [
                 "-o",
                 "StrictHostKeyChecking=no",
@@ -161,6 +152,7 @@ class ClientTunnel(SSHTunnel):
         host: str,
         ports: Dict[int, int],
         id_rsa_path: PathLike,
+        ssh_config_path: str,
         control_sock_path: Optional[str] = None,
     ):
         if control_sock_path is None:
@@ -172,4 +164,5 @@ class ClientTunnel(SSHTunnel):
             ports=ports,
             control_sock_path=control_sock_path,
             options={},
+            ssh_config_path=ssh_config_path,
         )

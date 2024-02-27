@@ -49,8 +49,13 @@ class SSHAttach:
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
         self.run_name = run_name
+        self.ssh_config_path = str(ConfigManager().dstack_ssh_config_path)
         self.tunnel = ClientTunnel(
-            run_name, self.ports, id_rsa_path=id_rsa_path, control_sock_path=control_sock_path
+            run_name,
+            self.ports,
+            id_rsa_path=id_rsa_path,
+            control_sock_path=control_sock_path,
+            ssh_config_path=self.ssh_config_path,
         )
         self.ssh_proxy = ssh_proxy
         if ssh_proxy is None:
@@ -103,7 +108,6 @@ class SSHAttach:
             }
         else:
             self.container_config = None
-        self.ssh_config_path = str(ConfigManager().dstack_ssh_config_path)
 
     def attach(self):
         include_ssh_config(self.ssh_config_path)
