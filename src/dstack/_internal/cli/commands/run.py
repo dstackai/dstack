@@ -272,7 +272,7 @@ class RunCommand(APIBaseCommand):
 
 
 def _print_fail_message(run: Run):
-    error_code = _get_run_termination_reason(run)
+    termination_reason = _get_run_termination_reason(run)
     message = "Run failed due to unknown reason. Check CLI and server logs."
     if _get_run_termination_reason(run) == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         message = (
@@ -280,9 +280,9 @@ def _print_fail_message(run: Run):
             "This is likely due to cloud providers not having enough capacity. "
             "Check CLI and server logs for more details."
         )
-    elif error_code is not None:
+    elif termination_reason is not None:
         message = (
-            f"Run failed with error code {error_code}. "
+            f"Run failed with error code {termination_reason}. "
             "Check CLI and server logs for more details."
         )
     console.print(f"[error]{message}[/]")

@@ -20,7 +20,15 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import JobSpec, JobStatus, Requirements, RunSpec, RunStatus
+from dstack._internal.core.models.runs import (
+    JobSpec,
+    JobStatus,
+    JobTerminationReason,
+    Requirements,
+    RunSpec,
+    RunStatus,
+    RunTerminationReason,
+)
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
@@ -257,7 +265,7 @@ def get_dev_env_run_dict(
                         "submitted_at": submitted_at,
                         "finished_at": finished_at,
                         "status": "submitted",
-                        "error_code": None,
+                        "termination_reason": None,
                         "job_provisioning_data": None,
                     }
                 ],
@@ -269,7 +277,7 @@ def get_dev_env_run_dict(
             "submitted_at": submitted_at,
             "finished_at": finished_at,
             "status": "submitted",
-            "error_code": None,
+            "termination_reason": None,
             "job_provisioning_data": None,
         },
         "cost": 0.0,
@@ -334,7 +342,7 @@ class TestListRuns:
                                 "submitted_at": "2023-01-02T03:04:00+00:00",
                                 "finished_at": None,
                                 "status": "submitted",
-                                "error_code": None,
+                                "termination_reason": None,
                                 "job_provisioning_data": None,
                             }
                         ],
@@ -346,7 +354,7 @@ class TestListRuns:
                     "submitted_at": "2023-01-02T03:04:00+00:00",
                     "finished_at": None,
                     "status": "submitted",
-                    "error_code": None,
+                    "termination_reason": None,
                     "job_provisioning_data": None,
                 },
                 "cost": 0,
@@ -594,8 +602,12 @@ class TestStopRuns:
             json={"runs_names": [run.run_name], "abort": False},
         )
         assert response.status_code == 200
+        await session.refresh(run)
+        assert run.status == RunStatus.TERMINATED
+        assert run.termination_reason == RunTerminationReason.STOPPED_BY_USER
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATED
+        assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
     async def test_terminates_running_run(self, test_db, session: AsyncSession):
@@ -627,9 +639,12 @@ class TestStopRuns:
             )
             stop_runner.assert_called_once()
         assert response.status_code == 200
+        await session.refresh(run)
+        assert run.status == RunStatus.TERMINATING
+        assert run.termination_reason == RunTerminationReason.STOPPED_BY_USER
         await session.refresh(job)
-        assert job.status == JobStatus.TERMINATED
-        assert not job.removed
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
     async def test_leaves_finished_runs_unchanged(self, test_db, session: AsyncSession):

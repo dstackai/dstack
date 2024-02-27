@@ -39,6 +39,7 @@ from dstack._internal.core.models.runs import (
     JobSpec,
     JobStatus,
     JobSubmission,
+    JobTerminationReason,
     Requirements,
     Run,
     RunPlan,
@@ -69,7 +70,6 @@ from dstack._internal.server.services.jobs import (
     PROCESSING_RUNS_LOCK,
     get_jobs_from_run_spec,
     job_model_to_job_submission,
-    stop_job,
 )
 from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
@@ -344,7 +344,7 @@ def create_job_model_for_new_submission(
         submitted_at=now,
         last_processed_at=now,
         status=status,
-        error_code=None,
+        termination_reason=None,
         job_spec_data=job.job_spec.json(),
         job_provisioning_data=None,
     )
@@ -384,14 +384,17 @@ async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
         await session.refresh(run)
         if run.status.is_finished():
             return
+
+        run.status = RunStatus.TERMINATING
         if abort:
-            # Jobs will be stopped by `process_runs`
-            run.status = RunStatus.TERMINATED
             run.termination_reason = RunTerminationReason.ABORTED_BY_USER
-            await session.commit()
         else:
-            for job in run.jobs:
-                await stop_job(session, run.project, job)
+            run.termination_reason = RunTerminationReason.STOPPED_BY_USER
+        # process the run out of turn
+        await process_terminating_run(session, run)
+
+        run.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
     finally:
         PROCESSING_RUNS_IDS.remove(run.id)
 
@@ -664,3 +667,65 @@ def _get_run_service(run: Run) -> Optional[ServiceInfo]:
 def _validate_run_name(run_name: str):
     if not re.match("^[a-z][a-z0-9-]{1,40}$", run_name):
         raise ServerClientError("run_name should match regex '^[a-z][a-z0-9-]{1,40}$'")
+
+
+async def process_terminating_run(session: AsyncSession, run: RunModel):
+    """
+    Used by both `process_runs` and `stop_run` to process a run that is TERMINATING.
+    Caller must acquire the lock on run.
+    """
+    job_termination_reason = run_to_job_termination_reason(run.termination_reason)
+
+    # TODO(egor-s): acquire jobs lock
+
+    all_jobs_finished = True
+    job: JobModel
+    for job in run.jobs:
+        if job.status.is_finished():
+            continue
+        all_jobs_finished = False
+        if job.status == JobStatus.TERMINATING:
+            # `process_terminating_jobs` will abort frozen jobs
+            continue
+
+        # TODO(egor-s): stop/abort jobs
+        job.status = JobStatus.TERMINATING
+        job.termination_reason = job_termination_reason
+
+    if all_jobs_finished:
+        run.status = run_termination_reason_to_status(run.termination_reason)
+        logger.info(
+            "%s: run status has changed TERMINATING -> %s, reason: %s",
+            fmt(run),
+            run.status.name,
+            run.termination_reason.name,
+        )
+
+
+def fmt(run: RunModel) -> str:
+    """Format a run for logging"""
+    return f"({run.id.hex[:6]}){run.run_name}"
+
+
+def run_to_job_termination_reason(
+    run_termination_reason: RunTerminationReason,
+) -> JobTerminationReason:
+    mapping = {
+        RunTerminationReason.ALL_JOBS_DONE: JobTerminationReason.DONE_BY_RUNNER,
+        RunTerminationReason.JOB_FAILED: JobTerminationReason.TERMINATED_BY_SERVER,
+        RunTerminationReason.RETRY_LIMIT_EXCEEDED: JobTerminationReason.TERMINATED_BY_SERVER,
+        RunTerminationReason.STOPPED_BY_USER: JobTerminationReason.TERMINATED_BY_USER,
+        RunTerminationReason.ABORTED_BY_USER: JobTerminationReason.ABORTED_BY_USER,
+    }
+    return mapping[run_termination_reason]
+
+
+def run_termination_reason_to_status(run_termination_reason: RunTerminationReason) -> RunStatus:
+    mapping = {
+        RunTerminationReason.ALL_JOBS_DONE: RunStatus.DONE,
+        RunTerminationReason.JOB_FAILED: RunStatus.FAILED,
+        RunTerminationReason.RETRY_LIMIT_EXCEEDED: RunStatus.FAILED,
+        RunTerminationReason.STOPPED_BY_USER: RunStatus.TERMINATED,
+        RunTerminationReason.ABORTED_BY_USER: RunStatus.TERMINATED,
+    }
+    return mapping[run_termination_reason]

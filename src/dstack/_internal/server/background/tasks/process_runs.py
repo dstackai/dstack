@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import itertools
 import uuid
-from typing import Iterable, List, Tuple
+from typing import Iterable, List, Optional, Set, Tuple
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +10,13 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.instances import InstanceOffer
 from dstack._internal.core.models.profiles import ProfileRetryPolicy
-from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunSpec, RunStatus
+from dstack._internal.core.models.runs import (
+    JobStatus,
+    JobTerminationReason,
+    RunSpec,
+    RunStatus,
+    RunTerminationReason,
+)
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, RunModel
 from dstack._internal.server.services.jobs import (
@@ -21,6 +27,8 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.runs import (
     create_job_model_for_new_submission,
+    fmt,
+    process_terminating_run,
     run_model_to_run,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -39,7 +47,7 @@ async def process_runs():
         async with PROCESSING_RUNS_LOCK:
             res = await session.execute(
                 sa.select(RunModel).where(
-                    RunModel.processing_finished == False,
+                    RunModel.status.not_in(RunStatus.finished_statuses()),
                     RunModel.last_processed_at < get_current_datetime() - PROCESSING_INTERVAL,
                     RunModel.id.not_in(PROCESSING_RUNS_IDS),
                 )
@@ -79,8 +87,10 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
             await process_pending_run(session, run)
         elif run.status in {RunStatus.SUBMITTED, RunStatus.STARTING, RunStatus.RUNNING}:
             await process_active_run(session, run)
+        elif run.status == RunStatus.TERMINATING:
+            await process_terminating_run(session, run)
         elif run.status.is_finished():
-            await process_finished_run(session, run)
+            pass
         else:
             raise ValueError(f"Unexpected run status {run.status}")
 
@@ -128,81 +138,85 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
     run_spec = RunSpec.parse_raw(run_model.run_spec)
     retry_policy = run_spec.profile.retry_policy or ProfileRetryPolicy()
 
-    any_replica_failed = False
+    run_statuses: Set[RunStatus] = set()
+    run_termination_reasons: Set[RunTerminationReason] = set()
     replicas_to_retry: List[Tuple[int, List[JobModel]]] = []
-    any_replica_submitted = False
-    any_replica_starting = False
-    any_replica_running = False
-    any_replica_done = False
 
     # TODO(egor-s): collect replicas count and statuses for auto-scaling
     for replica_num, jobs in group_jobs_by_replica_latest(run_model.jobs):
-        any_job_failed = False
-        any_job_failed_retryable = False
-        any_job_submitted = False
-        any_job_starting = False
-        any_job_running = False
-        all_jobs_scaled_down = True
-        all_jobs_done = True
+        replica_statuses: Set[RunStatus] = set()
+        replica_needs_retry = False
 
         for job in jobs:
-            if job.status == JobStatus.FAILED:
-                if not await is_job_retryable(
-                    session, job, retry_policy
-                ):  # critical, can't recover
-                    any_job_failed = True
-                    break
-                any_job_failed_retryable = True
-            elif (
-                job.status in {JobStatus.TERMINATED, JobStatus.ABORTED}
-                and job.termination_reason != JobTerminationReason.SCALED_DOWN
+            if job.status == JobStatus.DONE or (
+                job.status == JobStatus.TERMINATING
+                and job.termination_reason == JobTerminationReason.DONE_BY_RUNNER
             ):
-                any_job_failed = True
-                break
-            elif job.status == JobStatus.SUBMITTED:
-                any_job_submitted = True
-            elif job.status in {JobStatus.PROVISIONING, JobStatus.PULLING}:
-                any_job_starting = True
+                # the job is done or going to be done
+                replica_statuses.add(RunStatus.DONE)
+            elif job.termination_reason == JobTerminationReason.SCALED_DOWN:
+                pass  # the job was scaled down
             elif job.status == JobStatus.RUNNING:
-                any_job_running = True
+                # the job is running
+                replica_statuses.add(RunStatus.RUNNING)
+            elif job.status in {JobStatus.PROVISIONING, JobStatus.PULLING}:
+                # the job is starting
+                replica_statuses.add(RunStatus.STARTING)
+            elif job.status == JobStatus.SUBMITTED:
+                # the job is submitted
+                replica_statuses.add(RunStatus.SUBMITTED)
+            elif (
+                job.status == JobStatus.FAILED
+            ):  # TODO(egor-s): or terminating with specific statuses
+                if await is_retry_enabled(session, job, retry_policy):
+                    if await is_retry_limit_exceeded(session, job, retry_policy):
+                        replica_statuses.add(RunStatus.FAILED)
+                        run_termination_reasons.add(RunTerminationReason.RETRY_LIMIT_EXCEEDED)
+                    else:
+                        # do a retry
+                        replica_needs_retry = True
+                else:
+                    # just failed
+                    replica_statuses.add(RunStatus.FAILED)
+                    run_termination_reasons.add(RunTerminationReason.JOB_FAILED)
+            elif job.status in {JobStatus.TERMINATING, JobStatus.TERMINATED, JobStatus.ABORTED}:
+                pass  # unexpected, but let's ignore it
+            else:
+                raise ValueError(f"Unexpected job status {job.status}")
 
-            if job.status != JobStatus.DONE:
-                all_jobs_done = False
-            if job.termination_reason != JobTerminationReason.SCALED_DOWN:
-                all_jobs_scaled_down = False
-
-        if any_job_failed:  # critical, can't recover
-            any_replica_failed = True
-            break
-        if any_job_failed_retryable:
-            replicas_to_retry.append((replica_num, jobs))
-        elif all_jobs_scaled_down:
-            pass  # the replica was scaled down, ignore it
+        if RunStatus.FAILED in replica_statuses:
+            run_statuses.add(RunStatus.FAILED)
         else:
-            any_replica_submitted = any_replica_submitted or any_job_submitted
-            any_replica_starting = any_replica_starting or any_job_starting
-            any_replica_running = any_replica_running or any_job_running
-            any_replica_done = any_replica_done or all_jobs_done
+            if replica_needs_retry:
+                replicas_to_retry.append((replica_num, jobs))
+            if not replica_needs_retry or can_retry_single_job(run_spec):
+                run_statuses.update(replica_statuses)
 
-    if any_replica_failed:
-        new_status = RunStatus.FAILED
-    elif not (any_replica_submitted or any_replica_starting or any_replica_running):
-        if any_replica_done:
-            new_status = RunStatus.DONE
+    termination_reason: Optional[RunTerminationReason] = None
+    if RunStatus.FAILED in run_statuses:
+        new_status = RunStatus.TERMINATING
+        if RunTerminationReason.JOB_FAILED in run_termination_reasons:
+            termination_reason = RunTerminationReason.JOB_FAILED
+        elif RunTerminationReason.RETRY_LIMIT_EXCEEDED in run_termination_reasons:
+            termination_reason = RunTerminationReason.RETRY_LIMIT_EXCEEDED
         else:
-            # TODO(egor-s): do we need to exit?
-            new_status = RunStatus.PENDING
+            raise ValueError(f"Unexpected termination reason {run_termination_reasons}")
+    elif RunStatus.RUNNING in run_statuses:
+        new_status = RunStatus.RUNNING
+    elif RunStatus.STARTING in run_statuses:
+        new_status = RunStatus.STARTING
+    elif RunStatus.SUBMITTED in run_statuses:
+        new_status = RunStatus.SUBMITTED
+    elif RunStatus.DONE in run_statuses and not replicas_to_retry:
+        new_status = RunStatus.TERMINATING
+        termination_reason = RunTerminationReason.ALL_JOBS_DONE
     else:
-        # TODO(egor-s): retry failed replicas while other replicas are active, terminate jobs if needed
-        # TODO(egor-s): perform auto-scaling
-        if any_replica_running:
-            new_status = RunStatus.RUNNING
-        elif any_replica_starting:
-            new_status = RunStatus.STARTING
-        elif any_replica_submitted:
-            new_status = RunStatus.SUBMITTED
-        else:
-            raise ValueError("Unexpected state")
+        new_status = RunStatus.PENDING
+
+    if new_status not in {RunStatus.TERMINATING, RunStatus.PENDING}:
+        # No need to retry if the run is terminating,
+        # pending run will retry replicas in `process_pending_run`
+        pass  # TODO(egor-s): retry replicas
 
     if run_model.status != new_status:
         logger.info(
@@ -212,17 +226,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
             new_status.name,
         )
         run_model.status = new_status
-
-
-async def process_finished_run(session: AsyncSession, run: RunModel):
-    """Done, failed, or terminated. Stop all jobs, unregister the service"""
-    for job in run.jobs:
-        if not job.status.is_finished():
-            logger.info("%s is %s: terminating job %s", fmt(run), run.status.name, job.job_name)
-            job.status = JobStatus.TERMINATED
-            # TODO(egor-s): set job.error_code
-    # TODO(egor-s): unregister the service
-    run.processing_finished = True
+        run_model.termination_reason = termination_reason
 
 
 def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, List[JobModel]]]:
@@ -246,28 +250,31 @@ def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, Li
         yield replica_num, replica_jobs
 
 
-def fmt(run: RunModel) -> str:
-    """Format a run for logging"""
-    return f"({run.id.hex[:6]}){run.run_name}"
-
-
-async def is_job_retryable(
+async def is_retry_enabled(
     session: AsyncSession, job: JobModel, retry_policy: ProfileRetryPolicy
 ) -> bool:
-    if not retry_policy.retry:
-        return False
-    if job.termination_reason not in JOB_ERROR_CODES_TO_RETRY:
-        return False
+    # retry for spot instances only
+    if retry_policy.retry and job.termination_reason in JOB_ERROR_CODES_TO_RETRY:
+        instance = await session.get(InstanceModel, job.used_instance_id)
+        instance_offer = InstanceOffer.parse_raw(instance.offer)
+        if instance_offer.instance.resources.spot:
+            return True
+
+    return False
+
+
+async def is_retry_limit_exceeded(
+    session: AsyncSession, job: JobModel, retry_policy: ProfileRetryPolicy
+) -> bool:
     if (
         retry_policy.limit is not None
         and get_current_datetime() - job.submitted_at
         > datetime.timedelta(seconds=retry_policy.limit)
     ):
-        return False
+        return True
+    return False
 
-    # instance is not loaded by default, so we have to load it explicitly
-    instance = await session.get(InstanceModel, job.used_instance_id)
-    instance_offer = InstanceOffer.parse_raw(instance.offer)
-    if not instance_offer.instance.resources.spot:
-        return False
-    return True
+
+def can_retry_single_job(run_spec: RunSpec) -> bool:
+    # TODO(egor-s): handle independent and interconnected clusters
+    return False

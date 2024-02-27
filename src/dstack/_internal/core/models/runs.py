@@ -52,9 +52,10 @@ class RetryPolicy(BaseModel):
 
 
 class RunTerminationReason(str, Enum):
+    ALL_JOBS_DONE = "all_jobs_done"
     JOB_FAILED = "job_failed"
     RETRY_LIMIT_EXCEEDED = "retry_limit_exceeded"
-    STOPPED_BY_USER = "terminated_by_user"
+    STOPPED_BY_USER = "stopped_by_user"
     ABORTED_BY_USER = "aborted_by_user"
 
 
@@ -66,6 +67,9 @@ class JobTerminationReason(str, Enum):
     TERMINATED_BY_USER = "terminated_by_user"
     GATEWAY_ERROR = "gateway_error"
     SCALED_DOWN = "scaled_down"
+    DONE_BY_RUNNER = "done_by_runner"
+    ABORTED_BY_USER = "aborted_by_user"
+    TERMINATED_BY_SERVER = "terminated_by_server"
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"

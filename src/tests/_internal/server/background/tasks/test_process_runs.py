@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.background.tasks.process_runs as process_runs
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy
-from dstack._internal.core.models.runs import JobStatus, JobTerminationReason, RunStatus
+from dstack._internal.core.models.runs import (
+    JobStatus,
+    JobTerminationReason,
+    RunStatus,
+    RunTerminationReason,
+)
 from dstack._internal.server.models import RunModel
 from dstack._internal.server.testing.common import (
     create_instance,
@@ -83,20 +88,21 @@ class TestProcessRuns:
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == RunStatus.DONE
+        assert run.status == RunStatus.TERMINATING
+        assert run.termination_reason == RunTerminationReason.ALL_JOBS_DONE
 
     @pytest.mark.asyncio
     async def test_terminate_run_jobs(self, test_db, session: AsyncSession, run: RunModel):
-        run.status = RunStatus.TERMINATED
-        run.processing_finished = False
+        run.status = RunStatus.TERMINATING
+        run.termination_reason = RunTerminationReason.JOB_FAILED
         job = await create_job(session=session, run=run, status=JobStatus.RUNNING)
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(job)
-        assert job.status == JobStatus.TERMINATED
-        # TODO(egor-s): assert job.error_code
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER
         await session.refresh(run)
-        assert run.processing_finished is True
+        assert run.status == RunStatus.TERMINATING
 
     @pytest.mark.asyncio
     async def test_retry_running_to_pending(self, test_db, session: AsyncSession, run: RunModel):
@@ -108,7 +114,7 @@ class TestProcessRuns:
             session=session,
             run=run,
             status=JobStatus.FAILED,
-            error_code=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+            termination_reason=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
             instance=instance,
         )
 
@@ -129,7 +135,7 @@ class TestProcessRuns:
             session=session,
             run=run,
             status=JobStatus.FAILED,
-            error_code=None,
+            termination_reason=None,
             instance=instance,
         )
 
@@ -137,7 +143,8 @@ class TestProcessRuns:
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
             await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == RunStatus.FAILED
+        assert run.status == RunStatus.TERMINATING
+        assert run.termination_reason == RunTerminationReason.JOB_FAILED
 
     @pytest.mark.asyncio
     async def test_pending_to_submitted(self, test_db, session: AsyncSession, run: RunModel):
