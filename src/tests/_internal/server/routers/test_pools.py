@@ -2,12 +2,15 @@ import datetime as dt
 
 import pytest
 from fastapi.testclient import TestClient
+from freezegun import freeze_time
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
+from dstack._internal.server.models import PoolModel
 from dstack._internal.server.schemas.pools import (
     CreatePoolRequest,
     DeletePoolRequest,
@@ -42,59 +45,25 @@ class TestListPool:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_create_default_and_list(self, test_db, session: AsyncSession):
+    @freeze_time(dt.datetime(2023, 10, 4, 12, 0, tzinfo=dt.timezone.utc))
+    async def test_creates_and_lists_default_pool(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-
         response = client.post(
             f"/api/project/{project.name}/pool/list",
             headers=get_auth_headers(user.token),
             json={},
         )
         assert response.status_code == 200
-
         result = response.json()
-        assert len(result) == 1
-        pool = result[0]
         expected = [
             {
                 "name": "default-pool",
                 "default": True,
-                "created_at": str(pool["created_at"]),
-                "total_instances": 0,
-                "available_instances": 0,
-            }
-        ]
-        assert result == expected
-
-    @pytest.mark.asyncio
-    async def test_list_pools(self, test_db, session: AsyncSession):
-        user = await create_user(session=session, global_role=GlobalRole.USER)
-        project = await create_project(session=session, owner=user)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.USER
-        )
-
-        await create_pool(session, project, pool_name=TEST_POOL_NAME)
-
-        response = client.post(
-            f"/api/project/{project.name}/pool/list",
-            headers=get_auth_headers(user.token),
-            json={},
-        )
-        assert response.status_code == 200
-
-        result = response.json()
-        assert len(result) == 1
-        pool = result[0]
-        expected = [
-            {
-                "name": TEST_POOL_NAME,
-                "default": False,
-                "created_at": str(pool["created_at"]),
+                "created_at": "2023-10-04T12:00:00+00:00",
                 "total_instances": 0,
                 "available_instances": 0,
             }
@@ -120,7 +89,6 @@ class TestDeletePool:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
         pool = await create_pool(session, project, pool_name=TEST_POOL_NAME)
         response = client.post(
             f"/api/project/{project.name}/pool/delete",
@@ -145,65 +113,38 @@ class TestDeletePool:
         assert dt.datetime.fromisoformat(default_pool["created_at"]) > pool.created_at
 
     @pytest.mark.asyncio
-    async def test_delete_pool(self, test_db, session: AsyncSession):
+    async def test_deletes_pool(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
-        pool_left = await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-left")
-        pool_right = await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-right")
+        pool1 = await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-left")
+        pool2 = await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-right")
         response = client.post(
             f"/api/project/{project.name}/pool/delete",
             headers=get_auth_headers(user.token),
-            json=DeletePoolRequest(name=pool_left.name, force=False).dict(),
+            json=DeletePoolRequest(name=pool1.name, force=False).dict(),
         )
         assert response.status_code == 200
         assert response.json() is None
-
-        response = client.post(
-            f"/api/project/{project.name}/pool/list",
-            headers=get_auth_headers(user.token),
-            json={},
-        )
-        assert response.status_code == 200
-
-        result = response.json()
-        assert len(result) == 1
-
-        default_pool = result[0]
-        assert default_pool["name"] == pool_right.name
+        res = await session.execute(select(PoolModel).where(PoolModel.deleted == False))
+        pool = res.scalar_one()
+        assert pool.name == pool2.name
 
     @pytest.mark.asyncio
-    async def test_delete_missing(self, test_db, session: AsyncSession):
+    async def test_returns_400_if_pool_missing(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
-        pool = await create_pool(session, project, pool_name=TEST_POOL_NAME)
         response = client.post(
             f"/api/project/{project.name}/pool/delete",
             headers=get_auth_headers(user.token),
             json=DeletePoolRequest(name="missing name", force=False).dict(),
         )
-        assert response.status_code == 200
-        assert response.json() is None
-
-        response = client.post(
-            f"/api/project/{project.name}/pool/list",
-            headers=get_auth_headers(user.token),
-            json={},
-        )
-        assert response.status_code == 200
-
-        result = response.json()
-        assert len(result) == 1
-
-        default_pool = result[0]
-        assert default_pool["name"] == pool.name
+        assert response.status_code == 400
 
 
 class TestSetDefaultPool:
@@ -218,66 +159,35 @@ class TestSetDefaultPool:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_set_default(self, test_db, session: AsyncSession):
+    async def test_sets_default(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
-        await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-left")
-        pool_right = await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-right")
+        pool = await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-right")
         response = client.post(
             f"/api/project/{project.name}/pool/set_default",
             headers=get_auth_headers(user.token),
-            json=SetDefaultPoolRequest(pool_name=pool_right.name).dict(),
+            json=SetDefaultPoolRequest(pool_name=pool.name).dict(),
         )
         assert response.status_code == 200
-        assert response.json() == True
-
-        response = client.post(
-            f"/api/project/{project.name}/pool/list",
-            headers=get_auth_headers(user.token),
-            json={},
-        )
-        assert response.status_code == 200
-
-        result = response.json()
-        assert len(result) == 2
-
-        default_pool = [p for p in result if p["default"]][0]
-        assert default_pool["name"] == pool_right.name
+        await session.refresh(project)
+        assert project.default_pool_id == pool.id
 
     @pytest.mark.asyncio
-    async def test_set_default_missing(self, test_db, session: AsyncSession):
+    async def test_returns_400_if_pool_missing(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
-        pool = await create_pool(session, project, pool_name=TEST_POOL_NAME)
         response = client.post(
             f"/api/project/{project.name}/pool/set_default",
             headers=get_auth_headers(user.token),
             json=SetDefaultPoolRequest(pool_name="missing pool").dict(),
         )
-        assert response.status_code == 200
-        assert response.json() == False
-
-        response = client.post(
-            f"/api/project/{project.name}/pool/list",
-            headers=get_auth_headers(user.token),
-            json={},
-        )
-        assert response.status_code == 200
-
-        result = response.json()
-        assert len(result) == 1
-
-        result_pool = result[0]
-        assert result_pool["name"] == pool.name
-        assert result_pool["default"] == False
+        assert response.status_code == 400
 
 
 class TestCreatePool:
@@ -305,28 +215,16 @@ class TestCreatePool:
         )
         assert response.status_code == 200
         assert response.json() is None
-
-        response = client.post(
-            f"/api/project/{project.name}/pool/list",
-            headers=get_auth_headers(user.token),
-            json={},
-        )
-        assert response.status_code == 200
-
-        result = response.json()
-        assert len(result) == 1
-
-        default_pool = result[0]
-        assert default_pool["name"] == TEST_POOL_NAME
+        res = await session.execute(select(PoolModel).where(PoolModel.deleted == False))
+        res.scalar_one()
 
     @pytest.mark.asyncio
-    async def test_duplicate_name(self, test_db, session: AsyncSession):
+    async def test_returns_400_on_duplicate_name(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
         response = client.post(
             f"/api/project/{project.name}/pool/create",
             headers=get_auth_headers(user.token),
@@ -334,13 +232,12 @@ class TestCreatePool:
         )
         assert response.status_code == 200
         assert response.json() is None
-
-        with pytest.raises(ValueError):
-            response = client.post(
-                f"/api/project/{project.name}/pool/create",
-                headers=get_auth_headers(user.token),
-                json=CreatePoolRequest(name=TEST_POOL_NAME).dict(),
-            )
+        response = client.post(
+            f"/api/project/{project.name}/pool/create",
+            headers=get_auth_headers(user.token),
+            json=CreatePoolRequest(name=TEST_POOL_NAME).dict(),
+        )
+        assert response.status_code == 400
 
 
 class TestShowPool:
@@ -417,7 +314,7 @@ class TestShowPool:
         )
         assert response.status_code == 400
         assert response.json() == {
-            "detail": [{"msg": "Pool is not found", "code": "resource_not_exists"}]
+            "detail": [{"msg": "Pool not found", "code": "resource_not_exists"}]
         }
 
 

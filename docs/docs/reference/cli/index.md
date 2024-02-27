@@ -164,7 +164,7 @@ $ dstack pool create --help
 
 ##### dstack pool list
 
-The `dstack pool delete` lists all existing pools.
+The `dstack pool list` lists all existing pools.
 
 <div class="termy">
 
@@ -182,7 +182,7 @@ The `dstack pool delete` command deletes a specified pool.
 <div class="termy">
 
 ```shell
-$ dstack gateway update --help
+$ dstack pool delete --help
 #GENERATE#
 ```
 

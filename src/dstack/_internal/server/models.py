@@ -87,7 +87,7 @@ class ProjectModel(BaseModel):
     default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
         ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )
-    default_pool: Mapped["PoolModel"] = relationship(
+    default_pool: Mapped[Optional["PoolModel"]] = relationship(
         foreign_keys=[default_pool_id], lazy="selectin"
     )
 

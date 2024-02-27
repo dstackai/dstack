@@ -19,7 +19,7 @@ from dstack._internal.core.models.runs import InstanceStatus, JobStatus
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.services.pools import (
-    get_or_create_default_pool_by_name,
+    get_or_create_pool_by_name,
 )
 from dstack._internal.server.testing.common import (
     create_instance,
@@ -207,7 +207,7 @@ class TestProcessSubmittedJobs:
             session=session,
             project_id=project.id,
         )
-        pool = await get_or_create_default_pool_by_name(session, project, pool_name=None)
+        pool = await get_or_create_pool_by_name(session, project, pool_name=None)
         instance = await create_instance(
             session=session,
             project=project,

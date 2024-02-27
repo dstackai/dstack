@@ -16,7 +16,6 @@ import dstack._internal.utils.common as common_utils
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import (
     BackendError,
-    ComputeError,
     RepoDoesNotExistError,
     ServerClientError,
 )
@@ -31,7 +30,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, CreationPolicy, Profile
+from dstack._internal.core.models.profiles import CreationPolicy, Profile
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -69,9 +68,8 @@ from dstack._internal.server.services.jobs.configurators.base import (
     get_default_python_verison,
 )
 from dstack._internal.server.services.pools import (
-    create_pool_model,
     filter_pool_instances,
-    get_or_create_default_pool_by_name,
+    get_or_create_pool_by_name,
     get_pool_instances,
     instance_model_to_instance,
 )
@@ -167,148 +165,6 @@ async def get_run(
     return run_model_to_run(run_model)
 
 
-async def get_run_plan_by_requirements(
-    project: ProjectModel,
-    profile: Profile,
-    requirements: Requirements,
-    exclude_not_available=False,
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
-    backends: List[Backend] = await backends_services.get_project_backends(project=project)
-
-    if profile.backends is not None:
-        backends = [b for b in backends if b.TYPE in profile.backends]
-
-    # filter backends with create_instance support
-    backends = [b for b in backends if b.TYPE in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]
-
-    offers = await backends_services.get_instance_offers(
-        backends=backends,
-        requirements=requirements,
-        exclude_not_available=exclude_not_available,
-    )
-
-    return offers
-
-
-async def create_instance(
-    session: AsyncSession,
-    project: ProjectModel,
-    user: UserModel,
-    ssh_key: SSHKey,
-    pool_name: str,
-    instance_name: str,
-    profile: Profile,
-    requirements: Requirements,
-) -> Optional[Instance]:
-    offers = await get_run_plan_by_requirements(
-        project, profile, requirements, exclude_not_available=True
-    )
-
-    # Backends doesn't suppport create_instance
-    backend_types = set((backend.TYPE for backend, _ in offers))
-    if all(
-        (backend_type not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT)
-        for backend_type in backend_types
-    ):
-        backends = ", ".join(sorted(backend_types))
-        raise ComputeError(
-            f"Backends {backends} doesn't support create_intance. Try to select other backends"
-        )
-
-    if not offers:
-        return
-
-    user_ssh_key = ssh_key
-    project_ssh_key = SSHKey(
-        public=project.ssh_public_key.strip(),
-        private=project.ssh_private_key.strip(),
-    )
-
-    image = parse_image_name(get_default_image(get_default_python_verison()))
-    instance_config = InstanceConfiguration(
-        project_name=project.name,
-        instance_name=instance_name,
-        ssh_keys=[user_ssh_key, project_ssh_key],
-        job_docker_config=DockerConfig(
-            image=image,
-            registry_auth=None,
-        ),
-        user=user.name,
-    )
-
-    pool = await pools_services.get_pool(session, project, pool_name)
-
-    if pool is None:
-        pool = await create_pool_model(session, project, pool_name)
-
-    backends = {backend for backend, _ in offers}
-
-    for backend, instance_offer in offers:
-        # cannot create an instance in vastai/k8s. skip
-        if instance_offer.instance_runtime == InstanceRuntime.RUNNER:
-            continue
-
-        logger.debug(
-            "trying %s in %s/%s for $%0.4f per hour",
-            instance_offer.instance.name,
-            instance_offer.backend.value,
-            instance_offer.region,
-            instance_offer.price,
-        )
-        try:
-            launched_instance_info: LaunchedInstanceInfo = await run_async(
-                backend.compute().create_instance,
-                instance_offer,
-                instance_config,
-            )
-        except BackendError as e:
-            logger.warning(
-                "%s launch in %s/%s failed: %s",
-                instance_offer.instance.name,
-                instance_offer.backend.value,
-                instance_offer.region,
-                repr(e),
-            )
-            continue
-        except NotImplementedError:
-            # skip a backend without create_instance support, continue with next backend and offer
-            continue
-
-        job_provisioning_data = JobProvisioningData(
-            backend=backend.TYPE,
-            instance_type=instance_offer.instance,
-            instance_id=launched_instance_info.instance_id,
-            hostname=launched_instance_info.ip_address,
-            region=launched_instance_info.region,
-            price=instance_offer.price,
-            username=launched_instance_info.username,
-            ssh_port=launched_instance_info.ssh_port,
-            dockerized=launched_instance_info.dockerized,
-            backend_data=launched_instance_info.backend_data,
-            ssh_proxy=None,
-        )
-
-        im = InstanceModel(
-            name=instance_name,
-            project=project,
-            pool=pool,
-            created_at=common_utils.get_current_datetime(),
-            started_at=common_utils.get_current_datetime(),
-            status=InstanceStatus.STARTING,
-            backend=backend.TYPE,
-            region=instance_offer.region,
-            price=instance_offer.price,
-            job_provisioning_data=job_provisioning_data.json(),
-            offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
-            termination_policy=profile.termination_policy,
-            termination_idle_time=profile.termination_idle_time,
-        )
-        session.add(im)
-        await session.commit()
-
-        return instance_model_to_instance(im)
-
-
 async def get_run_plan(
     session: AsyncSession, project: ProjectModel, user: UserModel, run_spec: RunSpec
 ) -> RunPlan:
@@ -316,58 +172,40 @@ async def get_run_plan(
         _validate_run_name(run_spec.run_name)
 
     profile = run_spec.profile
+    creation_policy = profile.creation_policy
 
-    # TODO: get_or_create_default_pool
-
-    pool_name = profile.pool_name
-    if profile.pool_name is None:
-        try:
-            pool_name = project.default_pool.name
-        except Exception:
-            pool_name = DEFAULT_POOL_NAME  # TODO: get pool from project
-
-    pool_instances = [
-        instance
-        for instance in (await get_pool_instances(session, project, pool_name))
-        if not instance.deleted
-    ]
-
+    pool = await get_or_create_pool_by_name(
+        session=session, project=project, pool_name=profile.pool_name
+    )
+    pool_filtered_instances = filter_pool_instances(
+        pool_instances=get_pool_instances(pool),
+        profile=profile,
+        resources=run_spec.configuration.resources,
+    )
     pool_offers: List[InstanceOfferWithAvailability] = []
-
-    for instance in filter_pool_instances(
-        pool_instances, profile, run_spec.configuration.resources
-    ):
-        offer = pydantic.parse_raw_as(InstanceOfferWithAvailability, instance.offer)
+    for instance in pool_filtered_instances:
+        offer = InstanceOfferWithAvailability.parse_raw(instance.offer)
+        offer.availability = InstanceAvailability.BUSY
         if instance.status == InstanceStatus.READY:
             offer.availability = InstanceAvailability.READY
-        else:
-            offer.availability = InstanceAvailability.BUSY
         pool_offers.append(offer)
-
-    backends = await backends_services.get_project_backends(project=project)
-    if profile.backends is not None:
-        backends = [b for b in backends if b.TYPE in profile.backends]
 
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
     jobs = get_jobs_from_run_spec(run_spec)
     job_plans = []
 
-    creation_policy = profile.creation_policy
-
     for job in jobs:
         job_offers: List[InstanceOfferWithAvailability] = []
         job_offers.extend(pool_offers)
 
         if creation_policy is None or creation_policy == CreationPolicy.REUSE_OR_CREATE:
-            requirements = job.job_spec.requirements
-            offers = await backends_services.get_instance_offers(
-                backends=backends,
-                requirements=requirements,
+            offers = await get_offers_by_requirements(
+                project=project,
+                profile=profile,
+                requirements=job.job_spec.requirements,
                 exclude_not_available=False,
             )
-            for backend, offer in offers:
-                offer.backend = backend.TYPE
             job_offers.extend(offer for _, offer in offers)
 
         # TODO(egor-s): merge job_offers and pool_offers based on (availability, use/create, price)
@@ -379,12 +217,37 @@ async def get_run_plan(
         )
         job_plans.append(job_plan)
 
-    run_spec.profile.pool_name = pool_name  # write pool name back for the client
+    run_spec.profile.pool_name = pool.name  # write pool name back for the client
     run_spec.run_name = run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name, user=user.name, run_spec=run_spec, job_plans=job_plans
     )
     return run_plan
+
+
+async def get_offers_by_requirements(
+    project: ProjectModel,
+    profile: Profile,
+    requirements: Requirements,
+    exclude_not_available=False,
+) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+    backends: List[Backend] = await backends_services.get_project_backends(project=project)
+
+    if profile.backends is not None:
+        backends = [b for b in backends if b.TYPE in profile.backends]
+
+    offers = await backends_services.get_instance_offers(
+        backends=backends,
+        requirements=requirements,
+        exclude_not_available=exclude_not_available,
+    )
+
+    # Hide internal offer.backend by backend that returned the offer.
+    # This is relevant for dstack Cloud.
+    for backend, offer in offers:
+        offer.backend = backend.TYPE
+
+    return offers
 
 
 async def submit_run(
@@ -414,7 +277,7 @@ async def submit_run(
         _validate_run_name(run_spec.run_name)
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
-    pool = await get_or_create_default_pool_by_name(session, project, run_spec.profile.pool_name)
+    pool = await get_or_create_pool_by_name(session, project, run_spec.profile.pool_name)
 
     run_model = RunModel(
         id=uuid.uuid4(),
@@ -527,6 +390,136 @@ async def delete_runs(
     await session.commit()
 
 
+async def get_create_instance_offers(
+    project: ProjectModel,
+    profile: Profile,
+    requirements: Requirements,
+    exclude_not_available=False,
+) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+    offers = await get_offers_by_requirements(
+        project=project,
+        profile=profile,
+        requirements=requirements,
+        exclude_not_available=exclude_not_available,
+    )
+    offers = [
+        (backend, offer)
+        for backend, offer in offers
+        if backend.TYPE in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+    ]
+    return offers
+
+
+async def create_instance(
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    ssh_key: SSHKey,
+    pool_name: str,
+    instance_name: str,
+    profile: Profile,
+    requirements: Requirements,
+) -> Instance:
+    offers = await get_create_instance_offers(
+        project=project,
+        profile=profile,
+        requirements=requirements,
+        exclude_not_available=True,
+    )
+
+    # Raise error if no backends suppport create_instance
+    backend_types = set((backend.TYPE for backend, _ in offers))
+    if all(
+        (backend_type not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT)
+        for backend_type in backend_types
+    ):
+        backends = ", ".join(sorted(backend_types))
+        raise ServerClientError(
+            f"Backends {backends} do not support create_intance. Try to select other backends."
+        )
+
+    pool = await pools_services.get_or_create_pool_by_name(session, project, pool_name)
+
+    user_ssh_key = ssh_key
+    project_ssh_key = SSHKey(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+    image = parse_image_name(get_default_image(get_default_python_verison()))
+    instance_config = InstanceConfiguration(
+        project_name=project.name,
+        instance_name=instance_name,
+        ssh_keys=[user_ssh_key, project_ssh_key],
+        job_docker_config=DockerConfig(
+            image=image,
+            registry_auth=None,
+        ),
+        user=user.name,
+    )
+
+    for backend, instance_offer in offers:
+        # cannot create an instance in vastai/k8s. skip
+        if instance_offer.instance_runtime == InstanceRuntime.RUNNER:
+            continue
+        logger.debug(
+            "trying %s in %s/%s for $%0.4f per hour",
+            instance_offer.instance.name,
+            instance_offer.backend.value,
+            instance_offer.region,
+            instance_offer.price,
+        )
+        try:
+            launched_instance_info: LaunchedInstanceInfo = await run_async(
+                backend.compute().create_instance,
+                instance_offer,
+                instance_config,
+            )
+        except BackendError as e:
+            logger.warning(
+                "%s launch in %s/%s failed: %s",
+                instance_offer.instance.name,
+                instance_offer.backend.value,
+                instance_offer.region,
+                repr(e),
+            )
+            continue
+        except NotImplementedError:
+            # skip a backend without create_instance support, continue with next backend and offer
+            continue
+        job_provisioning_data = JobProvisioningData(
+            backend=backend.TYPE,
+            instance_type=instance_offer.instance,
+            instance_id=launched_instance_info.instance_id,
+            hostname=launched_instance_info.ip_address,
+            region=launched_instance_info.region,
+            price=instance_offer.price,
+            username=launched_instance_info.username,
+            ssh_port=launched_instance_info.ssh_port,
+            dockerized=launched_instance_info.dockerized,
+            backend_data=launched_instance_info.backend_data,
+            ssh_proxy=None,
+        )
+        im = InstanceModel(
+            name=instance_name,
+            project=project,
+            pool=pool,
+            created_at=common_utils.get_current_datetime(),
+            started_at=common_utils.get_current_datetime(),
+            status=InstanceStatus.STARTING,
+            backend=backend.TYPE,
+            region=instance_offer.region,
+            price=instance_offer.price,
+            job_provisioning_data=job_provisioning_data.json(),
+            offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
+            termination_policy=profile.termination_policy,
+            termination_idle_time=profile.termination_idle_time,
+        )
+        session.add(im)
+        await session.commit()
+        return instance_model_to_instance(im)
+    raise ServerClientError("Failed to find offers to create the instance.")
+
+
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:
     jobs: List[Job] = []
     # JobSpec from JobConfigurator doesn't have gateway information for `service` type
@@ -635,21 +628,6 @@ def _get_run_service(run: Run) -> Optional[ServiceInfo]:
         ),
         model=model,
     )
-
-
-async def abort_runs_of_pool(session: AsyncSession, project_model: ProjectModel, pool_name: str):
-    runs = await list_project_runs(session, project_model, repo_id=None)
-    active_run_names = []
-    for run_model in runs:
-        if run_model.status.is_finished():
-            continue
-
-        run = run_model_to_run(run_model)
-        run_pool_name = run.run_spec.profile.pool_name
-        if run_pool_name == pool_name:
-            active_run_names.append(run.run_spec.run_name)
-
-    await stop_runs(session, project_model, active_run_names, abort=True)
 
 
 # The run_name validation is not performed in pydantic models since

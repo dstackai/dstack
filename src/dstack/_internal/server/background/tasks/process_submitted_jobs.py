@@ -1,12 +1,10 @@
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 from uuid import UUID
 
-from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -23,8 +21,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel, RunModel
-from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.jobs import (
     PROCESSING_POOL_LOCK,
     SUBMITTED_PROCESSING_JOBS_IDS,
@@ -33,10 +30,10 @@ from dstack._internal.server.services.jobs import (
 from dstack._internal.server.services.logging import job_log
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
-    get_or_create_default_pool_by_name,
+    get_or_create_pool_by_name,
     get_pool_instances,
 )
-from dstack._internal.server.services.runs import run_model_to_run
+from dstack._internal.server.services.runs import get_offers_by_requirements, run_model_to_run
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
@@ -87,26 +84,24 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
     run_model = res.scalar_one()
     project_model = run_model.project
-
-    run_spec = parse_raw_as(RunSpec, run_model.run_spec)
+    run_spec = RunSpec.parse_raw(run_model.run_spec)
     profile = run_spec.profile
 
-    # check default pool
-    pool = project_model.default_pool
-    if pool is None:
-        pool = await get_or_create_default_pool_by_name(
-            session, project_model, pool_name=profile.pool_name
-        )
-        project_model.default_pool = pool
-
+    # Try to provision on an instance from the pool
+    pool = await get_or_create_pool_by_name(
+        session=session,
+        project=project_model,
+        pool_name=profile.pool_name,
+    )
     async with PROCESSING_POOL_LOCK:
-        # pool capacity
-        pool_instances = await get_pool_instances(session, project_model, pool.name)
+        pool_instances = get_pool_instances(pool)
         relevant_instances = filter_pool_instances(
-            pool_instances, profile, run_spec.configuration.resources, status=InstanceStatus.READY
+            pool_instances=pool_instances,
+            profile=profile,
+            resources=run_spec.configuration.resources,
+            status=InstanceStatus.READY,
         )
-
-        if relevant_instances:
+        if len(relevant_instances) > 0:
             sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
             instance = sorted_instances[0]
             instance.status = InstanceStatus.BUSY
@@ -116,9 +111,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             job_model.job_provisioning_data = instance.job_provisioning_data
             job_model.status = JobStatus.PROVISIONING
             job_model.last_processed_at = common_utils.get_current_datetime()
-
             await session.commit()
-
             return
 
     run = run_model_to_run(run_model)
@@ -136,21 +129,29 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.commit()
         return
 
-    # create a new cloud instance
-    backends = await backends_services.get_project_backends(project=run_model.project)
-
+    # Create a new cloud instance
     # TODO: create VM (backend.compute().create_instance)
-    job_provisioning_data, offer = await _run_job(
+    run_job_result = await _run_job(
+        project_model=project_model,
         job_model=job_model,
         run=run,
         job=job,
-        backends=backends,
         project_ssh_public_key=project_model.ssh_public_key,
         project_ssh_private_key=project_model.ssh_private_key,
     )
-    if job_provisioning_data is not None and offer is not None:
+
+    if run_job_result is None:
+        logger.debug(*job_log("provisioning failed", job_model))
+        if job.is_retry_active():
+            logger.debug(*job_log("now is pending because retry is active", job_model))
+            job_model.status = JobStatus.PENDING
+        else:
+            job_model.status = JobStatus.FAILED
+            job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+    else:
         logger.info(*job_log("now is provisioning", job_model))
 
+        job_provisioning_data, offer = run_job_result
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
 
@@ -160,7 +161,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             # terminate vastai/k8s instances immediately
             termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
             termination_idle_time = 0
-
         im = InstanceModel(
             name=job.job_spec.job_name,  # TODO: make new name
             project=project_model,
@@ -178,33 +178,23 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             region=offer.region,
         )
         session.add(im)
-
-    else:
-        logger.debug(*job_log("provisioning failed", job_model))
-        if job.is_retry_active():
-            logger.debug(*job_log("now is pending because retry is active", job_model))
-            job_model.status = JobStatus.PENDING
-        else:
-            job_model.status = JobStatus.FAILED
-            job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
 
 
 async def _run_job(
+    project_model: ProjectModel,
     job_model: JobModel,
     run: Run,
     job: Job,
-    backends: List[Backend],
     project_ssh_public_key: str,
     project_ssh_private_key: str,
-) -> Tuple[Optional[JobProvisioningData], Optional[InstanceOfferWithAvailability]]:
-    if run.run_spec.profile.backends is not None:
-        backends = [b for b in backends if b.TYPE in run.run_spec.profile.backends]
-
-    requirements = job.job_spec.requirements
-    offers = await backends_services.get_instance_offers(
-        backends, requirements, exclude_not_available=True
+) -> Optional[Tuple[JobProvisioningData, InstanceOfferWithAvailability]]:
+    offers = await get_offers_by_requirements(
+        project=project_model,
+        profile=run.run_spec.profile,
+        requirements=job.job_spec.requirements,
+        exclude_not_available=True,
     )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
@@ -265,6 +255,5 @@ async def _run_job(
                 ssh_proxy=launched_instance_info.ssh_proxy,
                 backend_data=launched_instance_info.backend_data,
             )
-
-            return (job_provisioning_data, offer)
-    return (None, None)
+            return job_provisioning_data, offer
+    return None

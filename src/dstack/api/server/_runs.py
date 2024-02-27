@@ -1,16 +1,21 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
+from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.runs import Requirements, Run, RunPlan, RunSpec
+from dstack._internal.core.models.runs import (
+    PoolInstanceOffers,
+    Requirements,
+    Run,
+    RunPlan,
+    RunSpec,
+)
 from dstack._internal.server.schemas.runs import (
     CreateInstanceRequest,
     DeleteRunsRequest,
     GetOffersRequest,
-    GetOffersResponse,
     GetRunPlanRequest,
     GetRunRequest,
     ListRunsRequest,
@@ -33,11 +38,10 @@ class RunsAPIClient(APIClientGroup):
 
     def get_offers(
         self, project_name: str, profile: Profile, requirements: Requirements
-    ) -> Tuple[str, List[InstanceOfferWithAvailability]]:
+    ) -> PoolInstanceOffers:
         body = GetOffersRequest(profile=profile, requirements=requirements)
         resp = self._request(f"/api/project/{project_name}/runs/get_offers", body=body.json())
-        response = parse_obj_as(GetOffersResponse, resp.json())
-        return response.pool_name, response.instances
+        return parse_obj_as(PoolInstanceOffers, resp.json())
 
     def create_instance(
         self,
