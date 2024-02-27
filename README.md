@@ -98,12 +98,23 @@ Services make it very easy to deploy any model or web application as a public en
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="650"/>
 
+## Examples
+
+Here are some featured examples:
+
+- [TGI](https://dstack.ai/examples/tgi/)
+- [vLLM](https://dstack.ai/examples/vllm/)
+- [Ollama](https://dstack.ai/examples/ollama/)
+- [SDXL](https://dstack.ai/examples/sdxl/)
+- [QLoRA](https://dstack.ai/examples/qlora/)
+
+Browse [dstack.ai/examples](https://dstack.ai/examples) for more examples.
+
 ## More information
 
 For additional information and examples, see the following links:
 
 - [Docs](https://dstack.ai/docs)
-- [Examples](https://dstack.ai/examples)
 - [Discord](https://discord.gg/u8SmfwPpMd)
 
 ## Licence

@@ -21,7 +21,7 @@
     font-weight: 800;
 }
 
-.tx-landing__hero_text h1 .gradient {
+/*.tx-landing__hero_text h1*/ .gradient {
     background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -243,7 +243,7 @@
 .md-header__buttons .md-button-secondary,
 .tx-container .md-button-secondary {
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
-    border-width: 1.5px;
+    border-width: 1px;
     border-style: solid;
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
     -webkit-background-clip: text;
@@ -621,6 +621,11 @@
     flex-wrap: wrap;
     gap: 2rem;
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+}
+
+.plans_card.dstack_sky {
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.025), rgba(225, 101, 254, 0.025));
+    border-image: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.5), rgba(225, 101, 254, 0.5)) 10;
 }
 
 .plans_card {
