@@ -68,8 +68,11 @@ from dstack._internal.server.services.gateways.options import (
 from dstack._internal.server.services.jobs import (
     PROCESSING_RUNS_IDS,
     PROCESSING_RUNS_LOCK,
+    RUNNING_PROCESSING_JOBS_IDS,
+    RUNNING_PROCESSING_JOBS_LOCK,
     get_jobs_from_run_spec,
     job_model_to_job_submission,
+    stop_runner,
 )
 from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
@@ -390,6 +393,7 @@ async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
             run.termination_reason = RunTerminationReason.ABORTED_BY_USER
         else:
             run.termination_reason = RunTerminationReason.STOPPED_BY_USER
+        await session.commit()  # run will be refreshed later
         # process the run out of turn
         await process_terminating_run(session, run)
 
@@ -676,7 +680,14 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
     """
     job_termination_reason = run_to_job_termination_reason(run.termination_reason)
 
-    # TODO(egor-s): acquire jobs lock
+    jobs_ids_set = {job.id for job in run.jobs}
+    while True:  # let job processing complete
+        # TODO(egor-s): acquire locks for submitted and terminating jobs
+        async with RUNNING_PROCESSING_JOBS_LOCK:
+            if not RUNNING_PROCESSING_JOBS_IDS & jobs_ids_set:
+                break
+            await asyncio.sleep(0.1)
+    await session.refresh(run)
 
     all_jobs_finished = True
     job: JobModel
@@ -688,9 +699,15 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
             # `process_terminating_jobs` will abort frozen jobs
             continue
 
-        # TODO(egor-s): stop/abort jobs
+        if job.status == JobStatus.RUNNING and job_termination_reason not in {
+            JobTerminationReason.ABORTED_BY_USER,
+            JobTerminationReason.DONE_BY_RUNNER,
+        }:
+            # send a signal to stop the job gracefully
+            await stop_runner(session, job)
         job.status = JobStatus.TERMINATING
         job.termination_reason = job_termination_reason
+        # TODO(egor-s): call process_terminating_job
 
     if all_jobs_finished:
         run.status = run_termination_reason_to_status(run.termination_reason)

@@ -625,13 +625,14 @@ class TestStopRuns:
             project=project,
             repo=repo,
             user=user,
+            status=RunStatus.RUNNING,
         )
         job = await create_job(
             session=session,
             run=run,
             status=JobStatus.RUNNING,
         )
-        with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
+        with patch("dstack._internal.server.services.runs.stop_runner") as stop_runner:
             response = client.post(
                 f"/api/project/{project.name}/runs/stop",
                 headers=get_auth_headers(user.token),
@@ -662,6 +663,7 @@ class TestStopRuns:
             project=project,
             repo=repo,
             user=user,
+            status=RunStatus.FAILED,
         )
         job = await create_job(
             session=session,

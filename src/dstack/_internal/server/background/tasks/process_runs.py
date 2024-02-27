@@ -89,8 +89,6 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
             await process_active_run(session, run)
         elif run.status == RunStatus.TERMINATING:
             await process_terminating_run(session, run)
-        elif run.status.is_finished():
-            pass
         else:
             raise ValueError(f"Unexpected run status {run.status}")
 

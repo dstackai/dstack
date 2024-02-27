@@ -97,7 +97,9 @@ class TestProcessRuns:
         run.termination_reason = RunTerminationReason.JOB_FAILED
         job = await create_job(session=session, run=run, status=JobStatus.RUNNING)
 
-        await process_runs.process_single_run(run.id, [])
+        with patch("dstack._internal.server.services.runs.stop_runner") as stop_runner:
+            await process_runs.process_single_run(run.id, [])
+            stop_runner.assert_called_once()
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_SERVER

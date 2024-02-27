@@ -108,7 +108,9 @@ async def stop_job(
         job_submission = job_model_to_job_submission(job_model)
         if job_model.status == JobStatus.RUNNING:
             try:
-                await run_async(_stop_runner, job_submission, project.ssh_private_key)
+                await run_async(
+                    _stop_runner, job_submission.job_provisioning_data, project.ssh_private_key
+                )
                 # delay termination for 15 seconds to allow the runner to stop gracefully
                 delay_job_instance_termination(job_model)
             except SSHError:
@@ -171,19 +173,29 @@ _job_configurator_classes = [
 _configuration_type_to_configurator_class_map = {c.TYPE: c for c in _job_configurator_classes}
 
 
+async def stop_runner(session: AsyncSession, job_model: JobModel):
+    project = await session.get(ProjectModel, job_model.project_id)
+    jpd = JobProvisioningData.parse_raw(job_model.job_provisioning_data)
+    try:
+        await run_async(_stop_runner, jpd, project.ssh_private_key)
+        delay_job_instance_termination(job_model)
+    except SSHError:
+        logger.debug(*job_log("failed to stop runner", job_model))
+
+
 def _stop_runner(
-    job_submission: JobSubmission,
+    job_provisioning_data: JobProvisioningData,
     server_ssh_private_key: str,
 ):
     ports = get_runner_ports()
     with ssh_tunnel.RunnerTunnel(
-        hostname=job_submission.job_provisioning_data.hostname,
-        ssh_port=job_submission.job_provisioning_data.ssh_port,
-        user=job_submission.job_provisioning_data.username,
+        hostname=job_provisioning_data.hostname,
+        ssh_port=job_provisioning_data.ssh_port,
+        user=job_provisioning_data.username,
         ports=ports,
         id_rsa=server_ssh_private_key,
-        ssh_proxy=job_submission.job_provisioning_data.ssh_proxy,
+        ssh_proxy=job_provisioning_data.ssh_proxy,
     ):
         runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
-        logger.debug("Stopping runner %s", job_submission.job_provisioning_data.hostname)
+        logger.debug("Stopping runner %s", job_provisioning_data.hostname)
         runner_client.stop()
