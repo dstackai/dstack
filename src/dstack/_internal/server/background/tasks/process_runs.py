@@ -35,7 +35,7 @@ from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-PROCESSING_INTERVAL = datetime.timedelta(seconds=5)
+PROCESSING_INTERVAL = datetime.timedelta(seconds=2)
 JOB_ERROR_CODES_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
@@ -161,9 +161,11 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
             elif job.status == JobStatus.SUBMITTED:
                 # the job is submitted
                 replica_statuses.add(RunStatus.SUBMITTED)
-            elif (
-                job.status == JobStatus.FAILED
-            ):  # TODO(egor-s): or terminating with specific statuses
+            elif job.status == JobStatus.FAILED or (
+                job.status == JobStatus.TERMINATING
+                and job.termination_reason
+                not in {JobTerminationReason.DONE_BY_RUNNER, JobTerminationReason.SCALED_DOWN}
+            ):
                 if await is_retry_enabled(session, job, retry_policy):
                     if await is_retry_limit_exceeded(session, job, retry_policy):
                         replica_statuses.add(RunStatus.FAILED)

@@ -34,7 +34,6 @@ from dstack._internal.server.services.jobs import (
     PROCESSING_RUNS_LOCK,
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
-    delay_job_instance_termination,
     job_model_to_job_submission,
 )
 from dstack._internal.server.services.logging import job_log
@@ -167,7 +166,7 @@ async def _process_job(job_id: UUID):
                             job_submission.age,
                         )
                     )
-                    job_model.status = JobStatus.FAILED
+                    job_model.status = JobStatus.TERMINATING
                     job_model.termination_reason = (
                         JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
                     )
@@ -219,7 +218,7 @@ async def _process_job(job_id: UUID):
                         job_submission.age,
                     )
                 )
-                job_model.status = JobStatus.FAILED
+                job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
                 job_model.used_instance_id = job_model.instance.id
                 job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
@@ -253,7 +252,7 @@ async def _process_job(job_id: UUID):
                         job_submission.age,
                     )
                 )
-                job_model.status = JobStatus.FAILED
+                job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
 
         job_model.last_processed_at = common_utils.get_current_datetime()
@@ -274,7 +273,7 @@ def _process_provisioning_no_shim(
     """
     Possible next states:
     - JobStatus.RUNNING if runner is available
-    - JobStatus.FAILED if timeout is exceeded
+    - JobStatus.TERMINATING if timeout is exceeded
 
     Returns:
         is successful
@@ -307,7 +306,7 @@ def _process_provisioning_with_shim(
     """
     Possible next states:
     - JobStatus.PULLING if shim is available
-    - JobStatus.FAILED if timeout is exceeded
+    - JobStatus.TERMINATING if timeout is exceeded
 
     Returns:
         is successful
@@ -355,7 +354,7 @@ def _process_pulling_with_shim(
     """
     Possible next states:
     - JobStatus.RUNNING if runner is available
-    - JobStatus.FAILED if shim is not available
+    - JobStatus.TERMINATING if shim is not available
 
     Returns:
         is successful
@@ -389,7 +388,7 @@ def _process_running(
 ) -> bool:
     """
     Possible next states:
-    - JobStatus.FAILED if runner is not available
+    - JobStatus.TERMINATING if runner is not available
     - Any status received from runner
 
     Returns:
@@ -409,11 +408,18 @@ def _process_running(
         job_logs=resp.job_logs,
     )
     if len(resp.job_states) > 0:
-        last_job_state = resp.job_states[-1]
-        job_model.status = last_job_state.state
-        if job_model.status == JobStatus.DONE:
-            job_model.run.status = JobStatus.DONE
-            delay_job_instance_termination(job_model)
+        latest_status = resp.job_states[-1].state
+        # TODO(egor-s): refactor dstack-runner to return compatible statuses and reasons
+        if latest_status == JobStatus.DONE:
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.DONE_BY_RUNNER
+            # let the CLI pull logs?
+            # delay_job_instance_termination(job_model)
+        elif latest_status in {JobStatus.FAILED, JobStatus.ABORTED, JobStatus.TERMINATED}:
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.CONTAINER_EXITED_WITH_ERROR
+            # let the CLI pull logs?
+            # delay_job_instance_termination(job_model)
         logger.info(*job_log("now is %s", job_model, job_model.status.value))
     return True
 
