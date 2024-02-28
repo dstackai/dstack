@@ -44,10 +44,12 @@ from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     LaunchedGatewayInfo,
     LaunchedInstanceInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
@@ -82,13 +84,10 @@ class AzureCompute(Compute):
         )
         return offers_with_availability
 
-    def run_job(
+    def create_instance(
         self,
-        run: Run,
-        job: Job,
         instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
+        instance_config: InstanceConfiguration,
     ) -> LaunchedInstanceInfo:
         location = instance_offer.region
         logger.info(
@@ -97,10 +96,7 @@ class AzureCompute(Compute):
             "spot" if instance_offer.instance.resources.spot else "",
             location,
         )
-        ssh_pub_keys = [
-            run.run_spec.ssh_key_pub.strip(),
-            project_ssh_public_key.strip(),
-        ]
+        ssh_pub_keys = instance_config.get_public_keys()
         try:
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             vm = _launch_instance(
@@ -131,7 +127,7 @@ class AzureCompute(Compute):
                 vm_size=instance_offer.instance.name,
                 # instance_name includes region because Azure may create an instance resource
                 # even when provisioning fails.
-                instance_name=f"{get_instance_name(run, job)}-{instance_offer.region}",
+                instance_name=f"{instance_config.instance_name}-{instance_offer.region}",
                 user_data=get_user_data(authorized_keys=ssh_pub_keys),
                 ssh_pub_keys=ssh_pub_keys,
                 spot=instance_offer.instance.resources.spot,
@@ -157,6 +153,27 @@ class AzureCompute(Compute):
             logger.info("Failed to request instance in %s", location)
         logger.info("Failed to request instance")
         raise NoCapacityError()
+
+    def run_job(
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ) -> LaunchedInstanceInfo:
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=project_ssh_public_key.strip()),
+            ],
+            job_docker_config=None,
+            user=run.user,
+        )
+        launched_instance_info = self.create_instance(instance_offer, instance_config)
+        return launched_instance_info
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
