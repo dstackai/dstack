@@ -151,8 +151,8 @@ class TestProcessSubmittedJobs:
 
         await session.refresh(job)
         assert job is not None
-        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         assert job.status == JobStatus.FAILED
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
         await session.refresh(project)
         assert not project.default_pool.instances

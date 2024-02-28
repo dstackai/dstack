@@ -138,12 +138,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     if run_job_result is None:
         logger.debug(*job_log("provisioning failed", job_model))
-        if job.is_retry_active():
-            logger.debug(*job_log("now is pending because retry is active", job_model))
-            job_model.status = JobStatus.PENDING
-        else:
-            job_model.status = JobStatus.FAILED
-            job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        job_model.status = JobStatus.FAILED
+        job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
     else:
         logger.info(*job_log("now is provisioning", job_model))
 
