@@ -103,7 +103,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             pool_instances=pool_instances,
             profile=profile,
             resources=run_spec.configuration.resources,
-            status=InstanceStatus.READY,
+            status=InstanceStatus.IDLE,
         )
         if len(relevant_instances) > 0:
             sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)

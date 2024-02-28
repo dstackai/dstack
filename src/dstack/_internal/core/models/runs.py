@@ -227,7 +227,7 @@ class PoolInstanceOffers(BaseModel):
 class InstanceStatus(str, Enum):
     PENDING = "pending"
     PROVISIONING = "provisioning"
-    READY = "ready"
+    IDLE = "idle"
     BUSY = "busy"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
@@ -243,4 +243,4 @@ class InstanceStatus(str, Enum):
         return not self.is_finished()
 
     def is_available(self) -> bool:
-        return self in [self.READY, self.BUSY]
+        return self in [self.IDLE, self.BUSY]

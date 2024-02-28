@@ -212,7 +212,7 @@ class TestProcessSubmittedJobs:
             session=session,
             project=project,
             pool=pool,
-            status=InstanceStatus.READY,
+            status=InstanceStatus.IDLE,
         )
         await session.refresh(pool)
         run = await create_run(
