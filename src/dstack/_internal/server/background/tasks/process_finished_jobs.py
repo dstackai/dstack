@@ -101,7 +101,7 @@ async def _process_job(job_id):
             if job_model.instance.status == InstanceStatus.BUSY:
                 job_model.instance.status = InstanceStatus.READY
             elif job_model.instance.status != InstanceStatus.TERMINATED:
-                # instance was CREATING or STARTING (specially for the job)
+                # instance was PROVISIONING (specially for the job)
                 # schedule for termination
                 job_model.instance.status = InstanceStatus.TERMINATING
 

@@ -226,8 +226,7 @@ class PoolInstanceOffers(BaseModel):
 
 class InstanceStatus(str, Enum):
     PENDING = "pending"
-    CREATING = "creating"
-    STARTING = "starting"
+    PROVISIONING = "provisioning"
     READY = "ready"
     BUSY = "busy"
     TERMINATING = "terminating"

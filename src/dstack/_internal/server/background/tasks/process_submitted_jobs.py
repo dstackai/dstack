@@ -173,7 +173,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             pool=pool,
             created_at=common_utils.get_current_datetime(),
             started_at=common_utils.get_current_datetime(),
-            status=InstanceStatus.STARTING,
+            status=InstanceStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data.json(),
             offer=offer.json(),
             termination_policy=termination_policy,
