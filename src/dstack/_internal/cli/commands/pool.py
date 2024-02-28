@@ -78,9 +78,7 @@ class PoolCommand(APIBaseCommand):
         delete_parser.add_argument(
             "-n", "--name", dest="pool_name", help="The name of the pool", required=True
         )
-        delete_parser.add_argument(
-            "-f", "--force", dest="force", help="Force remove", type=bool, default=False
-        )
+        # TODO: support --force
         delete_parser.set_defaults(subfunc=self._delete)
 
         # show pool instances
@@ -181,7 +179,7 @@ class PoolCommand(APIBaseCommand):
     def _delete(self, args: argparse.Namespace) -> None:
         # TODO(egor-s): ask for confirmation
         with console.status("Removing pool..."):
-            self.api.client.pool.delete(self.api.project, args.pool_name, args.force)
+            self.api.client.pool.delete(self.api.project, args.pool_name, False)
         console.print(f"Pool {args.pool_name!r} removed")
 
     def _remove(self, args: argparse.Namespace) -> None:
@@ -208,9 +206,7 @@ class PoolCommand(APIBaseCommand):
         console.print(f"Instance {args.instance_name!r} removed")
 
     def _set_default(self, args: argparse.Namespace) -> None:
-        result = self.api.client.pool.set_default(self.api.project, args.pool_name)
-        if not result:
-            console.print(f"Failed to set default pool {args.pool_name!r}", style="error")
+        self.api.client.pool.set_default(self.api.project, args.pool_name)
 
     def _ps(self, args: argparse.Namespace) -> None:
         pool_name_template = " [bold]Pool name[/]  {}\n"
@@ -291,11 +287,11 @@ class PoolCommand(APIBaseCommand):
             return
 
         with console.status("Getting instances..."):
-            pool_name, offers = self.api.runs.get_offers(profile, requirements)
+            pool_offers = self.api.runs.get_offers(profile, requirements)
 
-        offers = [o for o in offers if o.instance_runtime == InstanceRuntime.SHIM]
+        offers = [o for o in pool_offers.instances if o.instance_runtime == InstanceRuntime.SHIM]
 
-        print_offers_table(pool_name, profile, requirements, offers)
+        print_offers_table(pool_offers.pool_name, profile, requirements, offers)
         if not offers:
             console.print("\nThere are no offers with these criteria. Exiting...")
             return
@@ -308,7 +304,9 @@ class PoolCommand(APIBaseCommand):
         pub_key = SSHKey(public=user_pub_key)
         try:
             with console.status("Creating instance..."):
-                instance = self.api.runs.create_instance(pool_name, profile, requirements, pub_key)
+                instance = self.api.runs.create_instance(
+                    pool_offers.pool_name, profile, requirements, pub_key
+                )
         except ServerClientError as e:
             raise CLIError(e.msg)
         print_instance_table([instance])

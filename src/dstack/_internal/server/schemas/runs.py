@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
+from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, RunSpec
@@ -24,11 +24,6 @@ class GetRunPlanRequest(BaseModel):
 class GetOffersRequest(BaseModel):
     profile: Profile
     requirements: Requirements
-
-
-class GetOffersResponse(BaseModel):
-    pool_name: str
-    instances: List[InstanceOfferWithAvailability]
 
 
 class CreateInstanceRequest(BaseModel):

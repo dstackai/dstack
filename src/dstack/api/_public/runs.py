@@ -7,7 +7,7 @@ from abc import ABC
 from copy import copy
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 from websocket import WebSocketApp
 
@@ -15,7 +15,7 @@ import dstack.api as api
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
-from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
+from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
@@ -27,7 +27,13 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import ResourcesSpec
-from dstack._internal.core.models.runs import JobSpec, Requirements, RunPlan, RunSpec
+from dstack._internal.core.models.runs import (
+    JobSpec,
+    PoolInstanceOffers,
+    Requirements,
+    RunPlan,
+    RunSpec,
+)
 from dstack._internal.core.models.runs import JobStatus as RunStatus
 from dstack._internal.core.models.runs import Run as RunModel
 from dstack._internal.core.services.logs import URLReplacer
@@ -365,9 +371,7 @@ class RunCollection:
         )
         return self.exec_plan(run_plan, repo, reserve_ports=reserve_ports)
 
-    def get_offers(
-        self, profile: Profile, requirements: Requirements
-    ) -> Tuple[str, List[InstanceOfferWithAvailability]]:
+    def get_offers(self, profile: Profile, requirements: Requirements) -> PoolInstanceOffers:
         return self._api_client.runs.get_offers(self._project, profile, requirements)
 
     def create_instance(

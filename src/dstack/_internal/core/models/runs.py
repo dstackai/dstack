@@ -219,6 +219,11 @@ class RunPlan(BaseModel):
     job_plans: List[JobPlan]
 
 
+class PoolInstanceOffers(BaseModel):
+    pool_name: str
+    instances: List[InstanceOfferWithAvailability]
+
+
 class InstanceStatus(str, Enum):
     PENDING = "pending"
     CREATING = "creating"
