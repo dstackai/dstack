@@ -54,7 +54,7 @@ async def process_pools() -> None:
                         [
                             InstanceStatus.PROVISIONING,
                             InstanceStatus.TERMINATING,
-                            InstanceStatus.READY,
+                            InstanceStatus.IDLE,
                             InstanceStatus.BUSY,
                         ]
                     ),
@@ -71,7 +71,7 @@ async def process_pools() -> None:
         for inst in instances:
             if inst.status in (
                 InstanceStatus.PROVISIONING,
-                InstanceStatus.READY,
+                InstanceStatus.IDLE,
                 InstanceStatus.BUSY,
             ):
                 await check_shim(inst.id)
@@ -112,7 +112,7 @@ async def check_shim(instance_id: UUID) -> None:
 
             if instance.status == InstanceStatus.PROVISIONING:
                 instance.status = (
-                    InstanceStatus.READY if instance.job_id is None else InstanceStatus.BUSY
+                    InstanceStatus.IDLE if instance.job_id is None else InstanceStatus.BUSY
                 )
                 await session.commit()
         else:
@@ -124,7 +124,7 @@ async def check_shim(instance_id: UUID) -> None:
                 )
             instance.health_status = health.reason
 
-            if instance.status in (InstanceStatus.READY, InstanceStatus.BUSY):
+            if instance.status in (InstanceStatus.IDLE, InstanceStatus.BUSY):
                 logger.warning("instance %s shim is not available", instance.name)
                 deadline = instance.termination_deadline.replace(tzinfo=datetime.timezone.utc)
                 if get_current_datetime() > deadline:

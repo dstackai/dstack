@@ -38,7 +38,7 @@ class TestProcessFinishedJobs:
             session=session,
             project=project,
             pool=pool,
-            status=InstanceStatus.READY,
+            status=InstanceStatus.IDLE,
         )
         job = await create_job(
             session=session,

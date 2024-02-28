@@ -194,8 +194,8 @@ async def get_run_plan(
     for instance in pool_filtered_instances:
         offer = InstanceOfferWithAvailability.parse_raw(instance.offer)
         offer.availability = InstanceAvailability.BUSY
-        if instance.status == InstanceStatus.READY:
-            offer.availability = InstanceAvailability.READY
+        if instance.status == InstanceStatus.IDLE:
+            offer.availability = InstanceAvailability.IDLE
         pool_offers.append(offer)
 
     run_name = run_spec.run_name  # preserve run_name
@@ -528,7 +528,7 @@ async def create_instance(
             pool=pool,
             created_at=common_utils.get_current_datetime(),
             started_at=common_utils.get_current_datetime(),
-            status=InstanceStatus.STARTING,
+            status=InstanceStatus.PROVISIONING,
             backend=backend.TYPE,
             region=instance_offer.region,
             price=instance_offer.price,

@@ -880,7 +880,7 @@ class TestCreateInstance:
             "dstack._internal.server.services.runs.get_offers_by_requirements"
         ) as run_plan_by_req:
             offers = InstanceOfferWithAvailability(
-                backend=BackendType.AZURE,
+                backend=BackendType.VASTAI,
                 instance=InstanceType(
                     name="instance",
                     resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
@@ -891,7 +891,7 @@ class TestCreateInstance:
             )
 
             backend = Mock()
-            backend.TYPE = BackendType.AZURE
+            backend.TYPE = BackendType.VASTAI
             backend.compute.return_value.get_offers.return_value = [offers]
             backend.compute.return_value.create_instance.side_effect = NotImplementedError()
             run_plan_by_req.return_value = [(backend, offers)]

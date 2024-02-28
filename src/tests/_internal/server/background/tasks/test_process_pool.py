@@ -49,7 +49,7 @@ class TestCheckShim:
         await session.refresh(instance)
 
         assert instance is not None
-        assert instance.status == InstanceStatus.READY
+        assert instance.status == InstanceStatus.IDLE
         assert instance.termination_deadline is None
         assert instance.health_status is None
 
@@ -136,7 +136,7 @@ class TestCheckShim:
         project = await create_project(session=session)
         pool = await create_pool(session, project)
 
-        instance = await create_instance(session, project, pool, status=InstanceStatus.READY)
+        instance = await create_instance(session, project, pool, status=InstanceStatus.IDLE)
 
         health_status = "SSH connection fail"
         with patch(
@@ -148,7 +148,7 @@ class TestCheckShim:
         await session.refresh(instance)
 
         assert instance is not None
-        assert instance.status == InstanceStatus.READY
+        assert instance.status == InstanceStatus.IDLE
         assert instance.termination_deadline is not None
         assert instance.termination_deadline.replace(
             tzinfo=dt.timezone.utc
@@ -160,7 +160,7 @@ class TestCheckShim:
         project = await create_project(session=session)
         pool = await create_pool(session, project)
 
-        instance = await create_instance(session, project, pool, status=InstanceStatus.READY)
+        instance = await create_instance(session, project, pool, status=InstanceStatus.IDLE)
         instance.termination_deadline = get_current_datetime() + dt.timedelta(minutes=19)
         await session.commit()
 
@@ -173,7 +173,7 @@ class TestCheckShim:
         await session.refresh(instance)
 
         assert instance is not None
-        assert instance.status == InstanceStatus.READY
+        assert instance.status == InstanceStatus.IDLE
         assert instance.termination_deadline is None
         assert instance.health_status is None
 
@@ -182,7 +182,7 @@ class TestCheckShim:
         project = await create_project(session=session)
         pool = await create_pool(session, project)
 
-        instance = await create_instance(session, project, pool, status=InstanceStatus.READY)
+        instance = await create_instance(session, project, pool, status=InstanceStatus.IDLE)
         termination_deadline_time = get_current_datetime() + dt.timedelta(minutes=-19)
         instance.termination_deadline = termination_deadline_time
         await session.commit()
@@ -212,7 +212,7 @@ class TestIdleTime:
         project = await create_project(session=session)
         pool = await create_pool(session, project)
 
-        instance = await create_instance(session, project, pool, status=InstanceStatus.READY)
+        instance = await create_instance(session, project, pool, status=InstanceStatus.IDLE)
         instance.termination_idle_time = 300
         instance.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
         instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
