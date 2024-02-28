@@ -815,7 +815,7 @@ class TestCreateInstance:
                 "job_name": None,
                 "job_status": None,
                 "hostname": "127.0.0.1",
-                "status": "starting",
+                "status": "provisioning",
                 "created": result["created"],
                 "region": "eu",
                 "price": 1.0,
