@@ -68,6 +68,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 
 	for i := 0; i < timeout; i++ {
 		cmd := exec.Command("ssh",
+			"-F", "none",
 			"-o", "StrictHostKeyChecking=no",
 			"-o", "UserKnownHostsFile=/dev/null",
 			"-i", tempDir+"/id_rsa",

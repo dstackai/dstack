@@ -272,6 +272,8 @@ def _run_ssh_command(hostname: str, ssh_private_key: str, command: str):
         subprocess.run(
             [
                 "ssh",
+                "-F",
+                "none",
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-i",
@@ -291,6 +293,8 @@ def _run_scp_command(hostname: str, ssh_private_key: str, source: str, target: s
         subprocess.run(
             [
                 "scp",
+                "-F",
+                "none",
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-i",

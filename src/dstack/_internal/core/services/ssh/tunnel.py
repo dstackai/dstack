@@ -20,6 +20,7 @@ class SSHTunnel:
         ports: Dict[int, int],
         control_sock_path: PathLike,
         options: Dict[str, str],
+        ssh_config_path: str = "none",
     ):
         """
         :param ports: Mapping { remote port -> local port }
@@ -29,10 +30,22 @@ class SSHTunnel:
         self.ports = ports
         self.control_sock_path = control_sock_path
         self.options = options
+        self.ssh_config_path = ssh_config_path
 
     def open(self):
         # ControlMaster and ControlPath are always set
-        command = ["ssh", "-f", "-N", "-M", "-S", self.control_sock_path, "-i", self.id_rsa_path]
+        command = [
+            "ssh",
+            "-F",
+            self.ssh_config_path,
+            "-f",
+            "-N",
+            "-M",
+            "-S",
+            self.control_sock_path,
+            "-i",
+            self.id_rsa_path,
+        ]
         for k, v in self.options.items():
             command += ["-o", f"{k}={v}"]
         for port_remote, port_local in self.ports.items():
@@ -139,6 +152,7 @@ class ClientTunnel(SSHTunnel):
         host: str,
         ports: Dict[int, int],
         id_rsa_path: PathLike,
+        ssh_config_path: str,
         control_sock_path: Optional[str] = None,
     ):
         if control_sock_path is None:
@@ -150,4 +164,5 @@ class ClientTunnel(SSHTunnel):
             ports=ports,
             control_sock_path=control_sock_path,
             options={},
+            ssh_config_path=ssh_config_path,
         )

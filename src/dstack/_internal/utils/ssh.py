@@ -9,7 +9,10 @@ from filelock import FileLock
 from paramiko.config import SSHConfig
 from paramiko.pkey import PKey, PublicBlob
 
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
+
+logger = get_logger(__name__)
 
 default_ssh_config_path = "~/.ssh/config"
 
@@ -29,7 +32,7 @@ def get_host_config(hostname: str, ssh_config_path: PathLike = default_ssh_confi
 
 
 def make_ssh_command_for_git(identity_file: PathLike) -> str:
-    return f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={identity_file}"
+    return f"ssh -F none -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={identity_file}"
 
 
 def try_ssh_key_passphrase(identity_file: PathLike, passphrase: str = "") -> bool:
@@ -56,8 +59,18 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
             with open(ssh_config_path, "r") as f:
                 content = f.read()
         if include not in content:
-            with open(ssh_config_path, "w") as f:
-                f.write(include + content)
+            try:
+                with open(ssh_config_path, "w") as f:
+                    f.write(include + content)
+            except PermissionError:
+                logger.warning(
+                    f"Couldn't update `[code]{ssh_config_path}[/]` due to a permissions problem.\n\n"
+                    f"The `[code]vscode://vscode-remote/ssh-remote+<run name>/workflow[/]` link and "
+                    f"the `[code]ssh <run name>[/]` command won't work.\n\n"
+                    f"To fix this, make sure `[code]{ssh_config_path}[/]` is writable, or add "
+                    f"`[code]Include {path}[/]` to the top of `[code]{ssh_config_path}[/]` manually.",
+                    extra={"markup": True},
+                )
 
 
 def get_ssh_config(path: PathLike, host: str) -> Optional[Dict[str, str]]:

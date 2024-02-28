@@ -539,6 +539,8 @@ def _run_ssh_command(hostname: str, port: int, ssh_private_key: str, command: st
         subprocess.run(
             [
                 "ssh",
+                "-F",
+                "none",
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-i",
