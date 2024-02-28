@@ -1,7 +1,8 @@
 import functools
 import inspect
+import socket
 import time
-from typing import Callable, List
+from typing import Callable, Dict, List, Optional
 
 import requests
 from typing_extensions import Concatenate, ParamSpec
@@ -9,7 +10,7 @@ from typing_extensions import Concatenate, ParamSpec
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.core.services.ssh.tunnel import RunnerTunnel
-from dstack._internal.server.services.jobs import get_runner_ports
+from dstack._internal.server.services.runner import client
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.logging import get_logger
 
@@ -77,3 +78,18 @@ def runner_ssh_tunnel(
         return wrapper
 
     return decorator
+
+
+def get_runner_ports(ports: Optional[List[int]] = None) -> Dict[int, int]:
+    ports = ports or [client.REMOTE_RUNNER_PORT]
+    sockets = []
+    try:
+        for port in ports:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(("localhost", 0))  # Bind to a free port provided by the host
+            sockets.append((port, s))
+        return {port: s.getsockname()[1] for port, s in sockets}
+    finally:
+        for _, s in sockets:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.close()

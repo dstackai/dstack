@@ -22,6 +22,7 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_job_provisioning_data,
     get_run_spec,
 )
 
@@ -95,9 +96,14 @@ class TestProcessRuns:
     async def test_terminate_run_jobs(self, test_db, session: AsyncSession, run: RunModel):
         run.status = RunStatus.TERMINATING
         run.termination_reason = RunTerminationReason.JOB_FAILED
-        job = await create_job(session=session, run=run, status=JobStatus.RUNNING)
+        job = await create_job(
+            session=session,
+            run=run,
+            job_provisioning_data=get_job_provisioning_data(),
+            status=JobStatus.RUNNING,
+        )
 
-        with patch("dstack._internal.server.services.runs.stop_runner") as stop_runner:
+        with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
             await process_runs.process_single_run(run.id, [])
             stop_runner.assert_called_once()
         await session.refresh(job)

@@ -72,6 +72,7 @@ from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_LOCK,
     get_jobs_from_run_spec,
     job_model_to_job_submission,
+    process_terminating_job,
     stop_runner,
 )
 from dstack._internal.server.services.jobs.configurators.base import (
@@ -689,12 +690,12 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
             await asyncio.sleep(0.1)
     await session.refresh(run)
 
-    all_jobs_finished = True
+    unfinished_jobs_count = 0
     job: JobModel
     for job in run.jobs:
         if job.status.is_finished():
             continue
-        all_jobs_finished = False
+        unfinished_jobs_count += 1
         if job.status == JobStatus.TERMINATING:
             # `process_terminating_jobs` will abort frozen jobs
             continue
@@ -707,9 +708,13 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
             await stop_runner(session, job)
         job.status = JobStatus.TERMINATING
         job.termination_reason = job_termination_reason
-        # TODO(egor-s): call process_terminating_job
+        await process_terminating_job(session, job)
+        if job.status.is_finished():
+            unfinished_jobs_count -= 1
+        job.last_processed_at = common_utils.get_current_datetime()
 
-    if all_jobs_finished:
+    if unfinished_jobs_count == 0:
+        # TODO(egor-s): unregister service
         run.status = run_termination_reason_to_status(run.termination_reason)
         logger.info(
             "%s: run status has changed TERMINATING -> %s, reason: %s",

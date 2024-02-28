@@ -41,6 +41,7 @@ from dstack._internal.server.testing.common import (
     create_run,
     create_user,
     get_auth_headers,
+    get_job_provisioning_data,
 )
 
 client = TestClient(app)
@@ -630,9 +631,10 @@ class TestStopRuns:
         job = await create_job(
             session=session,
             run=run,
+            job_provisioning_data=get_job_provisioning_data(),
             status=JobStatus.RUNNING,
         )
-        with patch("dstack._internal.server.services.runs.stop_runner") as stop_runner:
+        with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
             response = client.post(
                 f"/api/project/{project.name}/runs/stop",
                 headers=get_auth_headers(user.token),
