@@ -716,7 +716,6 @@ class TestDeleteRuns:
             run=run,
             status=JobStatus.FAILED,
         )
-        run.processing_finished = True
         session.add(run)
         await session.commit()
         response = client.post(

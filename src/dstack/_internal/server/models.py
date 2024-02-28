@@ -176,9 +176,6 @@ class RunModel(BaseModel):
     run_spec: Mapped[str] = mapped_column(String(4000))
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="run", lazy="selectin")
     last_processed_at: Mapped[datetime] = mapped_column(DateTime)
-    processing_finished: Mapped[bool] = mapped_column(
-        Boolean, default=False
-    )  # TODO(egor-s): deprecated
     gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateways.id", ondelete="SET NULL")
     )
@@ -212,7 +209,6 @@ class JobModel(BaseModel):
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
     runner_timestamp: Mapped[Optional[int]] = mapped_column(Integer)
     # `removed` is used to ensure that the instance is killed after the job is finished
-    removed: Mapped[bool] = mapped_column(Boolean, default=False)  # TODO(egor-s): deprecated
     remove_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))

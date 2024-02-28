@@ -415,7 +415,7 @@ async def delete_runs(
         )
     )
     run_models = res.scalars().all()
-    active_runs = [r for r in run_models if not r.processing_finished]
+    active_runs = [r for r in run_models if not r.status.is_finished()]
     if len(active_runs) > 0:
         raise ServerClientError(
             msg=f"Cannot delete active runs: {[r.run_name for r in active_runs]}"
