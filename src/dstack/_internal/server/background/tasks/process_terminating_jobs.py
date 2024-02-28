@@ -8,7 +8,6 @@ from dstack._internal.server.models import JobModel
 from dstack._internal.server.services.jobs import (
     TERMINATING_PROCESSING_JOBS_IDS,
     TERMINATING_PROCESSING_JOBS_LOCK,
-    fmt,
     process_terminating_job,
 )
 from dstack._internal.utils.common import get_current_datetime
@@ -47,4 +46,3 @@ async def _process_job(job_id: uuid.UUID):
         await process_terminating_job(session, job_model)
         job_model.last_processed_at = get_current_datetime()
         await session.commit()
-        logger.info("%s: marked as removed", fmt(job_model))

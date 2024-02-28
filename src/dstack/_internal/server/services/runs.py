@@ -396,6 +396,7 @@ async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
             run.termination_reason = RunTerminationReason.STOPPED_BY_USER
         await session.commit()  # run will be refreshed later
         # process the run out of turn
+        logger.debug("%s: terminating because %s", fmt(run), run.termination_reason.name)
         await process_terminating_run(session, run)
 
         run.last_processed_at = common_utils.get_current_datetime()
@@ -726,7 +727,7 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
 
 def fmt(run: RunModel) -> str:
     """Format a run for logging"""
-    return f"({run.id.hex[:6]}){run.run_name}"
+    return f"run({run.id.hex[:6]}){run.run_name}"
 
 
 def run_to_job_termination_reason(
