@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source toolkit for running GPU workloads on any cloud. It simplifies development, training, and deployment of gen AI models.
+  dstack is an open-source engine that streamlines the development, training, and deployment of AI models across any cloud provider.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack

@@ -243,7 +243,7 @@
 .md-header__buttons .md-button-secondary,
 .tx-container .md-button-secondary {
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
-    border-width: 1px;
+    border-width: 1.5px;
     border-style: solid;
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
     -webkit-background-clip: text;
@@ -625,7 +625,7 @@
 
 .plans_card.dstack_sky {
     background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.025), rgba(225, 101, 254, 0.025));
-    border-image: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.5), rgba(225, 101, 254, 0.5)) 10;
+    border-image: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.75), rgba(225, 101, 254, 0.75)) 10;
 }
 
 .plans_card {
