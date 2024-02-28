@@ -194,7 +194,10 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
     Used by both process_terminating_jobs and process_terminating_run.
     Caller must acquire the lock on the job.
     """
-    if job_model.remove_at is not None and job_model.remove_at > get_current_datetime():
+    if (
+        job_model.remove_at is not None
+        and job_model.remove_at.replace(tzinfo=datetime.timezone.utc) > get_current_datetime()
+    ):
         # it's too early to terminate the instance
         return
 
@@ -206,7 +209,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
         )
         .options(sa.orm.joinedload(InstanceModel.project))
     )
-    instance: Optional[InstanceModel] = res.one_or_none()
+    instance: Optional[InstanceModel] = res.scalar()
 
     if instance is not None:
         # there is an associated instance to empty

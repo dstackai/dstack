@@ -55,9 +55,7 @@ async def process_runs():
             runs: List[RunModel] = res.scalars().all()
             PROCESSING_RUNS_IDS.update(run.id for run in runs)
 
-    futures = [
-        process_single_run(run.id, [job.id for job in run.jobs if not job.removed]) for run in runs
-    ]
+    futures = [process_single_run(run.id, [job.id for job in run.jobs]) for run in runs]
     for future in asyncio.as_completed(futures):
         try:
             run_id = await future
