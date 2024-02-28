@@ -28,8 +28,8 @@ def cli_error(e: DstackError) -> CLIError:
 
 def configure_logging():
     dstack_logger = logging.getLogger("dstack")
-    dstack_logger.setLevel(os.getenv("DSTACK_CLI_LOG_LEVEL", "CRITICAL").upper())
-    handler = DstackRichHandler(console=console)
+    dstack_logger.setLevel(os.getenv("DSTACK_CLI_LOG_LEVEL", "WARNING").upper())
+    handler = DstackRichHandler(console=console, markup=True)
     handler.setFormatter(logging.Formatter(fmt="%(message)s", datefmt="[%X]"))
     dstack_logger.addHandler(handler)
 

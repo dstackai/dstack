@@ -9,7 +9,10 @@ from filelock import FileLock
 from paramiko.config import SSHConfig
 from paramiko.pkey import PKey, PublicBlob
 
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
+
+logger = get_logger(__name__)
 
 default_ssh_config_path = "~/.ssh/config"
 
@@ -60,10 +63,12 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
                 with open(ssh_config_path, "w") as f:
                     f.write(include + content)
             except PermissionError:
-                print(f"Couldn't write to {ssh_config_path} due to a permissions problem")
-                print(f"Please include the following ssh config file manually: {path}")
-                print(
-                    f"You can do that by adding `Include {path}` to the top of {ssh_config_path}"
+                logger.warning(
+                    f"Couldn't update `[code]{ssh_config_path}[/]` due to a permissions problem.\n\n"
+                    f"The `[code]vscode://vscode-remote/ssh-remote+<run name>/workflow[/]` link and "
+                    f"the `[code]ssh <run name>[/]` command won't work.\n\n"
+                    f"To fix this, make sure `[code]{ssh_config_path}[/]` is writable, or add "
+                    f"`[code]Include {path}[/]` to the top of `[code]{ssh_config_path}[/]` manually."
                 )
 
 
