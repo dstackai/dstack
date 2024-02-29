@@ -8,7 +8,7 @@ from dstack._internal.core.backends.base.compute import get_instance_name, get_s
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.tensordock.api_client import TensorDockAPIClient
 from dstack._internal.core.backends.tensordock.config import TensorDockConfig
-from dstack._internal.core.errors import NoCapacityError
+from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -108,5 +108,15 @@ class TensorDockCompute(Compute):
     ):
         try:
             self.api_client.delete_single(instance_id)
-        except requests.HTTPError:
-            pass
+        except requests.HTTPError as e:
+            logger.error(
+                "An HTTP error occurred when trying to terminate TensorDock instance %s: %s",
+                instance_id,
+                e,
+            )
+        except BackendError as e:
+            logger.error(
+                "TensorDock returned an error when trying to terminate instance %s: %s",
+                instance_id,
+                e,
+            )
