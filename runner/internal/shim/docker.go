@@ -223,7 +223,7 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		"chmod 600 ~/.ssh/authorized_keys",
 		// preserve environment variables for SSH clients
 		"env >> ~/.ssh/environment",
-		"echo \"export PATH=$PATH\" >> ~/.profile",
+		"sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile",
 		// regenerate host keys
 		"rm -rf /etc/ssh/ssh_host_*",
 		"ssh-keygen -A > /dev/null",
