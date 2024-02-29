@@ -93,9 +93,9 @@ class CudoCompute(Compute):
 
         vm = self.api_client.get_vm(self.config.project_id, instance_config.instance_name)
         # Wait until VM State is Active. This is necessary to get the ip_address.
-        while vm["VM"]["state"] == "ACTIVE":
+        while vm["VM"]["state"] != "ACTIVE":
             time.sleep(1)
-            logger.info("Fetching VM state")
+            logger.debug("Fetching VM state")
             vm = self.api_client.get_vm(self.config.project_id, instance_config.instance_name)
 
         launched_instance = LaunchedInstanceInfo(

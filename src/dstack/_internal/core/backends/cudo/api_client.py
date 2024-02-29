@@ -88,7 +88,6 @@ class CudoApiClient:
         fingerprint = get_public_key_fingerprint(public_key)
         keys = self.list_ssh_keys()
         found_keys = [key for key in keys if fingerprint == key["fingerprint"]]
-        print(found_keys)
         if found_keys:
             key = found_keys[0]
             return key["id"]
@@ -102,7 +101,7 @@ class CudoApiClient:
             return resp.json()["sshKeys"]
         resp.raise_for_status()
 
-    def create_ssh_key(self, public_key: str) -> List[Dict]:
+    def create_ssh_key(self, public_key: str) -> str:
         data = {"publicKey": public_key}
         resp = self._make_request("POST", "/ssh-keys", data)
         if resp.ok:
