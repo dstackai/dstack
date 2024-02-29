@@ -8,6 +8,7 @@ from copy import copy
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
+from urllib.parse import urlparse
 
 from websocket import WebSocketApp
 
@@ -123,20 +124,21 @@ class Run(ABC):
         )
         threading.Thread(target=ws_thread).start()
 
-        job_spec = self._run.jobs[0].job_spec
         ports = self.ports
         hostname = "127.0.0.1"
         secure = False
-        if job_spec.gateway is not None:
+        if self._run.service is not None:
+            url = urlparse(self._run.service.url)
             ports = {
                 **ports,
-                job_spec.gateway.service_port: job_spec.gateway.public_port,
+                # we support only default https port
+                self._run.run_spec.configuration.port.container_port: url.port or 443,
             }
-            hostname = job_spec.gateway.hostname
-            secure = job_spec.gateway.secure
+            hostname = url.hostname
+            secure = url.scheme == "https"
         replace_urls = URLReplacer(
             ports=ports,
-            app_specs=job_spec.app_specs,
+            app_specs=self._run.jobs[0].job_spec.app_specs,
             hostname=hostname,
             secure=secure,
             ip_address=self.hostname,

@@ -46,8 +46,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
     RunStatus,
     RunTerminationReason,
-    ServiceInfo,
-    ServiceModelInfo,
+    ServiceSpec,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
@@ -61,10 +60,6 @@ from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.docker import parse_image_name
-from dstack._internal.server.services.gateways.options import (
-    complete_service_model,
-    get_service_options,
-)
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -312,12 +307,7 @@ async def submit_run(
     session.add(run_model)
 
     if run_spec.configuration.type == "service":
-        if run_spec.configuration.model is not None:
-            complete_service_model(run_spec.configuration.model)
-            run_model.run_spec = run_spec.json()
-        await gateways.register_service(
-            session, run_model, get_service_options(run_spec.configuration)
-        )
+        await gateways.register_service(session, run_model)
 
     jobs = get_jobs_from_run_spec(run_spec)
     for job in jobs:
@@ -584,6 +574,10 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
     if include_job_submissions:
         latest_job_submission = jobs[0].job_submissions[-1]
 
+    service_spec = None
+    if run_model.service_spec is not None:
+        service_spec = ServiceSpec.parse_raw(run_model.service_spec)
+
     run = Run(
         id=run_model.id,
         project_name=run_model.project.name,
@@ -593,10 +587,10 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
         run_spec=run_spec,
         jobs=jobs,
         latest_job_submission=latest_job_submission,
+        service=service_spec,
     )
     # TODO(egor-s): add replicas support
     run.cost = _get_run_cost(run)
-    run.service = _get_run_service(run)
     return run
 
 
@@ -637,34 +631,6 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
         return 0
     duration_hours = job_submission.duration.total_seconds() / 3600
     return job_submission.job_provisioning_data.price * duration_hours
-
-
-def _get_run_service(run: Run) -> Optional[ServiceInfo]:
-    if run.run_spec.configuration.type != "service":
-        return None
-
-    gateway = run.jobs[0].job_spec.gateway
-    model = None
-    if run.run_spec.configuration.model is not None:
-        domain = gateway.hostname.split(".", maxsplit=1)[1]
-        model = ServiceModelInfo(
-            name=run.run_spec.configuration.model.name,
-            base_url=f"https://gateway.{domain}",
-            type=run.run_spec.configuration.model.type,
-        )
-
-    omit_port = (gateway.secure and gateway.public_port == 443) or (
-        not gateway.secure and gateway.public_port == 80
-    )
-    return ServiceInfo(
-        url="%s://%s%s"
-        % (
-            "https" if gateway.secure else "http",
-            gateway.hostname,
-            "" if omit_port else f":{gateway.public_port}",
-        ),
-        model=model,
-    )
 
 
 # The run_name validation is not performed in pydantic models since
@@ -714,7 +680,11 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
         job.last_processed_at = common_utils.get_current_datetime()
 
     if unfinished_jobs_count == 0:
-        # TODO(egor-s): unregister service
+        if run.gateway_id is not None:
+            try:
+                await gateways.unregister_service(session, run)
+            except Exception as e:
+                logger.warning("%s: failed to unregister service: %s", fmt(run), repr(e))
         run.status = run_termination_reason_to_status(run.termination_reason)
         logger.info(
             "%s: run status has changed TERMINATING -> %s, reason: %s",

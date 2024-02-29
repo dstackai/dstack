@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from pydantic import UUID4, BaseModel, Field
 from typing_extensions import Annotated
@@ -123,7 +123,6 @@ class JobSpec(BaseModel):
     app_specs: Optional[List[AppSpec]]
     commands: List[str]
     env: Dict[str, str]
-    gateway: Optional[Gateway]  # TODO(egor-s): deprecated, remove
     home_dir: Optional[str]
     image_name: str
     max_duration: Optional[int]
@@ -186,15 +185,16 @@ class RunSpec(BaseModel):
     ssh_key_pub: str
 
 
-class ServiceModelInfo(BaseModel):
+class ServiceModelSpec(BaseModel):
     name: str
     base_url: str
     type: str
 
 
-class ServiceInfo(BaseModel):
+class ServiceSpec(BaseModel):
     url: str
-    model: Optional[ServiceModelInfo] = None
+    model: Optional[ServiceModelSpec] = None
+    options: Dict[str, Any] = {}
 
 
 class RunStatus(str, Enum):
@@ -225,7 +225,7 @@ class Run(BaseModel):
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission]
     cost: float = 0
-    service: Optional[ServiceInfo] = None
+    service: Optional[ServiceSpec] = None
 
 
 class JobPlan(BaseModel):

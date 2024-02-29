@@ -5,7 +5,6 @@ import httpx
 
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.runs import JobProvisioningData, Run
-from dstack._internal.server.services.gateways.options import get_service_options
 
 GATEWAY_MANAGEMENT_PORT = 8000
 
@@ -26,7 +25,7 @@ class GatewayClient:
             "public_domain": urlparse(run.service.url).hostname,
             "app_port": conf.port.container_port,
             "auth": conf.auth,
-            "options": get_service_options(conf),
+            "options": run.service.options,
         }
         ssh_proxy = job_provisioning_data.ssh_proxy
         if ssh_proxy is None:

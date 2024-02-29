@@ -239,7 +239,7 @@ async def _process_job(job_id: UUID):
                     *job_log(
                         "service is registered: %s, age=%s",
                         job_model,
-                        job.job_spec.gateway.hostname,
+                        run.service.url,
                         job_submission.age,
                     )
                 )

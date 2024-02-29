@@ -183,6 +183,7 @@ class RunModel(BaseModel):
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
         Enum(RunTerminationReason)
     )
+    service_spec: Mapped[Optional[str]] = mapped_column(String(4000))
 
 
 class JobModel(BaseModel):

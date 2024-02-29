@@ -1,6 +1,7 @@
 import asyncio
 from datetime import timezone
 from typing import List, Optional, Sequence
+from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy import delete, select, update
@@ -19,7 +20,13 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
-from dstack._internal.core.models.runs import JobProvisioningData, Run
+from dstack._internal.core.models.runs import (
+    JobProvisioningData,
+    Run,
+    RunSpec,
+    ServiceModelSpec,
+    ServiceSpec,
+)
 from dstack._internal.server import settings
 from dstack._internal.server.models import (
     GatewayComputeModel,
@@ -32,7 +39,9 @@ from dstack._internal.server.services.backends import (
     get_project_backends_with_models,
 )
 from dstack._internal.server.services.gateways.connection import GatewayConnection
+from dstack._internal.server.services.gateways.options import get_service_options
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.utils.common import gather_map_async, run_async
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
@@ -262,14 +271,11 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
             return name
 
 
-async def register_service(
-    session: AsyncSession,
-    run_model: RunModel,
-    options: dict,
-):
+async def register_service(session: AsyncSession, run_model: RunModel):
+    run_spec = RunSpec.parse_raw(run_model.run_spec)
+
     # TODO(egor-s): allow to configure gateway name
     gateway_name: Optional[str] = None
-
     if gateway_name is None:
         gateway = run_model.project.default_gateway
         if gateway is None:
@@ -286,21 +292,31 @@ async def register_service(
     wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     if wildcard_domain is None:
         raise ServerClientError("Domain is required for gateway")
+    # we force port 443 for now
+    service_spec = ServiceSpec(url=f"https://{run_model.run_name}.{wildcard_domain}")
+    if run_spec.configuration.model is not None:
+        service_spec.model = ServiceModelSpec(
+            name=run_spec.configuration.model.name,
+            base_url=f"https://gateway.{wildcard_domain}",
+            type=run_spec.configuration.model.type,
+        )
+        service_spec.options = get_service_options(run_spec.configuration)
 
     run_model.gateway = gateway
-    service_address = f"{run_model.run_name}.{wildcard_domain}"
+    run_model.service_spec = service_spec.json()
 
-    if (conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)) is None:
+    conn = await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
+    if conn is None:
         raise ServerClientError("Gateway is not connected")
 
     try:
-        logger.debug("Running service preflight: %s", service_address)
+        logger.debug("%s: registering service as %s", fmt(run_model), service_spec.url)
         await run_async(
             conn.client.preflight,
             run_model.project.name,
-            service_address,
+            urlparse(service_spec.url).hostname,
             run_model.project.ssh_private_key,
-            options,
+            service_spec.options,
         )
     except SSHError:
         raise ServerClientError("Gateway tunnel is not working")
@@ -321,6 +337,31 @@ async def register_replica(
             conn.client.register_service,
             run,
             job_provisioning_data,
+        )
+    except (httpx.RequestError, SSHError) as e:
+        raise GatewayError(str(e))
+
+
+async def unregister_service(session: AsyncSession, run_model: RunModel):
+    gateway = await session.get(GatewayModel, run_model.gateway_id)
+    if gateway.gateway_compute is None:
+        raise GatewayError("Gateway is broken")
+    conn = await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
+    if conn is None:
+        raise GatewayError("Gateway is not connected")
+
+    # TODO(egor-s): unregister by run_id
+    wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
+    if wildcard_domain is None:
+        raise ServerClientError("Domain is required for gateway")
+    service_address = f"{run_model.run_name}.{wildcard_domain}"
+
+    project = await session.get(ProjectModel, run_model.project_id)
+    try:
+        await run_async(
+            conn.client.unregister_service,
+            project.name,
+            service_address,
         )
     except (httpx.RequestError, SSHError) as e:
         raise GatewayError(str(e))
