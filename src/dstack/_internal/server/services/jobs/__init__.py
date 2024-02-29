@@ -26,6 +26,7 @@ from dstack._internal.server.services.jobs.configurators.base import JobConfigur
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import get_runner_ports, runner_ssh_tunnel
 from dstack._internal.server.utils.common import run_async, wait_to_lock
@@ -252,8 +253,3 @@ def _shim_submit_stop(job_model: JobModel, ports: Dict[int, int]):
 
     # we force container deletion because the runner had time to gracefully stop the job
     shim_client.stop(force=True)
-
-
-def fmt(job_model: JobModel) -> str:
-    """Format a job for logging"""
-    return f"job({job_model.id.hex[:6]}){job_model.job_name}"

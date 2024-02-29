@@ -54,7 +54,8 @@ class TestProcessSubmittedJobs:
         await process_submitted_jobs()
         await session.refresh(job)
         assert job is not None
-        assert job.status == JobStatus.FAILED
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
     @pytest.mark.asyncio
     async def test_provisiones_job(self, test_db, session: AsyncSession):
@@ -151,7 +152,7 @@ class TestProcessSubmittedJobs:
 
         await session.refresh(job)
         assert job is not None
-        assert job.status == JobStatus.FAILED
+        assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
         await session.refresh(project)

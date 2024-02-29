@@ -34,7 +34,7 @@ from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_LOCK,
     job_model_to_job_submission,
 )
-from dstack._internal.server.services.logging import job_log
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
@@ -112,9 +112,9 @@ async def _process_job(job_id: UUID):
         ):  # fails are acceptable until timeout is exceeded
             if job_provisioning_data.dockerized:
                 logger.debug(
-                    *job_log(
-                        "process provisioning job with shim, age=%s", job_model, job_submission.age
-                    )
+                    "%s: process provisioning job with shim, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
                 )
                 success = await run_async(
                     _process_provisioning_with_shim,
@@ -126,11 +126,9 @@ async def _process_job(job_id: UUID):
                 )
             else:
                 logger.debug(
-                    *job_log(
-                        "process provisioning job without shim, age=%s",
-                        job_model,
-                        job_submission.age,
-                    )
+                    "%s: process provisioning job without shim, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
                 )
                 code = await _get_job_code(
                     session=session,
@@ -160,11 +158,9 @@ async def _process_job(job_id: UUID):
                     job_provisioning_data.backend
                 ):
                     logger.warning(
-                        *job_log(
-                            "failed because runner has not become available in time, age=%s",
-                            job_model,
-                            job_submission.age,
-                        )
+                        "%s: failed because runner has not become available in time, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
                     )
                     job_model.status = JobStatus.TERMINATING
                     job_model.termination_reason = (
@@ -177,9 +173,7 @@ async def _process_job(job_id: UUID):
         else:  # fails are not acceptable
             if initial_status == JobStatus.PULLING:
                 logger.debug(
-                    *job_log(
-                        "process pulling job with shim, age=%s", job_model, job_submission.age
-                    )
+                    "%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age
                 )
                 code = await _get_job_code(
                     session=session,
@@ -199,9 +193,7 @@ async def _process_job(job_id: UUID):
                     repo_creds,
                 )
             elif initial_status == JobStatus.RUNNING:
-                logger.debug(
-                    *job_log("process running job, age=%s", job_model, job_submission.age)
-                )
+                logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
                 success = await run_async(
                     _process_running,
                     server_ssh_private_key,
@@ -212,11 +204,9 @@ async def _process_job(job_id: UUID):
 
             if not success:  # kill the job
                 logger.warning(
-                    *job_log(
-                        "failed because runner is not available, age=%s",
-                        job_model,
-                        job_submission.age,
-                    )
+                    "%s: failed because runner is not available, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
                 )
                 job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
@@ -232,25 +222,22 @@ async def _process_job(job_id: UUID):
             and job_model.job_num == 0  # gateway connects only to the first node
             and run.run_spec.configuration.type == "service"
         ):
+            # TODO(egor-s): move code to gateways module
             gateway = await session.get(GatewayModel, run_model.gateway_id)
             try:
                 await gateways.register_replica(gateway, run, job_provisioning_data)
                 logger.debug(
-                    *job_log(
-                        "service is registered: %s, age=%s",
-                        job_model,
-                        run.service.url,
-                        job_submission.age,
-                    )
+                    "%s: service replica is registered: %s, age=%s",
+                    fmt(job_model),
+                    run.service.url,
+                    job_submission.age,
                 )
             except GatewayError as e:
                 logger.warning(
-                    *job_log(
-                        "failed to register service: %s, age=%s",
-                        job_model,
-                        e,
-                        job_submission.age,
-                    )
+                    "%s: failed to register service replica: %s, age=%s",
+                    fmt(job_model),
+                    e,
+                    job_submission.age,
                 )
                 job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
@@ -317,11 +304,11 @@ def _process_provisioning_with_shim(
 
     resp = shim_client.healthcheck()
     if resp is None:
-        logger.debug(*job_log("shim is not available yet", job_model))
+        logger.debug("%s: shim is not available yet", fmt(job_model))
         return False  # shim is not available yet
 
     if registry_auth is not None:
-        logger.debug(*job_log("authenticating to the registry...", job_model))
+        logger.debug("%s: authenticating to the registry...", fmt(job_model))
         interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
         shim_client.submit(
             username=interpolate(registry_auth.username),
@@ -336,7 +323,7 @@ def _process_provisioning_with_shim(
         )
 
     job_model.status = JobStatus.PULLING
-    logger.info(*job_log("now is pulling", job_model))
+    logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
     return True
 
 
@@ -420,7 +407,7 @@ def _process_running(
             job_model.termination_reason = JobTerminationReason.CONTAINER_EXITED_WITH_ERROR
             # let the CLI pull logs?
             # delay_job_instance_termination(job_model)
-        logger.info(*job_log("now is %s", job_model, job_model.status.value))
+        logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
     return True
 
 
@@ -451,13 +438,11 @@ def _submit_job_to_runner(
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
 ):
-    logger.debug(*job_log("submitting job spec", job_model))
+    logger.debug("%s: submitting job spec", fmt(job_model))
     logger.debug(
-        *job_log(
-            "repo credentials are %s",
-            job_model,
-            None if repo_credentials is None else repo_credentials.protocol.value,
-        )
+        "%s: repo credentials are %s",
+        fmt(job_model),
+        None if repo_credentials is None else repo_credentials.protocol.value,
     )
     runner_client.submit_job(
         run_spec=run.run_spec,
@@ -465,9 +450,9 @@ def _submit_job_to_runner(
         secrets=secrets,
         repo_credentials=repo_credentials,
     )
-    logger.debug(*job_log("uploading code", job_model))
+    logger.debug("%s: uploading code", fmt(job_model))
     runner_client.upload_code(code)
-    logger.debug(*job_log("starting job", job_model))
+    logger.debug("%s: starting job", fmt(job_model))
     runner_client.run_job()
 
     job_model.status = JobStatus.RUNNING

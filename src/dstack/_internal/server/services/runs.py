@@ -76,6 +76,7 @@ from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
     get_or_create_pool_by_name,
@@ -692,11 +693,6 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
             run.status.name,
             run.termination_reason.name,
         )
-
-
-def fmt(run: RunModel) -> str:
-    """Format a run for logging"""
-    return f"run({run.id.hex[:6]}){run.run_name}"
 
 
 def run_to_job_termination_reason(
