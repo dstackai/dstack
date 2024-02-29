@@ -250,7 +250,8 @@ def _shim_submit_stop(job_model: JobModel, ports: Dict[int, int]):
         logger.debug("%s: can't stop container, shim is not available yet", fmt(job_model))
         return False  # shim is not available yet
 
-    shim_client.stop(force=False)
+    # we force container deletion because the runner had time to gracefully stop the job
+    shim_client.stop(force=True)
 
 
 def fmt(job_model: JobModel) -> str:

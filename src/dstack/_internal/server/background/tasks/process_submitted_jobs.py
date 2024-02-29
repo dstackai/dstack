@@ -125,7 +125,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     if profile.creation_policy == CreationPolicy.REUSE:
         logger.debug(*job_log("reuse instance failed", job_model))
-        job_model.status = JobStatus.FAILED
+        job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
@@ -144,7 +144,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     if run_job_result is None:
         logger.debug(*job_log("provisioning failed", job_model))
-        job_model.status = JobStatus.FAILED
+        job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
     else:
         logger.info(*job_log("now is provisioning", job_model))
