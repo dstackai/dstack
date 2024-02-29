@@ -75,6 +75,7 @@ def get_dev_env_run_plan_dict(
             "configuration_path": "dstack.yaml",
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
+                "regions": ["us"],
                 "creation_policy": None,
                 "default": False,
                 "instance_name": None,
@@ -187,6 +188,7 @@ def get_dev_env_run_dict(
             "configuration_path": "dstack.yaml",
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
+                "regions": ["us"],
                 "creation_policy": None,
                 "default": False,
                 "instance_name": None,
