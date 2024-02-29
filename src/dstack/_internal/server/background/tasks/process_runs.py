@@ -20,17 +20,22 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, RunModel
 from dstack._internal.server.services.jobs import (
-    PROCESSING_RUNS_IDS,
-    PROCESSING_RUNS_LOCK,
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
+    SUBMITTED_PROCESSING_JOBS_IDS,
+    SUBMITTED_PROCESSING_JOBS_LOCK,
+    TERMINATING_PROCESSING_JOBS_IDS,
+    TERMINATING_PROCESSING_JOBS_LOCK,
 )
 from dstack._internal.server.services.runs import (
+    PROCESSING_RUNS_IDS,
+    PROCESSING_RUNS_LOCK,
     create_job_model_for_new_submission,
     fmt,
     process_terminating_run,
     run_model_to_run,
 )
+from dstack._internal.server.utils.common import wait_unlock
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -70,11 +75,11 @@ async def process_runs():
 
 async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uuid.UUID:
     jobs_ids_set = set(job_ids)
-    while True:  # let job processing complete
-        async with RUNNING_PROCESSING_JOBS_LOCK:
-            if not RUNNING_PROCESSING_JOBS_IDS & jobs_ids_set:
-                break
-            await asyncio.sleep(0.1)
+    await wait_unlock(SUBMITTED_PROCESSING_JOBS_LOCK, SUBMITTED_PROCESSING_JOBS_IDS, jobs_ids_set)
+    await wait_unlock(RUNNING_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_IDS, jobs_ids_set)
+    await wait_unlock(
+        TERMINATING_PROCESSING_JOBS_LOCK, TERMINATING_PROCESSING_JOBS_IDS, jobs_ids_set
+    )
 
     async with get_session_ctx() as session:
         run = await session.get(RunModel, run_id)

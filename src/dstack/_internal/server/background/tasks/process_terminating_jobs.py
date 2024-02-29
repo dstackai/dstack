@@ -10,6 +10,7 @@ from dstack._internal.server.services.jobs import (
     TERMINATING_PROCESSING_JOBS_LOCK,
     process_terminating_job,
 )
+from dstack._internal.server.services.runs import PROCESSING_RUNS_IDS, PROCESSING_RUNS_LOCK
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -18,12 +19,13 @@ logger = get_logger(__name__)
 
 async def process_terminating_jobs():
     async with get_session_ctx() as session:
-        async with TERMINATING_PROCESSING_JOBS_LOCK:
+        async with PROCESSING_RUNS_LOCK, TERMINATING_PROCESSING_JOBS_LOCK:
             res = await session.execute(
                 select(JobModel)
                 .where(
                     JobModel.id.not_in(TERMINATING_PROCESSING_JOBS_IDS),
                     JobModel.status == JobStatus.TERMINATING,
+                    JobModel.run_id.not_in(PROCESSING_RUNS_IDS),
                     or_(JobModel.remove_at.is_(None), JobModel.remove_at < get_current_datetime()),
                 )
                 .order_by(JobModel.last_processed_at.asc())

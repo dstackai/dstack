@@ -33,7 +33,12 @@ from dstack._internal.server.services.pools import (
     get_or_create_pool_by_name,
     get_pool_instances,
 )
-from dstack._internal.server.services.runs import get_offers_by_requirements, run_model_to_run
+from dstack._internal.server.services.runs import (
+    PROCESSING_RUNS_IDS,
+    PROCESSING_RUNS_LOCK,
+    get_offers_by_requirements,
+    run_model_to_run,
+)
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
@@ -43,12 +48,13 @@ logger = get_logger(__name__)
 
 async def process_submitted_jobs():
     async with get_session_ctx() as session:
-        async with SUBMITTED_PROCESSING_JOBS_LOCK:
+        async with PROCESSING_RUNS_LOCK, SUBMITTED_PROCESSING_JOBS_LOCK:
             res = await session.execute(
                 select(JobModel)
                 .where(
                     JobModel.status == JobStatus.SUBMITTED,
                     JobModel.id.not_in(SUBMITTED_PROCESSING_JOBS_IDS),
+                    JobModel.run_id.not_in(PROCESSING_RUNS_IDS),
                 )
                 .limit(1)  # TODO process multiple at once
             )

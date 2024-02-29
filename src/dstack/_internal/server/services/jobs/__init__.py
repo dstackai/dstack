@@ -1,8 +1,7 @@
 import asyncio
 import datetime
-import uuid
 from datetime import timezone
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 import sqlalchemy as sa
 import sqlalchemy.orm
@@ -47,9 +46,6 @@ PROCESSING_POOL_IDS = set()
 
 TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 TERMINATING_PROCESSING_JOBS_IDS = set()
-
-PROCESSING_RUNS_LOCK = asyncio.Lock()
-PROCESSING_RUNS_IDS: Set[uuid.UUID] = set()
 
 
 def get_jobs_from_run_spec(run_spec: RunSpec) -> List[Job]:

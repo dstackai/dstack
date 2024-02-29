@@ -4,7 +4,7 @@ import math
 import re
 import uuid
 from datetime import timezone
-from typing import List, Optional, Tuple, cast
+from typing import List, Optional, Set, Tuple, cast
 
 import pydantic
 from sqlalchemy import select, update
@@ -66,10 +66,12 @@ from dstack._internal.server.services.gateways.options import (
     get_service_options,
 )
 from dstack._internal.server.services.jobs import (
-    PROCESSING_RUNS_IDS,
-    PROCESSING_RUNS_LOCK,
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
+    SUBMITTED_PROCESSING_JOBS_IDS,
+    SUBMITTED_PROCESSING_JOBS_LOCK,
+    TERMINATING_PROCESSING_JOBS_IDS,
+    TERMINATING_PROCESSING_JOBS_LOCK,
     get_jobs_from_run_spec,
     job_model_to_job_submission,
     process_terminating_job,
@@ -86,7 +88,7 @@ from dstack._internal.server.services.pools import (
     instance_model_to_instance,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.server.utils.common import run_async, wait_unlock
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
 
@@ -97,6 +99,9 @@ BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
 ]
 
 logger = get_logger(__name__)
+
+PROCESSING_RUNS_LOCK = asyncio.Lock()
+PROCESSING_RUNS_IDS: Set[uuid.UUID] = set()
 
 
 async def list_user_runs(
@@ -683,12 +688,11 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
     job_termination_reason = run_to_job_termination_reason(run.termination_reason)
 
     jobs_ids_set = {job.id for job in run.jobs}
-    while True:  # let job processing complete
-        # TODO(egor-s): acquire locks for submitted and terminating jobs
-        async with RUNNING_PROCESSING_JOBS_LOCK:
-            if not RUNNING_PROCESSING_JOBS_IDS & jobs_ids_set:
-                break
-            await asyncio.sleep(0.1)
+    await wait_unlock(RUNNING_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_IDS, jobs_ids_set)
+    await wait_unlock(SUBMITTED_PROCESSING_JOBS_LOCK, SUBMITTED_PROCESSING_JOBS_IDS, jobs_ids_set)
+    await wait_unlock(
+        TERMINATING_PROCESSING_JOBS_LOCK, TERMINATING_PROCESSING_JOBS_IDS, jobs_ids_set
+    )
     await session.refresh(run)
 
     unfinished_jobs_count = 0

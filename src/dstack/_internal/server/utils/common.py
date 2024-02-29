@@ -1,6 +1,6 @@
 import asyncio
 from functools import partial
-from typing import Awaitable, Callable, List, Sequence, Tuple, TypeVar, Union
+from typing import Awaitable, Callable, Iterable, List, Sequence, Set, Tuple, TypeVar, Union
 
 from typing_extensions import ParamSpec
 
@@ -42,3 +42,21 @@ async def gather_map_async(
             ),
         )
     ]
+
+
+KeyT = TypeVar("KeyT")
+
+
+async def wait_unlock(
+    lock: asyncio.Lock, locked: Set[KeyT], keys: Iterable[KeyT], *, delay: float = 0.1
+):
+    """
+    Wait until all keys are unlocked (not presented in the `locked` set).
+    Lock is released during the sleep.
+    """
+    keys_set = set(keys)
+    while True:
+        async with lock:
+            if not keys_set.intersection(locked):
+                return
+        await asyncio.sleep(delay)

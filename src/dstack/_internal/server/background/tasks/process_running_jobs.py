@@ -30,8 +30,6 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
-    PROCESSING_RUNS_IDS,
-    PROCESSING_RUNS_LOCK,
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
     job_model_to_job_submission,
@@ -41,6 +39,8 @@ from dstack._internal.server.services.repos import get_code_model, repo_model_to
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
+    PROCESSING_RUNS_IDS,
+    PROCESSING_RUNS_LOCK,
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
