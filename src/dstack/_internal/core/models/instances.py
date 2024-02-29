@@ -95,6 +95,7 @@ class InstanceAvailability(Enum):
     AVAILABLE = "available"
     NOT_AVAILABLE = "not_available"
     NO_QUOTA = "no_quota"
+    READY = "ready"  # TODO: Backward compatibility, will be removed in 0.17
     IDLE = "idle"
     BUSY = "busy"
 
@@ -102,6 +103,7 @@ class InstanceAvailability(Enum):
         return self in {
             InstanceAvailability.UNKNOWN,
             InstanceAvailability.AVAILABLE,
+            InstanceAvailability.READY,  # TODO: Backward compatibility, will be removed in 0.17
             InstanceAvailability.IDLE,
         }
 

@@ -226,6 +226,9 @@ class PoolInstanceOffers(BaseModel):
 
 class InstanceStatus(str, Enum):
     PENDING = "pending"
+    CREATING = "creating"  # TODO: Backward compatibility, will be removed in 0.17
+    STARTING = "starting"  # TODO: Backward compatibility, will be removed in 0.17
+    READY = "ready"  # TODO: Backward compatibility, will be removed in 0.17
     PROVISIONING = "provisioning"
     IDLE = "idle"
     BUSY = "busy"
@@ -233,14 +236,18 @@ class InstanceStatus(str, Enum):
     TERMINATED = "terminated"
 
     @property
-    def finished_statuses(cls) -> Sequence["InstanceStatus"]:
+    def finished_statuses(cls) -> Sequence["InstanceStatus"]:  # TODO: remove in 0.17
         return [cls.TERMINATED]
 
-    def is_finished(self):
+    def is_finished(self):  # TODO: remove in 0.17
         return self in self.finished_statuses
 
-    def is_started(self):
+    def is_started(self):  # TODO: remove in 0.17
         return not self.is_finished()
 
     def is_available(self) -> bool:
-        return self in [self.IDLE, self.BUSY]
+        return self in (
+            self.READY,  # TODO: Backward compatibility, will be removed in 0.17
+            self.IDLE,
+            self.BUSY,
+        )

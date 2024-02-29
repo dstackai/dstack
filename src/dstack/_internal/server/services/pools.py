@@ -189,9 +189,18 @@ async def show_pool_instances(
     else:
         pool = await get_or_create_pool_by_name(session, project, pool_name)
     pool_instances = get_pool_instances(pool)
+    instances = []
+    for instance_item in pool_instances:
+        instance = instance_model_to_instance(instance_item)
+        # TODO: Backward compatibility, will be removed in 0.17
+        if instance.status == InstanceStatus.IDLE:
+            instance.status = InstanceStatus.READY
+        elif instance.status == InstanceStatus.PROVISIONING:
+            instance.status = InstanceStatus.STARTING
+        instances.append(instance)
     return PoolInstances(
         name=pool.name,
-        instances=[instance_model_to_instance(i) for i in pool_instances],
+        instances=instances,
     )
 
 
