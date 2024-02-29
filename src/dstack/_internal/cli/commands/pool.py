@@ -337,6 +337,14 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
     table.add_column("CREATED")
 
     for instance in instances:
+        status = instance.status.value
+
+        if instance.status in (InstanceStatus.STARTING, InstanceStatus.CREATING):
+            status = InstanceStatus.PROVISIONING.value
+
+        if instance.status == InstanceStatus.READY:
+            status = InstanceStatus.IDLE.value
+
         row = [
             instance.name,
             instance.backend,
@@ -344,7 +352,7 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
             instance.instance_type.resources.pretty_format(),
             "yes" if instance.instance_type.resources.spot else "no",
             f"${instance.price:.4}",
-            instance.status.value,
+            status,
             pretty_date(instance.created),
         ]
         table.add_row(*row)
