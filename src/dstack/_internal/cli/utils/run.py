@@ -105,12 +105,12 @@ def generate_runs_table(
     table.add_column("RUN", style="bold", no_wrap=True)
     if include_configuration:
         table.add_column("CONFIGURATION", style="grey58")
-    table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
     table.add_column("BACKEND", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("REGION", style="grey58")
     if verbose:
         table.add_column("INSTANCE", no_wrap=True)
     table.add_column("RESOURCES")
-    table.add_column("SPOT", no_wrap=True)
+    table.add_column("SPOT")
     table.add_column("PRICE", no_wrap=True)
     table.add_column("STATUS", no_wrap=True)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True)
@@ -126,8 +126,8 @@ def generate_runs_table(
         if include_configuration:
             renderables.append(run.run_spec.configuration_path)
         renderables += [
-            run.user,
             provisioning.backend.value if provisioning else "",
+            provisioning.region if provisioning else "",
             *_render_instance_and_resources(
                 provisioning.instance_type if provisioning else None, verbose
             ),
@@ -137,7 +137,7 @@ def generate_runs_table(
             pretty_date(run.submitted_at),
         ]
         if verbose:
-            renderables.append("TODO")  # TODO
+            renderables.append("-")  # TODO
         table.add_row(*renderables)
     return table
 
