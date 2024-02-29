@@ -60,3 +60,16 @@ async def wait_unlock(
             if not keys_set.intersection(locked):
                 return
         await asyncio.sleep(delay)
+
+
+async def wait_to_lock(lock: asyncio.Lock, locked: Set[KeyT], key: KeyT, *, delay: float = 0.1):
+    """
+    Retry locking until the key is locked.
+    Lock is released during the sleep.
+    """
+    while True:
+        async with lock:
+            if key not in locked:
+                locked.add(key)
+                return
+        await asyncio.sleep(delay)

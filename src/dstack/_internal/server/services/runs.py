@@ -88,7 +88,7 @@ from dstack._internal.server.services.pools import (
     instance_model_to_instance,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
-from dstack._internal.server.utils.common import run_async, wait_unlock
+from dstack._internal.server.utils.common import run_async, wait_to_lock, wait_unlock
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
 
@@ -382,12 +382,7 @@ async def stop_runs(
 
 
 async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
-    while True:
-        async with PROCESSING_RUNS_LOCK:
-            if run.id not in PROCESSING_RUNS_IDS:
-                PROCESSING_RUNS_IDS.add(run.id)
-                break
-        await asyncio.sleep(0.1)
+    await wait_to_lock(PROCESSING_RUNS_LOCK, PROCESSING_RUNS_IDS, run.id)
 
     try:
         await session.refresh(run)

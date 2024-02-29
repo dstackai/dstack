@@ -28,7 +28,7 @@ from dstack._internal.server.services.jobs.configurators.service import ServiceJ
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import get_runner_ports, runner_ssh_tunnel
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.server.utils.common import run_async, wait_to_lock
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -168,34 +168,38 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
     instance: Optional[InstanceModel] = res.scalar()
 
     if instance is not None:
-        # TODO(egor-s): acquire the instance lock
-        # there is an associated instance to empty
-        jpd: Optional[JobProvisioningData] = None
-        if job_model.job_provisioning_data is not None:
-            jpd = JobProvisioningData.parse_raw(job_model.job_provisioning_data)
-            logger.debug("%s: stopping container", fmt(job_model))
-            await stop_container(job_model, jpd, instance.project.ssh_private_key)
+        await wait_to_lock(PROCESSING_POOL_LOCK, PROCESSING_POOL_IDS, instance.id)
+        await session.refresh(instance)
+        try:
+            # there is an associated instance to empty
+            jpd: Optional[JobProvisioningData] = None
+            if job_model.job_provisioning_data is not None:
+                jpd = JobProvisioningData.parse_raw(job_model.job_provisioning_data)
+                logger.debug("%s: stopping container", fmt(job_model))
+                await stop_container(job_model, jpd, instance.project.ssh_private_key)
 
-        if instance.status == InstanceStatus.BUSY:
-            instance.status = InstanceStatus.READY
-        elif instance.status != InstanceStatus.TERMINATED:
-            # instance was CREATING or STARTING (specially for the job)
-            # schedule for termination
-            instance.status = InstanceStatus.TERMINATING
+            if instance.status == InstanceStatus.BUSY:
+                instance.status = InstanceStatus.READY
+            elif instance.status != InstanceStatus.TERMINATED:
+                # instance was CREATING or STARTING (specially for the job)
+                # schedule for termination
+                instance.status = InstanceStatus.TERMINATING
 
-        if jpd is None or not jpd.dockerized:
-            # do not reuse vastai/k8s instances
-            instance.status = InstanceStatus.TERMINATING
+            if jpd is None or not jpd.dockerized:
+                # do not reuse vastai/k8s instances
+                instance.status = InstanceStatus.TERMINATING
 
-        instance.job_id = None
-        instance.last_job_processed_at = get_current_datetime()
-        logger.info(
-            "%s: instance '%s' has been released, new status is %s",
-            fmt(job_model),
-            instance.name,
-            instance.status.name,
-        )
-        # TODO(egor-s): unregister service replica
+            instance.job_id = None
+            instance.last_job_processed_at = get_current_datetime()
+            logger.info(
+                "%s: instance '%s' has been released, new status is %s",
+                fmt(job_model),
+                instance.name,
+                instance.status.name,
+            )
+            # TODO(egor-s): unregister service replica
+        finally:
+            PROCESSING_POOL_IDS.remove(instance.id)
 
     job_model.status = job_termination_reason_to_status(job_model.termination_reason)
     logger.info(
