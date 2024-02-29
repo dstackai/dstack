@@ -5,7 +5,6 @@ from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
     get_instance_name,
     get_shim_commands,
-    logger,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.cudo.api_client import CudoApiClient
@@ -95,7 +94,6 @@ class CudoCompute(Compute):
         # Wait until VM State is Active. This is necessary to get the ip_address.
         while vm["VM"]["state"] != "ACTIVE":
             time.sleep(1)
-            logger.debug("Fetching VM state")
             vm = self.api_client.get_vm(self.config.project_id, instance_config.instance_name)
 
         launched_instance = LaunchedInstanceInfo(
