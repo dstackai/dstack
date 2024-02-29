@@ -169,6 +169,7 @@ class RunCommand(APIBaseCommand):
                     repo=repo,
                     configuration_path=configuration_path,
                     backends=profile.backends,
+                    regions=profile.regions,
                     spot_policy=profile.spot_policy,  # pass profile piece by piece
                     retry_policy=profile.retry_policy,
                     max_duration=profile.max_duration,

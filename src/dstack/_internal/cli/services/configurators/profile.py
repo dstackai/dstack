@@ -37,6 +37,14 @@ def register_profile_args(parser: argparse.ArgumentParser):
         dest="backends",
         help="The backends that will be tried for provisioning",
     )
+    profile_group.add_argument(
+        "-r",
+        "--region",
+        action="append",
+        metavar="NAME",
+        dest="regions",
+        help="The regions that will be tried for provisioning",
+    )
 
     spot_group = parser.add_argument_group("Spot policy")
     spot_group_exc = spot_group.add_mutually_exclusive_group()
@@ -87,6 +95,8 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile):
         profile.max_duration = args.max_duration
     if args.backends:
         profile.backends = args.backends
+    if args.regions:
+        profile.regions = args.regions
 
     if args.spot_policy is not None:
         profile.spot_policy = args.spot_policy
