@@ -8,12 +8,14 @@ from dstack._internal.core.backends.base.compute import get_instance_name, get_s
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.tensordock.api_client import TensorDockAPIClient
 from dstack._internal.core.backends.tensordock.config import TensorDockConfig
-from dstack._internal.core.errors import NoCapacityError
+from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
@@ -41,20 +43,15 @@ class TensorDockCompute(Compute):
         ]
         return offers
 
-    def run_job(
+    def create_instance(
         self,
-        run: Run,
-        job: Job,
         instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
+        instance_config: InstanceConfiguration,
     ) -> LaunchedInstanceInfo:
-        commands = get_shim_commands(
-            authorized_keys=[run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
-        )
+        commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
         try:
             resp = self.api_client.deploy_single(
-                instance_name=get_instance_name(run, job),
+                instance_name=instance_config.instance_name,
                 instance=instance_offer.instance,
                 cloudinit={
                     "ssh_pwauth": False,  # disable password auth
@@ -62,10 +59,7 @@ class TensorDockCompute(Compute):
                         "default",
                         {
                             "name": "user",
-                            "ssh_authorized_keys": [
-                                run.run_spec.ssh_key_pub.strip(),
-                                project_ssh_public_key.strip(),
-                            ],
+                            "ssh_authorized_keys": instance_config.get_public_keys(),
                         },
                     ],
                     "runcmd": [
@@ -103,10 +97,42 @@ class TensorDockCompute(Compute):
             backend_data=None,
         )
 
+    def run_job(
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ) -> LaunchedInstanceInfo:
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=project_ssh_public_key.strip()),
+            ],
+            job_docker_config=None,
+            user=run.user,
+        )
+
+        launched_instance_info = self.create_instance(instance_offer, instance_config)
+        return launched_instance_info
+
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
         try:
             self.api_client.delete_single(instance_id)
-        except requests.HTTPError:
-            pass
+        except requests.HTTPError as e:
+            logger.error(
+                "An HTTP error occurred when trying to terminate TensorDock instance %s: %s",
+                instance_id,
+                e,
+            )
+        except BackendError as e:
+            logger.error(
+                "TensorDock returned an error when trying to terminate instance %s: %s",
+                instance_id,
+                e,
+            )

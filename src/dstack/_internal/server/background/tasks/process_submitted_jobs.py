@@ -10,7 +10,11 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import CreationPolicy, TerminationPolicy
+from dstack._internal.core.models.profiles import (
+    DEFAULT_RUN_TERMINATION_IDLE_TIME,
+    CreationPolicy,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -105,7 +109,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             pool_instances=pool_instances,
             profile=profile,
             resources=run_spec.configuration.resources,
-            status=InstanceStatus.READY,
+            status=InstanceStatus.IDLE,
         )
         if len(relevant_instances) > 0:
             sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
@@ -153,8 +157,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
 
-        termination_policy = profile.termination_policy
+        termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
         termination_idle_time = profile.termination_idle_time
+        if termination_idle_time is None:
+            termination_idle_time = DEFAULT_RUN_TERMINATION_IDLE_TIME
         if not job_provisioning_data.dockerized:
             # terminate vastai/k8s instances immediately
             termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
@@ -165,7 +171,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             pool=pool,
             created_at=common_utils.get_current_datetime(),
             started_at=common_utils.get_current_datetime(),
-            status=InstanceStatus.STARTING,
+            status=InstanceStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data.json(),
             offer=offer.json(),
             termination_policy=termination_policy,

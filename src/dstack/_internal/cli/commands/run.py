@@ -17,12 +17,6 @@ from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
-from dstack._internal.core.models.profiles import (
-    DEFAULT_RUN_TERMINATION_IDLE_TIME,
-    CreationPolicy,
-    TerminationPolicy,
-    parse_max_duration,
-)
 from dstack._internal.core.models.runs import JobTerminationReason
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
@@ -84,29 +78,6 @@ class RunCommand(APIBaseCommand):
             type=int,
             default=3,
         )
-        self._parser.add_argument(
-            "--pool",
-            dest="pool_name",
-            help="The name of the pool. If not set, the default pool will be used",
-        )
-        self._parser.add_argument(
-            "--reuse",
-            dest="creation_policy_reuse",
-            action="store_true",
-            help="Reuse instance from pool",
-        )
-        self._parser.add_argument(
-            "--idle-duration",
-            dest="idle_duration",
-            type=str,
-            help="Idle time before instance termination",
-        )
-        self._parser.add_argument(
-            "--instance",
-            dest="instance_name",
-            metavar="NAME",
-            help="Reuse instance from pool with name [code]NAME[/]",
-        )
         register_profile_args(self._parser)
 
     def _command(self, args: argparse.Namespace):
@@ -117,31 +88,6 @@ class RunCommand(APIBaseCommand):
                 BaseRunConfigurator.register(self._parser)
             self._parser.print_help()
             return
-
-        termination_policy_idle = DEFAULT_RUN_TERMINATION_IDLE_TIME
-        termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-
-        if args.idle_duration is not None:
-            try:
-                termination_policy_idle = int(args.idle_duration)
-            except ValueError:
-                termination_policy_idle = parse_max_duration(args.idle_duration)
-
-        creation_policy = (
-            CreationPolicy.REUSE if args.creation_policy_reuse else CreationPolicy.REUSE_OR_CREATE
-        )
-
-        if creation_policy == CreationPolicy.REUSE and termination_policy_idle is not None:
-            console.print(
-                "[warning]If the flag --reuse is set, the argument --idle-duration will be skipped[/]"
-            )
-            termination_policy = TerminationPolicy.DONT_DESTROY
-
-        if args.instance_name is not None and termination_policy_idle is not None:
-            console.print(
-                f"[warning]--idle-duration won't be applied to the instance {args.instance_name!r}[/]"
-            )
-            termination_policy = TerminationPolicy.DONT_DESTROY
 
         super()._command(args)
         try:
@@ -175,11 +121,11 @@ class RunCommand(APIBaseCommand):
                     max_price=profile.max_price,
                     working_dir=args.working_dir,
                     run_name=args.run_name,
-                    pool_name=args.pool_name,
-                    instance_name=args.instance_name,
-                    creation_policy=creation_policy,
-                    termination_policy=termination_policy,
-                    termination_policy_idle=termination_policy_idle,
+                    pool_name=profile.pool_name,
+                    instance_name=profile.instance_name,
+                    creation_policy=profile.creation_policy,
+                    termination_policy=profile.termination_policy,
+                    termination_policy_idle=profile.termination_idle_time,
                 )
         except ConfigurationError as e:
             raise CLIError(str(e))

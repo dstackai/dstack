@@ -30,7 +30,12 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance
-from dstack._internal.core.models.profiles import CreationPolicy, Profile
+from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    CreationPolicy,
+    Profile,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -90,8 +95,11 @@ from dstack._internal.utils.random_names import generate_name
 
 BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
     BackendType.AWS,
+    BackendType.AZURE,
     BackendType.DATACRUNCH,
     BackendType.GCP,
+    BackendType.LAMBDA,
+    BackendType.TENSORDOCK,
 ]
 
 logger = get_logger(__name__)
@@ -185,7 +193,7 @@ async def get_run_plan(
         _validate_run_name(run_spec.run_name)
 
     profile = run_spec.profile
-    creation_policy = profile.creation_policy
+    creation_policy = profile.creation_policy or CreationPolicy.REUSE_OR_CREATE
 
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
@@ -199,8 +207,8 @@ async def get_run_plan(
     for instance in pool_filtered_instances:
         offer = InstanceOfferWithAvailability.parse_raw(instance.offer)
         offer.availability = InstanceAvailability.BUSY
-        if instance.status == InstanceStatus.READY:
-            offer.availability = InstanceAvailability.READY
+        if instance.status == InstanceStatus.IDLE:
+            offer.availability = InstanceAvailability.IDLE
         pool_offers.append(offer)
 
     run_name = run_spec.run_name  # preserve run_name
@@ -212,7 +220,7 @@ async def get_run_plan(
         job_offers: List[InstanceOfferWithAvailability] = []
         job_offers.extend(pool_offers)
 
-        if creation_policy is None or creation_policy == CreationPolicy.REUSE_OR_CREATE:
+        if creation_policy == CreationPolicy.REUSE_OR_CREATE:
             offers = await get_offers_by_requirements(
                 project=project,
                 profile=profile,
@@ -248,6 +256,9 @@ async def get_offers_by_requirements(
 
     if profile.backends is not None:
         backends = [b for b in backends if b.TYPE in profile.backends]
+
+    # filter backends with create_instance support
+    backends = [b for b in backends if b.TYPE in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]
 
     offers = await backends_services.get_instance_offers(
         backends=backends,
@@ -468,8 +479,13 @@ async def create_instance(
     ):
         backends = ", ".join(sorted(backend_types))
         raise ServerClientError(
-            f"Backends {backends} do not support create_intance. Try to select other backends."
+            f"Backends {backends} do not support create_instance. Try to select other backends."
         )
+
+    if not offers:
+        raise ServerClientError(
+            "Failed to find offers to create the instance."
+        )  # TODO(sergeyme): ComputeError?
 
     pool = await pools_services.get_or_create_pool_by_name(session, project, pool_name)
 
@@ -532,25 +548,29 @@ async def create_instance(
             backend_data=launched_instance_info.backend_data,
             ssh_proxy=None,
         )
+        termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
+        termination_idle_time = profile.termination_idle_time
+        if termination_idle_time is None:
+            termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
         im = InstanceModel(
             name=instance_name,
             project=project,
             pool=pool,
             created_at=common_utils.get_current_datetime(),
             started_at=common_utils.get_current_datetime(),
-            status=InstanceStatus.STARTING,
+            status=InstanceStatus.PROVISIONING,
             backend=backend.TYPE,
             region=instance_offer.region,
             price=instance_offer.price,
             job_provisioning_data=job_provisioning_data.json(),
             offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
-            termination_policy=profile.termination_policy,
-            termination_idle_time=profile.termination_idle_time,
+            termination_policy=termination_policy,
+            termination_idle_time=termination_idle_time,
         )
         session.add(im)
         await session.commit()
         return instance_model_to_instance(im)
-    raise ServerClientError("Failed to find offers to create the instance.")
+    raise ServerClientError("Failed to create the instance.")  # TODO(sergeyme): ComputeError?
 
 
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:

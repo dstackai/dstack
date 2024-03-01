@@ -18,16 +18,12 @@ from dstack._internal.core.errors import CLIError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
-    InstanceRuntime,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     SpotPolicy,
-    TerminationPolicy,
-    parse_max_duration,
 )
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
 from dstack._internal.core.models.runs import InstanceStatus, Requirements
@@ -105,10 +101,11 @@ class PoolCommand(APIBaseCommand):
         add_parser = subparsers.add_parser(
             "add", help="Add instance to pool", formatter_class=self._parser.formatter_class
         )
-        add_parser.add_argument(
-            "--pool",
-            dest="pool_name",
-            help="The name of the pool. If not set, the default pool will be used",
+        self._parser.add_argument(
+            "--max-offers",
+            help="Number of offers to show in the run plan",
+            type=int,
+            default=3,
         )
         add_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
@@ -127,8 +124,7 @@ class PoolCommand(APIBaseCommand):
         add_parser.add_argument(
             "--name", dest="instance_name", help="Set the name of the instance"
         )
-        add_parser.add_argument("--idle-duration", dest="idle_duration", help="Idle duration")
-        register_profile_args(add_parser)
+        register_profile_args(add_parser, pool_add=True)
         register_resource_args(add_parser)
         add_parser.set_defaults(subfunc=self._add)
 
@@ -213,8 +209,7 @@ class PoolCommand(APIBaseCommand):
         if not args.watch:
             resp = self.api.client.pool.show(self.api.project, args.pool_name)
             console.print(pool_name_template.format(resp.name))
-            console.print(print_instance_table(resp.instances))
-            console.print()
+            print_instance_table(resp.instances)
             return
 
         try:
@@ -222,7 +217,7 @@ class PoolCommand(APIBaseCommand):
                 while True:
                     resp = self.api.client.pool.show(self.api.project, args.pool_name)
                     group = Group(
-                        pool_name_template.format(resp.name), print_instance_table(resp.instances)
+                        pool_name_template.format(resp.name), get_instance_table(resp.instances)
                     )
                     live.update(group)
                     time.sleep(LIVE_PROVISION_INTERVAL_SECS)
@@ -241,35 +236,7 @@ class PoolCommand(APIBaseCommand):
         )
 
         profile = load_profile(Path.cwd(), args.profile)
-        apply_profile_args(args, profile)
-        profile.pool_name = args.pool_name
-
-        spot = None
-        if profile.spot_policy == SpotPolicy.SPOT:
-            spot = True
-        if profile.spot_policy == SpotPolicy.ONDEMAND:
-            spot = False
-
-        requirements = Requirements(
-            resources=resources,
-            max_price=args.max_price,
-            spot=spot,
-        )
-
-        idle_duration = parse_max_duration(args.idle_duration)
-        if idle_duration is None:
-            profile.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
-            profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        elif idle_duration == "off":
-            profile.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
-            profile.termination_policy = TerminationPolicy.DONT_DESTROY
-        elif isinstance(idle_duration, int):
-            profile.termination_idle_time = idle_duration
-            profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        else:
-            raise CLIError(
-                f"Invalid format --idle-duration {args.idle_duration!r}. It must be literal string 'off' or an integer number with an suffix s|m|h|d|w "
-            )
+        apply_profile_args(args, profile, pool_add=True)
 
         # Add remote instance
         if args.remote:
@@ -286,15 +253,31 @@ class PoolCommand(APIBaseCommand):
             # TODO(egor-s): print on success
             return
 
+        spot = None
+        if profile.spot_policy == SpotPolicy.SPOT:
+            spot = True
+        if profile.spot_policy == SpotPolicy.ONDEMAND:
+            spot = False
+        requirements = Requirements(
+            resources=resources,
+            max_price=profile.max_price,
+            spot=spot,
+        )
+
         with console.status("Getting instances..."):
             pool_offers = self.api.runs.get_offers(profile, requirements)
 
-        offers = [o for o in pool_offers.instances if o.instance_runtime == InstanceRuntime.SHIM]
-
-        print_offers_table(pool_offers.pool_name, profile, requirements, offers)
-        if not offers:
+        print_offers_table(
+            pool_name=pool_offers.pool_name,
+            profile=profile,
+            requirements=requirements,
+            instance_offers=pool_offers.instances,
+            offers_limit=args.max_offers,
+        )
+        if not pool_offers.instances:
             console.print("\nThere are no offers with these criteria. Exiting...")
             return
+
         if not args.yes and not confirm_ask("Continue?"):
             console.print("\nExiting...")
             return
@@ -304,11 +287,14 @@ class PoolCommand(APIBaseCommand):
         pub_key = SSHKey(public=user_pub_key)
         try:
             with console.status("Creating instance..."):
+                # TODO: Instance name is not passed, so --instance does not work.
+                # There is profile.instance_name but it makes sense for `dstack run` only.
                 instance = self.api.runs.create_instance(
                     pool_offers.pool_name, profile, requirements, pub_key
                 )
         except ServerClientError as e:
             raise CLIError(e.msg)
+        console.print()
         print_instance_table([instance])
 
     def _command(self, args: argparse.Namespace) -> None:
@@ -339,7 +325,12 @@ def print_pool_table(pools: Sequence[Pool], verbose: bool) -> None:
     console.print()
 
 
-def print_instance_table(instances: Sequence[Instance]) -> Table:
+def print_instance_table(instances: Sequence[Instance]) -> None:
+    console.print(get_instance_table(instances))
+    console.print()
+
+
+def get_instance_table(instances: Sequence[Instance]) -> Table:
     table = Table(box=None)
     table.add_column("INSTANCE", no_wrap=True)
     table.add_column("BACKEND")
@@ -351,6 +342,14 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
     table.add_column("CREATED")
 
     for instance in instances:
+        status = instance.status.value
+
+        if instance.status in (InstanceStatus.STARTING, InstanceStatus.CREATING):
+            status = InstanceStatus.PROVISIONING.value
+
+        if instance.status == InstanceStatus.READY:
+            status = InstanceStatus.IDLE.value
+
         row = [
             instance.name,
             instance.backend,
@@ -358,7 +357,7 @@ def print_instance_table(instances: Sequence[Instance]) -> Table:
             instance.instance_type.resources.pretty_format(),
             "yes" if instance.instance_type.resources.spot else "no",
             f"${instance.price:.4}",
-            instance.status.value,
+            status,
             pretty_date(instance.created),
         ]
         table.add_row(*row)
@@ -371,21 +370,10 @@ def print_offers_table(
     profile: Profile,
     requirements: Requirements,
     instance_offers: Sequence[InstanceOfferWithAvailability],
-    offers_limit: int = 3,
+    offers_limit: int,
 ) -> None:
     pretty_req = requirements.pretty_format(resources_only=True)
     max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
-    max_duration = (
-        f"{profile.max_duration / 3600:g}h" if isinstance(profile.max_duration, int) else "-"
-    )
-
-    # TODO: improve retry policy
-    # retry_policy = profile.retry_policy
-    # retry_policy = (
-    #     (f"{retry_policy.limit / 3600:g}h" if retry_policy.limit else "yes")
-    #     if retry_policy.retry
-    #     else "no"
-    # )
 
     if requirements.spot is None:
         spot_policy = "auto"
@@ -404,9 +392,7 @@ def print_offers_table(
     props.add_row(th("Pool name"), pool_name)
     props.add_row(th("Min resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
-    props.add_row(th("Max duration"), max_duration)
     props.add_row(th("Spot policy"), spot_policy)
-    # props.add_row(th("Retry policy"), retry_policy)
 
     offers_table = Table(box=None)
     offers_table.add_column("#")
@@ -420,8 +406,8 @@ def print_offers_table(
 
     print_offers = instance_offers[:offers_limit]
 
-    for i, offer in enumerate(print_offers, start=1):
-        r = offer.instance.resources
+    for index, offer in enumerate(print_offers, start=1):
+        resources = offer.instance.resources
 
         availability = ""
         if offer.availability in {
@@ -430,15 +416,15 @@ def print_offers_table(
         }:
             availability = offer.availability.value.replace("_", " ").title()
         offers_table.add_row(
-            f"{i}",
+            f"{index}",
             offer.backend,
             offer.region,
             offer.instance.name,
-            r.pretty_format(),
-            "yes" if r.spot else "no",
+            resources.pretty_format(),
+            "yes" if resources.spot else "no",
             f"${offer.price:g}",
             availability,
-            style=None if i == 1 else "secondary",
+            style=None if index == 1 else "secondary",
         )
     if len(print_offers) > offers_limit:
         offers_table.add_row("", "...", style="secondary")

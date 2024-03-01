@@ -36,6 +36,10 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
         return None
     if isinstance(v, int):
         return v
+    try:
+        return int(v)
+    except ValueError:
+        pass
     regex = re.compile(r"(?P<amount>\d+) *(?P<unit>[smhdw])$")
     re_match = regex.match(v)
     if not re_match:
@@ -115,18 +119,21 @@ class Profile(ForbidExtra):
     instance_name: Annotated[Optional[str], Field(description="The name of the instance")]
     creation_policy: Annotated[
         Optional[CreationPolicy], Field(description="The policy for using instances from the pool")
-    ]
+    ] = CreationPolicy.REUSE_OR_CREATE
     termination_policy: Annotated[
         Optional[TerminationPolicy], Field(description="The policy for termination instances")
-    ]
+    ] = TerminationPolicy.DESTROY_AFTER_IDLE
     termination_idle_time: Annotated[
-        int,
-        Field(description="Seconds to wait before destroying the instance"),
+        Optional[Union[str, int]],
+        Field(description="Time to wait before destroying the idle instance"),
     ] = DEFAULT_RUN_TERMINATION_IDLE_TIME
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
     )
+    _validate_termination_idle_time = validator(
+        "termination_idle_time", pre=True, allow_reuse=True
+    )(parse_duration)
 
 
 class ProfilesConfig(ForbidExtra):

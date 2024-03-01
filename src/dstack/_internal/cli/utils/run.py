@@ -4,6 +4,7 @@ from rich.table import Table
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.models.instances import InstanceAvailability, InstanceType
+from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import RunPlan
 from dstack._internal.utils.common import pretty_date
 from dstack.api import Run
@@ -28,6 +29,11 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         if retry_policy.retry
         else "no"
     )
+    creation_policy = run_plan.run_spec.profile.creation_policy
+    termination_policy = run_plan.run_spec.profile.termination_policy
+    termination_idle_time = f"{run_plan.run_spec.profile.termination_idle_time}s"
+    if termination_policy == TerminationPolicy.DONT_DESTROY:
+        termination_idle_time = "-"
 
     if req.spot is None:
         spot_policy = "auto"
@@ -48,6 +54,9 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Max duration"), max_duration)
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Retry policy"), retry_policy)
+    props.add_row(th("Creation policy"), creation_policy)
+    props.add_row(th("Termination policy"), termination_policy)
+    props.add_row(th("Termination idle time"), termination_idle_time)
 
     offers = Table(box=None)
     offers.add_column("#")
@@ -68,7 +77,8 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         if offer.availability in {
             InstanceAvailability.NOT_AVAILABLE,
             InstanceAvailability.NO_QUOTA,
-            InstanceAvailability.READY,
+            InstanceAvailability.READY,  # TODO: Backward compatibility, will be removed in 0.17
+            InstanceAvailability.IDLE,
             InstanceAvailability.BUSY,
         }:
             availability = offer.availability.value.replace("_", " ").title()
@@ -105,12 +115,12 @@ def generate_runs_table(
     table.add_column("RUN", style="bold", no_wrap=True)
     if include_configuration:
         table.add_column("CONFIGURATION", style="grey58")
-    table.add_column("USER", style="grey58", no_wrap=True, max_width=16)
     table.add_column("BACKEND", style="grey58", no_wrap=True, max_width=16)
+    table.add_column("REGION", style="grey58")
     if verbose:
         table.add_column("INSTANCE", no_wrap=True)
     table.add_column("RESOURCES")
-    table.add_column("SPOT", no_wrap=True)
+    table.add_column("SPOT")
     table.add_column("PRICE", no_wrap=True)
     table.add_column("STATUS", no_wrap=True)
     table.add_column("SUBMITTED", style="grey58", no_wrap=True)
@@ -126,8 +136,8 @@ def generate_runs_table(
         if include_configuration:
             renderables.append(run.run_spec.configuration_path)
         renderables += [
-            run.user,
             provisioning.backend.value if provisioning else "",
+            provisioning.region if provisioning else "",
             *_render_instance_and_resources(
                 provisioning.instance_type if provisioning else None, verbose
             ),
@@ -137,7 +147,7 @@ def generate_runs_table(
             pretty_date(run.submitted_at),
         ]
         if verbose:
-            renderables.append("TODO")  # TODO
+            renderables.append("-")  # TODO
         table.add_row(*renderables)
     return table
 

@@ -316,7 +316,7 @@ async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
     pool: PoolModel,
-    status: InstanceStatus = InstanceStatus.READY,
+    status: InstanceStatus = InstanceStatus.IDLE,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     finished_at: Optional[datetime] = None,
     spot: bool = False,

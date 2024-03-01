@@ -3,6 +3,7 @@ import uuid
 import requests
 import yaml
 
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceType
 from dstack._internal.utils.logging import get_logger
 
@@ -85,9 +86,12 @@ class TensorDockAPIClient:
             },
         )
         resp.raise_for_status()
-        data = resp.json()
-        if not data["success"]:
-            raise requests.HTTPError(data)
+        try:
+            data = resp.json()
+            if not data["success"]:
+                raise BackendError(data)
+        except ValueError:  # json parsing error
+            raise BackendError(resp.text)
 
     def _url(self, path):
         return f"{self.api_url}/{path.lstrip('/')}"

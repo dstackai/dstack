@@ -295,7 +295,7 @@ class TestProcessRunningJobs:
             session=session,
             project=project,
             pool=pool,
-            status=InstanceStatus.READY,
+            status=InstanceStatus.IDLE,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
         job = await create_job(
