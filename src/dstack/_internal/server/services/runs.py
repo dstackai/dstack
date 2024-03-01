@@ -172,7 +172,7 @@ async def get_run_plan(
         _validate_run_name(run_spec.run_name)
 
     profile = run_spec.profile
-    creation_policy = profile.creation_policy
+    creation_policy = profile.creation_policy or CreationPolicy.REUSE_OR_CREATE
 
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
@@ -199,7 +199,7 @@ async def get_run_plan(
         job_offers: List[InstanceOfferWithAvailability] = []
         job_offers.extend(pool_offers)
 
-        if creation_policy is None or creation_policy == CreationPolicy.REUSE_OR_CREATE:
+        if creation_policy == CreationPolicy.REUSE_OR_CREATE:
             offers = await get_offers_by_requirements(
                 project=project,
                 profile=profile,

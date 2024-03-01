@@ -18,16 +18,12 @@ from dstack._internal.core.errors import CLIError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
-    InstanceRuntime,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     SpotPolicy,
-    TerminationPolicy,
-    parse_max_duration,
 )
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
 from dstack._internal.core.models.runs import InstanceStatus, Requirements
@@ -106,11 +102,6 @@ class PoolCommand(APIBaseCommand):
             "add", help="Add instance to pool", formatter_class=self._parser.formatter_class
         )
         add_parser.add_argument(
-            "--pool",
-            dest="pool_name",
-            help="The name of the pool. If not set, the default pool will be used",
-        )
-        add_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )
         add_parser.add_argument(
@@ -127,8 +118,7 @@ class PoolCommand(APIBaseCommand):
         add_parser.add_argument(
             "--name", dest="instance_name", help="Set the name of the instance"
         )
-        add_parser.add_argument("--idle-duration", dest="idle_duration", help="Idle duration")
-        register_profile_args(add_parser)
+        register_profile_args(add_parser, pool_add=True)
         register_resource_args(add_parser)
         add_parser.set_defaults(subfunc=self._add)
 
@@ -241,35 +231,7 @@ class PoolCommand(APIBaseCommand):
         )
 
         profile = load_profile(Path.cwd(), args.profile)
-        apply_profile_args(args, profile)
-        profile.pool_name = args.pool_name
-
-        spot = None
-        if profile.spot_policy == SpotPolicy.SPOT:
-            spot = True
-        if profile.spot_policy == SpotPolicy.ONDEMAND:
-            spot = False
-
-        requirements = Requirements(
-            resources=resources,
-            max_price=args.max_price,
-            spot=spot,
-        )
-
-        idle_duration = parse_max_duration(args.idle_duration)
-        if idle_duration is None:
-            profile.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
-            profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        elif idle_duration == "off":
-            profile.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
-            profile.termination_policy = TerminationPolicy.DONT_DESTROY
-        elif isinstance(idle_duration, int):
-            profile.termination_idle_time = idle_duration
-            profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-        else:
-            raise CLIError(
-                f"Invalid format --idle-duration {args.idle_duration!r}. It must be literal string 'off' or an integer number with an suffix s|m|h|d|w "
-            )
+        apply_profile_args(args, profile, pool_add=True)
 
         # Add remote instance
         if args.remote:
@@ -286,11 +248,21 @@ class PoolCommand(APIBaseCommand):
             # TODO(egor-s): print on success
             return
 
+        spot = None
+        if profile.spot_policy == SpotPolicy.SPOT:
+            spot = True
+        if profile.spot_policy == SpotPolicy.ONDEMAND:
+            spot = False
+        requirements = Requirements(
+            resources=resources,
+            max_price=profile.max_price,
+            spot=spot,
+        )
+
         with console.status("Getting instances..."):
             pool_offers = self.api.runs.get_offers(profile, requirements)
 
-        offers = [o for o in pool_offers.instances if o.instance_runtime == InstanceRuntime.SHIM]
-
+        offers = [o for o in pool_offers.instances]
         print_offers_table(pool_offers.pool_name, profile, requirements, offers)
         if not offers:
             console.print("\nThere are no offers with these criteria. Exiting...")
@@ -304,6 +276,8 @@ class PoolCommand(APIBaseCommand):
         pub_key = SSHKey(public=user_pub_key)
         try:
             with console.status("Creating instance..."):
+                # TODO: Instance name is not passed, so --instance does not work.
+                # There is profile.instance_name but it makes sense for `dstack run` only.
                 instance = self.api.runs.create_instance(
                     pool_offers.pool_name, profile, requirements, pub_key
                 )
@@ -375,17 +349,6 @@ def print_offers_table(
 ) -> None:
     pretty_req = requirements.pretty_format(resources_only=True)
     max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
-    max_duration = (
-        f"{profile.max_duration / 3600:g}h" if isinstance(profile.max_duration, int) else "-"
-    )
-
-    # TODO: improve retry policy
-    # retry_policy = profile.retry_policy
-    # retry_policy = (
-    #     (f"{retry_policy.limit / 3600:g}h" if retry_policy.limit else "yes")
-    #     if retry_policy.retry
-    #     else "no"
-    # )
 
     if requirements.spot is None:
         spot_policy = "auto"
@@ -404,9 +367,7 @@ def print_offers_table(
     props.add_row(th("Pool name"), pool_name)
     props.add_row(th("Min resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
-    props.add_row(th("Max duration"), max_duration)
     props.add_row(th("Spot policy"), spot_policy)
-    # props.add_row(th("Retry policy"), retry_policy)
 
     offers_table = Table(box=None)
     offers_table.add_column("#")
