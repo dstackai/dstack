@@ -53,7 +53,7 @@ def upgrade() -> None:
         "  status = 'TERMINATED' "
         "WHERE id NOT IN ( "
         "  SELECT run_id FROM jobs "
-        "  WHERE removed = 0"
+        "  WHERE status NOT IN ('TERMINATED', 'ABORTED', 'FAILED', 'DONE') "
         ")"
     )
     with op.batch_alter_table("runs", schema=None) as batch_op:
@@ -90,10 +90,11 @@ def downgrade() -> None:
     with op.batch_alter_table("jobs", schema=None) as batch_op:
         batch_op.alter_column(
             "termination_reason",
-            new_columns_name="error_code",
+            new_column_name="error_code",
             type_=sa.VARCHAR(length=34),
         )
         batch_op.add_column(
+            # all jobs will get not removed
             sa.Column("removed", sa.BOOLEAN(), server_default=sa.text("'0'"), nullable=False)
         )
         batch_op.drop_column("replica_num")
