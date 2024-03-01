@@ -10,7 +10,11 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.profiles import CreationPolicy, TerminationPolicy
+from dstack._internal.core.models.profiles import (
+    DEFAULT_RUN_TERMINATION_IDLE_TIME,
+    CreationPolicy,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -155,8 +159,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
 
-        termination_policy = profile.termination_policy
-        termination_idle_time = profile.termination_idle_time
+        termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
+        termination_idle_time = profile.termination_idle_time or DEFAULT_RUN_TERMINATION_IDLE_TIME
         if not job_provisioning_data.dockerized:
             # terminate vastai/k8s instances immediately
             termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE

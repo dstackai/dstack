@@ -30,7 +30,12 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance
-from dstack._internal.core.models.profiles import CreationPolicy, Profile
+from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    CreationPolicy,
+    Profile,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -502,6 +507,8 @@ async def create_instance(
             backend_data=launched_instance_info.backend_data,
             ssh_proxy=None,
         )
+        termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
+        termination_idle_time = profile.termination_idle_time or DEFAULT_POOL_TERMINATION_IDLE_TIME
         im = InstanceModel(
             name=instance_name,
             project=project,
@@ -514,8 +521,8 @@ async def create_instance(
             price=instance_offer.price,
             job_provisioning_data=job_provisioning_data.json(),
             offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
-            termination_policy=profile.termination_policy,
-            termination_idle_time=profile.termination_idle_time,
+            termination_policy=termination_policy,
+            termination_idle_time=termination_idle_time,
         )
         session.add(im)
         await session.commit()
