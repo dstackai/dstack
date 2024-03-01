@@ -36,6 +36,10 @@ def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
         return None
     if isinstance(v, int):
         return v
+    try:
+        return int(v)
+    except ValueError:
+        pass
     regex = re.compile(r"(?P<amount>\d+) *(?P<unit>[smhdw])$")
     re_match = regex.match(v)
     if not re_match:

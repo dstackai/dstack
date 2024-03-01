@@ -160,7 +160,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_model.status = JobStatus.PROVISIONING
 
         termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
-        termination_idle_time = profile.termination_idle_time or DEFAULT_RUN_TERMINATION_IDLE_TIME
+        termination_idle_time = profile.termination_idle_time
+        if termination_idle_time is None:
+            termination_idle_time = DEFAULT_RUN_TERMINATION_IDLE_TIME
         if not job_provisioning_data.dockerized:
             # terminate vastai/k8s instances immediately
             termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE

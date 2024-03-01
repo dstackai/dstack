@@ -508,7 +508,9 @@ async def create_instance(
             ssh_proxy=None,
         )
         termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
-        termination_idle_time = profile.termination_idle_time or DEFAULT_POOL_TERMINATION_IDLE_TIME
+        termination_idle_time = profile.termination_idle_time
+        if termination_idle_time is None:
+            termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
         im = InstanceModel(
             name=instance_name,
             project=project,
