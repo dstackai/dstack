@@ -209,8 +209,7 @@ class PoolCommand(APIBaseCommand):
         if not args.watch:
             resp = self.api.client.pool.show(self.api.project, args.pool_name)
             console.print(pool_name_template.format(resp.name))
-            console.print(print_instance_table(resp.instances))
-            console.print()
+            print_instance_table(resp.instances)
             return
 
         try:
@@ -218,7 +217,7 @@ class PoolCommand(APIBaseCommand):
                 while True:
                     resp = self.api.client.pool.show(self.api.project, args.pool_name)
                     group = Group(
-                        pool_name_template.format(resp.name), print_instance_table(resp.instances)
+                        pool_name_template.format(resp.name), get_instance_table(resp.instances)
                     )
                     live.update(group)
                     time.sleep(LIVE_PROVISION_INTERVAL_SECS)
@@ -295,6 +294,7 @@ class PoolCommand(APIBaseCommand):
                 )
         except ServerClientError as e:
             raise CLIError(e.msg)
+        console.print()
         print_instance_table([instance])
 
     def _command(self, args: argparse.Namespace) -> None:
@@ -325,7 +325,12 @@ def print_pool_table(pools: Sequence[Pool], verbose: bool) -> None:
     console.print()
 
 
-def print_instance_table(instances: Sequence[Instance]) -> Table:
+def print_instance_table(instances: Sequence[Instance]) -> None:
+    console.print(get_instance_table(instances))
+    console.print()
+
+
+def get_instance_table(instances: Sequence[Instance]) -> Table:
     table = Table(box=None)
     table.add_column("INSTANCE", no_wrap=True)
     table.add_column("BACKEND")
