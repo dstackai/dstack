@@ -1,4 +1,5 @@
 import os
+import pprint
 import time
 from typing import Dict, List, Optional, Type
 
@@ -121,7 +122,8 @@ class APIClient:
                     code = kwargs.pop("code")
                     raise _server_client_errors[code](**kwargs)
             if resp.status_code == 422:
-                logger.debug("Server validation error: %s", resp.text)
+                formatted_error = pprint.pformat(resp.json())
+                raise ClientError(f"Server validation error: \n{formatted_error}")
             resp.raise_for_status()
         return resp
 

@@ -4,6 +4,7 @@ from rich.table import Table
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.models.instances import InstanceAvailability, InstanceType
+from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import RunPlan
 from dstack._internal.utils.common import pretty_date
 from dstack.api import Run
@@ -28,6 +29,11 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         if retry_policy.retry
         else "no"
     )
+    creation_policy = run_plan.run_spec.profile.creation_policy
+    termination_policy = run_plan.run_spec.profile.termination_policy
+    termination_idle_time = f"{run_plan.run_spec.profile.termination_idle_time}s"
+    if termination_policy == TerminationPolicy.DONT_DESTROY:
+        termination_idle_time = "-"
 
     if req.spot is None:
         spot_policy = "auto"
@@ -48,6 +54,9 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Max duration"), max_duration)
     props.add_row(th("Spot policy"), spot_policy)
     props.add_row(th("Retry policy"), retry_policy)
+    props.add_row(th("Creation policy"), creation_policy)
+    props.add_row(th("Termination policy"), termination_policy)
+    props.add_row(th("Termination idle time"), termination_idle_time)
 
     offers = Table(box=None)
     offers.add_column("#")
