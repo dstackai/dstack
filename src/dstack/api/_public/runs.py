@@ -231,7 +231,7 @@ class Run(ABC):
             while self.status in (
                 RunStatus.SUBMITTED,
                 RunStatus.PENDING,
-                RunStatus.STARTING,
+                RunStatus.PROVISIONING,
             ):
                 time.sleep(5)
                 self.refresh()

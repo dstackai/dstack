@@ -200,7 +200,7 @@ class ServiceSpec(BaseModel):
 class RunStatus(str, Enum):
     PENDING = "pending"
     SUBMITTED = "submitted"
-    STARTING = "starting"
+    PROVISIONING = "provisioning"
     RUNNING = "running"
     TERMINATING = "terminating"
     TERMINATED = "terminated"

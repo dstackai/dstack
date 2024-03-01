@@ -18,7 +18,7 @@ If a job fails and the configuration allows retrying, the server will spawn a ne
 - STEP 1: The user submits the run. `services.runs.submit_run` creates jobs with status `SUBMITTED`. Now the run has status `SUBMITTED`.
 - STEP 2: The server periodically pulls unfinished runs and processes them in `background.tasks.process_runs`.
 	- If any job is `RUNNING`, the run becomes `RUNNING`.
-	- If any job is `PROVISIONING` or `PULLING`, the run becomes `STARTING`.
+	- If any job is `PROVISIONING` or `PULLING`, the run becomes `PROVISIONING`.
 	- If any job fails and cannot be retried, the run becomes `TERMINATING`, and after processing, `FAILED`.
 	- If all jobs are `DONE`, the run becomes `TERMINATING`, and after processing, `DONE`.
 	- If any job fails, can be retried, and there is any other active job, the failed job will be resubmitted in-place. The run status is defined by the rules above.

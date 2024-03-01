@@ -88,7 +88,7 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
 
         if run.status == RunStatus.PENDING:
             await process_pending_run(session, run)
-        elif run.status in {RunStatus.SUBMITTED, RunStatus.STARTING, RunStatus.RUNNING}:
+        elif run.status in {RunStatus.SUBMITTED, RunStatus.PROVISIONING, RunStatus.RUNNING}:
             await process_active_run(session, run)
         elif run.status == RunStatus.TERMINATING:
             await process_terminating_run(session, run)
@@ -133,7 +133,7 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
 
 async def process_active_run(session: AsyncSession, run_model: RunModel):
     """
-    Run is submitted, starting, or running.
+    Run is submitted, provisioning, or running.
     We handle fails, scaling, and status changes.
     """
     run_spec = RunSpec.parse_raw(run_model.run_spec)
@@ -161,8 +161,8 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
                 # the job is running
                 replica_statuses.add(RunStatus.RUNNING)
             elif job.status in {JobStatus.PROVISIONING, JobStatus.PULLING}:
-                # the job is starting
-                replica_statuses.add(RunStatus.STARTING)
+                # the job is provisioning
+                replica_statuses.add(RunStatus.PROVISIONING)
             elif job.status == JobStatus.SUBMITTED:
                 # the job is submitted
                 replica_statuses.add(RunStatus.SUBMITTED)
@@ -206,8 +206,8 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
             raise ValueError(f"Unexpected termination reason {run_termination_reasons}")
     elif RunStatus.RUNNING in run_statuses:
         new_status = RunStatus.RUNNING
-    elif RunStatus.STARTING in run_statuses:
-        new_status = RunStatus.STARTING
+    elif RunStatus.PROVISIONING in run_statuses:
+        new_status = RunStatus.PROVISIONING
     elif RunStatus.SUBMITTED in run_statuses:
         new_status = RunStatus.SUBMITTED
     elif RunStatus.DONE in run_statuses and not replicas_to_retry:

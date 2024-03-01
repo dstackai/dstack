@@ -160,7 +160,7 @@ class RunCommand(APIBaseCommand):
                 while run.status in (
                     RunStatus.SUBMITTED,
                     RunStatus.PENDING,
-                    RunStatus.STARTING,
+                    RunStatus.PROVISIONING,
                 ):
                     status.update(
                         f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]"

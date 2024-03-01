@@ -56,17 +56,17 @@ async def run(session: AsyncSession) -> RunModel:
 
 class TestProcessRuns:
     @pytest.mark.asyncio
-    async def test_submitted_to_starting(self, test_db, session: AsyncSession, run: RunModel):
+    async def test_submitted_to_provisioning(self, test_db, session: AsyncSession, run: RunModel):
         run.status = RunStatus.SUBMITTED
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING)
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == RunStatus.STARTING
+        assert run.status == RunStatus.PROVISIONING
 
     @pytest.mark.asyncio
-    async def test_starting_to_running(self, test_db, session: AsyncSession, run: RunModel):
-        run.status = RunStatus.STARTING
+    async def test_provisioning_to_running(self, test_db, session: AsyncSession, run: RunModel):
+        run.status = RunStatus.PROVISIONING
         await create_job(session=session, run=run, status=JobStatus.RUNNING)
 
         await process_runs.process_single_run(run.id, [])
@@ -74,13 +74,13 @@ class TestProcessRuns:
         assert run.status == RunStatus.RUNNING
 
     @pytest.mark.asyncio
-    async def test_keep_starting(self, test_db, session: AsyncSession, run: RunModel):
-        run.status = RunStatus.STARTING
+    async def test_keep_provisioning(self, test_db, session: AsyncSession, run: RunModel):
+        run.status = RunStatus.PROVISIONING
         await create_job(session=session, run=run, status=JobStatus.PULLING)
 
         await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
-        assert run.status == RunStatus.STARTING
+        assert run.status == RunStatus.PROVISIONING
 
     @pytest.mark.asyncio
     async def test_running_to_done(self, test_db, session: AsyncSession, run: RunModel):
