@@ -91,12 +91,6 @@ class Profile(ForbidExtra):
         Optional[List[BackendType]],
         Field(description='The backends to consider for provisionig (e.g., "[aws, gcp]")'),
     ]
-    regions: Annotated[
-        Optional[List[str]],
-        Field(
-            description='The regions to consider for provisionig (e.g., "[eu-west-1, us-west4, westeurope]")'
-        ),
-    ]
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(

@@ -253,9 +253,6 @@ async def get_offers_by_requirements(
         exclude_not_available=exclude_not_available,
     )
 
-    if profile.regions is not None:
-        offers = [(b, o) for b, o in offers if o.region in profile.regions]
-
     # Hide internal offer.backend by backend that returned the offer.
     # This is relevant for dstack Cloud.
     for backend, offer in offers:
