@@ -180,7 +180,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                 await stop_container(job_model, jpd, instance.project.ssh_private_key)
 
             if instance.status == InstanceStatus.BUSY:
-                instance.status = InstanceStatus.READY
+                instance.status = InstanceStatus.IDLE
             elif instance.status != InstanceStatus.TERMINATED:
                 # instance was CREATING or STARTING (specially for the job)
                 # schedule for termination
