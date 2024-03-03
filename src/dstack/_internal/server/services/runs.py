@@ -89,8 +89,7 @@ BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
     BackendType.DATACRUNCH,
     BackendType.GCP,
     BackendType.LAMBDA,
-    BackendType.TENSORDOCK,
-    BackendType.VASTAI
+    BackendType.TENSORDOCK
 ]
 
 logger = get_logger(__name__)
@@ -244,9 +243,6 @@ async def get_offers_by_requirements(
 
     if profile.backends is not None:
         backends = [b for b in backends if b.TYPE in profile.backends]
-
-    # filter backends with create_instance support
-    backends = [b for b in backends if b.TYPE in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]
 
     offers = await backends_services.get_instance_offers(
         backends=backends,
