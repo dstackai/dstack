@@ -57,6 +57,7 @@ class RunTerminationReason(str, Enum):
     RETRY_LIMIT_EXCEEDED = "retry_limit_exceeded"
     STOPPED_BY_USER = "stopped_by_user"
     ABORTED_BY_USER = "aborted_by_user"
+    SERVER_ERROR = "server_error"
 
 
 class JobTerminationReason(str, Enum):

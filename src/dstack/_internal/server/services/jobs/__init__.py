@@ -4,7 +4,7 @@ from datetime import timezone
 from typing import Dict, List, Optional
 
 import sqlalchemy as sa
-import sqlalchemy.orm
+import sqlalchemy.orm as sa_orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import SSHError
@@ -164,7 +164,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             InstanceModel.project_id == job_model.project_id,
             InstanceModel.job_id == job_model.id,
         )
-        .options(sa.orm.joinedload(InstanceModel.project))
+        .options(sa_orm.joinedload(InstanceModel.project))
     )
     instance: Optional[InstanceModel] = res.scalar()
 
@@ -202,7 +202,11 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
         finally:
             PROCESSING_POOL_IDS.remove(instance.id)
 
-    job_model.status = job_termination_reason_to_status(job_model.termination_reason)
+    if job_model.termination_reason is not None:
+        job_model.status = job_termination_reason_to_status(job_model.termination_reason)
+    else:
+        job_model.status = JobStatus.FAILED
+        logger.warning("%s: job termination reason is not set", fmt(job_model))
     logger.info(
         "%s: job status is %s, reason: %s",
         fmt(job_model),

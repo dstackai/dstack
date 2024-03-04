@@ -57,20 +57,18 @@ async def process_runs():
                     RunModel.id.not_in(PROCESSING_RUNS_IDS),
                 )
             )
-            runs: List[RunModel] = res.scalars().all()
+            runs = res.scalars().all()
             PROCESSING_RUNS_IDS.update(run.id for run in runs)
 
     futures = [process_single_run(run.id, [job.id for job in run.jobs]) for run in runs]
-    for future in asyncio.as_completed(futures):
-        try:
+    try:
+        for future in asyncio.as_completed(futures):
             run_id = await future
             PROCESSING_RUNS_IDS.remove(run_id)  # unlock job processing as soon as possible
-        except Exception as e:
-            logger.error("Unexpected run processing error", exc_info=e)
-
-    PROCESSING_RUNS_IDS.difference_update(
-        run.id for run in runs
-    )  # ensure that all runs are unlocked
+    finally:
+        PROCESSING_RUNS_IDS.difference_update(
+            run.id for run in runs
+        )  # ensure that all runs are unlocked
 
 
 async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uuid.UUID:
@@ -84,7 +82,8 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
     async with get_session_ctx() as session:
         run = await session.get(RunModel, run_id)
         if run is None:
-            raise ValueError(f"Run {run_id} not found")
+            logger.error(f"Run {run_id} not found")
+            return run_id
 
         if run.status == RunStatus.PENDING:
             await process_pending_run(session, run)
@@ -93,7 +92,9 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
         elif run.status == RunStatus.TERMINATING:
             await process_terminating_run(session, run)
         else:
-            raise ValueError(f"Unexpected run status {run.status}")
+            logger.error("%s: unexpected status %s", fmt(run), run.status.name)
+            run.status = RunStatus.TERMINATING
+            run.termination_reason = RunTerminationReason.SERVER_ERROR
 
         run.last_processed_at = get_current_datetime()
         await session.commit()

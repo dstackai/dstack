@@ -34,6 +34,7 @@ def upgrade() -> None:
                     "RETRY_LIMIT_EXCEEDED",
                     "STOPPED_BY_USER",
                     "ABORTED_BY_USER",
+                    "SERVER_ERROR",
                     name="runterminationreason",
                 ),
                 nullable=True,

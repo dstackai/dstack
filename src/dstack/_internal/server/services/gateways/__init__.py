@@ -325,7 +325,7 @@ async def register_service(session: AsyncSession, run_model: RunModel):
 
 
 async def register_replica(
-    gateway: GatewayModel, run: Run, job_provisioning_data: JobProvisioningData
+    gateway: Optional[GatewayModel], run: Run, job_provisioning_data: JobProvisioningData
 ):
     if gateway is None:
         raise GatewayError("Gateway is not found")
