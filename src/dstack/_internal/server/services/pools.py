@@ -3,7 +3,6 @@ from datetime import timezone
 from typing import Dict, List, Optional
 
 import gpuhunt
-from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -359,7 +358,8 @@ def filter_pool_instances(
     )
     query_filter = requirements_to_query_filter(requirements)
     for instance in candidates:
-        catalog_item = offer_to_catalog_item(parse_raw_as(InstanceOffer, instance.offer))
+        offer = InstanceOffer.__response__.parse_raw(instance.offer)
+        catalog_item = offer_to_catalog_item(offer)
         if gpuhunt.matches(catalog_item, query_filter):
             instances.append(instance)
     return instances

@@ -1,13 +1,14 @@
 import datetime
 from typing import Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 
 
-class Gateway(BaseModel):
+class Gateway(CoreModel):
     name: str
     ip_address: Optional[str]
     instance_id: Optional[str]
@@ -18,7 +19,7 @@ class Gateway(BaseModel):
     backend: BackendType
 
 
-class BaseChatModel(BaseModel):
+class BaseChatModel(CoreModel):
     type: Annotated[Literal["chat"], Field(description="The type of the model")]
     name: Annotated[str, Field(description="The name of the model")]
     format: Annotated[str, Field(description="The serving format")]

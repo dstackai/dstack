@@ -1,22 +1,21 @@
 from typing import List
 
-from pydantic import BaseModel
-
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.users import ProjectRole
 
 
-class CreateProjectRequest(BaseModel):
+class CreateProjectRequest(CoreModel):
     project_name: str
 
 
-class DeleteProjectsRequest(BaseModel):
+class DeleteProjectsRequest(CoreModel):
     projects_names: List[str]
 
 
-class MemberSetting(BaseModel):
+class MemberSetting(CoreModel):
     username: str
     project_role: ProjectRole
 
 
-class SetProjectMembersRequest(BaseModel):
+class SetProjectMembersRequest(CoreModel):
     members: List[MemberSetting]

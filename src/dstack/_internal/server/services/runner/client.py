@@ -34,7 +34,7 @@ class RunnerClient:
         try:
             resp = requests.get(self._url("/api/healthcheck"))
             resp.raise_for_status()
-            return HealthcheckResponse.parse_obj(resp.json())
+            return HealthcheckResponse.__response__.parse_obj(resp.json())
         except requests.exceptions.RequestException:
             return None
 
@@ -72,7 +72,7 @@ class RunnerClient:
             self._url("/api/pull"), params={"timestamp": timestamp}, timeout=timeout
         )
         resp.raise_for_status()
-        return PullResponse.parse_obj(resp.json())
+        return PullResponse.__response__.parse_obj(resp.json())
 
     def stop(self):
         resp = requests.post(self._url("/api/stop"))
@@ -96,7 +96,7 @@ class ShimClient:
         try:
             resp = requests.get(self._url("/api/healthcheck"))
             resp.raise_for_status()
-            return HealthcheckResponse.parse_obj(resp.json())
+            return HealthcheckResponse.__response__.parse_obj(resp.json())
         except requests.exceptions.RequestException:
             if unmask_exeptions:
                 raise

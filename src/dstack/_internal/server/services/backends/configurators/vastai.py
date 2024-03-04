@@ -49,15 +49,17 @@ class VastAIConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=VastAIStoredConfig(**VastAIConfigInfo.parse_obj(config).dict()).json(),
+            config=VastAIStoredConfig(
+                **VastAIConfigInfo.__response__.parse_obj(config).dict()
+            ).json(),
             auth=VastAICreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyVastAIConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return VastAIConfigInfoWithCreds.parse_obj(config)
-        return VastAIConfigInfo.parse_obj(config)
+            return VastAIConfigInfoWithCreds.__response__.parse_obj(config)
+        return VastAIConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> VastAIBackend:
         config = self._get_backend_config(model)

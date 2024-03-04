@@ -4,7 +4,7 @@ from pydantic import Field, root_validator, validator
 from pydantic.generics import GenericModel
 from typing_extensions import Annotated
 
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 
 T = TypeVar("T", bound=Union[int, float])
 
@@ -104,7 +104,7 @@ DEFAULT_MEMORY_SIZE = Range[Memory](min=Memory.parse("8GB"))
 DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
 
 
-class GPUSpec(ForbidExtra):
+class GPUSpec(CoreModel):
     """
     The GPU spec
 
@@ -161,7 +161,7 @@ class GPUSpec(ForbidExtra):
         return v
 
 
-class DiskSpec(ForbidExtra):
+class DiskSpec(CoreModel):
     """
     The disk spec
 
@@ -183,7 +183,7 @@ class DiskSpec(ForbidExtra):
         return v
 
 
-class ResourcesSpec(ForbidExtra):
+class ResourcesSpec(CoreModel):
     """
     The minimum resources requirements for the run.
 
@@ -219,7 +219,7 @@ DiskLike = Union[DiskSpec, "DiskSpecSchema", float, int, str]
 ComputeCapabilityLike = Union[ComputeCapability, float, str]
 
 
-class GPUSpecSchema(ForbidExtra):
+class GPUSpecSchema(CoreModel):
     name: Annotated[
         Optional[Union[List[str], str]], Field(description="The GPU name or list of names")
     ] = None
@@ -238,11 +238,11 @@ class GPUSpecSchema(ForbidExtra):
     ] = None
 
 
-class DiskSpecSchema(ForbidExtra):
+class DiskSpecSchema(CoreModel):
     size: Annotated[MemoryRangeLike, Field(description="The disk size (e.g., 100GB)")]
 
 
-class ResourcesSpecSchema(ForbidExtra):
+class ResourcesSpecSchema(CoreModel):
     cpu: Annotated[
         Optional[IntRangeLike], Field(description="The number of CPU cores")
     ] = DEFAULT_CPU_COUNT

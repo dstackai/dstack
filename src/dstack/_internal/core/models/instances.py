@@ -1,24 +1,25 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.server.services.docker import DockerImage
 from dstack._internal.utils.common import pretty_resources
 
 
-class Gpu(BaseModel):
+class Gpu(CoreModel):
     name: str
     memory_mib: int
 
 
-class Disk(BaseModel):
+class Disk(CoreModel):
     size_mib: int
 
 
-class Resources(BaseModel):
+class Resources(CoreModel):
     cpus: int
     memory_mib: int
     gpus: List[Gpu]
@@ -42,28 +43,28 @@ class Resources(BaseModel):
         return pretty_resources(**resources)
 
 
-class InstanceType(BaseModel):
+class InstanceType(CoreModel):
     name: str
     resources: Resources
 
 
-class SSHConnectionParams(BaseModel):
+class SSHConnectionParams(CoreModel):
     hostname: str
     username: str
     port: int
 
 
-class SSHKey(BaseModel):
+class SSHKey(CoreModel):
     public: str
     private: Optional[str] = None
 
 
-class DockerConfig(BaseModel):
+class DockerConfig(CoreModel):
     registry_auth: Optional[RegistryAuth]
     image: Optional[DockerImage]
 
 
-class InstanceConfiguration(BaseModel):
+class InstanceConfiguration(CoreModel):
     project_name: str
     instance_name: str  # unique in pool
     ssh_keys: List[SSHKey]
@@ -74,7 +75,7 @@ class InstanceConfiguration(BaseModel):
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]
 
 
-class LaunchedInstanceInfo(BaseModel):
+class LaunchedInstanceInfo(CoreModel):
     instance_id: str
     region: str
     ip_address: str
@@ -108,7 +109,7 @@ class InstanceAvailability(Enum):
         }
 
 
-class InstanceOffer(BaseModel):
+class InstanceOffer(CoreModel):
     backend: BackendType
     instance: InstanceType
     region: str
@@ -120,7 +121,7 @@ class InstanceOfferWithAvailability(InstanceOffer):
     instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
 
 
-class LaunchedGatewayInfo(BaseModel):
+class LaunchedGatewayInfo(CoreModel):
     instance_id: str
     ip_address: str
     region: str

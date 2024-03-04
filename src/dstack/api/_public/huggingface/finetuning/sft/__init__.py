@@ -150,7 +150,7 @@ class FineTuningTask(TaskConfiguration):
             commands.append("tensorboard --logdir results/runs &")
             ports.append("6006")
         commands.append(python_command)
-        super().__init__(commands=commands, ports=ports, env=env)
+        # super().__init__(commands=commands, ports=ports, env=env)
 
     @staticmethod
     def _get_arg(name, value: Any, default: Any) -> str:

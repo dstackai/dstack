@@ -1,6 +1,5 @@
-from pydantic import BaseModel, Extra
+from pydantic_duality import DualBaseModel
 
 
-class ForbidExtra(BaseModel):
-    class Config:
-        extra = Extra.forbid
+class CoreModel(DualBaseModel):
+    pass

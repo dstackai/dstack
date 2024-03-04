@@ -51,7 +51,7 @@ class CompletionService(ServiceConfiguration):
         dtype: Optional[str] = None,
     ):
         commands, image, port, env = get_configuration(model_name, env, quantize, dtype)
-        super().__init__(commands=commands, image=image, port=port, env=env)
+        # super().__init__(commands=commands, image=image, port=port, env=env)
 
 
 class CompletionTask(TaskConfiguration):
@@ -76,9 +76,9 @@ class CompletionTask(TaskConfiguration):
         local_port: int = 80,
     ):
         commands, image, port, env = get_configuration(model_name, env, quantize, dtype)
-        super().__init__(
-            commands=commands,
-            image=image,
-            ports=[f"{local_port}:{port}"],
-            env=env,
-        )
+        # super().__init__(
+        #     commands=commands,
+        #     image=image,
+        #     ports=[f"{local_port}:{port}"],
+        #     env=env,
+        # )

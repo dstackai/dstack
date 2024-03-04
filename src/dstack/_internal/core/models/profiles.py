@@ -6,7 +6,7 @@ from pydantic import Field, confloat, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 
 DEFAULT_RETRY_LIMIT = 3600
 DEFAULT_POOL_NAME = "default-pool"
@@ -61,7 +61,7 @@ def parse_max_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]
     return parse_duration(v)
 
 
-class ProfileRetryPolicy(ForbidExtra):
+class ProfileRetryPolicy(CoreModel):
     retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
     limit: Annotated[
         Optional[Union[int, str]],
@@ -80,7 +80,7 @@ class ProfileRetryPolicy(ForbidExtra):
         return field_values
 
 
-class Profile(ForbidExtra):
+class Profile(CoreModel):
     name: Annotated[
         str,
         Field(
@@ -136,7 +136,7 @@ class Profile(ForbidExtra):
     )(parse_duration)
 
 
-class ProfilesConfig(ForbidExtra):
+class ProfilesConfig(CoreModel):
     profiles: List[Profile]
 
     class Config:

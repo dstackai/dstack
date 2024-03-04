@@ -46,15 +46,15 @@ class KubernetesConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=KubernetesStoredConfig.parse_obj(config).json(),
+            config=KubernetesStoredConfig.__response__.parse_obj(config).json(),
             auth="",
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyKubernetesConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return KubernetesConfigInfoWithCreds.parse_obj(config)
-        return KubernetesConfigInfo.parse_obj(config)
+            return KubernetesConfigInfoWithCreds.__response__.parse_obj(config)
+        return KubernetesConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> KubernetesBackend:
         return KubernetesBackend(self._get_backend_config(model))

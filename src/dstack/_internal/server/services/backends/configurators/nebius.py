@@ -55,15 +55,15 @@ class NebiusConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=NebiusStoredConfig.parse_obj(config).json(),
+            config=NebiusStoredConfig.__response__.parse_obj(config).json(),
             auth=NebiusCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> NebiusConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return NebiusConfigInfoWithCreds.parse_obj(config)
-        return NebiusConfigInfo.parse_obj(config)
+            return NebiusConfigInfoWithCreds.__response__.parse_obj(config)
+        return NebiusConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> Backend:
         config = self._get_backend_config(model)

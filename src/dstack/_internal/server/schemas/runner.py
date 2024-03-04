@@ -1,19 +1,20 @@
 from base64 import b64decode
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, validator
+from pydantic import Field, validator
 from typing_extensions import Annotated
 
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.runs import JobSpec, JobStatus, RunSpec
 
 
-class JobStateEvent(BaseModel):
+class JobStateEvent(CoreModel):
     timestamp: int
     state: JobStatus
 
 
-class LogEvent(BaseModel):
+class LogEvent(CoreModel):
     timestamp: int  # nanoseconds
     message: bytes
 
@@ -24,14 +25,14 @@ class LogEvent(BaseModel):
         return v
 
 
-class PullResponse(BaseModel):
+class PullResponse(CoreModel):
     job_states: List[JobStateEvent]
     job_logs: List[LogEvent]
     runner_logs: List[LogEvent]
     last_updated: int
 
 
-class SubmitBody(BaseModel):
+class SubmitBody(CoreModel):
     run_spec: Annotated[
         RunSpec,
         Field(
@@ -61,16 +62,16 @@ class SubmitBody(BaseModel):
     repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)]
 
 
-class HealthcheckResponse(BaseModel):
+class HealthcheckResponse(CoreModel):
     service: str
     version: str
 
 
-class DockerImageBody(BaseModel):
+class DockerImageBody(CoreModel):
     username: str
     password: str
     image_name: str
 
 
-class StopBody(BaseModel):
+class StopBody(CoreModel):
     force: bool = False
