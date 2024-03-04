@@ -104,6 +104,10 @@ BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
 
 logger = get_logger(__name__)
 
+# Run processing task must acquire the lock and add the run id to the set.
+# Run processing has higher priority than job processing.
+# It means that job processing tasks should not take the job if `job.run_id` is in the set.
+# But run processing tasks should wait until job processing tasks release PROCESSING_JOBS locks.
 PROCESSING_RUNS_LOCK = asyncio.Lock()
 PROCESSING_RUNS_IDS: Set[uuid.UUID] = set()
 

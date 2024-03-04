@@ -70,3 +70,20 @@ Services' jobs lifecycle has some modifications:
 
 ## Stop a Run
 To stop a run, `services.runs.stop_runs` assigns `TERMINATING` status to the run and executes one iteration of the processing without waiting for the background task.
+
+## Concurrency
+Since SQLite lacks per-row locking, we use an in-memory locking mechanism to avoid race conditions.
+
+Every lock consists of a lock primitive (`asyncio.Lock`) and a set of locked IDs (`Set[uuid.UUID]`). It follows the rules below:
+- Only the `asyncio.Lock` holder can add an ID to the set.
+- The processing task must remove the corresponding ID from the set; acquiring `asyncio.Lock` is not required.
+
+Runs and jobs are processed by concurrent background tasks. There are locks for runs and jobs:
+- `PROCESSING_RUNS_(LOCK|IDS)`
+- `SUBMITTED_PROCESSING_JOBS_(LOCK|IDS)`
+- `RUNNING_PROCESSING_JOBS_(LOCK|IDS)`
+- `TERMINATING_PROCESSING_JOBS_(LOCK|IDS)`
+
+Run processing takes priority over job processing; that's why:
+- Once `run.id` is in `PROCESSING_RUNS_IDS`, any job processing task should not take any job with `job.run_id` in `PROCESSING_RUNS_IDS`.
+- Any run processing task should wait until job processing tasks release all run's job IDs from `*_PROCESSING_JOBS_IDS` sets.
