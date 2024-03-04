@@ -2,6 +2,7 @@ import argparse
 import os
 
 from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
     ProfileRetryPolicy,
@@ -146,8 +147,12 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: boo
 
     if args.pool_name:
         profile.pool_name = args.pool_name
+
     if args.idle_duration is not None:
         profile.termination_idle_time = args.idle_duration
+    if pool_add and args.idle_duration is None:
+        profile.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
+
     if args.dont_destroy:
         profile.termination_policy = TerminationPolicy.DONT_DESTROY
     if not pool_add:
