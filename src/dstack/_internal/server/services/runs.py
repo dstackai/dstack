@@ -89,7 +89,7 @@ BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
     BackendType.DATACRUNCH,
     BackendType.GCP,
     BackendType.LAMBDA,
-    BackendType.TENSORDOCK
+    BackendType.TENSORDOCK,
 ]
 
 logger = get_logger(__name__)
