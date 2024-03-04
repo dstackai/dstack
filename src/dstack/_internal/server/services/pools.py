@@ -27,7 +27,7 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, SpotPolicy
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.server import settings
@@ -323,7 +323,7 @@ async def add_remote(
 def filter_pool_instances(
     pool_instances: List[InstanceModel],
     profile: Profile,
-    resources: ResourcesSpec,
+    requirements: Requirements,
     *,
     status: Optional[InstanceStatus] = None,
 ) -> List[InstanceModel]:
@@ -347,16 +347,6 @@ def filter_pool_instances(
             continue
         candidates.append(instance)
 
-    requirements = Requirements(
-        resources=resources,
-        max_price=profile.max_price,
-        spot={
-            None: None,
-            SpotPolicy.AUTO: None,
-            SpotPolicy.SPOT: True,
-            SpotPolicy.ONDEMAND: False,
-        }[profile.spot_policy],
-    )
     query_filter = requirements_to_query_filter(requirements)
     for instance in candidates:
         catalog_item = offer_to_catalog_item(parse_raw_as(InstanceOffer, instance.offer))

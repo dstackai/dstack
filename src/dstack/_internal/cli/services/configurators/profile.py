@@ -158,6 +158,8 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: boo
 
     if args.spot_policy is not None:
         profile.spot_policy = args.spot_policy
+    if pool_add and args.spot_policy is None:  # ONDEMAND by default for `dstack pool add`
+        profile.spot_policy = SpotPolicy.ONDEMAND
 
     if not pool_add:
         if args.retry_policy is not None:
