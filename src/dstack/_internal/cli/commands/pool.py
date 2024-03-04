@@ -21,7 +21,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool
-from dstack._internal.core.models.profiles import Profile, SpotPolicy
+from dstack._internal.core.models.profiles import Profile, SpotPolicy, parse_duration
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
 from dstack._internal.core.models.runs import InstanceStatus, Requirements, get_policy_map
 from dstack._internal.utils.common import pretty_date
@@ -368,6 +368,9 @@ def print_offers_table(
 ) -> None:
     pretty_req = requirements.pretty_format(resources_only=True)
     max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
+    creation_policy = profile.creation_policy
+    termination_policy = profile.termination_policy
+    termination_idle_time = f"{parse_duration(profile.termination_idle_time)}s"
 
     if requirements.spot is None:
         spot_policy = "auto"
@@ -387,6 +390,9 @@ def print_offers_table(
     props.add_row(th("Min resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Spot policy"), spot_policy)
+    props.add_row(th("Creation policy"), creation_policy)
+    props.add_row(th("Termination policy"), termination_policy)
+    props.add_row(th("Termination idle time"), termination_idle_time)
 
     offers_table = Table(box=None)
     offers_table.add_column("#")
