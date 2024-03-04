@@ -21,13 +21,9 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool
-from dstack._internal.core.models.profiles import (
-    Profile,
-    SpotPolicy,
-    parse_duration,
-)
+from dstack._internal.core.models.profiles import Profile, SpotPolicy, parse_duration
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
-from dstack._internal.core.models.runs import InstanceStatus, Requirements
+from dstack._internal.core.models.runs import InstanceStatus, Requirements, get_policy_map
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
 from dstack.api._public.resources import Resources
@@ -254,11 +250,8 @@ class PoolCommand(APIBaseCommand):
             # TODO(egor-s): print on success
             return
 
-        spot = None
-        if profile.spot_policy == SpotPolicy.SPOT:
-            spot = True
-        if profile.spot_policy == SpotPolicy.ONDEMAND:
-            spot = False
+        spot = get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND)
+
         requirements = Requirements(
             resources=resources,
             max_price=profile.max_price,
