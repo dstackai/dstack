@@ -12,7 +12,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     SSHConnectionParams,
 )
-from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.profiles import Profile, SpotPolicy
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils import common as common_utils
@@ -275,3 +275,18 @@ class InstanceStatus(str, Enum):
             self.IDLE,
             self.BUSY,
         )
+
+
+def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Optional[bool]:
+    """Map profile.spot_policy[SpotPolicy|None] to requirements.spot[bool|None]
+    - SpotPolicy.AUTO by default for `dstack run`
+    - SpotPolicy.ONDEMAND by default for `dstack pool add`
+    """
+    if spot_policy is None:
+        spot_policy = default
+    policy_map = {
+        SpotPolicy.AUTO: None,
+        SpotPolicy.SPOT: True,
+        SpotPolicy.ONDEMAND: False,
+    }
+    return policy_map[spot_policy]

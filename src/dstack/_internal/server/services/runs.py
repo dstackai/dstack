@@ -34,6 +34,7 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
+    SpotPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
@@ -52,6 +53,7 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
     ServiceSpec,
+    get_policy_map,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
@@ -202,10 +204,16 @@ async def get_run_plan(
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
     )
+
+    requirements = Requirements(
+        resources=run_spec.configuration.resources,
+        max_price=profile.max_price,
+        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.AUTO),
+    )
     pool_filtered_instances = filter_pool_instances(
         pool_instances=get_pool_instances(pool),
         profile=profile,
-        resources=run_spec.configuration.resources,
+        requirements=requirements,
     )
     pool_offers: List[InstanceOfferWithAvailability] = []
     for instance in pool_filtered_instances:

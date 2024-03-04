@@ -13,6 +13,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
+    SpotPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
@@ -21,8 +22,10 @@ from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobStatus,
     JobTerminationReason,
+    Requirements,
     Run,
     RunSpec,
+    get_policy_map,
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
@@ -105,10 +108,16 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
     async with PROCESSING_POOL_LOCK:
         pool_instances = get_pool_instances(pool)
+
+        requirements = Requirements(
+            resources=run_spec.configuration.resources,
+            max_price=profile.max_price,
+            spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
+        )
         relevant_instances = filter_pool_instances(
             pool_instances=pool_instances,
             profile=profile,
-            resources=run_spec.configuration.resources,
+            requirements=requirements,
             status=InstanceStatus.IDLE,
         )
         if len(relevant_instances) > 0:
