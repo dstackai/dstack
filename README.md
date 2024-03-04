@@ -81,22 +81,38 @@ Below is a live demo of how it works with the CLI.
 
 ### Dev environments
 
-Dev environments allow you to quickly provision a machine with a pre-configured environment, resources, IDE, code, etc.
+You specify the required environment and resources, then run it. dstack provisions the dev
+environment in the cloud and enables access via your desktop IDE.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif" width="650"/>
 
 ### Tasks
 
-Tasks are perfect for scheduling all kinds of jobs (e.g., training, fine-tuning, processing data, batch inference, etc.)
-as well as running web applications.
+Tasks allow for convenient scheduling of any kind of batch jobs, such as training, fine-tuning,
+or data processing, as well as running web applications.
+
+Specify the environment and resources, then run it. dstack executes the task in the
+cloud, enabling port forwarding to your local machine for convenient access.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="650"/>
 
 ### Services
 
-Services make it very easy to deploy any model or web application as a public endpoint.
+Services make it very easy to deploy any kind of model or web application as public endpoints.
+
+Use any serving frameworks and specify required resources. dstack deploys it in the configured
+backend, handles authentication, and provides an OpenAI-compatible interface if needed.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="650"/>
+
+### Pools
+
+Pools simplify managing the lifecycle of cloud instances and enable their efficient reuse across runs.
+
+You can have instances provisioned in the cloud automatically, or add them manually, configuring the required resources,
+idle duration, etc.
+
+<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-pool.gif" width="650"/>
 
 ## Examples
 

@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source engine that streamlines the development, training, and deployment of AI models across any cloud provider.
+  dstack is an open-source engine that automates infrastructure provisioning on any cloud — for development, training, and deployment of AI models.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack

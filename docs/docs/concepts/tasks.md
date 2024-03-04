@@ -1,7 +1,10 @@
 # Tasks
 
-Tasks are perfect for scheduling all kinds of jobs (e.g., training, fine-tuning, processing data, batch inference, etc.)
-as well as running web applications.
+Tasks allow for convenient scheduling of any kind of batch jobs, such as training, fine-tuning, or data processing, as
+well as running web applications.
+
+Specify the environment and resources, then run it. `dstack` executes the task in the configured backend, enabling port
+forwarding to your local machine for convenient access.
 
 [//]: # (TODO: Support multi-node)
 
