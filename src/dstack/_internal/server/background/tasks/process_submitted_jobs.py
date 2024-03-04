@@ -19,9 +19,9 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
-    JobErrorCode,
     JobProvisioningData,
     JobStatus,
+    JobTerminationReason,
     Requirements,
     Run,
     RunSpec,
@@ -34,13 +34,18 @@ from dstack._internal.server.services.jobs import (
     SUBMITTED_PROCESSING_JOBS_IDS,
     SUBMITTED_PROCESSING_JOBS_LOCK,
 )
-from dstack._internal.server.services.logging import job_log
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
     get_or_create_pool_by_name,
     get_pool_instances,
 )
-from dstack._internal.server.services.runs import get_offers_by_requirements, run_model_to_run
+from dstack._internal.server.services.runs import (
+    PROCESSING_RUNS_IDS,
+    PROCESSING_RUNS_LOCK,
+    get_offers_by_requirements,
+    run_model_to_run,
+)
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
@@ -50,12 +55,13 @@ logger = get_logger(__name__)
 
 async def process_submitted_jobs():
     async with get_session_ctx() as session:
-        async with SUBMITTED_PROCESSING_JOBS_LOCK:
+        async with PROCESSING_RUNS_LOCK, SUBMITTED_PROCESSING_JOBS_LOCK:
             res = await session.execute(
                 select(JobModel)
                 .where(
                     JobModel.status == JobStatus.SUBMITTED,
                     JobModel.id.not_in(SUBMITTED_PROCESSING_JOBS_IDS),
+                    JobModel.run_id.not_in(PROCESSING_RUNS_IDS),
                 )
                 .limit(1)  # TODO process multiple at once
             )
@@ -82,7 +88,7 @@ async def _process_job(job_id: UUID):
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
-    logger.debug(*job_log("provisioning", job_model))
+    logger.debug("%s: provisioning has started", fmt(job_model))
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
@@ -120,7 +126,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             instance.status = InstanceStatus.BUSY
             instance.job = job_model
 
-            logger.info(*job_log("now is provisioning", job_model))
+            logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
             job_model.job_provisioning_data = instance.job_provisioning_data
             job_model.status = JobStatus.PROVISIONING
             job_model.last_processed_at = common_utils.get_current_datetime()
@@ -131,13 +137,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     job = run.jobs[job_model.job_num]
 
     if profile.creation_policy == CreationPolicy.REUSE:
-        logger.debug(*job_log("reuse instance failed", job_model))
-        if job.is_retry_active():
-            logger.debug(*job_log("now is pending because retry is active", job_model))
-            job_model.status = JobStatus.PENDING
-        else:
-            job_model.status = JobStatus.FAILED
-            job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        logger.debug("%s: reuse instance failed", fmt(job_model))
+        job_model.status = JobStatus.TERMINATING
+        job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
         return
@@ -154,15 +156,11 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
 
     if run_job_result is None:
-        logger.debug(*job_log("provisioning failed", job_model))
-        if job.is_retry_active():
-            logger.debug(*job_log("now is pending because retry is active", job_model))
-            job_model.status = JobStatus.PENDING
-        else:
-            job_model.status = JobStatus.FAILED
-            job_model.error_code = JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        logger.debug("%s: provisioning failed", fmt(job_model))
+        job_model.status = JobStatus.TERMINATING
+        job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
     else:
-        logger.info(*job_log("now is provisioning", job_model))
+        logger.info("%s: now is provisioning a new instance", fmt(job_model))
 
         job_provisioning_data, offer = run_job_result
         job_model.job_provisioning_data = job_provisioning_data.json()
@@ -215,14 +213,12 @@ async def _run_job(
     # in case all offers fail.
     for backend, offer in offers[:15]:
         logger.debug(
-            *job_log(
-                "trying %s in %s/%s for $%0.4f per hour",
-                job_model,
-                offer.instance.name,
-                offer.backend.value,
-                offer.region,
-                offer.price,
-            )
+            "%s: trying %s in %s/%s for $%0.4f per hour",
+            fmt(job_model),
+            offer.instance.name,
+            offer.backend.value,
+            offer.region,
+            offer.price,
         )
         try:
             launched_instance_info: LaunchedInstanceInfo = await run_async(
@@ -235,25 +231,21 @@ async def _run_job(
             )
         except BackendError as e:
             logger.warning(
-                *job_log(
-                    "%s launch in %s/%s failed: %s",
-                    job_model,
-                    offer.instance.name,
-                    offer.backend.value,
-                    offer.region,
-                    repr(e),
-                )
+                "%s: %s launch in %s/%s failed: %s",
+                fmt(job_model),
+                offer.instance.name,
+                offer.backend.value,
+                offer.region,
+                repr(e),
             )
             continue
         except Exception:
             logger.exception(
-                *job_log(
-                    "got exception when launching %s in %s/%s",
-                    job_model,
-                    offer.instance.name,
-                    offer.backend.value,
-                    offer.region,
-                )
+                "%s: got exception when launching %s in %s/%s",
+                fmt(job_model),
+                offer.instance.name,
+                offer.backend.value,
+                offer.region,
             )
             continue
         else:

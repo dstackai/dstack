@@ -291,7 +291,7 @@ class TestShowPool:
                     "status": "ready",
                     "created": "2023-01-02T03:04:00+00:00",
                     "region": "en",
-                    "price": 0.1,
+                    "price": 1,
                 }
             ],
         }
@@ -428,7 +428,7 @@ class TestRemoveInstance:
                     "status": "terminating",
                     "created": "2023-01-02T03:04:00+00:00",
                     "region": "en",
-                    "price": 0.1,
+                    "price": 1,
                 }
             ],
         }

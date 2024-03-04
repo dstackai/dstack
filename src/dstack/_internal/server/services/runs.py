@@ -4,7 +4,7 @@ import math
 import re
 import uuid
 from datetime import timezone
-from typing import List, Optional, Tuple, cast
+from typing import List, Optional, Set, Tuple, cast
 
 import pydantic
 from sqlalchemy import select, update
@@ -45,12 +45,14 @@ from dstack._internal.core.models.runs import (
     JobSpec,
     JobStatus,
     JobSubmission,
+    JobTerminationReason,
     Requirements,
     Run,
     RunPlan,
     RunSpec,
-    ServiceInfo,
-    ServiceModelInfo,
+    RunStatus,
+    RunTerminationReason,
+    ServiceSpec,
     get_policy_map,
 )
 from dstack._internal.core.models.users import GlobalRole
@@ -66,14 +68,22 @@ from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services.docker import parse_image_name
 from dstack._internal.server.services.jobs import (
+    RUNNING_PROCESSING_JOBS_IDS,
+    RUNNING_PROCESSING_JOBS_LOCK,
+    SUBMITTED_PROCESSING_JOBS_IDS,
+    SUBMITTED_PROCESSING_JOBS_LOCK,
+    TERMINATING_PROCESSING_JOBS_IDS,
+    TERMINATING_PROCESSING_JOBS_LOCK,
     get_jobs_from_run_spec,
     job_model_to_job_submission,
-    stop_job,
+    process_terminating_job,
+    stop_runner,
 )
 from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
     get_or_create_pool_by_name,
@@ -81,7 +91,7 @@ from dstack._internal.server.services.pools import (
     instance_model_to_instance,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.server.utils.common import run_async, wait_to_lock, wait_unlock
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
 
@@ -95,6 +105,13 @@ BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
 ]
 
 logger = get_logger(__name__)
+
+# Run processing task must acquire the lock and add the run id to the set.
+# Run processing has higher priority than job processing.
+# It means that job processing tasks should not take the job if `job.run_id` is in the set.
+# But run processing tasks should wait until job processing tasks release PROCESSING_JOBS locks.
+PROCESSING_RUNS_LOCK = asyncio.Lock()
+PROCESSING_RUNS_IDS: Set[uuid.UUID] = set()
 
 
 async def list_user_runs(
@@ -295,22 +312,25 @@ async def submit_run(
 
     pool = await get_or_create_pool_by_name(session, project, run_spec.profile.pool_name)
 
+    submitted_at = common_utils.get_current_datetime()
     run_model = RunModel(
         id=uuid.uuid4(),
         project_id=project.id,
+        project=project,
         repo_id=repo.id,
-        user=user,
+        user_id=user.id,
         run_name=run_spec.run_name,
-        submitted_at=common_utils.get_current_datetime(),
-        status=JobStatus.SUBMITTED,
+        submitted_at=submitted_at,
+        status=RunStatus.SUBMITTED,
         run_spec=run_spec.json(),
+        last_processed_at=submitted_at,
     )
     session.add(run_model)
 
-    jobs = get_jobs_from_run_spec(run_spec)
     if run_spec.configuration.type == "service":
-        await gateways.register_service_jobs(session, project, run_spec.run_name, jobs)
+        await gateways.register_service(session, run_model)
 
+    jobs = get_jobs_from_run_spec(run_spec)
     for job in jobs:
         job.job_spec.pool_name = pool.name
         job_model = create_job_model_for_new_submission(
@@ -339,11 +359,12 @@ def create_job_model_for_new_submission(
         run_name=run_model.run_name,
         job_num=job.job_spec.job_num,
         job_name=job.job_spec.job_name,
+        replica_num=0,  # TODO(egor-s): replace with actual replica number
         submission_num=len(job.job_submissions),
         submitted_at=now,
         last_processed_at=now,
         status=status,
-        error_code=None,
+        termination_reason=None,
         job_spec_data=job.job_spec.json(),
         job_provisioning_data=None,
     )
@@ -355,27 +376,44 @@ async def stop_runs(
     runs_names: List[str],
     abort: bool,
 ):
-    new_status = JobStatus.TERMINATED
-    if abort:
-        new_status = JobStatus.ABORTED
-
+    """
+    If abort is False, jobs receive a signal to stop and run status will be changed as a reaction to jobs status change.
+    If abort is True, run is marked as TERMINATED and process_runs will stop the jobs.
+    """
     res = await session.execute(
-        select(JobModel)
-        .where(
-            JobModel.project_id == project.id,
-            JobModel.run_name.in_(runs_names),
-            JobModel.status.not_in(JobStatus.finished_statuses()),
+        select(RunModel).where(
+            RunModel.project_id == project.id,
+            RunModel.run_name.in_(runs_names),
+            RunModel.status.not_in(RunStatus.finished_statuses()),
         )
-        .options(joinedload(JobModel.instance))
     )
-    job_models = res.scalars().all()
-    for job_model in job_models:
-        await stop_job(
-            session=session,
-            project=project,
-            job_model=job_model,
-            new_status=new_status,
-        )
+    runs = res.scalars().all()
+    # TODO(egor-s): consider raising an exception if no runs found
+    await asyncio.gather(*(stop_run(session, run, abort) for run in runs))
+
+
+async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
+    await wait_to_lock(PROCESSING_RUNS_LOCK, PROCESSING_RUNS_IDS, run.id)
+
+    try:
+        await session.refresh(run)
+        if run.status.is_finished():
+            return
+
+        run.status = RunStatus.TERMINATING
+        if abort:
+            run.termination_reason = RunTerminationReason.ABORTED_BY_USER
+        else:
+            run.termination_reason = RunTerminationReason.STOPPED_BY_USER
+        await session.commit()  # run will be refreshed later
+        # process the run out of turn
+        logger.debug("%s: terminating because %s", fmt(run), run.termination_reason.name)
+        await process_terminating_run(session, run)
+
+        run.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
+    finally:
+        PROCESSING_RUNS_IDS.remove(run.id)
 
 
 async def delete_runs(
@@ -389,11 +427,10 @@ async def delete_runs(
         )
     )
     run_models = res.scalars().all()
-    runs = [run_model_to_run(r) for r in run_models]
-    active_runs = [r for r in runs if not r.status.is_finished()]
+    active_runs = [r for r in run_models if not r.status.is_finished()]
     if len(active_runs) > 0:
         raise ServerClientError(
-            msg=f"Cannot delete active runs: {[r.run_spec.run_name for r in active_runs]}"
+            msg=f"Cannot delete active runs: {[r.run_name for r in active_runs]}"
         )
     await session.execute(
         update(RunModel)
@@ -548,6 +585,7 @@ async def create_instance(
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:
     jobs: List[Job] = []
     # JobSpec from JobConfigurator doesn't have gateway information for `service` type
+    # TODO(egor-s): consider replicas
     run_jobs = sorted(run_model.jobs, key=lambda j: (j.job_num, j.submission_num))
     for job_num, job_submissions in itertools.groupby(run_jobs):
         job_spec = None
@@ -566,26 +604,24 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
     if include_job_submissions:
         latest_job_submission = jobs[0].job_submissions[-1]
 
+    service_spec = None
+    if run_model.service_spec is not None:
+        service_spec = ServiceSpec.parse_raw(run_model.service_spec)
+
     run = Run(
         id=run_model.id,
         project_name=run_model.project.name,
         user=run_model.user.name,
         submitted_at=run_model.submitted_at.replace(tzinfo=timezone.utc),
-        status=get_run_status(jobs),
+        status=run_model.status,
         run_spec=run_spec,
         jobs=jobs,
         latest_job_submission=latest_job_submission,
+        service=service_spec,
     )
+    # TODO(egor-s): add replicas support
     run.cost = _get_run_cost(run)
-    run.service = _get_run_service(run)
     return run
-
-
-def get_run_status(jobs: List[Job]) -> JobStatus:
-    job = jobs[0]
-    if len(job.job_submissions) == 0:
-        return JobStatus.SUBMITTED
-    return job.job_submissions[-1].status
 
 
 _PROJECTS_TO_RUN_NAMES_LOCK = {}
@@ -627,37 +663,86 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
     return job_submission.job_provisioning_data.price * duration_hours
 
 
-def _get_run_service(run: Run) -> Optional[ServiceInfo]:
-    if run.run_spec.configuration.type != "service":
-        return None
-
-    gateway = run.jobs[0].job_spec.gateway
-    model = None
-    if run.run_spec.configuration.model is not None:
-        domain = gateway.hostname.split(".", maxsplit=1)[1]
-        model = ServiceModelInfo(
-            name=run.run_spec.configuration.model.name,
-            base_url=f"https://gateway.{domain}",
-            type=run.run_spec.configuration.model.type,
-        )
-
-    omit_port = (gateway.secure and gateway.public_port == 443) or (
-        not gateway.secure and gateway.public_port == 80
-    )
-    return ServiceInfo(
-        url="%s://%s%s"
-        % (
-            "https" if gateway.secure else "http",
-            gateway.hostname,
-            "" if omit_port else f":{gateway.public_port}",
-        ),
-        model=model,
-    )
-
-
 # The run_name validation is not performed in pydantic models since
 # the models are reused on the client, and we don't want to
 # tie run_name validation to the client side.
 def _validate_run_name(run_name: str):
     if not re.match("^[a-z][a-z0-9-]{1,40}$", run_name):
         raise ServerClientError("run_name should match regex '^[a-z][a-z0-9-]{1,40}$'")
+
+
+async def process_terminating_run(session: AsyncSession, run: RunModel):
+    """
+    Used by both `process_runs` and `stop_run` to process a run that is TERMINATING.
+    Caller must acquire the lock on run.
+    """
+    job_termination_reason = run_to_job_termination_reason(run.termination_reason)
+
+    jobs_ids_set = {job.id for job in run.jobs}
+    await wait_unlock(RUNNING_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_IDS, jobs_ids_set)
+    await wait_unlock(SUBMITTED_PROCESSING_JOBS_LOCK, SUBMITTED_PROCESSING_JOBS_IDS, jobs_ids_set)
+    await wait_unlock(
+        TERMINATING_PROCESSING_JOBS_LOCK, TERMINATING_PROCESSING_JOBS_IDS, jobs_ids_set
+    )
+    await session.refresh(run)
+
+    unfinished_jobs_count = 0
+    job: JobModel
+    for job in run.jobs:
+        if job.status.is_finished():
+            continue
+        unfinished_jobs_count += 1
+        if job.status == JobStatus.TERMINATING:
+            # `process_terminating_jobs` will abort frozen jobs
+            continue
+
+        if job.status == JobStatus.RUNNING and job_termination_reason not in {
+            JobTerminationReason.ABORTED_BY_USER,
+            JobTerminationReason.DONE_BY_RUNNER,
+        }:
+            # send a signal to stop the job gracefully
+            await stop_runner(session, job)
+        job.status = JobStatus.TERMINATING
+        job.termination_reason = job_termination_reason
+        await process_terminating_job(session, job)
+        if job.status.is_finished():
+            unfinished_jobs_count -= 1
+        job.last_processed_at = common_utils.get_current_datetime()
+
+    if unfinished_jobs_count == 0:
+        if run.gateway_id is not None:
+            try:
+                await gateways.unregister_service(session, run)
+            except Exception as e:
+                logger.warning("%s: failed to unregister service: %s", fmt(run), repr(e))
+        run.status = run_termination_reason_to_status(run.termination_reason)
+        logger.info(
+            "%s: run status has changed TERMINATING -> %s, reason: %s",
+            fmt(run),
+            run.status.name,
+            run.termination_reason.name,
+        )
+
+
+def run_to_job_termination_reason(
+    run_termination_reason: RunTerminationReason,
+) -> JobTerminationReason:
+    mapping = {
+        RunTerminationReason.ALL_JOBS_DONE: JobTerminationReason.DONE_BY_RUNNER,
+        RunTerminationReason.JOB_FAILED: JobTerminationReason.TERMINATED_BY_SERVER,
+        RunTerminationReason.RETRY_LIMIT_EXCEEDED: JobTerminationReason.TERMINATED_BY_SERVER,
+        RunTerminationReason.STOPPED_BY_USER: JobTerminationReason.TERMINATED_BY_USER,
+        RunTerminationReason.ABORTED_BY_USER: JobTerminationReason.ABORTED_BY_USER,
+    }
+    return mapping[run_termination_reason]
+
+
+def run_termination_reason_to_status(run_termination_reason: RunTerminationReason) -> RunStatus:
+    mapping = {
+        RunTerminationReason.ALL_JOBS_DONE: RunStatus.DONE,
+        RunTerminationReason.JOB_FAILED: RunStatus.FAILED,
+        RunTerminationReason.RETRY_LIMIT_EXCEEDED: RunStatus.FAILED,
+        RunTerminationReason.STOPPED_BY_USER: RunStatus.TERMINATED,
+        RunTerminationReason.ABORTED_BY_USER: RunStatus.TERMINATED,
+    }
+    return mapping[run_termination_reason]

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from pydantic import UUID4, BaseModel, Field
 from typing_extensions import Annotated
@@ -28,7 +28,6 @@ class AppSpec(BaseModel):
 
 
 class JobStatus(str, Enum):
-    PENDING = "pending"
     SUBMITTED = "submitted"
     PROVISIONING = "provisioning"
     PULLING = "pulling"
@@ -52,13 +51,26 @@ class RetryPolicy(BaseModel):
     limit: Optional[int]
 
 
-class JobErrorCode(str, Enum):
+class RunTerminationReason(str, Enum):
+    ALL_JOBS_DONE = "all_jobs_done"
+    JOB_FAILED = "job_failed"
+    RETRY_LIMIT_EXCEEDED = "retry_limit_exceeded"
+    STOPPED_BY_USER = "stopped_by_user"
+    ABORTED_BY_USER = "aborted_by_user"
+    SERVER_ERROR = "server_error"
+
+
+class JobTerminationReason(str, Enum):
     # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
     TERMINATED_BY_USER = "terminated_by_user"
     GATEWAY_ERROR = "gateway_error"
+    SCALED_DOWN = "scaled_down"
+    DONE_BY_RUNNER = "done_by_runner"
+    ABORTED_BY_USER = "aborted_by_user"
+    TERMINATED_BY_SERVER = "terminated_by_server"
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"
@@ -112,7 +124,6 @@ class JobSpec(BaseModel):
     app_specs: Optional[List[AppSpec]]
     commands: List[str]
     env: Dict[str, str]
-    gateway: Optional[Gateway]
     home_dir: Optional[str]
     image_name: str
     max_duration: Optional[int]
@@ -143,7 +154,7 @@ class JobSubmission(BaseModel):
     submitted_at: datetime
     finished_at: Optional[datetime]
     status: JobStatus
-    error_code: Optional[JobErrorCode]
+    termination_reason: Optional[JobTerminationReason]
     job_provisioning_data: Optional[JobProvisioningData]
 
     @property
@@ -162,12 +173,6 @@ class Job(BaseModel):
     job_spec: JobSpec
     job_submissions: List[JobSubmission]
 
-    def is_retry_active(self):
-        return self.job_spec.retry_policy.retry and (
-            self.job_spec.retry_policy.limit is None
-            or self.job_submissions[0].age < timedelta(seconds=self.job_spec.retry_policy.limit)
-        )
-
 
 class RunSpec(BaseModel):
     run_name: Optional[str]
@@ -181,15 +186,34 @@ class RunSpec(BaseModel):
     ssh_key_pub: str
 
 
-class ServiceModelInfo(BaseModel):
+class ServiceModelSpec(BaseModel):
     name: str
     base_url: str
     type: str
 
 
-class ServiceInfo(BaseModel):
+class ServiceSpec(BaseModel):
     url: str
-    model: Optional[ServiceModelInfo] = None
+    model: Optional[ServiceModelSpec] = None
+    options: Dict[str, Any] = {}
+
+
+class RunStatus(str, Enum):
+    PENDING = "pending"
+    SUBMITTED = "submitted"
+    PROVISIONING = "provisioning"
+    RUNNING = "running"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
+    FAILED = "failed"
+    DONE = "done"
+
+    @classmethod
+    def finished_statuses(cls) -> List["RunStatus"]:
+        return [cls.TERMINATED, cls.FAILED, cls.DONE]
+
+    def is_finished(self):
+        return self in self.finished_statuses()
 
 
 class Run(BaseModel):
@@ -197,12 +221,12 @@ class Run(BaseModel):
     project_name: str
     user: str
     submitted_at: datetime
-    status: JobStatus
+    status: RunStatus
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission]
     cost: float = 0
-    service: Optional[ServiceInfo] = None
+    service: Optional[ServiceSpec] = None
 
 
 class JobPlan(BaseModel):

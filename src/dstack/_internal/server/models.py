@@ -25,7 +25,13 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import RepoType
-from dstack._internal.core.models.runs import InstanceStatus, JobErrorCode, JobStatus
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobStatus,
+    JobTerminationReason,
+    RunStatus,
+    RunTerminationReason,
+)
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.utils.common import get_current_datetime
 
@@ -166,9 +172,18 @@ class RunModel(BaseModel):
     user: Mapped["UserModel"] = relationship()
     submitted_at: Mapped[datetime] = mapped_column(DateTime)
     run_name: Mapped[str] = mapped_column(String(100))
-    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
+    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
     run_spec: Mapped[str] = mapped_column(String(4000))
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="run", lazy="selectin")
+    last_processed_at: Mapped[datetime] = mapped_column(DateTime)
+    gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("gateways.id", ondelete="SET NULL")
+    )
+    gateway: Mapped[Optional["GatewayModel"]] = relationship()
+    termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
+        Enum(RunTerminationReason)
+    )
+    service_spec: Mapped[Optional[str]] = mapped_column(String(4000))
 
 
 class JobModel(BaseModel):
@@ -188,15 +203,17 @@ class JobModel(BaseModel):
     submitted_at: Mapped[datetime] = mapped_column(DateTime)
     last_processed_at: Mapped[datetime] = mapped_column(DateTime)
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
-    error_code: Mapped[Optional[JobErrorCode]] = mapped_column(Enum(JobErrorCode))
+    termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
+        Enum(JobTerminationReason)
+    )
     job_spec_data: Mapped[str] = mapped_column(String(4000))
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
     runner_timestamp: Mapped[Optional[int]] = mapped_column(Integer)
     # `removed` is used to ensure that the instance is killed after the job is finished
-    removed: Mapped[bool] = mapped_column(Boolean, default=False)
     remove_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
+    replica_num: Mapped[int] = mapped_column(Integer)
 
 
 class GatewayModel(BaseModel):
@@ -219,6 +236,8 @@ class GatewayModel(BaseModel):
         ForeignKey("gateway_computes.id", ondelete="CASCADE")
     )
     gateway_compute: Mapped[Optional["GatewayComputeModel"]] = relationship(lazy="joined")
+
+    runs: Mapped[List["RunModel"]] = relationship(back_populates="gateway")
 
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_gateways_project_id_name"),)
 

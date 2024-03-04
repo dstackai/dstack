@@ -17,7 +17,7 @@ from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
-from dstack._internal.core.models.runs import JobErrorCode
+from dstack._internal.core.models.runs import JobTerminationReason
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
@@ -161,7 +161,6 @@ class RunCommand(APIBaseCommand):
                     RunStatus.SUBMITTED,
                     RunStatus.PENDING,
                     RunStatus.PROVISIONING,
-                    RunStatus.PULLING,
                 ):
                     status.update(
                         f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]"
@@ -203,7 +202,7 @@ class RunCommand(APIBaseCommand):
                 # Gently stop the run and wait for it to finish
                 with console.status("Stopping..."):
                     run.stop(abort=False)
-                    while not (run.status.is_finished() or run.status == RunStatus.TERMINATING):
+                    while not run.status.is_finished():
                         time.sleep(2)
                         run.refresh()
                 console.print("Stopped")
@@ -219,25 +218,25 @@ class RunCommand(APIBaseCommand):
 
 
 def _print_fail_message(run: Run):
-    error_code = _get_run_error_code(run)
+    termination_reason = _get_run_termination_reason(run)
     message = "Run failed due to unknown reason. Check CLI and server logs."
-    if _get_run_error_code(run) == JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
+    if _get_run_termination_reason(run) == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         message = (
             "All provisioning attempts failed. "
             "This is likely due to cloud providers not having enough capacity. "
             "Check CLI and server logs for more details."
         )
-    elif error_code is not None:
+    elif termination_reason is not None:
         message = (
-            f"Run failed with error code {error_code}. "
+            f"Run failed with error code {termination_reason}. "
             "Check CLI and server logs for more details."
         )
     console.print(f"[error]{message}[/]")
 
 
-def _get_run_error_code(run: Run) -> Optional[JobErrorCode]:
+def _get_run_termination_reason(run: Run) -> Optional[JobTerminationReason]:
     job = run._run.jobs[0]
     if len(job.job_submissions) == 0:
         return None
     job_submission = job.job_submissions[0]
-    return job_submission.error_code
+    return job_submission.termination_reason
