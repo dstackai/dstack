@@ -6,14 +6,13 @@ from typing import Dict, List, Tuple
 from pydantic import BaseModel, ValidationError
 
 from dstack.gateway.core.persistent import get_persistent_state
-from dstack.gateway.core.store import StoreSubscriber
+from dstack.gateway.core.store import Service, StoreSubscriber
 from dstack.gateway.errors import GatewayError, NotFoundError
 from dstack.gateway.openai.clients import ChatCompletionsClient
 from dstack.gateway.openai.clients.openai import OpenAIChatCompletions
 from dstack.gateway.openai.clients.tgi import TGIChatCompletions
 from dstack.gateway.openai.models import OpenAIOptions, ServiceModel
 from dstack.gateway.openai.schemas import Model
-from dstack.gateway.schemas import Service
 
 
 class OpenAIStore(BaseModel, StoreSubscriber):
@@ -23,7 +22,7 @@ class OpenAIStore(BaseModel, StoreSubscriber):
     """
 
     index: Dict[str, Dict[str, Dict[str, ServiceModel]]] = {}
-    domain_index: Dict[str, Tuple[str, str, str]] = {}
+    services_index: Dict[str, Tuple[str, str, str]] = {}
     _lock: asyncio.Lock = asyncio.Lock()
 
     async def on_register(self, project: str, service: Service):
@@ -41,18 +40,20 @@ class OpenAIStore(BaseModel, StoreSubscriber):
                 self.index[project][model.type] = {}
             self.index[project][model.type][model.name] = ServiceModel(
                 model=model,
-                domain=service.public_domain,
+                domain=service.domain,
                 created=int(datetime.datetime.utcnow().timestamp()),
             )
-            self.domain_index[service.public_domain] = (project, model.type, model.name)
+            self.services_index[service.id] = (project, model.type, model.name)
 
-    async def on_unregister(self, project: str, domain: str):
+    async def on_unregister(self, project: str, service_id: str):
         async with self._lock:
-            if domain not in self.domain_index or self.domain_index[domain][0] != project:
+            if (
+                service_id not in self.services_index
+                or self.services_index[service_id][0] != project
+            ):
                 return
-            project, model_type, model_name = self.domain_index[domain]
-            del self.domain_index[domain]
-            del self.index[project][model_type][model_name]
+            project, model_type, model_name = self.services_index.pop(service_id)
+            self.index[project][model_type].pop(model_name)
 
     async def list_models(self, project: str) -> List[Model]:
         models = []
