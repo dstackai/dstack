@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import DefaultDict, Dict, List, Optional, Set, Tuple
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, ValidationError
 
 from dstack.gateway.common import run_async
 from dstack.gateway.core.nginx import Nginx
@@ -170,14 +170,16 @@ class Store(BaseModel):
                     port=replica.ssh_port,
                     app_port=replica.app_port,
                     id_rsa_path=(self._ssh_keys_dir / project).as_posix(),
-                    docker_host=replica.ssh_jump_host,
-                    docker_port=replica.ssh_jump_port,
+                    jump_host=replica.ssh_jump_host,
+                    jump_port=replica.ssh_jump_port,
                 )
                 await run_async(ssh_tunnel.start)
                 stack.push_async_callback(supress_exc_async(run_async, ssh_tunnel.stop))
 
                 # Add to nginx
-                await self.nginx.add_upstream(service.domain, ssh_tunnel.sock_path, replica.id)
+                await self.nginx.add_upstream(
+                    service.domain, f"unix:{ssh_tunnel.sock_path}", replica.id
+                )
                 stack.push_async_callback(
                     supress_exc_async(self.nginx.remove_upstream, service.domain, replica.id)
                 )
@@ -305,7 +307,11 @@ def supress_exc(func, *args, **kwargs):
 
 @lru_cache()
 def get_store() -> Store:
-    # TODO(egor-s): keep going if failed to restore the state
-    store = Store.model_validate(get_persistent_state().get("store", {}))
-    store.start_tunnels()  # start tunnels after restoring the state
+    try:
+        store = Store.model_validate(get_persistent_state().get("store", {}))
+    except ValidationError as e:
+        logger.warning("Failed to load store state: %s", e)
+        store = Store()
+    # Start tunnels after restoring the state
+    store.start_tunnels()
     return store
