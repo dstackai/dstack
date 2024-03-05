@@ -8,4 +8,4 @@ from dstack.api.server._group import APIClientGroup
 class LogsAPIClient(APIClientGroup):
     def poll(self, project_name: str, body: PollLogsRequest) -> JobSubmissionLogs:
         resp = self._request(f"/api/project/{project_name}/logs/poll", body=body.json())
-        return parse_obj_as(JobSubmissionLogs, resp.json())
+        return parse_obj_as(JobSubmissionLogs.__response__, resp.json())

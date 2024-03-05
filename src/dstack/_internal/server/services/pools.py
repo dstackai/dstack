@@ -208,10 +208,8 @@ def get_pool_instances(pool: PoolModel) -> List[InstanceModel]:
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
-    offer: InstanceOfferWithAvailability = InstanceOfferWithAvailability.parse_raw(
-        instance_model.offer
-    )
-    jpd: JobProvisioningData = JobProvisioningData.parse_raw(instance_model.job_provisioning_data)
+    offer = InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
+    jpd = JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
     instance = Instance(
         backend=offer.backend,
         name=instance_model.name,

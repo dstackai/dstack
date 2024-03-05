@@ -97,7 +97,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
     run_model = res.scalar_one()
     project_model = run_model.project
-    run_spec = RunSpec.parse_raw(run_model.run_spec)
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
     profile = run_spec.profile
 
     # Try to provision on an instance from the pool

@@ -209,7 +209,7 @@ async def create_job(
     job_num: int = 0,
     replica_num: int = 0,
 ) -> JobModel:
-    run_spec = RunSpec.parse_raw(run.run_spec)
+    run_spec = RunSpec.__response__.parse_raw(run.run_spec)
     job_spec = get_job_specs_from_run_spec(run_spec)[0]
     job = JobModel(
         project_id=run.project_id,
