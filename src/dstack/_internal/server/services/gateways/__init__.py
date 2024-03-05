@@ -334,7 +334,7 @@ async def register_replica(
 
     try:
         await run_async(
-            conn.client.register_service,
+            conn.client.register_replica,
             run,
             job_provisioning_data,
         )

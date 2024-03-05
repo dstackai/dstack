@@ -50,4 +50,4 @@ def get_info():
 
 @app.exception_handler(GatewayError)
 async def gateway_error_handler(request, exc: GatewayError):
-    return exc.http()
+    return exc.to_response()

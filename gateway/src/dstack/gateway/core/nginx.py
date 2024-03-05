@@ -164,6 +164,7 @@ class Nginx(BaseModel):
         r = subprocess.run(cmd)
         if r.returncode != 0:
             raise GatewayError("Failed to reload nginx")
+        # TODO(egor-s) implement nginx config rollback
 
     @classmethod
     def write_conf(cls, conf: str, conf_path: Path):

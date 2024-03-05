@@ -5,7 +5,6 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from dstack.gateway.core.auth import AuthProvider, get_auth
-from dstack.gateway.errors import GatewayError
 from dstack.gateway.openai.schemas import (
     ChatCompletionsChunk,
     ChatCompletionsRequest,
@@ -38,18 +37,15 @@ async def get_models(
 async def post_chat_completions(
     project: str, body: ChatCompletionsRequest, store: Annotated[OpenAIStore, Depends(get_store)]
 ):
-    try:
-        client = await store.get_chat_client(project, body.model)
-        if not body.stream:
-            return await client.generate(body)
-        else:
-            return StreamingResponse(
-                stream_chunks(client.stream(body)),
-                media_type="text/event-stream",
-                headers={"X-Accel-Buffering": "no"},
-            )
-    except GatewayError as e:
-        raise e.http()
+    client = await store.get_chat_client(project, body.model)
+    if not body.stream:
+        return await client.generate(body)
+    else:
+        return StreamingResponse(
+            stream_chunks(client.stream(body)),
+            media_type="text/event-stream",
+            headers={"X-Accel-Buffering": "no"},
+        )
 
 
 async def stream_chunks(chunks: AsyncIterator[ChatCompletionsChunk]) -> AsyncIterator[bytes]:

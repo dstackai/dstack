@@ -1,10 +1,11 @@
+import uuid
 from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
 
 from dstack._internal.core.errors import GatewayError
-from dstack._internal.core.models.runs import JobProvisioningData, Run
+from dstack._internal.core.models.runs import Run
 
 GATEWAY_MANAGEMENT_PORT = 8000
 
@@ -19,31 +20,36 @@ class GatewayClient:
         self.base_url = "http://gateway" if uds else f"http://localhost:{port}"
         self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds) if uds else None, timeout=30)
 
-    def register_service(self, run: Run, job_provisioning_data: JobProvisioningData):
-        conf = run.run_spec.configuration
+    def register_service(self, run: Run, ssh_private_key: str):
         payload = {
-            "public_domain": urlparse(run.service.url).hostname,
-            "app_port": conf.port.container_port,
-            "auth": conf.auth,
+            "run_id": run.id.hex,
+            "domain": urlparse(run.service.url).hostname,
+            "auth": run.run_spec.configuration.auth,
             "options": run.service.options,
+            "ssh_private_key": ssh_private_key,
         }
-        ssh_proxy = job_provisioning_data.ssh_proxy
-        if ssh_proxy is None:
-            payload[
-                "ssh_host"
-            ] = f"{job_provisioning_data.username}@{job_provisioning_data.hostname}"
-            payload["ssh_port"] = job_provisioning_data.ssh_port
-            if job_provisioning_data.dockerized:
-                payload["docker_ssh_host"] = "root@localhost"
-                payload["docker_ssh_port"] = 10022
-        else:
-            payload["ssh_host"] = f"{ssh_proxy.username}@{ssh_proxy.hostname}"
-            payload["ssh_port"] = ssh_proxy.port
-            payload[
-                "docker_ssh_host"
-            ] = f"{job_provisioning_data.username}@{job_provisioning_data.hostname}"
-            payload["docker_ssh_port"] = job_provisioning_data.ssh_port
-        resp = self.s.post(self._url(f"/api/registry/{run.project_name}/register"), json=payload)
+        resp = self.s.post(
+            self._url(f"/api/registry/{run.project_name}/services/register"), json=payload
+        )
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+
+    def unregister_service(self, project: str, run_id: uuid.UUID):
+        resp = self.s.post(self._url(f"/api/registry/{project}/services/{run_id.hex}/unregister"))
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+
+    def register_replica(self):
+        pass  # TODO(egor-s): implement
+
+    def unregister_replica(self, project: str, run_id: uuid.UUID, job_id: uuid.UUID):
+        resp = self.s.post(
+            self._url(
+                f"/api/registry/{project}/services/{run_id.hex}/replicas/{job_id.hex}/unregister"
+            )
+        )
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
@@ -51,14 +57,6 @@ class GatewayClient:
     def register_openai_entrypoint(self, project: str, domain: str):
         resp = self.s.post(
             self._url(f"/api/registry/{project}/openai/register"), json={"domain": domain}
-        )
-        if resp.status_code == 400:
-            raise gateway_error(resp.json())
-        resp.raise_for_status()
-
-    def unregister_service(self, project: str, public_domain: str):
-        resp = self.s.post(
-            self._url(f"/api/registry/{project}/unregister"), json={"public_domain": public_domain}
         )
         if resp.status_code == 400:
             raise gateway_error(resp.json())
@@ -89,5 +87,4 @@ class GatewayClient:
 
 
 def gateway_error(data: dict) -> GatewayError:
-    detail = data["detail"]
-    return GatewayError(msg=f"{detail['error']}: {detail['message']}")
+    return GatewayError(msg=f"{data['error']}: {data['message']}")
