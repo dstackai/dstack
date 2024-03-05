@@ -1,5 +1,6 @@
 upstream {{ upstream }} {
-  server {{ server }};
+
+  server http://localhost:{{ port }}/{{ fallback.strip('/') }} backup;
 }
 server {
   server_name {{ domain }};

@@ -11,6 +11,7 @@ from dstack.gateway.core.persistent import save_persistent_state
 from dstack.gateway.core.store import get_store
 from dstack.gateway.errors import GatewayError
 from dstack.gateway.logging import configure_logging
+from dstack.gateway.monitoring.routes import router as monitoring_router
 from dstack.gateway.openai.routes import router as openai_router
 from dstack.gateway.registry.routes import router as registry_router
 
@@ -36,9 +37,10 @@ async def lifespan(app: FastAPI):
 
 configure_logging(logging.DEBUG)
 app = FastAPI(lifespan=lifespan)
-app.include_router(registry_router, prefix="/api/registry")
-app.include_router(openai_router, prefix="/api/openai")
 app.include_router(auth_router, prefix="/auth")
+app.include_router(monitoring_router, prefix="/api/monitoring")
+app.include_router(openai_router, prefix="/api/openai")
+app.include_router(registry_router, prefix="/api/registry")
 
 
 @app.get("/")

@@ -88,7 +88,11 @@ class Store(BaseModel):
             async with AsyncExitStack() as stack:
                 # Configure nginx and issue SSL cert
                 await self.nginx.register_service(
-                    project, service.id, service.domain, service.auth
+                    project,
+                    service.id,
+                    service.domain,
+                    service.auth,
+                    fallback=f"/api/monitoring/{project}/services/{service.id}/fallback",
                 )
                 stack.push_async_callback(
                     supress_exc_async(self.nginx.unregister_domain, service.domain)
@@ -173,7 +177,7 @@ class Store(BaseModel):
                 stack.push_async_callback(supress_exc_async(run_async, ssh_tunnel.stop))
 
                 # Add to nginx
-                await self.nginx.add_upstream(service.domain, replica.id, ssh_tunnel.sock_path)
+                await self.nginx.add_upstream(service.domain, ssh_tunnel.sock_path, replica.id)
                 stack.push_async_callback(
                     supress_exc_async(self.nginx.remove_upstream, service.domain, replica.id)
                 )
