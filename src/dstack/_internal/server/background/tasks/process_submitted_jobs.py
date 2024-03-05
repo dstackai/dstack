@@ -13,7 +13,6 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
-    SpotPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
@@ -25,7 +24,6 @@ from dstack._internal.core.models.runs import (
     Requirements,
     Run,
     RunSpec,
-    get_policy_map,
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
@@ -100,13 +98,17 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         project=project_model,
         pool_name=profile.pool_name,
     )
+
+    run = run_model_to_run(run_model)
+    job = run.jobs[job_model.job_num]
+
     async with PROCESSING_POOL_LOCK:
         pool_instances = get_pool_instances(pool)
 
         requirements = Requirements(
             resources=run_spec.configuration.resources,
             max_price=profile.max_price,
-            spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
+            spot=job.job_spec.requirements.spot,
         )
         relevant_instances = filter_pool_instances(
             pool_instances=pool_instances,
@@ -126,9 +128,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
-
-    run = run_model_to_run(run_model)
-    job = run.jobs[job_model.job_num]
 
     if profile.creation_policy == CreationPolicy.REUSE:
         logger.debug(*job_log("reuse instance failed", job_model))
