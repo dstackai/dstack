@@ -1,9 +1,9 @@
 # Services
 
-Services make it very easy to deploy any model or web application as a public endpoint.
+Services make it very easy to deploy any kind of model or web application as public endpoints.
 
-Regardless of which model you deploy or which serving framework you use,
-it's possible to offer the model via the OpenAI-compatible interface.
+Use any serving frameworks and specify required resources. `dstack` deploys it in the configured backend, handles
+authentication, and provides an OpenAI-compatible interface if needed.
 
 [//]: # (TODO: Support auto-scaling)
 

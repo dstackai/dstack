@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceType, Resources
-from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, JobStatus
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobProvisioningData,
+    JobStatus,
+    JobTerminationReason,
+)
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.schemas.runner import HealthcheckResponse, JobStateEvent, PullResponse
@@ -180,7 +185,8 @@ class TestProcessRunningJobs:
             RunnerTunnelMock.assert_called_once()
         await session.refresh(job)
         assert job is not None
-        assert job.status == JobStatus.DONE
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.DONE_BY_RUNNER
         assert job.runner_timestamp == 2
 
     @pytest.mark.asyncio
@@ -307,5 +313,6 @@ class TestProcessRunningJobs:
             assert RunnerTunnelMock.call_count == 3
         await session.refresh(job)
         assert job is not None
-        assert job.status == JobStatus.FAILED
+        assert job.status == JobStatus.TERMINATING
+        assert job.termination_reason == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
         assert job.remove_at is None

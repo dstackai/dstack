@@ -18,10 +18,11 @@ from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
 from dstack._internal.core.models.runs import (
     InstanceStatus,
-    JobErrorCode,
     JobProvisioningData,
     JobStatus,
+    JobTerminationReason,
     RunSpec,
+    RunStatus,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
@@ -171,7 +172,7 @@ async def create_run(
     repo: RepoModel,
     user: UserModel,
     run_name: str = "test-run",
-    status: JobStatus = JobStatus.SUBMITTED,
+    status: RunStatus = RunStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
 ) -> RunModel:
@@ -188,6 +189,7 @@ async def create_run(
         run_name=run_name,
         status=status,
         run_spec=run_spec.json(),
+        last_processed_at=submitted_at,
     )
     session.add(run)
     await session.commit()
@@ -201,9 +203,11 @@ async def create_job(
     status: JobStatus = JobStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
-    error_code: Optional[JobErrorCode] = None,
+    termination_reason: Optional[JobTerminationReason] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
     instance: Optional[InstanceModel] = None,
+    job_num: int = 0,
+    replica_num: int = 0,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = get_job_specs_from_run_spec(run_spec)[0]
@@ -211,16 +215,18 @@ async def create_job(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
-        job_num=0,
+        job_num=job_num,
         job_name=run.run_name + "-0",
+        replica_num=replica_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
         last_processed_at=last_processed_at,
         status=status,
-        error_code=error_code,
+        termination_reason=termination_reason,
         job_spec_data=job_spec.json(),
         job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
-        instance=instance if instance is not None else None,
+        instance=instance,
+        used_instance_id=instance.id if instance is not None else None,
     )
     session.add(job)
     await session.commit()
@@ -313,7 +319,49 @@ async def create_instance(
     status: InstanceStatus = InstanceStatus.IDLE,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     finished_at: Optional[datetime] = None,
+    spot: bool = False,
 ) -> InstanceModel:
+    job_provisioning_data = {
+        "backend": "datacrunch",
+        "instance_type": {
+            "name": "instance",
+            "resources": {
+                "cpus": 1,
+                "memory_mib": 512,
+                "gpus": [],
+                "spot": spot,
+                "disk": {"size_mib": 102400},
+                "description": "",
+            },
+        },
+        "instance_id": "running_instance.id",
+        "ssh_proxy": None,
+        "hostname": "running_instance.ip",
+        "region": "running_instance.location",
+        "price": 0.1,
+        "username": "root",
+        "ssh_port": 22,
+        "dockerized": True,
+        "backend_data": None,
+    }
+    offer = {
+        "backend": "datacrunch",
+        "instance": {
+            "name": "instance",
+            "resources": {
+                "cpus": 2,
+                "memory_mib": 12000,
+                "gpus": [],
+                "spot": spot,
+                "disk": {"size_mib": 102400},
+                "description": "",
+            },
+        },
+        "region": "en",
+        "price": 1,
+        "availability": "available",
+    }
+
     im = InstanceModel(
         name="test_instance",
         pool=pool,
@@ -322,8 +370,8 @@ async def create_instance(
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
-        job_provisioning_data='{"backend": "datacrunch", "instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "instance_id": "running_instance.id", "ssh_proxy": null, "hostname": "running_instance.ip", "region": "running_instance.location", "price": 0.1, "username": "root", "ssh_port": 22, "dockerized": true, "backend_data": null}',
-        offer='{"backend": "datacrunch", "instance": {"name": "instance", "resources": {"cpus": 2, "memory_mib": 12000, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description": ""}}, "region": "en", "price": 0.1, "availability": "available"}',
+        job_provisioning_data=json.dumps(job_provisioning_data),
+        offer=json.dumps(offer),
         price=1,
         region="eu-west",
         backend=BackendType.DATACRUNCH,

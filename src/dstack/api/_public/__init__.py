@@ -59,7 +59,7 @@ class Client:
 
         Args:
             project_name: The name of the project, required if `server_url` and `user_token` are specified
-            server_url: The dstack server URL (e.g. `http://localhost:3000/` or `https://cloud.dstack.ai`)
+            server_url: The dstack server URL (e.g. `http://localhost:3000/` or `https://sky.dstack.ai`)
             user_token: The dstack user token
             ssh_identity_file: The private SSH key path for SSH tunneling
 

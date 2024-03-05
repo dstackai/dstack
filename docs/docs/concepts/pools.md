@@ -1,41 +1,33 @@
 # Pools
 
-Pools enable efficient lifecycle management of cloud instances and their reuse across runs.
+Pools simplify managing the lifecycle of cloud instances and enable their efficient reuse across runs.
 
-- When an instance is provisioned in a configured backend, it is added to a pool.
-- The instance is marked as busy while it runs the workload.
-- Once the workload is finished, the instance is marked as ready (to run other workloads).
-- If the instance remains idle for the configured duration, `dstack` tears it down.
+You can have instances provisioned in the configured backend automatically when you run a workload, or add them
+manually, configuring the required resources, idle duration, etc.
 
-## `dstack run`
+## Adding instances
 
-By default, when you use the `dstack run` command, it attempts to reuse an instance from a pool. If there is no ready
-instance that meets the requirements, `dstack` automatically provisions a new instance.
+### `dstack run`
 
-To solely use existing instances, pass the `--reuse` argument. In this scenario, the run will be assigned to an instance
-once it's ready.
+By default, when using the `dstack run` command, it tries to reuse an instance from a pool. If no idle instance meets the
+requirements, `dstack` automatically provisions a new one and adds it to the pool.
+
+To avoid provisioning new instances with `dstack run`, use `--reuse`. Your run will be assigned to an idle instance in 
+the pool.
 
 !!! info "Idle duration"
-    By default, if `dstack run` provisions a new instance, its idle duration is set to `5m`. This means the instance waits for a
-    new workload for only five minutes before getting torn down.
-    To override it, use the `--idle-duration DURATION` argument.
+    By default, `dstack run` sets the idle duration of a newly provisioned instance to `5m`.
+    This means that if the run is finished and the instance remains idle for longer than five minutes, it is automatically
+    removed from the pool. To override the default idle duration, use  `--idle-duration DURATION` with `dstack run`.
 
-## `dstack pool`
-
-The `dstack pool` command allows for managing instances within pools as well as managing the pools themselves.
-
-#### List instances 
-
-The [`dstack pool ps`](../reference/cli/index.md#dstack-pool-ps) command lists all active instances and their status.
-
-#### Add instances 
+### `dstack pool add` 
 
 To manually add an instance to a pool, use [`dstack pool add`](../reference/cli/index.md#dstack-pool-add):
 
 <div class="termy">
 
 ```shell
-$ dstack pool add --gpu 80GB --idle-duration 1d
+$ dstack pool add --gpu 80GB
 
  BACKEND     REGION         RESOURCES                     SPOT  PRICE
  tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
@@ -50,18 +42,24 @@ Continue? [y/n]: y
 The `dstack pool add` command allows specifying resource requirements, along with the spot policy, idle duration, max
 price, retry policy, and other policies.
 
+The default idle duration if you're using `dstack pool add` is `72h`. To override it, use the `--idle-duration DURATION` argument.
+
 [//]: # (TODO: Mention the retry policy)
 
-Alternatively, you can specify these policies via [`.dstack/profiles.yml`](../reference/profiles.yml.md) instead of passing them as arguments.
+You can also specify the policies via [`.dstack/profiles.yml`](../reference/profiles.yml.md) instead of passing them as arguments.
 For more details on policies and their defaults, refer to [`.dstack/profiles.yml`](../reference/profiles.yml.md).
 
 ??? info "Limitations"
-    The `dstack pool add` command is not yet supported for Lambda, Azure, TensorDock, Kubernetes, and VastAI backends. Support
-    for them is coming in version `0.16.1`.
+    The `dstack pool add` command is not supported for Kubernetes, and VastAI backends yet.
 
-#### Remove instances
+## Removing instances
 
-To remove an instance from a pool, use the `dstack pool remove` command. 
+!!! info "Idle duration"
+    If the instance remains idle for the configured duration, `dstack` removes it and deletes all cloud resources.
+
+### `dstack pool remove`
+
+To remove an instance from the pool manually, use the `dstack pool remove` command. 
 
 <div class="termy">
 
@@ -71,8 +69,10 @@ $ dstack pool remove &lt;instance name&gt;
 
 </div>
 
-!!! info "Idle time"
-    If the instance remains idle for the configured duration, `dstack` removes it and deletes all cloud resources.
+## Listing instances 
+
+The [`dstack pool ps`](../reference/cli/index.md#dstack-pool-ps) command lists active instances and their status (`busy`
+or `idle`).
 
 [//]: # (#### Manage pools)
 

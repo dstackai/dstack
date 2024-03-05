@@ -2,22 +2,22 @@ from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
 
-import httpx
 from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import GatewayError, SSHError
+import dstack._internal.server.services.gateways as gateways
+from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
-    JobErrorCode,
     JobSpec,
     JobStatus,
+    JobTerminationReason,
     Run,
 )
 from dstack._internal.server.db import get_session_ctx
@@ -29,19 +29,18 @@ from dstack._internal.server.models import (
     RunModel,
 )
 from dstack._internal.server.services import logs as logs_services
-from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
-    delay_job_instance_termination,
     job_model_to_job_submission,
 )
-from dstack._internal.server.services.logging import job_log
+from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
-    create_job_model_for_new_submission,
+    PROCESSING_RUNS_IDS,
+    PROCESSING_RUNS_LOCK,
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
@@ -55,7 +54,7 @@ logger = get_logger(__name__)
 
 async def process_running_jobs():
     async with get_session_ctx() as session:
-        async with RUNNING_PROCESSING_JOBS_LOCK:
+        async with PROCESSING_RUNS_LOCK, RUNNING_PROCESSING_JOBS_LOCK:
             res = await session.execute(
                 select(JobModel)
                 .where(
@@ -63,6 +62,9 @@ async def process_running_jobs():
                         [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                     ),
                     JobModel.id.not_in(RUNNING_PROCESSING_JOBS_IDS),
+                    JobModel.run_id.not_in(
+                        PROCESSING_RUNS_IDS
+                    ),  # runs processing has higher priority
                 )
                 .order_by(JobModel.last_processed_at.asc())
                 .limit(1)  # TODO process multiple at once
@@ -110,9 +112,9 @@ async def _process_job(job_id: UUID):
         ):  # fails are acceptable until timeout is exceeded
             if job_provisioning_data.dockerized:
                 logger.debug(
-                    *job_log(
-                        "process provisioning job with shim, age=%s", job_model, job_submission.age
-                    )
+                    "%s: process provisioning job with shim, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
                 )
                 success = await run_async(
                     _process_provisioning_with_shim,
@@ -124,11 +126,9 @@ async def _process_job(job_id: UUID):
                 )
             else:
                 logger.debug(
-                    *job_log(
-                        "process provisioning job without shim, age=%s",
-                        job_model,
-                        job_submission.age,
-                    )
+                    "%s: process provisioning job without shim, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
                 )
                 code = await _get_job_code(
                     session=session,
@@ -158,14 +158,14 @@ async def _process_job(job_id: UUID):
                     job_provisioning_data.backend
                 ):
                     logger.warning(
-                        *job_log(
-                            "failed because runner has not become available in time, age=%s",
-                            job_model,
-                            job_submission.age,
-                        )
+                        "%s: failed because runner has not become available in time, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
                     )
-                    job_model.status = JobStatus.FAILED
-                    job_model.error_code = JobErrorCode.WAITING_RUNNER_LIMIT_EXCEEDED
+                    job_model.status = JobStatus.TERMINATING
+                    job_model.termination_reason = (
+                        JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+                    )
                     job_model.used_instance_id = job_model.instance.id
                     job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
                     job_model.instance = None
@@ -173,9 +173,7 @@ async def _process_job(job_id: UUID):
         else:  # fails are not acceptable
             if initial_status == JobStatus.PULLING:
                 logger.debug(
-                    *job_log(
-                        "process pulling job with shim, age=%s", job_model, job_submission.age
-                    )
+                    "%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age
                 )
                 code = await _get_job_code(
                     session=session,
@@ -195,9 +193,7 @@ async def _process_job(job_id: UUID):
                     repo_creds,
                 )
             elif initial_status == JobStatus.RUNNING:
-                logger.debug(
-                    *job_log("process running job, age=%s", job_model, job_submission.age)
-                )
+                logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
                 success = await run_async(
                     _process_running,
                     server_ssh_private_key,
@@ -208,77 +204,43 @@ async def _process_job(job_id: UUID):
 
             if not success:  # kill the job
                 logger.warning(
-                    *job_log(
-                        "failed because runner is not available, age=%s",
-                        job_model,
-                        job_submission.age,
-                    )
+                    "%s: failed because runner is not available, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
                 )
-                job_model.status = JobStatus.FAILED
-                job_model.error_code = JobErrorCode.INTERRUPTED_BY_NO_CAPACITY
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
                 job_model.used_instance_id = job_model.instance.id
                 job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
                 job_model.instance = None
-
-                if job.is_retry_active():
-                    if job_submission.job_provisioning_data.instance_type.resources.spot:
-                        new_job_model = create_job_model_for_new_submission(
-                            run_model=run_model,
-                            job=job,
-                            status=JobStatus.PENDING,
-                        )
-                        session.add(new_job_model)
 
                 # job will be terminated by process_finished_jobs
 
         if (
             initial_status != job_model.status
             and job_model.status == JobStatus.RUNNING
+            and job_model.job_num == 0  # gateway connects only to the first node
             and run.run_spec.configuration.type == "service"
         ):
-            res = await session.execute(
-                select(GatewayModel).where(
-                    GatewayModel.project_id == project.id,
-                    GatewayModel.name == job.job_spec.gateway.gateway_name,
-                )
-            )
+            # TODO(egor-s): move code to gateways module
+            gateway = await session.get(GatewayModel, run_model.gateway_id)
             try:
-                if (gateway := res.scalar_one_or_none()) is None:
-                    raise GatewayError("Gateway is not found")
-                if (
-                    conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
-                ) is None:
-                    raise GatewayError("Gateway is not connected")
-
-                try:
-                    await run_async(
-                        conn.client.register_service,
-                        project.name,
-                        job,
-                        job_provisioning_data,
-                    )
-                except (httpx.RequestError, SSHError) as e:
-                    raise GatewayError(str(e))
+                await gateways.register_replica(gateway, run, job_provisioning_data)
                 logger.debug(
-                    *job_log(
-                        "service is registered: %s, age=%s",
-                        job_model,
-                        job.job_spec.gateway.hostname,
-                        job_submission.age,
-                    )
+                    "%s: service replica is registered: %s, age=%s",
+                    fmt(job_model),
+                    run.service.url,
+                    job_submission.age,
                 )
             except GatewayError as e:
                 logger.warning(
-                    *job_log(
-                        "failed to register service: %s, age=%s",
-                        job_model,
-                        e,
-                        job_submission.age,
-                    )
+                    "%s: failed to register service replica: %s, age=%s",
+                    fmt(job_model),
+                    e,
+                    job_submission.age,
                 )
-                job_model.status = JobStatus.FAILED
-                job_model.error_code = JobErrorCode.GATEWAY_ERROR
-                # TODO(egor-s): retry?
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
 
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
@@ -298,7 +260,7 @@ def _process_provisioning_no_shim(
     """
     Possible next states:
     - JobStatus.RUNNING if runner is available
-    - JobStatus.FAILED if timeout is exceeded
+    - JobStatus.TERMINATING if timeout is exceeded
 
     Returns:
         is successful
@@ -331,7 +293,7 @@ def _process_provisioning_with_shim(
     """
     Possible next states:
     - JobStatus.PULLING if shim is available
-    - JobStatus.FAILED if timeout is exceeded
+    - JobStatus.TERMINATING if timeout is exceeded
 
     Returns:
         is successful
@@ -342,11 +304,11 @@ def _process_provisioning_with_shim(
 
     resp = shim_client.healthcheck()
     if resp is None:
-        logger.debug(*job_log("shim is not available yet", job_model))
+        logger.debug("%s: shim is not available yet", fmt(job_model))
         return False  # shim is not available yet
 
     if registry_auth is not None:
-        logger.debug(*job_log("authenticating to the registry...", job_model))
+        logger.debug("%s: authenticating to the registry...", fmt(job_model))
         interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
         shim_client.submit(
             username=interpolate(registry_auth.username),
@@ -361,7 +323,7 @@ def _process_provisioning_with_shim(
         )
 
     job_model.status = JobStatus.PULLING
-    logger.info(*job_log("now is pulling", job_model))
+    logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
     return True
 
 
@@ -379,7 +341,7 @@ def _process_pulling_with_shim(
     """
     Possible next states:
     - JobStatus.RUNNING if runner is available
-    - JobStatus.FAILED if shim is not available
+    - JobStatus.TERMINATING if shim is not available
 
     Returns:
         is successful
@@ -413,7 +375,7 @@ def _process_running(
 ) -> bool:
     """
     Possible next states:
-    - JobStatus.FAILED if runner is not available
+    - JobStatus.TERMINATING if runner is not available
     - Any status received from runner
 
     Returns:
@@ -433,12 +395,19 @@ def _process_running(
         job_logs=resp.job_logs,
     )
     if len(resp.job_states) > 0:
-        last_job_state = resp.job_states[-1]
-        job_model.status = last_job_state.state
-        if job_model.status == JobStatus.DONE:
-            job_model.run.status = JobStatus.DONE
-            delay_job_instance_termination(job_model)
-        logger.info(*job_log("now is %s", job_model, job_model.status.value))
+        latest_status = resp.job_states[-1].state
+        # TODO(egor-s): refactor dstack-runner to return compatible statuses and reasons
+        if latest_status == JobStatus.DONE:
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.DONE_BY_RUNNER
+            # let the CLI pull logs?
+            # delay_job_instance_termination(job_model)
+        elif latest_status in {JobStatus.FAILED, JobStatus.ABORTED, JobStatus.TERMINATED}:
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.CONTAINER_EXITED_WITH_ERROR
+            # let the CLI pull logs?
+            # delay_job_instance_termination(job_model)
+        logger.info("%s: now is %s", fmt(job_model), job_model.status.name)
     return True
 
 
@@ -469,13 +438,11 @@ def _submit_job_to_runner(
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
 ):
-    logger.debug(*job_log("submitting job spec", job_model))
+    logger.debug("%s: submitting job spec", fmt(job_model))
     logger.debug(
-        *job_log(
-            "repo credentials are %s",
-            job_model,
-            None if repo_credentials is None else repo_credentials.protocol.value,
-        )
+        "%s: repo credentials are %s",
+        fmt(job_model),
+        None if repo_credentials is None else repo_credentials.protocol.value,
     )
     runner_client.submit_job(
         run_spec=run.run_spec,
@@ -483,9 +450,9 @@ def _submit_job_to_runner(
         secrets=secrets,
         repo_credentials=repo_credentials,
     )
-    logger.debug(*job_log("uploading code", job_model))
+    logger.debug("%s: uploading code", fmt(job_model))
     runner_client.upload_code(code)
-    logger.debug(*job_log("starting job", job_model))
+    logger.debug("%s: starting job", fmt(job_model))
     runner_client.run_job()
 
     job_model.status = JobStatus.RUNNING

@@ -13,7 +13,6 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import (
     AppSpec,
-    Gateway,
     JobSpec,
     Requirements,
     RetryPolicy,
@@ -45,7 +44,6 @@ class JobConfigurator(ABC):
             app_specs=self._app_specs(),
             commands=self._commands(),
             env=self._env(),
-            gateway=self._gateway(),
             home_dir=self._home_dir(),
             image_name=self._image_name(),
             max_duration=self._max_duration(),
@@ -114,9 +112,6 @@ class JobConfigurator(ABC):
 
     def _env(self) -> Dict[str, str]:
         return self.run_spec.configuration.env
-
-    def _gateway(self) -> Optional[Gateway]:
-        return None
 
     def _home_dir(self) -> Optional[str]:
         return self.run_spec.configuration.home_dir

@@ -109,17 +109,10 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Orchestrate
-                    <span class="gradient">GPU</span> workloads effortlessly
-                    <!--efficiently-->
-                    on <span class="gradient">any cloud</span>
-                    <!--<span class="gradient" id="typed"></span>-->
-                </h1>
+                <h1>Orchestrate GPU workloads effortlessly on any cloud</h1>
 
-                <p>
-                    dstack is an open-source engine that streamlines the development, training, and deployment of AI
-                    models across any cloud provider.
-                </p>
+                <p>dstack is an open-source engine that automates infrastructure provisioning on any cloud
+                    &mdash; for development, training, and deployment of AI models.</p>
             </div>
 
             <div class="tx-landing__hero_buttons">
@@ -132,10 +125,10 @@
                         Get support and learn from <br>the community
                     </div>-->
 
-                    <a href="javascript:void(0)" onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});" class="md-button md-button--primary"
+                    <a href="javascript:void(0)" onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});" class="md-button md-button--primary sky"
                        style="min-width: 225px; margin-right: 10px">
                         <span>Get started</span>
-                        <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                            <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
                     </a>
 
                     <a href="/docs" class="md-button md-button-secondary"
@@ -200,12 +193,15 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>Development</h2>
-                    <p>Experiment interactively in your IDE, terminal, or Jupyter notebooks before submitting long tasks or deploying models.</p>
+                    <h2>Dev environments</h2>
+                    <p>Before submitting a task or deploying a model, you may want to run code interactively.
+                        Dev environments allow you to do exactly that.</p>
 
-                    <p>With dstack, a single command provisions the necessary cloud resources, code, and environment for your dev setup.</p>
+                    <p>You specify the required environment and resources, then run it. dstack provisions the dev
+                        environment in the cloud and enables access via your desktop IDE.</p>
+
                     <p>
-                        <a href="/docs/guides/dev-environments" target="_blank"
+                        <a href="/docs/concepts/dev-environments" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
@@ -223,15 +219,16 @@
                 </div>
 
                 <div class="block">
-                    <h2>Training</h2>
+                    <h2>Tasks</h2>
 
-                    <p>With dstack, running tasks such as training or fine-tuning scripts, or any other batch jobs, is incredibly easy.</p>
+                    <p>Tasks allow for convenient scheduling of any kind of batch jobs, such as training, fine-tuning,
+                        or data processing, as well as running web applications.</p>
 
-                    <p>Simply provide the commands, ports, and choose the Python version or a Docker image. dstack will
-                        handle the execution on configured cloud GPU provider(s) with the necessary resources.</p>
+                    <p>Specify the environment and resources, then run it. dstack executes the task in the
+                        cloud, enabling port forwarding to your local machine for convenient access.</p>
 
                     <p>
-                        <a href="/docs/guides/tasks" target="_blank"
+                        <a href="/docs/concepts/tasks" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
@@ -241,21 +238,43 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>Deployment</h2>
+                    <h2>Services</h2>
 
-                    <p>With dstack, deploying models or any other web apps is straightforward.</p>
+                    <p>Services make it very easy to deploy any kind of model or web application as public endpoints.</p>
 
-                    <p>Just provide commands, port, and select Python version or Docker image. dstack handles deployment
-                        on configured cloud GPU provider(s), giving you a public HTTPS endpoint.</p>
+                    <p>Use any serving frameworks and specify required resources. dstack deploys it in the configured
+                        backend, handles authentication, and provides an OpenAI-compatible interface if needed.</p>
 
                     <p>
-                        <a href="/docs/guides/services" target="_blank"
+                        <a href="/docs/concepts/services" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
 
                 <div class="block large">
                     <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="777" style="border-radius: 10px">
+                </div>
+            </div>
+        </div>
+
+        <div class="tx-landing__major_feature">
+            <div class="section">
+                <div class="block large margin">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-pool.gif" width="777" style="border-radius: 10px">
+                </div>
+
+                <div class="block">
+                    <h2>Pools</h2>
+
+                    <p>You can have instances provisioned in the cloud automatically, or add them manually, configuring
+                        the required resources, idle duration, etc.</p>
+
+                    <p>Pools simplify managing the lifecycle of cloud instances and enable their efficient reuse across runs.</p>
+
+                    <p>
+                        <a href="/docs/concepts/pools" target="_blank"
+                           class="md-button md-button-secondary small">Learn more</a>
+                    </p>
                 </div>
             </div>
         </div>
@@ -292,7 +311,7 @@
                     </p>
 
                     <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">Embeddings</div>
                     </div>
                 </a>
 
@@ -337,7 +356,7 @@
                     </p>
 
                     <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">LLMs</div>
                     </div>
                 </a>
 
@@ -354,15 +373,16 @@
                     </p>
 
                     <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">LLMs</div>
                     </div>
                 </a>
             </div>
 
-            <div class="tx-landing__highlights_cta">
-                <a href="/examples">Browse all examples</a>
-            </div>
-
+            <p>
+                <a href="/examples" target="_blank"
+                   class="md-button md-button-secondary small">Browse all examples
+                </a>
+            </p>
         </div>
 
         <!--<div class="tx-landing__bottom_cta">
@@ -395,8 +415,7 @@
             <div class="tx-landing__plans_cards">
                 <div class="plans_card open_source">
                     <div class="plans_card__title">Open-source</div>
-                    <div class="plans_card__subtitle">Use dstack with your own cloud accounts
-                        and on-premises clusters. <br><br></div>
+                    <div class="plans_card__subtitle">Use with your own cloud account(s). <br><br></div>
 
                     <div class="plans_card__services">
                         <div class="plans_card__service-item">
@@ -438,16 +457,16 @@
 
                     <div class="plans_card__buttons">
                         <a href="/docs/installation" target="_blank"
-                           class="md-button md-button-secondary small">Install open-source</a>
-                        <div class="plans_card__buttons_subtitle">100% open-source</div>
+                           class="md-button md-button--primary small">Install open-source</a>
+                        <div class="plans_card__buttons_subtitle">100% open-source and free.</div>
                     </div>
                 </div>
 
                 <div class="plans_card dstack_sky">
-                    <div class="plans_card__title"><span class="gradient">dstack Sky</span></div>
+                    <div class="plans_card__title">dstack Sky</div>
                     <div class="plans_card__subtitle">
-                        Get GPUs at the best prices and availability from a wide range of providers. No cloud
-                        account of your own is required.
+                        No need for your own cloud account(s). <br>
+                        Get GPUs at competitive rates from a wide pool of providers.
                     </div>
 
                     <div class="plans_card__services">
@@ -484,10 +503,10 @@
                     </div>
 
                     <div class="plans_card__buttons">
-                        <a href="https://cloud.dstack.ai" target="_blank"
-                           class="md-button md-button--primary small">
-                            <span>Sign in with GitHub</span>
-<!--                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
+                        <a href="https://sky.dstack.ai" target="_blank"
+                           class="md-button md-button--primary sky small">
+                            <span>Sign up for free</span>
+                            <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
                         </a>
                         <div class="plans_card__buttons_subtitle">Pay per compute. No commission.</div>
                     </div>

@@ -3,8 +3,8 @@
 Before submitting a task or deploying a model, you may want to run code interactively.
 Dev environments allow you to do exactly that. 
 
-You just specify the required environment, resources, and run it. `dstack` provisions the dev environment
-in a configured backend.
+You specify the required environment and resources, then run it. `dstack` provisions the dev
+environment in the configured backend and enables access via your desktop IDE.
 
 ## Define a configuration
 
