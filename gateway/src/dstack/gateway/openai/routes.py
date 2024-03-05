@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from dstack.gateway.core.auth import AuthProvider, get_auth
 from dstack.gateway.errors import GatewayError
 from dstack.gateway.openai.schemas import (
     ChatCompletionsChunk,
@@ -12,7 +13,6 @@ from dstack.gateway.openai.schemas import (
     ModelsResponse,
 )
 from dstack.gateway.openai.store import OpenAIStore, get_store
-from dstack.gateway.services.auth import AuthProvider, get_auth
 
 
 async def auth_required(

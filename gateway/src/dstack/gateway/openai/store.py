@@ -5,6 +5,8 @@ from typing import Dict, List, Tuple
 
 from pydantic import BaseModel, ValidationError
 
+from dstack.gateway.core.persistent import get_persistent_state
+from dstack.gateway.core.store import StoreSubscriber
 from dstack.gateway.errors import GatewayError, NotFoundError
 from dstack.gateway.openai.clients import ChatCompletionsClient
 from dstack.gateway.openai.clients.openai import OpenAIChatCompletions
@@ -12,8 +14,6 @@ from dstack.gateway.openai.clients.tgi import TGIChatCompletions
 from dstack.gateway.openai.models import OpenAIOptions, ServiceModel
 from dstack.gateway.openai.schemas import Model
 from dstack.gateway.schemas import Service
-from dstack.gateway.services.persistent import get_persistent_state
-from dstack.gateway.services.store import StoreSubscriber
 
 
 class OpenAIStore(BaseModel, StoreSubscriber):

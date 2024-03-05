@@ -3,10 +3,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from dstack.gateway.core.nginx import Nginx
+from dstack.gateway.core.store import Store
 from dstack.gateway.openai.store import OpenAIStore
 from dstack.gateway.schemas import Service
-from dstack.gateway.services.nginx import Nginx
-from dstack.gateway.services.store import Store
 
 
 @pytest.fixture()

@@ -2,60 +2,77 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from dstack.gateway.errors import GatewayError
+from dstack.gateway.core.store import Replica, Service, Store, get_store
 from dstack.gateway.registry.schemas import (
-    PreflightRequest,
+    OkResponse,
     RegisterEntrypointRequest,
-    RegisterRequest,
-    UnregisterRequest,
+    RegisterReplicaRequest,
+    RegisterServiceRequest,
 )
-from dstack.gateway.services.store import Store, get_store
 
-router = APIRouter()
-
-
-@router.post("/{project}/register")
-async def post_register(
-    project: str, body: RegisterRequest, store: Annotated[Store, Depends(get_store)]
-):
-    try:
-        await store.register(project, body)
-    except GatewayError as e:
-        raise e.http()
-    return "ok"
+router = APIRouter(prefix="/{project}")
 
 
-@router.post("/{project}/unregister")
-async def post_unregister(
-    project: str, body: UnregisterRequest, store: Annotated[Store, Depends(get_store)]
-):
-    try:
-        await store.unregister(project, body.public_domain)
-    except GatewayError as e:
-        raise e.http()
-    return "ok"
+@router.post("/services/register")
+async def post_register_service(
+    project: str, body: RegisterServiceRequest, store: Annotated[Store, Depends(get_store)]
+) -> OkResponse:
+    await store.register_service(
+        project,
+        Service(
+            id=body.run_id,
+            domain=body.domain,
+            auth=body.auth,
+            options=body.options,
+        ),
+        body.ssh_private_key,
+    )
+    return OkResponse()
 
 
-@router.post("/{project}/{module}/register")
+@router.post("/services/{run_id}/unregister")
+async def post_unregister_services(
+    project: str, run_id: str, store: Annotated[Store, Depends(get_store)]
+) -> OkResponse:
+    await store.unregister_service(project, run_id)
+    return OkResponse()
+
+
+@router.post("/services/{run_id}/replicas/register")
+async def post_register_replica(
+    project: str,
+    run_id: str,
+    body: RegisterReplicaRequest,
+    store: Annotated[Store, Depends(get_store)],
+) -> OkResponse:
+    await store.register_replica(
+        project,
+        run_id,
+        Replica(
+            id=body.job_id,
+            app_port=body.app_port,
+            ssh_host=body.ssh_host,
+            ssh_port=body.ssh_port,
+            ssh_jump_host=body.ssh_jump_host,
+            ssh_jump_port=body.ssh_jump_port,
+        ),
+    )
+    return OkResponse()
+
+
+@router.post("/services/{run_id}/replicas/{job_id}/unregister")
+async def post_unregister_replica(
+    project: str, run_id: str, job_id: str, store: Annotated[Store, Depends(get_store)]
+) -> OkResponse:
+    await store.unregister_replica(project, run_id, job_id)
+    return OkResponse()
+
+
+@router.post("/entrypoints/register")
 async def post_register_entrypoint(
     project: str,
-    module: str,
     body: RegisterEntrypointRequest,
     store: Annotated[Store, Depends(get_store)],
-):
-    try:
-        await store.register_entrypoint(project, body.domain, module)
-    except GatewayError as e:
-        raise e.http()
-    return "ok"
-
-
-@router.post("/{project}/preflight")
-async def post_preflight(
-    project: str, body: PreflightRequest, store: Annotated[Store, Depends(get_store)]
-):
-    try:
-        await store.preflight(project, body.public_domain, body.ssh_private_key)
-    except GatewayError as e:
-        raise e.http()
-    return "ok"
+) -> OkResponse:
+    await store.register_entrypoint(project, body.domain, body.module)
+    return OkResponse()
