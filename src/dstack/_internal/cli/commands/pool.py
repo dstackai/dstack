@@ -368,7 +368,6 @@ def print_offers_table(
 ) -> None:
     pretty_req = requirements.pretty_format(resources_only=True)
     max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
-    creation_policy = profile.creation_policy
     termination_policy = profile.termination_policy
     termination_idle_time = f"{parse_duration(profile.termination_idle_time)}s"
 
@@ -390,7 +389,6 @@ def print_offers_table(
     props.add_row(th("Min resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Creation policy"), creation_policy)
     props.add_row(th("Termination policy"), termination_policy)
     props.add_row(th("Termination idle time"), termination_idle_time)
 
