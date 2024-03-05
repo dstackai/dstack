@@ -103,7 +103,7 @@ jobs:
             runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
 
   runner-upload:
-    needs: [ runner-compile ]
+    needs: [gateway-build, runner-compile]
     runs-on: ubuntu-latest
     steps:
       - name: Install AWS
