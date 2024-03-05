@@ -4,14 +4,14 @@
 It works with a wide range of cloud GPU providers (AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, etc.)
 as well as on-premises servers.
 
-### Why use dstack?
+## Why use dstack?
 
 1. Designed for development, training, and deployment of gen AI models.
 2. Efficiently utilizes GPUs across regions and cloud providers.
 3. Compatible with any frameworks.
 4. 100% open-source.
 
-### How does it work?
+## How does it work?
 
 1. [Install](installation/index.md) the open-source server and configure backends (or <a href="https://sky.dstack.ai">sign up</a> with the dstack Sky) 
 2. Define configurations such as dev environments, tasks, and services.
@@ -24,7 +24,7 @@ as well as on-premises servers.
 [//]: # (2. Auto-scalable services)
 [//]: # (3. Integration with Kubernetes)
 
-### Where do I start?
+## Where do I start?
 
 1. Follow [quickstart](quickstart.md)
 2. Browse [examples](../examples/index.md)

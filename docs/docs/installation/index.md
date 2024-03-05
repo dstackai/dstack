@@ -517,3 +517,9 @@ Configurated is updated at ~/.dstack/config.yml
 ```
 
 </div>
+
+## What's next?
+
+1. Follow [quickstart](../quickstart.md)
+2. Browse [examples](../../examples/index.md)
+3. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)

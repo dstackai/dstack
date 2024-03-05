@@ -28,6 +28,7 @@ as well as on-premises servers.
 
 ## Latest news ✨
 
+- [2024/03] [dstack 0.16.1: Improvements to `dstack pool` and bug-fixes](https://dstack.ai/changelog/0.16.1/) (Release)
 - [2024/02] [dstack 0.16.0: Pools](https://dstack.ai/changelog/0.16.0/) (Release)
 - [2024/02] [dstack 0.15.1: Kubernetes integration](https://dstack.ai/changelog/0.15.1/) (Release)
 - [2024/01] [dstack 0.15.0: Resources, authentication, and more](https://dstack.ai/changelog/0.15.0/) (Release)
