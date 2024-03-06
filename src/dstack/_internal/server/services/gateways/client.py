@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 import httpx
 
 from dstack._internal.core.errors import GatewayError
-from dstack._internal.core.models.runs import Run
+from dstack._internal.core.models.runs import JobSubmission, Run
 
 GATEWAY_MANAGEMENT_PORT = 8000
 
@@ -21,9 +21,15 @@ class GatewayClient:
         self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds) if uds else None, timeout=30)
 
     def register_service(self, run: Run, ssh_private_key: str):
+        domain = urlparse(run.service.url).hostname
+
+        if "openai" in run.service.options:
+            entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
+            self.register_openai_entrypoint(run.project_name, entrypoint)
+
         payload = {
             "run_id": run.id.hex,
-            "domain": urlparse(run.service.url).hostname,
+            "domain": domain,
             "auth": run.run_spec.configuration.auth,
             "options": run.service.options,
             "ssh_private_key": ssh_private_key,
@@ -41,8 +47,43 @@ class GatewayClient:
             raise gateway_error(resp.json())
         resp.raise_for_status()
 
-    def register_replica(self):
-        pass  # TODO(egor-s): implement
+    def register_replica(self, run: Run, job_submission: JobSubmission):
+        payload = {
+            "job_id": job_submission.id.hex,
+            "app_port": run.run_spec.configuration.port.container_port,
+        }
+        jpd = job_submission.job_provisioning_data
+        if not jpd.dockerized:
+            payload.update(
+                {
+                    "ssh_port": jpd.ssh_port,
+                    "ssh_host": f"{jpd.username}@{jpd.hostname}",
+                }
+            )
+            if jpd.ssh_proxy is not None:
+                payload.update(
+                    {
+                        "ssh_jump_port": jpd.ssh_proxy.port,
+                        "ssh_jump_host": f"{jpd.ssh_proxy.username}@{jpd.ssh_proxy.hostname}",
+                    }
+                )
+        else:
+            payload.update(
+                {
+                    "ssh_port": 10022,
+                    "ssh_host": "root@localhost",
+                    "ssh_jump_port": jpd.ssh_port,
+                    "ssh_jump_host": f"{jpd.username}@{jpd.hostname}",
+                }
+            )
+
+        resp = self.s.post(
+            self._url(f"/api/registry/{run.project_name}/services/{run.id.hex}/replicas/register"),
+            json=payload,
+        )
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
 
     def unregister_replica(self, project: str, run_id: uuid.UUID, job_id: uuid.UUID):
         resp = self.s.post(
@@ -57,19 +98,6 @@ class GatewayClient:
     def register_openai_entrypoint(self, project: str, domain: str):
         resp = self.s.post(
             self._url(f"/api/registry/{project}/openai/register"), json={"domain": domain}
-        )
-        if resp.status_code == 400:
-            raise gateway_error(resp.json())
-        resp.raise_for_status()
-
-    def preflight(self, project: str, domain: str, private_ssh_key: str, options: dict):
-        if "openai" in options:
-            # TODO(egor-s): custom entrypoint domain
-            entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
-            self.register_openai_entrypoint(project, entrypoint)
-        resp = self.s.post(
-            self._url(f"/api/registry/{project}/preflight"),
-            json={"public_domain": domain, "ssh_private_key": private_ssh_key, "options": options},
         )
         if resp.status_code == 400:
             raise gateway_error(resp.json())

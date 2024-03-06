@@ -162,7 +162,7 @@ class Store(BaseModel):
                 service.domain,
             )
 
-            with AsyncExitStack() as stack:
+            async with AsyncExitStack() as stack:
                 # Start SSH tunnel
                 ssh_tunnel = SSHTunnel.create(
                     host=replica.ssh_host,
