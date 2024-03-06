@@ -22,7 +22,6 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
-    GatewayModel,
     JobModel,
     ProjectModel,
     RepoModel,
@@ -222,10 +221,8 @@ async def _process_job(job_id: UUID):
             and job_model.job_num == 0  # gateway connects only to the first node
             and run.run_spec.configuration.type == "service"
         ):
-            # TODO(egor-s): move code to gateways module
-            gateway = await session.get(GatewayModel, run_model.gateway_id)
             try:
-                await gateways.register_replica(gateway, run, job_provisioning_data)
+                await gateways.register_replica(session, run_model.gateway_id, run, job_submission)
                 logger.debug(
                     "%s: service replica is registered: %s, age=%s",
                     fmt(job_model),

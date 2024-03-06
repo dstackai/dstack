@@ -1,9 +1,11 @@
 import asyncio
+import uuid
 from datetime import timezone
 from typing import List, Optional, Sequence
 from urllib.parse import urlparse
 
 import httpx
+import sqlalchemy.orm as sa_orm
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +23,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import Gateway
 from dstack._internal.core.models.runs import (
-    JobProvisioningData,
+    JobSubmission,
     Run,
     RunSpec,
     ServiceModelSpec,
@@ -31,6 +33,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import (
     GatewayComputeModel,
     GatewayModel,
+    JobModel,
     ProjectModel,
     RunModel,
 )
@@ -312,11 +315,13 @@ async def register_service(session: AsyncSession, run_model: RunModel):
     try:
         logger.debug("%s: registering service as %s", fmt(run_model), service_spec.url)
         await run_async(
-            conn.client.preflight,
-            run_model.project.name,
-            urlparse(service_spec.url).hostname,
-            run_model.project.ssh_private_key,
-            service_spec.options,
+            conn.client.register_service,
+            project=run_model.project.name,
+            run_id=run_model.id,
+            domain=urlparse(service_spec.url).hostname,
+            auth=run_spec.configuration.auth,
+            options=service_spec.options,
+            ssh_private_key=run_model.project.ssh_private_key,
         )
     except SSHError:
         raise ServerClientError("Gateway tunnel is not working")
@@ -325,46 +330,66 @@ async def register_service(session: AsyncSession, run_model: RunModel):
 
 
 async def register_replica(
-    gateway: Optional[GatewayModel], run: Run, job_provisioning_data: JobProvisioningData
+    session: AsyncSession, gateway_id: uuid.UUID, run: Run, job_submission: JobSubmission
 ):
-    if gateway is None:
-        raise GatewayError("Gateway is not found")
-    if (conn := await gateway_connections_pool.get(gateway.gateway_compute.ip_address)) is None:
-        raise GatewayError("Gateway is not connected")
-
+    conn = await get_gateway_connection(session, gateway_id)
     try:
         await run_async(
             conn.client.register_replica,
-            run,
-            job_provisioning_data,
+            run=run,
+            job_submission=job_submission,
         )
     except (httpx.RequestError, SSHError) as e:
         raise GatewayError(str(e))
 
 
 async def unregister_service(session: AsyncSession, run_model: RunModel):
-    gateway = await session.get(GatewayModel, run_model.gateway_id)
-    if gateway.gateway_compute is None:
-        raise GatewayError("Gateway is broken")
-    conn = await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
-    if conn is None:
-        raise GatewayError("Gateway is not connected")
-
-    # TODO(egor-s): unregister by run_id
-    wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
-    if wildcard_domain is None:
-        raise ServerClientError("Domain is required for gateway")
-    service_address = f"{run_model.run_name}.{wildcard_domain}"
-
+    conn = await get_gateway_connection(session, run_model.gateway_id)
     project = await session.get(ProjectModel, run_model.project_id)
     try:
         await run_async(
             conn.client.unregister_service,
-            project.name,
-            service_address,
+            project=project.name,
+            run_id=run_model.id,
         )
     except (httpx.RequestError, SSHError) as e:
         raise GatewayError(str(e))
+
+
+async def unregister_replica(session: AsyncSession, job_model: JobModel):
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == job_model.run_id)
+        .options(sa_orm.joinedload(RunModel.project))
+    )
+    run_model = res.scalar()
+    if run_model.gateway_id is None:
+        return
+
+    conn = await get_gateway_connection(session, run_model.gateway_id)
+    try:
+        await run_async(
+            conn.client.unregister_replica,
+            project=run_model.project.name,
+            run_id=run_model.id,
+            job_id=job_model.id,
+        )
+    except (httpx.RequestError, SSHError) as e:
+        raise GatewayError(str(e))
+
+
+async def get_gateway_connection(
+    session: AsyncSession, gateway_id: uuid.UUID
+) -> GatewayConnection:
+    gateway = await session.get(GatewayModel, gateway_id)
+    if gateway is None:
+        raise GatewayError("Gateway doesn't exist")
+    if gateway.gateway_compute is None:
+        raise GatewayError("Gateway is broken, no compute")
+    conn = await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
+    if conn is None:
+        raise GatewayError("Gateway is not connected")
+    return conn
 
 
 async def init_gateways(session: AsyncSession):

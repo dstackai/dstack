@@ -8,6 +8,7 @@ import sqlalchemy as sa
 import sqlalchemy.orm as sa_orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ConfigurationType
@@ -206,7 +207,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                 instance.name,
                 instance.status.name,
             )
-            # TODO(egor-s): unregister service replica
+            await gateways.unregister_replica(session, job_model)
         finally:
             PROCESSING_POOL_IDS.remove(instance.id)
 

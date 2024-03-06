@@ -1,6 +1,5 @@
 import uuid
 from typing import Optional
-from urllib.parse import urlparse
 
 import httpx
 
@@ -20,23 +19,27 @@ class GatewayClient:
         self.base_url = "http://gateway" if uds else f"http://localhost:{port}"
         self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds) if uds else None, timeout=30)
 
-    def register_service(self, run: Run, ssh_private_key: str):
-        domain = urlparse(run.service.url).hostname
-
-        if "openai" in run.service.options:
+    def register_service(
+        self,
+        project: str,
+        run_id: uuid.UUID,
+        domain: str,
+        auth: bool,
+        options: dict,
+        ssh_private_key: str,
+    ):
+        if "openai" in options:
             entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
-            self.register_openai_entrypoint(run.project_name, entrypoint)
+            self.register_openai_entrypoint(project, entrypoint)
 
         payload = {
-            "run_id": run.id.hex,
+            "run_id": run_id.hex,
             "domain": domain,
-            "auth": run.run_spec.configuration.auth,
-            "options": run.service.options,
+            "auth": auth,
+            "options": options,
             "ssh_private_key": ssh_private_key,
         }
-        resp = self.s.post(
-            self._url(f"/api/registry/{run.project_name}/services/register"), json=payload
-        )
+        resp = self.s.post(self._url(f"/api/registry/{project}/services/register"), json=payload)
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
