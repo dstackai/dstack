@@ -27,9 +27,7 @@ class Nginx(BaseModel):
     domains: Set[str] = set()
     _lock: Lock = Lock()
 
-    async def register_service(
-        self, project: str, service_id: str, domain: str, auth: bool, fallback: str
-    ):
+    async def register_service(self, project: str, service_id: str, domain: str, auth: bool):
         async with self._lock:
             if domain in self.domains:
                 raise GatewayError(f"Domain {domain} is already registered")
@@ -38,7 +36,7 @@ class Nginx(BaseModel):
 
             await run_async(self.run_certbot, domain)
             self.write_conf(
-                self.get_service_conf(project, domain, auth, service_id, fallback),
+                self.get_service_conf(project, domain, auth, service_id),
                 CONFIGS_DIR / f"443-{domain}.conf",
             )
             self.domains.add(domain)
@@ -116,15 +114,12 @@ class Nginx(BaseModel):
         logger.debug("Upstream %s is removed from domain %s", replica_id, domain)
 
     @classmethod
-    def get_service_conf(
-        cls, project: str, domain: str, auth: bool, upstream: str, fallback: str
-    ) -> str:
+    def get_service_conf(cls, project: str, domain: str, auth: bool, upstream: str) -> str:
         template = importlib.resources.read_text(
             "dstack.gateway.resources.nginx", "service.jinja2"
         )
         return jinja2.Template(template).render(
             upstream=upstream,
-            fallback=fallback,
             domain=domain,
             auth=auth,
             port=GATEWAY_PORT,

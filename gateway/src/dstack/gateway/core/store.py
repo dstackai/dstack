@@ -92,7 +92,6 @@ class Store(BaseModel):
                     service.id,
                     service.domain,
                     service.auth,
-                    fallback=f"/api/monitoring/{project}/services/{service.id}/fallback",
                 )
                 stack.push_async_callback(
                     supress_exc_async(self.nginx.unregister_domain, service.domain)
