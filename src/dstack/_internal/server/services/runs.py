@@ -221,6 +221,7 @@ async def get_run_plan(
                 profile=profile,
                 requirements=job.job_spec.requirements,
                 exclude_not_available=False,
+                override_offers_backend=True,
             )
             job_offers.extend(offer for _, offer in offers)
 
@@ -246,6 +247,7 @@ async def get_offers_by_requirements(
     profile: Profile,
     requirements: Requirements,
     exclude_not_available=False,
+    override_offers_backend=False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
@@ -260,8 +262,9 @@ async def get_offers_by_requirements(
 
     # Hide internal offer.backend by backend that returned the offer.
     # This is relevant for dstack Cloud.
-    for backend, offer in offers:
-        offer.backend = backend.TYPE
+    if override_offers_backend:
+        for backend, offer in offers:
+            offer.backend = backend.TYPE
 
     return offers
 
