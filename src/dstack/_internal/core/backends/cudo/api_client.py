@@ -53,7 +53,6 @@ class CudoApiClient:
             },
             "bootDiskImageId": boot_disk_image_id,
             "dataCenterId": data_center_id,
-            "gpuModel": gpu_model,
             "gpus": gpus,
             "machineType": machine_type,
             "memoryGib": memory_gib,
