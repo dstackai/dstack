@@ -28,7 +28,7 @@ class GatewayCommand(APIBaseCommand):
         )
         create_parser.set_defaults(subfunc=self._create)
         create_parser.add_argument(
-            "--backend", choices=["aws", "azure", "gcp", "kubernetes"], required=True
+            "--backend", choices=["aws", "azure", "cudo", "gcp", "kubernetes"], required=True
         )
         create_parser.add_argument("--region", required=True)
         create_parser.add_argument(
