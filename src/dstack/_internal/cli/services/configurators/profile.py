@@ -49,6 +49,14 @@ def register_profile_args(parser: argparse.ArgumentParser, pool_add: bool = Fals
         dest="backends",
         help="The backends that will be tried for provisioning",
     )
+    profile_group.add_argument(
+        "-r",
+        "--region",
+        action="append",
+        metavar="NAME",
+        dest="regions",
+        help="The regions that will be tried for provisioning",
+    )
     if pool_add:
         pools_group_exc = parser
     else:
@@ -139,6 +147,8 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: boo
     # Consider setting validate_assignment=True for modified pydantic models.
     if args.backends:
         profile.backends = args.backends
+    if args.regions:
+        profile.regions = args.regions
     if args.max_price is not None:
         profile.max_price = args.max_price
     if not pool_add:

@@ -321,6 +321,7 @@ class RunCollection:
         configuration_path: Optional[str] = None,
         repo: Optional[Repo] = None,
         backends: Optional[List[BackendType]] = None,
+        regions: Optional[List[str]] = None,
         resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
@@ -338,6 +339,7 @@ class RunCollection:
             configuration_path: The path to the configuration file, relative to the root directory of the repo.
             repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): A repo to mount to the run.
             backends: A list of allowed backend for provisioning.
+            regions: A list of cloud regions for provisioning.
             resources: The requirements to run the configuration. Overrides the configuration's resources.
             spot_policy: A spot policy for provisioning.
             retry_policy (RetryPolicy): A retry policy.
@@ -362,6 +364,7 @@ class RunCollection:
             repo=repo,
             configuration_path=configuration_path,
             backends=backends,
+            regions=regions,
             resources=resources,
             spot_policy=spot_policy,
             retry_policy=retry_policy,
@@ -388,6 +391,7 @@ class RunCollection:
         repo: Repo,
         configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
+        regions: Optional[List[str]] = None,
         resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
@@ -425,6 +429,7 @@ class RunCollection:
         profile = Profile(
             name="(python)",
             backends=backends,
+            regions=regions,
             spot_policy=spot_policy,
             retry_policy=retry_policy,
             max_duration=max_duration,
