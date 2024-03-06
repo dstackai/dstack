@@ -21,7 +21,7 @@ async def post_register_service(
         project,
         Service(
             id=body.run_id,
-            domain=body.domain,
+            domain=body.domain.lower(),
             auth=body.auth,
             options=body.options,
         ),
@@ -74,5 +74,5 @@ async def post_register_entrypoint(
     body: RegisterEntrypointRequest,
     store: Annotated[Store, Depends(get_store)],
 ) -> OkResponse:
-    await store.register_entrypoint(project, body.domain, body.module)
+    await store.register_entrypoint(project, body.domain.lower(), body.module)
     return OkResponse()
