@@ -1,15 +1,14 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
-
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.users import GlobalRole
 
 
-class GetUserRequest(BaseModel):
+class GetUserRequest(CoreModel):
     username: str
 
 
-class CreateUserRequest(BaseModel):
+class CreateUserRequest(CoreModel):
     username: str
     global_role: GlobalRole
     email: Optional[str]
@@ -18,9 +17,9 @@ class CreateUserRequest(BaseModel):
 UpdateUserRequest = CreateUserRequest
 
 
-class RefreshTokenRequest(BaseModel):
+class RefreshTokenRequest(CoreModel):
     username: str
 
 
-class DeleteUsersRequest(BaseModel):
+class DeleteUsersRequest(CoreModel):
     users: List[str]

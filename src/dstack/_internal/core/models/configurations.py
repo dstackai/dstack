@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, ValidationError, conint, constr, validato
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import AnyModel
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
@@ -29,7 +29,7 @@ class PythonVersion(str, Enum):
     PY311 = "3.11"
 
 
-class RegistryAuth(ForbidExtra):
+class RegistryAuth(CoreModel):
     """
     Credentials for pulling a private Docker image.
 
@@ -42,7 +42,7 @@ class RegistryAuth(ForbidExtra):
     password: Annotated[str, Field(description="The password or access token")]
 
 
-class PortMapping(ForbidExtra):
+class PortMapping(CoreModel):
     local_port: Optional[ValidPort] = None
     container_port: ValidPort
 
@@ -67,7 +67,7 @@ class PortMapping(ForbidExtra):
         return PortMapping(local_port=local_port, container_port=int(container_port))
 
 
-class Artifact(ForbidExtra):
+class Artifact(CoreModel):
     path: Annotated[
         str, Field(description="The path to the folder that must be stored as an output artifact")
     ]
@@ -79,7 +79,7 @@ class Artifact(ForbidExtra):
     ] = False
 
 
-class BaseConfiguration(ForbidExtra):
+class BaseConfiguration(CoreModel):
     type: Literal["none"]
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]

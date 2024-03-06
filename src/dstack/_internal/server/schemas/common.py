@@ -1,5 +1,5 @@
-from pydantic import BaseModel
+from dstack._internal.core.models.common import CoreModel
 
 
-class RepoRequest(BaseModel):
+class RepoRequest(CoreModel):
     repo_id: str

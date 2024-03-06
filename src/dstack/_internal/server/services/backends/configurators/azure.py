@@ -177,7 +177,7 @@ class AzureConfigurator(Configurator):
             project_id=project.id,
             type=self.TYPE.value,
             config=AzureStoredConfig(
-                **AzureConfigInfo.parse_obj(config).dict(),
+                **AzureConfigInfo.__response__.parse_obj(config).dict(),
                 resource_group=resource_group,
             ).json(),
             auth=AzureCreds.parse_obj(config.creds).__root__.json(),
@@ -186,8 +186,8 @@ class AzureConfigurator(Configurator):
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAzureConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return AzureConfigInfoWithCreds.parse_obj(config)
-        return AzureConfigInfo.parse_obj(config)
+            return AzureConfigInfoWithCreds.__response__.parse_obj(config)
+        return AzureConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> AzureBackend:
         config = self._get_backend_config(model)

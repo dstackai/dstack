@@ -14,12 +14,12 @@ from dstack.api.server._group import APIClientGroup
 class ReposAPIClient(APIClientGroup):
     def list(self, project_name: str) -> List[RepoHead]:
         resp = self._request(f"/api/project/{project_name}/repos/list")
-        return parse_obj_as(List[RepoHead], resp.json())
+        return parse_obj_as(List[RepoHead.__response__], resp.json())
 
     def get(self, project_name: str, repo_id: str, include_creds: bool) -> RepoHead:
         body = GetRepoRequest(repo_id=repo_id, include_creds=include_creds)
         resp = self._request(f"/api/project/{project_name}/repos/get", body=body.json())
-        return parse_obj_as(RepoHead, resp.json())
+        return parse_obj_as(RepoHead.__response__, resp.json())
 
     def init(
         self,

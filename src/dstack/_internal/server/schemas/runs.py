@@ -1,39 +1,38 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
-
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, RunSpec
 
 
-class ListRunsRequest(BaseModel):
+class ListRunsRequest(CoreModel):
     project_name: Optional[str]
     repo_id: Optional[str]
 
 
-class GetRunRequest(BaseModel):
+class GetRunRequest(CoreModel):
     run_name: str
 
 
-class GetRunPlanRequest(BaseModel):
+class GetRunPlanRequest(CoreModel):
     run_spec: RunSpec
 
 
-class GetOffersRequest(BaseModel):
+class GetOffersRequest(CoreModel):
     profile: Profile
     requirements: Requirements
 
 
-class CreateInstanceRequest(BaseModel):
+class CreateInstanceRequest(CoreModel):
     pool_name: str
     profile: Profile
     requirements: Requirements
     ssh_key: SSHKey
 
 
-class AddRemoteInstanceRequest(BaseModel):
+class AddRemoteInstanceRequest(CoreModel):
     instance_name: Optional[str]
     host: str
     port: str
@@ -41,14 +40,14 @@ class AddRemoteInstanceRequest(BaseModel):
     profile: Profile
 
 
-class SubmitRunRequest(BaseModel):
+class SubmitRunRequest(CoreModel):
     run_spec: RunSpec
 
 
-class StopRunsRequest(BaseModel):
+class StopRunsRequest(CoreModel):
     runs_names: List[str]
     abort: bool
 
 
-class DeleteRunsRequest(BaseModel):
+class DeleteRunsRequest(CoreModel):
     runs_names: List[str]

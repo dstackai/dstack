@@ -1,22 +1,21 @@
 from typing import Optional, Union
 
-from pydantic import BaseModel
 from typing_extensions import Literal
 
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 
 
-class KubernetesNetworkingConfig(ForbidExtra):
+class KubernetesNetworkingConfig(CoreModel):
     ssh_host: Optional[str]
     ssh_port: Optional[int]
 
 
-class KubernetesConfigInfo(BaseModel):
+class KubernetesConfigInfo(CoreModel):
     type: Literal["kubernetes"] = "kubernetes"
     networking: KubernetesNetworkingConfig
 
 
-class KubeconfigConfig(ForbidExtra):
+class KubeconfigConfig(CoreModel):
     filename: str
     data: str
 
@@ -32,7 +31,7 @@ class KubernetesConfigInfoWithCredsPartial(KubernetesConfigInfoWithCreds):
     pass
 
 
-class KubernetesConfigValues(BaseModel):
+class KubernetesConfigValues(CoreModel):
     type: Literal["kubernetes"] = "kubernetes"
 
 

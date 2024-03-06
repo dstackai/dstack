@@ -15,7 +15,7 @@ from dstack._internal.core.models.backends.kubernetes import KubernetesNetworkin
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
 from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.backends.vastai import AnyVastAICreds
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.services import backends as backends_services
@@ -26,14 +26,14 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class AWSConfig(ForbidExtra):
+class AWSConfig(CoreModel):
     type: Literal["aws"] = "aws"
     regions: Optional[List[str]] = None
     vpc_name: Optional[str] = None
     creds: AnyAWSCreds = Field(..., discriminator="type")
 
 
-class AzureConfig(ForbidExtra):
+class AzureConfig(CoreModel):
     type: Literal["azure"] = "azure"
     tenant_id: str
     subscription_id: str
@@ -41,13 +41,13 @@ class AzureConfig(ForbidExtra):
     creds: AnyAzureCreds = Field(..., discriminator="type")
 
 
-class DataCrunchConfig(ForbidExtra):
+class DataCrunchConfig(CoreModel):
     type: Literal["datacrunch"] = "datacrunch"
     regions: Optional[List[str]] = None
     creds: AnyDataCrunchCreds
 
 
-class GCPServiceAccountCreds(ForbidExtra):
+class GCPServiceAccountCreds(CoreModel):
     type: Literal["service_account"] = "service_account"
     filename: str
     # If data is None, it is read from the file
@@ -58,21 +58,21 @@ class GCPServiceAccountCreds(ForbidExtra):
         return _fill_data(values)
 
 
-class GCPDefaultCreds(ForbidExtra):
+class GCPDefaultCreds(CoreModel):
     type: Literal["default"] = "default"
 
 
 AnyGCPCreds = Union[GCPServiceAccountCreds, GCPDefaultCreds]
 
 
-class GCPConfig(ForbidExtra):
+class GCPConfig(CoreModel):
     type: Literal["gcp"] = "gcp"
     project_id: str
     regions: Optional[List[str]] = None
     creds: AnyGCPCreds = Field(..., discriminator="type")
 
 
-class KubeconfigConfig(ForbidExtra):
+class KubeconfigConfig(CoreModel):
     filename: str
     data: Optional[str] = None
 
@@ -81,19 +81,19 @@ class KubeconfigConfig(ForbidExtra):
         return _fill_data(values)
 
 
-class KubernetesConfig(ForbidExtra):
+class KubernetesConfig(CoreModel):
     type: Literal["kubernetes"] = "kubernetes"
     kubeconfig: KubeconfigConfig
     networking: Optional[KubernetesNetworkingConfig]
 
 
-class LambdaConfig(ForbidExtra):
+class LambdaConfig(CoreModel):
     type: Literal["lambda"] = "lambda"
     regions: Optional[List[str]] = None
     creds: AnyLambdaCreds
 
 
-class NebiusServiceAccountCreds(ForbidExtra):
+class NebiusServiceAccountCreds(CoreModel):
     type: Literal["service_account"] = "service_account"
     filename: str
     data: Optional[str] = None
@@ -106,7 +106,7 @@ class NebiusServiceAccountCreds(ForbidExtra):
 AnyNebiusCreds = Union[NebiusServiceAccountCreds]
 
 
-class NebiusConfig(ForbidExtra):
+class NebiusConfig(CoreModel):
     type: Literal["nebius"] = "nebius"
     cloud_id: str
     folder_id: str
@@ -115,19 +115,19 @@ class NebiusConfig(ForbidExtra):
     creds: AnyNebiusCreds
 
 
-class TensorDockConfig(ForbidExtra):
+class TensorDockConfig(CoreModel):
     type: Literal["tensordock"] = "tensordock"
     regions: Optional[List[str]] = None
     creds: AnyTensorDockCreds
 
 
-class VastAIConfig(ForbidExtra):
+class VastAIConfig(CoreModel):
     type: Literal["vastai"] = "vastai"
     regions: Optional[List[str]] = None
     creds: AnyVastAICreds
 
 
-class DstackConfig(ForbidExtra):
+class DstackConfig(CoreModel):
     type: Literal["dstack"] = "dstack"
 
 
@@ -148,12 +148,12 @@ AnyBackendConfig = Union[
 BackendConfig = Annotated[AnyBackendConfig, Field(..., discriminator="type")]
 
 
-class ProjectConfig(ForbidExtra):
+class ProjectConfig(CoreModel):
     name: str
     backends: List[BackendConfig]
 
 
-class ServerConfig(ForbidExtra):
+class ServerConfig(CoreModel):
     projects: List[ProjectConfig]
 
 
@@ -289,7 +289,7 @@ def _internal_config_to_config(config_info: AnyConfigInfoWithCreds) -> BackendCo
     return backend_config.__root__
 
 
-class _ConfigInfoWithCreds(BaseModel):
+class _ConfigInfoWithCreds(CoreModel):
     __root__: Annotated[AnyConfigInfoWithCreds, Field(..., discriminator="type")]
 
 
@@ -299,9 +299,10 @@ def _config_to_internal_config(backend_config: BackendConfig) -> AnyConfigInfoWi
     if backend_config.type == "kubernetes":
         if backend_config.networking is None:
             backend_config_dict["networking"] = {}
-    config_info = _ConfigInfoWithCreds.parse_obj(backend_config_dict)
     if backend_config.type == "azure":
-        config_info.__root__.locations = backend_config.regions
+        backend_config_dict["locations"] = backend_config_dict["regions"]
+        del backend_config_dict["regions"]
+    config_info = _ConfigInfoWithCreds.parse_obj(backend_config_dict)
     return config_info.__root__
 
 

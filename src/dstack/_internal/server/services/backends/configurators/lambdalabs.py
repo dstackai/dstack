@@ -65,15 +65,17 @@ class LambdaConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=LambdaStoredConfig(**LambdaConfigInfo.parse_obj(config).dict()).json(),
+            config=LambdaStoredConfig(
+                **LambdaConfigInfo.__response__.parse_obj(config).dict()
+            ).json(),
             auth=LambdaCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyLambdaConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return LambdaConfigInfoWithCreds.parse_obj(config)
-        return LambdaConfigInfo.parse_obj(config)
+            return LambdaConfigInfoWithCreds.__response__.parse_obj(config)
+        return LambdaConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> LambdaBackend:
         config = self._get_backend_config(model)

@@ -1,13 +1,12 @@
 from typing import List, Optional, Union
 
-from pydantic import BaseModel
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigElement, ConfigMultiElement
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 
 
-class NebiusConfigInfo(BaseModel):
+class NebiusConfigInfo(CoreModel):
     type: Literal["nebius"] = "nebius"
     cloud_id: str
     folder_id: str
@@ -15,7 +14,7 @@ class NebiusConfigInfo(BaseModel):
     regions: Optional[List[str]] = None
 
 
-class NebiusServiceAccountCreds(ForbidExtra):
+class NebiusServiceAccountCreds(CoreModel):
     type: Literal["service_account"] = "service_account"
     filename: str
     data: str
@@ -34,7 +33,7 @@ class NebiusConfigInfoWithCreds(NebiusConfigInfo):
 AnyNebiusConfigInfo = Union[NebiusConfigInfo, NebiusConfigInfoWithCreds]
 
 
-class NebiusConfigInfoWithCredsPartial(BaseModel):
+class NebiusConfigInfoWithCredsPartial(CoreModel):
     type: Literal["nebius"] = "nebius"
     creds: Optional[AnyNebiusCreds]
     cloud_id: Optional[str]
@@ -43,7 +42,7 @@ class NebiusConfigInfoWithCredsPartial(BaseModel):
     regions: Optional[List[str]]
 
 
-class NebiusConfigValues(BaseModel):
+class NebiusConfigValues(CoreModel):
     type: Literal["nebius"] = "nebius"
     cloud_id: Optional[ConfigElement]
     folder_id: Optional[ConfigElement]

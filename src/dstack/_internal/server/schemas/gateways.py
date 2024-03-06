@@ -1,28 +1,27 @@
 from typing import List, Optional
 
-from pydantic import BaseModel
-
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 
 
-class CreateGatewayRequest(BaseModel):
+class CreateGatewayRequest(CoreModel):
     name: Optional[str]
     backend_type: BackendType
     region: str
 
 
-class GetGatewayRequest(BaseModel):
+class GetGatewayRequest(CoreModel):
     name: str
 
 
-class DeleteGatewaysRequest(BaseModel):
+class DeleteGatewaysRequest(CoreModel):
     names: List[str]
 
 
-class SetDefaultGatewayRequest(BaseModel):
+class SetDefaultGatewayRequest(CoreModel):
     name: str
 
 
-class SetWildcardDomainRequest(BaseModel):
+class SetWildcardDomainRequest(CoreModel):
     name: str
     wildcard_domain: str

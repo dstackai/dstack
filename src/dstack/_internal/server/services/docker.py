@@ -2,7 +2,8 @@ from enum import Enum
 from typing import Optional
 
 import requests
-from pydantic import BaseModel
+
+from dstack._internal.core.models.common import CoreModel
 
 manifests_media_types = [
     "application/vnd.oci.image.index.v1+json",
@@ -12,7 +13,7 @@ manifests_media_types = [
 ]
 
 
-class DockerImage(BaseModel):
+class DockerImage(CoreModel):
     class Config:
         frozen = True
 

@@ -64,7 +64,9 @@ def get_job_specs_from_run_spec(run_spec: RunSpec) -> List[JobSpec]:
 def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
     job_provisioning_data = None
     if job_model.job_provisioning_data is not None:
-        job_provisioning_data = JobProvisioningData.parse_raw(job_model.job_provisioning_data)
+        job_provisioning_data = JobProvisioningData.__response__.parse_raw(
+            job_model.job_provisioning_data
+        )
         # TODO remove after transitioning to computed fields
         job_provisioning_data.instance_type.resources.description = (
             job_provisioning_data.instance_type.resources.pretty_format()
@@ -131,7 +133,7 @@ def _stop_runner(
     job_model: JobModel,
     server_ssh_private_key: str,
 ):
-    jpd = JobProvisioningData.parse_raw(job_model.job_provisioning_data)
+    jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
     logger.debug("%s: stopping runner %s", fmt(job_model), jpd.hostname)
     ports = get_runner_ports()
     with ssh_tunnel.RunnerTunnel(
@@ -175,7 +177,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             # there is an associated instance to empty
             jpd: Optional[JobProvisioningData] = None
             if job_model.job_provisioning_data is not None:
-                jpd = JobProvisioningData.parse_raw(job_model.job_provisioning_data)
+                jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
                 logger.debug("%s: stopping container", fmt(job_model))
                 await stop_container(job_model, jpd, instance.project.ssh_private_key)
 
