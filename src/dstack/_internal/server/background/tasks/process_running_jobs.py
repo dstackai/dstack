@@ -222,13 +222,7 @@ async def _process_job(job_id: UUID):
             and run.run_spec.configuration.type == "service"
         ):
             try:
-                await gateways.register_replica(session, run_model.gateway_id, run, job_submission)
-                logger.debug(
-                    "%s: service replica is registered: %s, age=%s",
-                    fmt(job_model),
-                    run.service.url,
-                    job_submission.age,
-                )
+                await gateways.register_replica(session, run_model.gateway_id, run, job_model)
             except GatewayError as e:
                 logger.warning(
                     "%s: failed to register service replica: %s, age=%s",
