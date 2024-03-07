@@ -48,6 +48,14 @@ try:
 except ImportError:
     pass
 
+try:
+    from dstack._internal.server.services.backends.configurators.cudo import (
+        CudoConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(CudoConfigurator)
+except ImportError:
+    pass
 
 try:
     from dstack._internal.server.services.backends.configurators.datacrunch import (
