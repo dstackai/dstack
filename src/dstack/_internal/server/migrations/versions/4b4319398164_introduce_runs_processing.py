@@ -107,3 +107,4 @@ def downgrade() -> None:
         batch_op.drop_column("gateway_id")
         batch_op.drop_column("last_processed_at")
     op.execute("UPDATE runs SET status = 'SUBMITTED'")
+    op.execute("UPDATE jobs SET removed = 1")
