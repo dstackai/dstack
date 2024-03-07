@@ -2,6 +2,7 @@ from typing import Any, Dict, List
 
 import requests
 
+from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.utils.ssh import get_public_key_fingerprint
 
 API_URL = "https://rest.compute.cudo.org/v1"
@@ -14,10 +15,8 @@ class CudoApiClient:
     def validate_api_key(self) -> bool:
         try:
             self.get_user_details()
-        except requests.HTTPError as e:
-            if e.response.status_code in [401, 403]:
-                return False
-            raise e
+        except BackendInvalidCredentialsError:
+            return False
         return True
 
     def get_user_details(self):
@@ -25,7 +24,6 @@ class CudoApiClient:
         if resp.ok:
             data = resp.json()
             return data
-        resp.raise_for_status()
 
     def create_virtual_machine(
         self,
@@ -35,7 +33,6 @@ class CudoApiClient:
         book_disk_id: str,
         boot_disk_image_id: str,
         data_center_id: str,
-        gpu_model: str,
         gpus: int,
         machine_type: str,
         memory_gib: int,
@@ -66,22 +63,27 @@ class CudoApiClient:
         if resp.ok:
             data = resp.json()
             return data
-        resp.raise_for_status()
 
     def terminate_virtual_machine(self, vm_id: str, project_id):
         resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
         if resp.ok:
             data = resp.json()
             return data
-        resp.raise_for_status()
 
     def _make_request(self, method: str, path: str, data: Any = None):
-        return requests.request(
-            method=method,
-            url=API_URL + path,
-            json=data,
-            headers={"Authorization": f"Bearer {self.api_key}"},
-        )
+        try:
+            response = requests.request(
+                method=method,
+                url=API_URL + path,
+                json=data,
+                headers={"Authorization": f"Bearer {self.api_key}"},
+            )
+            response.raise_for_status()
+            return response
+        except requests.HTTPError as e:
+            if e.response.status_code in (requests.codes.forbidden, requests.codes.unauthorized):
+                raise BackendInvalidCredentialsError(e.response.text)
+            raise
 
     def get_or_create_ssh_key(self, public_key: str) -> str:
         fingerprint = get_public_key_fingerprint(public_key)
@@ -98,17 +100,14 @@ class CudoApiClient:
         resp = self._make_request("GET", "/ssh-keys")
         if resp.ok:
             return resp.json()["sshKeys"]
-        resp.raise_for_status()
 
     def create_ssh_key(self, public_key: str) -> str:
         data = {"publicKey": public_key}
         resp = self._make_request("POST", "/ssh-keys", data)
         if resp.ok:
             return resp.json()["id"]
-        resp.raise_for_status()
 
     def get_vm(self, project_id, vm_id):
         resp = self._make_request("GET", f"/projects/{project_id}/vms/{vm_id}")
         if resp.ok:
             return resp.json()
-        resp.raise_for_status()
