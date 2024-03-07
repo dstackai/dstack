@@ -119,6 +119,7 @@ class Gateway(BaseModel):
 
 
 class JobSpec(BaseModel):
+    replica_num: int = 0  # default value for backward compatibility
     job_num: int
     job_name: str
     app_specs: Optional[List[AppSpec]]

@@ -10,7 +10,7 @@ from dstack._internal.core.models.common import ForbidExtra
 from dstack._internal.core.models.gateways import AnyModel
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.resources import Range, ResourcesSpec
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -178,6 +178,7 @@ class ServiceConfiguration(BaseConfiguration):
         resources (Optional[ResourcesSpec]): The requirements to run the configuration.
         model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
         auth (bool): Enable the authorization. Defaults to `True`.
+        replicas Range[int]: The range of the number of replicas. Defaults to `1`.
     """
 
     type: Literal["service"] = "service"
@@ -191,6 +192,7 @@ class ServiceConfiguration(BaseConfiguration):
         Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
     ] = None
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
+    replicas: Annotated[Range[int], Field(description="The range ")] = Range[int](min=1, max=1)
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:

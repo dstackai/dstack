@@ -342,9 +342,17 @@ async def submit_run(
     )
     session.add(run_model)
 
+    replicas = 1
     if run_spec.configuration.type == "service":
+        replicas = run_spec.configuration.replicas.min
+        if replicas < 1:
+            raise ServerClientError("Replicas count should be at least 1")
+        if replicas != run_spec.configuration.replicas.max:
+            raise ServerClientError("Auto-scaling is not supported yet")
+
         await gateways.register_service(session, run_model)
 
+    # TODO(egor-s) spawn enough replicas
     jobs = get_jobs_from_run_spec(run_spec)
     for job in jobs:
         job.job_spec.pool_name = pool.name
@@ -373,8 +381,8 @@ def create_job_model_for_new_submission(
         run_id=run_model.id,
         run_name=run_model.run_name,
         job_num=job.job_spec.job_num,
-        job_name=job.job_spec.job_name,
-        replica_num=0,  # TODO(egor-s): replace with actual replica number
+        job_name=f"{job.job_spec.job_name}",
+        replica_num=job.job_spec.replica_num,
         submission_num=len(job.job_submissions),
         submitted_at=now,
         last_processed_at=now,
@@ -599,19 +607,22 @@ async def create_instance(
 
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:
     jobs: List[Job] = []
-    # JobSpec from JobConfigurator doesn't have gateway information for `service` type
-    # TODO(egor-s): consider replicas
-    run_jobs = sorted(run_model.jobs, key=lambda j: (j.job_num, j.submission_num))
-    for job_num, job_submissions in itertools.groupby(run_jobs):
-        job_spec = None
-        submissions = []
-        for job_model in job_submissions:
-            if job_spec is None:
-                job_spec = JobSpec.parse_raw(job_model.job_spec_data)
-            if include_job_submissions:
-                submissions.append(job_model_to_job_submission(job_model))
-        if job_spec is not None:
-            jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
+    run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
+    for replica_num, replica_submissions in itertools.groupby(
+        run_jobs, key=lambda j: j.replica_num
+    ):
+        for job_num, job_submissions in itertools.groupby(
+            replica_submissions, key=lambda j: j.job_num
+        ):
+            job_spec = None
+            submissions = []
+            for job_model in job_submissions:
+                if job_spec is None:
+                    job_spec = JobSpec.parse_raw(job_model.job_spec_data)
+                if include_job_submissions:
+                    submissions.append(job_model_to_job_submission(job_model))
+            if job_spec is not None:
+                jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
 
     run_spec = RunSpec.parse_raw(run_model.run_spec)
 
@@ -634,7 +645,6 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
         latest_job_submission=latest_job_submission,
         service=service_spec,
     )
-    # TODO(egor-s): add replicas support
     run.cost = _get_run_cost(run)
     return run
 

@@ -37,10 +37,12 @@ class JobConfigurator(ABC):
     def __init__(self, run_spec: RunSpec):
         self.run_spec = run_spec
 
-    def get_job_specs(self) -> List[JobSpec]:
+    def get_job_specs(self, replica_num: int) -> List[JobSpec]:
         job_spec = JobSpec(
+            replica_num=replica_num,  # TODO(egor-s): add to env variables in the runner
             job_num=0,
-            job_name=self.run_spec.run_name + "-0",
+            job_name=self.run_spec.run_name
+            + f"-0-{replica_num}",  # TODO(egor-s): use actual job_num
             app_specs=self._app_specs(),
             commands=self._commands(),
             env=self._env(),
