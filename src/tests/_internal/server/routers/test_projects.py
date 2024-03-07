@@ -152,7 +152,7 @@ class TestDeleteProject:
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
-    async def test_deletes_projects(self, test_db, session: AsyncSession):
+    async def test_cannot_delete_the_only_project(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -163,9 +163,31 @@ class TestDeleteProject:
             headers=get_auth_headers(user.token),
             json={"projects_names": [project.name]},
         )
-        assert response.status_code == 200
+        assert response.status_code == 400
         await session.refresh(project)
-        assert project.deleted
+        assert not project.deleted
+
+    @pytest.mark.asyncio
+    async def test_deletes_projects(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project1 = await create_project(session=session, owner=user, name="project1")
+        await add_project_member(
+            session=session, project=project1, user=user, project_role=ProjectRole.ADMIN
+        )
+        project2 = await create_project(session=session, owner=user, name="project2")
+        await add_project_member(
+            session=session, project=project2, user=user, project_role=ProjectRole.ADMIN
+        )
+        response = client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project1.name]},
+        )
+        assert response.status_code == 200
+        await session.refresh(project1)
+        await session.refresh(project2)
+        assert project1.deleted
+        assert not project2.deleted
 
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_admin(self, test_db, session: AsyncSession):

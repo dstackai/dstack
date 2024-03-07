@@ -101,6 +101,8 @@ async def delete_projects(
         for project in user_projects:
             if not _is_project_admin(user=user, project=project):
                 raise ForbiddenError()
+        if all(name in projects_names for name in user_project_names):
+            raise ServerClientError("Cannot delete the only project")
     timestamp = str(int(get_current_datetime().timestamp()))
     new_project_name = "_deleted_" + timestamp + ProjectModel.name
     await session.execute(
