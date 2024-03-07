@@ -132,7 +132,6 @@ def get_dev_env_run_plan_dict(
                     "replica_num": 0,
                     "job_num": 0,
                     "max_duration": None,
-                    "pool_name": DEFAULT_POOL_NAME,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -245,7 +244,6 @@ def get_dev_env_run_dict(
                     "replica_num": 0,
                     "job_num": 0,
                     "max_duration": None,
-                    "pool_name": DEFAULT_POOL_NAME,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {

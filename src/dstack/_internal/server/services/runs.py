@@ -226,7 +226,8 @@ async def get_run_plan(
 
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
-    jobs = get_jobs_from_run_spec(run_spec)
+    # TODO(egor-s): do we need to generate all replicas here?
+    jobs = get_jobs_from_run_spec(run_spec, replica_num=0)
     job_plans = []
 
     for job in jobs:
@@ -325,8 +326,6 @@ async def submit_run(
         _validate_run_name(run_spec.run_name)
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
-    pool = await get_or_create_pool_by_name(session, project, run_spec.profile.pool_name)
-
     submitted_at = common_utils.get_current_datetime()
     run_model = RunModel(
         id=uuid.uuid4(),
@@ -352,16 +351,15 @@ async def submit_run(
 
         await gateways.register_service(session, run_model)
 
-    # TODO(egor-s) spawn enough replicas
-    jobs = get_jobs_from_run_spec(run_spec)
-    for job in jobs:
-        job.job_spec.pool_name = pool.name
-        job_model = create_job_model_for_new_submission(
-            run_model=run_model,
-            job=job,
-            status=JobStatus.SUBMITTED,
-        )
-        session.add(job_model)
+    for replica_num in range(replicas):
+        jobs = get_jobs_from_run_spec(run_spec, replica_num=replica_num)
+        for job in jobs:
+            job_model = create_job_model_for_new_submission(
+                run_model=run_model,
+                job=job,
+                status=JobStatus.SUBMITTED,
+            )
+            session.add(job_model)
     await session.commit()
     await session.refresh(run_model)
 

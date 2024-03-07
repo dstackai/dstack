@@ -210,13 +210,13 @@ async def create_job(
     replica_num: int = 0,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
-    job_spec = get_job_specs_from_run_spec(run_spec, replica_num=0)[0]
+    job_spec = get_job_specs_from_run_spec(run_spec, replica_num=replica_num)[0]
     job = JobModel(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
         job_num=job_num,
-        job_name=run.run_name + "-0-0",
+        job_name=run.run_name + f"-0-{replica_num}",
         replica_num=replica_num,
         submission_num=submission_num,
         submitted_at=submitted_at,

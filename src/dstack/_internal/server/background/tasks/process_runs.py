@@ -26,6 +26,7 @@ from dstack._internal.server.services.jobs import (
     SUBMITTED_PROCESSING_JOBS_LOCK,
     TERMINATING_PROCESSING_JOBS_IDS,
     TERMINATING_PROCESSING_JOBS_LOCK,
+    get_jobs_from_run_spec,
 )
 from dstack._internal.server.services.runs import (
     PROCESSING_RUNS_IDS,
@@ -106,7 +107,6 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
 
     # TODO(egor-s): consider retry delay
-    # TODO(egor-s): respect min_replicas and auto-scaling
 
     await session.execute(
         sa.select(RunModel)
@@ -118,15 +118,36 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
     )
     run = run_model_to_run(run_model)
 
-    for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
-        for job_model in job_models:
+    replicas = 1
+    if run.run_spec.configuration.type == "service":
+        # TODO(egor-s): consider auto-scaling
+        replicas = run.run_spec.configuration.replicas.min
+
+    scheduled_replicas = 0
+    # Resubmit existing replicas
+    for replica_num, replica_jobs in itertools.groupby(
+        run.jobs, key=lambda j: j.job_spec.replica_num
+    ):
+        if scheduled_replicas >= replicas:
+            break
+        scheduled_replicas += 1
+        for job in replica_jobs:
             new_job_model = create_job_model_for_new_submission(
                 run_model=run_model,
-                job=run.jobs[job_model.job_num],
+                job=job,
                 status=JobStatus.SUBMITTED,
             )
             session.add(new_job_model)
-        break  # TODO(egor-s): add replicas support
+    # Create missing replicas
+    for replica_num in range(scheduled_replicas, replicas):
+        jobs = get_jobs_from_run_spec(run.run_spec, replica_num=replica_num)
+        for job in jobs:
+            job_model = create_job_model_for_new_submission(
+                run_model=run_model,
+                job=job,
+                status=JobStatus.SUBMITTED,
+            )
+            session.add(job_model)
 
     run_model.status = RunStatus.SUBMITTED
     logger.info("%s: run status has changed PENDING -> SUBMITTED", fmt(run_model))
