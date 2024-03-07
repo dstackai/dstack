@@ -283,6 +283,7 @@ def get_dev_env_run_dict(
         },
         "cost": 0.0,
         "service": None,
+        "termination_reason": None,
     }
 
 
@@ -360,6 +361,7 @@ class TestListRuns:
                 },
                 "cost": 0,
                 "service": None,
+                "termination_reason": None,
             }
         ]
 

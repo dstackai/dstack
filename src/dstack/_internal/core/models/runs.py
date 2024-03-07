@@ -222,6 +222,7 @@ class Run(BaseModel):
     user: str
     submitted_at: datetime
     status: RunStatus
+    termination_reason: Optional[RunTerminationReason]
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission]

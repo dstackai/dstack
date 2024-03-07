@@ -239,7 +239,8 @@ class Run(ABC):
             if self.status.is_finished() and self.status != RunStatus.DONE:
                 return False
 
-            provisioning_data = self._run.jobs[0].job_submissions[-1].job_provisioning_data
+            job = self._run.jobs[0]  # TODO(egor-s): pull logs from all replicas?
+            provisioning_data = job.job_submissions[-1].job_provisioning_data
 
             control_sock_path_and_port_locks = SSHAttach.reuse_control_sock_path_and_port_locks(
                 run_name=self.name
@@ -247,7 +248,7 @@ class Run(ABC):
 
             if control_sock_path_and_port_locks is None:
                 if self._ports_lock is None:
-                    self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
+                    self._ports_lock = _reserve_ports(job.job_spec)
 
                 logger.debug(
                     "Attaching to %s (%s: %s)",

@@ -638,6 +638,7 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
         user=run_model.user.name,
         submitted_at=run_model.submitted_at.replace(tzinfo=timezone.utc),
         status=run_model.status,
+        termination_reason=run_model.termination_reason,
         run_spec=run_spec,
         jobs=jobs,
         latest_job_submission=latest_job_submission,

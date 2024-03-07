@@ -1,11 +1,12 @@
 import logging
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional, Union
 
 from rich.console import Console, ConsoleRenderable
 from rich.logging import RichHandler
 from rich.prompt import Confirm
+from rich.table import Table
 from rich.theme import Theme
 from rich.traceback import Traceback
 
@@ -63,3 +64,17 @@ class DstackRichHandler(RichHandler):
 def confirm_ask(prompt, **kwargs) -> bool:
     kwargs["console"] = console
     return Confirm.ask(prompt=prompt, **kwargs)
+
+
+def add_row_from_dict(table: Table, data: Dict[Union[str, int], Any], **kwargs):
+    """Maps dict keys to a table columns. `data` key is a column name or index. Missing keys are ignored."""
+    row = []
+    for i, col in enumerate(table.columns):
+        # TODO(egor-s): clear header style
+        if col.header in data:
+            row.append(data[col.header])
+        elif i in data:
+            row.append(data[i])
+        else:
+            row.append("")
+    table.add_row(*row, **kwargs)
