@@ -221,7 +221,6 @@ async def get_run_plan(
                 profile=profile,
                 requirements=job.job_spec.requirements,
                 exclude_not_available=False,
-                override_offers_backend=True,
             )
             job_offers.extend(offer for _, offer in offers)
 
@@ -247,12 +246,21 @@ async def get_offers_by_requirements(
     profile: Profile,
     requirements: Requirements,
     exclude_not_available=False,
-    override_offers_backend=False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
+    # For backward-compatibility to show offers if users set `backends: [dstack]`
+    if (
+        profile.backends is not None
+        and len(profile.backends) == 1
+        and BackendType.DSTACK in profile.backends
+    ):
+        profile.backends = None
+
     if profile.backends is not None:
-        backends = [b for b in backends if b.TYPE in profile.backends]
+        backends = [
+            b for b in backends if b.TYPE in profile.backends or b.TYPE == BackendType.DSTACK
+        ]
 
     offers = await backends_services.get_instance_offers(
         backends=backends,
@@ -260,11 +268,11 @@ async def get_offers_by_requirements(
         exclude_not_available=exclude_not_available,
     )
 
-    # Hide internal offer.backend by backend that returned the offer.
-    # This is relevant for dstack Cloud.
-    if override_offers_backend:
-        for backend, offer in offers:
-            offer.backend = backend.TYPE
+    # Filter offers again for backends since a backend
+    # can return offers of different backend types (e.g. BackendType.DSTACK).
+    # The first filter should remain as an optimization.
+    if profile.backends is not None:
+        offers = [(b, o) for b, o in offers if o.backend in profile.backends]
 
     return offers
 
