@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import json
 from datetime import timezone
 from typing import Dict, List, Optional
 
@@ -8,6 +9,7 @@ import sqlalchemy.orm as sa_orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.runs import (
     InstanceStatus,
@@ -69,6 +71,12 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         job_provisioning_data.instance_type.resources.description = (
             job_provisioning_data.instance_type.resources.pretty_format()
         )
+        if (
+            job_provisioning_data.backend == BackendType.DSTACK
+            and job_provisioning_data.backend_data is not None
+        ):
+            backend_data = json.loads(job_provisioning_data.backend_data)
+            job_provisioning_data.backend = backend_data["base_backend"]
     finished_at = None
     if job_model.status.is_finished():
         finished_at = job_model.last_processed_at.replace(tzinfo=timezone.utc)

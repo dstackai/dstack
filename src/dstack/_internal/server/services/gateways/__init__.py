@@ -414,6 +414,9 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
     if gateway_model.gateway_compute is not None:
         ip_address = gateway_model.gateway_compute.ip_address
         instance_id = gateway_model.gateway_compute.instance_id
+    backend_type = gateway_model.backend.type
+    if gateway_model.backend.type == BackendType.DSTACK:
+        backend_type = BackendType.AWS
     return Gateway(
         name=gateway_model.name,
         ip_address=ip_address,
@@ -422,5 +425,5 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         wildcard_domain=gateway_model.wildcard_domain,
         default=gateway_model.project.default_gateway_id == gateway_model.id,
         created_at=gateway_model.created_at.replace(tzinfo=timezone.utc),
-        backend=gateway_model.backend.type,
+        backend=backend_type,
     )
