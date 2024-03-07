@@ -9,6 +9,7 @@ class BackendType(str, enum.Enum):
     Attributes:
         AWS (BackendType): Amazon Web Services
         AZURE (BackendType): Microsoft Azure
+        CUDO (BackendType): Cudo
         DSTACK (BackendType): dstack Sky
         GCP (BackendType): Google Cloud Platform
         DATACRUNCH (BackendType): DataCrunch
@@ -20,6 +21,7 @@ class BackendType(str, enum.Enum):
 
     AWS = "aws"
     AZURE = "azure"
+    CUDO = "cudo"
     DATACRUNCH = "datacrunch"
     DSTACK = "dstack"
     GCP = "gcp"

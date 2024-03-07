@@ -98,6 +98,7 @@ from dstack._internal.utils.random_names import generate_name
 BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
     BackendType.AWS,
     BackendType.AZURE,
+    BackendType.CUDO,
     BackendType.DATACRUNCH,
     BackendType.GCP,
     BackendType.LAMBDA,
