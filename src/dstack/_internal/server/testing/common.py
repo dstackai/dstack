@@ -7,7 +7,10 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.configurations import (
+    AnyRunConfiguration,
+    DevEnvironmentConfiguration,
+)
 from dstack._internal.core.models.instances import InstanceType, Resources
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
@@ -150,6 +153,7 @@ def get_run_spec(
     run_name: str,
     repo_id: str,
     profile: Optional[Profile] = None,
+    configuration: Optional[AnyRunConfiguration] = None,
 ) -> RunSpec:
     if profile is None:
         profile = Profile(name="default")
@@ -160,7 +164,7 @@ def get_run_spec(
         repo_code_hash=None,
         working_dir=".",
         configuration_path="dstack.yaml",
-        configuration=DevEnvironmentConfiguration(ide="vscode"),
+        configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
         ssh_key_pub="",
     )
