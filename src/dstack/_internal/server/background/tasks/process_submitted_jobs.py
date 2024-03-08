@@ -31,6 +31,7 @@ from dstack._internal.server.services.jobs import (
     PROCESSING_POOL_LOCK,
     SUBMITTED_PROCESSING_JOBS_IDS,
     SUBMITTED_PROCESSING_JOBS_LOCK,
+    find_job,
 )
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
@@ -106,7 +107,15 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
 
     run = run_model_to_run(run_model)
-    job = run.jobs[job_model.job_num]
+    job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+    if job is None:
+        # Impossible scenario
+        logger.warning("%s: job not found in run", fmt(job_model))
+        job_model.status = JobStatus.TERMINATING
+        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+        job_model.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
+        return
 
     async with PROCESSING_POOL_LOCK:
         pool_instances = get_pool_instances(pool)
@@ -130,6 +139,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
             logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
             job_model.job_provisioning_data = instance.job_provisioning_data
+            job_model.used_instance_id = instance.id
             job_model.status = JobStatus.PROVISIONING
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
@@ -190,6 +200,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             region=offer.region,
         )
         session.add(im)
+        await session.flush()  # to get im.id
+        job_model.used_instance_id = im.id
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
 

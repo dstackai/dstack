@@ -13,7 +13,6 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     Job,
     JobSpec,
     JobStatus,
@@ -31,6 +30,7 @@ from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
+    find_job,
     job_model_to_job_submission,
 )
 from dstack._internal.server.services.logging import fmt
@@ -97,9 +97,17 @@ async def _process_job(job_id: UUID):
         repo_model = run_model.repo
         project = run_model.project
         run = run_model_to_run(run_model)
-        job = run.jobs[job_model.job_num]
         job_submission = job_model_to_job_submission(job_model)
         job_provisioning_data = job_submission.job_provisioning_data
+        job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+        if job is None:
+            # Impossible scenario
+            logger.warning("%s: job not found in run, age=%s", fmt(job_model), job_submission.age)
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
 
         server_ssh_private_key = project.ssh_private_key
         secrets = {}  # TODO secrets
@@ -146,10 +154,6 @@ async def _process_job(job_id: UUID):
                     secrets,
                     repo_creds,
                 )
-                if job_model.instance is not None:
-                    job_model.used_instance_id = job_model.instance.id
-                    if success:
-                        job_model.instance.status = InstanceStatus.BUSY
 
             if not success:
                 # check timeout
@@ -165,9 +169,7 @@ async def _process_job(job_id: UUID):
                     job_model.termination_reason = (
                         JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
                     )
-                    job_model.used_instance_id = job_model.instance.id
-                    job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
-                    job_model.instance = None
+                    # instance will be emptied by process_terminating_jobs
 
         else:  # fails are not acceptable
             if initial_status == JobStatus.PULLING:
@@ -209,11 +211,7 @@ async def _process_job(job_id: UUID):
                 )
                 job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-                job_model.used_instance_id = job_model.instance.id
-                job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
-                job_model.instance = None
-
-                # job will be terminated by process_finished_jobs
+                # job will be terminated and instance will be emptied by process_terminating_jobs
 
         if (
             initial_status != job_model.status

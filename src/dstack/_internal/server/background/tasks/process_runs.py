@@ -11,6 +11,8 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.models.instances import InstanceOffer
 from dstack._internal.core.models.profiles import ProfileRetryPolicy
 from dstack._internal.core.models.runs import (
+    Job,
+    JobSpec,
     JobStatus,
     JobTerminationReason,
     RunSpec,
@@ -42,7 +44,7 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 PROCESSING_INTERVAL = datetime.timedelta(seconds=2)
-JOB_ERROR_CODES_TO_RETRY = {
+JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
     JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
 }
@@ -160,6 +162,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
     """
     run_spec = RunSpec.parse_raw(run_model.run_spec)
     retry_policy = run_spec.profile.retry_policy or ProfileRetryPolicy()
+    retry_single_job = can_retry_single_job(run_spec)
 
     run_statuses: Set[RunStatus] = set()
     run_termination_reasons: Set[RunTerminationReason] = set()
@@ -214,7 +217,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
         else:
             if replica_needs_retry:
                 replicas_to_retry.append((replica_num, jobs))
-            if not replica_needs_retry or can_retry_single_job(run_spec):
+            if not replica_needs_retry or retry_single_job:
                 run_statuses.update(replica_statuses)
 
     termination_reason: Optional[RunTerminationReason] = None
@@ -241,7 +244,10 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
     if new_status not in {RunStatus.TERMINATING, RunStatus.PENDING}:
         # No need to retry if the run is terminating,
         # pending run will retry replicas in `process_pending_run`
-        pass  # TODO(egor-s): retry replicas
+        for _, replica_jobs in replicas_to_retry:
+            await retry_replica_jobs(
+                session, run_model, replica_jobs, only_failed=retry_single_job
+            )
 
     if run_model.status != new_status:
         logger.info(
@@ -279,7 +285,7 @@ async def is_retry_enabled(
     session: AsyncSession, job: JobModel, retry_policy: ProfileRetryPolicy
 ) -> bool:
     # retry for spot instances only
-    if retry_policy.retry and job.termination_reason in JOB_ERROR_CODES_TO_RETRY:
+    if retry_policy.retry and job.termination_reason in JOB_TERMINATION_REASONS_TO_RETRY:
         instance = await session.get(InstanceModel, job.used_instance_id)
         instance_offer = InstanceOffer.parse_raw(instance.offer)
         if instance_offer.instance.resources.spot:
@@ -291,11 +297,9 @@ async def is_retry_enabled(
 async def is_retry_limit_exceeded(
     session: AsyncSession, job: JobModel, retry_policy: ProfileRetryPolicy
 ) -> bool:
-    if (
-        retry_policy.limit is not None
-        and get_current_datetime() - job.submitted_at
-        > datetime.timedelta(seconds=retry_policy.limit)
-    ):
+    if retry_policy.limit is not None and get_current_datetime() - job.submitted_at.replace(
+        tzinfo=datetime.timezone.utc
+    ) > datetime.timedelta(seconds=retry_policy.limit):
         return True
     return False
 
@@ -303,3 +307,26 @@ async def is_retry_limit_exceeded(
 def can_retry_single_job(run_spec: RunSpec) -> bool:
     # TODO(egor-s): handle independent and interconnected clusters
     return False
+
+
+async def retry_replica_jobs(
+    session: AsyncSession, run_model: RunModel, latest_jobs: List[JobModel], *, only_failed: bool
+):
+    for job_model in latest_jobs:
+        if job_model.termination_reason not in JOB_TERMINATION_REASONS_TO_RETRY:
+            if only_failed:
+                # No need to resubmit, skip
+                continue
+            if not (job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING):
+                # The job is not finished, but we have to retry all jobs. Terminate it
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+
+        new_job_model = create_job_model_for_new_submission(
+            run_model=run_model,
+            job=Job(job_spec=JobSpec.parse_raw(job_model.job_spec_data), job_submissions=[]),
+            status=JobStatus.SUBMITTED,
+        )
+        # dirty hack to avoid passing all job submissions
+        new_job_model.submission_num = job_model.submission_num + 1
+        session.add(new_job_model)

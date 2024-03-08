@@ -358,6 +358,9 @@ async def unregister_service(session: AsyncSession, run_model: RunModel):
             run_id=run_model.id,
         )
         logger.debug("%s: service is unregistered", fmt(run_model))
+    except GatewayError as e:
+        # ignore if service is not registered
+        logger.warning("%s: unregistering service: %s", fmt(run_model), e)
     except (httpx.RequestError, SSHError) as e:
         raise GatewayError(str(e))
 
@@ -386,6 +389,9 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
         logger.info(
             "%s: replica is unregistered from service %s", fmt(job_model), job_model.run_id.hex
         )
+    except GatewayError as e:
+        # ignore if replica is not registered
+        logger.warning("%s: unregistering replica from service: %s", fmt(job_model), e)
     except (httpx.RequestError, SSHError) as e:
         raise GatewayError(str(e))
 

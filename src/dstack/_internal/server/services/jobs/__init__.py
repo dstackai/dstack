@@ -93,6 +93,13 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
     )
 
 
+def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Optional[Job]:
+    for job in jobs:
+        if job.job_spec.replica_num == replica_num and job.job_spec.job_num == job_num:
+            return job
+    return None
+
+
 async def terminate_job_provisioning_data_instance(
     project: ProjectModel, job_provisioning_data: JobProvisioningData
 ):
@@ -208,7 +215,9 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                 instance.name,
                 instance.status.name,
             )
-            await gateways.unregister_replica(session, job_model)
+            await gateways.unregister_replica(
+                session, job_model
+            )  # TODO(egor-s) ensure always runs
         finally:
             PROCESSING_POOL_IDS.remove(instance.id)
 
