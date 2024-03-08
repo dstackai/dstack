@@ -125,29 +125,33 @@ class TestCreateUser:
                 "/api/users/create",
                 headers=get_auth_headers(user.token),
                 json={
-                    "username": "test",
+                    "username": "Test",
                     "global_role": GlobalRole.USER,
                 },
             )
         assert response.status_code == 200
         assert response.json() == {
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
-            "username": "test",
+            "username": "Test",
             "global_role": "user",
             "email": None,
         }
-        with patch("uuid.uuid4") as uuid_mock:
-            uuid_mock.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
-            response = client.post(
-                "/api/users/create",
-                headers=get_auth_headers(user.token),
-                json={
-                    "username": "test",
-                    "global_role": GlobalRole.USER,
-                },
-            )
-        assert response.status_code == 400
-        res = await session.execute(select(UserModel).where(UserModel.name == "test"))
+        # Username uniqueness check should be case insensitive
+        for username in ["test", "Test", "TesT"]:
+            with patch("uuid.uuid4") as uuid_mock:
+                uuid_mock.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+                response = client.post(
+                    "/api/users/create",
+                    headers=get_auth_headers(user.token),
+                    json={
+                        "username": username,
+                        "global_role": GlobalRole.USER,
+                    },
+                )
+            assert response.status_code == 400
+        res = await session.execute(
+            select(UserModel).where(UserModel.name.in_(["test", "Test", "TesT"]))
+        )
         assert len(res.scalars().all()) == 1
 
 

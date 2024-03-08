@@ -124,6 +124,34 @@ class TestCreateProject:
         }
 
     @pytest.mark.asyncio
+    async def test_return_400_if_project_name_is_taken(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        with patch("uuid.uuid4") as m:
+            m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+            response = client.post(
+                "/api/projects/create",
+                headers=get_auth_headers(user.token),
+                json={"project_name": "TestProject"},
+            )
+        assert response.status_code == 200
+        # Project name uniqueness check should be case insensitive
+        for project_name in ["testproject", "TestProject", "TESTPROJECT"]:
+            with patch("uuid.uuid4") as m:
+                m.return_value = UUID("2b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+                response = client.post(
+                    "/api/projects/create",
+                    headers=get_auth_headers(user.token),
+                    json={"project_name": project_name},
+                )
+            assert response.status_code == 400
+        res = await session.execute(
+            select(ProjectModel).where(
+                ProjectModel.name.in_(["TestProject", "testproject", "TestProject", "TESTPROJECT"])
+            )
+        )
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.asyncio
     async def test_returns_400_if_user_project_quota_exceeded(
         self, test_db, session: AsyncSession
     ):

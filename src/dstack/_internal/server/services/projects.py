@@ -2,6 +2,7 @@ import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import delete, select, update
+from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
@@ -63,7 +64,9 @@ async def get_project_by_name(
 
 
 async def create_project(session: AsyncSession, user: UserModel, project_name: str) -> Project:
-    project = await get_project_model_by_name(session=session, project_name=project_name)
+    project = await get_project_model_by_name(
+        session=session, project_name=project_name, ignore_case=True
+    )
     if project is not None:
         raise ResourceExistsError()
     await _check_projects_quota(session=session, user=user)
@@ -202,15 +205,14 @@ async def list_project_models(
 
 
 async def get_project_model_by_name(
-    session: AsyncSession,
-    project_name: str,
+    session: AsyncSession, project_name: str, ignore_case: bool = True
 ) -> Optional[ProjectModel]:
-    res = await session.execute(
-        select(ProjectModel).where(
-            ProjectModel.name == project_name,
-            ProjectModel.deleted == False,
-        )
-    )
+    filters = [ProjectModel.deleted == False]
+    if ignore_case:
+        filters.append(safunc.lower(ProjectModel.name) == safunc.lower(project_name))
+    else:
+        filters.append(ProjectModel.name == project_name)
+    res = await session.execute(select(ProjectModel).where(*filters))
     return res.scalar()
 
 

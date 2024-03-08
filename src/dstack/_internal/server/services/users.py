@@ -2,6 +2,7 @@ import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import delete, select, update
+from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceExistsError
@@ -57,7 +58,7 @@ async def create_user(
     global_role: GlobalRole,
     email: Optional[str] = None,
 ) -> UserModel:
-    user_model = await get_user_model_by_name(session=session, username=username)
+    user_model = await get_user_model_by_name(session=session, username=username, ignore_case=True)
     if user_model is not None:
         raise ResourceExistsError()
     user = UserModel(
@@ -106,8 +107,17 @@ async def delete_users(
     await session.commit()
 
 
-async def get_user_model_by_name(session: AsyncSession, username: str) -> Optional[UserModel]:
-    res = await session.execute(select(UserModel).where(UserModel.name == username))
+async def get_user_model_by_name(
+    session: AsyncSession,
+    username: str,
+    ignore_case: bool = False,
+) -> Optional[UserModel]:
+    filters = []
+    if ignore_case:
+        filters.append(safunc.lower(UserModel.name) == safunc.lower(username))
+    else:
+        filters.append(UserModel.name == username)
+    res = await session.execute(select(UserModel).where(*filters))
     return res.scalar()
 
 
