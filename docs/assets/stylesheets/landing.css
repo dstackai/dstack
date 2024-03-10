@@ -144,7 +144,7 @@
 }
 
 .md-header__buttons .md-button.discord:before,
-.tx-container .md-button.discord:before {
+.md-typeset .md-button.discord:before {
     position: relative;
     top: 5px;
     content: '';
@@ -160,7 +160,7 @@
 }
 
 .md-header__buttons .md-button.github:before,
-.tx-container .md-button.github:before {
+.md-typeset .md-button.github:before {
     position: relative;
     top: 5px;
     content: '';
@@ -180,7 +180,7 @@
 }
 
 .md-header__buttons .md-button,
-.tx-container .md-button {
+.md-typeset .md-button {
     margin-top: 1.2rem;
     margin-bottom: 1.5rem;
     font-size: 22px;
@@ -195,28 +195,28 @@
     font-size: 19px;
 }
 
-.tx-container .md-button {
+.md-typeset .md-button {
     min-width: 200px;
     padding: 0.55em 2em;
     font-size: 21px;
 }
 
-.tx-container .md-button.small {
+.md-typeset .md-button.small {
     min-width: 175px;
     padding: 0.6em 2em;
     font-size: 20px;
 }
 
-.tx-container .md-button {
+.md-typeset .md-button {
     vertical-align: middle;
 }
 
-.tx-container .md-button--primary:hover {
+.md-typeset .md-button--primary:hover {
     transform: translateY(-2px);
     transition: opacity .2s ease,transform .2s ease;
 }
 
-.tx-container .md-button .icon {
+.md-typeset .md-button .icon {
     display: inline-block;
     position: relative;
     width: 15px;
@@ -225,15 +225,15 @@
     transition: opacity .2s ease,transform .2s ease;
 }
 
-.tx-container .md-button--primary:hover .icon {
+.md-typeset .md-button--primary:hover .icon {
     transform: translateX(3px)
 }
 
 .md-header__buttons .md-button--primary, .md-header__buttons .md-button--primary:hover,
-.tx-container .md-button--primary, .tx-container .md-button--primary:hover {
+.md-typeset .md-button--primary, .md-typeset .md-button--primary:hover {
     background: rgba(0, 0, 0, 0.87);
     border: 1.5px solid black;
-    border-radius: 3px;
+    border-radius: 1px;
 }
 
 .md-header__buttons .md-button--primary,
@@ -243,9 +243,9 @@
 }
 
 .md-header__buttons .md-button-secondary,
-.tx-container .md-button-secondary,
+.md-typeset .md-button-secondary,
 .md-header__buttons .md-button-secondary:hover,
-.tx-container .md-button-secondary:hover {
+.md-typeset .md-button-secondary:hover {
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
     border-width: 1.5px;
     border-style: solid;
@@ -334,9 +334,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 15px;
+    padding: 9px 18px;
     border-radius: 3px;
-    font-size: 0.8em;
+    font-size: 0.9em;
     font-weight: 400;
     line-height: 1.44;
     color: black;
@@ -406,7 +406,7 @@
 }
 
 .tx-landing__highlights_grid h3 {
-    font-size: 1.2em;
+    font-size: 1.3em;
     font-weight: 800;
     border-bottom: none;
     padding-bottom: 0.1em;
@@ -624,7 +624,7 @@
 }
 
 .md-header__buttons .md-button--primary.sky, .md-header__buttons .md-button--primary.sky:hover,
-.tx-container .md-button--primary.sky, .tx-container .md-button--primary.sky:hover {
+.md-typeset .md-button--primary.sky, .md-typeset .md-button--primary.sky:hover {
     background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
     border-radius: 3px;
     border: 1px solid transparent;
@@ -672,7 +672,7 @@
 .plans_card__services {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
     margin-bottom: 2.4rem;
 }
 

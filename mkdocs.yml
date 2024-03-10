@@ -64,6 +64,8 @@ plugins:
       blog_toc: true
   - blog:
       blog_dir: blog
+      post_url_format: "{slug}"
+      blog_toc: true
   - social:
       cards_layout_options:
         background_color: "black"
@@ -217,5 +219,7 @@ nav:
         - Mixtral 8x7B: examples/mixtral.md
   - Changelog:
       - changelog/index.md
+  - Blog:
+      - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd
   - GitHub: https://github.com/dstackai/dstack

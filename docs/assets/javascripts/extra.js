@@ -33,7 +33,7 @@ function setupTermynal() {
             .querySelectorAll(`.${termynalActivateClass} .highlight`)
             .forEach(node => {
                 const text = node.textContent;
-                const lines = text.split("\n");
+                const lines = text.split(/(?<!\\)\n/)
                 const useLines = [];
                 let buffer = [];
                 function saveBuffer() {
@@ -103,7 +103,8 @@ function setupTermynal() {
                 const termynal = new Termynal(div, {
                     lineData: useLines,
                     noInit: true,
-                    lineDelay: 500
+                    lineDelay: 500,
+                    typeDelay: 20
                 });
                 termynals.push(termynal);
             });
