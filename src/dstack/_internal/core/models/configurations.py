@@ -1,3 +1,4 @@
+import os
 import re
 from enum import Enum
 from typing import Dict, List, Optional, Union
@@ -94,7 +95,7 @@ class BaseConfiguration(ForbidExtra):
         Field(description="The major version of Python\nMutually exclusive with the image"),
     ]
     env: Annotated[
-        Union[List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$")], Dict[str, str]],
+        Union[List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*(=.*$|$)")], Dict[str, str]],
         Field(description="The mapping or the list of environment variables"),
     ] = {}
     setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
@@ -117,7 +118,20 @@ class BaseConfiguration(ForbidExtra):
     @validator("env")
     def convert_env(cls, v) -> Dict[str, str]:
         if isinstance(v, list):
-            return dict(pair.split(sep="=", maxsplit=1) for pair in v)
+            d = {}
+            for var in v:
+                if "=" not in var:
+                    if var not in d:
+                        d[var] = os.environ[var]
+                    else:
+                        raise ValueError(f"Duplicate environment variable: {var}")
+                else:
+                    k, v = var.split("=", maxsplit=1)
+                    if k not in d:
+                        d[k] = v
+                    else:
+                        raise ValueError(f"Duplicate environment variable: {var}")
+            return d
         return v
 
     def get_repo(self) -> Repo:
