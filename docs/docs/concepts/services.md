@@ -36,7 +36,7 @@ authentication, and provides an OpenAI-compatible interface if needed.
     Now, if you run a service, `dstack` will make its endpoint available at 
     `https://<run name>.<gateway domain>`.
 
-    In case your service has the [model mapping](#model-mapping) configured, `dstack` will 
+    In case your service has the [model mapping](#configure-model-mapping) configured, `dstack` will 
     automatically make your model available at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
 
     If you're using [dstack Sky](https://sky.dstack.ai), the gateway is set up for you.
@@ -201,7 +201,7 @@ Authentication can be disabled by setting `auth` to `false` in the service confi
 
 #### OpenAI interface
 
-In case the service has the [model mapping](#model-mapping) configured, you will also be able 
+In case the service has the [model mapping](#configure-model-mapping) configured, you will also be able 
 to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
 
 ```python
