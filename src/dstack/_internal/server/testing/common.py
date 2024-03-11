@@ -7,7 +7,10 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
+from dstack._internal.core.models.configurations import (
+    AnyRunConfiguration,
+    DevEnvironmentConfiguration,
+)
 from dstack._internal.core.models.instances import InstanceType, Resources
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
@@ -150,6 +153,7 @@ def get_run_spec(
     run_name: str,
     repo_id: str,
     profile: Optional[Profile] = None,
+    configuration: Optional[AnyRunConfiguration] = None,
 ) -> RunSpec:
     if profile is None:
         profile = Profile(name="default")
@@ -160,7 +164,7 @@ def get_run_spec(
         repo_code_hash=None,
         working_dir=".",
         configuration_path="dstack.yaml",
-        configuration=DevEnvironmentConfiguration(ide="vscode"),
+        configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
         ssh_key_pub="",
     )
@@ -210,13 +214,13 @@ async def create_job(
     replica_num: int = 0,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
-    job_spec = get_job_specs_from_run_spec(run_spec)[0]
+    job_spec = get_job_specs_from_run_spec(run_spec, replica_num=replica_num)[0]
     job = JobModel(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
         job_num=job_num,
-        job_name=run.run_name + "-0",
+        job_name=run.run_name + f"-0-{replica_num}",
         replica_num=replica_num,
         submission_num=submission_num,
         submitted_at=submitted_at,

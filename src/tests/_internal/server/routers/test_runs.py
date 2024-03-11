@@ -128,10 +128,10 @@ def get_dev_env_run_plan_dict(
                     "env": {},
                     "home_dir": "/root",
                     "image_name": "dstackai/base:py3.8-0.4rc4-cuda-12.1",
-                    "job_name": f"{run_name}-0",
+                    "job_name": f"{run_name}-0-0",
+                    "replica_num": 0,
                     "job_num": 0,
                     "max_duration": None,
-                    "pool_name": DEFAULT_POOL_NAME,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -240,10 +240,10 @@ def get_dev_env_run_dict(
                     "env": {},
                     "home_dir": "/root",
                     "image_name": "dstackai/base:py3.8-0.4rc4-cuda-12.1",
-                    "job_name": f"{run_name}-0",
+                    "job_name": f"{run_name}-0-0",
+                    "replica_num": 0,
                     "job_num": 0,
                     "max_duration": None,
-                    "pool_name": DEFAULT_POOL_NAME,
                     "registry_auth": None,
                     "requirements": {
                         "resources": {
@@ -283,6 +283,7 @@ def get_dev_env_run_dict(
         },
         "cost": 0.0,
         "service": None,
+        "termination_reason": None,
     }
 
 
@@ -360,6 +361,7 @@ class TestListRuns:
                 },
                 "cost": 0,
                 "service": None,
+                "termination_reason": None,
             }
         ]
 

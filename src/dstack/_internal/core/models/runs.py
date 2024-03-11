@@ -119,6 +119,7 @@ class Gateway(BaseModel):
 
 
 class JobSpec(BaseModel):
+    replica_num: int = 0  # default value for backward compatibility
     job_num: int
     job_name: str
     app_specs: Optional[List[AppSpec]]
@@ -131,7 +132,6 @@ class JobSpec(BaseModel):
     requirements: Requirements
     retry_policy: RetryPolicy
     working_dir: str
-    pool_name: Optional[str]  # TODO: remove pool_name from JobSpec
 
 
 class JobProvisioningData(BaseModel):
@@ -222,6 +222,7 @@ class Run(BaseModel):
     user: str
     submitted_at: datetime
     status: RunStatus
+    termination_reason: Optional[RunTerminationReason]
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission]

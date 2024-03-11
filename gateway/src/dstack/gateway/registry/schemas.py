@@ -1,22 +1,29 @@
+from typing import Literal, Optional
+
 from pydantic import BaseModel
 
-import dstack.gateway.schemas
+
+class RegisterServiceRequest(BaseModel):
+    run_id: str
+    domain: str
+    auth: bool = True
+    options: dict = {}
+    ssh_private_key: str
 
 
-class RegisterRequest(dstack.gateway.schemas.Service):
-    pass  # TODO(egor-s): adapters and auth requirements
-
-
-class UnregisterRequest(BaseModel):
-    public_domain: str
+class RegisterReplicaRequest(BaseModel):
+    job_id: str
+    app_port: int
+    ssh_host: str
+    ssh_port: int
+    ssh_jump_host: Optional[str] = None
+    ssh_jump_port: Optional[int] = None
 
 
 class RegisterEntrypointRequest(BaseModel):
+    module: Literal["openai"]
     domain: str
 
 
-class PreflightRequest(BaseModel):
-    public_domain: str
-    ssh_private_key: str
-
-    options: dict = {}
+class OkResponse(BaseModel):
+    status: str = "ok"

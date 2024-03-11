@@ -8,7 +8,8 @@ import sqlalchemy as sa
 import sqlalchemy.orm as sa_orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import SSHError
+import dstack._internal.server.services.gateways as gateways
+from dstack._internal.core.errors import ResourceNotFoundError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.runs import (
@@ -51,15 +52,16 @@ TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 TERMINATING_PROCESSING_JOBS_IDS = set()
 
 
-def get_jobs_from_run_spec(run_spec: RunSpec) -> List[Job]:
-    job_configurator = _get_job_configurator(run_spec)
-    job_specs = job_configurator.get_job_specs()
-    return [Job(job_spec=s, job_submissions=[]) for s in job_specs]
+def get_jobs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[Job]:
+    return [
+        Job(job_spec=s, job_submissions=[])
+        for s in get_job_specs_from_run_spec(run_spec, replica_num)
+    ]
 
 
-def get_job_specs_from_run_spec(run_spec: RunSpec) -> List[JobSpec]:
+def get_job_specs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[JobSpec]:
     job_configurator = _get_job_configurator(run_spec)
-    job_specs = job_configurator.get_job_specs()
+    job_specs = job_configurator.get_job_specs(replica_num=replica_num)
     return job_specs
 
 
@@ -88,6 +90,15 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         status=job_model.status,
         termination_reason=job_model.termination_reason,
         job_provisioning_data=job_provisioning_data,
+    )
+
+
+def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
+    for job in jobs:
+        if job.job_spec.replica_num == replica_num and job.job_spec.job_num == job_num:
+            return job
+    raise ResourceNotFoundError(
+        f"Job with replica_num={replica_num} and job_num={job_num} not found"
     )
 
 
@@ -206,7 +217,9 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                 instance.name,
                 instance.status.name,
             )
-            # TODO(egor-s): unregister service replica
+            await gateways.unregister_replica(
+                session, job_model
+            )  # TODO(egor-s) ensure always runs
         finally:
             PROCESSING_POOL_IDS.remove(instance.id)
 

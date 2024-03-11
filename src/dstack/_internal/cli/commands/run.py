@@ -163,8 +163,12 @@ class RunCommand(APIBaseCommand):
                     RunStatus.PENDING,
                     RunStatus.PROVISIONING,
                 ):
+                    job_statuses = "\n".join(
+                        f"  - {job.job_spec.job_name} [secondary]({job.job_submissions[-1].status.value})[/]"
+                        for job in run._run.jobs
+                    )
                     status.update(
-                        f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]"
+                        f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]\n{job_statuses}"
                     )
                     time.sleep(5)
                     run.refresh()

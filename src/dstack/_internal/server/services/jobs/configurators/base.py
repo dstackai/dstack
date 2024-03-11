@@ -37,10 +37,12 @@ class JobConfigurator(ABC):
     def __init__(self, run_spec: RunSpec):
         self.run_spec = run_spec
 
-    def get_job_specs(self) -> List[JobSpec]:
+    def get_job_specs(self, replica_num: int) -> List[JobSpec]:
         job_spec = JobSpec(
+            replica_num=replica_num,  # TODO(egor-s): add to env variables in the runner
             job_num=0,
-            job_name=self.run_spec.run_name + "-0",
+            job_name=self.run_spec.run_name
+            + f"-0-{replica_num}",  # TODO(egor-s): use actual job_num
             app_specs=self._app_specs(),
             commands=self._commands(),
             env=self._env(),
@@ -51,7 +53,6 @@ class JobConfigurator(ABC):
             requirements=self._requirements(),
             retry_policy=self._retry_policy(),
             working_dir=self._working_dir(),
-            pool_name=self._pool_name(),
         )
         return [job_spec]
 
@@ -146,9 +147,6 @@ class JobConfigurator(ABC):
         if self.run_spec.configuration.python is not None:
             return self.run_spec.configuration.python.value
         return get_default_python_verison()
-
-    def _pool_name(self):
-        return self.run_spec.profile.pool_name
 
 
 def _join_shell_commands(commands: List[str], env: Optional[Dict[str, str]] = None) -> str:

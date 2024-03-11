@@ -1,11 +1,12 @@
 from fastapi import HTTPException
+from starlette.responses import JSONResponse
 
 
 class GatewayError(Exception):
-    def http(self, code: int = 400, **kwargs) -> HTTPException:
-        return HTTPException(
-            code,
-            {
+    def to_response(self, code: int = 400, **kwargs) -> JSONResponse:
+        return JSONResponse(
+            status_code=code,
+            content={
                 "error": self.__class__.__name__,
                 "message": str(self),
                 **kwargs,
