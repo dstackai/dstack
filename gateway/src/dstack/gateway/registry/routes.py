@@ -18,7 +18,7 @@ async def post_register_service(
     project: str, body: RegisterServiceRequest, store: Annotated[Store, Depends(get_store)]
 ) -> OkResponse:
     await store.register_service(
-        project,
+        project.lower(),
         Service(
             id=body.run_id,
             domain=body.domain.lower(),
@@ -34,7 +34,7 @@ async def post_register_service(
 async def post_unregister_services(
     project: str, run_id: str, store: Annotated[Store, Depends(get_store)]
 ) -> OkResponse:
-    await store.unregister_service(project, run_id)
+    await store.unregister_service(project.lower(), run_id)
     return OkResponse()
 
 
@@ -46,7 +46,7 @@ async def post_register_replica(
     store: Annotated[Store, Depends(get_store)],
 ) -> OkResponse:
     await store.register_replica(
-        project,
+        project.lower(),
         run_id,
         Replica(
             id=body.job_id,
@@ -64,7 +64,7 @@ async def post_register_replica(
 async def post_unregister_replica(
     project: str, run_id: str, job_id: str, store: Annotated[Store, Depends(get_store)]
 ) -> OkResponse:
-    await store.unregister_replica(project, run_id, job_id)
+    await store.unregister_replica(project.lower(), run_id, job_id)
     return OkResponse()
 
 
@@ -74,5 +74,5 @@ async def post_register_entrypoint(
     body: RegisterEntrypointRequest,
     store: Annotated[Store, Depends(get_store)],
 ) -> OkResponse:
-    await store.register_entrypoint(project, body.domain.lower(), body.module)
+    await store.register_entrypoint(project.lower(), body.domain.lower(), body.module)
     return OkResponse()

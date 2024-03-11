@@ -100,14 +100,6 @@ async def _process_job(job_id: UUID):
         job_submission = job_model_to_job_submission(job_model)
         job_provisioning_data = job_submission.job_provisioning_data
         job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
-        if job is None:
-            # Impossible scenario
-            logger.warning("%s: job not found in run, age=%s", fmt(job_model), job_submission.age)
-            job_model.status = JobStatus.TERMINATING
-            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
-            return
 
         server_ssh_private_key = project.ssh_private_key
         secrets = {}  # TODO secrets

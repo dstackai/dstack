@@ -46,6 +46,8 @@ class Store(BaseModel):
     Store is a central place to register and unregister services.
     Other components can subscribe to updates.
     Its internal state could be serialized to a file and restored from it using pydantic.
+
+    Domains and project names must be lowercased.
     """
 
     services: Dict[str, Service] = {}
@@ -122,7 +124,7 @@ class Store(BaseModel):
 
             logger.debug("%s: unregistering service %s (%s)", project, service_id, service.domain)
 
-            await asyncio.gather(
+            results = await asyncio.gather(
                 # Terminate all SSH tunnels
                 *(
                     run_async(replica.ssh_tunnel.stop)
@@ -138,6 +140,14 @@ class Store(BaseModel):
                 ),
                 return_exceptions=True,
             )
+            for exc in results:
+                if isinstance(exc, Exception):
+                    logger.error(
+                        "%s: exception during unregistering service %s: %s",
+                        project,
+                        service_id,
+                        exc,
+                    )
 
             self.projects[project].remove(service_id)
             self.services.pop(service_id)
@@ -221,13 +231,21 @@ class Store(BaseModel):
                 service.domain,
             )
 
-            await asyncio.gather(
+            results = await asyncio.gather(
                 # Terminate SSH tunnel
                 run_async(replica.ssh_tunnel.stop),
                 # Remove from nginx
                 self.nginx.remove_upstream(service.domain, replica.id),
                 return_exceptions=True,
             )
+            for exc in results:
+                if isinstance(exc, Exception):
+                    logger.error(
+                        "%s: exception during unregistering replica %s: %s",
+                        project,
+                        replica_id,
+                        exc,
+                    )
 
             service.replicas.remove(replica)
 

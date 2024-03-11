@@ -344,7 +344,7 @@ async def submit_run(
     replicas = 1
     if run_spec.configuration.type == "service":
         replicas = run_spec.configuration.replicas.min
-        if replicas < 1:
+        if replicas is None or replicas < 1:
             raise ServerClientError("Replicas count should be at least 1")
         if replicas != run_spec.configuration.replicas.max:
             raise ServerClientError("Auto-scaling is not supported yet")

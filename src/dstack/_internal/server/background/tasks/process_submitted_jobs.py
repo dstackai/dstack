@@ -108,14 +108,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     run = run_model_to_run(run_model)
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
-    if job is None:
-        # Impossible scenario
-        logger.warning("%s: job not found in run", fmt(job_model))
-        job_model.status = JobStatus.TERMINATING
-        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
-        return
 
     async with PROCESSING_POOL_LOCK:
         pool_instances = get_pool_instances(pool)

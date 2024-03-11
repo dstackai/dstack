@@ -100,7 +100,11 @@ class GatewayClient:
 
     def register_openai_entrypoint(self, project: str, domain: str):
         resp = self.s.post(
-            self._url(f"/api/registry/{project}/openai/register"), json={"domain": domain}
+            self._url(f"/api/registry/{project}/entrypoints/register"),
+            json={
+                "module": "openai",
+                "domain": domain,
+            },
         )
         if resp.status_code == 400:
             raise gateway_error(resp.json())

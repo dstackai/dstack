@@ -122,8 +122,8 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
 
     replicas = 1
     if run.run_spec.configuration.type == "service":
-        # TODO(egor-s): consider auto-scaling
-        replicas = run.run_spec.configuration.replicas.min
+        # TODO(egor-s): consider max for auto-scaling
+        replicas = run.run_spec.configuration.replicas.min or 0
 
     scheduled_replicas = 0
     # Resubmit existing replicas
