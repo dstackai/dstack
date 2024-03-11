@@ -10,6 +10,8 @@ upstream {{ service_id }} {
 server {
     server_name {{ domain }};
 
+    access_log /var/log/nginx/dstack.access.log dstack_stat;
+
     location / {
         {% if auth %}
         auth_request /auth;

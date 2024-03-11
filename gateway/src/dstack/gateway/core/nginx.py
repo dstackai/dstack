@@ -182,6 +182,13 @@ class Nginx(BaseModel):
     def get_config_name(domain: str) -> str:
         return f"443-{domain}.conf"
 
+    @classmethod
+    def write_global_conf(cls):
+        conf = importlib.resources.read_text(
+            "dstack.gateway.resources.nginx", "00-log-format.conf"
+        )
+        cls.write_conf(conf, "00-log-format.conf")
+
 
 def sudo_write(path: Path, content: str):
     with tempfile.NamedTemporaryFile("w") as temp:

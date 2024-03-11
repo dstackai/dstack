@@ -329,6 +329,8 @@ def get_store() -> Store:
     except ValidationError as e:
         logger.warning("Failed to load store state: %s", e)
         store = Store()
+    # Write nginx conf for all services
+    store.nginx.write_global_conf()
     # Start tunnels after restoring the state
     store.start_tunnels()
     return store
