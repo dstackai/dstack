@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
                 )
             else:
                 with console.status(f"Applying [code]{server_config_dir}[/]..."):
-                    await server_config_manager.apply_config(session=session)
+                    await server_config_manager.apply_config(session=session, owner=admin)
                 console.print(f"[code]✓[/] Applied [code]{server_config_dir}[/]")
         gateway_connections_pool.server_port = SERVER_PORT
         with console.status("Initializing gateways..."):

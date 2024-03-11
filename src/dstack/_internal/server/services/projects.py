@@ -72,7 +72,7 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
     await _check_projects_quota(session=session, user=user)
     project = await create_project_model(
         session=session,
-        user=user,
+        owner=user,
         project_name=project_name,
     )
     await add_project_member(
@@ -243,14 +243,14 @@ async def get_project_model_by_id_or_error(
 
 
 async def create_project_model(
-    session: AsyncSession, user: UserModel, project_name: str
+    session: AsyncSession, owner: UserModel, project_name: str
 ) -> ProjectModel:
     private_bytes, public_bytes = await run_async(
         generate_rsa_key_pair_bytes, f"{project_name}@dstack"
     )
     project = ProjectModel(
         id=uuid.uuid4(),
-        owner_id=user.id,
+        owner_id=owner.id,
         name=project_name,
         ssh_private_key=private_bytes.decode(),
         ssh_public_key=public_bytes.decode(),
