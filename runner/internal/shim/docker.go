@@ -185,7 +185,8 @@ func createContainer(ctx context.Context, client docker.APIClient, dockerParams 
 		Resources: container.Resources{
 			DeviceRequests: gpuRequest,
 		},
-		Mounts: mounts,
+		Mounts:  mounts,
+		ShmSize: taskParams.ShmSize,
 	}
 	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
 	if err != nil {
