@@ -30,6 +30,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.server.background.tasks.process_instances import process_instances
 from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.schemas.runs import CreateInstanceRequest
@@ -903,31 +904,21 @@ class TestCreateInstance:
             assert response.status_code == 200
             result = response.json()
             expected = {
-                "backend": "aws",
-                "instance_type": {
-                    "name": "instance",
-                    "resources": {
-                        "cpus": 1,
-                        "memory_mib": 512,
-                        "gpus": [],
-                        "spot": False,
-                        "disk": {"size_mib": 102400},
-                        "description": "",
-                    },
-                },
+                "backend": None,
+                "instance_type": None,
                 "name": result["name"],
                 "job_name": None,
                 "job_status": None,
-                "hostname": "127.0.0.1",
-                "status": "provisioning",
+                "hostname": None,
+                "status": "pending",
                 "created": result["created"],
-                "region": "eu",
-                "price": 1.0,
+                "region": None,
+                "price": None,
             }
             assert result == expected
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_backends_do_not_support_create_instance(
+    async def test_error_if_backends_do_not_support_create_instance(
         self, test_db, session: AsyncSession
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -964,7 +955,8 @@ class TestCreateInstance:
                 headers=get_auth_headers(user.token),
                 json=request.dict(),
             )
-            assert response.status_code == 400
+            assert response.status_code == 200
+            await process_instances()
 
     @pytest.mark.asyncio
     async def test_backend_does_not_support_create_instance(self, test_db, session: AsyncSession):

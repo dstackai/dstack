@@ -17,16 +17,16 @@ class Pool(BaseModel):
 
 
 class Instance(BaseModel):
-    backend: BackendType
-    instance_type: InstanceType
+    backend: Optional[BackendType] = None
+    instance_type: Optional[InstanceType] = None
     name: str
     job_name: Optional[str] = None
     job_status: Optional[JobStatus] = None
-    hostname: str
+    hostname: Optional[str] = None
     status: InstanceStatus
     created: datetime.datetime
-    region: str
-    price: float
+    region: Optional[str] = None
+    price: Optional[float] = None
 
 
 class PoolInstances(BaseModel):

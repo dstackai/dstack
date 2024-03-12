@@ -4,7 +4,7 @@ import math
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Set, Tuple, cast
+from typing import List, Optional, Set, Tuple
 
 import pydantic
 from sqlalchemy import and_, or_, select, update
@@ -15,7 +15,6 @@ import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import (
-    BackendError,
     RepoDoesNotExistError,
     ServerClientError,
 )
@@ -25,8 +24,6 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    InstanceRuntime,
-    LaunchedInstanceInfo,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance
@@ -36,17 +33,18 @@ from dstack._internal.core.models.profiles import (
     Profile,
     SpotPolicy,
     TerminationPolicy,
+    parse_duration,
 )
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
     JobPlan,
-    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobSubmission,
     JobTerminationReason,
     Requirements,
+    RetryPolicy,
     Run,
     RunPlan,
     RunSpec,
@@ -87,12 +85,13 @@ from dstack._internal.server.services.jobs.configurators.base import (
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
+    generate_instance_name,
     get_or_create_pool_by_name,
     get_pool_instances,
     instance_model_to_instance,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
-from dstack._internal.server.utils.common import run_async, wait_to_lock, wait_unlock
+from dstack._internal.server.utils.common import wait_to_lock, wait_unlock
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
 
@@ -552,8 +551,6 @@ async def create_instance(
     project: ProjectModel,
     user: UserModel,
     ssh_key: SSHKey,
-    pool_name: str,
-    instance_name: str,
     profile: Profile,
     requirements: Requirements,
 ) -> Instance:
@@ -580,8 +577,10 @@ async def create_instance(
             "Failed to find offers to create the instance."
         )  # TODO(sergeyme): ComputeError?
 
-    pool = await pools_services.get_or_create_pool_by_name(session, project, pool_name)
-
+    pool = await pools_services.get_or_create_pool_by_name(session, project, profile.pool_name)
+    instance_name = await generate_instance_name(
+        session=session, project=project, pool_name=pool.name
+    )
     user_ssh_key = ssh_key
     project_ssh_key = SSHKey(
         public=project.ssh_public_key.strip(),
@@ -599,71 +598,35 @@ async def create_instance(
         user=user.name,
     )
 
-    for backend, instance_offer in offers:
-        # cannot create an instance in vastai/k8s. skip
-        if instance_offer.instance_runtime == InstanceRuntime.RUNNER:
-            continue
-        logger.debug(
-            "trying %s in %s/%s for $%0.4f per hour",
-            instance_offer.instance.name,
-            instance_offer.backend.value,
-            instance_offer.region,
-            instance_offer.price,
-        )
-        try:
-            launched_instance_info: LaunchedInstanceInfo = await run_async(
-                backend.compute().create_instance,
-                instance_offer,
-                instance_config,
-            )
-        except BackendError as e:
-            logger.warning(
-                "%s launch in %s/%s failed: %s",
-                instance_offer.instance.name,
-                instance_offer.backend.value,
-                instance_offer.region,
-                repr(e),
-            )
-            continue
-        except NotImplementedError:
-            # skip a backend without create_instance support, continue with next backend and offer
-            continue
-        job_provisioning_data = JobProvisioningData(
-            backend=backend.TYPE,
-            instance_type=instance_offer.instance,
-            instance_id=launched_instance_info.instance_id,
-            hostname=launched_instance_info.ip_address,
-            region=launched_instance_info.region,
-            price=instance_offer.price,
-            username=launched_instance_info.username,
-            ssh_port=launched_instance_info.ssh_port,
-            dockerized=launched_instance_info.dockerized,
-            backend_data=launched_instance_info.backend_data,
-            ssh_proxy=None,
-        )
-        termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
-        termination_idle_time = profile.termination_idle_time
-        if termination_idle_time is None:
-            termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
-        im = InstanceModel(
-            name=instance_name,
-            project=project,
-            pool=pool,
-            created_at=common_utils.get_current_datetime(),
-            started_at=common_utils.get_current_datetime(),
-            status=InstanceStatus.PROVISIONING,
-            backend=backend.TYPE,
-            region=instance_offer.region,
-            price=instance_offer.price,
-            job_provisioning_data=job_provisioning_data.json(),
-            offer=cast(InstanceOfferWithAvailability, instance_offer).json(),
-            termination_policy=termination_policy,
-            termination_idle_time=termination_idle_time,
-        )
-        session.add(im)
-        await session.commit()
-        return instance_model_to_instance(im)
-    raise ServerClientError("Failed to create the instance.")  # TODO(sergeyme): ComputeError?
+    termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
+    termination_idle_time = profile.termination_idle_time
+    if termination_idle_time is None:
+        termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
+
+    retry_policy = RetryPolicy(retry=False, limit=None)
+    if profile.retry_policy is not None:
+        retry_policy.retry = profile.retry_policy.retry
+        retry_policy.limit = parse_duration(profile.retry_policy.limit)
+
+    im = InstanceModel(
+        name=instance_name,
+        project=project,
+        pool=pool,
+        created_at=common_utils.get_current_datetime(),
+        status=InstanceStatus.PENDING,
+        profile=profile.json(),
+        requirements=requirements.json(),
+        instance_configuration=instance_config.json(),
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
+        retry_policy=retry_policy.retry,
+        retry_policy_duration=retry_policy.limit,
+    )
+
+    session.add(im)
+    await session.commit()
+
+    return instance_model_to_instance(im)
 
 
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:

@@ -32,7 +32,6 @@ class GetOffersRequest(BaseModel):
 
 
 class CreateInstanceRequest(BaseModel):
-    pool_name: str
     profile: Profile
     requirements: Requirements
     ssh_key: SSHKey

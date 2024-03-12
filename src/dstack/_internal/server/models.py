@@ -310,11 +310,21 @@ class InstanceModel(BaseModel):
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
+    # create instance
+    profile: Mapped[Optional[str]] = mapped_column(Text)
+    requirements: Mapped[Optional[str]] = mapped_column(String(10_000))
+    instance_configuration: Mapped[Optional[str]] = mapped_column(Text)
+
     # temination policy
     termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(50))
     termination_idle_time: Mapped[int] = mapped_column(
         Integer, default=DEFAULT_POOL_TERMINATION_IDLE_TIME
     )
+
+    # retry policy
+    retry_policy: Mapped[bool] = mapped_column(Boolean, default=False)
+    retry_policy_duration: Mapped[Optional[int]] = mapped_column(Integer)
+    last_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # instance termination handling
     termination_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime)
@@ -322,15 +332,15 @@ class InstanceModel(BaseModel):
     health_status: Mapped[Optional[str]] = mapped_column(String(4000))
 
     # backend
-    backend: Mapped[BackendType] = mapped_column(Enum(BackendType))
+    backend: Mapped[Optional[BackendType]] = mapped_column(Enum(BackendType))
     backend_data: Mapped[Optional[str]] = mapped_column(String(4000))
 
     # offer
-    offer: Mapped[str] = mapped_column(String(4000))
-    region: Mapped[str] = mapped_column(String(2000))
-    price: Mapped[float] = mapped_column(Float)
+    offer: Mapped[Optional[str]] = mapped_column(String(4000))
+    region: Mapped[Optional[str]] = mapped_column(String(2000))
+    price: Mapped[Optional[float]] = mapped_column(Float)
 
-    job_provisioning_data: Mapped[str] = mapped_column(String(4000))
+    job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
 
     # current job
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))

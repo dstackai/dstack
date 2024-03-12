@@ -21,7 +21,6 @@ from dstack._internal.server.schemas.runs import (
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
 from dstack._internal.server.services.pools import (
-    generate_instance_name,
     get_or_create_pool_by_name,
 )
 
@@ -134,8 +133,6 @@ async def delete_runs(
 
 
 # FIXME: get_offers and create_instance semantically belong to pools, not runs
-
-
 @project_router.post("/get_offers")
 async def get_offers(
     body: GetOffersRequest,
@@ -153,6 +150,7 @@ async def get_offers(
     return PoolInstanceOffers(pool_name=pool.name, instances=instances)
 
 
+# FIXME: get_offers and create_instance semantically belong to pools, not runs
 @project_router.post("/create_instance")
 async def create_instance(
     body: CreateInstanceRequest,
@@ -160,17 +158,12 @@ async def create_instance(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Instance:
     user, project = user_project
-    instance_name = await generate_instance_name(
-        session=session, project=project, pool_name=body.pool_name
-    )
     try:
         instance = await runs.create_instance(
             session=session,
             project=project,
             user=user,
             ssh_key=body.ssh_key,
-            pool_name=body.pool_name,
-            instance_name=instance_name,
             profile=body.profile,
             requirements=body.requirements,
         )

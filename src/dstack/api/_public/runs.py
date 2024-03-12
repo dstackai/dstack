@@ -382,11 +382,9 @@ class RunCollection:
         return self._api_client.runs.get_offers(self._project, profile, requirements)
 
     def create_instance(
-        self, pool_name: str, profile: Profile, requirements: Requirements, ssh_key: SSHKey
+        self, profile: Profile, requirements: Requirements, ssh_key: SSHKey
     ) -> Instance:
-        return self._api_client.runs.create_instance(
-            self._project, pool_name, profile, requirements, ssh_key
-        )
+        return self._api_client.runs.create_instance(self._project, profile, requirements, ssh_key)
 
     def get_plan(
         self,

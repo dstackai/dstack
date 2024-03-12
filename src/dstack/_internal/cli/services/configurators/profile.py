@@ -2,6 +2,7 @@ import argparse
 import os
 
 from dstack._internal.core.models.profiles import (
+    DEFAULT_INSTANCE_RETRY_DURATION,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
@@ -131,18 +132,15 @@ def register_profile_args(parser: argparse.ArgumentParser, pool_add: bool = Fals
         help="One of %s" % ", ".join([f"[code]{i.value}[/]" for i in SpotPolicy]),
     )
 
-    if not pool_add:
-        retry_group = parser.add_argument_group("Retry policy")
-        retry_group_exc = retry_group.add_mutually_exclusive_group()
-        retry_group_exc.add_argument(
-            "--retry", action="store_const", dest="retry_policy", const=True
-        )
-        retry_group_exc.add_argument(
-            "--no-retry", action="store_const", dest="retry_policy", const=False
-        )
-        retry_group_exc.add_argument(
-            "--retry-limit", type=retry_limit, dest="retry_limit", metavar="DURATION"
-        )
+    retry_group = parser.add_argument_group("Retry policy")
+    retry_group_exc = retry_group.add_mutually_exclusive_group()
+    retry_group_exc.add_argument("--retry", action="store_const", dest="retry_policy", const=True)
+    retry_group_exc.add_argument(
+        "--no-retry", action="store_const", dest="retry_policy", const=False
+    )
+    retry_group_exc.add_argument(
+        "--retry-limit", type=retry_limit, dest="retry_limit", metavar="DURATION"
+    )
 
 
 def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: bool = False):
@@ -195,6 +193,18 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: boo
                 profile.retry_policy = ProfileRetryPolicy()
             profile.retry_policy.retry = True
             profile.retry_policy.limit = args.retry_limit
+    else:
+        if args.retry_policy is not None:
+            if not profile.retry_policy:
+                profile.retry_policy = ProfileRetryPolicy()
+            profile.retry_policy.retry = args.retry_policy
+            if profile.retry_policy.retry:
+                profile.retry_policy.limit = DEFAULT_INSTANCE_RETRY_DURATION
+        elif args.retry_limit is not None:
+            if not profile.retry_policy:
+                profile.retry_policy = ProfileRetryPolicy()
+            profile.retry_policy.retry = True
+            profile.retry_policy.limit = args.retry_limit  # --retry-duration
 
 
 def max_duration(v: str) -> int:
