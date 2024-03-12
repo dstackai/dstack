@@ -1,11 +1,12 @@
 import asyncio
 import datetime
+import logging
 from functools import lru_cache
-from typing import Dict, List, Tuple
+from typing import ClassVar, Dict, List, Tuple
 
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
-from dstack.gateway.core.persistent import get_persistent_state
+from dstack.gateway.core.persistent import PersistentModel, get_persistent_state
 from dstack.gateway.core.store import Service, StoreSubscriber
 from dstack.gateway.errors import GatewayError, NotFoundError
 from dstack.gateway.openai.clients import ChatCompletionsClient
@@ -14,12 +15,16 @@ from dstack.gateway.openai.clients.tgi import TGIChatCompletions
 from dstack.gateway.openai.models import OpenAIOptions, ServiceModel
 from dstack.gateway.openai.schemas import Model
 
+logger = logging.getLogger(__name__)
 
-class OpenAIStore(BaseModel, StoreSubscriber):
+
+class OpenAIStore(PersistentModel, StoreSubscriber):
     """
     OpenAIStore keeps track of LLM models registered in the system and dispatches requests.
     Its internal state could be serialized to a file and restored from it using pydantic.
     """
+
+    persistent_key: ClassVar[str] = "openai"
 
     index: Dict[str, Dict[str, Dict[str, ServiceModel]]] = {}
     services_index: Dict[str, Tuple[str, str, str]] = {}
@@ -94,4 +99,11 @@ class OpenAIStore(BaseModel, StoreSubscriber):
 
 @lru_cache()
 def get_store() -> OpenAIStore:
-    return OpenAIStore.model_validate(get_persistent_state().get("openai", {}))
+    try:
+        store = OpenAIStore.model_validate(
+            get_persistent_state().get(OpenAIStore.persistent_key, {})
+        )
+    except ValidationError as e:
+        logger.warning("Failed to load openai store state: %s", e)
+        store = OpenAIStore()
+    return store

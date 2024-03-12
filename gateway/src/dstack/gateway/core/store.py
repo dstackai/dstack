@@ -10,13 +10,13 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import AsyncExitStack
 from functools import lru_cache
 from pathlib import Path
-from typing import DefaultDict, Dict, List, Optional, Set, Tuple
+from typing import ClassVar, DefaultDict, Dict, List, Optional, Set, Tuple
 
 from pydantic import BaseModel, Field, PrivateAttr, ValidationError
 
 from dstack.gateway.common import run_async
 from dstack.gateway.core.nginx import Nginx
-from dstack.gateway.core.persistent import get_persistent_state
+from dstack.gateway.core.persistent import PersistentModel, get_persistent_state
 from dstack.gateway.core.tunnel import SSHTunnel
 from dstack.gateway.errors import GatewayError
 
@@ -41,7 +41,7 @@ class Service(BaseModel):
     replicas: List[Replica] = []
 
 
-class Store(BaseModel):
+class Store(PersistentModel):
     """
     Store is a central place to register and unregister services.
     Other components can subscribe to updates.
@@ -49,6 +49,8 @@ class Store(BaseModel):
 
     Domains and project names must be lowercased.
     """
+
+    persistent_key: ClassVar[str] = "store"
 
     services: Dict[str, Service] = {}
     projects: DefaultDict[str, Set[str]] = defaultdict(set)
@@ -325,7 +327,7 @@ def supress_exc(func, *args, **kwargs):
 @lru_cache()
 def get_store() -> Store:
     try:
-        store = Store.model_validate(get_persistent_state().get("store", {}))
+        store = Store.model_validate(get_persistent_state().get(Store.persistent_key, {}))
     except ValidationError as e:
         logger.warning("Failed to load store state: %s", e)
         store = Store()
