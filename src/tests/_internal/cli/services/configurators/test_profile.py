@@ -64,7 +64,7 @@ class TestProfileArgs:
 
     def test_retry_limit(self):
         profile = Profile(name="test")
-        modified, _ = apply_args(profile, ["--retry-limit", "1h"])
+        modified, _ = apply_args(profile, ["--retry-duration", "1h"])
         profile.retry_policy = ProfileRetryPolicy(retry=True, limit=3600)
         assert profile.dict() == modified.dict()
 
