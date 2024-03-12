@@ -209,23 +209,27 @@ def get_pool_instances(pool: PoolModel) -> List[InstanceModel]:
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
-    offer: InstanceOfferWithAvailability = InstanceOfferWithAvailability.parse_raw(
-        instance_model.offer
-    )
-    jpd: JobProvisioningData = JobProvisioningData.parse_raw(instance_model.job_provisioning_data)
     instance = Instance(
-        backend=offer.backend,
         name=instance_model.name,
-        instance_type=jpd.instance_type,
-        hostname=jpd.hostname,
         status=instance_model.status,
-        region=offer.region,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
-        price=offer.price,
     )
+
+    if instance_model.offer is not None:
+        offer = InstanceOfferWithAvailability.parse_raw(instance_model.offer)
+        instance.backend = offer.backend
+        instance.region = offer.region
+        instance.price = offer.price
+
+    if instance_model.job_provisioning_data is not None:
+        jpd = JobProvisioningData.parse_raw(instance_model.job_provisioning_data)
+        instance.instance_type = jpd.instance_type
+        instance.hostname = jpd.hostname
+
     if instance_model.job is not None:
         instance.job_name = instance_model.job.job_name
         instance.job_status = instance_model.job.status
+
     return instance
 
 

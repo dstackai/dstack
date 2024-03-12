@@ -13,6 +13,8 @@ DEFAULT_POOL_NAME = "default-pool"
 DEFAULT_RUN_TERMINATION_IDLE_TIME = 5 * 60  # 5 minutes
 DEFAULT_POOL_TERMINATION_IDLE_TIME = 72 * 60 * 60  # 3 days
 
+DEFAULT_INSTANCE_RETRY_DURATION = 60 * 60 * 24  # 24h
+
 
 class SpotPolicy(str, Enum):
     SPOT = "spot"
