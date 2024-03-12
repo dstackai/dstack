@@ -70,6 +70,7 @@ class DockerImageBody(BaseModel):
     username: str
     password: str
     image_name: str
+    shm_size: int
 
 
 class StopBody(BaseModel):

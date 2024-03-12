@@ -221,7 +221,10 @@ class TestProcessRunningJobs:
             RunnerTunnelMock.assert_called_once()
             ShimClientMock.return_value.healthcheck.assert_called_once()
             ShimClientMock.return_value.submit.assert_called_once_with(
-                username="", password="", image_name="dstackai/base:py3.11-0.4rc4-cuda-12.1"
+                username="",
+                password="",
+                image_name="dstackai/base:py3.11-0.4rc4-cuda-12.1",
+                shm_size=None,
             )
         await session.refresh(job)
         assert job is not None

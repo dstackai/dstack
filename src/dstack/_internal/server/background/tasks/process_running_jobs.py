@@ -352,12 +352,14 @@ def _process_provisioning_with_shim(
             username=interpolate(registry_auth.username),
             password=interpolate(registry_auth.password),
             image_name=job_spec.image_name,
+            shm_size=job_spec.requirements.resources.shm_size,
         )
     else:
         shim_client.submit(
             username="",
             password="",
             image_name=job_spec.image_name,
+            shm_size=job_spec.requirements.resources.shm_size,
         )
 
     job_model.status = JobStatus.PULLING
