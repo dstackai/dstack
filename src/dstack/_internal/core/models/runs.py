@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
 from pydantic import UUID4, BaseModel, Field
 from typing_extensions import Annotated
@@ -251,28 +251,14 @@ class PoolInstanceOffers(BaseModel):
 
 class InstanceStatus(str, Enum):
     PENDING = "pending"
-    CREATING = "creating"  # TODO: Backward compatibility, will be removed in 0.17
-    STARTING = "starting"  # TODO: Backward compatibility, will be removed in 0.17
-    READY = "ready"  # TODO: Backward compatibility, will be removed in 0.17
     PROVISIONING = "provisioning"
     IDLE = "idle"
     BUSY = "busy"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
 
-    @property
-    def finished_statuses(cls) -> Sequence["InstanceStatus"]:  # TODO: remove in 0.17
-        return [cls.TERMINATED]
-
-    def is_finished(self):  # TODO: remove in 0.17
-        return self in self.finished_statuses
-
-    def is_started(self):  # TODO: remove in 0.17
-        return not self.is_finished()
-
     def is_available(self) -> bool:
         return self in (
-            self.READY,  # TODO: Backward compatibility, will be removed in 0.17
             self.IDLE,
             self.BUSY,
         )

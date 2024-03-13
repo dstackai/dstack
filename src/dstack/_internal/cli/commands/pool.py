@@ -335,14 +335,6 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
     table.add_column("CREATED")
 
     for instance in instances:
-        status = instance.status.value
-
-        if instance.status in (InstanceStatus.STARTING, InstanceStatus.CREATING):
-            status = InstanceStatus.PROVISIONING.value
-
-        if instance.status == InstanceStatus.READY:
-            status = InstanceStatus.IDLE.value
-
         resources = ""
         spot = ""
         if instance.instance_type is not None:
@@ -356,7 +348,7 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
             resources,
             spot,
             f"${instance.price:.4}" if instance.price is not None else "",
-            status,
+            instance.status.value,
             pretty_date(instance.created),
         ]
         table.add_row(*row)
