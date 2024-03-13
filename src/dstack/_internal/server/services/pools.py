@@ -130,7 +130,7 @@ async def delete_pool(session: AsyncSession, project: ProjectModel, pool_name: s
 
     pool_instances = get_pool_instances(pool)
     for instance in pool_instances:
-        if not instance.status.is_finished():
+        if instance.status != InstanceStatus.TERMINATED:
             raise ServerClientError("Cannot delete pool with running instances")
 
     pool.deleted = True
@@ -189,15 +189,7 @@ async def show_pool_instances(
     else:
         pool = await get_or_create_pool_by_name(session, project, pool_name)
     pool_instances = get_pool_instances(pool)
-    instances = []
-    for instance_item in pool_instances:
-        instance = instance_model_to_instance(instance_item)
-        # TODO: Backward compatibility, will be removed in 0.17
-        if instance.status == InstanceStatus.IDLE:
-            instance.status = InstanceStatus.READY
-        elif instance.status == InstanceStatus.PROVISIONING:
-            instance.status = InstanceStatus.STARTING
-        instances.append(instance)
+    instances = list(map(instance_model_to_instance, pool_instances))
     return PoolInstances(
         name=pool.name,
         instances=instances,

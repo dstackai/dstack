@@ -288,7 +288,7 @@ class TestShowPool:
                     "job_name": None,
                     "job_status": None,
                     "hostname": "running_instance.ip",
-                    "status": "ready",
+                    "status": "idle",
                     "created": "2023-01-02T03:04:00+00:00",
                     "region": "en",
                     "price": 1,

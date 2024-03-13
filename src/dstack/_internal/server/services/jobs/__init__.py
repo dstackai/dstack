@@ -202,7 +202,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             if instance.status == InstanceStatus.BUSY:
                 instance.status = InstanceStatus.IDLE
             elif instance.status != InstanceStatus.TERMINATED:
-                # instance was CREATING or STARTING (specially for the job)
+                # instance was PROVISIONING (specially for the job)
                 # schedule for termination
                 instance.status = InstanceStatus.TERMINATING
 
