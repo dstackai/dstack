@@ -126,9 +126,9 @@ class BaseConfiguration(ForbidExtra):
                     else:
                         raise ValueError(f"Duplicate environment variable: {var}")
                 else:
-                    k, v = var.split("=", maxsplit=1)
+                    k, val = var.split("=", maxsplit=1)
                     if k not in d:
-                        d[k] = v
+                        d[k] = val
                     else:
                         raise ValueError(f"Duplicate environment variable: {var}")
             return d
