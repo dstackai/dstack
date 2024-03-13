@@ -63,6 +63,7 @@ BASE_DEPS = [
     "gpuhunt==0.0.6",
     "sentry-sdk[fastapi]",
     "httpx",
+    "aiorwlock",
 ]
 
 AWS_DEPS = [

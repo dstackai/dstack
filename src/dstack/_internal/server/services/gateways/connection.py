@@ -1,14 +1,19 @@
 import contextlib
 import os
-from typing import Iterator
+import uuid
+from typing import AsyncIterator, Dict, Optional
 
-from dstack._internal.server.services.gateways.client import GATEWAY_MANAGEMENT_PORT, GatewayClient
-from dstack._internal.server.services.ssh import SSHAutoTunnel
+import aiorwlock
 
+from dstack._internal.server.services.gateways.client import (
+    GATEWAY_MANAGEMENT_PORT,
+    GatewayClient,
+    Stat,
+)
+from dstack._internal.server.services.ssh import AsyncSSHTunnel
+from dstack._internal.utils.logging import get_logger
 
-@contextlib.contextmanager
-def gateway_tunnel_client(hostname: str, id_rsa: str) -> Iterator[GatewayClient]:
-    raise NotImplementedError()  # TODO(egor-s): remove
+logger = get_logger(__name__)
 
 
 class GatewayConnection:
@@ -21,10 +26,13 @@ class GatewayConnection:
     """
 
     def __init__(self, ip_address: str, id_rsa: str, server_port: int):
+        self._lock = aiorwlock.RWLock()
+        self.stats: Dict[str, Dict[int, Stat]] = {}
         self.ip_address = ip_address
+
         args = ["-L", "{temp_dir}/gateway:localhost:%d" % GATEWAY_MANAGEMENT_PORT]
         args += ["-R", f"localhost:8001:localhost:{server_port}"]
-        self.tunnel = SSHAutoTunnel(
+        self.tunnel = AsyncSSHTunnel(
             f"ubuntu@{ip_address}",
             id_rsa,
             {
@@ -37,4 +45,26 @@ class GatewayConnection:
             },
             args,
         )
-        self.client = GatewayClient(uds=os.path.join(self.tunnel.temp_dir, "gateway"))
+        self._client = GatewayClient(uds=os.path.join(self.tunnel.temp_dir, "gateway"))
+
+    async def check_or_restart(self):
+        async with self._lock.writer_lock:
+            if not await self.tunnel.check():
+                logger.info("Connection to gateway %s is down, restarting", self.ip_address)
+                await self.tunnel.start()
+        return
+
+    async def collect_stats(self):
+        async with self._lock.writer_lock:
+            self.stats = await self._client.collect_stats()
+            for service_id, stats in self.stats.items():
+                logger.debug("%s stats: %s", service_id, stats)
+
+    async def get_stats(self, service_id: uuid.UUID) -> Optional[Dict[int, Stat]]:
+        async with self._lock.reader_lock:
+            return self.stats.get(service_id.hex)
+
+    @contextlib.asynccontextmanager
+    async def client(self) -> AsyncIterator[GatewayClient]:
+        async with self._lock.reader_lock:
+            yield self._client

@@ -117,6 +117,7 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
         .options(joinedload(RunModel.project))
         .options(joinedload(RunModel.user))
         .options(joinedload(RunModel.repo))
+        .options(joinedload(RunModel.gateway))
     )
     run = run_model_to_run(run_model)
 
