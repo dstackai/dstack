@@ -7,6 +7,7 @@ import requests
 import requests.exceptions
 
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
+from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import JobSpec, RunSpec
 from dstack._internal.server.schemas.runner import (
     DockerImageBody,
@@ -102,9 +103,10 @@ class ShimClient:
                 raise
             return None
 
-    def submit(self, username: str, password: str, image_name: str):
+    def submit(self, username: str, password: str, image_name: str, shm_size: Optional[Memory]):
+        _shm_size = int(shm_size * 1024 * 1024 * 1014) if shm_size else 0
         post_body = DockerImageBody(
-            username=username, password=password, image_name=image_name
+            username=username, password=password, image_name=image_name, shm_size=_shm_size
         ).dict()
         resp = requests.post(
             self._url("/api/submit"),

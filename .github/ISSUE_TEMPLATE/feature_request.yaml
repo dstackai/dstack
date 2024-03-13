@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for taking the time to suggest this feature. Before submitting it, please ensure that there is no existing feature request and that you have discussed it with the team via [Slack](https://discord.gg/u8SmfwPpMd).
+        Thank you for taking the time to suggest this feature. Before submitting it, please ensure that there is no existing feature request and that you have discussed it with the team via [Discord](https://discord.gg/u8SmfwPpMd).
   - type: textarea
     id: problem
     attributes:

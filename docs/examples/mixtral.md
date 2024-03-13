@@ -125,7 +125,7 @@ Once the service is up, you'll be able to access it at `https://<run name>.<gate
 
 #### OpenAI interface
 
-In case the service has the [model mapping](../docs/concepts/services.md#model-mapping) configured, you will also be able 
+In case the service has the [model mapping](../docs/concepts/services.md#configure-model-mapping) configured, you will also be able 
 to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
 
 ```python
