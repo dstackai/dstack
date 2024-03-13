@@ -6,7 +6,7 @@ import requests
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
     get_instance_name,
-    get_shim_commands,
+    get_shim_commands, get_gateway_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.cudo.api_client import CudoApiClient
@@ -18,7 +18,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
     LaunchedInstanceInfo,
-    SSHKey,
+    SSHKey, LaunchedGatewayInfo,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
@@ -30,13 +30,14 @@ class CudoCompute(Compute):
     def __init__(self, config: CudoConfig):
         self.config = config
         self.api_client = CudoApiClient(config.creds.api_key)
+        self.catalog = gpuhunt.Catalog(balance_resources=False, auto_reload=False)
+        self.catalog.add_provider(CudoProvider())
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
-            backend=BackendType.CUDO,
-            requirements=requirements,
+            backend=BackendType.CUDO, requirements=requirements, catalog=self.catalog
         )
         offers = [
             InstanceOfferWithAvailability(
@@ -136,3 +137,41 @@ class CudoCompute(Compute):
                 logger.debug("The instance with name %s not found", instance_id)
                 return
             raise BackendError(e.response.text)
+
+
+    def create_gateway(
+        self,
+        instance_name: str,
+        ssh_key_pub: str,
+        region: str,
+        project_id: str,
+    ) -> LaunchedGatewayInfo:
+        resp_data = self.api_client.create_virtual_machine(
+            project_id=self.config.project_id,
+            boot_disk_storage_class="STORAGE_CLASS_NETWORK",
+            boot_disk_size_gib=30,
+            book_disk_id=f"{instance_name}_disk_id",
+            boot_disk_image_id="ubuntu-2204",
+            data_center_id=region,
+            gpu_model=None,
+            gpus=None,
+            machine_type="intel-broadwell",
+            memory_gib=2,
+            vcpus=1,
+            vm_id=instance_name,
+            start_script=get_gateway_user_data(ssh_key_pub),
+            password=None,
+            customSshKeys=[ssh_key_pub],
+        )
+
+        vm = self.api_client.get_vm(self.config.project_id, instance_name)
+        # Wait until VM State is Active. This is necessary to get the ip_address.
+        while vm["VM"]["state"] != "ACTIVE":
+            time.sleep(1)
+            vm = self.api_client.get_vm(self.config.project_id, instance_name)
+
+        return LaunchedGatewayInfo(
+            instance_id=resp_data["id"],
+            ip_address=vm["VM"]["publicIpAddress"],
+            region=resp_data["vm"]["regionId"],
+        )
