@@ -1,12 +1,15 @@
 import time
 from typing import List, Optional
 
+import gpuhunt
 import requests
+from gpuhunt.providers.cudo import CudoProvider
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
+    get_gateway_user_data,
     get_instance_name,
-    get_shim_commands, get_gateway_user_data,
+    get_shim_commands,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.cudo.api_client import CudoApiClient
@@ -17,8 +20,9 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
+    LaunchedGatewayInfo,
     LaunchedInstanceInfo,
-    SSHKey, LaunchedGatewayInfo,
+    SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
@@ -137,7 +141,6 @@ class CudoCompute(Compute):
                 logger.debug("The instance with name %s not found", instance_id)
                 return
             raise BackendError(e.response.text)
-
 
     def create_gateway(
         self,
