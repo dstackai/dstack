@@ -64,6 +64,12 @@ class CudoApiClient:
             data = resp.json()
             return data
 
+    def get_machine_types(self):
+        resp = self._make_request("GET", "/vms/machine-types-2")
+        if resp.ok:
+            data = resp.json()
+            return data
+
     def terminate_virtual_machine(self, vm_id: str, project_id):
         resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
         if resp.ok:

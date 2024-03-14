@@ -14,7 +14,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.cudo.api_client import CudoApiClient
 from dstack._internal.core.backends.cudo.config import CudoConfig
-from dstack._internal.core.errors import BackendError, NoCapacityError
+from dstack._internal.core.errors import BackendError, NoCapacityError, ResourceNotFoundError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -24,10 +24,15 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
     SSHKey,
 )
+from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+CPU_GATEWAY = 1
+MEMORY_GATEWAY = Memory.parse("2GB")
+DISK_SIZE_GATEWAY = 30
 
 
 class CudoCompute(Compute):
@@ -149,23 +154,39 @@ class CudoCompute(Compute):
         region: str,
         project_id: str,
     ) -> LaunchedGatewayInfo:
-        resp_data = self.api_client.create_virtual_machine(
-            project_id=self.config.project_id,
-            boot_disk_storage_class="STORAGE_CLASS_NETWORK",
-            boot_disk_size_gib=30,
-            book_disk_id=f"{instance_name}_disk_id",
-            boot_disk_image_id="ubuntu-2204",
-            data_center_id=region,
-            gpu_model=None,
-            gpus=None,
-            machine_type="intel-broadwell",
-            memory_gib=2,
-            vcpus=1,
-            vm_id=instance_name,
-            start_script=get_gateway_user_data(ssh_key_pub),
-            password=None,
-            customSshKeys=[ssh_key_pub],
-        )
+        vm = self.get_gateway_machine(region)
+        if not vm:
+            raise ResourceNotFoundError()
+        try:
+            resp_data = self.api_client.create_virtual_machine(
+                project_id=self.config.project_id,
+                boot_disk_storage_class="STORAGE_CLASS_NETWORK",
+                boot_disk_size_gib=DISK_SIZE_GATEWAY,
+                book_disk_id=f"{instance_name}_disk_id",
+                boot_disk_image_id="ubuntu-2204",
+                data_center_id=region,
+                gpus=None,
+                machine_type=vm["machineType"],
+                memory_gib=MEMORY_GATEWAY,
+                vcpus=CPU_GATEWAY,
+                vm_id=instance_name,
+                start_script=get_gateway_user_data(ssh_key_pub),
+                password=None,
+                customSshKeys=[ssh_key_pub],
+            )
+        except requests.HTTPError as e:
+            try:
+                details = e.response.json()
+                response_code = details.get("code")
+            except ValueError:
+                raise BackendError(e)
+
+            # code 3: There are no hosts available for your specified virtual machine.
+            if response_code == 3:
+                raise NoCapacityError(details.get("message"))
+            # code 9: Vm cannot be assigned ip from network. Network full
+            if response_code == 9:
+                raise BackendError(details.get("message"))
 
         vm = self.api_client.get_vm(self.config.project_id, instance_name)
         # Wait until VM State is Active. This is necessary to get the ip_address.
@@ -178,3 +199,23 @@ class CudoCompute(Compute):
             ip_address=vm["VM"]["publicIpAddress"],
             region=resp_data["vm"]["regionId"],
         )
+
+    def get_gateway_machine(self, region):
+        machine_types = self.api_client.get_machine_types()["machineTypes"]
+        vms = [
+            vm
+            for vm in machine_types
+            if vm.get("dataCenterId") == region
+            and vm.get("maxVcpuFree", 0) > CPU_GATEWAY
+            and vm.get("maxMemoryGibFree", 0) > MEMORY_GATEWAY
+            and vm.get("maxStorageGibFree", 0) > DISK_SIZE_GATEWAY
+        ]
+        if not vms:
+            return None
+        for vm in vms:
+            vm["price"] = round(float(vm["vcpuPriceHr"]["value"]), 5) * CPU_GATEWAY
+        +(round(float(vm["memoryGibPriceHr"]["value"]), 5) * MEMORY_GATEWAY)
+        +(round(float(vm["minStorageGibPriceHr"]["value"]), 5) * DISK_SIZE_GATEWAY)
+        +(round(float(vm["ipv4PriceHr"]["value"]), 5))
+        vms_sorted = sorted(vms, key=lambda x: x["price"])
+        return vms_sorted[0]
