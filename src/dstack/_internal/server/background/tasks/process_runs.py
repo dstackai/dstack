@@ -8,6 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+import dstack._internal.server.services.gateways.autoscalers as autoscalers
 from dstack._internal.core.models.instances import InstanceOffer
 from dstack._internal.core.models.profiles import ProfileRetryPolicy
 from dstack._internal.core.models.runs import (
@@ -21,6 +22,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, JobModel, RunModel
+from dstack._internal.server.services.gateways import gateway_connections_pool
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -123,8 +125,26 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
 
     replicas = 1
     if run.run_spec.configuration.type == "service":
-        # TODO(egor-s): consider max for auto-scaling
-        replicas = run.run_spec.configuration.replicas.min or 0
+        replicas = run.run_spec.configuration.replicas.min or 0  # new default
+        scaler = autoscalers.get_service_autoscaler(run.run_spec.configuration)
+        if scaler is not None:
+            conn = await gateway_connections_pool.get(run_model.gateway.gateway_compute.ip_address)
+            if conn is None:
+                logger.error(
+                    "%s: can't get connection to gateway %s",
+                    fmt(run_model),
+                    run_model.gateway.gateway_compute.ip_address,
+                )
+                run_model.status = RunStatus.TERMINATING
+                run_model.termination_reason = RunTerminationReason.SERVER_ERROR
+                return
+            stats = await conn.get_stats(run_model.id)
+            if stats:
+                # replicas info doesn't matter for now
+                replicas = scaler.scale([], stats)
+    if replicas == 0:
+        # stay zero scaled
+        return
 
     scheduled_replicas = 0
     # Resubmit existing replicas

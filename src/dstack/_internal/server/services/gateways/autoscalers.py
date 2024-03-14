@@ -1,11 +1,12 @@
 import datetime
 import math
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
 import dstack._internal.utils.common as common_utils
+from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.server.services.gateways.client import Stat
 
 
@@ -80,3 +81,17 @@ class RPSAutoscaler(BaseAutoscaler):
                 return 0
             return target_replicas - len(active_replicas)
         return 0
+
+
+def get_service_autoscaler(conf: ServiceConfiguration) -> Optional[BaseAutoscaler]:
+    if conf.scaling is None:
+        return None
+    if conf.scaling.metric == "rps":
+        return RPSAutoscaler(
+            # replicas count validated by configuration model
+            min_replicas=conf.replicas.min,
+            max_replicas=conf.replicas.max,
+            target=conf.scaling.target,
+            scale_up_delay=conf.scaling.scale_up_delay,
+            scale_down_delay=conf.scaling.scale_down_delay,
+        )

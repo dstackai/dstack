@@ -621,7 +621,9 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
 
     latest_job_submission = None
     if include_job_submissions:
-        latest_job_submission = jobs[0].job_submissions[-1]
+        # TODO(egor-s): does it make sense with replicas and multi-node?
+        if jobs:
+            latest_job_submission = jobs[0].job_submissions[-1]
 
     service_spec = None
     if run_model.service_spec is not None:
