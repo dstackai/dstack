@@ -75,6 +75,7 @@ from dstack._internal.server.services.jobs import (
     TERMINATING_PROCESSING_JOBS_IDS,
     TERMINATING_PROCESSING_JOBS_LOCK,
     get_jobs_from_run_spec,
+    group_jobs_by_replica_latest,
     job_model_to_job_submission,
     process_terminating_job,
     stop_runner,
@@ -113,6 +114,11 @@ logger = get_logger(__name__)
 # But run processing tasks should wait until job processing tasks release PROCESSING_JOBS locks.
 PROCESSING_RUNS_LOCK = asyncio.Lock()
 PROCESSING_RUNS_IDS: Set[uuid.UUID] = set()
+
+JOB_TERMINATION_REASONS_TO_RETRY = {
+    JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY,
+}
 
 
 async def list_user_runs(
@@ -767,3 +773,99 @@ def run_termination_reason_to_status(run_termination_reason: RunTerminationReaso
         RunTerminationReason.ABORTED_BY_USER: RunStatus.TERMINATED,
     }
     return mapping[run_termination_reason]
+
+
+async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replicas_diff: int):
+    if replicas_diff == 0:
+        # nothing to do
+        return
+
+    logger.info(
+        "%s: scaling %s %s replica(s)",
+        fmt(run_model),
+        "UP" if replicas_diff > 0 else "DOWN",
+        abs(replicas_diff),
+    )
+
+    # lists of (importance, replica_num, jobs)
+    active_replicas = []
+    inactive_replicas = []
+
+    for replica_num, replica_jobs in group_jobs_by_replica_latest(run_model.jobs):
+        statuses = set(job.status for job in replica_jobs)
+        if {JobStatus.TERMINATING, *JobStatus.finished_statuses()} & statuses:
+            # if there are any terminating or finished jobs, the replica is inactive
+            inactive_replicas.append((0, replica_num, replica_jobs))
+        elif JobStatus.SUBMITTED in statuses:
+            # if there are any submitted jobs, the replica is active and has the importance of 0
+            active_replicas.append((0, replica_num, replica_jobs))
+        elif {JobStatus.PROVISIONING, JobStatus.PULLING} & statuses:
+            # if there are any provisioning or pulling jobs, the replica is active and has the importance of 1
+            active_replicas.append((1, replica_num, replica_jobs))
+        else:
+            # all jobs are running, the replica is active and has the importance of 2
+            active_replicas.append((2, replica_num, replica_jobs))
+
+    # sort by importance (desc) and replica_num (asc)
+    active_replicas.sort(key=lambda r: (-r[0], r[1]))
+    run_spec = RunSpec.parse_raw(run_model.run_spec)
+
+    if replicas_diff < 0:
+        if len(active_replicas) + replicas_diff < run_spec.configuration.replicas.min:
+            raise ServerClientError("Can't scale down below the minimum number of replicas")
+
+        for _, _, replica_jobs in reversed(active_replicas[-abs(replicas_diff) :]):
+            # scale down the less important replicas first
+            for job in replica_jobs:
+                if job.status.is_finished() or job.status == JobStatus.TERMINATING:
+                    continue
+                job.status = JobStatus.TERMINATING
+                job.termination_reason = JobTerminationReason.SCALED_DOWN
+                # background task will process the job later
+    else:
+        if len(active_replicas) + replicas_diff > run_spec.configuration.replicas.max:
+            raise ServerClientError("Can't scale up above the maximum number of replicas")
+        scheduled_replicas = 0
+
+        # rerun inactive replicas
+        for _, _, replica_jobs in inactive_replicas:
+            if scheduled_replicas == replicas_diff:
+                break
+            await retry_run_replica_jobs(session, run_model, replica_jobs, only_failed=False)
+            scheduled_replicas += 1
+
+        # create new replicas
+        for replica_num in range(
+            len(active_replicas) + scheduled_replicas, len(active_replicas) + replicas_diff
+        ):
+            jobs = get_jobs_from_run_spec(run_spec, replica_num=replica_num)
+            for job in jobs:
+                job_model = create_job_model_for_new_submission(
+                    run_model=run_model,
+                    job=job,
+                    status=JobStatus.SUBMITTED,
+                )
+                session.add(job_model)
+
+
+async def retry_run_replica_jobs(
+    session: AsyncSession, run_model: RunModel, latest_jobs: List[JobModel], *, only_failed: bool
+):
+    for job_model in latest_jobs:
+        if job_model.termination_reason not in JOB_TERMINATION_REASONS_TO_RETRY:
+            if only_failed:
+                # No need to resubmit, skip
+                continue
+            if not (job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING):
+                # The job is not finished, but we have to retry all jobs. Terminate it
+                job_model.status = JobStatus.TERMINATING
+                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+
+        new_job_model = create_job_model_for_new_submission(
+            run_model=run_model,
+            job=Job(job_spec=JobSpec.parse_raw(job_model.job_spec_data), job_submissions=[]),
+            status=JobStatus.SUBMITTED,
+        )
+        # dirty hack to avoid passing all job submissions
+        new_job_model.submission_num = job_model.submission_num + 1
+        session.add(new_job_model)
