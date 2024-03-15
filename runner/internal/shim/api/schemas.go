@@ -6,6 +6,7 @@ type DockerTaskBody struct {
 	Username  string `json:"username"`
 	Password  string `json:"password"`
 	ImageName string `json:"image_name"`
+	ShmSize   int64  `json:"shm_size"`
 }
 
 type StopBody struct {
@@ -30,6 +31,7 @@ func (ra DockerTaskBody) TaskParams() shim.DockerImageConfig {
 		ImageName: ra.ImageName,
 		Username:  ra.Username,
 		Password:  ra.Password,
+		ShmSize:   ra.ShmSize,
 	}
 	return res
 }

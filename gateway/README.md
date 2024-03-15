@@ -14,11 +14,14 @@
    ```shell
    dstack gateway create --backend aws --region us-east-1 --domain my.wildcard.domain.com
    ```
-2. Extract the project key from the sqlite to the file
+2. Save the gateway key to a file. You can find the key in sqlite, e.g.:
+   ```shell
+   sqlite3 ~/.dstack/server/data/sqlite.db "SELECT ip_address, ssh_private_key FROM gateway_computes"
+   ```
 3. Build gateway locally and deploy it:
    ```shell
    HOST=ubuntu@x.my.wildcard.domain.com
-   ID_RSA=/path/to/the/project/key
+   ID_RSA=/path/to/the/gateway/key
    WHEEL=dstack_gateway-0.0.0-py3-none-any.whl
    
    python -m build .
