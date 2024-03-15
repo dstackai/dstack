@@ -2,11 +2,11 @@ import re
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, ValidationError, conint, constr, validator
+from pydantic import BaseModel, Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import Duration, ForbidExtra
 from dstack._internal.core.models.gateways import AnyModel
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
@@ -77,6 +77,17 @@ class Artifact(ForbidExtra):
             description="Must be set to `true` if the artifact files must be saved in real-time"
         ),
     ] = False
+
+
+class ScalingSpec(ForbidExtra):
+    metric: Annotated[Literal["rps"], Field(description="The target metric to track")]
+    target: Annotated[float, Field(description="The target value of the metric")]
+    scale_up_delay: Annotated[
+        Duration, Field(description="The delay in seconds before scaling up")
+    ] = Duration.parse("5m")
+    scale_down_delay: Annotated[
+        Duration, Field(description="The delay in seconds before scaling down")
+    ] = Duration.parse("10m")
 
 
 class BaseConfiguration(ForbidExtra):
@@ -179,6 +190,7 @@ class ServiceConfiguration(BaseConfiguration):
         model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
         auth (bool): Enable the authorization. Defaults to `True`.
         replicas Range[int]: The range of the number of replicas. Defaults to `1`.
+        scaling: Optional[ScalingSpec]: The auto-scaling configuration.
     """
 
     type: Literal["service"] = "service"
@@ -193,6 +205,9 @@ class ServiceConfiguration(BaseConfiguration):
     ] = None
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
     replicas: Annotated[Range[int], Field(description="The range ")] = Range[int](min=1, max=1)
+    scaling: Annotated[
+        Optional[ScalingSpec], Field(description="The auto-scaling configuration")
+    ] = None
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
@@ -201,6 +216,28 @@ class ServiceConfiguration(BaseConfiguration):
         elif isinstance(v, str):
             return PortMapping.parse(v)
         return v
+
+    @validator("replicas")
+    def convert_replicas(cls, v: Range[int]) -> Range[int]:
+        if v.max is None:
+            raise ValueError("The maximum number of replicas must be set")
+        if v.max < 1:
+            raise ValueError("The maximum number of replicas must be greater than 0")
+        if v.min is None:
+            v.min = 0
+        elif v.min < 0:
+            raise ValueError("The minimum number of replicas must be greater or equal than 0")
+        return v
+
+    @root_validator()
+    def validate_scaling(cls, values):
+        scaling = values.get("scaling")
+        replicas = values.get("replicas")
+        if replicas.min != replicas.max and not scaling:
+            raise ValueError("Auto-scaling must be defined for a range of replicas")
+        if replicas.min == replicas.max and scaling:
+            raise ValueError("Can't perform auto-scaling for a fixed number of replicas")
+        return values
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]

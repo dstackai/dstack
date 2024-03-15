@@ -1,8 +1,9 @@
 import asyncio
 import datetime
+import itertools
 import json
 from datetime import timezone
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import sqlalchemy as sa
 import sqlalchemy.orm as sa_orm
@@ -278,3 +279,24 @@ def _shim_submit_stop(job_model: JobModel, ports: Dict[int, int]):
 
     # we force container deletion because the runner had time to gracefully stop the job
     shim_client.stop(force=True)
+
+
+def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, List[JobModel]]]:
+    """
+    Args:
+        jobs: unsorted list of jobs
+
+    Yields:
+        latest jobs in each replica (replica_num, jobs)
+    """
+    jobs = sorted(jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
+    for replica_num, all_replica_jobs in itertools.groupby(jobs, key=lambda j: j.replica_num):
+        replica_jobs: List[JobModel] = []
+        for job_num, job_submissions in itertools.groupby(
+            all_replica_jobs, key=lambda j: j.job_num
+        ):
+            # take only the latest submission
+            # the latest `submission_num` doesn't have to be the same for all jobs
+            *_, latest_job_submission = job_submissions
+            replica_jobs.append(latest_job_submission)
+        yield replica_num, replica_jobs

@@ -1,12 +1,22 @@
+import asyncio
 import uuid
-from typing import Optional
+from typing import Dict, Optional
 
 import httpx
+from pydantic import BaseModel, parse_obj_as
 
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.runs import JobSubmission, Run
 
 GATEWAY_MANAGEMENT_PORT = 8000
+
+
+class Stat(BaseModel):
+    requests: int
+    request_time: float
+
+
+StatsCollectResponse = Dict[str, Dict[int, Stat]]
 
 
 class GatewayClient:
@@ -17,9 +27,11 @@ class GatewayClient:
             raise ValueError("Either uds or port should be specified, not both")
 
         self.base_url = "http://gateway" if uds else f"http://localhost:{port}"
-        self.s = httpx.Client(transport=httpx.HTTPTransport(uds=uds) if uds else None, timeout=30)
+        self._client = AsyncClientWrapper(
+            transport=httpx.AsyncHTTPTransport(uds=uds) if uds else None, timeout=30
+        )
 
-    def register_service(
+    async def register_service(
         self,
         project: str,
         run_id: uuid.UUID,
@@ -30,7 +42,7 @@ class GatewayClient:
     ):
         if "openai" in options:
             entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
-            self.register_openai_entrypoint(project, entrypoint)
+            await self.register_openai_entrypoint(project, entrypoint)
 
         payload = {
             "run_id": run_id.hex,
@@ -39,18 +51,22 @@ class GatewayClient:
             "options": options,
             "ssh_private_key": ssh_private_key,
         }
-        resp = self.s.post(self._url(f"/api/registry/{project}/services/register"), json=payload)
+        resp = await self._client.post(
+            self._url(f"/api/registry/{project}/services/register"), json=payload
+        )
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
 
-    def unregister_service(self, project: str, run_id: uuid.UUID):
-        resp = self.s.post(self._url(f"/api/registry/{project}/services/{run_id.hex}/unregister"))
+    async def unregister_service(self, project: str, run_id: uuid.UUID):
+        resp = await self._client.post(
+            self._url(f"/api/registry/{project}/services/{run_id.hex}/unregister")
+        )
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
 
-    def register_replica(self, run: Run, job_submission: JobSubmission):
+    async def register_replica(self, run: Run, job_submission: JobSubmission):
         payload = {
             "job_id": job_submission.id.hex,
             "app_port": run.run_spec.configuration.port.container_port,
@@ -80,7 +96,7 @@ class GatewayClient:
                 }
             )
 
-        resp = self.s.post(
+        resp = await self._client.post(
             self._url(f"/api/registry/{run.project_name}/services/{run.id.hex}/replicas/register"),
             json=payload,
         )
@@ -88,8 +104,8 @@ class GatewayClient:
             raise gateway_error(resp.json())
         resp.raise_for_status()
 
-    def unregister_replica(self, project: str, run_id: uuid.UUID, job_id: uuid.UUID):
-        resp = self.s.post(
+    async def unregister_replica(self, project: str, run_id: uuid.UUID, job_id: uuid.UUID):
+        resp = await self._client.post(
             self._url(
                 f"/api/registry/{project}/services/{run_id.hex}/replicas/{job_id.hex}/unregister"
             )
@@ -98,8 +114,8 @@ class GatewayClient:
             raise gateway_error(resp.json())
         resp.raise_for_status()
 
-    def register_openai_entrypoint(self, project: str, domain: str):
-        resp = self.s.post(
+    async def register_openai_entrypoint(self, project: str, domain: str):
+        resp = await self._client.post(
             self._url(f"/api/registry/{project}/entrypoints/register"),
             json={
                 "module": "openai",
@@ -110,12 +126,19 @@ class GatewayClient:
             raise gateway_error(resp.json())
         resp.raise_for_status()
 
-    def info(self) -> dict:
-        resp = self.s.get(self._url("/"))
+    async def info(self) -> dict:
+        resp = await self._client.get(self._url("/"))
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
         return resp.json()
+
+    async def collect_stats(self) -> StatsCollectResponse:
+        resp = await self._client.get(self._url("/api/stats/collect"))
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+        return parse_obj_as(StatsCollectResponse, resp.json())
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/{path.lstrip('/')}"
@@ -123,3 +146,11 @@ class GatewayClient:
 
 def gateway_error(data: dict) -> GatewayError:
     return GatewayError(msg=f"{data['error']}: {data['message']}")
+
+
+class AsyncClientWrapper(httpx.AsyncClient):
+    def __del__(self):
+        try:
+            asyncio.get_running_loop().create_task(self.aclose())
+        except Exception:
+            pass

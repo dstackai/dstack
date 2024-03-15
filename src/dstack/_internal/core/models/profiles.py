@@ -1,4 +1,3 @@
-import re
 from enum import Enum
 from typing import List, Optional, Union
 
@@ -6,7 +5,7 @@ from pydantic import Field, confloat, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import Duration, ForbidExtra
 
 DEFAULT_RETRY_LIMIT = 3600
 DEFAULT_POOL_NAME = "default-pool"
@@ -34,25 +33,7 @@ class TerminationPolicy(str, Enum):
 def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     if v is None:
         return None
-    if isinstance(v, int):
-        return v
-    try:
-        return int(v)
-    except ValueError:
-        pass
-    regex = re.compile(r"(?P<amount>\d+) *(?P<unit>[smhdw])$")
-    re_match = regex.match(v)
-    if not re_match:
-        raise ValueError(f"Cannot parse the duration {v}")
-    amount, unit = int(re_match.group("amount")), re_match.group("unit")
-    multiplier = {
-        "s": 1,
-        "m": 60,
-        "h": 3600,
-        "d": 24 * 3600,
-        "w": 7 * 24 * 3600,
-    }[unit]
-    return amount * multiplier
+    return Duration.parse(v)
 
 
 def parse_max_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:

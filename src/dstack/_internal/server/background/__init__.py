@@ -1,6 +1,7 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
+from dstack._internal.server.background.tasks.process_gateways import process_gateways
 from dstack._internal.server.background.tasks.process_pools import (
     process_pools,
     terminate_idle_instance,
@@ -26,5 +27,6 @@ def start_background_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(process_pools, IntervalTrigger(seconds=10))
     _scheduler.add_job(terminate_idle_instance, IntervalTrigger(seconds=10))
     _scheduler.add_job(process_runs, IntervalTrigger(seconds=1))
+    _scheduler.add_job(process_gateways, IntervalTrigger(seconds=15))
     _scheduler.start()
     return _scheduler
