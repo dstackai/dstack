@@ -7,6 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
 from dstack._internal.core.models.backends import BackendInfo
+from dstack._internal.core.models.backends.dstack import (
+    DstackBaseBackendConfigInfo,
+    DstackConfigInfo,
+)
 from dstack._internal.core.models.projects import Member, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
@@ -276,11 +280,20 @@ def project_model_to_project(project_model: ProjectModel) -> Project:
             logger.warning("Configurator for backend %s not found", b.type)
             continue
         config_info = configurator.get_config_info(model=b, include_creds=False)
-        backend_info = BackendInfo(
-            name=b.type,
-            config=config_info,
-        )
-        backends.append(backend_info)
+        if isinstance(config_info, DstackConfigInfo):
+            for backend_type in config_info.base_backends:
+                backends.append(
+                    BackendInfo(
+                        name=backend_type, config=DstackBaseBackendConfigInfo(type=backend_type)
+                    )
+                )
+        else:
+            backends.append(
+                BackendInfo(
+                    name=b.type,
+                    config=config_info,
+                )
+            )
     return Project(
         project_id=project_model.id,
         project_name=project_model.name,
