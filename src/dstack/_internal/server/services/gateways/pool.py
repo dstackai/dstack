@@ -13,18 +13,18 @@ class GatewayConnectionsPool:
         self._lock = asyncio.Lock()
         self.server_port: Optional[int] = None
 
-    async def add(self, hostname: str, id_rsa: str) -> bool:
+    async def add(self, hostname: str, id_rsa: str) -> GatewayConnection:
         if self.server_port is None:
             raise ValueError("Server port is not set")
         async with self._lock:
             if hostname in self._connections:
                 logger.warning(f"Gateway connection for {hostname} already exists")
-                return False
+                return self._connections[hostname]
             self._connections[hostname] = GatewayConnection(hostname, id_rsa, self.server_port)
             start_task = self._connections[hostname].tunnel.start()
         try:
             await start_task
-            return True
+            return self._connections[hostname]
         except Exception:
             async with self._lock:
                 self._connections.pop(hostname, None)

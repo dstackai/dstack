@@ -7,6 +7,7 @@ from pydantic import BaseModel, parse_obj_as
 
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.runs import JobSubmission, Run
+from dstack._internal.server import settings
 
 GATEWAY_MANAGEMENT_PORT = 8000
 
@@ -120,6 +121,19 @@ class GatewayClient:
             json={
                 "module": "openai",
                 "domain": domain,
+            },
+        )
+        if resp.status_code == 400:
+            raise gateway_error(resp.json())
+        resp.raise_for_status()
+
+    async def submit_gateway_config(self) -> None:
+        resp = await self._client.post(
+            self._url("/api/config"),
+            json={
+                "acme_server": settings.ACME_SERVER,
+                "acme_eab_kid": settings.ACME_EAB_KID,
+                "acme_eab_hmac_key": settings.ACME_EAB_HMAC_KEY,
             },
         )
         if resp.status_code == 400:

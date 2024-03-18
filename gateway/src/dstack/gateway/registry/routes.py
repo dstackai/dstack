@@ -2,9 +2,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
+from dstack.gateway.common import OkResponse
 from dstack.gateway.core.store import Replica, Service, Store, get_store
 from dstack.gateway.registry.schemas import (
-    OkResponse,
     RegisterEntrypointRequest,
     RegisterReplicaRequest,
     RegisterServiceRequest,

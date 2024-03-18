@@ -12,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import ClassVar, DefaultDict, Dict, List, Optional, Set, Tuple
 
-from pydantic import BaseModel, Field, PrivateAttr, ValidationError
+from pydantic import AnyHttpUrl, BaseModel, Field, PrivateAttr, ValidationError
 
 from dstack.gateway.common import run_async
 from dstack.gateway.core.nginx import Nginx
@@ -61,6 +61,14 @@ class Store(PersistentModel):
     _ssh_keys_dir = PrivateAttr(
         default_factory=lambda: Path("~/.ssh/projects").expanduser().resolve()
     )
+
+    async def update_config(
+        self,
+        acme_server: Optional[AnyHttpUrl],
+        acme_eab_kid: Optional[str],
+        acme_eab_hmac_key: Optional[str],
+    ) -> None:
+        await self.nginx.set_acme_settings(acme_server, acme_eab_kid, acme_eab_hmac_key)
 
     async def register_service(self, project: str, service: Service, ssh_private_key: str):
         async with self._lock:

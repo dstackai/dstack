@@ -4,10 +4,10 @@ import subprocess
 import tempfile
 from asyncio import Lock
 from pathlib import Path
-from typing import Annotated, Dict, Literal, Union
+from typing import Annotated, Dict, Literal, Optional, Union
 
 import jinja2
-from pydantic import BaseModel, Field
+from pydantic import AnyHttpUrl, BaseModel, Field
 
 from dstack.gateway.common import run_async
 from dstack.gateway.errors import GatewayError
@@ -44,6 +44,12 @@ class EntrypointConfig(SiteConfig):
     proxy_path: str
 
 
+class ACMESettings(BaseModel):
+    server: Optional[AnyHttpUrl] = None
+    eab_kid: Optional[str] = None
+    eab_hmac_key: Optional[str] = None
+
+
 class Nginx(BaseModel):
     """
     Nginx keeps track of registered domains, updates nginx config and issues SSL certificates.
@@ -53,7 +59,19 @@ class Nginx(BaseModel):
     configs: Dict[
         str, Annotated[Union[ServiceConfig, EntrypointConfig], Field(discriminator="type")]
     ] = {}
+    acme_settings: ACMESettings = ACMESettings()
     _lock: Lock = Lock()
+
+    async def set_acme_settings(
+        self,
+        server: Optional[AnyHttpUrl],
+        eab_kid: Optional[str],
+        eab_hmac_key: Optional[str],
+    ) -> None:
+        async with self._lock:
+            self.acme_settings = ACMESettings(
+                server=server, eab_kid=eab_kid, eab_hmac_key=eab_hmac_key
+            )
 
     async def register_service(self, project: str, service_id: str, domain: str, auth: bool):
         config_name = self.get_config_name(domain)
@@ -168,12 +186,20 @@ class Nginx(BaseModel):
                 sudo_rm(conf_path)
             raise
 
-    @staticmethod
-    def run_certbot(domain: str):
+    def run_certbot(self, domain: str):
         logger.info("Running certbot for %s", domain)
+
         cmd = ["sudo", "certbot", "certonly"]
         cmd += ["--non-interactive", "--agree-tos", "--register-unsafely-without-email"]
         cmd += ["--nginx", "--domain", domain]
+
+        if self.acme_settings.server:
+            cmd += ["--server", str(self.acme_settings.server)]
+
+        if self.acme_settings.eab_kid and self.acme_settings.eab_hmac_key:
+            cmd += ["--eab-kid", self.acme_settings.eab_kid]
+            cmd += ["--eab-hmac-key", self.acme_settings.eab_hmac_key]
+
         r = subprocess.run(cmd, capture_output=True)
         if r.returncode != 0:
             raise GatewayError(f"Certbot failed:\n{r.stderr.decode()}")
