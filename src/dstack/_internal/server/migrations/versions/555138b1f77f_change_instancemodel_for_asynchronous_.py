@@ -22,7 +22,7 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column("profile", sa.Text(), nullable=True))
         batch_op.add_column(sa.Column("requirements", sa.String(length=10000), nullable=True))
         batch_op.add_column(sa.Column("instance_configuration", sa.Text(), nullable=True))
-        batch_op.add_column(sa.Column("retry_policy", sa.Boolean(), nullable=False))
+        batch_op.add_column(sa.Column("retry_policy", sa.Boolean(), nullable=True))
         batch_op.add_column(sa.Column("retry_policy_duration", sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column("last_retry_at", sa.DateTime(), nullable=True))
         batch_op.alter_column("backend", existing_type=sa.VARCHAR(length=10), nullable=True)
@@ -33,6 +33,11 @@ def upgrade() -> None:
             "job_provisioning_data", existing_type=sa.VARCHAR(length=4000), nullable=True
         )
 
+    # Set the default value for the retry_policy
+    op.execute(sa.sql.text("UPDATE instances SET retry_policy = FALSE"))
+
+    with op.batch_alter_table("instances", schema=None) as batch_op:
+        batch_op.alter_column("retry_policy", nullable=False)
     # ### end Alembic commands ###
 
 
