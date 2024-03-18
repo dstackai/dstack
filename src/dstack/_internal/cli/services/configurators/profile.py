@@ -57,6 +57,13 @@ def register_profile_args(parser: argparse.ArgumentParser, pool_add: bool = Fals
         dest="regions",
         help="The regions that will be tried for provisioning",
     )
+    profile_group.add_argument(
+        "--instance-type",
+        action="append",
+        metavar="NAME",
+        dest="instance_types",
+        help="The cloud-specific instance types that will be tried for provisioning",
+    )
     if pool_add:
         pools_group_exc = parser
     else:
@@ -149,6 +156,8 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: boo
         profile.backends = args.backends
     if args.regions:
         profile.regions = args.regions
+    if args.instance_types:
+        profile.instance_types = args.instance_types
     if args.max_price is not None:
         profile.max_price = args.max_price
     if not pool_add:
