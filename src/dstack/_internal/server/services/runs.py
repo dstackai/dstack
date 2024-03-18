@@ -7,7 +7,7 @@ from datetime import timezone
 from typing import List, Optional, Set, Tuple, cast
 
 import pydantic
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -127,28 +127,59 @@ async def list_user_runs(
     project_name: Optional[str],
     repo_id: Optional[str],
 ) -> List[Run]:
+    """
+    Returns all runs visible to `user`.
+    A `project_name` and `repo_id` can be specified as filters.
+    Specifying `repo_id` without `project_name` returns no runs.
+    """
+    if project_name is None and repo_id is not None:
+        return []
     if user.global_role == GlobalRole.ADMIN:
         projects = await list_project_models(session=session)
     else:
         projects = await list_user_project_models(session=session, user=user)
     if project_name:
         projects = [p for p in projects if p.name == project_name]
-    runs = []
-    for project in projects:
-        project_runs = await list_project_runs(
+        if len(projects) == 0:
+            return []
+        run_models = await list_project_run_models(
             session=session,
-            project=project,
+            project=projects[0],
             repo_id=repo_id,
         )
-        runs.extend(project_runs)
+    else:
+        run_models = await list_projects_run_models(
+            session=session,
+            projects=projects,
+        )
+    runs = []
+    for r in run_models:
+        try:
+            runs.append(run_model_to_run(r))
+        except pydantic.ValidationError:
+            pass
+    if len(run_models) > len(runs):
+        logger.debug("Can't load %s runs", len(run_models) - len(runs))
     return sorted(runs, key=lambda r: r.submitted_at, reverse=True)
 
 
-async def list_project_runs(
+async def list_projects_run_models(
+    session: AsyncSession,
+    projects: List[ProjectModel],
+) -> List[RunModel]:
+    filters = [RunModel.deleted == False, or_(*[RunModel.project_id == p.id for p in projects])]
+    res = await session.execute(
+        select(RunModel).where(*filters).options(joinedload(RunModel.user))
+    )
+    run_models = list(res.scalars().all())
+    return run_models
+
+
+async def list_project_run_models(
     session: AsyncSession,
     project: ProjectModel,
     repo_id: Optional[str],
-) -> List[Run]:
+) -> List[RunModel]:
     filters = [
         RunModel.project_id == project.id,
         RunModel.deleted == False,
@@ -165,18 +196,8 @@ async def list_project_runs(
     res = await session.execute(
         select(RunModel).where(*filters).options(joinedload(RunModel.user))
     )
-    run_models = res.scalars().all()
-    runs = []
-    for r in run_models:
-        try:
-            runs.append(run_model_to_run(r))
-        except pydantic.ValidationError:
-            pass
-    if len(run_models) > len(runs):
-        logger.debug(
-            "Can't load %s runs from project %s", len(run_models) - len(runs), project.name
-        )
-    return runs
+    run_models = list(res.scalars().all())
+    return run_models
 
 
 async def get_run(
