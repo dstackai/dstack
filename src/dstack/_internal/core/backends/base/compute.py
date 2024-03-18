@@ -121,7 +121,9 @@ def get_dstack_shim(build: str) -> List[str]:
 
 def get_run_shim_script() -> List[str]:
     dev_flag = "" if settings.DSTACK_VERSION is not None else "--dev"
-    return [f"nohup dstack-shim {dev_flag} docker --keep-container >/root/shim.log 2>&1 &"]
+    return [
+        f"mkdir /root/.dstack -p && nohup dstack-shim {dev_flag} docker --keep-container >/root/.dstack/shim.log 2>&1 &"
+    ]
 
 
 def get_gateway_user_data(authorized_key: str) -> str:

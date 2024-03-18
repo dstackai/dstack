@@ -26,7 +26,11 @@ from dstack._internal.core.models.backends.datacrunch import (
     DataCrunchConfigInfoWithCredsPartial,
     DataCrunchConfigValues,
 )
-from dstack._internal.core.models.backends.dstack import DstackConfigInfo, DstackConfigValues
+from dstack._internal.core.models.backends.dstack import (
+    DstackBaseBackendConfigInfo,
+    DstackConfigInfo,
+    DstackConfigValues,
+)
 from dstack._internal.core.models.backends.gcp import (
     GCPConfigInfo,
     GCPConfigInfoWithCreds,
@@ -76,6 +80,7 @@ AnyConfigInfoWithoutCreds = Union[
     TensorDockConfigInfo,
     VastAIConfigInfo,
     DstackConfigInfo,
+    DstackBaseBackendConfigInfo,
 ]
 AnyConfigInfoWithCreds = Union[
     AWSConfigInfoWithCreds,

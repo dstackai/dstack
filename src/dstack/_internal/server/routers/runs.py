@@ -21,7 +21,6 @@ from dstack._internal.server.schemas.runs import (
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 from dstack._internal.server.services import runs
 from dstack._internal.server.services.pools import (
-    generate_instance_name,
     get_or_create_pool_by_name,
 )
 
@@ -41,11 +40,22 @@ async def list_runs(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ) -> List[Run]:
+    """
+    Returns all runs visible to user sorted by descending submitted_at.
+    A **project_name** and **repo_id** can be specified as filters.
+    Specifying **repo_id** without **project_name** returns no runs.
+
+    The results are paginated. To get the next page, pass submitted_at and id of
+    the last run from the previous page as **prev_submitted_at** and **prev_run_id**.
+    """
     return await runs.list_user_runs(
         session=session,
         user=user,
         project_name=body.project_name,
         repo_id=body.repo_id,
+        prev_submitted_at=body.prev_submitted_at,
+        prev_run_id=body.prev_run_id,
+        limit=body.limit,
     )
 
 
@@ -123,8 +133,6 @@ async def delete_runs(
 
 
 # FIXME: get_offers and create_instance semantically belong to pools, not runs
-
-
 @project_router.post("/get_offers")
 async def get_offers(
     body: GetOffersRequest,
@@ -142,6 +150,7 @@ async def get_offers(
     return PoolInstanceOffers(pool_name=pool.name, instances=instances)
 
 
+# FIXME: get_offers and create_instance semantically belong to pools, not runs
 @project_router.post("/create_instance")
 async def create_instance(
     body: CreateInstanceRequest,
@@ -149,17 +158,12 @@ async def create_instance(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Instance:
     user, project = user_project
-    instance_name = await generate_instance_name(
-        session=session, project=project, pool_name=body.pool_name
-    )
     try:
         instance = await runs.create_instance(
             session=session,
             project=project,
             user=user,
             ssh_key=body.ssh_key,
-            pool_name=body.pool_name,
-            instance_name=instance_name,
             profile=body.profile,
             requirements=body.requirements,
         )

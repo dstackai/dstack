@@ -3,9 +3,7 @@
 Services make it very easy to deploy any kind of model or web application as public endpoints.
 
 Use any serving frameworks and specify required resources. `dstack` deploys it in the configured backend, handles
-authentication, and provides an OpenAI-compatible interface if needed.
-
-[//]: # (TODO: Support auto-scaling)
+authentication, replicas, and provides an OpenAI-compatible interface if needed.
 
 ??? info "Prerequisites"
 
@@ -145,6 +143,47 @@ and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-com
     2. Doesn't work if `eos_token` is defined in the model repository as a dictionary. As a workaround, set `eos_token` manually, as shown in the example above (see Chat template).
 
     If you encounter any other issues, please make sure to file a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
+
+### Configure replicas and auto-scaling
+
+By default, `dstack` runs a single replica of the service.
+You can configure the number of replicas at the top level of the configuration file.
+
+<div editor-title="serve.dstack.yml"> 
+
+```yaml
+...
+
+replicas: 3
+```
+
+</div>
+
+You also can specify a range of replicas with a scaling policy,
+and dstack will automatically scale the service up and down based on the load.
+Currently, the only supported metric is `rps` — requests per second per replica.
+
+<div editor-title="serve.dstack.yml"> 
+
+```yaml
+...
+
+replicas: 0..3
+scaling:
+  metric: rps
+  target: 5.5
+  # (Optional) Configure `scale_up_delay` and `scale_down_delay`
+  scale_up_delay: 5m
+  scale_down_delay: 10m
+```
+
+</div>
+
+Specifying minimum replicas as `0` means that the service will be scaled down to zero when there are no requests.
+
+!!! info "Cold start time"
+    Scaling up from zero could take from tens of seconds if there is an available instance in the pool,
+    up to several tens of minutes if a new instance has to be provisioned and a large model has to be pulled.
 
 ## Run the configuration
 

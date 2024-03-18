@@ -323,6 +323,7 @@ class RunCollection:
         repo: Optional[Repo] = None,
         backends: Optional[List[BackendType]] = None,
         regions: Optional[List[str]] = None,
+        instance_types: Optional[List[str]] = None,
         resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
@@ -366,6 +367,7 @@ class RunCollection:
             configuration_path=configuration_path,
             backends=backends,
             regions=regions,
+            instance_types=instance_types,
             resources=resources,
             spot_policy=spot_policy,
             retry_policy=retry_policy,
@@ -380,11 +382,9 @@ class RunCollection:
         return self._api_client.runs.get_offers(self._project, profile, requirements)
 
     def create_instance(
-        self, pool_name: str, profile: Profile, requirements: Requirements, ssh_key: SSHKey
+        self, profile: Profile, requirements: Requirements, ssh_key: SSHKey
     ) -> Instance:
-        return self._api_client.runs.create_instance(
-            self._project, pool_name, profile, requirements, ssh_key
-        )
+        return self._api_client.runs.create_instance(self._project, profile, requirements, ssh_key)
 
     def get_plan(
         self,
@@ -393,6 +393,7 @@ class RunCollection:
         configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
         regions: Optional[List[str]] = None,
+        instance_types: Optional[List[str]] = None,
         resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
@@ -431,6 +432,7 @@ class RunCollection:
             name="(python)",
             backends=backends,
             regions=regions,
+            instance_types=instance_types,
             spot_policy=spot_policy,
             retry_policy=retry_policy,
             max_duration=max_duration,

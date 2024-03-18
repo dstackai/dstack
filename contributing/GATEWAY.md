@@ -59,3 +59,14 @@ To decouple the store from other modules, there is a subscription mechanism. Sub
 ## OpenAI interface
 
 The OpenAI interface subscribes to `Store` events and emulates the real OpenAI API for chat completion models. It can list running models in the project and redirect requests to the right service.
+
+## Stats Collector
+
+The Stats collector parses nginx `/var/log/nginx/dstack.access.log` to collect basic metrics:
+
+1. Requests per second
+2. Average request processing time
+
+By default, it stores 5 minutes with 1-second resolution frames for each domain. It aggregates these frames in windows of the size 30 seconds, 1 minute, and 5 minutes, before sending to the server.
+
+To increase performance, `StatsCollector` keeps position in file and read only new records. It can detect log rotation and reopen the log file.

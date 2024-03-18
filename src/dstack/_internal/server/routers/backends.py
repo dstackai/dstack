@@ -22,6 +22,9 @@ root_router = APIRouter(prefix="/api/backends", tags=["backends"])
 project_router = APIRouter(prefix="/api/project/{project_name}/backends", tags=["backends"])
 
 
+# These routes are not currently in use since backend UI configuration is disabled.
+
+
 @root_router.post("/list_types")
 async def list_backend_types() -> List[BackendType]:
     return backends.list_available_backend_types()

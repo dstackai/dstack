@@ -13,22 +13,27 @@ from dstack.gateway.errors import GatewayError
 from dstack.gateway.logging import configure_logging
 from dstack.gateway.openai.routes import router as openai_router
 from dstack.gateway.registry.routes import router as registry_router
+from dstack.gateway.stats.collector import get_collector
+from dstack.gateway.stats.routes import router as stats_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     store = get_store()
     openai = openai_store.get_store()
+    stats_collector = get_collector()
     await store.subscribe(openai)
+    await store.subscribe(stats_collector)
     yield
 
-    async with store._lock, store.nginx._lock, openai._lock:
+    async with store._lock, store.nginx._lock, openai._lock, stats_collector._lock:
         # Store the state between restarts
         save_persistent_state(
             pydantic_core.to_json(
                 {
                     "store": store,
                     "openai": openai,
+                    "stats_collector": stats_collector,
                 }
             )
         )
@@ -39,6 +44,7 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(auth_router, prefix="/auth")
 app.include_router(openai_router, prefix="/api/openai")
 app.include_router(registry_router, prefix="/api/registry")
+app.include_router(stats_router, prefix="/api/stats")
 
 
 @app.get("/")

@@ -314,15 +314,15 @@ async def register_service(session: AsyncSession, run_model: RunModel):
 
     try:
         logger.debug("%s: registering service as %s", fmt(run_model), service_spec.url)
-        await run_async(
-            conn.client.register_service,
-            project=run_model.project.name,
-            run_id=run_model.id,
-            domain=urlparse(service_spec.url).hostname,
-            auth=run_spec.configuration.auth,
-            options=service_spec.options,
-            ssh_private_key=run_model.project.ssh_private_key,
-        )
+        async with conn.client() as client:
+            await client.register_service(
+                project=run_model.project.name,
+                run_id=run_model.id,
+                domain=urlparse(service_spec.url).hostname,
+                auth=run_spec.configuration.auth,
+                options=service_spec.options,
+                ssh_private_key=run_model.project.ssh_private_key,
+            )
         logger.info("%s: service is registered as %s", fmt(run_model), service_spec.url)
     except SSHError:
         raise ServerClientError("Gateway tunnel is not working")
@@ -337,11 +337,11 @@ async def register_replica(
     job_submission = jobs_services.job_model_to_job_submission(job_model)
     try:
         logger.debug("%s: registering replica for service %s", fmt(job_model), run.id.hex)
-        await run_async(
-            conn.client.register_replica,
-            run=run,
-            job_submission=job_submission,
-        )
+        async with conn.client() as client:
+            await client.register_replica(
+                run=run,
+                job_submission=job_submission,
+            )
         logger.info("%s: replica is registered for service %s", fmt(job_model), run.id.hex)
     except (httpx.RequestError, SSHError) as e:
         raise GatewayError(str(e))
@@ -352,11 +352,11 @@ async def unregister_service(session: AsyncSession, run_model: RunModel):
     project = await session.get(ProjectModel, run_model.project_id)
     try:
         logger.debug("%s: unregistering service", fmt(run_model))
-        await run_async(
-            conn.client.unregister_service,
-            project=project.name,
-            run_id=run_model.id,
-        )
+        async with conn.client() as client:
+            await client.unregister_service(
+                project=project.name,
+                run_id=run_model.id,
+            )
         logger.debug("%s: service is unregistered", fmt(run_model))
     except GatewayError as e:
         # ignore if service is not registered
@@ -380,12 +380,12 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
         logger.debug(
             "%s: unregistering replica from service %s", fmt(job_model), job_model.run_id.hex
         )
-        await run_async(
-            conn.client.unregister_replica,
-            project=run_model.project.name,
-            run_id=run_model.id,
-            job_id=job_model.id,
-        )
+        async with conn.client() as client:
+            await client.unregister_replica(
+                project=run_model.project.name,
+                run_id=run_model.id,
+                job_id=job_model.id,
+            )
         logger.info(
             "%s: replica is unregistered from service %s", fmt(job_model), job_model.run_id.hex
         )

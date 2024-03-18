@@ -5,12 +5,18 @@ from typing import Dict, Optional, Union
 from uuid import UUID
 
 import requests
-from pydantic import parse_raw_as
+from pydantic import ValidationError, parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.models.profiles import TerminationPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData
+from dstack._internal.core.errors import BackendError
+from dstack._internal.core.models.instances import (
+    InstanceConfiguration,
+    InstanceRuntime,
+    LaunchedInstanceInfo,
+)
+from dstack._internal.core.models.profiles import Profile, TerminationPolicy
+from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.services import backends as backends_services
@@ -21,6 +27,7 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
+from dstack._internal.server.services.runs import get_create_instance_offers
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -45,7 +52,7 @@ class HealthStatus:
 logger = get_logger(__name__)
 
 
-async def process_pools() -> None:
+async def process_instances() -> None:
     async with get_session_ctx() as session:
         async with PROCESSING_POOL_LOCK:
             res = await session.scalars(
@@ -56,6 +63,7 @@ async def process_pools() -> None:
                             InstanceStatus.TERMINATING,
                             InstanceStatus.IDLE,
                             InstanceStatus.BUSY,
+                            InstanceStatus.PENDING,
                         ]
                     ),
                     InstanceModel.id.not_in(PROCESSING_POOL_IDS),
@@ -68,17 +76,167 @@ async def process_pools() -> None:
             PROCESSING_POOL_IDS.update(i.id for i in instances)
 
     try:
-        for inst in instances:
-            if inst.status in (
+        for instance in instances:
+            if instance.status == InstanceStatus.PENDING:
+                await create_instance(instance.id)
+            if instance.status in (
                 InstanceStatus.PROVISIONING,
                 InstanceStatus.IDLE,
                 InstanceStatus.BUSY,
             ):
-                await check_shim(inst.id)
-            if inst.status == InstanceStatus.TERMINATING:
-                await terminate(inst.id)
+                await check_shim(instance.id)
+            if instance.status == InstanceStatus.TERMINATING:
+                await terminate(instance.id)
     finally:
         PROCESSING_POOL_IDS.difference_update(i.id for i in instances)
+
+
+async def create_instance(instance_id: UUID) -> None:
+    async with get_session_ctx() as session:
+        instance = (
+            await session.scalars(
+                select(InstanceModel)
+                .where(InstanceModel.id == instance_id)
+                .options(joinedload(InstanceModel.project))
+            )
+        ).one()
+
+        if instance.retry_policy and instance.retry_policy_duration is not None:
+            retry_duration_deadline = instance.created_at.replace(
+                tzinfo=datetime.timezone.utc
+            ) + timedelta(seconds=instance.retry_policy_duration)
+            if retry_duration_deadline < get_current_datetime():
+                instance.status = InstanceStatus.TERMINATED
+                instance.deleted = True
+                instance.deleted_at = get_current_datetime()
+                instance.termination_reason = "The retry's duration expired"
+                await session.commit()
+                logger.debug("The retry's duration expired. Terminate instance %s", instance.name)
+                return
+
+        if instance.last_retry_at is not None:
+            last_retry = instance.last_retry_at.replace(tzinfo=datetime.timezone.utc)
+            if get_current_datetime() < last_retry + timedelta(minutes=1):
+                return
+
+        if (
+            instance.profile is None
+            or instance.requirements is None
+            or instance.instance_configuration is None
+        ):
+            instance.status = InstanceStatus.TERMINATED
+            instance.deleted = True
+            instance.deleted_at = get_current_datetime()
+            instance.termination_reason = "Empty profile, requirements or instance_configuration"
+            instance.last_retry_at = get_current_datetime()
+            await session.commit()
+            logger.debug(
+                "Empty profile, requirements or instance_configuration. Terminate instance: %s",
+                instance.name,
+            )
+            return
+
+        try:
+            profile = Profile.parse_raw(instance.profile)
+            requirements = Requirements.parse_raw(instance.requirements)
+            instance_configuration = InstanceConfiguration.parse_raw(
+                instance.instance_configuration
+            )
+        except ValidationError as e:
+            instance.status = InstanceStatus.TERMINATED
+            instance.deleted = True
+            instance.deleted_at = get_current_datetime()
+            instance.termination_reason = (
+                f"Error to parse profile, requirements or instance_configuration: {e}"
+            )
+            instance.last_retry_at = get_current_datetime()
+            logger.debug(
+                "Error to parse profile, requirements or instance_configuration. Terminate instance: %s",
+                instance.name,
+            )
+            await session.commit()
+            return
+
+        offers = await get_create_instance_offers(
+            project=instance.project,
+            profile=profile,
+            requirements=requirements,
+            exclude_not_available=True,
+        )
+
+        if not offers and instance.retry_policy:
+            instance.last_retry_at = get_current_datetime()
+            await session.commit()
+            logger.debug("No offers for %s. Next retry", instance.name)
+            return
+
+        for backend, instance_offer in offers:
+            # cannot create an instance in vastai/k8s. skip
+            if instance_offer.instance_runtime == InstanceRuntime.RUNNER:
+                continue
+            logger.debug(
+                "trying %s in %s/%s for $%0.4f per hour",
+                instance_offer.instance.name,
+                instance_offer.backend.value,
+                instance_offer.region,
+                instance_offer.price,
+            )
+            try:
+                launched_instance_info: LaunchedInstanceInfo = await run_async(
+                    backend.compute().create_instance,
+                    instance_offer,
+                    instance_configuration,
+                )
+            except BackendError as e:
+                logger.warning(
+                    "%s launch in %s/%s failed: %s",
+                    instance_offer.instance.name,
+                    instance_offer.backend.value,
+                    instance_offer.region,
+                    repr(e),
+                )
+                continue
+            except NotImplementedError:
+                # skip a backend without create_instance support, continue with next backend and offer
+                continue
+            job_provisioning_data = JobProvisioningData(
+                backend=backend.TYPE,
+                instance_type=instance_offer.instance,
+                instance_id=launched_instance_info.instance_id,
+                hostname=launched_instance_info.ip_address,
+                region=launched_instance_info.region,
+                price=instance_offer.price,
+                username=launched_instance_info.username,
+                ssh_port=launched_instance_info.ssh_port,
+                dockerized=launched_instance_info.dockerized,
+                backend_data=launched_instance_info.backend_data,
+                ssh_proxy=None,
+            )
+
+            instance.status = InstanceStatus.PROVISIONING
+            instance.backend = backend.TYPE
+            instance.region = instance_offer.region
+            instance.price = instance_offer.price
+            instance.job_provisioning_data = job_provisioning_data.json()
+            instance.offer = instance_offer.json()
+            instance.started_at = get_current_datetime()
+            instance.last_retry_at = get_current_datetime()
+
+            await session.commit()
+            logger.info("Created instance %s", instance.name)
+
+            return
+
+        instance.last_retry_at = get_current_datetime()
+
+        if not instance.retry_policy:
+            instance.status = InstanceStatus.TERMINATED
+            instance.deleted = True
+            instance.deleted_at = get_current_datetime()
+            instance.termination_reason = "There were no offers found"
+            logger.info("There were no offers found. Terminated instance %s", instance.name)
+
+        await session.commit()
 
 
 async def check_shim(instance_id: UUID) -> None:

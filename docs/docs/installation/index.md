@@ -365,6 +365,27 @@ projects:
 !!! info "NOTE:"
     Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
+#### CUDO
+
+Log into your [CUDO Compute](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
+
+Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: cudo
+    project_id: my-cudo-project
+    creds:
+      type: api_key
+      api_key: 7487240a466624b48de22865589
+```
+
+</div>
+
 #### DataCrunch
 
 Log into your [DataCrunch](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
