@@ -36,7 +36,7 @@ Authentication responses are cached for 60 seconds. If the server is not respond
 
 `dstack-gateway` configures an Nginx reverse proxy. Each service or entrypoint configuration is stored as `/etc/nginx/sites-enabled/{port}-{server_name}.conf`. If the Nginx reload fails, `dstack-gateway` rolls back the changes.
 
-`dstack-gateway` enforces HTTPS (except for local traffic). Certbot issues Let's Encrypt certificates on service registration.
+`dstack-gateway` enforces HTTPS (except for local traffic). On each service registration a TLS certificate is issued by Let's Encrypt or other configured CA via Certbot.
 
 If there are no replicas, the service configuration always returns 503; otherwise, the upstream with replicas is used. The upstream handles load balancing for us. `dstack-gateway` uses Unix sockets for SSH tunnels to avoid port conflicts between services.
 
