@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -11,6 +13,9 @@ from dstack._internal.core.models.runs import Requirements, RunSpec
 class ListRunsRequest(BaseModel):
     project_name: Optional[str]
     repo_id: Optional[str]
+    prev_submitted_at: Optional[datetime]
+    prev_run_id: Optional[UUID]
+    limit: int = 1000
 
 
 class GetRunRequest(BaseModel):

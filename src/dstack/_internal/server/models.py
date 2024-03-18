@@ -9,6 +9,7 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     String,
@@ -184,6 +185,8 @@ class RunModel(BaseModel):
         Enum(RunTerminationReason)
     )
     service_spec: Mapped[Optional[str]] = mapped_column(String(4000))
+
+    __table_args__ = (Index("ix_submitted_at_id", submitted_at.desc(), id),)
 
 
 class JobModel(BaseModel):

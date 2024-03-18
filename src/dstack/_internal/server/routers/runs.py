@@ -41,11 +41,22 @@ async def list_runs(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ) -> List[Run]:
+    """
+    Returns all runs visible to user sorted by descending submitted_at.
+    A **project_name** and **repo_id** can be specified as filters.
+    Specifying **repo_id** without **project_name** returns no runs.
+
+    The results are paginated. To get the next page, pass submitted_at and id of
+    the last run from the previous page as **prev_submitted_at** and **prev_run_id**.
+    """
     return await runs.list_user_runs(
         session=session,
         user=user,
         project_name=body.project_name,
         repo_id=body.repo_id,
+        prev_submitted_at=body.prev_submitted_at,
+        prev_run_id=body.prev_run_id,
+        limit=body.limit,
     )
 
 
