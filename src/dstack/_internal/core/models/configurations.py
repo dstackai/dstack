@@ -1,7 +1,7 @@
 import os
 import re
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Mapping, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError, conint, constr, validator
 from typing_extensions import Annotated, Literal
@@ -80,6 +80,20 @@ class Artifact(ForbidExtra):
     ] = False
 
 
+class EnvSentinel(ForbidExtra):
+    key: str
+
+    def from_env(self, env: Mapping[str, str]) -> str:
+        if self.key in env:
+            return env[self.key]
+
+        else:
+            raise ValueError(f"Environment variable {self.key} is not set")
+
+    def __str__(self):
+        return f"EnvSentinel({self.key})"
+
+
 class BaseConfiguration(ForbidExtra):
     type: Literal["none"]
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
@@ -95,7 +109,9 @@ class BaseConfiguration(ForbidExtra):
         Field(description="The major version of Python\nMutually exclusive with the image"),
     ]
     env: Annotated[
-        Union[List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*(=.*$|$)")], Dict[str, str]],
+        Union[
+            List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*(=.*$|$)")], Dict[str, str | EnvSentinel]
+        ],
         Field(description="The mapping or the list of environment variables"),
     ] = {}
     setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
@@ -122,7 +138,7 @@ class BaseConfiguration(ForbidExtra):
             for var in v:
                 if "=" not in var:
                     if var not in d:
-                        d[var] = os.environ[var]
+                        d[var] = EnvSentinel(key=var)
                     else:
                         raise ValueError(f"Duplicate environment variable: {var}")
                 else:

@@ -1,4 +1,5 @@
 import argparse
+import os
 import subprocess
 from typing import Dict, List, Optional, Type
 
@@ -11,6 +12,7 @@ from dstack._internal.core.models.configurations import (
     BaseConfigurationWithPorts,
     ConfigurationType,
     DevEnvironmentConfiguration,
+    EnvSentinel,
     PortMapping,
     ServiceConfiguration,
     TaskConfiguration,
@@ -59,6 +61,10 @@ class BaseRunConfigurator:
             conf.resources.gpu = resources.GPUSpec.parse_obj(gpu)
         if args.disk_spec:
             conf.resources.disk = args.disk_spec
+
+        for k, v in conf.env.items():
+            if isinstance(v, EnvSentinel):
+                conf.env[k] = v.from_env(os.environ)
 
         cls.interpolate_run_args(conf.setup, unknown)
 
