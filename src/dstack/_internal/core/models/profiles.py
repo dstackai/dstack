@@ -78,6 +78,12 @@ class Profile(ForbidExtra):
             description='The regions to consider for provisionig (e.g., "[eu-west-1, us-west4, westeurope]")'
         ),
     ]
+    instance_types: Annotated[
+        Optional[List[str]],
+        Field(
+            description='The cloud-specific instance types to consider for provisionig (e.g., "[p3.8xlarge, n1-standard-4]")'
+        ),
+    ]
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(

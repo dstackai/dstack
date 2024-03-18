@@ -85,6 +85,7 @@ def get_dev_env_run_plan_dict(
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
+                "instance_types": None,
                 "creation_policy": None,
                 "default": False,
                 "instance_name": None,
@@ -197,6 +198,7 @@ def get_dev_env_run_dict(
             "profile": {
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
+                "instance_types": None,
                 "creation_policy": None,
                 "default": False,
                 "instance_name": None,

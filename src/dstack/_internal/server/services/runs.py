@@ -361,6 +361,9 @@ async def get_offers_by_requirements(
     if profile.regions is not None:
         offers = [(b, o) for b, o in offers if o.region in profile.regions]
 
+    if profile.instance_types is not None:
+        offers = [(b, o) for b, o in offers if o.instance.name in profile.instance_types]
+
     return offers
 
 
