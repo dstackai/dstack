@@ -179,13 +179,17 @@ async def create_run(
     status: RunStatus = RunStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
+    run_id: Optional[UUID] = None,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
             run_name=run_name,
             repo_id=repo.name,
         )
+    if run_id is None:
+        run_id = uuid.uuid4()
     run = RunModel(
+        id=run_id,
         project_id=project.id,
         repo_id=repo.id,
         user_id=user.id,

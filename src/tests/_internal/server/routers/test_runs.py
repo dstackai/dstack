@@ -304,22 +304,31 @@ class TestListRuns:
             session=session,
             project_id=project.id,
         )
-        submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
-        run = await create_run(
+        run1_submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        run1 = await create_run(
             session=session,
             project=project,
             repo=repo,
             user=user,
-            submitted_at=submitted_at,
+            submitted_at=run1_submitted_at,
         )
-        run_spec = RunSpec.parse_raw(run.run_spec)
+        run1_spec = RunSpec.parse_raw(run1.run_spec)
         job = await create_job(
             session=session,
-            run=run,
-            submitted_at=submitted_at,
-            last_processed_at=submitted_at,
+            run=run1,
+            submitted_at=run1_submitted_at,
+            last_processed_at=run1_submitted_at,
         )
         job_spec = JobSpec.parse_raw(job.job_spec_data)
+        run2_submitted_at = datetime(2023, 1, 1, 3, 4, tzinfo=timezone.utc)
+        run2 = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            submitted_at=run2_submitted_at,
+        )
+        run2_spec = RunSpec.parse_raw(run2.run_spec)
         response = client.post(
             "/api/runs/list",
             headers=get_auth_headers(user.token),
@@ -328,12 +337,12 @@ class TestListRuns:
         assert response.status_code == 200, response.json()
         assert response.json() == [
             {
-                "id": str(run.id),
+                "id": str(run1.id),
                 "project_name": project.name,
                 "user": user.name,
-                "submitted_at": submitted_at.isoformat(),
+                "submitted_at": run1_submitted_at.isoformat(),
                 "status": "submitted",
-                "run_spec": run_spec.dict(),
+                "run_spec": run1_spec.dict(),
                 "jobs": [
                     {
                         "job_spec": job_spec.dict(),
@@ -362,8 +371,79 @@ class TestListRuns:
                 "cost": 0,
                 "service": None,
                 "termination_reason": None,
-            }
+            },
+            {
+                "id": str(run2.id),
+                "project_name": project.name,
+                "user": user.name,
+                "submitted_at": run2_submitted_at.isoformat(),
+                "status": "submitted",
+                "run_spec": run2_spec.dict(),
+                "jobs": [],
+                "latest_job_submission": None,
+                "cost": 0,
+                "service": None,
+                "termination_reason": None,
+            },
         ]
+
+    @pytest.mark.asyncio
+    async def test_lists_runs_pagination(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run1 = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            submitted_at=datetime(2023, 1, 2, 1, 4, tzinfo=timezone.utc),
+            run_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0b"),
+        )
+        run2 = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            submitted_at=datetime(2023, 1, 2, 1, 4, tzinfo=timezone.utc),
+            run_id=UUID("2b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0b"),
+        )
+        run3 = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            submitted_at=datetime(2023, 1, 2, 5, 15, tzinfo=timezone.utc),
+        )
+        response1 = client.post(
+            "/api/runs/list",
+            headers=get_auth_headers(user.token),
+            json={"limit": 2},
+        )
+        response1_json = response1.json()
+        assert response1.status_code == 200, response1_json
+        assert len(response1_json) == 2
+        assert response1_json[0]["id"] == str(run3.id)
+        assert response1_json[1]["id"] == str(run1.id)
+        response2 = client.post(
+            "/api/runs/list",
+            headers=get_auth_headers(user.token),
+            json={
+                "limit": 2,
+                "prev_submitted_at": str(run1.submitted_at),
+                "prev_run_id": str(run1.id),
+            },
+        )
+        response2_json = response2.json()
+        assert response2.status_code == 200, response2_json
+        assert len(response2_json) == 1
+        assert response2_json[0]["id"] == str(run2.id)
 
 
 class TestGetRunPlan:
