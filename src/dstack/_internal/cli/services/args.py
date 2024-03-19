@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 from pydantic import parse_obj_as
 
@@ -11,18 +11,15 @@ def gpu_spec(v: str) -> Dict:
     return resources.GPUSpec.parse(v)
 
 
-def env_var(v: str) -> Tuple[str, str | EnvSentinel]:
+def env_var(v: str) -> Tuple[str, Union[str, EnvSentinel]]:
     r = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)(=.*$|$)", v)
     if r is None:
         raise ValueError(v)
-
     if "=" in v:
         key, value = v.split("=", 1)
-
     else:
         key = r.group(1)
         value = EnvSentinel(key=key)
-
     return key, value
 
 

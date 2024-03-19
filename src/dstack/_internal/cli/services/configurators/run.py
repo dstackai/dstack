@@ -64,7 +64,10 @@ class BaseRunConfigurator:
 
         for k, v in conf.env.items():
             if isinstance(v, EnvSentinel):
-                conf.env[k] = v.from_env(os.environ)
+                try:
+                    conf.env[k] = v.from_env(os.environ)
+                except ValueError as e:
+                    raise ConfigurationError(*e.args)
 
         cls.interpolate_run_args(conf.setup, unknown)
 

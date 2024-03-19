@@ -1,4 +1,3 @@
-import os
 import re
 from enum import Enum
 from typing import Dict, List, Mapping, Optional, Union
@@ -97,9 +96,7 @@ class EnvSentinel(ForbidExtra):
     def from_env(self, env: Mapping[str, str]) -> str:
         if self.key in env:
             return env[self.key]
-
-        else:
-            raise ValueError(f"Environment variable {self.key} is not set")
+        raise ValueError(f"Environment variable {self.key} is not set")
 
     def __str__(self):
         return f"EnvSentinel({self.key})"
