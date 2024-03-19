@@ -118,7 +118,8 @@ class BaseConfiguration(ForbidExtra):
     ]
     env: Annotated[
         Union[
-            List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*(=.*$|$)")], Dict[str, str | EnvSentinel]
+            List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*(=.*$|$)")],
+            Dict[str, Union[str, EnvSentinel]],
         ],
         Field(description="The mapping or the list of environment variables"),
     ] = {}
