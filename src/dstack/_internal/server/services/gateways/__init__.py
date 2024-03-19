@@ -54,6 +54,8 @@ logger = get_logger(__name__)
 
 GATEWAY_CONNECT_ATTEMPTS = 9
 GATEWAY_CONNECT_DELAY = 10
+GATEWAY_CONFIGURE_ATTEMPTS = 40
+GATEWAY_CONFIGURE_DELAY = 3
 
 
 async def list_project_gateways(session: AsyncSession, project: ProjectModel) -> List[Gateway]:
@@ -143,10 +145,10 @@ async def create_gateway(
 
     # Give gateway sufficient time to become available.
     # In the case of gateway being accessed via domain (e.g. Kubernetes LB),
-    # it may take sime time before the domain can be resolved.
+    # it may take some time before the domain can be resolved.
     for attempt in range(GATEWAY_CONNECT_ATTEMPTS):
         try:
-            await gateway_connections_pool.add(
+            connection = await gateway_connections_pool.add(
                 gateway.gateway_compute.ip_address, gateway_ssh_private_key
             )
             break
@@ -160,6 +162,11 @@ async def create_gateway(
                 logger.error(
                     "Failed to connect to gateway %s: %s", gateway.gateway_compute.ip_address, e
                 )
+
+    try:
+        await _configure_gateway(connection)
+    except Exception as e:
+        logger.error("Failed to configure gateway %s: %s", gateway.gateway_compute.ip_address, e)
 
     return gateway_model_to_gateway(gateway)
 
@@ -424,22 +431,27 @@ async def init_gateways(session: AsyncSession):
     ):
         if isinstance(error, Exception):
             logger.warning("Failed to connect to gateway %s: %s", gateway.ip_address, error)
-            continue
 
     if settings.SKIP_GATEWAY_UPDATE:
         logger.debug("Skipping gateway update due to DSTACK_SKIP_GATEWAY_UPDATE env variable")
-        return
+    else:
+        build = get_dstack_runner_version()
 
-    build = get_dstack_runner_version()
+        for conn, error in await gather_map_async(
+            await gateway_connections_pool.all(),
+            lambda c: _update_gateway(c, build),
+            return_exceptions=True,
+        ):
+            if isinstance(error, Exception):
+                logger.warning("Failed to update gateway %s: %s", conn.ip_address, error)
 
     for conn, error in await gather_map_async(
         await gateway_connections_pool.all(),
-        lambda c: _update_gateway(c, build),
+        _configure_gateway,
         return_exceptions=True,
     ):
         if isinstance(error, Exception):
-            logger.warning("Failed to update gateway %s: %s", conn.ip_address, error)
-            continue
+            logger.warning("Failed to configure gateway %s: %s", conn.ip_address, error)
 
 
 async def _update_gateway(connection: GatewayConnection, build: str):
@@ -449,6 +461,34 @@ async def _update_gateway(connection: GatewayConnection, build: str):
     )
     if "Update successfully completed" in stdout:
         logger.info("Gateway %s updated", connection.ip_address)
+
+
+async def _configure_gateway(connection: GatewayConnection) -> None:
+    """
+    Try submitting gateway config several times in case gateway's HTTP server is not
+    running yet
+    """
+
+    logger.debug("Configuring gateway %s", connection.ip_address)
+
+    for attempt in range(GATEWAY_CONFIGURE_ATTEMPTS - 1):
+        try:
+            async with connection.client() as client:
+                await client.submit_gateway_config()
+            break
+        except httpx.NetworkError as e:
+            logger.debug(
+                "Failed attempt %s at configuring gateway %s: %s",
+                attempt + 1,
+                connection.ip_address,
+                e,
+            )
+            await asyncio.sleep(GATEWAY_CONFIGURE_DELAY)
+    else:
+        async with connection.client() as client:
+            await client.submit_gateway_config()
+
+    logger.info("Gateway %s configured", connection.ip_address)
 
 
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:

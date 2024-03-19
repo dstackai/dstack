@@ -23,7 +23,3 @@ class RegisterReplicaRequest(BaseModel):
 class RegisterEntrypointRequest(BaseModel):
     module: Literal["openai"]
     domain: str
-
-
-class OkResponse(BaseModel):
-    status: str = "ok"
