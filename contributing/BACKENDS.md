@@ -20,7 +20,7 @@ To add a new cloud provider to `gpuhunt`, follow these steps:
 ### 1.1. Clone the repo
 
 ```bash
-https://github.com/dstackai/gpuhunt.git
+git clone https://github.com/dstackai/gpuhunt.git
 ```
 
 ### 1.2. Create the provider class
@@ -80,7 +80,7 @@ the corresponding backend with `dstack`. Follow the steps below.
 git clone https://github.com/dstackai/dstack.git
 ```
 
-#### 2.2. Set up the development environment 
+#### 2.2. Set up the development environment
 
 Follow [DEVELOPMENT.md](DEVELOPMENT.md)`.
 
@@ -116,12 +116,14 @@ Refer to examples:
 Under the backend directory you've created, create the `compute.py` file and define the
 backend compute class there (should extend `dstack._internal.core.backends.base.compute.Compute`).
 
-You'll have to implement `get_offers`, `run_job` and `terminate_instance`.
+You'll have to implement `get_offers`, `create_instance`, `run_job` and `terminate_instance`.
 
-Refer to examples: 
-[datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/compute.py), 
-[aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/compute.py), 
-[gcp.py](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/compute.py), 
+The `create_instance` method is required for the pool feature. If you implement the `create_instance` method, you should add the provider name to `BACKENDS_WITH_CREATE_INSTANCE_SUPPORT`. (`src/dstack/_internal/server/services/runs.py`).
+
+Refer to examples:
+[datacrunch](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/datacrunch/compute.py),
+[aws](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/aws/compute.py),
+[gcp.py](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/gcp/compute.py),
 [azure](https://github.com/dstackai/dstack/blob/master/src/dstack/_internal/core/backends/azure/compute.py), etc.
 
 ##### 2.4.5. Create the backend config model class
