@@ -50,14 +50,13 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	var err error
 
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
-
-	d.cancelRun = cancel
+	pullCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
 	defer cancel()
+	d.cancelRun = cancel
 
 	log.Println("Pulling image")
 	d.state = Pulling
-	if err = pullImage(ctx, d.client, cfg); err != nil {
+	if err = pullImage(pullCtx, d.client, cfg); err != nil {
 		d.state = Pending
 		log.Printf("pullImage error: %s\n", err.Error())
 		return err
