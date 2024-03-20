@@ -16,6 +16,6 @@ async def process_gateways():
 async def _process_connection(conn: GatewayConnection):
     try:
         await conn.check_or_restart()
-        await conn.collect_stats()
+        await conn.try_collect_stats()
     except SSHError as e:
         logger.error("Connection to gateway %s failed: %s", conn.ip_address, e)

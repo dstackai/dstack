@@ -27,6 +27,7 @@ class GatewayClient:
         if uds is not None and port is not None:
             raise ValueError("Either uds or port should be specified, not both")
 
+        self.is_server_ready = False
         self.base_url = "http://gateway" if uds else f"http://localhost:{port}"
         self._client = AsyncClientWrapper(
             transport=httpx.AsyncHTTPTransport(uds=uds) if uds else None, timeout=30
@@ -58,6 +59,7 @@ class GatewayClient:
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
+        self.is_server_ready = True
 
     async def unregister_service(self, project: str, run_id: uuid.UUID):
         resp = await self._client.post(
@@ -66,6 +68,7 @@ class GatewayClient:
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
+        self.is_server_ready = True
 
     async def register_replica(self, run: Run, job_submission: JobSubmission):
         payload = {
@@ -104,6 +107,7 @@ class GatewayClient:
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
+        self.is_server_ready = True
 
     async def unregister_replica(self, project: str, run_id: uuid.UUID, job_id: uuid.UUID):
         resp = await self._client.post(
@@ -114,6 +118,7 @@ class GatewayClient:
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
+        self.is_server_ready = True
 
     async def register_openai_entrypoint(self, project: str, domain: str):
         resp = await self._client.post(
@@ -126,6 +131,7 @@ class GatewayClient:
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
+        self.is_server_ready = True
 
     async def submit_gateway_config(self) -> None:
         resp = await self._client.post(
@@ -139,12 +145,14 @@ class GatewayClient:
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
+        self.is_server_ready = True
 
     async def info(self) -> dict:
         resp = await self._client.get(self._url("/"))
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
+        self.is_server_ready = True
         return resp.json()
 
     async def collect_stats(self) -> StatsCollectResponse:
@@ -152,6 +160,7 @@ class GatewayClient:
         if resp.status_code == 400:
             raise gateway_error(resp.json())
         resp.raise_for_status()
+        self.is_server_ready = True
         return parse_obj_as(StatsCollectResponse, resp.json())
 
     def _url(self, path: str) -> str:
