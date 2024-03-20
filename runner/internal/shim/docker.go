@@ -48,7 +48,7 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	var err error
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
 
 	d.cancelRun = cancel
 	defer cancel()
