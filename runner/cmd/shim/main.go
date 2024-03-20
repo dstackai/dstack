@@ -16,6 +16,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// Version is a build-time variable. The value is overridden by ldflags.
+var Version string
+
 func main() {
 	var args shim.CLIArgs
 	args.Docker.SSHPort = 10022
