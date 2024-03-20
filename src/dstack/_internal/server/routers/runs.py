@@ -53,6 +53,7 @@ async def list_runs(
         user=user,
         project_name=body.project_name,
         repo_id=body.repo_id,
+        only_active=body.only_active,
         prev_submitted_at=body.prev_submitted_at,
         prev_run_id=body.prev_run_id,
         limit=body.limit,

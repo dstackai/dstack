@@ -125,6 +125,7 @@ async def list_user_runs(
     user: UserModel,
     project_name: Optional[str],
     repo_id: Optional[str],
+    only_active: bool,
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
@@ -143,6 +144,7 @@ async def list_user_runs(
             session=session,
             project=projects[0],
             repo_id=repo_id,
+            only_active=only_active,
             prev_submitted_at=prev_submitted_at,
             prev_run_id=prev_run_id,
             limit=limit,
@@ -151,6 +153,7 @@ async def list_user_runs(
         run_models = await list_projects_run_models(
             session=session,
             projects=projects,
+            only_active=only_active,
             prev_submitted_at=prev_submitted_at,
             prev_run_id=prev_run_id,
             limit=limit,
@@ -169,11 +172,14 @@ async def list_user_runs(
 async def list_projects_run_models(
     session: AsyncSession,
     projects: List[ProjectModel],
+    only_active: bool,
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
 ) -> List[RunModel]:
-    filters = [RunModel.deleted == False, or_(*[RunModel.project_id == p.id for p in projects])]
+    filters = [RunModel.deleted == False, RunModel.project_id.in_(p.id for p in projects)]
+    if only_active:
+        filters.append(RunModel.status.not_in(RunStatus.finished_statuses()))
     if prev_submitted_at is not None:
         if prev_run_id is None:
             filters.append(RunModel.submitted_at < prev_submitted_at)
@@ -199,6 +205,7 @@ async def list_project_run_models(
     session: AsyncSession,
     project: ProjectModel,
     repo_id: Optional[str],
+    only_active: bool,
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
@@ -207,6 +214,8 @@ async def list_project_run_models(
         RunModel.project_id == project.id,
         RunModel.deleted == False,
     ]
+    if only_active:
+        filters.append(RunModel.status.not_in(RunStatus.finished_statuses()))
     if prev_submitted_at is not None:
         if prev_run_id is None:
             filters.append(RunModel.submitted_at < prev_submitted_at)
