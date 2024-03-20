@@ -54,7 +54,10 @@ class GatewayConnection:
                 await self.tunnel.start()
         return
 
-    async def collect_stats(self):
+    async def try_collect_stats(self) -> None:
+        if not self._client.is_server_ready:
+            return
+
         async with self._lock.writer_lock:
             self.stats = await self._client.collect_stats()
             for service_id, stats in self.stats.items():
