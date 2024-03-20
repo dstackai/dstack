@@ -36,7 +36,7 @@ func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (
 	go func(taskParams shim.DockerImageConfig) {
 		err := s.runner.Run(context.Background(), taskParams)
 		if err != nil {
-			fmt.Printf("failed Run %v", err)
+			fmt.Printf("failed Run %v\n", err)
 		}
 	}(body.TaskParams())
 

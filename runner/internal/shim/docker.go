@@ -1,9 +1,10 @@
 package shim
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/dstackai/dstack/runner/consts"
+	bytesize "github.com/inhies/go-bytesize"
 	"github.com/ztrue/tracerr"
 )
 
@@ -57,7 +59,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	d.state = Pulling
 	if err = pullImage(ctx, d.client, cfg); err != nil {
 		d.state = Pending
-		fmt.Printf("pullImage error: %s\n", err.Error())
+		log.Printf("pullImage error: %s\n", err.Error())
 		return err
 	}
 
@@ -66,7 +68,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	containerID, err := createContainer(ctx, d.client, d.dockerParams, cfg)
 	if err != nil {
 		d.state = Pending
-		fmt.Printf("createContainer error: %s\n", err.Error())
+		log.Printf("createContainer error: %s\n", err.Error())
 		return err
 	}
 
@@ -86,7 +88,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	d.state = Running
 	if err = runContainer(ctx, d.client, containerID); err != nil {
 		d.state = Pending
-		fmt.Printf("runContainer error: %s\n", err.Error())
+		log.Printf("runContainer error: %s\n", err.Error())
 		return err
 	}
 
@@ -143,20 +145,59 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 		opts.RegistryAuth = regAuth
 	}
 
+	startTime := time.Now()
 	reader, err := client.ImagePull(ctx, taskParams.ImageName, opts) // todo test registry auth
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 	defer func() { _ = reader.Close() }()
 
-	_, err = io.Copy(io.Discard, reader)
-	if err != nil {
-		return tracerr.Wrap(err)
+	current := make(map[string]uint)
+	total := make(map[string]uint)
+
+	type ProgressDetail struct {
+		Current uint `json:"current"`
+		Total   uint `json:"total"`
+	}
+	type Progress struct {
+		Id             string         `json:"id"`
+		Status         string         `json:"status"`
+		ProgressDetail ProgressDetail `json:"progressDetail"`
 	}
 
-	// {"status":"Pulling from clickhouse/clickhouse-server","id":"latest"}
-	// {"status":"Digest: sha256:2ff5796c67e8d588273a5f3f84184b9cdaa39a324bcf74abd3652d818d755f8c"}
-	// {"status":"Status: Downloaded newer image for clickhouse/clickhouse-server:latest"}
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		var progressRow Progress
+		if err := json.Unmarshal(line, &progressRow); err != nil {
+			continue
+		}
+		if progressRow.Status == "Downloading" {
+			current[progressRow.Id] = progressRow.ProgressDetail.Current
+			total[progressRow.Id] = progressRow.ProgressDetail.Total
+		}
+		if progressRow.Status == "Download complete" {
+			current[progressRow.Id] = total[progressRow.Id]
+		}
+	}
+
+	duration := time.Since(startTime)
+
+	var currentBytes uint
+	var totalBytes uint
+	for _, v := range current {
+		currentBytes += v
+	}
+	for _, v := range total {
+		totalBytes += v
+	}
+
+	speed := bytesize.New(float64(currentBytes) / duration.Seconds())
+	if currentBytes == totalBytes {
+		log.Printf("Image Pull successfully downloaded: %d bytes (%s/s)", currentBytes, speed)
+	} else {
+		log.Printf("Image Pull interrupted: downloaded %d bytes out of %d (%s/s)", currentBytes, totalBytes, speed)
+	}
 
 	return nil
 }
