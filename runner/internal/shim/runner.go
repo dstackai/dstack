@@ -2,6 +2,7 @@ package shim
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -92,16 +93,29 @@ func downloadRunner(url string) (string, error) {
 	}
 	defer func() {
 		err := resp.Body.Close()
-		log.Printf("close body error: %s\n", err)
+		if err != nil {
+			log.Printf("downloadRunner: close body error: %s\n", err)
+		}
 	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", gerrors.Newf("unexpected status code: %s", resp.Status)
 	}
 
-	_, err = io.Copy(tempFile, resp.Body)
+	written, err := io.Copy(tempFile, resp.Body)
 	if err != nil {
 		return "", gerrors.Wrap(err)
+	}
+
+	select {
+	case <-ctx.Done():
+		err := ctx.Err()
+		if errors.Is(err, context.DeadlineExceeded) {
+			fmt.Printf("downloadRunner: %s, %d bytes out of %d bytes were downloaded", err, written, resp.ContentLength)
+			return "", gerrors.Newf("Cannot download runner %w", err)
+		}
+	default:
+		log.Printf("The runner was downloaded successfully (%d bytes)", written)
 	}
 
 	if err := tempFile.Chmod(0755); err != nil {

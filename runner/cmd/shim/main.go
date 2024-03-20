@@ -110,7 +110,9 @@ func main() {
 					if err != nil {
 						return cli.Exit(err, 1)
 					}
-					log.Printf("Docker: %+v\n", args)
+					log.Printf("Config Shim: %+v\n", args.Shim)
+					log.Printf("Config Runner: %+v\n", args.Runner)
+					log.Printf("Config Docker: %+v\n", args.Docker)
 
 					dockerRunner, err := shim.NewDockerRunner(args)
 					if err != nil {
