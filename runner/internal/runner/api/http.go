@@ -79,8 +79,8 @@ func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
-	runCtx := context.Background()
-	runCtx, s.cancelRun = context.WithCancel(runCtx)
+	var runCtx context.Context
+	runCtx, s.cancelRun = context.WithCancel(context.Background())
 	go func() {
 		_ = s.executor.Run(runCtx) // todo handle error
 		s.jobBarrierCh <- nil      // notify server that job finished
