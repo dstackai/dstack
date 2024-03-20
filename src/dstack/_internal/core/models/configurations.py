@@ -27,6 +27,7 @@ class PythonVersion(str, Enum):
     PY39 = "3.9"
     PY310 = "3.10"
     PY311 = "3.11"
+    PY312 = "3.12"
 
 
 class RegistryAuth(ForbidExtra):
