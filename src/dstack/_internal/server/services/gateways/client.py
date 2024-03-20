@@ -27,7 +27,11 @@ class GatewayClient:
         if uds is not None and port is not None:
             raise ValueError("Either uds or port should be specified, not both")
 
+        # Shows that the gateway's HTTP server has started. Should become True
+        # in submit_gateway_config during gateway setup. If setup fails, it
+        # should become True after any other successful request.
         self.is_server_ready = False
+
         self.base_url = "http://gateway" if uds else f"http://localhost:{port}"
         self._client = AsyncClientWrapper(
             transport=httpx.AsyncHTTPTransport(uds=uds) if uds else None, timeout=30
