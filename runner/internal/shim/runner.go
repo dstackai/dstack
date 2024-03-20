@@ -78,7 +78,7 @@ func downloadRunner(url string) (string, error) {
 	}()
 
 	log.Printf("Downloading runner from %s\n", url)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*600)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
