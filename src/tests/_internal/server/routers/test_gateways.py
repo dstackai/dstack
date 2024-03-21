@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,6 +24,14 @@ from dstack._internal.server.testing.common import (
 )
 
 client = TestClient(app)
+
+
+class AsyncContextManager:
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        pass
 
 
 class TestListAndGetGateways:
@@ -152,7 +160,8 @@ class TestCreateGateway:
                 ip_address="2.2.2.2",
                 region="us",
             )
-
+            pool_add.return_value = MagicMock()
+            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
             response = client.post(
                 f"/api/project/{project.name}/gateways/create",
                 json={"name": "test", "backend_type": "aws", "region": "us"},
@@ -196,7 +205,8 @@ class TestCreateGateway:
                 ip_address="2.2.2.2",
                 region="us",
             )
-
+            pool_add.return_value = MagicMock()
+            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
             response = client.post(
                 f"/api/project/{project.name}/gateways/create",
                 json={"name": None, "backend_type": "aws", "region": "us"},
