@@ -166,7 +166,7 @@ async def create_gateway(
     try:
         await _configure_gateway(connection)
     except Exception as e:
-        logger.error("Failed to configure gateway %s: %s", gateway.gateway_compute.ip_address, e)
+        logger.error("Failed to configure gateway %s: %r", gateway.gateway_compute.ip_address, e)
 
     return gateway_model_to_gateway(gateway)
 
@@ -451,7 +451,7 @@ async def init_gateways(session: AsyncSession):
         return_exceptions=True,
     ):
         if isinstance(error, Exception):
-            logger.warning("Failed to configure gateway %s: %s", conn.ip_address, error)
+            logger.warning("Failed to configure gateway %s: %r", conn.ip_address, error)
 
 
 async def _update_gateway(connection: GatewayConnection, build: str):
@@ -476,10 +476,11 @@ async def _configure_gateway(connection: GatewayConnection) -> None:
             async with connection.client() as client:
                 await client.submit_gateway_config()
             break
-        except httpx.NetworkError as e:
+        except httpx.RequestError as e:
             logger.debug(
-                "Failed attempt %s at configuring gateway %s: %s",
+                "Failed attempt %s/%s at configuring gateway %s: %r",
                 attempt + 1,
+                GATEWAY_CONFIGURE_ATTEMPTS,
                 connection.ip_address,
                 e,
             )
