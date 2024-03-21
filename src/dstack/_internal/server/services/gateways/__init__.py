@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import dstack._internal.server.services.jobs as jobs_services
 import dstack._internal.utils.random_names as random_names
 from dstack._internal.core.backends.base.compute import (
+    Compute,
     get_dstack_gateway_wheel,
     get_dstack_runner_version,
 )
@@ -81,6 +82,35 @@ async def get_project_default_gateway(
     return gateway_model_to_gateway(gateway)
 
 
+async def create_gateway_compute(
+    backend_compute: Compute,
+    instance_name: str,
+    region: str,
+    project_id: str,
+    backend_id: Optional[uuid.UUID] = None,
+) -> GatewayComputeModel:
+    private_bytes, public_bytes = generate_rsa_key_pair_bytes()
+    gateway_ssh_private_key = private_bytes.decode()
+    gateway_ssh_public_key = public_bytes.decode()
+
+    info = await run_async(
+        backend_compute.create_gateway,
+        instance_name,
+        gateway_ssh_public_key,
+        region,
+        project_id,
+    )
+
+    return GatewayComputeModel(
+        backend_id=backend_id,
+        ip_address=info.ip_address,
+        region=info.region,
+        instance_id=info.instance_id,
+        ssh_private_key=gateway_ssh_private_key,
+        ssh_public_key=gateway_ssh_public_key,
+    )
+
+
 async def create_gateway(
     session: AsyncSession,
     project: ProjectModel,
@@ -110,25 +140,13 @@ async def create_gateway(
     if project.default_gateway is None:
         await set_default_gateway(session=session, project=project, name=name)
 
-    private_bytes, public_bytes = generate_rsa_key_pair_bytes()
-    gateway_ssh_private_key = private_bytes.decode()
-    gateway_ssh_public_key = public_bytes.decode()
-
     try:
-        info = await run_async(
-            backend.compute().create_gateway,
-            name,
-            gateway_ssh_public_key,
-            region,
-            project.name,
-        )
-        gateway.gateway_compute = GatewayComputeModel(
+        gateway.gateway_compute = await create_gateway_compute(
+            backend_compute=backend.compute(),
+            instance_name=gateway.name,
+            region=region,
+            project_id=project.name,
             backend_id=backend_model.id,
-            ip_address=info.ip_address,
-            region=info.region,
-            instance_id=info.instance_id,
-            ssh_private_key=gateway_ssh_private_key,
-            ssh_public_key=gateway_ssh_public_key,
         )
         session.add(gateway)
         await session.commit()
@@ -149,7 +167,7 @@ async def create_gateway(
     for attempt in range(GATEWAY_CONNECT_ATTEMPTS):
         try:
             connection = await gateway_connections_pool.add(
-                gateway.gateway_compute.ip_address, gateway_ssh_private_key
+                gateway.gateway_compute.ip_address, gateway.gateway_compute.ssh_private_key
             )
             break
         except SSHError as e:
