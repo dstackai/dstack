@@ -41,10 +41,11 @@ type CLIArgs struct {
 }
 
 type DockerImageConfig struct {
-	Username  string
-	Password  string
-	ImageName string
-	ShmSize   int64
+	Username      string
+	Password      string
+	ImageName     string
+	ContainerName string
+	ShmSize       int64
 }
 
 func (ra DockerImageConfig) EncodeRegistryAuth() (string, error) {

@@ -230,6 +230,7 @@ class TestProcessRunningJobs:
                 username="",
                 password="",
                 image_name="dstackai/base:py3.11-0.4rc4-cuda-12.1",
+                container_name="test-run-0-0",
                 shm_size=None,
             )
         await session.refresh(job)

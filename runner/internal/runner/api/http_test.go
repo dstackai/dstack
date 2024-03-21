@@ -12,11 +12,12 @@ import (
 )
 
 type DummyRunner struct {
-	State shim.RunnerStatus
+	State           shim.RunnerStatus
+	ContainerStatus shim.ContainerStatus
 }
 
-func (ds DummyRunner) GetState() shim.RunnerStatus {
-	return ds.State
+func (ds DummyRunner) GetState() (shim.RunnerStatus, shim.ContainerStatus) {
+	return ds.State, ds.ContainerStatus
 }
 
 func (ds DummyRunner) Run(context.Context, shim.DockerImageConfig) error {
