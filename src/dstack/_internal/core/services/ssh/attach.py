@@ -45,6 +45,7 @@ class SSHAttach:
         dockerized: bool,
         ssh_proxy: Optional[SSHConnectionParams] = None,
         control_sock_path: Optional[str] = None,
+        local_backend: bool = False,
     ):
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
@@ -78,7 +79,7 @@ class SSHAttach:
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
             }
-        if dockerized:
+        if dockerized and not local_backend:
             self.container_config = {
                 "HostName": "localhost",
                 "Port": 10022,
