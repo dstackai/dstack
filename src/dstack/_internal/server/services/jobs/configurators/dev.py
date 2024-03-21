@@ -26,7 +26,8 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         super().__init__(run_spec)
 
     def _shell_commands(self) -> List[str]:
-        commands = []
+        # preserve environment variables for SSH clients
+        commands = ["env >> ~/.ssh/environment"]
         commands += self.ide.get_install_commands()
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup

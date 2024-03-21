@@ -114,6 +114,7 @@ def get_dev_env_run_plan_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
+                        "env >> ~/.ssh/environment && "
                         "(echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
@@ -227,6 +228,7 @@ def get_dev_env_run_dict(
                         "/bin/bash",
                         "-i",
                         "-c",
+                        "env >> ~/.ssh/environment && "
                         "(echo pip install ipykernel... && "
                         "pip install -q --no-cache-dir "
                         'ipykernel 2> /dev/null) || echo "no '
