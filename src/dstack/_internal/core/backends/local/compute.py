@@ -46,7 +46,7 @@ class LocalCompute(Compute):
             region="",
             username="root",
             ssh_port=10022,
-            dockerized=False,
+            dockerized=True,
             backend_data=None,
         )
         return launched_instance
@@ -65,7 +65,7 @@ class LocalCompute(Compute):
             region="",
             username="root",
             ssh_port=10022,
-            dockerized=False,
+            dockerized=True,
             ssh_proxy=None,
             backend_data=None,
         )

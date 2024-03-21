@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from websocket import WebSocketApp
 
 import dstack.api as api
+from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
@@ -278,6 +279,7 @@ class Run(ABC):
                 control_sock_path=control_sock_path_and_port_locks[0]
                 if control_sock_path_and_port_locks
                 else None,
+                local_backend=provisioning_data.backend == LocalBackend,
             )
             if not control_sock_path_and_port_locks:
                 self._ssh_attach.attach()
