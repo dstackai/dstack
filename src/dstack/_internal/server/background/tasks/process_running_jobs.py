@@ -295,6 +295,7 @@ def _process_provisioning_with_shim(
             username=interpolate(registry_auth.username),
             password=interpolate(registry_auth.password),
             image_name=job_spec.image_name,
+            container_name=job_model.job_name,
             shm_size=job_spec.requirements.resources.shm_size,
         )
     else:
@@ -302,6 +303,7 @@ def _process_provisioning_with_shim(
             username="",
             password="",
             image_name=job_spec.image_name,
+            container_name=job_model.job_name,
             shm_size=job_spec.requirements.resources.shm_size,
         )
 
@@ -330,11 +332,23 @@ def _process_pulling_with_shim(
         is successful
     """
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
-    shim_client.pull()  # raises error if shim is down, causes retry
+    container_status = shim_client.pull()  # raises error if shim is down, causes retry
 
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
     resp = runner_client.healthcheck()
     if resp is None:
+        if (
+            container_status.state == "pending"
+            and container_status.container_name == job_model.job_name
+        ):
+            logger.error(
+                "The docker container of the job '%s' is not working: exit code: %s, error %s",
+                job_model.job_name,
+                container_status.exit_code,
+                container_status.error,
+            )
+            logger.debug("runner healthcheck: %s", container_status.dict())
+            return False
         return True  # runner is not available yet, but shim is alive (pulling)
 
     _submit_job_to_runner(
