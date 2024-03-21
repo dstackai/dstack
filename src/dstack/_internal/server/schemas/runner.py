@@ -70,8 +70,20 @@ class DockerImageBody(BaseModel):
     username: str
     password: str
     image_name: str
+    container_name: str
     shm_size: int
 
 
 class StopBody(BaseModel):
     force: bool = False
+
+
+class PullBody(BaseModel):
+    state: str
+    container_name: Optional[str]
+    status: Optional[str]
+    running: Optional[bool]
+    oom_killed: Optional[bool]
+    dead: Optional[bool]
+    exit_code: Optional[int]
+    error: Optional[str]

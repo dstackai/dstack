@@ -24,13 +24,26 @@ import (
 	"github.com/ztrue/tracerr"
 )
 
+type ContainerStatus struct {
+	ContainerID   string
+	ContainerName string
+	Status        string
+	Running       bool
+	OOMKilled     bool
+	Dead          bool
+	ExitCode      int
+	Error         string
+}
+
 type DockerRunner struct {
 	client           *docker.Client
 	dockerParams     DockerParameters
 	currentContainer string
 	state            RunnerStatus
 
-	cancelRun context.CancelFunc
+	cancelPull context.CancelFunc
+
+	containerStatus ContainerStatus
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -50,15 +63,21 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	var err error
 
-	pullCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
+	d.containerStatus = ContainerStatus{
+		ContainerName: cfg.ContainerName,
+	}
+
+	pullCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	d.cancelRun = cancel
+	d.cancelPull = cancel
 
 	log.Println("Pulling image")
 	d.state = Pulling
 	if err = pullImage(pullCtx, d.client, cfg); err != nil {
 		d.state = Pending
-		log.Printf("pullImage error: %s\n", err.Error())
+		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
+		d.containerStatus.Error = errMessage
+		log.Print(errMessage + "\n")
 		return err
 	}
 
@@ -67,11 +86,11 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	containerID, err := createContainer(ctx, d.client, d.dockerParams, cfg)
 	if err != nil {
 		d.state = Pending
-		log.Printf("createContainer error: %s\n", err.Error())
+		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
+		d.containerStatus.Error = errMessage
+		log.Print(errMessage + "\n")
 		return err
 	}
-
-	d.currentContainer = containerID
 
 	if !d.dockerParams.DockerKeepContainer() {
 		defer func() {
@@ -84,27 +103,30 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	}
 
 	log.Printf("Running container, id=%s\n", containerID)
+	d.containerStatus, _ = inspectContainer(d.client, containerID)
 	d.state = Running
+	d.currentContainer = containerID
+
 	if err = runContainer(ctx, d.client, containerID); err != nil {
-		d.state = Pending
 		log.Printf("runContainer error: %s\n", err.Error())
+		d.state = Pending
+		d.containerStatus, _ = inspectContainer(d.client, containerID)
+		d.currentContainer = ""
 		return err
 	}
 
 	log.Printf("Container finished successfully, id=%s\n", containerID)
-
-	d.currentContainer = ""
+	d.containerStatus, _ = inspectContainer(d.client, containerID)
 	d.state = Pending
+	d.currentContainer = ""
 	return nil
 }
 
 func (d *DockerRunner) Stop(force bool) {
-	if d.currentContainer == "" && d.state == Pulling {
-		d.cancelRun()
+	if d.state == Pulling && d.currentContainer == "" {
+		d.cancelPull()
 		return
 	}
-
-	ctx := context.Background()
 
 	stopOptions := container.StopOptions{}
 	if force {
@@ -112,14 +134,14 @@ func (d *DockerRunner) Stop(force bool) {
 		stopOptions.Timeout = &timeout
 	}
 
-	err := d.client.ContainerStop(ctx, d.currentContainer, stopOptions)
+	err := d.client.ContainerStop(context.Background(), d.currentContainer, stopOptions)
 	if err != nil {
 		log.Printf("Failed to stop container: %s", err)
 	}
 }
 
-func (d DockerRunner) GetState() RunnerStatus {
-	return d.state
+func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus) {
+	return d.state, d.containerStatus
 }
 
 func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerImageConfig) error {
@@ -145,7 +167,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 	}
 
 	startTime := time.Now()
-	reader, err := client.ImagePull(ctx, taskParams.ImageName, opts) // todo test registry auth
+	reader, err := client.ImagePull(ctx, taskParams.ImageName, opts)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -161,8 +183,10 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 	type Progress struct {
 		Id             string         `json:"id"`
 		Status         string         `json:"status"`
-		ProgressDetail ProgressDetail `json:"progressDetail"`
+		ProgressDetail ProgressDetail `json:"progressDetail"` //nolint:tagliatelle
 	}
+
+	var status bool
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -178,6 +202,10 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 		if progressRow.Status == "Download complete" {
 			current[progressRow.Id] = total[progressRow.Id]
 		}
+		if strings.HasPrefix(progressRow.Status, "Status:") {
+			status = true
+			log.Println(progressRow.Status)
+		}
 	}
 
 	duration := time.Since(startTime)
@@ -192,13 +220,13 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 	}
 
 	speed := bytesize.New(float64(currentBytes) / duration.Seconds())
-	if currentBytes == totalBytes {
+	if status && currentBytes == totalBytes {
 		log.Printf("Image Pull successfully downloaded: %d bytes (%s/s)", currentBytes, speed)
 	} else {
 		log.Printf("Image Pull interrupted: downloaded %d bytes out of %d (%s/s)", currentBytes, totalBytes, speed)
 	}
 
-	return nil
+	return ctx.Err()
 }
 
 func createContainer(ctx context.Context, client docker.APIClient, dockerParams DockerParameters, taskParams DockerImageConfig) (string, error) {
@@ -228,7 +256,7 @@ func createContainer(ctx context.Context, client docker.APIClient, dockerParams 
 		Mounts:  mounts,
 		ShmSize: taskParams.ShmSize,
 	}
-	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
+	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskParams.ContainerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -353,4 +381,23 @@ func (c CLIArgs) DockerMounts() ([]mount.Mount, error) {
 
 func (c CLIArgs) DockerPorts() []int {
 	return []int{c.Runner.HTTPPort, c.Docker.SSHPort}
+}
+
+func inspectContainer(client *docker.Client, containerID string) (ContainerStatus, error) {
+	inspection, err := client.ContainerInspect(context.Background(), containerID)
+	if err != nil {
+		s := ContainerStatus{}
+		return s, err
+	}
+	containerStatus := ContainerStatus{
+		ContainerID:   containerID,
+		ContainerName: strings.TrimLeft(inspection.Name, "/"),
+		Status:        inspection.State.Status,
+		Running:       inspection.State.Running,
+		OOMKilled:     inspection.State.OOMKilled,
+		Dead:          inspection.State.Dead,
+		ExitCode:      inspection.State.ExitCode,
+		Error:         inspection.State.Error,
+	}
+	return containerStatus, nil
 }
