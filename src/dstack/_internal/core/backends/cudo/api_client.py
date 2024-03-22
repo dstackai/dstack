@@ -70,6 +70,12 @@ class CudoApiClient:
             data = resp.json()
             return data
 
+    def get_cpu_only_machine_types(self, vcpu, memory):
+        resp = self._make_request("GET", f"/vms/machine-types?vcpu={vcpu}&memory_gib={memory}")
+        if resp.ok:
+            data = resp.json()
+            return data
+
     def terminate_virtual_machine(self, vm_id: str, project_id):
         resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
         if resp.ok:

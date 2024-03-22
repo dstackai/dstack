@@ -24,14 +24,13 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
     SSHKey,
 )
-from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 CPU_GATEWAY = 1
-MEMORY_GATEWAY = Memory.parse("2GB")
+MEMORY_GATEWAY = 2
 DISK_SIZE_GATEWAY = 30
 
 
@@ -201,21 +200,19 @@ class CudoCompute(Compute):
         )
 
     def get_gateway_machine(self, region):
-        machine_types = self.api_client.get_machine_types()["machineTypes"]
+        machine_types = self.api_client.get_cpu_only_machine_types(CPU_GATEWAY, MEMORY_GATEWAY)
+        machine_types = machine_types["hostConfigs"]
         vms = [
             vm
             for vm in machine_types
-            if vm.get("dataCenterId") == region
-            and vm.get("maxVcpuFree", 0) > CPU_GATEWAY
-            and vm.get("maxMemoryGibFree", 0) > MEMORY_GATEWAY
-            and vm.get("maxStorageGibFree", 0) > DISK_SIZE_GATEWAY
+            if vm.get("dataCenterId") == region and vm.get("countVmAvailable") > 0
         ]
         if not vms:
             return None
         for vm in vms:
-            vm["price"] = round(float(vm["vcpuPriceHr"]["value"]), 5) * CPU_GATEWAY
-        +(round(float(vm["memoryGibPriceHr"]["value"]), 5) * MEMORY_GATEWAY)
-        +(round(float(vm["minStorageGibPriceHr"]["value"]), 5) * DISK_SIZE_GATEWAY)
-        +(round(float(vm["ipv4PriceHr"]["value"]), 5))
+            vm["price"] = round(float(vm["totalVcpuPriceHr"]["value"]), 5)
+        +(round(float(vm["totalMemoryPriceHr"]["value"]), 5))
+        +(round(float(vm["storageGibPriceHr"]["value"]), 5) * DISK_SIZE_GATEWAY)
+        +(round(float(vm["storageGibPriceHr"]["value"]), 5))
         vms_sorted = sorted(vms, key=lambda x: x["price"])
         return vms_sorted[0]
