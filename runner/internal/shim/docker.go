@@ -230,6 +230,19 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 }
 
 func createContainer(ctx context.Context, client docker.APIClient, dockerParams DockerParameters, taskParams DockerImageConfig) (string, error) {
+	timeout := int(0)
+	stopOptions := container.StopOptions{Timeout: &timeout}
+	err := client.ContainerStop(ctx, taskParams.ContainerName, stopOptions)
+	if err != nil {
+		log.Printf("Unable to stop the container: %s", err)
+	}
+
+	removeOptions := types.ContainerRemoveOptions{Force: true}
+	err = client.ContainerRemove(ctx, taskParams.ContainerName, removeOptions)
+	if err != nil {
+		log.Printf("Unable to remove the container: %s", err)
+	}
+
 	gpuRequest, err := requestGpuIfAvailable(ctx, client)
 	if err != nil {
 		return "", tracerr.Wrap(err)
