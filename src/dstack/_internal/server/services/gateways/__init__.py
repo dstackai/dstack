@@ -161,32 +161,45 @@ async def create_gateway(
         await session.commit()
         raise
 
-    # Give gateway sufficient time to become available.
-    # In the case of gateway being accessed via domain (e.g. Kubernetes LB),
-    # it may take some time before the domain can be resolved.
+    connection = await connect_to_gateway_with_retry(gateway.gateway_compute)
+
+    if connection:
+        try:
+            await configure_gateway(connection)
+        except Exception as e:
+            logger.error(
+                "Failed to configure gateway %s: %r", gateway.gateway_compute.ip_address, e
+            )
+
+    return gateway_model_to_gateway(gateway)
+
+
+async def connect_to_gateway_with_retry(
+    gateway_compute: GatewayComputeModel,
+) -> Optional[GatewayConnection]:
+    """
+    Create gateway connection and add it to connection pool.
+    Give gateway sufficient time to become available. In the case of gateway
+    being accessed via domain (e.g. Kubernetes LB), it may take some time before
+    the domain can be resolved.
+    """
+
+    connection = None
+
     for attempt in range(GATEWAY_CONNECT_ATTEMPTS):
         try:
             connection = await gateway_connections_pool.add(
-                gateway.gateway_compute.ip_address, gateway.gateway_compute.ssh_private_key
+                gateway_compute.ip_address, gateway_compute.ssh_private_key
             )
             break
         except SSHError as e:
             if attempt < GATEWAY_CONNECT_ATTEMPTS - 1:
-                logger.debug(
-                    "Failed to connect to gateway %s: %s", gateway.gateway_compute.ip_address, e
-                )
+                logger.debug("Failed to connect to gateway %s: %s", gateway_compute.ip_address, e)
                 await asyncio.sleep(GATEWAY_CONNECT_DELAY)
             else:
-                logger.error(
-                    "Failed to connect to gateway %s: %s", gateway.gateway_compute.ip_address, e
-                )
+                logger.error("Failed to connect to gateway %s: %s", gateway_compute.ip_address, e)
 
-    try:
-        await _configure_gateway(connection)
-    except Exception as e:
-        logger.error("Failed to configure gateway %s: %r", gateway.gateway_compute.ip_address, e)
-
-    return gateway_model_to_gateway(gateway)
+    return connection
 
 
 async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways_names: List[str]):
@@ -465,7 +478,7 @@ async def init_gateways(session: AsyncSession):
 
     for conn, error in await gather_map_async(
         await gateway_connections_pool.all(),
-        _configure_gateway,
+        configure_gateway,
         return_exceptions=True,
     ):
         if isinstance(error, Exception):
@@ -481,7 +494,7 @@ async def _update_gateway(connection: GatewayConnection, build: str):
         logger.info("Gateway %s updated", connection.ip_address)
 
 
-async def _configure_gateway(connection: GatewayConnection) -> None:
+async def configure_gateway(connection: GatewayConnection) -> None:
     """
     Try submitting gateway config several times in case gateway's HTTP server is not
     running yet
