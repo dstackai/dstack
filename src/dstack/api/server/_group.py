@@ -8,7 +8,7 @@ class APIRequest(Protocol):
     def __call__(
         self, path: str, body: Optional[str] = None, raise_for_status: bool = True, **kwargs
     ) -> requests.Response:
-        ...
+        pass
 
 
 class APIClientGroup:

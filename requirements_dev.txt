@@ -3,4 +3,4 @@ httpx>=0.23
 pytest~=7.2
 pytest-asyncio>=0.21
 freezegun>=1.2.0
-ruff
+ruff~=0.3.4

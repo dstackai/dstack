@@ -1,6 +1,7 @@
 """
 Generates schema reference for dstack models.
 """
+
 import importlib
 import logging
 import re
