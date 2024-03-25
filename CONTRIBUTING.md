@@ -15,8 +15,8 @@ Follow [contributing/DEVELOPMENT.md](contributing/DEVELOPMENT.md)
 
 We use [`ruff`](https://docs.astral.sh/ruff/) to format Python code and to sort Python imports. Before committing your changes, run:
 
-1. `ruff --fix src`
-2. `ruff format src`
+1. `ruff check --fix`
+2. `ruff format`
 
 > There are also helper pre-commits installed for [`ruff`](https://docs.astral.sh/ruff/integrations/#pre-commit) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
 
