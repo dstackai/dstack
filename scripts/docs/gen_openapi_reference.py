@@ -1,6 +1,7 @@
 """
 Generates OpenAPI schema from dstack server app.
 """
+
 import json
 
 import mkdocs_gen_files
