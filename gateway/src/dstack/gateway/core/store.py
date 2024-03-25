@@ -301,11 +301,11 @@ class Store(PersistentModel):
 class StoreSubscriber(ABC):
     @abstractmethod
     async def on_register(self, project: str, service: Service):
-        ...
+        pass
 
     @abstractmethod
     async def on_unregister(self, project: str, service_id: str):
-        ...
+        pass
 
 
 def supress_exc_async(func, *args, **kwargs):
