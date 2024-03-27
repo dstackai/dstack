@@ -24,6 +24,9 @@ import (
 	"github.com/ztrue/tracerr"
 )
 
+// TODO: Allow for configuration via cli arguments or environment variables.
+const ImagePullTimeout time.Duration = 20 * time.Minute
+
 type ContainerStatus struct {
 	ContainerID   string
 	ContainerName string
@@ -67,7 +70,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 		ContainerName: cfg.ContainerName,
 	}
 
-	pullCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	pullCtx, cancel := context.WithTimeout(ctx, ImagePullTimeout)
 	defer cancel()
 	d.cancelPull = cancel
 
