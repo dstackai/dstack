@@ -737,7 +737,9 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
     Used by both `process_runs` and `stop_run` to process a run that is TERMINATING.
     Caller must acquire the lock on run.
     """
-    job_termination_reason = run_to_job_termination_reason(run.termination_reason)
+
+    assert run.termination_reason is not None
+    job_termination_reason = run.termination_reason.to_job_termination_reason()
 
     jobs_ids_set = {job.id for job in run.jobs}
     await wait_unlock(RUNNING_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_IDS, jobs_ids_set)
@@ -776,39 +778,13 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
                 await gateways.unregister_service(session, run)
             except Exception as e:
                 logger.warning("%s: failed to unregister service: %s", fmt(run), repr(e))
-        run.status = run_termination_reason_to_status(run.termination_reason)
+        run.status = run.termination_reason.to_status()
         logger.info(
             "%s: run status has changed TERMINATING -> %s, reason: %s",
             fmt(run),
             run.status.name,
             run.termination_reason.name,
         )
-
-
-def run_to_job_termination_reason(
-    run_termination_reason: RunTerminationReason,
-) -> JobTerminationReason:
-    mapping = {
-        RunTerminationReason.ALL_JOBS_DONE: JobTerminationReason.DONE_BY_RUNNER,
-        RunTerminationReason.JOB_FAILED: JobTerminationReason.TERMINATED_BY_SERVER,
-        RunTerminationReason.RETRY_LIMIT_EXCEEDED: JobTerminationReason.TERMINATED_BY_SERVER,
-        RunTerminationReason.STOPPED_BY_USER: JobTerminationReason.TERMINATED_BY_USER,
-        RunTerminationReason.ABORTED_BY_USER: JobTerminationReason.ABORTED_BY_USER,
-        RunTerminationReason.SERVER_ERROR: JobTerminationReason.TERMINATED_BY_SERVER,
-    }
-    return mapping[run_termination_reason]
-
-
-def run_termination_reason_to_status(run_termination_reason: RunTerminationReason) -> RunStatus:
-    mapping = {
-        RunTerminationReason.ALL_JOBS_DONE: RunStatus.DONE,
-        RunTerminationReason.JOB_FAILED: RunStatus.FAILED,
-        RunTerminationReason.RETRY_LIMIT_EXCEEDED: RunStatus.FAILED,
-        RunTerminationReason.STOPPED_BY_USER: RunStatus.TERMINATED,
-        RunTerminationReason.ABORTED_BY_USER: RunStatus.TERMINATED,
-        RunTerminationReason.SERVER_ERROR: RunStatus.FAILED,
-    }
-    return mapping[run_termination_reason]
 
 
 async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replicas_diff: int):
