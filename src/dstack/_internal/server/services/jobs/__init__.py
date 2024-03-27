@@ -20,7 +20,6 @@ from dstack._internal.core.models.runs import (
     JobSpec,
     JobStatus,
     JobSubmission,
-    JobTerminationReason,
     RunSpec,
 )
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
@@ -225,7 +224,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             PROCESSING_POOL_IDS.remove(instance.id)
 
     if job_model.termination_reason is not None:
-        job_model.status = job_termination_reason_to_status(job_model.termination_reason)
+        job_model.status = job_model.termination_reason.to_status()
     else:
         job_model.status = JobStatus.FAILED
         logger.warning("%s: job termination reason is not set", fmt(job_model))
@@ -235,23 +234,6 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
         job_model.status.name,
         job_model.termination_reason.name,
     )
-
-
-def job_termination_reason_to_status(termination_reason: JobTerminationReason) -> JobStatus:
-    mapping = {
-        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY: JobStatus.FAILED,
-        JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY: JobStatus.FAILED,
-        JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED: JobStatus.FAILED,
-        JobTerminationReason.TERMINATED_BY_USER: JobStatus.TERMINATED,
-        JobTerminationReason.GATEWAY_ERROR: JobStatus.FAILED,
-        JobTerminationReason.SCALED_DOWN: JobStatus.TERMINATED,
-        JobTerminationReason.DONE_BY_RUNNER: JobStatus.DONE,
-        JobTerminationReason.ABORTED_BY_USER: JobStatus.ABORTED,
-        JobTerminationReason.TERMINATED_BY_SERVER: JobStatus.TERMINATED,
-        JobTerminationReason.CONTAINER_EXITED_WITH_ERROR: JobStatus.FAILED,
-        JobTerminationReason.PORTS_BINDING_FAILED: JobStatus.FAILED,
-    }
-    return mapping[termination_reason]
 
 
 async def stop_container(
