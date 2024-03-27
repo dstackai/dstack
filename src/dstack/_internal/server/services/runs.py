@@ -794,6 +794,7 @@ def run_to_job_termination_reason(
         RunTerminationReason.RETRY_LIMIT_EXCEEDED: JobTerminationReason.TERMINATED_BY_SERVER,
         RunTerminationReason.STOPPED_BY_USER: JobTerminationReason.TERMINATED_BY_USER,
         RunTerminationReason.ABORTED_BY_USER: JobTerminationReason.ABORTED_BY_USER,
+        RunTerminationReason.SERVER_ERROR: JobTerminationReason.TERMINATED_BY_SERVER,
     }
     return mapping[run_termination_reason]
 
@@ -805,6 +806,7 @@ def run_termination_reason_to_status(run_termination_reason: RunTerminationReaso
         RunTerminationReason.RETRY_LIMIT_EXCEEDED: RunStatus.FAILED,
         RunTerminationReason.STOPPED_BY_USER: RunStatus.TERMINATED,
         RunTerminationReason.ABORTED_BY_USER: RunStatus.TERMINATED,
+        RunTerminationReason.SERVER_ERROR: RunStatus.FAILED,
     }
     return mapping[run_termination_reason]
 
