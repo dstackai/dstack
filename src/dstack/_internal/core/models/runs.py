@@ -59,6 +59,28 @@ class RunTerminationReason(str, Enum):
     ABORTED_BY_USER = "aborted_by_user"
     SERVER_ERROR = "server_error"
 
+    def to_job_termination_reason(self) -> "JobTerminationReason":
+        mapping = {
+            self.ALL_JOBS_DONE: JobTerminationReason.DONE_BY_RUNNER,
+            self.JOB_FAILED: JobTerminationReason.TERMINATED_BY_SERVER,
+            self.RETRY_LIMIT_EXCEEDED: JobTerminationReason.TERMINATED_BY_SERVER,
+            self.STOPPED_BY_USER: JobTerminationReason.TERMINATED_BY_USER,
+            self.ABORTED_BY_USER: JobTerminationReason.ABORTED_BY_USER,
+            self.SERVER_ERROR: JobTerminationReason.TERMINATED_BY_SERVER,
+        }
+        return mapping[self]
+
+    def to_status(self) -> "RunStatus":
+        mapping = {
+            self.ALL_JOBS_DONE: RunStatus.DONE,
+            self.JOB_FAILED: RunStatus.FAILED,
+            self.RETRY_LIMIT_EXCEEDED: RunStatus.FAILED,
+            self.STOPPED_BY_USER: RunStatus.TERMINATED,
+            self.ABORTED_BY_USER: RunStatus.TERMINATED,
+            self.SERVER_ERROR: RunStatus.FAILED,
+        }
+        return mapping[self]
+
 
 class JobTerminationReason(str, Enum):
     # Set by the server
@@ -74,6 +96,22 @@ class JobTerminationReason(str, Enum):
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"
+
+    def to_status(self) -> JobStatus:
+        mapping = {
+            self.FAILED_TO_START_DUE_TO_NO_CAPACITY: JobStatus.FAILED,
+            self.INTERRUPTED_BY_NO_CAPACITY: JobStatus.FAILED,
+            self.WAITING_RUNNER_LIMIT_EXCEEDED: JobStatus.FAILED,
+            self.TERMINATED_BY_USER: JobStatus.TERMINATED,
+            self.GATEWAY_ERROR: JobStatus.FAILED,
+            self.SCALED_DOWN: JobStatus.TERMINATED,
+            self.DONE_BY_RUNNER: JobStatus.DONE,
+            self.ABORTED_BY_USER: JobStatus.ABORTED,
+            self.TERMINATED_BY_SERVER: JobStatus.TERMINATED,
+            self.CONTAINER_EXITED_WITH_ERROR: JobStatus.FAILED,
+            self.PORTS_BINDING_FAILED: JobStatus.FAILED,
+        }
+        return mapping[self]
 
     def pretty_repr(self) -> str:
         return " ".join(self.value.split("_")).capitalize()
