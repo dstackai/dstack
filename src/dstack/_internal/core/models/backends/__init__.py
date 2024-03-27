@@ -53,6 +53,12 @@ from dstack._internal.core.models.backends.nebius import (
     NebiusConfigInfoWithCredsPartial,
     NebiusConfigValues,
 )
+from dstack._internal.core.models.backends.runpod import (
+    RunpodConfigInfo,
+    RunpodConfigInfoWithCreds,
+    RunpodConfigInfoWithCredsPartial,
+    RunpodConfigValues,
+)
 from dstack._internal.core.models.backends.tensordock import (
     TensorDockConfigInfo,
     TensorDockConfigInfoWithCreds,
@@ -76,6 +82,7 @@ AnyConfigInfoWithoutCreds = Union[
     KubernetesConfigInfo,
     LambdaConfigInfo,
     NebiusConfigInfo,
+    RunpodConfigInfo,
     TensorDockConfigInfo,
     VastAIConfigInfo,
     DstackConfigInfo,
@@ -90,6 +97,7 @@ AnyConfigInfoWithCreds = Union[
     KubernetesConfigInfoWithCreds,
     LambdaConfigInfoWithCreds,
     NebiusConfigInfoWithCreds,
+    RunpodConfigInfoWithCreds,
     TensorDockConfigInfoWithCreds,
     VastAIConfigInfoWithCreds,
     DstackConfigInfo,
@@ -103,6 +111,7 @@ AnyConfigInfoWithCredsPartial = Union[
     KubernetesConfigInfoWithCredsPartial,
     LambdaConfigInfoWithCredsPartial,
     NebiusConfigInfoWithCredsPartial,
+    RunpodConfigInfoWithCredsPartial,
     TensorDockConfigInfoWithCredsPartial,
     VastAIConfigInfoWithCredsPartial,
     DstackConfigInfo,
@@ -119,6 +128,7 @@ AnyConfigValues = Union[
     KubernetesConfigValues,
     LambdaConfigValues,
     NebiusConfigValues,
+    RunpodConfigValues,
     TensorDockConfigValues,
     VastAIConfigValues,
     DstackConfigValues,

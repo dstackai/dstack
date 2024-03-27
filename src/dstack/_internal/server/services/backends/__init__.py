@@ -99,6 +99,13 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.server.services.backends.configurators.runpod import RunpodConfigurator
+
+    _CONFIGURATOR_CLASSES.append(RunpodConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.server.services.backends.configurators.tensordock import (
         TensorDockConfigurator,
     )
