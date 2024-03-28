@@ -20,7 +20,6 @@ type: dev-environment
 python: "3.11"
 
 # image: ghcr.io/huggingface/text-generation-inference:latest
-
 ide: vscode
 
 # (Optional) Configure `gpu`, `memory`, `disk`, etc
@@ -33,6 +32,28 @@ resources:
 The YAML file allows you to specify your own Docker image, environment variables, 
 resource requirements, etc.
 If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
+
+??? info "Environment variables"
+    Environment variables can be set either within the configuration file or passed via the CLI.
+
+    If you only specify the name of the environment variable without specifying the value, 
+    `dstack` will require that the value is passed via the CLI or set for the current process.
+
+    ```yaml
+    type: dev-environment
+
+    env:
+      - HUGGING_FACE_HUB_TOKEN
+      - HF_HUB_ENABLE_HF_TRANSFER=1
+
+    python: "3.11"
+    ide: vscode
+    
+    resources:
+      gpu: 80GB
+    ```
+
+    This way, you can define environment variables in a `.env` file and also use tools such as `direnv` and similar.
 
 For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml.md).
 
@@ -68,6 +89,9 @@ When `dstack` provisions the dev environment, it uses the current folder content
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in either `.gitignore` or `.dstackignore`.
 
+The `dstack run` command allows specifying many things, including spot policy, retry and max duration, 
+max price, regions, instance types, and [much more](../reference/cli/index.md#dstack-run).
+
 ### IDE
 
 To open the dev environment in your desktop IDE, use the link from the output 
@@ -87,13 +111,10 @@ $ ssh fast-moth-1
 
 </div>
 
-## Configure policies
+## Configure profiles
 
-For a run, multiple policies can be configured, such as spot policy, retry policy, max duration, max price, etc.
-
-Policies can be configured either via [`dstack run`](../reference/cli/index.md#dstack-run)
-or [`.dstack/profiles.yml`](../reference/profiles.yml.md).
-For more details on policies and their defaults, refer to [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+In case you'd like to reuse certain parameters (such as spot policy, retry and max duration, 
+max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
 
 ## Manage runs
 

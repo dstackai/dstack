@@ -3,7 +3,7 @@
 Services make it very easy to deploy any kind of model or web application as public endpoints.
 
 Use any serving frameworks and specify required resources. `dstack` deploys it in the configured backend, handles
-authentication, replicas, and provides an OpenAI-compatible interface if needed.
+authentication, auto-scaling, and provides an OpenAI-compatible interface if needed.
 
 ??? info "Prerequisites"
 
@@ -66,6 +66,30 @@ resources:
 The YAML file allows you to specify your own Docker image, environment variables, 
 resource requirements, etc.
 If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
+
+??? info "Environment variables"
+    Environment variables can be set either within the configuration file or passed via the CLI.
+
+    If you only specify the name of the environment variable without specifying the value, 
+    `dstack` will require that the value is passed via the CLI or set for the current process.
+
+    ```yaml
+    type: service
+    
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    env:
+      - HUGGING_FACE_HUB_TOKEN
+      - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+    port: 80
+    commands:
+      - text-generation-launcher --port 80 --trust-remote-code
+    
+    # (Optional) Configure `gpu`, `memory`, `disk`, etc
+    resources:
+      gpu: 80GB
+    ```
+
+    This way, you can define environment variables in a `.env` file and also use tools such as `direnv` and similar.
 
 For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml.md).
 
@@ -135,7 +159,7 @@ and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-com
       eos_token: "</s>"
     ```
 
-    #### Limitations
+    ##### Limitations
 
     Please note that model mapping is an experimental feature with the following limitations:
     
@@ -147,43 +171,39 @@ and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-com
 ### Configure replicas and auto-scaling
 
 By default, `dstack` runs a single replica of the service.
-You can configure the number of replicas at the top level of the configuration file.
+You can configure the number of replicas as well as the auto-scaling policy.
 
 <div editor-title="serve.dstack.yml"> 
 
 ```yaml
-...
+type: service
 
-replicas: 3
-```
+python: "3.11"
+env:
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
 
-</div>
-
-You also can specify a range of replicas with a scaling policy,
-and dstack will automatically scale the service up and down based on the load.
-Currently, the only supported metric is `rps` — requests per second per replica.
-
-<div editor-title="serve.dstack.yml"> 
-
-```yaml
-...
-
-replicas: 0..3
+replicas: 1..4
 scaling:
   metric: rps
-  target: 5.5
-  # (Optional) Configure `scale_up_delay` and `scale_down_delay`
-  scale_up_delay: 5m
-  scale_down_delay: 10m
+  target: 10
+
+# (Optional) Enable the OpenAI-compatible endpoint
+model:
+  format: openai
+  type: chat
+  name: NousResearch/Llama-2-7b-chat-hf
 ```
 
 </div>
 
-Specifying minimum replicas as `0` means that the service will be scaled down to zero when there are no requests.
+If you specify the minimum number of replicas as `0`, the service will scale down to zero when there are no requests.
 
-!!! info "Cold start time"
-    Scaling up from zero could take from tens of seconds if there is an available instance in the pool,
-    up to several tens of minutes if a new instance has to be provisioned and a large model has to be pulled.
+[//]: # (??? info "Cold start")
+[//]: # (    Scaling up from zero could take several minutes, considering the provisioning of a new instance and the pulling of a large model.)
 
 ## Run the configuration
 
@@ -215,6 +235,9 @@ When `dstack` submits the task, it uses the current folder contents.
 !!! info "Exclude files"
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in either `.gitignore` or `.dstackignore`.
+
+The `dstack run` command allows specifying many things, including spot policy, retry and max duration, 
+max price, regions, instance types, and [much more](../reference/cli/index.md#dstack-run).
 
 ### Service endpoint
 
@@ -262,13 +285,10 @@ completion = client.chat.completions.create(
 print(completion.choices[0].message)
 ```
 
-## Configure policies
+## Configure profiles
 
-For a run, multiple policies can be configured, such as spot policy, retry policy, max duration, max price, etc.
-
-Policies can be configured either via [`dstack run`](../reference/cli/index.md#dstack-run)
-or [`.dstack/profiles.yml`](../reference/profiles.yml.md).
-For more details on policies and their defaults, refer to [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+In case you'd like to reuse certain parameters (such as spot policy, retry and max duration, 
+max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
 
 ## Manage runs
 
@@ -280,9 +300,9 @@ When you use [`dstack stop`](../reference/cli/index.md#dstack-stop), the service
 
 The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
 
-!!! info "What's next?"
+## What's next?
 
-    1. Check the [Text Generation Inference](../../examples/tgi.md) and [vLLM](../../examples/vllm.md) examples
-    2. Read about [dev environments](../concepts/dev-environments.md), [tasks](../concepts/tasks.md), and [pools](../concepts/pools.md)
-    3. Browse [examples](../../examples/index.md)
-    4. Check the [reference](../reference/dstack.yml.md)
+1. Check the [Text Generation Inference](../../examples/tgi.md) and [vLLM](../../examples/vllm.md) examples
+2. Read about [dev environments](../concepts/dev-environments.md), [tasks](../concepts/tasks.md), and [pools](../concepts/pools.md)
+3. Browse [examples](../../examples/index.md)
+4. Check the [reference](../reference/dstack.yml.md)

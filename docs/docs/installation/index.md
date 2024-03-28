@@ -494,32 +494,33 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 
 [//]: # (TODO: Should we automatically detect ~/.kube/config)
 
-### Configure regions
+[//]: # (### Configure regions)
+[//]: # ()
+[//]: # (In addition to credentials, each backend &#40;except TensorDock, Vast AI, DataCrunch, and Kubernetes&#41; )
+[//]: # (optionally allows for region configuration.)
+[//]: # ()
+[//]: # (<div editor-title="~/.dstack/server/config.yml">)
+[//]: # ()
+[//]: # (```yaml)
+[//]: # (projects:)
+[//]: # (- name: main)
+[//]: # (  backends:)
+[//]: # (  - type: aws)
+[//]: # (    regions: [us-west-2, eu-west-1])
+[//]: # (    creds:)
 
-In addition to credentials, each backend (except TensorDock, Vast AI, DataCrunch, and Kubernetes) 
-optionally allows for region configuration.
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-  - type: aws
-    regions: [us-west-2, eu-west-1]
-    creds:
-      type: access_key
-      access_key: AIZKISCVKUKO5AAKLAEH
-      secret_key: QSbmpqJIUBn1V5U3pyM9S6lwwiu8/fOJ2dgfwFdW
-```
-
-</div>
-
-If regions aren't specified, `dstack` will use all available regions.
+[//]: # (      type: access_key)
+[//]: # (      access_key: AIZKISCVKUKO5AAKLAEH)
+[//]: # (      secret_key: QSbmpqJIUBn1V5U3pyM9S6lwwiu8/fOJ2dgfwFdW)
+[//]: # (```)
+[//]: # ()
+[//]: # (</div>)
+[//]: # ()
+[//]: # (If regions aren't specified, `dstack` will use all available regions.)
 
 After you update `~/.dstack/server/config.yml`, make sure to restart the server.
 
-## Set up the CLI
+## Set up the client
 
 The client is configured via `~/.dstack/config.yml` with the server address, user token, and
 the project name. 
