@@ -66,14 +66,16 @@ plugins:
       blog_dir: blog
       post_url_format: "{slug}"
       blog_toc: true
-  - social:
-      cards_layout_options:
-        background_color: "black"
-        color: "#FFFFFF"
-        font_family: Roboto
+#  0.17.0 workaround
+#  see https://github.com/squidfunk/mkdocs-material/issues/6983
+#  - social:
+#      cards_layout_options:
+#        background_color: "black"
+#        color: "#FFFFFF"
+#        font_family: "Roboto"
 #      debug: true
-      cards_layout_dir: layouts
-      cards_layout: custom
+#      cards_layout_dir: layouts
+#      cards_layout: custom
   - search
   - redirects:
       redirect_maps:
