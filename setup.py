@@ -65,6 +65,7 @@ BASE_DEPS = [
     "sentry-sdk[fastapi]",
     "httpx",
     "aiorwlock",
+    "python-json-logger",
 ]
 
 AWS_DEPS = [

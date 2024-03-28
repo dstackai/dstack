@@ -259,6 +259,7 @@ $ dstack gateway update --help
 | `DSTACK_SERVER_DIR`               | Sets path to store data and server configs    | `~/.dstack/server` |
 | `DSTACK_SERVER_HOST`              | Has the same effect as `--host`               | `127.0.0.1`        |
 | `DSTACK_SERVER_LOG_LEVEL`         | Has the same effect as `--log-level`          | `WARNING`          |
+| `DSTACK_SERVER_LOG_FORMAT`        | Sets format of log output                     | `standard`         |
 | `DSTACK_SERVER_PORT`              | Has the same effect as `--port`               | `3000`             |
 | `DSTACK_SERVER_ROOT_LOG_LEVEL`    | Sets root logger log level                    | `ERROR`            |
 | `DSTACK_SERVER_UVICORN_LOG_LEVEL` | Sets uvicorn logger log level                 | `ERROR`            |

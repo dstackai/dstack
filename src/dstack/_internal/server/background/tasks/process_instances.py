@@ -111,7 +111,14 @@ async def create_instance(instance_id: UUID) -> None:
                 instance.deleted_at = get_current_datetime()
                 instance.termination_reason = "The retry's duration expired"
                 await session.commit()
-                logger.debug("The retry's duration expired. Terminate instance %s", instance.name)
+                logger.warning(
+                    "The retry's duration expired. Terminate instance %s",
+                    instance.name,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATED.value,
+                    },
+                )
                 return
 
         if instance.last_retry_at is not None:
@@ -130,9 +137,13 @@ async def create_instance(instance_id: UUID) -> None:
             instance.termination_reason = "Empty profile, requirements or instance_configuration"
             instance.last_retry_at = get_current_datetime()
             await session.commit()
-            logger.debug(
+            logger.warning(
                 "Empty profile, requirements or instance_configuration. Terminate instance: %s",
                 instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
             )
             return
 
@@ -150,9 +161,13 @@ async def create_instance(instance_id: UUID) -> None:
                 f"Error to parse profile, requirements or instance_configuration: {e}"
             )
             instance.last_retry_at = get_current_datetime()
-            logger.debug(
+            logger.warning(
                 "Error to parse profile, requirements or instance_configuration. Terminate instance: %s",
                 instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
             )
             await session.commit()
             return
@@ -167,7 +182,11 @@ async def create_instance(instance_id: UUID) -> None:
         if not offers and instance.retry_policy:
             instance.last_retry_at = get_current_datetime()
             await session.commit()
-            logger.debug("No offers for %s. Next retry", instance.name)
+            logger.debug(
+                "No offers for %s. Next retry",
+                instance.name,
+                extra={"instance_name": instance.name},
+            )
             return
 
         for backend, instance_offer in offers:
@@ -194,6 +213,7 @@ async def create_instance(instance_id: UUID) -> None:
                     instance_offer.backend.value,
                     instance_offer.region,
                     repr(e),
+                    extra={"instance_name": instance.name},
                 )
                 continue
             except NotImplementedError:
@@ -223,7 +243,14 @@ async def create_instance(instance_id: UUID) -> None:
             instance.last_retry_at = get_current_datetime()
 
             await session.commit()
-            logger.info("Created instance %s", instance.name)
+            logger.info(
+                "Created instance %s",
+                instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.PROVISIONING.value,
+                },
+            )
 
             return
 
@@ -234,7 +261,14 @@ async def create_instance(instance_id: UUID) -> None:
             instance.deleted = True
             instance.deleted_at = get_current_datetime()
             instance.termination_reason = "There were no offers found"
-            logger.info("There were no offers found. Terminated instance %s", instance.name)
+            logger.info(
+                "There were no offers found. Terminated instance %s",
+                instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
+            )
 
         await session.commit()
 
@@ -266,7 +300,11 @@ async def check_shim(instance_id: UUID) -> None:
             health = instance_health
 
         if health.healthy:
-            logger.debug("check instance %s status: shim health is OK", instance.name)
+            logger.debug(
+                "check instance %s status: shim health is OK",
+                instance.name,
+                extra={"instance_name": instance.name},
+            )
             instance.termination_deadline = None
             instance.health_status = None
 
@@ -274,9 +312,23 @@ async def check_shim(instance_id: UUID) -> None:
                 instance.status = (
                     InstanceStatus.IDLE if instance.job_id is None else InstanceStatus.BUSY
                 )
+                logger.info(
+                    "The instance %s has switched to %s status",
+                    instance.name,
+                    instance.status.value,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": instance.status.value,
+                    },
+                )
                 await session.commit()
         else:
-            logger.debug("check instance %s status: shim health: %s", instance.name, health)
+            logger.debug(
+                "check instance %s status: shim health: %s",
+                instance.name,
+                health,
+                extra={"instance_name": instance.name, "shim_health": health},
+            )
 
             if instance.termination_deadline is None:
                 instance.termination_deadline = (
@@ -285,12 +337,23 @@ async def check_shim(instance_id: UUID) -> None:
             instance.health_status = health.reason
 
             if instance.status in (InstanceStatus.IDLE, InstanceStatus.BUSY):
-                logger.warning("instance %s shim is not available", instance.name)
+                logger.warning(
+                    "instance %s shim is not available",
+                    instance.name,
+                    extra={"instance_name": instance.name},
+                )
                 deadline = instance.termination_deadline.replace(tzinfo=datetime.timezone.utc)
                 if get_current_datetime() > deadline:
                     instance.status = InstanceStatus.TERMINATING
                     instance.termination_reason = "Termination deadline"
-                    logger.warning("mark instance %s as TERMINATED", instance.name)
+                    logger.warning(
+                        "Shim is not available. mark instance %s as TERMINATED",
+                        instance.name,
+                        extra={
+                            "instance_name": instance.name,
+                            "instance_status": InstanceStatus.TERMINATED.value,
+                        },
+                    )
 
             if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
                 provisioning_time_threshold = instance.started_at.replace(
@@ -300,9 +363,13 @@ async def check_shim(instance_id: UUID) -> None:
                 if expire_provisioning:
                     instance.status = InstanceStatus.TERMINATING
                     logger.warning(
-                        "The Instance %s can't start in %s seconds. Marked as TERMINATED",
+                        "The instance %s can't start in %s seconds. Marked as TERMINATED",
                         instance.name,
                         PROVISIONING_TIMEOUT_SECONDS,
+                        extra={
+                            "instance_name": instance.name,
+                            "instance_status": InstanceStatus.TERMINATED.value,
+                        },
                     )
 
             await session.commit()
@@ -358,7 +425,14 @@ async def terminate(instance_id: UUID) -> None:
         instance.finished_at = get_current_datetime()
         instance.status = InstanceStatus.TERMINATED
 
-        logger.info("instance %s terminated", instance.name)
+        logger.info(
+            "instance %s terminated",
+            instance.name,
+            extra={
+                "instance_name": instance.name,
+                "instance_status": InstanceStatus.TERMINATED.value,
+            },
+        )
 
         await session.commit()
 
@@ -402,6 +476,10 @@ async def terminate_idle_instance() -> None:
                     "instance %s terminated by termination policy: idle time %ss",
                     instance.name,
                     str(idle_time.seconds),
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATED.value,
+                    },
                 )
 
         await session.commit()
