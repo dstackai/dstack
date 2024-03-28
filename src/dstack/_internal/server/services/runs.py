@@ -588,7 +588,7 @@ async def create_instance(
         retry_policy.retry = profile.retry_policy.retry
         retry_policy.limit = parse_duration(profile.retry_policy.limit)
 
-    im = InstanceModel(
+    instance = InstanceModel(
         name=instance_name,
         project=project,
         pool=pool,
@@ -602,11 +602,18 @@ async def create_instance(
         retry_policy=retry_policy.retry,
         retry_policy_duration=retry_policy.limit,
     )
-
-    session.add(im)
+    logger.info(
+        "Added a new instance %s",
+        instance.name,
+        extra={
+            "instance_name": instance.name,
+            "instance_status": InstanceStatus.PENDING.value,
+        },
+    )
+    session.add(instance)
     await session.commit()
 
-    return instance_model_to_instance(im)
+    return instance_model_to_instance(instance)
 
 
 def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:

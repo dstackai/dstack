@@ -128,6 +128,15 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             instance = sorted_instances[0]
             instance.status = InstanceStatus.BUSY
             instance.job = job_model
+            logger.info(
+                "The job %s switched instance %s status to BUSY",
+                job_model.job_name,
+                instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.BUSY.value,
+                },
+            )
 
             logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
             job_model.job_provisioning_data = instance.job_provisioning_data
@@ -175,7 +184,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             # terminate vastai/k8s instances immediately
             termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
             termination_idle_time = 0
-        im = InstanceModel(
+        instance = InstanceModel(
             name=job.job_spec.job_name,  # TODO: make new name
             project=project_model,
             pool=pool,
@@ -191,9 +200,18 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             price=offer.price,
             region=offer.region,
         )
-        session.add(im)
+        logger.info(
+            "The job %s created the new instance %s",
+            job_model.job_name,
+            instance.name,
+            extra={
+                "instance_name": instance.name,
+                "instance_status": InstanceStatus.PROVISIONING.value,
+            },
+        )
+        session.add(instance)
         await session.flush()  # to get im.id
-        job_model.used_instance_id = im.id
+        job_model.used_instance_id = instance.id
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
 
