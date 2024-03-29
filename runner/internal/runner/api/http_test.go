@@ -16,8 +16,8 @@ type DummyRunner struct {
 	ContainerStatus shim.ContainerStatus
 }
 
-func (ds DummyRunner) GetState() (shim.RunnerStatus, shim.ContainerStatus) {
-	return ds.State, ds.ContainerStatus
+func (ds DummyRunner) GetState() (shim.RunnerStatus, shim.ContainerStatus, string) {
+	return ds.State, ds.ContainerStatus, ""
 }
 
 func (ds DummyRunner) Run(context.Context, shim.DockerImageConfig) error {

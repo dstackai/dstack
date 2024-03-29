@@ -209,6 +209,7 @@ class JobModel(BaseModel):
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
         Enum(JobTerminationReason)
     )
+    termination_reason_message: Mapped[Optional[str]] = mapped_column(Text)
     job_spec_data: Mapped[str] = mapped_column(String(4000))
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
     runner_timestamp: Mapped[Optional[int]] = mapped_column(Integer)

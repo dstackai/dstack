@@ -91,6 +91,7 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         finished_at=finished_at,
         status=job_model.status,
         termination_reason=job_model.termination_reason,
+        termination_reason_message=job_model.termination_reason_message,
         job_provisioning_data=job_provisioning_data,
     )
 

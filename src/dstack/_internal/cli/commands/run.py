@@ -226,10 +226,22 @@ class RunCommand(APIBaseCommand):
 def _print_fail_message(run: Run):
     termination_reason = _get_run_termination_reason(run)
     message = "Run failed due to unknown reason. Check CLI and server logs."
-    if _get_run_termination_reason(run) == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
+    if termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         message = (
             "All provisioning attempts failed. "
             "This is likely due to cloud providers not having enough capacity. "
+            "Check CLI and server logs for more details."
+        )
+    elif termination_reason == JobTerminationReason.CREATING_CONTAINER_ERROR:
+        message = (
+            "Cannot create container. "
+            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message} "
+            "Check CLI and server logs for more details."
+        )
+    elif termination_reason == JobTerminationReason.EXECUTOR_ERROR:
+        message = (
+            "There is an error with git auth/clone or with command execution "
+            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message} "
             "Check CLI and server logs for more details."
         )
     elif termination_reason is not None:
