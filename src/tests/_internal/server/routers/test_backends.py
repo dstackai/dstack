@@ -34,6 +34,7 @@ class TestListBackendTypes:
             "kubernetes",
             "lambda",
             "nebius",
+            "runpod",
             "tensordock",
             "vastai",
         ]
