@@ -33,7 +33,7 @@ Ensure your class...
 - Has the `NAME` property, that will be used as the unique identifier for your provider.
 - Implements the `get` method, that is responsible for fetching the available machine configurations from the cloud provider.
 
-[//]: # (TODO: Ellaborate better on how to use `query_filter` and `balance_resources`)
+[//]: # (TODO: Elaborate better on how to use `query_filter` and `balance_resources`)
 
 Refer to examples: [datacrunch.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/datacrunch.py), 
 [aws.py](https://github.com/dstackai/gpuhunt/blob/main/src/gpuhunt/providers/aws.py), 
@@ -211,7 +211,7 @@ To support it, `dstack` expects the following from the cloud provider:
 
 When `dstack` provisions a VM, it launches there `dstack-shim`.
 
-[//]: # (TODO: Ellaborate on what dstach-shim is and how it works)
+[//]: # (TODO: Elaborate on what dstack-shim is and how it works)
 
 The examples of VM-based backends include: `aws`, `azure`, `gcp`, `lambda`, `datacrunch`, `tensordock`, etc.
 
@@ -231,12 +231,12 @@ To support it, `dstack` expects the following from the cloud provider:
 - An external IP and a public port for SSH
 - A way to override the container entrypoint (at least ~2KB)
 
-The examples of VM-based backends include: `kubernetes`, `vastai`, etc.
+The examples of container-based backends include: `kubernetes`, `vastai`, etc.
 
 Note: There are two types of compute in dstack:
 
 When `dstack` provisions a VM, it launches there `dstack-runner`.
 
-[//]: # (TODO: Ellaborate on what dstach-runner is and how it works)
+[//]: # (TODO: Elaborate on what dstack-runner is and how it works)
 
 [//]: # (TODO: Update this guide to incorporate the pool feature)

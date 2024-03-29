@@ -490,7 +490,7 @@ In case of a self-managed cluster, also specify the IP address of any node in th
     aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
     ```
 
-[//]: # (TODO: Ellaborate on gateways, and what backends allow configuring them)
+[//]: # (TODO: Elaborate on gateways, and what backends allow configuring them)
 
 [//]: # (TODO: Should we automatically detect ~/.kube/config)
 
