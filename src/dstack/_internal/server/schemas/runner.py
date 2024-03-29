@@ -81,6 +81,7 @@ class StopBody(CoreModel):
 
 class PullBody(CoreModel):
     state: str
+    executor_error: Optional[str]
     container_name: Optional[str]
     status: Optional[str]
     running: Optional[bool]

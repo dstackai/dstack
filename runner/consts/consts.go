@@ -2,21 +2,15 @@ package consts
 
 import "time"
 
-const DSTACK_DIR_PATH string = ".dstack"
-const CONFIG_FILE_NAME string = "backend.yaml"
-const RUNNER_FILE_NAME string = "runner.yaml"
-const TMP_DIR_PATH = DSTACK_DIR_PATH + "/tmp"
-const USER_ARTIFACTS_DIR = "artifacts"
-const FUSE_DIR = "fuse"
-const RUNS_DIR = "runs"
+const DstackDirPath string = ".dstack"
 
-const FILE_LOCK_FULL_DOWNLOAD = ".lock.full"
-const SETUP_COMPLETED_FILE_NAME = ".setup_completed"
+// Runner's log filenames
+const RunnerDefaultLogFileName = "default.log"
+const RunnerJobLogFileName = "job.log"
+const RunnerLogFileName = "runner.log"
 
-// ServerUrl A default build-time variable. The value is overridden via ldflags.
-var ServerUrl = "https://api.stgn.dstack.ai"
-
-//var ServerUrl = "https://api.dstack.ai"
+// Error-containing messages will be identified by this signature
+const ExecutorFailedSignature = "Executor failed"
 
 // GPU constants
 const (

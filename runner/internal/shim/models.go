@@ -12,8 +12,9 @@ import (
 type DockerParameters interface {
 	DockerKeepContainer() bool
 	DockerShellCommands() []string
-	DockerMounts() ([]mount.Mount, error)
+	DockerMounts(string) ([]mount.Mount, error)
 	DockerPorts() []int
+	MakeRunnerDir() (string, error)
 }
 
 type CLIArgs struct {

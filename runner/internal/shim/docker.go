@@ -2,9 +2,11 @@ package shim
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -20,6 +22,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/icza/backscanner"
 	bytesize "github.com/inhies/go-bytesize"
 	"github.com/ztrue/tracerr"
 )
@@ -47,6 +50,7 @@ type DockerRunner struct {
 	cancelPull context.CancelFunc
 
 	containerStatus ContainerStatus
+	executorError   string
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -84,9 +88,18 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 		return err
 	}
 
+	runnerDir, err := d.dockerParams.MakeRunnerDir()
+	if err != nil {
+		d.state = Pending
+		errMessage := fmt.Sprintf("Cannot create dir for runner: %s", err.Error())
+		d.containerStatus.Error = errMessage
+		log.Print(errMessage + "\n")
+		return err
+	}
+
 	log.Println("Creating container")
 	d.state = Creating
-	containerID, err := createContainer(ctx, d.client, d.dockerParams, cfg)
+	containerID, err := createContainer(ctx, d.client, runnerDir, d.dockerParams, cfg)
 	if err != nil {
 		d.state = Pending
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
@@ -105,21 +118,24 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 		}()
 	}
 
-	log.Printf("Running container, id=%s\n", containerID)
 	d.containerStatus, _ = inspectContainer(d.client, containerID)
 	d.state = Running
 	d.currentContainer = containerID
+	d.executorError = ""
+	log.Printf("Running container, name=%s, id=%s\n", d.containerStatus.ContainerName, containerID)
 
 	if err = runContainer(ctx, d.client, containerID); err != nil {
 		log.Printf("runContainer error: %s\n", err.Error())
 		d.state = Pending
 		d.containerStatus, _ = inspectContainer(d.client, containerID)
+		d.executorError = FindExecutorError(runnerDir)
 		d.currentContainer = ""
 		return err
 	}
 
-	log.Printf("Container finished successfully, id=%s\n", containerID)
+	log.Printf("Container finished successfully, name=%s, id=%s", d.containerStatus.ContainerName, containerID)
 	d.containerStatus, _ = inspectContainer(d.client, containerID)
+	d.executorError = FindExecutorError(runnerDir)
 	d.state = Pending
 	d.currentContainer = ""
 	return nil
@@ -143,8 +159,8 @@ func (d *DockerRunner) Stop(force bool) {
 	}
 }
 
-func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus) {
-	return d.state, d.containerStatus
+func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus, string) {
+	return d.state, d.containerStatus, d.executorError
 }
 
 func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerImageConfig) error {
@@ -229,28 +245,32 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 		log.Printf("Image Pull interrupted: downloaded %d bytes out of %d (%s/s)", currentBytes, totalBytes, speed)
 	}
 
-	return ctx.Err()
+	err = ctx.Err()
+	if err != nil {
+		return tracerr.Errorf("imagepull interrupted: downloaded %d bytes out of %d (%s/s): %w", currentBytes, totalBytes, speed, err)
+	}
+	return nil
 }
 
-func createContainer(ctx context.Context, client docker.APIClient, dockerParams DockerParameters, taskParams DockerImageConfig) (string, error) {
+func createContainer(ctx context.Context, client docker.APIClient, runnerDir string, dockerParams DockerParameters, taskParams DockerImageConfig) (string, error) {
 	timeout := int(0)
 	stopOptions := container.StopOptions{Timeout: &timeout}
 	err := client.ContainerStop(ctx, taskParams.ContainerName, stopOptions)
 	if err != nil {
-		log.Printf("Unable to stop the container: %s", err)
+		log.Printf("Cleanup routine: Cannot stop container: %s", err)
 	}
 
 	removeOptions := types.ContainerRemoveOptions{Force: true}
 	err = client.ContainerRemove(ctx, taskParams.ContainerName, removeOptions)
 	if err != nil {
-		log.Printf("Unable to remove the container: %s", err)
+		log.Printf("Cleanup routine: Cannot remove container: %s", err)
 	}
 
 	gpuRequest, err := requestGpuIfAvailable(ctx, client)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
-	mounts, err := dockerParams.DockerMounts()
+	mounts, err := dockerParams.DockerMounts(runnerDir)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -375,16 +395,11 @@ func (c CLIArgs) DockerShellCommands() []string {
 	return commands
 }
 
-func (c CLIArgs) DockerMounts() ([]mount.Mount, error) {
-	runnerTemp := filepath.Join(c.Shim.HomeDir, "runners", time.Now().Format("20060102-150405"))
-	if err := os.MkdirAll(runnerTemp, 0755); err != nil {
-		return nil, tracerr.Wrap(err)
-	}
-
+func (c CLIArgs) DockerMounts(hostRunnerDir string) ([]mount.Mount, error) {
 	return []mount.Mount{
 		{
 			Type:   mount.TypeBind,
-			Source: runnerTemp,
+			Source: hostRunnerDir,
 			Target: c.Runner.TempDir,
 		},
 		{
@@ -397,6 +412,14 @@ func (c CLIArgs) DockerMounts() ([]mount.Mount, error) {
 
 func (c CLIArgs) DockerPorts() []int {
 	return []int{c.Runner.HTTPPort, c.Docker.SSHPort}
+}
+
+func (c CLIArgs) MakeRunnerDir() (string, error) {
+	runnerTemp := filepath.Join(c.Shim.HomeDir, "runners", time.Now().Format("20060102-150405"))
+	if err := os.MkdirAll(runnerTemp, 0755); err != nil {
+		return "", tracerr.Wrap(err)
+	}
+	return runnerTemp, nil
 }
 
 func inspectContainer(client *docker.Client, containerID string) (ContainerStatus, error) {
@@ -416,4 +439,36 @@ func inspectContainer(client *docker.Client, containerID string) (ContainerStatu
 		Error:         inspection.State.Error,
 	}
 	return containerStatus, nil
+}
+
+func FindExecutorError(runnerDir string) string {
+	filename := filepath.Join(runnerDir, consts.RunnerLogFileName)
+	file, err := os.Open(filename)
+	if err != nil {
+		log.Printf("Cannot open file %s: %s\n", filename, err)
+		return ""
+	}
+	defer file.Close()
+
+	fileStatus, err := file.Stat()
+	if err != nil {
+		log.Printf("Cannot stat file %s: %s\n", filename, err)
+		return ""
+	}
+
+	scanner := backscanner.New(file, int(fileStatus.Size()))
+	what := []byte(consts.ExecutorFailedSignature)
+	for {
+		line, _, err := scanner.LineBytes()
+		if err != nil {
+			if err == io.EOF {
+				return "" // consts.ExecutorFailedSignature is not found in file
+			}
+			log.Printf("FindExecutorError scan error: %s\n", err)
+			return ""
+		}
+		if bytes.Contains(line, what) {
+			return string(line)
+		}
+	}
 }

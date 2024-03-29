@@ -30,7 +30,7 @@ func (c *CLIArgs) GetDockerCommands() []string {
 }
 
 func (c *CLIArgs) DownloadRunner() error {
-	url := makeDownloadRunnerUrl(c.Runner.Version, c.Runner.DevChannel)
+	url := makeDownloadRunnerURL(c.Runner.Version, c.Runner.DevChannel)
 
 	runnerBinaryPath, err := downloadRunner(url)
 	if err != nil {
@@ -53,7 +53,7 @@ func (c *CLIArgs) getRunnerArgs() []string {
 	}
 }
 
-func makeDownloadRunnerUrl(version string, staging bool) string {
+func makeDownloadRunnerURL(version string, staging bool) string {
 	bucket := DstackReleaseBucket
 	if staging {
 		bucket = DstackStagingBucket

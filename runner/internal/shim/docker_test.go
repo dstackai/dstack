@@ -110,8 +110,12 @@ func (c *dockerParametersMock) DockerPorts() []int {
 	return ports
 }
 
-func (c *dockerParametersMock) DockerMounts() ([]mount.Mount, error) {
+func (c *dockerParametersMock) DockerMounts(string) ([]mount.Mount, error) {
 	return nil, nil
+}
+
+func (c *dockerParametersMock) MakeRunnerDir() (string, error) {
+	return "", nil
 }
 
 /* Utilities */

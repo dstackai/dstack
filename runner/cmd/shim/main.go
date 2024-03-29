@@ -155,5 +155,5 @@ func getDstackHome(flag string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, consts.DSTACK_DIR_PATH), nil
+	return filepath.Join(home, consts.DstackDirPath), nil
 }
