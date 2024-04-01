@@ -13,6 +13,7 @@ from dstack._internal.core.models.runs import Requirements, RunSpec
 class ListRunsRequest(BaseModel):
     project_name: Optional[str]
     repo_id: Optional[str]
+    username: Optional[str]
     only_active: bool = False
     prev_submitted_at: Optional[datetime]
     prev_run_id: Optional[UUID]
