@@ -42,7 +42,7 @@ async def list_runs(
 ) -> List[Run]:
     """
     Returns all runs visible to user sorted by descending submitted_at.
-    A **project_name** and **repo_id** can be specified as filters.
+    A **project_name**, **repo_id**, and **username** can be specified as filters.
     Specifying **repo_id** without **project_name** returns no runs.
 
     The results are paginated. To get the next page, pass submitted_at and id of
@@ -53,6 +53,7 @@ async def list_runs(
         user=user,
         project_name=body.project_name,
         repo_id=body.repo_id,
+        username=body.username,
         only_active=body.only_active,
         prev_submitted_at=body.prev_submitted_at,
         prev_run_id=body.prev_run_id,

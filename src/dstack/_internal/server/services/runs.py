@@ -16,6 +16,7 @@ import dstack._internal.utils.common as common_utils
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import (
     RepoDoesNotExistError,
+    ResourceNotExistsError,
     ServerClientError,
 )
 from dstack._internal.core.models.backends.base import BackendType
@@ -58,6 +59,7 @@ from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
     ProjectModel,
+    RepoModel,
     RunModel,
     UserModel,
 )
@@ -91,6 +93,7 @@ from dstack._internal.server.services.pools import (
     instance_model_to_instance,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
+from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.server.utils.common import wait_to_lock, wait_unlock
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
@@ -125,6 +128,7 @@ async def list_user_runs(
     user: UserModel,
     project_name: Optional[str],
     repo_id: Optional[str],
+    username: Optional[str],
     only_active: bool,
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
@@ -136,28 +140,34 @@ async def list_user_runs(
         projects = await list_project_models(session=session)
     else:
         projects = await list_user_project_models(session=session, user=user)
-    if project_name:
+    runs_user = None
+    if username is not None:
+        runs_user = await get_user_model_by_name(session=session, username=username)
+        if runs_user is None:
+            raise ResourceNotExistsError("User not found")
+    repo = None
+    if project_name is not None:
         projects = [p for p in projects if p.name == project_name]
         if len(projects) == 0:
             return []
-        run_models = await list_project_run_models(
-            session=session,
-            project=projects[0],
-            repo_id=repo_id,
-            only_active=only_active,
-            prev_submitted_at=prev_submitted_at,
-            prev_run_id=prev_run_id,
-            limit=limit,
-        )
-    else:
-        run_models = await list_projects_run_models(
-            session=session,
-            projects=projects,
-            only_active=only_active,
-            prev_submitted_at=prev_submitted_at,
-            prev_run_id=prev_run_id,
-            limit=limit,
-        )
+        if repo_id is not None:
+            repo = await repos_services.get_repo_model(
+                session=session,
+                project=projects[0],
+                repo_id=repo_id,
+            )
+            if repo is None:
+                raise RepoDoesNotExistError.with_id(repo_id)
+    run_models = await list_projects_run_models(
+        session=session,
+        projects=projects,
+        repo=repo,
+        runs_user=runs_user,
+        only_active=only_active,
+        prev_submitted_at=prev_submitted_at,
+        prev_run_id=prev_run_id,
+        limit=limit,
+    )
     runs = []
     for r in run_models:
         try:
@@ -172,69 +182,30 @@ async def list_user_runs(
 async def list_projects_run_models(
     session: AsyncSession,
     projects: List[ProjectModel],
+    repo: Optional[RepoModel],
+    runs_user: Optional[UserModel],
     only_active: bool,
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
 ) -> List[RunModel]:
     filters = [RunModel.deleted == False, RunModel.project_id.in_(p.id for p in projects)]
-    if only_active:
-        filters.append(RunModel.status.not_in(RunStatus.finished_statuses()))
-    if prev_submitted_at is not None:
-        if prev_run_id is None:
-            filters.append(RunModel.submitted_at < prev_submitted_at)
-        else:
-            filters.append(
-                or_(
-                    RunModel.submitted_at < prev_submitted_at,
-                    and_(RunModel.submitted_at == prev_submitted_at, RunModel.id > prev_run_id),
-                )
-            )
-    res = await session.execute(
-        select(RunModel)
-        .where(*filters)
-        .order_by(RunModel.submitted_at.desc(), RunModel.id)
-        .limit(limit)
-        .options(joinedload(RunModel.user))
-    )
-    run_models = list(res.scalars().all())
-    return run_models
-
-
-async def list_project_run_models(
-    session: AsyncSession,
-    project: ProjectModel,
-    repo_id: Optional[str],
-    only_active: bool,
-    prev_submitted_at: Optional[datetime],
-    prev_run_id: Optional[uuid.UUID],
-    limit: int,
-) -> List[RunModel]:
-    filters = [
-        RunModel.project_id == project.id,
-        RunModel.deleted == False,
-    ]
-    if only_active:
-        filters.append(RunModel.status.not_in(RunStatus.finished_statuses()))
-    if prev_submitted_at is not None:
-        if prev_run_id is None:
-            filters.append(RunModel.submitted_at < prev_submitted_at)
-        else:
-            filters.append(
-                or_(
-                    RunModel.submitted_at < prev_submitted_at,
-                    and_(RunModel.submitted_at == prev_submitted_at, RunModel.id > prev_run_id),
-                )
-            )
-    if repo_id is not None:
-        repo = await repos_services.get_repo_model(
-            session=session,
-            project=project,
-            repo_id=repo_id,
-        )
-        if repo is None:
-            raise RepoDoesNotExistError.with_id(repo_id)
+    if repo is not None:
         filters.append(RunModel.repo_id == repo.id)
+    if runs_user is not None:
+        filters.append(RunModel.user_id == runs_user.id)
+    if only_active:
+        filters.append(RunModel.status.not_in(RunStatus.finished_statuses()))
+    if prev_submitted_at is not None:
+        if prev_run_id is None:
+            filters.append(RunModel.submitted_at < prev_submitted_at)
+        else:
+            filters.append(
+                or_(
+                    RunModel.submitted_at < prev_submitted_at,
+                    and_(RunModel.submitted_at == prev_submitted_at, RunModel.id > prev_run_id),
+                )
+            )
     res = await session.execute(
         select(RunModel)
         .where(*filters)
