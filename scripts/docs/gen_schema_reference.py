@@ -14,6 +14,8 @@ import yaml
 from mkdocs.structure.files import File
 from pydantic.main import BaseModel
 
+from dstack._internal.core.models.resources import Range
+
 FILE_PATTERN = "docs/reference/**.md"
 logger = logging.getLogger("mkdocs.plugins.dstack.schema")
 
@@ -68,10 +70,18 @@ def generate_schema_reference(
             if overrides and name in overrides:
                 values.update(overrides[name])
             field_type = next(iter(get_args(field.annotation)), None)
+            # TODO: This is a dirty workaround
             if field_type:
-                if field.annotation.__name__ == "Annotated" and field_type.__name__ == "Optional":
-                    field_type = get_args(get_args(field.annotation)[0])[0]
-                base_model = inspect.isclass(field_type) and issubclass(field_type, BaseModel)
+                if field.annotation.__name__ == "Annotated":
+                    if field_type.__name__ == "Optional":
+                        field_type = get_args(get_args(field.annotation)[0])[0]
+                    if field_type.__name__ == "Union":
+                        field_type = get_args(get_args(field.annotation)[0])[0]
+                base_model = (
+                    inspect.isclass(field_type)
+                    and issubclass(field_type, BaseModel)
+                    and not issubclass(field_type, Range)
+                )
             else:
                 base_model = False
             rows.append(

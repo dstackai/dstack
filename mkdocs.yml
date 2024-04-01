@@ -50,7 +50,7 @@ theme:
     #    - navigation.instant
     #    - toc.integrate
     - navigation.sections
-    #    - navigation.expand
+    - navigation.expand
     - navigation.top
     - announce.dismiss
     - navigation.tracking

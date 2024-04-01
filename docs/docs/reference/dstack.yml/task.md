@@ -7,9 +7,13 @@ The `task` configuration type allows running [tasks](../../concepts/tasks.md).
     and can be located in the project's root directory or any nested folder.
     Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
 
-### Example usage
+### Examples
 
 #### Python version
+
+If you don't specify `image`, `dstack` uses the default Docker image pre-configured with 
+`python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
+The `python` property determines which default Docker image is used.
 
 <div editor-title="train.dstack.yml"> 
 
@@ -25,7 +29,14 @@ commands:
 
 </div>
 
-#### Ports
+??? info "nvcc"
+    Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
+    To install it, use `conda install cuda`.
+
+#### Ports { #_ports }
+
+A task can configure ports. In this case, if the task is running an application on a port, `dstack run` 
+will securely allow you to access this port from your local machine through port forwarding.
 
 <div editor-title="train.dstack.yml"> 
 
@@ -45,6 +56,9 @@ ports:
 
 </div>
 
+When running it, `dstack run` forwards `6000` port to `localhost:6000`, enabling secure access.
+See [tasks](../../concepts/tasks.md#configure-ports) for more detail.
+
 #### Docker image
 
 <div editor-title=".dstack.yml"> 
@@ -61,12 +75,31 @@ commands:
 
 </div>
 
-#### Resources
+??? info "Private registry"
+    Use the `registry_auth` property to provide credentials for a private Docker registry.
+
+    ```yaml
+    type: dev-environment
+    
+    image: dstackai/base:py3.11-0.4rc4-cuda-12.1
+    registry_auth:
+      username: peterschmidt85
+      password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
+    
+    commands:
+      - pip install -r fine-tuning/qlora/requirements.txt
+      - python fine-tuning/qlora/train.py
+    ```
+
+#### Required resources
+
+If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
+range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
 
 <div editor-title=".dstack.yml"> 
 
 ```yaml
-type: dev-environment
+type: task
 
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
@@ -81,6 +114,15 @@ resources:
 ```
 
 </div>
+
+The `gpu` property allows specifying not only memory size but also GPU names
+and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A100), 
+`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB), 
+`A100:40GB:2` (two A100 GPUs of 40GB).
+
+??? info "Shared memory"
+    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
+    `shm_size`, e.g. set it to `16GB`.
 
 #### Environment variables
 
@@ -102,26 +144,14 @@ commands:
 
 </div>
 
-#### Private Docker image
+If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
+`dstack` will require the value to be passed via the CLI or set in the current process.
 
-<div editor-title=".dstack.yml"> 
-
-```yaml
-type: dev-environment
-
-image: dstackai/base:py3.11-0.4rc4-cuda-12.1
-registry_auth:
-  username: peterschmidt85
-  password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
-
-commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
-```
-
-</div>
+For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
 
 #### Run arguments
+
+You can parameterize tasks with user arguments using `${{ run.args }}` in the configuration.
 
 <div editor-title="train.dstack.yml"> 
 
@@ -137,7 +167,12 @@ commands:
 
 </div>
 
+Now, you can pass your arguments to the `dstack run` command. 
+See [tasks](../../concepts/tasks.md#parametrize-tasks) for more detail.
+
 #### Web applications
+
+Here's an example of using `ports` to run web apps with `tasks`. 
 
 <div editor-title="app.dstack.yml"> 
 
@@ -157,7 +192,7 @@ ports:
 
 </div>
 
-### Root properties
+### Properties reference
 
 #SCHEMA# dstack._internal.core.models.configurations.TaskConfiguration
     overrides:
@@ -176,6 +211,14 @@ ports:
 ### gpu
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+### disk
+
+#SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
     overrides:
       show_root_heading: false
       type:

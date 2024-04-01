@@ -11,6 +11,10 @@ The `dev-environment` configuration type allows running [dev environments](../..
 
 #### Python version
 
+If you don't specify `image`, `dstack` uses the default Docker image pre-configured with 
+`python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
+The `python` property determines which default Docker image is used.
+
 <div editor-title=".dstack.yml"> 
 
 ```yaml
@@ -22,6 +26,10 @@ ide: vscode
 ```
 
 </div>
+
+??? info "nvcc"
+    Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
+    To install it, use `conda install cuda`.
 
 #### Docker image
 
@@ -37,7 +45,25 @@ ide: vscode
 
 </div>
 
-#### Resources
+??? info "Private registry"
+
+    Use the `registry_auth` property to provide credentials for a private Docker registry. 
+
+    ```yaml
+    type: dev-environment
+    
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    registry_auth:
+      username: peterschmidt85
+      password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
+    
+    ide: vscode
+    ```
+
+#### Required resources
+
+If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
+range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
 
 <div editor-title=".dstack.yml"> 
 
@@ -56,6 +82,15 @@ resources:
 
 </div>
 
+The `gpu` property allows specifying not only memory size but also GPU names
+and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A100), 
+`A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB), 
+`A100:40GB:2` (two A100 GPUs of 40GB).
+
+??? info "Shared memory"
+    If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
+    `shm_size`, e.g. set it to `16GB`.
+
 #### Environment variables
 
 <div editor-title=".dstack.yml"> 
@@ -72,40 +107,28 @@ ide: vscode
 
 </div>
 
-#### Private Docker image
+If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
+`dstack` will require the value to be passed via the CLI or set in the current process.
 
-<div editor-title=".dstack.yml"> 
+For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
 
-```yaml
-type: dev-environment
+[//]: # (#### Initialization commands)
+[//]: # ()
+[//]: # (<div editor-title=".dstack.yml"> )
+[//]: # ()
+[//]: # (```yaml)
+[//]: # (type: dev-environment)
+[//]: # ()
+[//]: # (python: "3.11")
+[//]: # ()
+[//]: # (ide: vscode)
+[//]: # ()
+[//]: # (init: pip install -r requirements.txt)
+[//]: # (```)
+[//]: # ()
+[//]: # (</div>)
 
-image: ghcr.io/huggingface/text-generation-inference:latest
-registry_auth:
-  username: peterschmidt85
-  password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
-
-ide: vscode
-```
-
-</div>
-
-#### Initialization commands
-
-<div editor-title=".dstack.yml"> 
-
-```yaml
-type: dev-environment
-
-python: "3.11"
-
-ide: vscode
-
-init: pip install -r requirements.txt
-```
-
-</div>
-
-### Root properties
+### Properties reference
 
 #SCHEMA# dstack._internal.core.models.configurations.DevEnvironmentConfiguration
     overrides:
@@ -124,6 +147,14 @@ init: pip install -r requirements.txt
 ### gpu
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+### disk
+
+#SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
     overrides:
       show_root_heading: false
       type:

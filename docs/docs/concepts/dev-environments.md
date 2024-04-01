@@ -37,9 +37,6 @@ If image is not specified, `dstack` uses its own (pre-configured with Python, Co
 
 Environment variables can be set either within the configuration file or passed via the CLI.
 
-If you only specify the name of the environment variable without specifying the value, 
-`dstack` will require that the value is passed via the CLI or set for the current process.
-
 ```yaml
 type: dev-environment
 
@@ -54,7 +51,10 @@ resources:
   gpu: 80GB
 ```
 
-This way, you can define environment variables in a `.env` file and also use tools such as `direnv` and similar.
+If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
+`dstack` will require the value to be passed via the CLI or set in the current process.
+
+For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
 
 ## Run the configuration
 
@@ -131,4 +131,4 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 
 ## What's next?
 
-1. Check the [`.dstack.yml` reference](../reference/dstack.yml/dev-environment.md)
+1. Check the [`.dstack.yml` reference](../reference/dstack.yml/dev-environment.md) for more details and examples
