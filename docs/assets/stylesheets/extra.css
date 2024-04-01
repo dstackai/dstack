@@ -1407,3 +1407,32 @@ img.border {
     border: 0.25px rgba(0,0,0,0.2) solid;
     border-radius: 7px;
 }
+
+.md-typeset .reference-item:hover > .headerlink {
+    display: none;
+}
+
+.md-typeset .reference-item {
+    display: list-item;
+    margin-left: .625em;
+    font-weight: inherit;
+    color: inherit;
+    font-size: inherit;
+    letter-spacing: inherit;
+}
+
+.md-typeset .reference-item a code {
+    color: var(--md-typeset-a-color);
+    font-size: .85em;
+}
+
+.md-typeset .reference-item code {
+    background-color: rgba(163, 68, 215, 0.05);
+    border-radius: 2px;
+    font-weight: 600;
+    color: var(--md-primary-fg-color);
+    text-align: center;
+    padding: 4px;
+    height: 16px;
+    margin: 0 4px;
+}

@@ -65,7 +65,7 @@ $ curl https://yellow-cat-1.example.com \
 
     To use a model with gated access, ensure configuring the `HUGGING_FACE_HUB_TOKEN` environment variable 
     (with [`--env`](../docs/reference/cli/index.md#dstack-run) in `dstack run` or 
-    using [`env`](../docs/reference/dstack.yml.md#service) in the configuration file).
+    using [`env`](../docs/reference/dstack.yml/service.md) in the configuration file).
     
 [//]: # (    <div class="termy">)
 [//]: # (    ```shell)

@@ -7,7 +7,7 @@ manually, configuring the required resources, idle duration, etc.
 
 ## Add instances
 
-### `dstack run`
+### dstack run
 
 By default, when using the `dstack run` command, it tries to reuse an instance from a pool. If no idle instance meets the
 requirements, `dstack` automatically provisions a new one and adds it to the pool.
@@ -20,7 +20,7 @@ the pool.
     This means that if the run is finished and the instance remains idle for longer than five minutes, it is automatically
     removed from the pool. To override the default idle duration, use  `--idle-duration DURATION` with `dstack run`.
 
-### `dstack pool add` 
+### dstack pool add 
 
 To manually add an instance to a pool, use [`dstack pool add`](../reference/cli/index.md#dstack-pool-add):
 

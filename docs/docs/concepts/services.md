@@ -52,11 +52,10 @@ type: service
 image: ghcr.io/huggingface/text-generation-inference:latest
 env:
   - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
-port: 80
 commands:
-  - text-generation-launcher --port 80 --trust-remote-code
+  - text-generation-launcher --port 8000 --trust-remote-code
+port: 8000
 
-# (Optional) Configure `gpu`, `memory`, `disk`, etc
 resources:
   gpu: 80GB
 ```
@@ -67,31 +66,32 @@ The YAML file allows you to specify your own Docker image, environment variables
 resource requirements, etc.
 If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
 
-??? info "Environment variables"
-    Environment variables can be set either within the configuration file or passed via the CLI.
+!!! info ".dstack.yml"
+    For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/service.md).
 
-    If you only specify the name of the environment variable without specifying the value, 
-    `dstack` will require that the value is passed via the CLI or set for the current process.
+### Configure environment variables
 
-    ```yaml
-    type: service
-    
-    image: ghcr.io/huggingface/text-generation-inference:latest
-    env:
-      - HUGGING_FACE_HUB_TOKEN
-      - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
-    port: 80
-    commands:
-      - text-generation-launcher --port 80 --trust-remote-code
-    
-    # (Optional) Configure `gpu`, `memory`, `disk`, etc
-    resources:
-      gpu: 80GB
-    ```
+Environment variables can be set either within the configuration file or passed via the CLI.
 
-    This way, you can define environment variables in a `.env` file and also use tools such as `direnv` and similar.
+If you only specify the name of the environment variable without specifying the value, 
+`dstack` will require that the value is passed via the CLI or set for the current process.
 
-For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml.md).
+```yaml
+type: service
+
+image: ghcr.io/huggingface/text-generation-inference:latest
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+commands:
+  - text-generation-launcher --port 8000 --trust-remote-code
+port: 8000
+
+resources:
+  gpu: 80GB
+```
+
+This way, you can define environment variables in a `.env` file and also use tools such as `direnv` and similar.
 
 ### Configure model mapping
 
@@ -108,15 +108,14 @@ type: service
 image: ghcr.io/huggingface/text-generation-inference:latest
 env:
   - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
-port: 80
 commands:
-  - text-generation-launcher --port 80 --trust-remote-code
+  - text-generation-launcher --port 8000 --trust-remote-code
+port: 8000
   
-# (Optional) Configure `gpu`, `memory`, `disk`, etc
 resources:
   gpu: 80GB
   
-# (Optional) Enable the OpenAI-compatible endpoint   
+# Enable the OpenAI-compatible endpoint   
 model:
   type: chat
   name: mistralai/Mistral-7B-Instruct-v0.1
@@ -142,15 +141,14 @@ and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-com
     image: ghcr.io/huggingface/text-generation-inference:latest
     env:
       - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ
-    port: 80
     commands:
-      - text-generation-launcher --port 80 --trust-remote-code --quantize gptq
+      - text-generation-launcher --port 8000 --trust-remote-code --quantize gptq
+    port: 8000
     
-    # (Optional) Configure `gpu`, `memory`, `disk`, etc
     resources:
       gpu: 80GB
       
-    # (Optional) Enable the OpenAI-compatible endpoint
+    # Enable the OpenAI-compatible endpoint
     model:
       type: chat
       name: TheBloke/Llama-2-13B-chat-GPTQ
@@ -191,7 +189,7 @@ scaling:
   metric: rps
   target: 10
 
-# (Optional) Enable the OpenAI-compatible endpoint
+# Enable the OpenAI-compatible endpoint
 model:
   format: openai
   type: chat
@@ -303,6 +301,5 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 ## What's next?
 
 1. Check the [Text Generation Inference](../../examples/tgi.md) and [vLLM](../../examples/vllm.md) examples
-2. Read about [dev environments](../concepts/dev-environments.md), [tasks](../concepts/tasks.md), and [pools](../concepts/pools.md)
-3. Browse [examples](../../examples/index.md)
-4. Check the [reference](../reference/dstack.yml.md)
+2. Check the [`.dstack.yml` reference](../reference/dstack.yml/service.md)
+3. Browse [all examples](../../examples/index.md)

@@ -3,6 +3,7 @@ Generates schema reference for dstack models.
 """
 
 import importlib
+import inspect
 import logging
 import re
 from fnmatch import fnmatch
@@ -11,8 +12,9 @@ from typing import Annotated, Any, Dict, Literal, Type, Union, get_args, get_ori
 import mkdocs_gen_files
 import yaml
 from mkdocs.structure.files import File
+from pydantic.main import BaseModel
 
-FILE_PATTERN = "docs/reference/*.md"
+FILE_PATTERN = "docs/reference/**.md"
 logger = logging.getLogger("mkdocs.plugins.dstack.schema")
 
 
@@ -53,45 +55,54 @@ def generate_schema_reference(
                 "",
             ]
         )
-    rows.extend(
-        [
-            "| Property | Description | Type | Default value |",
-            "| --- | --- | --- | --- |",
-        ]
-    )
     for name, field in cls.__fields__.items():
         values = dict(
             name=name,
             description=field.field_info.description,
             type=get_type(field.annotation),
-            default=str(field.default),
+            default=field.default,
             required=field.required,
         )
-        if overrides and name in overrides:
-            values.update(overrides[name])
-        rows.append(
-            "| %s | "
-            % " | ".join(
-                [
-                    f"`{values['name']}`",
-                    (values["description"] or "").replace("\n", "<br>"),
-                    f"`{values['type']}`",
-                    "*required*" if values["required"] else f"`{values['default']}`",
-                ]
+        # TODO: If the field doesn't have description (e.g. BaseConfiguration.type), we could fallback to docstring
+        if values["description"]:
+            if overrides and name in overrides:
+                values.update(overrides[name])
+            field_type = next(iter(get_args(field.annotation)), None)
+            if field_type:
+                if field.annotation.__name__ == "Annotated" and field_type.__name__ == "Optional":
+                    field_type = get_args(get_args(field.annotation)[0])[0]
+                base_model = inspect.isclass(field_type) and issubclass(field_type, BaseModel)
+            else:
+                base_model = False
+            rows.append(
+                " ".join(
+                    [
+                        "####",
+                        f"`{values['name']}`"
+                        if not base_model
+                        else f"[`{values['name']}`](#{values['name']})",
+                        "-",
+                        "(Optional)" if not values["required"] else "",
+                        (values["description"]).replace("\n", "<br>") + ".",
+                        f"Defaults to `{values['default']}`."
+                        if not base_model and values.get("default")
+                        else "",
+                        "{",
+                        f"#{values['name']}" if not base_model else f"#_{values['name']}",
+                        f"data-toc-label='{values['name']}'",
+                        "class='reference-item'",
+                        "}",
+                    ]
+                )
             )
-        )
     return "\n".join(rows)
 
 
 def sub_schema_reference(match: re.Match) -> str:
     logger.info("Generating schema reference for `%s`", match.group(1))
-    try:
-        options = yaml.safe_load("\n".join(row[4:] for row in match.group(2).split("\n")))
-        logger.debug("Options: %s", options)
-        return generate_schema_reference(match.group(1), **(options or {})) + "\n\n"
-    except Exception as e:
-        logger.error("Failed to generate schema reference for `%s`: %s", match.group(1), e)
-        return match.group(0)
+    options = yaml.safe_load("\n".join(row[4:] for row in match.group(2).split("\n")))
+    logger.debug("Options: %s", options)
+    return generate_schema_reference(match.group(1), **(options or {})) + "\n\n"
 
 
 file: File

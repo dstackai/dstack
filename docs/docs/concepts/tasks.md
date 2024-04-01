@@ -25,7 +25,6 @@ commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
-# (Optional) Configure `gpu`, `memory`, `disk`, etc
 resources:
   gpu: 80GB
 ```
@@ -36,31 +35,32 @@ The YAML file allows you to specify your own Docker image, environment variables
 resource requirements, etc.
 If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
 
-??? info "Environment variables"
-    Environment variables can be set either within the configuration file or passed via the CLI.
+!!! info ".dstack.yml"
+    For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/task.md).
 
-    If you only specify the name of the environment variable without specifying the value, 
-    `dstack` will require that the value is passed via the CLI or set for the current process.
+### Configure environment variables
 
-    ```yaml
-    type: task
+Environment variables can be set either within the configuration file or passed via the CLI.
 
-    python: "3.11"
-    env:
-      - HUGGING_FACE_HUB_TOKEN
-      - HF_HUB_ENABLE_HF_TRANSFER=1
-    commands:
-      - pip install -r fine-tuning/qlora/requirements.txt
-      - python fine-tuning/qlora/train.py
-    
-    # (Optional) Configure `gpu`, `memory`, `disk`, etc
-    resources:
-      gpu: 80GB
-    ```
+If you only specify the name of the environment variable without specifying the value, 
+`dstack` will require that the value is passed via the CLI or set for the current process.
 
-    This way, you can define environment variables in a `.env` file and also use tools such as `direnv` and similar.
+```yaml
+type: task
 
-For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml.md).
+python: "3.11"
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+resources:
+  gpu: 80GB
+```
+
+This way, you can define environment variables in a `.env` file and also use tools such as `direnv` and similar.
 
 ### Configure ports
 
@@ -120,7 +120,6 @@ commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py ${{ run.args }}
 
-# (Optional) Configure `gpu`, `memory`, `disk`, etc
 resources:
   gpu: 80GB
 ```
@@ -197,7 +196,6 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 ## What's next?
 
 1. Check the [QLoRA](../../examples/qlora.md) example
-2. Read about [dev environments](../concepts/dev-environments.md) and [services](../concepts/services.md)
-3. Browse [examples](../../examples/index.md)
-4. Check the [reference](../reference/dstack.yml.md)
-5. Check [Python API](../reference/api/python/index.md) and [REST API](../reference/api/rest/index.md)
+2. Check the [`.dstack.yml` reference](../reference/dstack.yml/task.md)
+3. Check [Python API](../reference/api/python/index.md)
+4. Browse [all examples](../../examples/index.md)
