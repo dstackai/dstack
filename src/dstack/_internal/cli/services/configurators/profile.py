@@ -192,19 +192,19 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: boo
             if not profile.retry_policy:
                 profile.retry_policy = ProfileRetryPolicy()
             profile.retry_policy.retry = True
-            profile.retry_policy.limit = args.retry_duration
+            profile.retry_policy.duration = args.retry_duration
     else:
         if args.retry_policy is not None:
             if not profile.retry_policy:
                 profile.retry_policy = ProfileRetryPolicy()
             profile.retry_policy.retry = args.retry_policy
             if profile.retry_policy.retry:
-                profile.retry_policy.limit = DEFAULT_INSTANCE_RETRY_DURATION
+                profile.retry_policy.duration = DEFAULT_INSTANCE_RETRY_DURATION
         elif args.retry_duration is not None:
             if not profile.retry_policy:
                 profile.retry_policy = ProfileRetryPolicy()
             profile.retry_policy.retry = True
-            profile.retry_policy.limit = args.retry_duration  # --retry-duration
+            profile.retry_policy.duration = args.retry_duration  # --retry-duration
 
 
 def max_duration(v: str) -> int:

@@ -49,7 +49,7 @@ class JobStatus(str, Enum):
 
 class RetryPolicy(CoreModel):
     retry: bool
-    limit: Optional[int]
+    duration: Optional[int]
 
 
 class RunTerminationReason(str, Enum):

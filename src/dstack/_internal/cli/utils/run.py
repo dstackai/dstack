@@ -25,7 +25,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     )
     retry_policy = job_plan.job_spec.retry_policy
     retry_policy = (
-        (f"{retry_policy.limit / 3600:g}h" if retry_policy.limit else "yes")
+        (f"{retry_policy.duration / 3600:g}h" if retry_policy.duration else "yes")
         if retry_policy.retry
         else "no"
     )
