@@ -191,7 +191,7 @@ class ResourcesSpec(ForbidExtra):
         cpu (Optional[Range[int]]): The number of CPUs
         memory (Optional[Range[Memory]]): The size of RAM memory (e.g., `"16GB"`)
         gpu (Optional[GPUSpec]): The GPU spec
-        shm_size (Optional[Range[Memory]]): The size of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this.
+        shm_size (Optional[Range[Memory]]): The size of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this
         disk (Optional[DiskSpec]): The disk spec
     """
 
@@ -226,20 +226,30 @@ class GPUSpecSchema(ForbidExtra):
     count: Annotated[IntRangeLike, Field(description="The number of GPUs")] = DEFAULT_GPU_COUNT
     memory: Annotated[
         Optional[MemoryRangeLike],
-        Field(description="The VRAM size (e.g., 16GB)"),
+        Field(
+            description="The VRAM size (e.g., `16GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
+        ),
     ] = None
     total_memory: Annotated[
         Optional[MemoryRangeLike],
-        Field(description="The total VRAM size (e.g., 32GB)"),
+        Field(
+            description="The total VRAM size (e.g., 32GB). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
+        ),
     ] = None
     compute_capability: Annotated[
         Optional[ComputeCapabilityLike],
-        Field(description="The minimum compute capability of the GPU (e.g., 7.5)"),
+        Field(description="The minimum compute capability of the GPU (e.g., `7.5`)"),
     ] = None
 
 
 class DiskSpecSchema(ForbidExtra):
-    size: Annotated[MemoryRangeLike, Field(description="The disk size (e.g., 100GB)")]
+    size: Annotated[
+        MemoryRangeLike,
+        Field(
+            description="The disk size. Can be a string (e.g., `100GB` or `100GB..`) or an object"
+            "; see [examples](#examples)"
+        ),
+    ]
 
 
 class ResourcesSpecSchema(ForbidExtra):
@@ -248,15 +258,20 @@ class ResourcesSpecSchema(ForbidExtra):
     )
     memory: Annotated[
         Optional[MemoryRangeLike],
-        Field(description="The RAM size (e.g., 8GB)"),
+        Field(description="The RAM size (e.g., `8GB`)"),
     ] = DEFAULT_MEMORY_SIZE
     shm_size: Annotated[
         Optional[MemoryLike],
         Field(
-            description="The size of shared memory (e.g., 8GB). "
+            description="The size of shared memory (e.g., `8GB`). "
             "If you are using parallel communicating processes (e.g., dataloaders in PyTorch), "
-            "you may need to configure this."
+            "you may need to configure this"
         ),
     ] = None
-    gpu: Annotated[Optional[GPULike], Field(description="The GPU resources")] = None
+    gpu: Annotated[
+        Optional[GPULike],
+        Field(
+            description="The GPU requirements. Can be set to a number, a string (e.g. `A100`, `80GB:2`, etc.), or an object; see [examples](#examples)"
+        ),
+    ] = None
     disk: Annotated[Optional[DiskLike], Field(description="The disk resources")] = None

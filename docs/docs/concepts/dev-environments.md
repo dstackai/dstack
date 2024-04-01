@@ -16,13 +16,10 @@ both acceptable).
 ```yaml
 type: dev-environment
 
-# Use either `python` or `image` to configure environment
 python: "3.11"
 
-# image: ghcr.io/huggingface/text-generation-inference:latest
 ide: vscode
 
-# (Optional) Configure `gpu`, `memory`, `disk`, etc
 resources:
   gpu: 80GB
 ```
@@ -33,29 +30,31 @@ The YAML file allows you to specify your own Docker image, environment variables
 resource requirements, etc.
 If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
 
-??? info "Environment variables"
-    Environment variables can be set either within the configuration file or passed via the CLI.
+!!! info ".dstack.yml"
+    For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/dev-environment.md).
 
-    If you only specify the name of the environment variable without specifying the value, 
-    `dstack` will require that the value is passed via the CLI or set for the current process.
+### Configure environment variables
 
-    ```yaml
-    type: dev-environment
+Environment variables can be set either within the configuration file or passed via the CLI.
 
-    env:
-      - HUGGING_FACE_HUB_TOKEN
-      - HF_HUB_ENABLE_HF_TRANSFER=1
+```yaml
+type: dev-environment
 
-    python: "3.11"
-    ide: vscode
-    
-    resources:
-      gpu: 80GB
-    ```
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
 
-    This way, you can define environment variables in a `.env` file and also use tools such as `direnv` and similar.
+python: "3.11"
+ide: vscode
 
-For more details on the file syntax, refer to [`.dstack.yml`](../reference/dstack.yml.md).
+resources:
+  gpu: 80GB
+```
+
+If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
+`dstack` will require the value to be passed via the CLI or set in the current process.
+
+For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
 
 ## Run the configuration
 
@@ -132,6 +131,4 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 
 ## What's next?
 
-1. Check out [`.dstack.yml`](../reference/dstack.yml.md), [`dstack run`](../reference/cli/index.md#dstack-run),
-    and [`profiles.yml`](../reference/profiles.yml.md)
-2. Read about [tasks](tasks.md), [services](tasks.md), and [pools](pools.md)
+1. Check the [`.dstack.yml` reference](../reference/dstack.yml/dev-environment.md) for more details and examples
