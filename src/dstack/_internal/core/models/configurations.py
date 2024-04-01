@@ -262,7 +262,7 @@ class ServiceConfiguration(BaseConfiguration):
             raise ValueError("The minimum number of replicas must be greater than or equal to 0")
         if v.max < v.min:
             raise ValueError(
-                "The maximum number of replicas must be greater than the minium number of replicas"
+                "The maximum number of replicas must be greater than or equal to the minium number of replicas"
             )
         return v
 
