@@ -1,14 +1,12 @@
 import time
 from typing import List, Optional
 
-import requests
-
 from dstack._internal import settings
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import get_instance_name
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
-from dstack._internal.core.errors import BackendError, NoCapacityError
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -18,6 +16,9 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class RunpodCompute(Compute):
@@ -69,33 +70,19 @@ class RunpodCompute(Compute):
         authorized_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        try:
-            resp = self.api_client.create_pod(
-                name=instance_config.instance_name,
-                image_name="runpod/pytorch:2.1.1-py3.10-cuda12.1.1-devel-ubuntu22.04",
-                gpu_type_id=instance_offer.instance.name,
-                cloud_type="ALL",  # ["ALL", "COMMUNITY", "SECURE"]:
-                gpu_count=len(instance_offer.instance.resources.gpus),
-                container_disk_in_gb=disk_size,
-                min_vcpu_count=instance_offer.instance.resources.cpus,
-                min_memory_in_gb=memory_size,
-                support_public_ip=True,
-                docker_args=get_docker_args(authorized_keys),
-                ports="22/tcp",
-            )
-        except requests.HTTPError as e:
-            try:
-                details = e.response.json()
-                response_code = details.get("code")
-            except ValueError:
-                raise BackendError(e)
-
-            # code 3: There are no hosts available for your specified virtual machine.
-            if response_code == 3:
-                raise NoCapacityError(details.get("message"))
-            # code 9: Vm cannot be assigned ip from network. Network full
-            if response_code == 9:
-                raise BackendError(details.get("message"))
+        resp = self.api_client.create_pod(
+            name=instance_config.instance_name,
+            image_name="runpod/pytorch:2.1.1-py3.10-cuda12.1.1-devel-ubuntu22.04",
+            gpu_type_id=instance_offer.instance.name,
+            cloud_type="ALL",  # ["ALL", "COMMUNITY", "SECURE"]:
+            gpu_count=len(instance_offer.instance.resources.gpus),
+            container_disk_in_gb=disk_size,
+            min_vcpu_count=instance_offer.instance.resources.cpus,
+            min_memory_in_gb=memory_size,
+            support_public_ip=True,
+            docker_args=get_docker_args(authorized_keys),
+            ports="22/tcp",
+        )
 
         instance_id = resp["id"]
         # Wait until VM State is Active. This is necessary to get the ip_address.
@@ -122,7 +109,13 @@ class RunpodCompute(Compute):
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
-        self.api_client.terminate_pod(instance_id)
+        try:
+            self.api_client.terminate_pod(instance_id)
+        except BackendError as e:
+            if e.args[0] == "Instance Not Found":
+                logger.debug("The instance with name %s not found", instance_id)
+                return
+            raise
 
 
 def get_docker_args(authorized_keys):

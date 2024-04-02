@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 
 import requests
 
-from dstack._internal.core.errors import BackendInvalidCredentialsError
+from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
 
 API_URL = "https://api.runpod.io/graphql"
 
@@ -97,6 +97,10 @@ class RunpodApiClient:
                 json=data,
             )
             response.raise_for_status()
+            if "errors" in response.json():
+                if "podTerminate" in response.json()["errors"][0]["path"]:
+                    raise BackendError("Instance Not Found")
+                raise BackendError(response.json()["errors"][0]["message"])
             return response
         except requests.HTTPError as e:
             if e.response.status_code in (requests.codes.forbidden, requests.codes.unauthorized):
