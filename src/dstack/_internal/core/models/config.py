@@ -1,4 +1,6 @@
-from typing import List, Optional
+from typing import Annotated, List, Optional
+
+from pydantic.fields import Field
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.repos.base import RepoType
@@ -19,5 +21,5 @@ class RepoConfig(CoreModel):
 
 
 class GlobalConfig(CoreModel):
-    projects: List[ProjectConfig] = []
+    projects: Annotated[List[ProjectConfig], Field(description="The list of projects")] = []
     repos: List[RepoConfig] = []

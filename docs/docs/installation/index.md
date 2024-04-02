@@ -322,9 +322,9 @@ projects:
 !!! info "NOTE:"
     The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
 
-### Vast AI
+### Vast.ai
 
-Log into your [Vast AI](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
+Log into your [Vast.ai](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
 API Key.
 
 Then, go ahead and configure the backend:

@@ -391,7 +391,7 @@ h4.doc-heading {
 }
 
 .md-typeset :is(h1, h2, h3, h4) > code {
-    /*background-color: inherit;*/
+    background-color: inherit;
     color: inherit;
     /*padding: 0;
     margin: 0;*/

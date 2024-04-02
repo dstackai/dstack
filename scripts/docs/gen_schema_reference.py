@@ -41,7 +41,10 @@ def get_type(annotation: Type) -> str:
 
 
 def generate_schema_reference(
-    model_path: str, *, overrides: Dict[str, Dict[str, Any]] = None
+    model_path: str,
+    *,
+    overrides: Dict[str, Dict[str, Any]] = None,
+    prefix: str = "",
 ) -> str:
     module, model_name = model_path.rsplit(".", maxsplit=1)
     cls = getattr(importlib.import_module(module), model_name)
@@ -53,7 +56,7 @@ def generate_schema_reference(
     ):
         rows.extend(
             [
-                f"### {cls.__name__}",
+                prefix + f"### {cls.__name__}",
                 "",
             ]
         )
@@ -75,6 +78,8 @@ def generate_schema_reference(
                 if field.annotation.__name__ == "Annotated":
                     if field_type.__name__ == "Optional":
                         field_type = get_args(get_args(field.annotation)[0])[0]
+                    if field_type.__name__ == "List":
+                        field_type = get_args(get_args(field.annotation)[0])[0]
                     if field_type.__name__ == "Union":
                         field_type = get_args(get_args(field.annotation)[0])[0]
                 base_model = (
@@ -84,23 +89,44 @@ def generate_schema_reference(
                 )
             else:
                 base_model = False
+            _defaults = (
+                f"Defaults to `{values['default']}`."
+                if not base_model and values.get("default")
+                else ""
+            )
+            _must_be = (
+                f"Must be `{values['default']}`."
+                if not base_model and values.get("default")
+                else ""
+            )
+            if overrides and "reference_prefix" in overrides:
+                reference_prefix = overrides["reference_prefix"]
+            else:
+                reference_prefix = ""
+            item_header = (
+                f"`{values['name']}`"
+                if not base_model
+                else f"[`{values['name']}`](#{reference_prefix}{values['name']})"
+            )
+            item_optional_marker = "(Optional)" if not values["required"] else ""
+            item_description = (values["description"]).replace("\n", "<br>") + "."
+            item_default = _defaults if not values["required"] else _must_be
+            item_id = f"#{values['name']}" if not base_model else f"#_{values['name']}"
+            item_toc_label = f"data-toc-label='{values['name']}'"
+            item_css_cass = "class='reference-item'"
             rows.append(
-                " ".join(
+                prefix
+                + " ".join(
                     [
-                        "####",
-                        f"`{values['name']}`"
-                        if not base_model
-                        else f"[`{values['name']}`](#{values['name']})",
+                        f"#### {item_header}",
                         "-",
-                        "(Optional)" if not values["required"] else "",
-                        (values["description"]).replace("\n", "<br>") + ".",
-                        f"Defaults to `{values['default']}`."
-                        if not base_model and values.get("default")
-                        else "",
+                        item_optional_marker,
+                        item_description,
+                        item_default,
                         "{",
-                        f"#{values['name']}" if not base_model else f"#_{values['name']}",
-                        f"data-toc-label='{values['name']}'",
-                        "class='reference-item'",
+                        item_id,
+                        item_toc_label,
+                        item_css_cass,
                         "}",
                     ]
                 )
@@ -109,10 +135,13 @@ def generate_schema_reference(
 
 
 def sub_schema_reference(match: re.Match) -> str:
-    logger.info("Generating schema reference for `%s`", match.group(1))
-    options = yaml.safe_load("\n".join(row[4:] for row in match.group(2).split("\n")))
+    logger.info("Generating schema reference for `%s`", match.group(2))
+    options = yaml.safe_load("\n".join(row[4:] for row in match.group(3).split("\n")))
     logger.debug("Options: %s", options)
-    return generate_schema_reference(match.group(1), **(options or {})) + "\n\n"
+    return (
+        generate_schema_reference(match.group(2), **(options or {}), prefix=match.group(1))
+        + "\n\n"
+    )
 
 
 file: File
@@ -128,7 +157,9 @@ for file in mkdocs_gen_files.files:
     #       name:
     #         required: true
     text = re.sub(
-        r"#SCHEMA#\s+(dstack\.[.a-z_0-9A-Z]+)\s*((?:\n {4}[^\n]+)*)\n", sub_schema_reference, text
+        r"( *)#SCHEMA#\s+(dstack\.[.a-z_0-9A-Z]+)\s*((?:\n {4}[^\n]+)*)\n",
+        sub_schema_reference,
+        text,
     )
     with mkdocs_gen_files.open(file.src_uri, "w") as f:
         f.write(text)

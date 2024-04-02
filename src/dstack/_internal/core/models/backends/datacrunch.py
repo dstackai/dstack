@@ -1,5 +1,6 @@
-from typing import List, Optional, Union
+from typing import Annotated, List, Optional, Union
 
+from pydantic.fields import Field
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
@@ -12,9 +13,9 @@ class DataCrunchConfigInfo(CoreModel):
 
 
 class DataCrunchAPIKeyCreds(CoreModel):
-    type: Literal["api_key"] = "api_key"
-    client_id: str
-    client_secret: str
+    type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"
+    client_id: Annotated[str, Field(description="The client ID")]
+    client_secret: Annotated[str, Field(description="The client secret")]
 
 
 AnyDataCrunchCreds = DataCrunchAPIKeyCreds

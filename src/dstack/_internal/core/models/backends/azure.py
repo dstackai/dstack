@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Annotated, List, Optional, Union
 
 from pydantic import Field
 from typing_extensions import Literal
@@ -15,15 +15,15 @@ class AzureConfigInfo(CoreModel):
 
 
 class AzureClientCreds(CoreModel):
-    type: Literal["client"] = "client"
-    client_id: str
-    client_secret: str
+    type: Annotated[Literal["client"], Field(description="The type of credentials")] = "client"
+    client_id: Annotated[str, Field(description="The client ID")]
+    client_secret: Annotated[str, Field(description="The client secret")]
     # if tenant_id is missing, it will be populated from config info
     tenant_id: Optional[str]
 
 
 class AzureDefaultCreds(CoreModel):
-    type: Literal["default"] = "default"
+    type: Annotated[Literal["default"], Field(description="The type of credentials")] = "default"
 
 
 AnyAzureCreds = Union[AzureClientCreds, AzureDefaultCreds]

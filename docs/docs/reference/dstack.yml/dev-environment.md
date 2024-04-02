@@ -60,7 +60,7 @@ ide: vscode
     ide: vscode
     ```
 
-#### Required resources
+#### Resources { #_resources }
 
 If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
 range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
@@ -128,7 +128,7 @@ For instance, you can define environment variables in a `.env` file and utilize 
 [//]: # ()
 [//]: # (</div>)
 
-### Properties reference
+### Root reference
 
 #SCHEMA# dstack._internal.core.models.configurations.DevEnvironmentConfiguration
     overrides:
@@ -136,7 +136,7 @@ For instance, you can define environment variables in a `.env` file and utilize 
       type:
         required: true
 
-### resources
+### `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
     overrides:
@@ -144,7 +144,7 @@ For instance, you can define environment variables in a `.env` file and utilize 
       type:
         required: true
 
-### gpu
+### `gpu`
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
     overrides:
@@ -152,7 +152,7 @@ For instance, you can define environment variables in a `.env` file and utilize 
       type:
         required: true
 
-### disk
+### `disk`
 
 #SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
     overrides:
@@ -160,7 +160,7 @@ For instance, you can define environment variables in a `.env` file and utilize 
       type:
         required: true
 
-### registry_auth
+### `registry_auth`
 
 #SCHEMA# dstack._internal.core.models.configurations.RegistryAuth
     overrides:

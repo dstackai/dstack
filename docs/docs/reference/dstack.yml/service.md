@@ -144,7 +144,7 @@ scaling:
 
 If you specify the minimum number of replicas as `0`, the service will scale down to zero when there are no requests.
 
-#### Required resources
+#### Resources { #_resources }
 
 If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
 range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
@@ -207,7 +207,7 @@ auth: false
 
 </div>
 
-### Properties reference
+### Root reference
 
 #SCHEMA# dstack._internal.core.models.configurations.ServiceConfiguration
     overrides:
@@ -215,7 +215,7 @@ auth: false
       type:
         required: true
 
-### model
+### `model`
 
 #SCHEMA# dstack._internal.core.models.gateways.BaseChatModel
     overrides:
@@ -223,7 +223,7 @@ auth: false
       type:
         required: true
 
-### scaling
+### `scaling`
 
 #SCHEMA# dstack._internal.core.models.configurations.ScalingSpec
     overrides:
@@ -231,7 +231,7 @@ auth: false
       type:
         required: true
 
-### resources
+### `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
     overrides:
@@ -239,7 +239,7 @@ auth: false
       type:
         required: true
 
-### gpu
+### `resouces.gpu` { #gpu data-toc-label="gpu" } 
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
     overrides:
@@ -247,7 +247,7 @@ auth: false
       type:
         required: true
 
-### disk
+### `resouces.disk` { #disk data-toc-label="disk" }
 
 #SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
     overrides:
@@ -255,7 +255,7 @@ auth: false
       type:
         required: true
 
-### registry_auth
+### `registry_auth`
 
 #SCHEMA# dstack._internal.core.models.configurations.RegistryAuth
     overrides:
