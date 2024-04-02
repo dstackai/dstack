@@ -14,6 +14,7 @@ from dstack._internal.core.models.backends.cudo import AnyCudoCreds
 from dstack._internal.core.models.backends.datacrunch import AnyDataCrunchCreds
 from dstack._internal.core.models.backends.kubernetes import KubernetesNetworkingConfig
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
+from dstack._internal.core.models.backends.runpod import AnyRunpodCreds
 from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.backends.vastai import AnyVastAICreds
 from dstack._internal.core.models.common import CoreModel
@@ -133,6 +134,12 @@ class NebiusConfig(CoreModel):
     creds: AnyNebiusCreds
 
 
+class RunpodConfig(CoreModel):
+    type: Literal["runpod"] = "runpod"
+    regions: Optional[List[str]] = None
+    creds: AnyRunpodCreds
+
+
 class TensorDockConfig(CoreModel):
     type: Annotated[Literal["tensordock"], Field(description="The type of backend")] = "tensordock"
     regions: Optional[List[str]] = None
@@ -158,6 +165,7 @@ AnyBackendConfig = Union[
     KubernetesConfig,
     LambdaConfig,
     NebiusConfig,
+    RunpodConfig,
     TensorDockConfig,
     VastAIConfig,
     DstackConfig,
