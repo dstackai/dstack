@@ -238,8 +238,9 @@ auth: false
       show_root_heading: false
       type:
         required: true
+      item_id_prefix: resources-
 
-### `resouces.gpu` { #gpu data-toc-label="gpu" } 
+### `resouces.gpu` { #resources-gpu data-toc-label="resources.gpu" } 
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
     overrides:
@@ -247,7 +248,7 @@ auth: false
       type:
         required: true
 
-### `resouces.disk` { #disk data-toc-label="disk" }
+### `resouces.disk` { #resources-disk data-toc-label="resources.disk" }
 
 #SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
     overrides:

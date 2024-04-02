@@ -1,6 +1,5 @@
-from typing import Annotated, Literal, Union
-
 from pydantic import BaseModel, Field
+from typing_extensions import Annotated, Literal, Union
 
 
 class BaseChatModel(BaseModel):

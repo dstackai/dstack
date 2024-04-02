@@ -143,8 +143,9 @@ For instance, you can define environment variables in a `.env` file and utilize 
       show_root_heading: false
       type:
         required: true
+      item_id_prefix: resources-
 
-### `gpu`
+### `resources.gpu` { #resources-gpu data-toc-label="resources.gpu" }
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
     overrides:
@@ -152,7 +153,7 @@ For instance, you can define environment variables in a `.env` file and utilize 
       type:
         required: true
 
-### `disk`
+### `resources.disk` { #resources-disk data-toc-label="resources.disk" }
 
 #SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
     overrides:

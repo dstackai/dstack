@@ -1,6 +1,5 @@
-from typing import Annotated, List, Optional
-
 from pydantic.fields import Field
+from typing_extensions import Annotated, List, Optional
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.repos.base import RepoType

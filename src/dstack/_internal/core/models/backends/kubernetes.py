@@ -1,7 +1,5 @@
-from typing import Annotated, Optional, Union
-
 from pydantic.fields import Field
-from typing_extensions import Literal
+from typing_extensions import Annotated, Literal, Optional, Union
 
 from dstack._internal.core.models.common import CoreModel
 

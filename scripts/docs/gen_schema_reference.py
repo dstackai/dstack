@@ -7,12 +7,12 @@ import inspect
 import logging
 import re
 from fnmatch import fnmatch
-from typing import Annotated, Any, Dict, Literal, Type, Union, get_args, get_origin
 
 import mkdocs_gen_files
 import yaml
 from mkdocs.structure.files import File
 from pydantic.main import BaseModel
+from typing_extensions import Annotated, Any, Dict, Literal, Type, Union, get_args, get_origin
 
 from dstack._internal.core.models.resources import Range
 
@@ -99,14 +99,14 @@ def generate_schema_reference(
                 if not base_model and values.get("default")
                 else ""
             )
-            if overrides and "reference_prefix" in overrides:
-                reference_prefix = overrides["reference_prefix"]
+            if overrides and "item_id_prefix" in overrides:
+                item_id_prefix = overrides["item_id_prefix"]
             else:
-                reference_prefix = ""
+                item_id_prefix = ""
             item_header = (
                 f"`{values['name']}`"
                 if not base_model
-                else f"[`{values['name']}`](#{reference_prefix}{values['name']})"
+                else f"[`{values['name']}`](#{item_id_prefix}{values['name']})"
             )
             item_optional_marker = "(Optional)" if not values["required"] else ""
             item_description = (values["description"]).replace("\n", "<br>") + "."

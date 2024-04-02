@@ -1,7 +1,5 @@
-from typing import Annotated, List, Optional, Union
-
 from pydantic.fields import Field
-from typing_extensions import Literal
+from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel

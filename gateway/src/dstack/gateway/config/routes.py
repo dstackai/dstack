@@ -1,6 +1,5 @@
-from typing import Annotated
-
 from fastapi import APIRouter, Depends
+from typing_extensions import Annotated
 
 from dstack.gateway.common import OkResponse
 from dstack.gateway.config.schemas import ConfigRequest

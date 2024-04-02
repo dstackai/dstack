@@ -250,16 +250,16 @@ For more details on configuring clouds, please refer to [Installation](../../ins
         backends:
             type: 'Union[AWSConfigInfoWithCreds, AzureConfigInfoWithCreds, GCPConfigInfoWithCreds, LambdaConfigInfoWithCreds, TensorDockConfigInfoWithCreds, VastAIConfigInfoWithCreds, KubernetesConfig]'
 
-### `projects[n].backends[type=aws]` { #aws data-toc-label="aws" }
+### `projects[n].backends[type=aws]` { #aws data-toc-label="backends[type=aws]" }
 
 #SCHEMA# dstack._internal.server.services.config.AWSConfig
     overrides:
         show_root_heading: false
         type:
             required: true
-        reference_prefix: aws-
+        item_id_prefix: aws-
 
-### `projects[n].backends[type=aws].creds` { #aws-creds data-toc-label="creds" } 
+### `projects[n].backends[type=aws].creds` { #aws-creds data-toc-label="backends[type=aws].creds" } 
 
 === "Access key"
     #SCHEMA# dstack._internal.core.models.backends.aws.AWSAccessKeyCreds
@@ -275,16 +275,16 @@ For more details on configuring clouds, please refer to [Installation](../../ins
             type:
                 required: true
 
-### `projects[n].backends[type=azure]` { #azure data-toc-label="azure" }
+### `projects[n].backends[type=azure]` { #azure data-toc-label="backends[type=azure]" }
 
 #SCHEMA# dstack._internal.server.services.config.AzureConfig
     overrides:
         show_root_heading: false
         type:
             required: true
-        reference_prefix: azure-
+        item_id_prefix: azure-
 
-### `projects[n].backends[type=azure].creds` { #azure-creds data-toc-label="creds" } 
+### `projects[n].backends[type=azure].creds` { #azure-creds data-toc-label="backends[type=azure].creds" } 
 
 === "Client"
     #SCHEMA# dstack._internal.core.models.backends.azure.AzureClientCreds
@@ -300,16 +300,16 @@ For more details on configuring clouds, please refer to [Installation](../../ins
             type:
                 required: true
 
-### `projects[n].backends[type=datacrunch]` { #datacrunch data-toc-label="datacrunch" }
+### `projects[n].backends[type=datacrunch]` { #datacrunch data-toc-label="backends[type=datacrunch]" }
 
 #SCHEMA# dstack._internal.server.services.config.DataCrunchConfig
     overrides:
         show_root_heading: false
         type:
             required: true
-        reference_prefix: datacrunch-
+        item_id_prefix: datacrunch-
 
-### `projects[n].backends[type=datacrunch].creds` { #datacrunch-creds data-toc-label="creds" } 
+### `projects[n].backends[type=datacrunch].creds` { #datacrunch-creds data-toc-label="backends[type=datacrunch].creds" } 
 
 #SCHEMA# dstack._internal.core.models.backends.datacrunch.DataCrunchAPIKeyCreds
     overrides:
@@ -317,16 +317,16 @@ For more details on configuring clouds, please refer to [Installation](../../ins
         type:
             required: true
 
-### `projects[n].backends[type=gcp]` { #gcp data-toc-label="gcp" }
+### `projects[n].backends[type=gcp]` { #gcp data-toc-label="backends[type=gcp]" }
 
 #SCHEMA# dstack._internal.server.services.config.GCPConfig
     overrides:
         show_root_heading: false
         type:
             required: true
-        reference_prefix: gcp-
+        item_id_prefix: gcp-
 
-### `projects[n].backends[type=gcp].creds` { #gcp-creds data-toc-label="creds" } 
+### `projects[n].backends[type=gcp].creds` { #gcp-creds data-toc-label="backends[type=gcp].creds" } 
 
 === "Service account"
     #SCHEMA# dstack._internal.server.services.config.GCPServiceAccountCreds
@@ -342,16 +342,16 @@ For more details on configuring clouds, please refer to [Installation](../../ins
             type:
                 required: true
 
-### `projects[n].backends[type=lambda]` { #lambda data-toc-label="lambda" }
+### `projects[n].backends[type=lambda]` { #lambda data-toc-label="backends[type=lambda]" }
 
 #SCHEMA# dstack._internal.server.services.config.LambdaConfig
     overrides:
         show_root_heading: false
         type:
             required: true
-        reference_prefix: lambda-
+        item_id_prefix: lambda-
 
-### `projects[n].backends[type=lambda].creds` { #lambda-creds data-toc-label="creds" } 
+### `projects[n].backends[type=lambda].creds` { #lambda-creds data-toc-label="backends[type=lambda].creds" } 
 
 #SCHEMA# dstack._internal.core.models.backends.lambdalabs.LambdaAPIKeyCreds
     overrides:
@@ -359,16 +359,16 @@ For more details on configuring clouds, please refer to [Installation](../../ins
         type:
             required: true
 
-### `projects[n].backends[type=tensordock]` { #tensordock data-toc-label="tensordock" }
+### `projects[n].backends[type=tensordock]` { #tensordock data-toc-label="backends[type=tensordock]" }
 
 #SCHEMA# dstack._internal.server.services.config.TensorDockConfig
     overrides:
         show_root_heading: false
         type:
             required: true
-        reference_prefix: tensordock-
+        item_id_prefix: tensordock-
 
-### `projects[n].backends[type=tensordock].creds` { #tensordock-creds data-toc-label="creds" } 
+### `projects[n].backends[type=tensordock].creds` { #tensordock-creds data-toc-label="backends[type=tensordock].creds" } 
 
 #SCHEMA# dstack._internal.core.models.backends.tensordock.TensorDockAPIKeyCreds
     overrides:
@@ -376,16 +376,16 @@ For more details on configuring clouds, please refer to [Installation](../../ins
         type:
             required: true
 
-### `projects[n].backends[type=vastai]` { #vastai data-toc-label="vastai" }
+### `projects[n].backends[type=vastai]` { #vastai data-toc-label="backends[type=vastai]" }
 
 #SCHEMA# dstack._internal.server.services.config.VastAIConfig
     overrides:
         show_root_heading: false
         type:
             required: true
-        reference_prefix: vastai-
+        item_id_prefix: vastai-
 
-### `projects[n].backends[type=vastai].creds` { #vastai-creds data-toc-label="creds" } 
+### `projects[n].backends[type=vastai].creds` { #vastai-creds data-toc-label="backends[type=vastai].creds" } 
 
 #SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
     overrides:
@@ -393,7 +393,7 @@ For more details on configuring clouds, please refer to [Installation](../../ins
         type:
             required: true
 
-### `projects[n].backends[type=kubernetes]` { #kubernetes data-toc-label="kubernetes" }
+### `projects[n].backends[type=kubernetes]` { #kubernetes data-toc-label="backends[type=kubernetes]" }
 
 #SCHEMA# dstack._internal.server.services.config.KubernetesConfig
     overrides:
