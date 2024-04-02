@@ -133,10 +133,12 @@ class NebiusConfig(CoreModel):
     regions: Optional[List[str]] = None
     creds: AnyNebiusCreds
 
+
 class RunpodConfig(CoreModel):
     type: Literal["runpod"] = "runpod"
     regions: Optional[List[str]] = None
     creds: AnyRunpodCreds
+
 
 class TensorDockConfig(CoreModel):
     type: Annotated[Literal["tensordock"], Field(description="The type of backend")] = "tensordock"
