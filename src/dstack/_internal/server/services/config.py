@@ -28,38 +28,42 @@ logger = get_logger(__name__)
 
 
 class AWSConfig(CoreModel):
-    type: Literal["aws"] = "aws"
+    type: Annotated[Literal["aws"], Field(description="The type of the backend")] = "aws"
     regions: Optional[List[str]] = None
-    vpc_name: Optional[str] = None
-    creds: AnyAWSCreds = Field(..., discriminator="type")
+    vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    creds: AnyAWSCreds = Field(..., description="The credentials", discriminator="type")
 
 
 class AzureConfig(CoreModel):
-    type: Literal["azure"] = "azure"
-    tenant_id: str
-    subscription_id: str
+    type: Annotated[Literal["azure"], Field(description="The type of the backend")] = "azure"
+    tenant_id: Annotated[str, Field(description="The tenant ID")]
+    subscription_id: Annotated[str, Field(description="The subscription ID")]
     regions: Optional[List[str]] = None
-    creds: AnyAzureCreds = Field(..., discriminator="type")
+    creds: AnyAzureCreds = Field(..., description="The credentials", discriminator="type")
 
 
 class CudoConfig(CoreModel):
-    type: Literal["cudo"] = "cudo"
+    type: Annotated[Literal["cudo"], Field(description="The type of backend")] = "cudo"
     regions: Optional[List[str]] = None
-    creds: AnyCudoCreds
-    project_id: str
+    creds: Annotated[AnyCudoCreds, Field(description="The credentials")]
+    project_id: Annotated[str, Field(description="The project ID")]
 
 
 class DataCrunchConfig(CoreModel):
-    type: Literal["datacrunch"] = "datacrunch"
+    type: Annotated[Literal["datacrunch"], Field(description="The type of backend")] = "datacrunch"
     regions: Optional[List[str]] = None
-    creds: AnyDataCrunchCreds
+    creds: Annotated[AnyDataCrunchCreds, Field(description="The credentials")]
 
 
 class GCPServiceAccountCreds(CoreModel):
-    type: Literal["service_account"] = "service_account"
-    filename: str
+    type: Annotated[Literal["service_account"], Field(description="The type of credentials")] = (
+        "service_account"
+    )
+    filename: Annotated[str, Field(description="The path to the service account file")]
     # If data is None, it is read from the file
-    data: Optional[str] = None
+    data: Annotated[
+        Optional[str], Field(description="The contents of the service account file")
+    ] = None
 
     @root_validator
     def fill_data(cls, values):
@@ -67,22 +71,22 @@ class GCPServiceAccountCreds(CoreModel):
 
 
 class GCPDefaultCreds(CoreModel):
-    type: Literal["default"] = "default"
+    type: Annotated[Literal["default"], Field(description="The type of credentials")] = "default"
 
 
 AnyGCPCreds = Union[GCPServiceAccountCreds, GCPDefaultCreds]
 
 
 class GCPConfig(CoreModel):
-    type: Literal["gcp"] = "gcp"
-    project_id: str
+    type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
+    project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
-    creds: AnyGCPCreds = Field(..., discriminator="type")
+    creds: AnyGCPCreds = Field(..., description="The credentials", discriminator="type")
 
 
 class KubeconfigConfig(CoreModel):
-    filename: str
-    data: Optional[str] = None
+    filename: Annotated[str, Field(description="The path to the kubeconfig file")]
+    data: Annotated[Optional[str], Field(description="The contents of the kubeconfig file")] = None
 
     @root_validator
     def fill_data(cls, values):
@@ -90,21 +94,27 @@ class KubeconfigConfig(CoreModel):
 
 
 class KubernetesConfig(CoreModel):
-    type: Literal["kubernetes"] = "kubernetes"
-    kubeconfig: KubeconfigConfig
-    networking: Optional[KubernetesNetworkingConfig]
+    type: Annotated[Literal["kubernetes"], Field(description="The type of backend")] = "kubernetes"
+    kubeconfig: Annotated[KubeconfigConfig, Field(description="The kubeconfig configuration")]
+    networking: Annotated[
+        Optional[KubernetesNetworkingConfig], Field(description="The networking configuration")
+    ]
 
 
 class LambdaConfig(CoreModel):
-    type: Literal["lambda"] = "lambda"
+    type: Annotated[Literal["lambda"], Field(description="The type of backend")] = "lambda"
     regions: Optional[List[str]] = None
-    creds: AnyLambdaCreds
+    creds: Annotated[AnyLambdaCreds, Field(description="The credentials")]
 
 
 class NebiusServiceAccountCreds(CoreModel):
-    type: Literal["service_account"] = "service_account"
-    filename: str
-    data: Optional[str] = None
+    type: Annotated[Literal["service_account"], Field(description="The type of credentials")] = (
+        "service_account"
+    )
+    filename: Annotated[str, Field(description="The path to the service account file")]
+    data: Annotated[
+        Optional[str], Field(description="The contents of the service account file")
+    ] = None
 
     @root_validator
     def fill_data(cls, values):
@@ -124,19 +134,19 @@ class NebiusConfig(CoreModel):
 
 
 class TensorDockConfig(CoreModel):
-    type: Literal["tensordock"] = "tensordock"
+    type: Annotated[Literal["tensordock"], Field(description="The type of backend")] = "tensordock"
     regions: Optional[List[str]] = None
-    creds: AnyTensorDockCreds
+    creds: Annotated[AnyTensorDockCreds, Field(description="The credentials")]
 
 
 class VastAIConfig(CoreModel):
-    type: Literal["vastai"] = "vastai"
+    type: Annotated[Literal["vastai"], Field(description="The type of backend")] = "vastai"
     regions: Optional[List[str]] = None
-    creds: AnyVastAICreds
+    creds: Annotated[AnyVastAICreds, Field(description="The credentials")]
 
 
 class DstackConfig(CoreModel):
-    type: Literal["dstack"] = "dstack"
+    type: Annotated[Literal["dstack"], Field(description="The type of backend")] = "dstack"
 
 
 AnyBackendConfig = Union[
@@ -158,12 +168,12 @@ BackendConfig = Annotated[AnyBackendConfig, Field(..., discriminator="type")]
 
 
 class ProjectConfig(CoreModel):
-    name: str
-    backends: List[BackendConfig]
+    name: Annotated[str, Field(description="The name of the project")]
+    backends: Annotated[List[BackendConfig], Field(description="The list of backends")]
 
 
 class ServerConfig(CoreModel):
-    projects: List[ProjectConfig]
+    projects: Annotated[List[ProjectConfig], Field(description="The list of projects")]
 
 
 class ServerConfigManager:

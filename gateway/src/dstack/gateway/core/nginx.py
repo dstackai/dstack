@@ -4,10 +4,10 @@ import subprocess
 import tempfile
 from asyncio import Lock
 from pathlib import Path
-from typing import Annotated, Dict, Literal, Optional, Union
 
 import jinja2
 from pydantic import AnyHttpUrl, BaseModel, Field
+from typing_extensions import Annotated, Dict, Literal, Optional, Union
 
 from dstack.gateway.common import run_async
 from dstack.gateway.errors import GatewayError

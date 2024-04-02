@@ -1,6 +1,5 @@
-from typing import List, Optional, Union
-
-from typing_extensions import Literal
+from pydantic.fields import Field
+from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
@@ -12,8 +11,8 @@ class LambdaConfigInfo(CoreModel):
 
 
 class LambdaAPIKeyCreds(CoreModel):
-    type: Literal["api_key"] = "api_key"
-    api_key: str
+    type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"
+    api_key: Annotated[str, Field(description="The API key")]
 
 
 AnyLambdaCreds = LambdaAPIKeyCreds

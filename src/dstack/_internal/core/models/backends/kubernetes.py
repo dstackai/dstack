@@ -1,13 +1,14 @@
-from typing import Optional, Union
-
-from typing_extensions import Literal
+from pydantic.fields import Field
+from typing_extensions import Annotated, Literal, Optional, Union
 
 from dstack._internal.core.models.common import CoreModel
 
 
 class KubernetesNetworkingConfig(CoreModel):
-    ssh_host: Optional[str]
-    ssh_port: Optional[int]
+    ssh_host: Annotated[Optional[str], Field(description="The external IP address of any node")]
+    ssh_port: Annotated[
+        Optional[str], Field(description="Any port accessible outside of the cluster")
+    ]
 
 
 class KubernetesConfigInfo(CoreModel):

@@ -1,7 +1,5 @@
-from typing import List, Optional, Union
-
 from pydantic import Field
-from typing_extensions import Literal
+from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.backends.base import ConfigElement, ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
@@ -15,15 +13,15 @@ class AzureConfigInfo(CoreModel):
 
 
 class AzureClientCreds(CoreModel):
-    type: Literal["client"] = "client"
-    client_id: str
-    client_secret: str
+    type: Annotated[Literal["client"], Field(description="The type of credentials")] = "client"
+    client_id: Annotated[str, Field(description="The client ID")]
+    client_secret: Annotated[str, Field(description="The client secret")]
     # if tenant_id is missing, it will be populated from config info
     tenant_id: Optional[str]
 
 
 class AzureDefaultCreds(CoreModel):
-    type: Literal["default"] = "default"
+    type: Annotated[Literal["default"], Field(description="The type of credentials")] = "default"
 
 
 AnyAzureCreds = Union[AzureClientCreds, AzureDefaultCreds]

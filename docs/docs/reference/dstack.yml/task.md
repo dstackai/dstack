@@ -91,7 +91,7 @@ commands:
       - python fine-tuning/qlora/train.py
     ```
 
-#### Required resources
+#### Resources { #_resources }
 
 If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
 range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
@@ -192,7 +192,7 @@ ports:
 
 </div>
 
-### Properties reference
+### Root reference
 
 #SCHEMA# dstack._internal.core.models.configurations.TaskConfiguration
     overrides:
@@ -200,15 +200,16 @@ ports:
       type:
         required: true
 
-### resources
+### `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
     overrides:
       show_root_heading: false
       type:
         required: true
+      item_id_prefix: resources-
 
-### gpu
+### `resouces.gpu` { #resources-gpu data-toc-label="resources.gpu" }
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
     overrides:
@@ -216,7 +217,7 @@ ports:
       type:
         required: true
 
-### disk
+### `resouces.disk` { #resources-disk data-toc-label="resources.disk" }
 
 #SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
     overrides:
@@ -224,7 +225,7 @@ ports:
       type:
         required: true
 
-### registry_auth
+### `registry_auth`
 
 #SCHEMA# dstack._internal.core.models.configurations.RegistryAuth
     overrides:

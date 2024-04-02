@@ -1,8 +1,7 @@
-from typing import Annotated, AsyncIterator
-
 from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from typing_extensions import Annotated, AsyncIterator
 
 from dstack.gateway.core.auth import AuthProvider, get_auth
 from dstack.gateway.openai.schemas import (

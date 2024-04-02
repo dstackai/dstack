@@ -1,7 +1,5 @@
-from typing import List, Optional, Union
-
 from pydantic import Field
-from typing_extensions import Literal
+from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
@@ -14,13 +12,15 @@ class AWSConfigInfo(CoreModel):
 
 
 class AWSAccessKeyCreds(CoreModel):
-    type: Literal["access_key"] = "access_key"
-    access_key: str
-    secret_key: str
+    type: Annotated[Literal["access_key"], Field(description="The type of credentials")] = (
+        "access_key"
+    )
+    access_key: Annotated[str, Field(description="The access key")]
+    secret_key: Annotated[str, Field(description="The secret key")]
 
 
 class AWSDefaultCreds(CoreModel):
-    type: Literal["default"] = "default"
+    type: Annotated[Literal["default"], Field(description="The type of credentials")] = "default"
 
 
 AnyAWSCreds = Union[AWSAccessKeyCreds, AWSDefaultCreds]
