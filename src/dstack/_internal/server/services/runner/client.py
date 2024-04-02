@@ -36,7 +36,7 @@ class RunnerClient:
         try:
             resp = requests.get(self._url("/api/healthcheck"))
             resp.raise_for_status()
-            return HealthcheckResponse.parse_obj(resp.json())
+            return HealthcheckResponse.__response__.parse_obj(resp.json())
         except requests.exceptions.RequestException:
             return None
 
@@ -74,7 +74,7 @@ class RunnerClient:
             self._url("/api/pull"), params={"timestamp": timestamp}, timeout=timeout
         )
         resp.raise_for_status()
-        return PullResponse.parse_obj(resp.json())
+        return PullResponse.__response__.parse_obj(resp.json())
 
     def stop(self):
         resp = requests.post(self._url("/api/stop"))
@@ -98,7 +98,7 @@ class ShimClient:
         try:
             resp = requests.get(self._url("/api/healthcheck"))
             resp.raise_for_status()
-            return HealthcheckResponse.parse_obj(resp.json())
+            return HealthcheckResponse.__response__.parse_obj(resp.json())
         except requests.exceptions.RequestException:
             if unmask_exeptions:
                 raise
@@ -134,7 +134,7 @@ class ShimClient:
     def pull(self) -> PullBody:
         resp = requests.get(self._url("/api/pull"))
         resp.raise_for_status()
-        return PullBody.parse_obj(resp.json())
+        return PullBody.__response__.parse_obj(resp.json())
 
     def _url(self, path: str) -> str:
         return f"{'https' if self.secure else 'http'}://{self.hostname}:{self.port}/{path.lstrip('/')}"
@@ -192,7 +192,7 @@ class AsyncRunnerClient:
             self._url("/api/pull"), params={"timestamp": timestamp}
         ) as resp:
             resp.raise_for_status()
-            return PullResponse.parse_obj(await resp.json())
+            return PullResponse.__response__.parse_obj(await resp.json())
 
     async def stop(self):
         async with self.session.post(self._url("/api/stop")) as resp:

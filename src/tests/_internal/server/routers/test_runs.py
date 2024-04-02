@@ -868,7 +868,6 @@ class TestCreateInstance:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         request = CreateInstanceRequest(
-            pool_name=DEFAULT_POOL_NAME,
             profile=Profile(name="test_profile"),
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
             ssh_key=SSHKey(public="test_public_key"),
@@ -929,7 +928,6 @@ class TestCreateInstance:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         request = CreateInstanceRequest(
-            pool_name=DEFAULT_POOL_NAME,
             profile=Profile(name="test_profile"),
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
             ssh_key=SSHKey(public="test_public_key"),
@@ -968,7 +966,6 @@ class TestCreateInstance:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         request = CreateInstanceRequest(
-            pool_name=DEFAULT_POOL_NAME,
             profile=Profile(name="test_profile"),
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
             ssh_key=SSHKey(public="test_public_key"),

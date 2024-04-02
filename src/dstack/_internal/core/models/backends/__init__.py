@@ -1,7 +1,5 @@
 from typing import Union
 
-from pydantic import BaseModel
-
 from dstack._internal.core.models.backends.aws import (
     AWSConfigInfo,
     AWSConfigInfoWithCreds,
@@ -67,6 +65,7 @@ from dstack._internal.core.models.backends.vastai import (
     VastAIConfigInfoWithCredsPartial,
     VastAIConfigValues,
 )
+from dstack._internal.core.models.common import CoreModel
 
 AnyConfigInfoWithoutCreds = Union[
     AWSConfigInfo,
@@ -126,6 +125,6 @@ AnyConfigValues = Union[
 ]
 
 
-class BackendInfo(BaseModel):
+class BackendInfo(CoreModel):
     name: str
     config: AnyConfigInfoWithoutCreds

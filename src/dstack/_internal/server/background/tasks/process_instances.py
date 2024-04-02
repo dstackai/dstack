@@ -5,7 +5,7 @@ from typing import Dict, Optional, Union
 from uuid import UUID
 
 import requests
-from pydantic import ValidationError, parse_raw_as
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
@@ -137,9 +137,9 @@ async def create_instance(instance_id: UUID) -> None:
             return
 
         try:
-            profile = Profile.parse_raw(instance.profile)
-            requirements = Requirements.parse_raw(instance.requirements)
-            instance_configuration = InstanceConfiguration.parse_raw(
+            profile = Profile.__response__.parse_raw(instance.profile)
+            requirements = Requirements.__response__.parse_raw(instance.requirements)
+            instance_configuration = InstanceConfiguration.__response__.parse_raw(
                 instance.instance_configuration
             )
         except ValidationError as e:
@@ -248,7 +248,9 @@ async def check_shim(instance_id: UUID) -> None:
                 .options(joinedload(InstanceModel.project))
             )
         ).one()
-        job_provisioning_data = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
+        job_provisioning_data = JobProvisioningData.__response__.parse_raw(
+            instance.job_provisioning_data
+        )
 
         # skip check vastai/k8s
         if not job_provisioning_data.dockerized:
@@ -341,7 +343,7 @@ async def terminate(instance_id: UUID) -> None:
             )
         ).one()
 
-        jpd = parse_raw_as(JobProvisioningData, instance.job_provisioning_data)
+        jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
         backends = await backends_services.get_project_backends(project=instance.project)
         backend = next((b for b in backends if b.TYPE == jpd.backend), None)
         if backend is None:
@@ -385,9 +387,7 @@ async def terminate_idle_instance() -> None:
             current_time = get_current_datetime().replace(tzinfo=datetime.timezone.utc)
 
             if last_time + delta < current_time:
-                jpd: JobProvisioningData = parse_raw_as(
-                    JobProvisioningData, instance.job_provisioning_data
-                )
+                jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
                 await terminate_job_provisioning_data_instance(
                     project=instance.project, job_provisioning_data=jpd
                 )

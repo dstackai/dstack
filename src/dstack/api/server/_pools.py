@@ -13,8 +13,7 @@ from dstack.api.server._group import APIClientGroup
 class PoolAPIClient(APIClientGroup):
     def list(self, project_name: str) -> List[Pool]:
         resp = self._request(f"/api/project/{project_name}/pool/list")
-        result: List[Pool] = parse_obj_as(List[Pool], resp.json())
-        return result
+        return parse_obj_as(List[Pool.__response__], resp.json())
 
     def delete(self, project_name: str, pool_name: str, force: bool) -> None:
         body = schemas_pools.DeletePoolRequest(name=pool_name, force=force)
@@ -27,8 +26,7 @@ class PoolAPIClient(APIClientGroup):
     def show(self, project_name: str, pool_name: Optional[str]) -> PoolInstances:
         body = schemas_pools.ShowPoolRequest(name=pool_name)
         resp = self._request(f"/api/project/{project_name}/pool/show", body=body.json())
-        pool: PoolInstances = parse_obj_as(PoolInstances, resp.json())
-        return pool
+        return parse_obj_as(PoolInstances.__response__, resp.json())
 
     def remove(self, project_name: str, pool_name: str, instance_name: str, force: bool) -> None:
         body = schemas_pools.RemoveInstanceRequest(

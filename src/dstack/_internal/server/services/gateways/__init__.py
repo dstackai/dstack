@@ -313,7 +313,7 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 
 
 async def register_service(session: AsyncSession, run_model: RunModel):
-    run_spec = RunSpec.parse_raw(run_model.run_spec)
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
     # TODO(egor-s): allow to configure gateway name
     gateway_name: Optional[str] = None

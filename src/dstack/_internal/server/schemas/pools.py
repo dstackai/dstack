@@ -1,26 +1,26 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from dstack._internal.core.models.common import CoreModel
 
 
-class DeletePoolRequest(BaseModel):
+class DeletePoolRequest(CoreModel):
     name: str
     force: bool
 
 
-class CreatePoolRequest(BaseModel):
+class CreatePoolRequest(CoreModel):
     name: str
 
 
-class ShowPoolRequest(BaseModel):
+class ShowPoolRequest(CoreModel):
     name: Optional[str]
 
 
-class RemoveInstanceRequest(BaseModel):
+class RemoveInstanceRequest(CoreModel):
     pool_name: str
     instance_name: str
     force: bool = False
 
 
-class SetDefaultPoolRequest(BaseModel):
+class SetDefaultPoolRequest(CoreModel):
     pool_name: str

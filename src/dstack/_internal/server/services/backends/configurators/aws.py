@@ -96,22 +96,22 @@ class AWSConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=AWSStoredConfig(**AWSConfigInfo.parse_obj(config).dict()).json(),
+            config=AWSStoredConfig(**AWSConfigInfo.__response__.parse_obj(config).dict()).json(),
             auth=AWSCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAWSConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return AWSConfigInfoWithCreds.parse_obj(config)
-        return AWSConfigInfo.parse_obj(config)
+            return AWSConfigInfoWithCreds.__response__.parse_obj(config)
+        return AWSConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> AWSBackend:
         config = self._get_backend_config(model)
         return AWSBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> AWSConfig:
-        return AWSConfig(
+        return AWSConfig.__response__(
             **json.loads(model.config),
             creds=AWSCreds.parse_raw(model.auth).__root__,
         )

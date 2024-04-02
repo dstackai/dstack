@@ -53,22 +53,24 @@ class DataCrunchConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=DataCrunchStoredConfig(**DataCrunchConfigInfo.parse_obj(config).dict()).json(),
+            config=DataCrunchStoredConfig(
+                **DataCrunchConfigInfo.__response__.parse_obj(config).dict()
+            ).json(),
             auth=DataCrunchCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyDataCrunchConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return DataCrunchConfigInfoWithCreds.parse_obj(config)
-        return DataCrunchConfigInfo.parse_obj(config)
+            return DataCrunchConfigInfoWithCreds.__response__.parse_obj(config)
+        return DataCrunchConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> DataCrunchBackend:
         config = self._get_backend_config(model)
         return DataCrunchBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> DataCrunchConfig:
-        return DataCrunchConfig(
+        return DataCrunchConfig.__response__(
             **json.loads(model.config),
             creds=DataCrunchCreds.parse_raw(model.auth),
         )

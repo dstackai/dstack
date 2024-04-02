@@ -262,7 +262,7 @@ async def get_run_plan(
     )
     pool_offers: List[InstanceOfferWithAvailability] = []
     for instance in pool_filtered_instances:
-        offer = InstanceOfferWithAvailability.parse_raw(instance.offer)
+        offer = InstanceOfferWithAvailability.__response__.parse_raw(instance.offer)
         offer.availability = InstanceAvailability.BUSY
         if instance.status == InstanceStatus.IDLE:
             offer.availability = InstanceAvailability.IDLE
@@ -622,13 +622,13 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
             submissions = []
             for job_model in job_submissions:
                 if job_spec is None:
-                    job_spec = JobSpec.parse_raw(job_model.job_spec_data)
+                    job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
                 if include_job_submissions:
                     submissions.append(job_model_to_job_submission(job_model))
             if job_spec is not None:
                 jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
 
-    run_spec = RunSpec.parse_raw(run_model.run_spec)
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
     latest_job_submission = None
     if include_job_submissions:
@@ -638,7 +638,7 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
 
     service_spec = None
     if run_model.service_spec is not None:
-        service_spec = ServiceSpec.parse_raw(run_model.service_spec)
+        service_spec = ServiceSpec.__response__.parse_raw(run_model.service_spec)
 
     run = Run(
         id=run_model.id,
@@ -791,7 +791,7 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
 
     # sort by importance (desc) and replica_num (asc)
     active_replicas.sort(key=lambda r: (-r[0], r[1]))
-    run_spec = RunSpec.parse_raw(run_model.run_spec)
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
     if replicas_diff < 0:
         if len(active_replicas) + replicas_diff < run_spec.configuration.replicas.min:
@@ -846,7 +846,10 @@ async def retry_run_replica_jobs(
 
         new_job_model = create_job_model_for_new_submission(
             run_model=run_model,
-            job=Job(job_spec=JobSpec.parse_raw(job_model.job_spec_data), job_submissions=[]),
+            job=Job(
+                job_spec=JobSpec.__response__.parse_raw(job_model.job_spec_data),
+                job_submissions=[],
+            ),
             status=JobStatus.SUBMITTED,
         )
         # dirty hack to avoid passing all job submissions

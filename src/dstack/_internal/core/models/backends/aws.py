@@ -1,32 +1,32 @@
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 
 
-class AWSConfigInfo(BaseModel):
+class AWSConfigInfo(CoreModel):
     type: Literal["aws"] = "aws"
     regions: Optional[List[str]] = None
     vpc_name: Optional[str] = None
 
 
-class AWSAccessKeyCreds(ForbidExtra):
+class AWSAccessKeyCreds(CoreModel):
     type: Literal["access_key"] = "access_key"
     access_key: str
     secret_key: str
 
 
-class AWSDefaultCreds(ForbidExtra):
+class AWSDefaultCreds(CoreModel):
     type: Literal["default"] = "default"
 
 
 AnyAWSCreds = Union[AWSAccessKeyCreds, AWSDefaultCreds]
 
 
-class AWSCreds(BaseModel):
+class AWSCreds(CoreModel):
     __root__: AnyAWSCreds = Field(..., discriminator="type")
 
 
@@ -37,13 +37,13 @@ class AWSConfigInfoWithCreds(AWSConfigInfo):
 AnyAWSConfigInfo = Union[AWSConfigInfo, AWSConfigInfoWithCreds]
 
 
-class AWSConfigInfoWithCredsPartial(BaseModel):
+class AWSConfigInfoWithCredsPartial(CoreModel):
     type: Literal["aws"] = "aws"
     creds: Optional[AnyAWSCreds]
     regions: Optional[List[str]]
 
 
-class AWSConfigValues(BaseModel):
+class AWSConfigValues(CoreModel):
     type: Literal["aws"] = "aws"
     default_creds: bool = False
     regions: Optional[ConfigMultiElement]

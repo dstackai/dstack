@@ -2,7 +2,6 @@ from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
 
-from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -279,7 +278,7 @@ def _process_provisioning_with_shim(
     Returns:
         is successful
     """
-    job_spec = parse_raw_as(JobSpec, job_model.job_spec_data)
+    job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
 
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
 

@@ -16,7 +16,7 @@ class SecretsAPIClient(APIClientGroup):
     def list(self, project_name: str, repo_id: str) -> List[Secret]:
         body = ListSecretsRequest(repo_id=repo_id)
         resp = self._request(f"/api/project/{project_name}/secrets/list", body=body.json())
-        return parse_obj_as(List[Secret], resp.json())
+        return parse_obj_as(List[Secret.__response__], resp.json())
 
     def get(self, project_name: str, repo_id: str, secret_name: str) -> Secret:
         raise NotImplementedError()
@@ -29,7 +29,7 @@ class SecretsAPIClient(APIClientGroup):
             repo_id=repo_id, secret=Secret(name=secret_name, value=secret_value)
         )
         resp = self._request(f"/api/project/{project_name}/secrets/add", body=body.json())
-        return parse_obj_as(Secret, resp.json())
+        return parse_obj_as(Secret.__response__, resp.json())
 
     def delete(self, project_name: str, repo_id: str, secrets_names: List[str]):
         body = DeleteSecretsRequest(repo_id=repo_id, secrets_names=secrets_names)

@@ -191,7 +191,7 @@ class GCPConfigurator(Configurator):
             project_id=project.id,
             type=self.TYPE.value,
             config=GCPStoredConfig(
-                **GCPConfigInfo.parse_obj(config).dict(),
+                **GCPConfigInfo.__response__.parse_obj(config).dict(),
                 service_account_email=service_account_email,
             ).json(),
             auth=GCPCreds.parse_obj(config.creds).json(),
@@ -200,15 +200,15 @@ class GCPConfigurator(Configurator):
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyGCPConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return GCPConfigInfoWithCreds.parse_obj(config)
-        return GCPConfigInfo.parse_obj(config)
+            return GCPConfigInfoWithCreds.__response__.parse_obj(config)
+        return GCPConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> GCPBackend:
         config = self._get_backend_config(model)
         return GCPBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> GCPConfig:
-        return GCPConfig(
+        return GCPConfig.__response__(
             **json.loads(model.config),
             creds=GCPCreds.parse_raw(model.auth).__root__,
         )

@@ -58,15 +58,15 @@ class CudoConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=CudoStoredConfig(**CudoConfigInfo.parse_obj(config).dict()).json(),
+            config=CudoStoredConfig(**CudoConfigInfo.__response__.parse_obj(config).dict()).json(),
             auth=CudoCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> CudoConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return CudoConfigInfoWithCreds.parse_obj(config)
-        return CudoConfigInfo.parse_obj(config)
+            return CudoConfigInfoWithCreds.__response__.parse_obj(config)
+        return CudoConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> Backend:
         config = self._get_backend_config(model)
@@ -79,7 +79,7 @@ class CudoConfigurator(Configurator):
         return element
 
     def _get_backend_config(self, model: BackendModel) -> CudoConfig:
-        return CudoConfig(
+        return CudoConfig.__response__(
             **json.loads(model.config),
             creds=CudoCreds.parse_raw(model.auth),
         )

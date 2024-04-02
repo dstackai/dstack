@@ -3,7 +3,6 @@ from datetime import timezone
 from typing import Dict, List, Optional
 
 import gpuhunt
-from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -208,13 +207,13 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     )
 
     if instance_model.offer is not None:
-        offer = InstanceOfferWithAvailability.parse_raw(instance_model.offer)
+        offer = InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
         instance.backend = offer.backend
         instance.region = offer.region
         instance.price = offer.price
 
     if instance_model.job_provisioning_data is not None:
-        jpd = JobProvisioningData.parse_raw(instance_model.job_provisioning_data)
+        jpd = JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
 
@@ -345,7 +344,8 @@ def filter_pool_instances(
 
     query_filter = requirements_to_query_filter(requirements)
     for instance in candidates:
-        catalog_item = offer_to_catalog_item(parse_raw_as(InstanceOffer, instance.offer))
+        offer = InstanceOffer.__response__.parse_raw(instance.offer)
+        catalog_item = offer_to_catalog_item(offer)
         if gpuhunt.matches(catalog_item, query_filter):
             instances.append(instance)
     return instances

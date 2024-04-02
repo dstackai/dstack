@@ -2,10 +2,11 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import UUID4, BaseModel, Field
+from pydantic import UUID4, Field
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import AnyRunConfiguration, RegistryAuth
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -19,7 +20,7 @@ from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.common import pretty_resources
 
 
-class AppSpec(BaseModel):
+class AppSpec(CoreModel):
     port: int
     map_to_port: Optional[int]
     app_name: str
@@ -46,7 +47,7 @@ class JobStatus(str, Enum):
         return self in self.finished_statuses()
 
 
-class RetryPolicy(BaseModel):
+class RetryPolicy(CoreModel):
     retry: bool
     limit: Optional[int]
 
@@ -117,7 +118,7 @@ class JobTerminationReason(str, Enum):
         return " ".join(self.value.split("_")).capitalize()
 
 
-class Requirements(BaseModel):
+class Requirements(CoreModel):
     # TODO: Make requirements' fields required
     resources: ResourcesSpec
     max_price: Optional[float]
@@ -145,7 +146,7 @@ class Requirements(BaseModel):
         return res
 
 
-class Gateway(BaseModel):
+class Gateway(CoreModel):
     gateway_name: Optional[str]
     service_port: int
     hostname: Optional[str]
@@ -156,7 +157,7 @@ class Gateway(BaseModel):
     options: dict = {}
 
 
-class JobSpec(BaseModel):
+class JobSpec(CoreModel):
     replica_num: int = 0  # default value for backward compatibility
     job_num: int
     job_name: str
@@ -172,7 +173,7 @@ class JobSpec(BaseModel):
     working_dir: str
 
 
-class JobProvisioningData(BaseModel):
+class JobProvisioningData(CoreModel):
     backend: BackendType
     instance_type: InstanceType
     instance_id: str
@@ -186,7 +187,7 @@ class JobProvisioningData(BaseModel):
     backend_data: Optional[str]  # backend-specific data in json
 
 
-class JobSubmission(BaseModel):
+class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
     submitted_at: datetime
@@ -207,12 +208,12 @@ class JobSubmission(BaseModel):
         return end_time - self.submitted_at
 
 
-class Job(BaseModel):
+class Job(CoreModel):
     job_spec: JobSpec
     job_submissions: List[JobSubmission]
 
 
-class RunSpec(BaseModel):
+class RunSpec(CoreModel):
     run_name: Optional[str]
     repo_id: str
     repo_data: Annotated[AnyRunRepoData, Field(discriminator="repo_type")]
@@ -224,13 +225,13 @@ class RunSpec(BaseModel):
     ssh_key_pub: str
 
 
-class ServiceModelSpec(BaseModel):
+class ServiceModelSpec(CoreModel):
     name: str
     base_url: str
     type: str
 
 
-class ServiceSpec(BaseModel):
+class ServiceSpec(CoreModel):
     url: str
     model: Optional[ServiceModelSpec] = None
     options: Dict[str, Any] = {}
@@ -254,7 +255,7 @@ class RunStatus(str, Enum):
         return self in self.finished_statuses()
 
 
-class Run(BaseModel):
+class Run(CoreModel):
     id: UUID4
     project_name: str
     user: str
@@ -268,21 +269,21 @@ class Run(BaseModel):
     service: Optional[ServiceSpec] = None
 
 
-class JobPlan(BaseModel):
+class JobPlan(CoreModel):
     job_spec: JobSpec
     offers: List[InstanceOfferWithAvailability]
     total_offers: int
     max_price: Optional[float]
 
 
-class RunPlan(BaseModel):
+class RunPlan(CoreModel):
     project_name: str
     user: str
     run_spec: RunSpec
     job_plans: List[JobPlan]
 
 
-class PoolInstanceOffers(BaseModel):
+class PoolInstanceOffers(CoreModel):
     pool_name: str
     instances: List[InstanceOfferWithAvailability]
 

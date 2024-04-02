@@ -1,17 +1,18 @@
 from typing import List
 
-from pydantic import BaseModel
 from typing_extensions import Literal
 
+from dstack._internal.core.models.common import CoreModel
 
-class DstackConfigInfo(BaseModel):
+
+class DstackConfigInfo(CoreModel):
     type: Literal["dstack"] = "dstack"
     base_backends: List[str]
 
 
-class DstackBaseBackendConfigInfo(BaseModel):
+class DstackBaseBackendConfigInfo(CoreModel):
     type: str
 
 
-class DstackConfigValues(BaseModel):
+class DstackConfigValues(CoreModel):
     type: Literal["dstack"] = "dstack"

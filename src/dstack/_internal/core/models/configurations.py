@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, ValidationError, conint, constr, root_val
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import Duration, ForbidExtra
+from dstack._internal.core.models.common import CoreModel, Duration
 from dstack._internal.core.models.gateways import AnyModel
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
@@ -30,7 +30,7 @@ class PythonVersion(str, Enum):
     PY312 = "3.12"
 
 
-class RegistryAuth(ForbidExtra):
+class RegistryAuth(CoreModel):
     """
     Credentials for pulling a private Docker image.
 
@@ -43,7 +43,7 @@ class RegistryAuth(ForbidExtra):
     password: Annotated[str, Field(description="The password or access token")]
 
 
-class PortMapping(ForbidExtra):
+class PortMapping(CoreModel):
     local_port: Optional[ValidPort] = None
     container_port: ValidPort
 
@@ -68,7 +68,7 @@ class PortMapping(ForbidExtra):
         return PortMapping(local_port=local_port, container_port=int(container_port))
 
 
-class Artifact(ForbidExtra):
+class Artifact(CoreModel):
     path: Annotated[
         str, Field(description="The path to the folder that must be stored as an output artifact")
     ]
@@ -80,7 +80,7 @@ class Artifact(ForbidExtra):
     ] = False
 
 
-class ScalingSpec(ForbidExtra):
+class ScalingSpec(CoreModel):
     metric: Annotated[Literal["rps"], Field(description="The target metric to track")]
     target: Annotated[float, Field(description="The target value of the metric")]
     scale_up_delay: Annotated[
@@ -91,7 +91,7 @@ class ScalingSpec(ForbidExtra):
     ] = Duration.parse("10m")
 
 
-class EnvSentinel(ForbidExtra):
+class EnvSentinel(CoreModel):
     key: str
 
     def from_env(self, env: Mapping[str, str]) -> str:
@@ -103,7 +103,7 @@ class EnvSentinel(ForbidExtra):
         return f"EnvSentinel({self.key})"
 
 
-class BaseConfiguration(ForbidExtra):
+class BaseConfiguration(CoreModel):
     type: Literal["none"]
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]

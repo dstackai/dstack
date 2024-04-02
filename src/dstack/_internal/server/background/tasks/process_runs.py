@@ -177,7 +177,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
     Run is submitted, provisioning, or running.
     We handle fails, scaling, and status changes.
     """
-    run_spec = RunSpec.parse_raw(run_model.run_spec)
+    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
     retry_policy = run_spec.profile.retry_policy or ProfileRetryPolicy()
     retry_single_job = can_retry_single_job(run_spec)
 
@@ -321,7 +321,7 @@ async def is_retry_enabled(
     # retry for spot instances only
     if retry_policy.retry and job.termination_reason in JOB_TERMINATION_REASONS_TO_RETRY:
         instance = await session.get(InstanceModel, job.used_instance_id)
-        instance_offer = InstanceOffer.parse_raw(instance.offer)
+        instance_offer = InstanceOffer.__response__.parse_raw(instance.offer)
         if instance_offer.instance.resources.spot:
             return True
 

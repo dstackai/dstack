@@ -1,7 +1,7 @@
 import enum
 from typing import List, Optional
 
-from pydantic import BaseModel
+from dstack._internal.core.models.common import CoreModel
 
 
 class BackendType(str, enum.Enum):
@@ -34,16 +34,16 @@ class BackendType(str, enum.Enum):
     VASTAI = "vastai"
 
 
-class ConfigElementValue(BaseModel):
+class ConfigElementValue(CoreModel):
     value: str
     label: str
 
 
-class ConfigElement(BaseModel):
+class ConfigElement(CoreModel):
     selected: Optional[str] = None
     values: List[ConfigElementValue] = []
 
 
-class ConfigMultiElement(BaseModel):
+class ConfigMultiElement(CoreModel):
     selected: List[str] = []
     values: List[ConfigElementValue] = []
