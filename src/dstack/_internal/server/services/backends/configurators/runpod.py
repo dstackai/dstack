@@ -67,8 +67,8 @@ class RunpodConfigurator(Configurator):
     def get_config_info(self, model: BackendModel, include_creds: bool) -> RunpodConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return RunpodConfigInfoWithCreds.parse_obj(config)
-        return RunpodConfigInfo.parse_obj(config)
+            return RunpodConfigInfoWithCreds.__response__.parse_obj(config)
+        return RunpodConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> Backend:
         config = self._get_backend_config(model)
