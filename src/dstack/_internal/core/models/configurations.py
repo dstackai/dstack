@@ -1,6 +1,6 @@
 import re
 from enum import Enum
-from typing import Dict, List, Mapping, Optional, Union
+from typing import Any, Dict, List, Mapping, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
@@ -233,7 +233,10 @@ class ServiceConfiguration(BaseConfiguration):
         Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
     ] = None
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
-    replicas: Annotated[Range[int], Field(description="The range ")] = Range[int](min=1, max=1)
+    replicas: Annotated[
+        Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],
+        Field(description="The range "),
+    ] = Range[int](min=1, max=1)
     scaling: Annotated[
         Optional[ScalingSpec], Field(description="The auto-scaling configuration")
     ] = None
@@ -247,15 +250,20 @@ class ServiceConfiguration(BaseConfiguration):
         return v
 
     @validator("replicas")
-    def convert_replicas(cls, v: Range[int]) -> Range[int]:
+    def convert_replicas(cls, v: Any) -> Range[int]:
+        if isinstance(v, str) and ".." in v:
+            min, max = v.replace(" ", "").split("..")
+            v = Range(min=min or 0, max=max or None)
+        elif isinstance(v, (int, float)):
+            v = Range(min=v, max=v)
         if v.max is None:
-            raise ValueError("The maximum number of replicas must be set")
-        if v.max < 1:
-            raise ValueError("The maximum number of replicas must be greater than 0")
-        if v.min is None:
-            v.min = 0
-        elif v.min < 0:
-            raise ValueError("The minimum number of replicas must be greater or equal than 0")
+            raise ValueError("The maximum number of replicas is required")
+        if v.min < 0:
+            raise ValueError("The minimum number of replicas must be greater than or equal to 0")
+        if v.max < v.min:
+            raise ValueError(
+                "The maximum number of replicas must be greater than or equal to the minium number of replicas"
+            )
         return v
 
     @root_validator()
@@ -263,9 +271,9 @@ class ServiceConfiguration(BaseConfiguration):
         scaling = values.get("scaling")
         replicas = values.get("replicas")
         if replicas.min != replicas.max and not scaling:
-            raise ValueError("Auto-scaling must be defined for a range of replicas")
+            raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
         if replicas.min == replicas.max and scaling:
-            raise ValueError("Can't perform auto-scaling for a fixed number of replicas")
+            raise ValueError("To use `scaling`, `replicas` must be set to a range.")
         return values
 
 
