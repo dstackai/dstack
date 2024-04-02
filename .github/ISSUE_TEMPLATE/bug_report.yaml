@@ -15,15 +15,11 @@ body:
     attributes:
       label: Expected behaviour
       description: Specify the expected behavior.
-    validations:
-      required: true
   - type: textarea
     id: actual-behaviour
     attributes:
       label: Actual behaviour
       description: Specify the actual behavior (along with complete outputs, detailed screenshots, etc.).
-    validations:
-      required: true
   - type: input
     id: dstack-version
     attributes:

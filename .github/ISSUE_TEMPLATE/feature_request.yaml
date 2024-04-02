@@ -15,8 +15,6 @@ body:
     attributes:
       label: Solution
       description: What solution or enhancement would you propose to solve the problem?
-    validations:
-      required: true
   - type: textarea
     id: alternatives
     attributes:
