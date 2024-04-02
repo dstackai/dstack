@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from dstack._internal import settings
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import get_instance_name
+from dstack._internal.core.backends.base.compute import get_dstack_runner_version, get_instance_name
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
 from dstack._internal.core.errors import BackendError
@@ -126,9 +126,9 @@ def get_docker_args(authorized_keys):
     rm_rf = "rm -rf /etc/ssh/ssh_host_*"
     ssh_key_gen = "ssh-keygen -A > /dev/null"
     runner = "/usr/local/bin/dstack-runner"
-    build = "latest"
-    bucket = "dstack-runner-downloads-stgn"
 
+    build = get_dstack_runner_version()
+    bucket = "dstack-runner-downloads-stgn"
     if settings.DSTACK_VERSION is not None:
         bucket = "dstack-runner-downloads"
     url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
