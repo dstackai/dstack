@@ -261,8 +261,9 @@ class PoolCommand(APIBaseCommand):
         with console.status("Getting instances..."):
             pool_offers = self.api.runs.get_offers(profile, requirements)
 
+        profile.pool_name = pool_offers.pool_name
+
         print_offers_table(
-            pool_name=pool_offers.pool_name,
             profile=profile,
             requirements=requirements,
             instance_offers=pool_offers.instances,
@@ -283,9 +284,7 @@ class PoolCommand(APIBaseCommand):
             with console.status("Creating instance..."):
                 # TODO: Instance name is not passed, so --instance does not work.
                 # There is profile.instance_name but it makes sense for `dstack run` only.
-                instance = self.api.runs.create_instance(
-                    pool_offers.pool_name, profile, requirements, pub_key
-                )
+                instance = self.api.runs.create_instance(profile, requirements, pub_key)
         except ServerClientError as e:
             raise CLIError(e.msg)
         console.print()
@@ -336,22 +335,20 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
     table.add_column("CREATED")
 
     for instance in instances:
-        status = instance.status.value
-
-        if instance.status in (InstanceStatus.STARTING, InstanceStatus.CREATING):
-            status = InstanceStatus.PROVISIONING.value
-
-        if instance.status == InstanceStatus.READY:
-            status = InstanceStatus.IDLE.value
+        resources = ""
+        spot = ""
+        if instance.instance_type is not None:
+            resources = instance.instance_type.resources.pretty_format()
+            spot = "yes" if instance.instance_type.resources.spot else "no"
 
         row = [
             instance.name,
-            instance.backend,
-            instance.region,
-            instance.instance_type.resources.pretty_format(),
-            "yes" if instance.instance_type.resources.spot else "no",
-            f"${instance.price:.4}",
-            status,
+            instance.backend or "",
+            instance.region or "",
+            resources,
+            spot,
+            f"${instance.price:.4}" if instance.price is not None else "",
+            instance.status.value,
             pretty_date(instance.created),
         ]
         table.add_row(*row)
@@ -360,7 +357,6 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
 
 
 def print_offers_table(
-    pool_name: str,
     profile: Profile,
     requirements: Requirements,
     instance_offers: Sequence[InstanceOfferWithAvailability],
@@ -368,7 +364,6 @@ def print_offers_table(
 ) -> None:
     pretty_req = requirements.pretty_format(resources_only=True)
     max_price = f"${requirements.max_price:g}" if requirements.max_price else "-"
-    creation_policy = profile.creation_policy
     termination_policy = profile.termination_policy
     termination_idle_time = f"{parse_duration(profile.termination_idle_time)}s"
 
@@ -386,11 +381,10 @@ def print_offers_table(
     props.add_column(no_wrap=True)  # key
     props.add_column()  # value
 
-    props.add_row(th("Pool name"), pool_name)
+    props.add_row(th("Pool name"), profile.pool_name)
     props.add_row(th("Min resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Creation policy"), creation_policy)
     props.add_row(th("Termination policy"), termination_policy)
     props.add_row(th("Termination idle time"), termination_idle_time)
 

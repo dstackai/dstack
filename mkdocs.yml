@@ -64,14 +64,18 @@ plugins:
       blog_toc: true
   - blog:
       blog_dir: blog
-  - social:
-      cards_layout_options:
-        background_color: "black"
-        color: "#FFFFFF"
-        font_family: Roboto
+      post_url_format: "{slug}"
+      blog_toc: true
+#  0.17.0 workaround
+#  see https://github.com/squidfunk/mkdocs-material/issues/6983
+#  - social:
+#      cards_layout_options:
+#        background_color: "black"
+#        color: "#FFFFFF"
+#        font_family: "Roboto"
 #      debug: true
-      cards_layout_dir: layouts
-      cards_layout: custom
+#      cards_layout_dir: layouts
+#      cards_layout: custom
   - search
   - redirects:
       redirect_maps:
@@ -217,5 +221,7 @@ nav:
         - Mixtral 8x7B: examples/mixtral.md
   - Changelog:
       - changelog/index.md
+  - Blog:
+      - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd
   - GitHub: https://github.com/dstackai/dstack

@@ -115,6 +115,8 @@ class RunCommand(APIBaseCommand):
                     repo=repo,
                     configuration_path=configuration_path,
                     backends=profile.backends,
+                    regions=profile.regions,
+                    instance_types=profile.instance_types,
                     spot_policy=profile.spot_policy,  # pass profile piece by piece
                     retry_policy=profile.retry_policy,
                     max_duration=profile.max_duration,
@@ -162,8 +164,12 @@ class RunCommand(APIBaseCommand):
                     RunStatus.PENDING,
                     RunStatus.PROVISIONING,
                 ):
+                    job_statuses = "\n".join(
+                        f"  - {job.job_spec.job_name} [secondary]({job.job_submissions[-1].status.value})[/]"
+                        for job in run._run.jobs
+                    )
                     status.update(
-                        f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]"
+                        f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]\n{job_statuses}"
                     )
                     time.sleep(5)
                     run.refresh()

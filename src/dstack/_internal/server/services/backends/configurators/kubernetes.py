@@ -60,4 +60,4 @@ class KubernetesConfigurator(Configurator):
         return KubernetesBackend(self._get_backend_config(model))
 
     def _get_backend_config(self, model: BackendModel) -> KubernetesConfig:
-        return KubernetesConfig.parse_raw(model.config)
+        return KubernetesConfig.__response__.parse_raw(model.config)

@@ -10,6 +10,7 @@ from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
 from dstack._internal.core.models.backends.aws import AnyAWSCreds
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.backends.cudo import AnyCudoCreds
 from dstack._internal.core.models.backends.datacrunch import AnyDataCrunchCreds
 from dstack._internal.core.models.backends.kubernetes import KubernetesNetworkingConfig
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
@@ -17,7 +18,7 @@ from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.backends.vastai import AnyVastAICreds
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.server import settings
-from dstack._internal.server.models import ProjectModel
+from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.utils.common import run_async
@@ -39,6 +40,13 @@ class AzureConfig(CoreModel):
     subscription_id: str
     regions: Optional[List[str]] = None
     creds: AnyAzureCreds = Field(..., discriminator="type")
+
+
+class CudoConfig(CoreModel):
+    type: Literal["cudo"] = "cudo"
+    regions: Optional[List[str]] = None
+    creds: AnyCudoCreds
+    project_id: str
 
 
 class DataCrunchConfig(CoreModel):
@@ -134,6 +142,7 @@ class DstackConfig(CoreModel):
 AnyBackendConfig = Union[
     AWSConfig,
     AzureConfig,
+    CudoConfig,
     DataCrunchConfig,
     GCPConfig,
     KubernetesConfig,
@@ -172,14 +181,21 @@ class ServerConfigManager:
         if self.config is not None:
             self._save_config(self.config)
 
-    async def apply_config(self, session: AsyncSession):
+    async def apply_config(self, session: AsyncSession, owner: UserModel):
         if self.config is None:
             raise ValueError("Config is not loaded")
         for project_config in self.config.projects:
-            project = await projects_services.get_project_model_by_name_or_error(
+            project = await projects_services.get_project_model_by_name(
                 session=session,
                 project_name=project_config.name,
             )
+            if not project:
+                await projects_services.create_project_model(
+                    session=session, owner=owner, project_name=project_config.name
+                )
+                project = await projects_services.get_project_model_by_name_or_error(
+                    session=session, project_name=project_config.name
+                )
             backends_to_delete = backends_services.list_available_backend_types()
             for backend_config in project_config.backends:
                 config_info = _config_to_internal_config(backend_config)

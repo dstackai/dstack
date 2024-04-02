@@ -5,7 +5,7 @@ Pools simplify managing the lifecycle of cloud instances and enable their effici
 You can have instances provisioned in the configured backend automatically when you run a workload, or add them
 manually, configuring the required resources, idle duration, etc.
 
-## Adding instances
+## Add instances
 
 ### `dstack run`
 
@@ -52,7 +52,7 @@ For more details on policies and their defaults, refer to [`.dstack/profiles.yml
 ??? info "Limitations"
     The `dstack pool add` command is not supported for Kubernetes, and VastAI backends yet.
 
-## Removing instances
+## Remove instances
 
 !!! info "Idle duration"
     If the instance remains idle for the configured duration, `dstack` removes it and deletes all cloud resources.
@@ -69,7 +69,7 @@ $ dstack pool remove &lt;instance name&gt;
 
 </div>
 
-## Listing instances 
+## List instances 
 
 The [`dstack pool ps`](../reference/cli/index.md#dstack-pool-ps) command lists active instances and their status (`busy`
 or `idle`).

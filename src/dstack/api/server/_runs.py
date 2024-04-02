@@ -66,13 +66,10 @@ class RunsAPIClient(APIClientGroup):
     def create_instance(
         self,
         project_name: str,
-        pool_name: str,
         profile: Profile,
         requirements: Requirements,
         ssh_key: SSHKey,
     ) -> Instance:
-        body = CreateInstanceRequest(
-            pool_name=pool_name, profile=profile, requirements=requirements, ssh_key=ssh_key
-        )
+        body = CreateInstanceRequest(profile=profile, requirements=requirements, ssh_key=ssh_key)
         resp = self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
         return parse_obj_as(Instance.__response__, resp.json())

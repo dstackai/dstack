@@ -1,9 +1,10 @@
 package shim
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -19,8 +20,23 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/dstackai/dstack/runner/consts"
+	bytesize "github.com/inhies/go-bytesize"
 	"github.com/ztrue/tracerr"
 )
+
+// TODO: Allow for configuration via cli arguments or environment variables.
+const ImagePullTimeout time.Duration = 20 * time.Minute
+
+type ContainerStatus struct {
+	ContainerID   string
+	ContainerName string
+	Status        string
+	Running       bool
+	OOMKilled     bool
+	Dead          bool
+	ExitCode      int
+	Error         string
+}
 
 type DockerRunner struct {
 	client           *docker.Client
@@ -28,7 +44,9 @@ type DockerRunner struct {
 	currentContainer string
 	state            RunnerStatus
 
-	cancelRun context.CancelFunc
+	cancelPull context.CancelFunc
+
+	containerStatus ContainerStatus
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -48,16 +66,21 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	var err error
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	d.containerStatus = ContainerStatus{
+		ContainerName: cfg.ContainerName,
+	}
 
-	d.cancelRun = cancel
+	pullCtx, cancel := context.WithTimeout(ctx, ImagePullTimeout)
 	defer cancel()
+	d.cancelPull = cancel
 
 	log.Println("Pulling image")
 	d.state = Pulling
-	if err = pullImage(ctx, d.client, cfg); err != nil {
+	if err = pullImage(pullCtx, d.client, cfg); err != nil {
 		d.state = Pending
-		fmt.Printf("pullImage error: %s\n", err.Error())
+		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
+		d.containerStatus.Error = errMessage
+		log.Print(errMessage + "\n")
 		return err
 	}
 
@@ -66,11 +89,11 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	containerID, err := createContainer(ctx, d.client, d.dockerParams, cfg)
 	if err != nil {
 		d.state = Pending
-		fmt.Printf("createContainer error: %s\n", err.Error())
+		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
+		d.containerStatus.Error = errMessage
+		log.Print(errMessage + "\n")
 		return err
 	}
-
-	d.currentContainer = containerID
 
 	if !d.dockerParams.DockerKeepContainer() {
 		defer func() {
@@ -83,27 +106,30 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	}
 
 	log.Printf("Running container, id=%s\n", containerID)
+	d.containerStatus, _ = inspectContainer(d.client, containerID)
 	d.state = Running
+	d.currentContainer = containerID
+
 	if err = runContainer(ctx, d.client, containerID); err != nil {
+		log.Printf("runContainer error: %s\n", err.Error())
 		d.state = Pending
-		fmt.Printf("runContainer error: %s\n", err.Error())
+		d.containerStatus, _ = inspectContainer(d.client, containerID)
+		d.currentContainer = ""
 		return err
 	}
 
 	log.Printf("Container finished successfully, id=%s\n", containerID)
-
-	d.currentContainer = ""
+	d.containerStatus, _ = inspectContainer(d.client, containerID)
 	d.state = Pending
+	d.currentContainer = ""
 	return nil
 }
 
 func (d *DockerRunner) Stop(force bool) {
-	if d.currentContainer == "" && d.state == Pulling {
-		d.cancelRun()
+	if d.state == Pulling && d.currentContainer == "" {
+		d.cancelPull()
 		return
 	}
-
-	ctx := context.Background()
 
 	stopOptions := container.StopOptions{}
 	if force {
@@ -111,14 +137,14 @@ func (d *DockerRunner) Stop(force bool) {
 		stopOptions.Timeout = &timeout
 	}
 
-	err := d.client.ContainerStop(ctx, d.currentContainer, stopOptions)
+	err := d.client.ContainerStop(context.Background(), d.currentContainer, stopOptions)
 	if err != nil {
 		log.Printf("Failed to stop container: %s", err)
 	}
 }
 
-func (d DockerRunner) GetState() RunnerStatus {
-	return d.state
+func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus) {
+	return d.state, d.containerStatus
 }
 
 func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerImageConfig) error {
@@ -143,25 +169,83 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 		opts.RegistryAuth = regAuth
 	}
 
-	reader, err := client.ImagePull(ctx, taskParams.ImageName, opts) // todo test registry auth
+	startTime := time.Now()
+	reader, err := client.ImagePull(ctx, taskParams.ImageName, opts)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 	defer func() { _ = reader.Close() }()
 
-	_, err = io.Copy(io.Discard, reader)
-	if err != nil {
-		return tracerr.Wrap(err)
+	current := make(map[string]uint)
+	total := make(map[string]uint)
+
+	type ProgressDetail struct {
+		Current uint `json:"current"`
+		Total   uint `json:"total"`
+	}
+	type Progress struct {
+		Id             string         `json:"id"`
+		Status         string         `json:"status"`
+		ProgressDetail ProgressDetail `json:"progressDetail"` //nolint:tagliatelle
 	}
 
-	// {"status":"Pulling from clickhouse/clickhouse-server","id":"latest"}
-	// {"status":"Digest: sha256:2ff5796c67e8d588273a5f3f84184b9cdaa39a324bcf74abd3652d818d755f8c"}
-	// {"status":"Status: Downloaded newer image for clickhouse/clickhouse-server:latest"}
+	var status bool
 
-	return nil
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		var progressRow Progress
+		if err := json.Unmarshal(line, &progressRow); err != nil {
+			continue
+		}
+		if progressRow.Status == "Downloading" {
+			current[progressRow.Id] = progressRow.ProgressDetail.Current
+			total[progressRow.Id] = progressRow.ProgressDetail.Total
+		}
+		if progressRow.Status == "Download complete" {
+			current[progressRow.Id] = total[progressRow.Id]
+		}
+		if strings.HasPrefix(progressRow.Status, "Status:") {
+			status = true
+			log.Println(progressRow.Status)
+		}
+	}
+
+	duration := time.Since(startTime)
+
+	var currentBytes uint
+	var totalBytes uint
+	for _, v := range current {
+		currentBytes += v
+	}
+	for _, v := range total {
+		totalBytes += v
+	}
+
+	speed := bytesize.New(float64(currentBytes) / duration.Seconds())
+	if status && currentBytes == totalBytes {
+		log.Printf("Image Pull successfully downloaded: %d bytes (%s/s)", currentBytes, speed)
+	} else {
+		log.Printf("Image Pull interrupted: downloaded %d bytes out of %d (%s/s)", currentBytes, totalBytes, speed)
+	}
+
+	return ctx.Err()
 }
 
 func createContainer(ctx context.Context, client docker.APIClient, dockerParams DockerParameters, taskParams DockerImageConfig) (string, error) {
+	timeout := int(0)
+	stopOptions := container.StopOptions{Timeout: &timeout}
+	err := client.ContainerStop(ctx, taskParams.ContainerName, stopOptions)
+	if err != nil {
+		log.Printf("Unable to stop the container: %s", err)
+	}
+
+	removeOptions := types.ContainerRemoveOptions{Force: true}
+	err = client.ContainerRemove(ctx, taskParams.ContainerName, removeOptions)
+	if err != nil {
+		log.Printf("Unable to remove the container: %s", err)
+	}
+
 	gpuRequest, err := requestGpuIfAvailable(ctx, client)
 	if err != nil {
 		return "", tracerr.Wrap(err)
@@ -185,9 +269,10 @@ func createContainer(ctx context.Context, client docker.APIClient, dockerParams 
 		Resources: container.Resources{
 			DeviceRequests: gpuRequest,
 		},
-		Mounts: mounts,
+		Mounts:  mounts,
+		ShmSize: taskParams.ShmSize,
 	}
-	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, "")
+	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskParams.ContainerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -312,4 +397,23 @@ func (c CLIArgs) DockerMounts() ([]mount.Mount, error) {
 
 func (c CLIArgs) DockerPorts() []int {
 	return []int{c.Runner.HTTPPort, c.Docker.SSHPort}
+}
+
+func inspectContainer(client *docker.Client, containerID string) (ContainerStatus, error) {
+	inspection, err := client.ContainerInspect(context.Background(), containerID)
+	if err != nil {
+		s := ContainerStatus{}
+		return s, err
+	}
+	containerStatus := ContainerStatus{
+		ContainerID:   containerID,
+		ContainerName: strings.TrimLeft(inspection.Name, "/"),
+		Status:        inspection.State.Status,
+		Running:       inspection.State.Running,
+		OOMKilled:     inspection.State.OOMKilled,
+		Dead:          inspection.State.Dead,
+		ExitCode:      inspection.State.ExitCode,
+		Error:         inspection.State.Error,
+	}
+	return containerStatus, nil
 }

@@ -208,7 +208,7 @@ class GCPConfigurator(Configurator):
         return GCPBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> GCPConfig:
-        return GCPConfig(
+        return GCPConfig.__response__(
             **json.loads(model.config),
             creds=GCPCreds.parse_raw(model.auth).__root__,
         )

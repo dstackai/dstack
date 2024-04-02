@@ -243,9 +243,9 @@ class DiskSpecSchema(CoreModel):
 
 
 class ResourcesSpecSchema(CoreModel):
-    cpu: Annotated[
-        Optional[IntRangeLike], Field(description="The number of CPU cores")
-    ] = DEFAULT_CPU_COUNT
+    cpu: Annotated[Optional[IntRangeLike], Field(description="The number of CPU cores")] = (
+        DEFAULT_CPU_COUNT
+    )
     memory: Annotated[
         Optional[MemoryRangeLike],
         Field(description="The RAM size (e.g., 8GB)"),

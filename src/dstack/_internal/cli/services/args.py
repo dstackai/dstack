@@ -1,21 +1,25 @@
 import re
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Union
 
 from pydantic import parse_obj_as
 
 from dstack._internal.core.models import resources as resources
-from dstack._internal.core.models.configurations import PortMapping
+from dstack._internal.core.models.configurations import EnvSentinel, PortMapping
 
 
 def gpu_spec(v: str) -> Dict:
     return resources.GPUSpec.parse(v)
 
 
-def env_var(v: str) -> Tuple[str, str]:
-    r = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$", v)
+def env_var(v: str) -> Tuple[str, Union[str, EnvSentinel]]:
+    r = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)(=.*$|$)", v)
     if r is None:
         raise ValueError(v)
-    key, value = r.groups()
+    if "=" in v:
+        key, value = v.split("=", 1)
+    else:
+        key = r.group(1)
+        value = EnvSentinel(key=key)
     return key, value
 
 

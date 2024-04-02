@@ -4,6 +4,7 @@ import json
 from typing import Any, AsyncIterator, Callable, Dict, ParamSpec, TypeVar
 
 import httpx
+from pydantic import BaseModel
 
 R = TypeVar("R")
 P = ParamSpec("P")
@@ -26,3 +27,7 @@ class AsyncClientWrapper(httpx.AsyncClient):
             async for line in resp.aiter_lines():
                 if line.startswith("data:"):
                     yield json.loads(line[len("data:") :].strip("\n"))
+
+
+class OkResponse(BaseModel):
+    status: str = "ok"

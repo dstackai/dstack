@@ -16,6 +16,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// Version is a build-time variable. The value is overridden by ldflags.
+var Version string
+
 func main() {
 	var args shim.CLIArgs
 	args.Docker.SSHPort = 10022
@@ -110,7 +113,9 @@ func main() {
 					if err != nil {
 						return cli.Exit(err, 1)
 					}
-					log.Printf("Docker: %+v\n", args)
+					log.Printf("Config Shim: %+v\n", args.Shim)
+					log.Printf("Config Runner: %+v\n", args.Runner)
+					log.Printf("Config Docker: %+v\n", args.Docker)
 
 					dockerRunner, err := shim.NewDockerRunner(args)
 					if err != nil {

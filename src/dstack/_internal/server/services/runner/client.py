@@ -7,10 +7,12 @@ import requests
 import requests.exceptions
 
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
+from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import JobSpec, RunSpec
 from dstack._internal.server.schemas.runner import (
     DockerImageBody,
     HealthcheckResponse,
+    PullBody,
     PullResponse,
     StopBody,
     SubmitBody,
@@ -102,9 +104,21 @@ class ShimClient:
                 raise
             return None
 
-    def submit(self, username: str, password: str, image_name: str):
+    def submit(
+        self,
+        username: str,
+        password: str,
+        image_name: str,
+        container_name: str,
+        shm_size: Optional[Memory],
+    ):
+        _shm_size = int(shm_size * 1024 * 1024 * 1014) if shm_size else 0
         post_body = DockerImageBody(
-            username=username, password=password, image_name=image_name
+            username=username,
+            password=password,
+            image_name=image_name,
+            container_name=container_name,
+            shm_size=_shm_size,
         ).dict()
         resp = requests.post(
             self._url("/api/submit"),
@@ -117,9 +131,10 @@ class ShimClient:
         resp = requests.post(self._url("/api/stop"), json=body.dict())
         resp.raise_for_status()
 
-    def pull(self):  # TODO return
+    def pull(self) -> PullBody:
         resp = requests.get(self._url("/api/pull"))
         resp.raise_for_status()
+        return PullBody.__response__.parse_obj(resp.json())
 
     def _url(self, path: str) -> str:
         return f"{'https' if self.secure else 'http'}://{self.hostname}:{self.port}/{path.lstrip('/')}"
@@ -177,7 +192,7 @@ class AsyncRunnerClient:
             self._url("/api/pull"), params={"timestamp": timestamp}
         ) as resp:
             resp.raise_for_status()
-            return PullResponse.parse_obj(await resp.json())
+            return PullResponse.__response__.parse_obj(await resp.json())
 
     async def stop(self):
         async with self.session.post(self._url("/api/stop")) as resp:

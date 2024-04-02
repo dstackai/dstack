@@ -2,6 +2,7 @@ import asyncio
 from typing import Dict, List, Optional
 
 from dstack._internal.server.services.gateways.connection import GatewayConnection
+from dstack._internal.server.settings import SERVER_PORT
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -11,20 +12,17 @@ class GatewayConnectionsPool:
     def __init__(self) -> None:
         self._connections: Dict[str, GatewayConnection] = {}
         self._lock = asyncio.Lock()
-        self.server_port: Optional[int] = None
 
-    async def add(self, hostname: str, id_rsa: str) -> bool:
-        if self.server_port is None:
-            raise ValueError("Server port is not set")
+    async def add(self, hostname: str, id_rsa: str) -> GatewayConnection:
         async with self._lock:
             if hostname in self._connections:
                 logger.warning(f"Gateway connection for {hostname} already exists")
-                return False
-            self._connections[hostname] = GatewayConnection(hostname, id_rsa, self.server_port)
+                return self._connections[hostname]
+            self._connections[hostname] = GatewayConnection(hostname, id_rsa, SERVER_PORT)
             start_task = self._connections[hostname].tunnel.start()
         try:
             await start_task
-            return True
+            return self._connections[hostname]
         except Exception:
             async with self._lock:
                 self._connections.pop(hostname, None)

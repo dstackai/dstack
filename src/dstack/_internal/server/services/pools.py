@@ -129,7 +129,7 @@ async def delete_pool(session: AsyncSession, project: ProjectModel, pool_name: s
 
     pool_instances = get_pool_instances(pool)
     for instance in pool_instances:
-        if not instance.status.is_finished():
+        if instance.status != InstanceStatus.TERMINATED:
             raise ServerClientError("Cannot delete pool with running instances")
 
     pool.deleted = True
@@ -188,15 +188,7 @@ async def show_pool_instances(
     else:
         pool = await get_or_create_pool_by_name(session, project, pool_name)
     pool_instances = get_pool_instances(pool)
-    instances = []
-    for instance_item in pool_instances:
-        instance = instance_model_to_instance(instance_item)
-        # TODO: Backward compatibility, will be removed in 0.17
-        if instance.status == InstanceStatus.IDLE:
-            instance.status = InstanceStatus.READY
-        elif instance.status == InstanceStatus.PROVISIONING:
-            instance.status = InstanceStatus.STARTING
-        instances.append(instance)
+    instances = list(map(instance_model_to_instance, pool_instances))
     return PoolInstances(
         name=pool.name,
         instances=instances,
@@ -208,21 +200,27 @@ def get_pool_instances(pool: PoolModel) -> List[InstanceModel]:
 
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
-    offer = InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
-    jpd = JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
     instance = Instance(
-        backend=offer.backend,
         name=instance_model.name,
-        instance_type=jpd.instance_type,
-        hostname=jpd.hostname,
         status=instance_model.status,
-        region=offer.region,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
-        price=offer.price,
     )
+
+    if instance_model.offer is not None:
+        offer = InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
+        instance.backend = offer.backend
+        instance.region = offer.region
+        instance.price = offer.price
+
+    if instance_model.job_provisioning_data is not None:
+        jpd = JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
+        instance.instance_type = jpd.instance_type
+        instance.hostname = jpd.hostname
+
     if instance_model.job is not None:
         instance.job_name = instance_model.job.job_name
         instance.job_status = instance_model.job.status
+
     return instance
 
 

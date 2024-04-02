@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from websocket import WebSocketApp
 
 import dstack.api as api
+from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
@@ -239,7 +240,8 @@ class Run(ABC):
             if self.status.is_finished() and self.status != RunStatus.DONE:
                 return False
 
-            provisioning_data = self._run.jobs[0].job_submissions[-1].job_provisioning_data
+            job = self._run.jobs[0]  # TODO(egor-s): pull logs from all replicas?
+            provisioning_data = job.job_submissions[-1].job_provisioning_data
 
             control_sock_path_and_port_locks = SSHAttach.reuse_control_sock_path_and_port_locks(
                 run_name=self.name
@@ -247,7 +249,7 @@ class Run(ABC):
 
             if control_sock_path_and_port_locks is None:
                 if self._ports_lock is None:
-                    self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
+                    self._ports_lock = _reserve_ports(job.job_spec)
 
                 logger.debug(
                     "Attaching to %s (%s: %s)",
@@ -277,6 +279,7 @@ class Run(ABC):
                 control_sock_path=control_sock_path_and_port_locks[0]
                 if control_sock_path_and_port_locks
                 else None,
+                local_backend=provisioning_data.backend == LocalBackend,
             )
             if not control_sock_path_and_port_locks:
                 self._ssh_attach.attach()
@@ -321,6 +324,8 @@ class RunCollection:
         configuration_path: Optional[str] = None,
         repo: Optional[Repo] = None,
         backends: Optional[List[BackendType]] = None,
+        regions: Optional[List[str]] = None,
+        instance_types: Optional[List[str]] = None,
         resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
@@ -338,6 +343,7 @@ class RunCollection:
             configuration_path: The path to the configuration file, relative to the root directory of the repo.
             repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): A repo to mount to the run.
             backends: A list of allowed backend for provisioning.
+            regions: A list of cloud regions for provisioning.
             resources: The requirements to run the configuration. Overrides the configuration's resources.
             spot_policy: A spot policy for provisioning.
             retry_policy (RetryPolicy): A retry policy.
@@ -362,6 +368,8 @@ class RunCollection:
             repo=repo,
             configuration_path=configuration_path,
             backends=backends,
+            regions=regions,
+            instance_types=instance_types,
             resources=resources,
             spot_policy=spot_policy,
             retry_policy=retry_policy,
@@ -376,11 +384,9 @@ class RunCollection:
         return self._api_client.runs.get_offers(self._project, profile, requirements)
 
     def create_instance(
-        self, pool_name: str, profile: Profile, requirements: Requirements, ssh_key: SSHKey
+        self, profile: Profile, requirements: Requirements, ssh_key: SSHKey
     ) -> Instance:
-        return self._api_client.runs.create_instance(
-            self._project, pool_name, profile, requirements, ssh_key
-        )
+        return self._api_client.runs.create_instance(self._project, profile, requirements, ssh_key)
 
     def get_plan(
         self,
@@ -388,6 +394,8 @@ class RunCollection:
         repo: Repo,
         configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
+        regions: Optional[List[str]] = None,
+        instance_types: Optional[List[str]] = None,
         resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
@@ -425,6 +433,8 @@ class RunCollection:
         profile = Profile(
             name="(python)",
             backends=backends,
+            regions=regions,
+            instance_types=instance_types,
             spot_policy=spot_policy,
             retry_policy=retry_policy,
             max_duration=max_duration,

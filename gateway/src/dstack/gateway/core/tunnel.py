@@ -32,8 +32,8 @@ class SSHTunnel(BaseModel):
         app_port: int,
         *,
         id_rsa_path: str = "~/.ssh/id_rsa",
-        docker_host: Optional[str] = None,
-        docker_port: Optional[int] = None,
+        jump_host: Optional[str] = None,
+        jump_port: Optional[int] = None,
     ) -> "SSHTunnel":
         temp_dir = tempfile.mkdtemp()
         os.chmod(temp_dir, 0o755)  # grant any user read access
@@ -44,17 +44,13 @@ class SSHTunnel(BaseModel):
         cmd += ["-o", "StreamLocalBindMask=0111", "-o", "StreamLocalBindUnlink=yes"]
         cmd += ["-o", "ServerAliveInterval=60"]
         cmd += ["-f", "-N", "-L", f"{_sock_path(temp_dir)}:localhost:{app_port}"]
-        if docker_host is not None:
+        if jump_host is not None:
             # use `host` as a jump host
             proxy = ["ssh", "-F", "none", "-i", id_rsa_path, "-W", "%h:%p"]
             proxy += ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
-            proxy += ["-p", str(port), host]
+            proxy += ["-p", str(jump_port), jump_host]
             cmd += ["-o", f"ProxyCommand={shlex.join(proxy)}"]
-            # connect to `docker_host`
-            cmd += ["-p", str(docker_port), docker_host]
-        else:
-            # connect to `host` directly
-            cmd += ["-p", str(port), host]
+        cmd += ["-p", str(port), host]
 
         start_cmd = cmd
         exit_cmd = ["ssh", "-S", control_path, "-O", "exit"]
@@ -65,6 +61,7 @@ class SSHTunnel(BaseModel):
     def sock_path(self):
         return _sock_path(self.temp_dir)
 
+    # TODO(egor-s): make it async
     def start(self):
         logger.info("Starting SSH tunnel for %s", self.sock_path)
         logger.debug("Executing %s", shlex.join(self.start_cmd))

@@ -2,9 +2,15 @@ import json
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict
+from typing import ClassVar, Dict
+
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+
+
+class PersistentModel(BaseModel):
+    persistent_key: ClassVar[str]
 
 
 def get_persistent_path() -> Path:

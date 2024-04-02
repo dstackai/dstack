@@ -1,13 +1,17 @@
 import asyncio
 import datetime
+import itertools
+import json
 from datetime import timezone
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import sqlalchemy as sa
 import sqlalchemy.orm as sa_orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import SSHError
+import dstack._internal.server.services.gateways as gateways
+from dstack._internal.core.errors import ResourceNotFoundError, SSHError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.runs import (
     InstanceStatus,
@@ -16,7 +20,6 @@ from dstack._internal.core.models.runs import (
     JobSpec,
     JobStatus,
     JobSubmission,
-    JobTerminationReason,
     RunSpec,
 )
 from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
@@ -49,15 +52,16 @@ TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 TERMINATING_PROCESSING_JOBS_IDS = set()
 
 
-def get_jobs_from_run_spec(run_spec: RunSpec) -> List[Job]:
-    job_configurator = _get_job_configurator(run_spec)
-    job_specs = job_configurator.get_job_specs()
-    return [Job(job_spec=s, job_submissions=[]) for s in job_specs]
+def get_jobs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[Job]:
+    return [
+        Job(job_spec=s, job_submissions=[])
+        for s in get_job_specs_from_run_spec(run_spec, replica_num)
+    ]
 
 
-def get_job_specs_from_run_spec(run_spec: RunSpec) -> List[JobSpec]:
+def get_job_specs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[JobSpec]:
     job_configurator = _get_job_configurator(run_spec)
-    job_specs = job_configurator.get_job_specs()
+    job_specs = job_configurator.get_job_specs(replica_num=replica_num)
     return job_specs
 
 
@@ -71,6 +75,12 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         job_provisioning_data.instance_type.resources.description = (
             job_provisioning_data.instance_type.resources.pretty_format()
         )
+        if (
+            job_provisioning_data.backend == BackendType.DSTACK
+            and job_provisioning_data.backend_data is not None
+        ):
+            backend_data = json.loads(job_provisioning_data.backend_data)
+            job_provisioning_data.backend = backend_data["base_backend"]
     finished_at = None
     if job_model.status.is_finished():
         finished_at = job_model.last_processed_at.replace(tzinfo=timezone.utc)
@@ -82,6 +92,15 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         status=job_model.status,
         termination_reason=job_model.termination_reason,
         job_provisioning_data=job_provisioning_data,
+    )
+
+
+def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
+    for job in jobs:
+        if job.job_spec.replica_num == replica_num and job.job_spec.job_num == job_num:
+            return job
+    raise ResourceNotFoundError(
+        f"Job with replica_num={replica_num} and job_num={job_num} not found"
     )
 
 
@@ -184,7 +203,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             if instance.status == InstanceStatus.BUSY:
                 instance.status = InstanceStatus.IDLE
             elif instance.status != InstanceStatus.TERMINATED:
-                # instance was CREATING or STARTING (specially for the job)
+                # instance was PROVISIONING (specially for the job)
                 # schedule for termination
                 instance.status = InstanceStatus.TERMINATING
 
@@ -200,12 +219,14 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                 instance.name,
                 instance.status.name,
             )
-            # TODO(egor-s): unregister service replica
+            await gateways.unregister_replica(
+                session, job_model
+            )  # TODO(egor-s) ensure always runs
         finally:
             PROCESSING_POOL_IDS.remove(instance.id)
 
     if job_model.termination_reason is not None:
-        job_model.status = job_termination_reason_to_status(job_model.termination_reason)
+        job_model.status = job_model.termination_reason.to_status()
     else:
         job_model.status = JobStatus.FAILED
         logger.warning("%s: job termination reason is not set", fmt(job_model))
@@ -215,23 +236,6 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
         job_model.status.name,
         job_model.termination_reason.name,
     )
-
-
-def job_termination_reason_to_status(termination_reason: JobTerminationReason) -> JobStatus:
-    mapping = {
-        JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY: JobStatus.FAILED,
-        JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY: JobStatus.FAILED,
-        JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED: JobStatus.FAILED,
-        JobTerminationReason.TERMINATED_BY_USER: JobStatus.TERMINATED,
-        JobTerminationReason.GATEWAY_ERROR: JobStatus.FAILED,
-        JobTerminationReason.SCALED_DOWN: JobStatus.TERMINATED,
-        JobTerminationReason.DONE_BY_RUNNER: JobStatus.DONE,
-        JobTerminationReason.ABORTED_BY_USER: JobStatus.ABORTED,
-        JobTerminationReason.TERMINATED_BY_SERVER: JobStatus.TERMINATED,
-        JobTerminationReason.CONTAINER_EXITED_WITH_ERROR: JobStatus.FAILED,
-        JobTerminationReason.PORTS_BINDING_FAILED: JobStatus.FAILED,
-    }
-    return mapping[termination_reason]
 
 
 async def stop_container(
@@ -259,3 +263,24 @@ def _shim_submit_stop(job_model: JobModel, ports: Dict[int, int]):
 
     # we force container deletion because the runner had time to gracefully stop the job
     shim_client.stop(force=True)
+
+
+def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, List[JobModel]]]:
+    """
+    Args:
+        jobs: unsorted list of jobs
+
+    Yields:
+        latest jobs in each replica (replica_num, jobs)
+    """
+    jobs = sorted(jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
+    for replica_num, all_replica_jobs in itertools.groupby(jobs, key=lambda j: j.replica_num):
+        replica_jobs: List[JobModel] = []
+        for job_num, job_submissions in itertools.groupby(
+            all_replica_jobs, key=lambda j: j.job_num
+        ):
+            # take only the latest submission
+            # the latest `submission_num` doesn't have to be the same for all jobs
+            *_, latest_job_submission = job_submissions
+            replica_jobs.append(latest_job_submission)
+        yield replica_num, replica_jobs

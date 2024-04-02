@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
 from pydantic import UUID4, Field
 from typing_extensions import Annotated
@@ -60,6 +60,28 @@ class RunTerminationReason(str, Enum):
     ABORTED_BY_USER = "aborted_by_user"
     SERVER_ERROR = "server_error"
 
+    def to_job_termination_reason(self) -> "JobTerminationReason":
+        mapping = {
+            self.ALL_JOBS_DONE: JobTerminationReason.DONE_BY_RUNNER,
+            self.JOB_FAILED: JobTerminationReason.TERMINATED_BY_SERVER,
+            self.RETRY_LIMIT_EXCEEDED: JobTerminationReason.TERMINATED_BY_SERVER,
+            self.STOPPED_BY_USER: JobTerminationReason.TERMINATED_BY_USER,
+            self.ABORTED_BY_USER: JobTerminationReason.ABORTED_BY_USER,
+            self.SERVER_ERROR: JobTerminationReason.TERMINATED_BY_SERVER,
+        }
+        return mapping[self]
+
+    def to_status(self) -> "RunStatus":
+        mapping = {
+            self.ALL_JOBS_DONE: RunStatus.DONE,
+            self.JOB_FAILED: RunStatus.FAILED,
+            self.RETRY_LIMIT_EXCEEDED: RunStatus.FAILED,
+            self.STOPPED_BY_USER: RunStatus.TERMINATED,
+            self.ABORTED_BY_USER: RunStatus.TERMINATED,
+            self.SERVER_ERROR: RunStatus.FAILED,
+        }
+        return mapping[self]
+
 
 class JobTerminationReason(str, Enum):
     # Set by the server
@@ -75,6 +97,22 @@ class JobTerminationReason(str, Enum):
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"
+
+    def to_status(self) -> JobStatus:
+        mapping = {
+            self.FAILED_TO_START_DUE_TO_NO_CAPACITY: JobStatus.FAILED,
+            self.INTERRUPTED_BY_NO_CAPACITY: JobStatus.FAILED,
+            self.WAITING_RUNNER_LIMIT_EXCEEDED: JobStatus.FAILED,
+            self.TERMINATED_BY_USER: JobStatus.TERMINATED,
+            self.GATEWAY_ERROR: JobStatus.FAILED,
+            self.SCALED_DOWN: JobStatus.TERMINATED,
+            self.DONE_BY_RUNNER: JobStatus.DONE,
+            self.ABORTED_BY_USER: JobStatus.ABORTED,
+            self.TERMINATED_BY_SERVER: JobStatus.TERMINATED,
+            self.CONTAINER_EXITED_WITH_ERROR: JobStatus.FAILED,
+            self.PORTS_BINDING_FAILED: JobStatus.FAILED,
+        }
+        return mapping[self]
 
     def pretty_repr(self) -> str:
         return " ".join(self.value.split("_")).capitalize()
@@ -120,6 +158,7 @@ class Gateway(CoreModel):
 
 
 class JobSpec(CoreModel):
+    replica_num: int = 0  # default value for backward compatibility
     job_num: int
     job_name: str
     app_specs: Optional[List[AppSpec]]
@@ -132,7 +171,6 @@ class JobSpec(CoreModel):
     requirements: Requirements
     retry_policy: RetryPolicy
     working_dir: str
-    pool_name: Optional[str]  # TODO: remove pool_name from JobSpec
 
 
 class JobProvisioningData(CoreModel):
@@ -223,6 +261,7 @@ class Run(CoreModel):
     user: str
     submitted_at: datetime
     status: RunStatus
+    termination_reason: Optional[RunTerminationReason]
     run_spec: RunSpec
     jobs: List[Job]
     latest_job_submission: Optional[JobSubmission]
@@ -251,28 +290,14 @@ class PoolInstanceOffers(CoreModel):
 
 class InstanceStatus(str, Enum):
     PENDING = "pending"
-    CREATING = "creating"  # TODO: Backward compatibility, will be removed in 0.17
-    STARTING = "starting"  # TODO: Backward compatibility, will be removed in 0.17
-    READY = "ready"  # TODO: Backward compatibility, will be removed in 0.17
     PROVISIONING = "provisioning"
     IDLE = "idle"
     BUSY = "busy"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
 
-    @property
-    def finished_statuses(cls) -> Sequence["InstanceStatus"]:  # TODO: remove in 0.17
-        return [cls.TERMINATED]
-
-    def is_finished(self):  # TODO: remove in 0.17
-        return self in self.finished_statuses
-
-    def is_started(self):  # TODO: remove in 0.17
-        return not self.is_finished()
-
     def is_available(self) -> bool:
         return self in (
-            self.READY,  # TODO: Backward compatibility, will be removed in 0.17
             self.IDLE,
             self.BUSY,
         )

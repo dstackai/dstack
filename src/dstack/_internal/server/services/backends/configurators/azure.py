@@ -194,7 +194,7 @@ class AzureConfigurator(Configurator):
         return AzureBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> AzureConfig:
-        return AzureConfig(
+        return AzureConfig.__response__(
             **json.loads(model.config),
             creds=AzureCreds.parse_raw(model.auth).__root__,
         )

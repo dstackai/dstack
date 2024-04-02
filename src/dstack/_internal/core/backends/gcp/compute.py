@@ -115,8 +115,8 @@ class GCPCompute(Compute):
                 authorized_keys=authorized_keys,
                 labels={
                     "owner": "dstack",
-                    "dstack_project": instance_config.project_name,
-                    "dstack_user": instance_config.user,
+                    "dstack_project": instance_config.project_name.lower(),
+                    "dstack_user": instance_config.user.lower(),
                 },
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,

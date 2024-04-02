@@ -2,6 +2,7 @@ import argparse
 import os
 
 from dstack._internal.core.models.profiles import (
+    DEFAULT_INSTANCE_RETRY_DURATION,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
@@ -48,6 +49,21 @@ def register_profile_args(parser: argparse.ArgumentParser, pool_add: bool = Fals
         metavar="NAME",
         dest="backends",
         help="The backends that will be tried for provisioning",
+    )
+    profile_group.add_argument(
+        "-r",
+        "--region",
+        action="append",
+        metavar="NAME",
+        dest="regions",
+        help="The regions that will be tried for provisioning",
+    )
+    profile_group.add_argument(
+        "--instance-type",
+        action="append",
+        metavar="NAME",
+        dest="instance_types",
+        help="The cloud-specific instance types that will be tried for provisioning",
     )
     if pool_add:
         pools_group_exc = parser
@@ -116,18 +132,15 @@ def register_profile_args(parser: argparse.ArgumentParser, pool_add: bool = Fals
         help="One of %s" % ", ".join([f"[code]{i.value}[/]" for i in SpotPolicy]),
     )
 
-    if not pool_add:
-        retry_group = parser.add_argument_group("Retry policy")
-        retry_group_exc = retry_group.add_mutually_exclusive_group()
-        retry_group_exc.add_argument(
-            "--retry", action="store_const", dest="retry_policy", const=True
-        )
-        retry_group_exc.add_argument(
-            "--no-retry", action="store_const", dest="retry_policy", const=False
-        )
-        retry_group_exc.add_argument(
-            "--retry-limit", type=retry_limit, dest="retry_limit", metavar="DURATION"
-        )
+    retry_group = parser.add_argument_group("Retry policy")
+    retry_group_exc = retry_group.add_mutually_exclusive_group()
+    retry_group_exc.add_argument("--retry", action="store_const", dest="retry_policy", const=True)
+    retry_group_exc.add_argument(
+        "--no-retry", action="store_const", dest="retry_policy", const=False
+    )
+    retry_group_exc.add_argument(
+        "--retry-duration", type=retry_duration, dest="retry_duration", metavar="DURATION"
+    )
 
 
 def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: bool = False):
@@ -139,6 +152,10 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: boo
     # Consider setting validate_assignment=True for modified pydantic models.
     if args.backends:
         profile.backends = args.backends
+    if args.regions:
+        profile.regions = args.regions
+    if args.instance_types:
+        profile.instance_types = args.instance_types
     if args.max_price is not None:
         profile.max_price = args.max_price
     if not pool_add:
@@ -171,16 +188,28 @@ def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: boo
             if not profile.retry_policy:
                 profile.retry_policy = ProfileRetryPolicy()
             profile.retry_policy.retry = args.retry_policy
-        elif args.retry_limit is not None:
+        elif args.retry_duration is not None:
             if not profile.retry_policy:
                 profile.retry_policy = ProfileRetryPolicy()
             profile.retry_policy.retry = True
-            profile.retry_policy.limit = args.retry_limit
+            profile.retry_policy.limit = args.retry_duration
+    else:
+        if args.retry_policy is not None:
+            if not profile.retry_policy:
+                profile.retry_policy = ProfileRetryPolicy()
+            profile.retry_policy.retry = args.retry_policy
+            if profile.retry_policy.retry:
+                profile.retry_policy.limit = DEFAULT_INSTANCE_RETRY_DURATION
+        elif args.retry_duration is not None:
+            if not profile.retry_policy:
+                profile.retry_policy = ProfileRetryPolicy()
+            profile.retry_policy.retry = True
+            profile.retry_policy.limit = args.retry_duration  # --retry-duration
 
 
 def max_duration(v: str) -> int:
     return parse_max_duration(v)
 
 
-def retry_limit(v: str) -> int:
+def retry_duration(v: str) -> int:
     return parse_duration(v)

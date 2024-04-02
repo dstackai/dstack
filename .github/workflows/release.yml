@@ -3,7 +3,10 @@ name: Release
 on:
   push:
     tags:
-      - '*'
+      - "[0-9]+.[0-9]+.[0-9]+a[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+.post[0-9]+"
 
 env:
   BUILD_INCREMENT: 150
@@ -100,7 +103,7 @@ jobs:
             runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
 
   runner-upload:
-    needs: [ runner-compile ]
+    needs: [gateway-build, runner-compile]
     runs-on: ubuntu-latest
     steps:
       - name: Install AWS
@@ -184,6 +187,13 @@ jobs:
           docker manifest push dstackai/dstack:$VERSION
           docker manifest create dstackai/dstack:latest --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
           docker manifest push dstackai/dstack:latest
+      - name: Docker Hub Description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: dstackai/dstack
+          readme-filepath: ./README.md
 
   generate-json-schema:
     needs: [ pypi-upload ]

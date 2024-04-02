@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import SSHKey
@@ -10,6 +12,11 @@ from dstack._internal.core.models.runs import Requirements, RunSpec
 class ListRunsRequest(CoreModel):
     project_name: Optional[str]
     repo_id: Optional[str]
+    username: Optional[str]
+    only_active: bool = False
+    prev_submitted_at: Optional[datetime]
+    prev_run_id: Optional[UUID]
+    limit: int = 1000
 
 
 class GetRunRequest(CoreModel):
@@ -26,7 +33,6 @@ class GetOffersRequest(CoreModel):
 
 
 class CreateInstanceRequest(CoreModel):
-    pool_name: str
     profile: Profile
     requirements: Requirements
     ssh_key: SSHKey

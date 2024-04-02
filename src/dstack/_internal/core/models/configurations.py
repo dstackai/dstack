@@ -1,16 +1,16 @@
 import re
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Mapping, Optional, Union
 
-from pydantic import BaseModel, Field, ValidationError, conint, constr, validator
+from pydantic import BaseModel, Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, Duration
 from dstack._internal.core.models.gateways import AnyModel
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.resources import Range, ResourcesSpec
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -27,6 +27,7 @@ class PythonVersion(str, Enum):
     PY39 = "3.9"
     PY310 = "3.10"
     PY311 = "3.11"
+    PY312 = "3.12"
 
 
 class RegistryAuth(CoreModel):
@@ -79,6 +80,29 @@ class Artifact(CoreModel):
     ] = False
 
 
+class ScalingSpec(CoreModel):
+    metric: Annotated[Literal["rps"], Field(description="The target metric to track")]
+    target: Annotated[float, Field(description="The target value of the metric")]
+    scale_up_delay: Annotated[
+        Duration, Field(description="The delay in seconds before scaling up")
+    ] = Duration.parse("5m")
+    scale_down_delay: Annotated[
+        Duration, Field(description="The delay in seconds before scaling down")
+    ] = Duration.parse("10m")
+
+
+class EnvSentinel(CoreModel):
+    key: str
+
+    def from_env(self, env: Mapping[str, str]) -> str:
+        if self.key in env:
+            return env[self.key]
+        raise ValueError(f"Environment variable {self.key} is not set")
+
+    def __str__(self):
+        return f"EnvSentinel({self.key})"
+
+
 class BaseConfiguration(CoreModel):
     type: Literal["none"]
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
@@ -94,7 +118,10 @@ class BaseConfiguration(CoreModel):
         Field(description="The major version of Python\nMutually exclusive with the image"),
     ]
     env: Annotated[
-        Union[List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$")], Dict[str, str]],
+        Union[
+            List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*(=.*$|$)")],
+            Dict[str, Union[str, EnvSentinel]],
+        ],
         Field(description="The mapping or the list of environment variables"),
     ] = {}
     setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
@@ -117,7 +144,20 @@ class BaseConfiguration(CoreModel):
     @validator("env")
     def convert_env(cls, v) -> Dict[str, str]:
         if isinstance(v, list):
-            return dict(pair.split(sep="=", maxsplit=1) for pair in v)
+            d = {}
+            for var in v:
+                if "=" not in var:
+                    if var not in d:
+                        d[var] = EnvSentinel(key=var)
+                    else:
+                        raise ValueError(f"Duplicate environment variable: {var}")
+                else:
+                    k, val = var.split("=", maxsplit=1)
+                    if k not in d:
+                        d[k] = val
+                    else:
+                        raise ValueError(f"Duplicate environment variable: {var}")
+            return d
         return v
 
     def get_repo(self) -> Repo:
@@ -178,6 +218,8 @@ class ServiceConfiguration(BaseConfiguration):
         resources (Optional[ResourcesSpec]): The requirements to run the configuration.
         model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
         auth (bool): Enable the authorization. Defaults to `True`.
+        replicas Range[int]: The range of the number of replicas. Defaults to `1`.
+        scaling: Optional[ScalingSpec]: The auto-scaling configuration.
     """
 
     type: Literal["service"] = "service"
@@ -191,6 +233,10 @@ class ServiceConfiguration(BaseConfiguration):
         Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
     ] = None
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
+    replicas: Annotated[Range[int], Field(description="The range ")] = Range[int](min=1, max=1)
+    scaling: Annotated[
+        Optional[ScalingSpec], Field(description="The auto-scaling configuration")
+    ] = None
 
     @validator("port")
     def convert_port(cls, v) -> PortMapping:
@@ -199,6 +245,28 @@ class ServiceConfiguration(BaseConfiguration):
         elif isinstance(v, str):
             return PortMapping.parse(v)
         return v
+
+    @validator("replicas")
+    def convert_replicas(cls, v: Range[int]) -> Range[int]:
+        if v.max is None:
+            raise ValueError("The maximum number of replicas must be set")
+        if v.max < 1:
+            raise ValueError("The maximum number of replicas must be greater than 0")
+        if v.min is None:
+            v.min = 0
+        elif v.min < 0:
+            raise ValueError("The minimum number of replicas must be greater or equal than 0")
+        return v
+
+    @root_validator()
+    def validate_scaling(cls, values):
+        scaling = values.get("scaling")
+        replicas = values.get("replicas")
+        if replicas.min != replicas.max and not scaling:
+            raise ValueError("Auto-scaling must be defined for a range of replicas")
+        if replicas.min == replicas.max and scaling:
+            raise ValueError("Can't perform auto-scaling for a fixed number of replicas")
+        return values
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]

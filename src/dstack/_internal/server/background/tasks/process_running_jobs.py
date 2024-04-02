@@ -2,7 +2,6 @@ from datetime import timedelta
 from typing import Dict, Optional
 from uuid import UUID
 
-from pydantic import parse_raw_as
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -13,7 +12,6 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     Job,
     JobSpec,
     JobStatus,
@@ -22,7 +20,6 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
-    GatewayModel,
     JobModel,
     ProjectModel,
     RepoModel,
@@ -32,6 +29,7 @@ from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
+    find_job,
     job_model_to_job_submission,
 )
 from dstack._internal.server.services.logging import fmt
@@ -98,9 +96,9 @@ async def _process_job(job_id: UUID):
         repo_model = run_model.repo
         project = run_model.project
         run = run_model_to_run(run_model)
-        job = run.jobs[job_model.job_num]
         job_submission = job_model_to_job_submission(job_model)
         job_provisioning_data = job_submission.job_provisioning_data
+        job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
 
         server_ssh_private_key = project.ssh_private_key
         secrets = {}  # TODO secrets
@@ -147,10 +145,6 @@ async def _process_job(job_id: UUID):
                     secrets,
                     repo_creds,
                 )
-                if job_model.instance is not None:
-                    job_model.used_instance_id = job_model.instance.id
-                    if success:
-                        job_model.instance.status = InstanceStatus.BUSY
 
             if not success:
                 # check timeout
@@ -166,9 +160,7 @@ async def _process_job(job_id: UUID):
                     job_model.termination_reason = (
                         JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
                     )
-                    job_model.used_instance_id = job_model.instance.id
-                    job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
-                    job_model.instance = None
+                    # instance will be emptied by process_terminating_jobs
 
         else:  # fails are not acceptable
             if initial_status == JobStatus.PULLING:
@@ -210,11 +202,7 @@ async def _process_job(job_id: UUID):
                 )
                 job_model.status = JobStatus.TERMINATING
                 job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-                job_model.used_instance_id = job_model.instance.id
-                job_model.instance.last_job_processed_at = common_utils.get_current_datetime()
-                job_model.instance = None
-
-                # job will be terminated by process_finished_jobs
+                # job will be terminated and instance will be emptied by process_terminating_jobs
 
         if (
             initial_status != job_model.status
@@ -222,16 +210,8 @@ async def _process_job(job_id: UUID):
             and job_model.job_num == 0  # gateway connects only to the first node
             and run.run_spec.configuration.type == "service"
         ):
-            # TODO(egor-s): move code to gateways module
-            gateway = await session.get(GatewayModel, run_model.gateway_id)
             try:
-                await gateways.register_replica(gateway, run, job_provisioning_data)
-                logger.debug(
-                    "%s: service replica is registered: %s, age=%s",
-                    fmt(job_model),
-                    run.service.url,
-                    job_submission.age,
-                )
+                await gateways.register_replica(session, run_model.gateway_id, run, job_model)
             except GatewayError as e:
                 logger.warning(
                     "%s: failed to register service replica: %s, age=%s",
@@ -298,7 +278,7 @@ def _process_provisioning_with_shim(
     Returns:
         is successful
     """
-    job_spec = parse_raw_as(JobSpec, job_model.job_spec_data)
+    job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
 
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
 
@@ -314,12 +294,16 @@ def _process_provisioning_with_shim(
             username=interpolate(registry_auth.username),
             password=interpolate(registry_auth.password),
             image_name=job_spec.image_name,
+            container_name=job_model.job_name,
+            shm_size=job_spec.requirements.resources.shm_size,
         )
     else:
         shim_client.submit(
             username="",
             password="",
             image_name=job_spec.image_name,
+            container_name=job_model.job_name,
+            shm_size=job_spec.requirements.resources.shm_size,
         )
 
     job_model.status = JobStatus.PULLING
@@ -347,11 +331,23 @@ def _process_pulling_with_shim(
         is successful
     """
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
-    shim_client.pull()  # raises error if shim is down, causes retry
+    container_status = shim_client.pull()  # raises error if shim is down, causes retry
 
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
     resp = runner_client.healthcheck()
     if resp is None:
+        if (
+            container_status.state == "pending"
+            and container_status.container_name == job_model.job_name
+        ):
+            logger.error(
+                "The docker container of the job '%s' is not working: exit code: %s, error %s",
+                job_model.job_name,
+                container_status.exit_code,
+                container_status.error,
+            )
+            logger.debug("runner healthcheck: %s", container_status.dict())
+            return False
         return True  # runner is not available yet, but shim is alive (pulling)
 
     _submit_job_to_runner(

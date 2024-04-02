@@ -111,7 +111,7 @@ class AWSConfigurator(Configurator):
         return AWSBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> AWSConfig:
-        return AWSConfig(
+        return AWSConfig.__response__(
             **json.loads(model.config),
             creds=AWSCreds.parse_raw(model.auth).__root__,
         )

@@ -28,6 +28,7 @@ class TestListBackendTypes:
         assert response.json() == [
             "aws",
             "azure",
+            "cudo",
             "datacrunch",
             "gcp",
             "kubernetes",

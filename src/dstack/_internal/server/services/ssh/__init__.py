@@ -2,7 +2,7 @@ import asyncio
 import os
 import subprocess
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.services.ssh import get_ssh_error
@@ -11,8 +11,9 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-class SSHAutoTunnel:
+class AsyncSSHTunnel:
     def __init__(self, user_host: str, id_rsa: str, options: Dict[str, Any], args: List[str]):
+        # TODO(egor-s): reuse existing SSH control sock (in case of server restart)
         self.user_host = user_host
 
         self._temp_dir = tempfile.TemporaryDirectory()
@@ -36,9 +37,6 @@ class SSHAutoTunnel:
         self._check_cmd = self._interpolate(self._check_cmd)
 
         self._exec_cmd = ["ssh", "-S", self.control_sock_path, user_host]
-
-        self._stop_event = asyncio.Event()
-        self._keep_alive_task: Optional[asyncio.Task] = None
 
     def _interpolate(self, cmd: List[str]) -> List[str]:
         data = {
@@ -68,8 +66,6 @@ class SSHAutoTunnel:
         if proc.returncode != 0:
             # TODO(egor-s): make robust, retry
             raise get_ssh_error(stderr)
-        if self._keep_alive_task is None:
-            self._keep_alive_task = asyncio.create_task(self._keep_alive())
         logger.debug("SSH tunnel `%s` is up", self.user_host)
 
     async def stop(self):
@@ -77,10 +73,6 @@ class SSHAutoTunnel:
             *self._stop_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         await proc.wait()
-        if self._keep_alive_task:
-            self._keep_alive_task.cancel()
-            await self._keep_alive_task
-            self._keep_alive_task = None
 
     async def check(self) -> bool:
         proc = await asyncio.create_subprocess_exec(
@@ -100,14 +92,3 @@ class SSHAutoTunnel:
             # TODO(egor-s): make robust, retry
             raise SSHError(stderr.decode())
         return stdout.decode()
-
-    async def _keep_alive(self):
-        try:
-            while True:
-                if not await self.check():
-                    logger.debug("SSH tunnel `%s` is down, restarting", self.user_host)
-                    # TODO(egor-s): make robust, retry
-                    await self.start()
-                await asyncio.sleep(60)
-        except asyncio.CancelledError:
-            pass

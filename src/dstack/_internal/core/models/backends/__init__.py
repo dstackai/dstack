@@ -12,13 +12,23 @@ from dstack._internal.core.models.backends.azure import (
     AzureConfigInfoWithCredsPartial,
     AzureConfigValues,
 )
+from dstack._internal.core.models.backends.cudo import (
+    CudoConfigInfo,
+    CudoConfigInfoWithCreds,
+    CudoConfigInfoWithCredsPartial,
+    CudoConfigValues,
+)
 from dstack._internal.core.models.backends.datacrunch import (
     DataCrunchConfigInfo,
     DataCrunchConfigInfoWithCreds,
     DataCrunchConfigInfoWithCredsPartial,
     DataCrunchConfigValues,
 )
-from dstack._internal.core.models.backends.dstack import DstackConfigInfo, DstackConfigValues
+from dstack._internal.core.models.backends.dstack import (
+    DstackBaseBackendConfigInfo,
+    DstackConfigInfo,
+    DstackConfigValues,
+)
 from dstack._internal.core.models.backends.gcp import (
     GCPConfigInfo,
     GCPConfigInfoWithCreds,
@@ -60,6 +70,7 @@ from dstack._internal.core.models.common import CoreModel
 AnyConfigInfoWithoutCreds = Union[
     AWSConfigInfo,
     AzureConfigInfo,
+    CudoConfigInfo,
     DataCrunchConfigInfo,
     GCPConfigInfo,
     KubernetesConfigInfo,
@@ -68,10 +79,12 @@ AnyConfigInfoWithoutCreds = Union[
     TensorDockConfigInfo,
     VastAIConfigInfo,
     DstackConfigInfo,
+    DstackBaseBackendConfigInfo,
 ]
 AnyConfigInfoWithCreds = Union[
     AWSConfigInfoWithCreds,
     AzureConfigInfoWithCreds,
+    CudoConfigInfoWithCreds,
     DataCrunchConfigInfoWithCreds,
     GCPConfigInfoWithCreds,
     KubernetesConfigInfoWithCreds,
@@ -84,6 +97,7 @@ AnyConfigInfoWithCreds = Union[
 AnyConfigInfoWithCredsPartial = Union[
     AWSConfigInfoWithCredsPartial,
     AzureConfigInfoWithCredsPartial,
+    CudoConfigInfoWithCredsPartial,
     DataCrunchConfigInfoWithCredsPartial,
     GCPConfigInfoWithCredsPartial,
     KubernetesConfigInfoWithCredsPartial,
@@ -99,6 +113,7 @@ AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 AnyConfigValues = Union[
     AWSConfigValues,
     AzureConfigValues,
+    CudoConfigValues,
     DataCrunchConfigValues,
     GCPConfigValues,
     KubernetesConfigValues,

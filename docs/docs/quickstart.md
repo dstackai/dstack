@@ -1,6 +1,6 @@
 # Quickstart
 
-??? info "Set up the CLI"
+??? info "Prerequisites"
     To use the open-source version, make sure to [install the server](installation/index.md) and configure backends.
 
     If you're using [dstack Sky](https://sky.dstack.ai), install the CLI and run the `dstack config` command:
@@ -129,8 +129,9 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 The `dstack run` command automatically uploads your code, including any local uncommitted changes. 
 To exclude any files from uploading, use `.gitignore`.
 
-!!! info "What's next?"
-    1. Read about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
-        [services](concepts/services.md), and [pools](concepts/pools.md) 
-    2. Browse [examples](../examples/index.md)
-    3. Join the [Discord server](https://discord.gg/u8SmfwPpMd)
+## What's next?
+
+1. Read about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
+    [services](concepts/services.md), and [pools](concepts/pools.md) 
+2. Browse [examples](../examples/index.md)
+3. Join the [Discord server](https://discord.gg/u8SmfwPpMd)

@@ -70,7 +70,7 @@ class NebiusConfigurator(Configurator):
         return NebiusBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> NebiusConfig:
-        return NebiusConfig(
+        return NebiusConfig.__response__(
             **json.loads(model.config),
             creds=NebiusCreds.parse_raw(model.auth),
         )

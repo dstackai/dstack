@@ -34,7 +34,6 @@ from dstack._internal.server.settings import (
     DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT,
     DSTACK_UPDATE_DEFAULT_PROJECT,
     SERVER_CONFIG_FILE_PATH,
-    SERVER_PORT,
     SERVER_URL,
 )
 from dstack._internal.server.utils.logging import configure_logging
@@ -85,9 +84,8 @@ async def lifespan(app: FastAPI):
                 )
             else:
                 with console.status(f"Applying [code]{server_config_dir}[/]..."):
-                    await server_config_manager.apply_config(session=session)
+                    await server_config_manager.apply_config(session=session, owner=admin)
                 console.print(f"[code]✓[/] Applied [code]{server_config_dir}[/]")
-        gateway_connections_pool.server_port = SERVER_PORT
         with console.status("Initializing gateways..."):
             await init_gateways(session=session)
         console.print("[code]✓[/] Initialized gateways")

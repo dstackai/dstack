@@ -7,8 +7,11 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
-from dstack._internal.core.models.instances import InstanceType, Resources
+from dstack._internal.core.models.configurations import (
+    AnyRunConfiguration,
+    DevEnvironmentConfiguration,
+)
+from dstack._internal.core.models.instances import InstanceConfiguration, InstanceType, Resources
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
@@ -16,11 +19,13 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
+from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     JobProvisioningData,
     JobStatus,
     JobTerminationReason,
+    Requirements,
     RunSpec,
     RunStatus,
 )
@@ -150,6 +155,7 @@ def get_run_spec(
     run_name: str,
     repo_id: str,
     profile: Optional[Profile] = None,
+    configuration: Optional[AnyRunConfiguration] = None,
 ) -> RunSpec:
     if profile is None:
         profile = Profile(name="default")
@@ -160,7 +166,7 @@ def get_run_spec(
         repo_code_hash=None,
         working_dir=".",
         configuration_path="dstack.yaml",
-        configuration=DevEnvironmentConfiguration(ide="vscode"),
+        configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
         ssh_key_pub="",
     )
@@ -175,13 +181,17 @@ async def create_run(
     status: RunStatus = RunStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
+    run_id: Optional[UUID] = None,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
             run_name=run_name,
             repo_id=repo.name,
         )
+    if run_id is None:
+        run_id = uuid.uuid4()
     run = RunModel(
+        id=run_id,
         project_id=project.id,
         repo_id=repo.id,
         user_id=user.id,
@@ -209,14 +219,14 @@ async def create_job(
     job_num: int = 0,
     replica_num: int = 0,
 ) -> JobModel:
-    run_spec = RunSpec.__response__.parse_raw(run.run_spec)
-    job_spec = get_job_specs_from_run_spec(run_spec)[0]
+    run_spec = RunSpec.parse_raw(run.run_spec)
+    job_spec = get_job_specs_from_run_spec(run_spec, replica_num=replica_num)[0]
     job = JobModel(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
         job_num=job_num,
-        job_name=run.run_name + "-0",
+        job_name=run.run_name + f"-0-{replica_num}",
         replica_num=replica_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
@@ -320,6 +330,9 @@ async def create_instance(
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     finished_at: Optional[datetime] = None,
     spot: bool = False,
+    profile: Optional[Profile] = None,
+    requirements: Optional[Requirements] = None,
+    instance_configuration: Optional[InstanceConfiguration] = None,
 ) -> InstanceModel:
     job_provisioning_data = {
         "backend": "datacrunch",
@@ -362,6 +375,20 @@ async def create_instance(
         "availability": "available",
     }
 
+    if profile is None:
+        profile = Profile(name="test_name")
+
+    if requirements is None:
+        requirements = Requirements(resources=ResourcesSpec(cpu=1))
+
+    if instance_configuration is None:
+        instance_configuration = InstanceConfiguration(
+            project_name="test_proj",
+            instance_name="test_instance_name",
+            ssh_keys=[],
+            user="test_user",
+        )
+
     im = InstanceModel(
         name="test_instance",
         pool=pool,
@@ -376,6 +403,13 @@ async def create_instance(
         region="eu-west",
         backend=BackendType.DATACRUNCH,
         termination_idle_time=DEFAULT_POOL_TERMINATION_IDLE_TIME,
+        profile=profile.json(),
+        requirements=requirements.json(),
+        instance_configuration=instance_configuration.json(),
+        retry_policy=profile.retry_policy.retry if profile.retry_policy is not None else False,
+        retry_policy_duration=profile.retry_policy.limit
+        if profile.retry_policy is not None
+        else 123,
     )
     session.add(im)
     await session.commit()

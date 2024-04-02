@@ -68,7 +68,7 @@ class TensorDockConfigurator(Configurator):
         return TensorDockBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> TensorDockConfig:
-        return TensorDockConfig(
+        return TensorDockConfig.__response__(
             **json.loads(model.config),
             creds=TensorDockCreds.parse_raw(model.auth),
         )

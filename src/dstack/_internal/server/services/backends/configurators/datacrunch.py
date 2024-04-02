@@ -70,7 +70,7 @@ class DataCrunchConfigurator(Configurator):
         return DataCrunchBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> DataCrunchConfig:
-        return DataCrunchConfig(
+        return DataCrunchConfig.__response__(
             **json.loads(model.config),
             creds=DataCrunchCreds.parse_raw(model.auth),
         )
