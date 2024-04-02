@@ -58,6 +58,7 @@ class RunpodConfigurator(Configurator):
         if config.regions is None:
             config.regions = REGIONS
         return BackendModel(
+            project_id=project.id,
             type=self.TYPE.value,
             config=RunpodStoredConfig(**RunpodConfigInfo.parse_obj(config).dict()).json(),
             auth=RunpodCreds.parse_obj(config.creds).json(),
