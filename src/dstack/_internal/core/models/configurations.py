@@ -39,7 +39,7 @@ class RegistryAuth(CoreModel):
         password (str): The password or access token
     """
 
-    username: Annotated[Optional[str], Field(description="The username")]
+    username: Annotated[str, Field(description="The username")]
     password: Annotated[str, Field(description="The password or access token")]
 
 

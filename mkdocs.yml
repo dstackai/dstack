@@ -50,7 +50,7 @@ theme:
     #    - navigation.instant
     #    - toc.integrate
     - navigation.sections
-    #    - navigation.expand
+    - navigation.expand
     - navigation.top
     - announce.dismiss
     - navigation.tracking
@@ -66,16 +66,14 @@ plugins:
       blog_dir: blog
       post_url_format: "{slug}"
       blog_toc: true
-#  0.17.0 workaround
-#  see https://github.com/squidfunk/mkdocs-material/issues/6983
-#  - social:
-#      cards_layout_options:
-#        background_color: "black"
-#        color: "#FFFFFF"
-#        font_family: "Roboto"
+  - social:
+      cards_layout_options:
+        background_color: "black"
+        color: "#FFFFFF"
+        font_family: "Roboto"
 #      debug: true
-#      cards_layout_dir: layouts
-#      cards_layout: custom
+      cards_layout_dir: layouts
+      cards_layout: custom
   - search
   - redirects:
       redirect_maps:
@@ -197,10 +195,13 @@ nav:
           - Services: docs/concepts/services.md
           - Pools: docs/concepts/pools.md
       - Reference:
-          - CLI: docs/reference/cli/index.md
-          - .dstack.yml: docs/reference/dstack.yml.md
-          - server/config.yml: docs/reference/server/config.yml.md
+          - .dstack.yml:
+              - dev-environment: docs/reference/dstack.yml/dev-environment.md
+              - task: docs/reference/dstack.yml/task.md
+              - service: docs/reference/dstack.yml/service.md
           - profiles.yml: docs/reference/profiles.yml.md
+          - CLI: docs/reference/cli/index.md
+          - server/config.yml: docs/reference/server/config.yml.md
           - API:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
