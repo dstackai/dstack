@@ -60,7 +60,9 @@ class RunpodConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=RunpodStoredConfig(**RunpodConfigInfo.__response__.parse_obj(config).dict()).json(),
+            config=RunpodStoredConfig(
+                **RunpodConfigInfo.__response__.parse_obj(config).dict()
+            ).json(),
             auth=RunpodCreds.parse_obj(config.creds).json(),
         )
 

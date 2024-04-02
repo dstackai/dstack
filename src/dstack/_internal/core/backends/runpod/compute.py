@@ -3,7 +3,10 @@ from typing import List, Optional
 
 from dstack._internal import settings
 from dstack._internal.core.backends.base import Compute
-from dstack._internal.core.backends.base.compute import get_dstack_runner_version, get_instance_name
+from dstack._internal.core.backends.base.compute import (
+    get_dstack_runner_version,
+    get_instance_name,
+)
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
 from dstack._internal.core.errors import BackendError
