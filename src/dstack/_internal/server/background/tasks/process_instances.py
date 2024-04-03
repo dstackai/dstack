@@ -439,47 +439,53 @@ async def terminate(instance_id: UUID) -> None:
 
 async def terminate_idle_instance() -> None:
     async with get_session_ctx() as session:
-        res = await session.execute(
-            select(InstanceModel)
-            .where(
-                InstanceModel.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE,
-                InstanceModel.deleted == False,
-                InstanceModel.job == None,  # noqa: E711
+        async with PROCESSING_POOL_LOCK:
+            res = await session.execute(
+                select(InstanceModel)
+                .where(
+                    InstanceModel.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE,
+                    InstanceModel.deleted == False,
+                    InstanceModel.job == None,  # noqa: E711
+                    InstanceModel.status == InstanceStatus.IDLE,
+                )
+                .options(joinedload(InstanceModel.project))
             )
-            .options(joinedload(InstanceModel.project))
-        )
-        instances = res.scalars().all()
+            instances = res.scalars().all()
 
-        for instance in instances:
-            last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
-            if instance.last_job_processed_at is not None:
-                last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+            for instance in instances:
+                last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
+                if instance.last_job_processed_at is not None:
+                    last_time = instance.last_job_processed_at.replace(
+                        tzinfo=datetime.timezone.utc
+                    )
 
-            idle_seconds = instance.termination_idle_time
-            delta = datetime.timedelta(seconds=idle_seconds)
+                idle_seconds = instance.termination_idle_time
+                delta = datetime.timedelta(seconds=idle_seconds)
 
-            current_time = get_current_datetime().replace(tzinfo=datetime.timezone.utc)
+                current_time = get_current_datetime().replace(tzinfo=datetime.timezone.utc)
 
-            if last_time + delta < current_time:
-                jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
-                await terminate_job_provisioning_data_instance(
-                    project=instance.project, job_provisioning_data=jpd
-                )
-                instance.deleted = True
-                instance.deleted_at = get_current_datetime()
-                instance.finished_at = get_current_datetime()
-                instance.status = InstanceStatus.TERMINATED
-                instance.termination_reason = "Idle timeout"
+                if last_time + delta < current_time:
+                    jpd = JobProvisioningData.__response__.parse_raw(
+                        instance.job_provisioning_data
+                    )
+                    await terminate_job_provisioning_data_instance(
+                        project=instance.project, job_provisioning_data=jpd
+                    )
+                    instance.deleted = True
+                    instance.deleted_at = get_current_datetime()
+                    instance.finished_at = get_current_datetime()
+                    instance.status = InstanceStatus.TERMINATED
+                    instance.termination_reason = "Idle timeout"
 
-                idle_time = current_time - last_time
-                logger.info(
-                    "instance %s terminated by termination policy: idle time %ss",
-                    instance.name,
-                    str(idle_time.seconds),
-                    extra={
-                        "instance_name": instance.name,
-                        "instance_status": InstanceStatus.TERMINATED.value,
-                    },
-                )
+                    idle_time = current_time - last_time
+                    logger.info(
+                        "Instance %s terminated by termination policy: idle time %ss",
+                        instance.name,
+                        str(idle_time.seconds),
+                        extra={
+                            "instance_name": instance.name,
+                            "instance_status": InstanceStatus.TERMINATED.value,
+                        },
+                    )
 
-        await session.commit()
+            await session.commit()
