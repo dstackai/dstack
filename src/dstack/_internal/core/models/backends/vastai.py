@@ -11,7 +11,7 @@ class VastAIConfigInfo(CoreModel):
 
 
 class VastAIAPIKeyCreds(CoreModel):
-    type: Annotated[Literal["apy_key"], Field(description="The type of credentials")] = "apy_key"
+    type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"
     api_key: Annotated[str, Field(description="The API key")]
 
 
