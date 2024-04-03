@@ -11,15 +11,15 @@ body:
     validations:
       required: true
   - type: textarea
-    id: expected-behaviour
-    attributes:
-      label: Expected behaviour
-      description: Specify the expected behavior.
-  - type: textarea
     id: actual-behaviour
     attributes:
       label: Actual behaviour
       description: Specify the actual behavior (along with complete outputs, detailed screenshots, etc.).
+  - type: textarea
+    id: expected-behaviour
+    attributes:
+      label: Expected behaviour
+      description: Specify the expected behavior.
   - type: input
     id: dstack-version
     attributes:
