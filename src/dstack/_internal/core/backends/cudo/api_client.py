@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -40,8 +40,8 @@ class CudoApiClient:
         vcpus: int,
         vm_id: str,
         customSshKeys,
-        start_script: str = None,
-    ):
+        start_script: Optional[str] = None,
+    ) -> Dict:
         data = {
             "bootDisk": {
                 "storage_class": boot_disk_storage_class,
@@ -60,15 +60,11 @@ class CudoApiClient:
             "customSshKeys": customSshKeys,
         }
         resp = self._make_request("POST", f"/projects/{project_id}/vm", data)
-        if resp.ok:
-            data = resp.json()
-            return data
+        return resp.json()
 
     def terminate_virtual_machine(self, vm_id: str, project_id):
         resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
-        if resp.ok:
-            data = resp.json()
-            return data
+        return resp.json()
 
     def _make_request(self, method: str, path: str, data: Any = None):
         try:
@@ -77,11 +73,15 @@ class CudoApiClient:
                 url=API_URL + path,
                 json=data,
                 headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=30,
             )
             response.raise_for_status()
             return response
         except requests.HTTPError as e:
-            if e.response.status_code in (requests.codes.forbidden, requests.codes.unauthorized):
+            if e.response is not None and e.response.status_code in (
+                requests.codes.forbidden,
+                requests.codes.unauthorized,
+            ):
                 raise BackendInvalidCredentialsError(e.response.text)
             raise
 
@@ -92,22 +92,18 @@ class CudoApiClient:
         if found_keys:
             key = found_keys[0]
             return key["id"]
-
         key_id = self.create_ssh_key(public_key)
         return key_id
 
     def list_ssh_keys(self) -> List[Dict]:
         resp = self._make_request("GET", "/ssh-keys")
-        if resp.ok:
-            return resp.json()["sshKeys"]
+        return resp.json()["sshKeys"]
 
     def create_ssh_key(self, public_key: str) -> str:
         data = {"publicKey": public_key}
         resp = self._make_request("POST", "/ssh-keys", data)
-        if resp.ok:
-            return resp.json()["id"]
+        return resp.json()["id"]
 
-    def get_vm(self, project_id, vm_id):
+    def get_vm(self, project_id, vm_id) -> Dict:
         resp = self._make_request("GET", f"/projects/{project_id}/vms/{vm_id}")
-        if resp.ok:
-            return resp.json()
+        return resp.json()

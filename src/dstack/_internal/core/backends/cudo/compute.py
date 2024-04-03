@@ -26,6 +26,10 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+_WAIT_FOR_INSTANCE_ATTEMPTS = 30
+_WAIT_FOR_INSTANCE_INTERVAL = 2
+
+
 class CudoCompute(Compute):
     def __init__(self, config: CudoConfig):
         self.config = config
@@ -43,6 +47,7 @@ class CudoCompute(Compute):
                 **offer.dict(), availability=InstanceAvailability.AVAILABLE
             )
             for offer in offers
+            if offer.region not in ["in-hyderabad-1"]
         ]
         return offers
 
@@ -109,11 +114,15 @@ class CudoCompute(Compute):
             if response_code == 9:
                 raise BackendError(details.get("message"))
 
-        vm = self.api_client.get_vm(self.config.project_id, instance_config.instance_name)
-        # Wait until VM State is Active. This is necessary to get the ip_address.
-        while vm["VM"]["state"] != "ACTIVE":
-            time.sleep(1)
+        for _ in range(_WAIT_FOR_INSTANCE_ATTEMPTS):
             vm = self.api_client.get_vm(self.config.project_id, instance_config.instance_name)
+            if vm["VM"]["state"] == "FAILED":
+                raise BackendError("VM entered FAILED state", vm)
+            if vm["VM"]["state"] == "ACTIVE":
+                break
+            time.sleep(_WAIT_FOR_INSTANCE_INTERVAL)
+        else:
+            raise BackendError("Failed waiting for VM to become ACTIVE", vm)
 
         launched_instance = LaunchedInstanceInfo(
             instance_id=resp_data["id"],
