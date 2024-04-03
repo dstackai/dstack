@@ -78,7 +78,9 @@ class RepoCollection:
                 )
             except InvalidRepoCredentialsError as e:
                 raise ConfigurationError(*e.args)
-        self._api_client.repos.init(self._project, repo.repo_id, repo.run_repo_data, creds)
+        self._api_client.repos.init(
+            self._project, repo.repo_id, repo.run_repo_data.to_info(), creds
+        )
 
     def is_initialized(
         self,

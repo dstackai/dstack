@@ -76,6 +76,14 @@ class RemoteRunRepoData(RemoteRepoInfo):
             else:
                 return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
 
+    def to_info(self) -> RemoteRepoInfo:
+        return RemoteRepoInfo(
+            repo_host_name=self.repo_host_name,
+            repo_port=self.repo_port,
+            repo_user_name=self.repo_user_name,
+            repo_name=self.repo_name,
+        )
+
 
 class RemoteRepo(Repo):
     """

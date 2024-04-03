@@ -157,10 +157,6 @@ class TestInitRepo:
                 "repo_port": None,
                 "repo_user_name": "dstackai",
                 "repo_name": "dstack",
-                "repo_branch": "test_branch",
-                "repo_hash": "test_hash",
-                "repo_config_name": "test_user",
-                "repo_config_email": "test_user@gmail.com",
             },
             "repo_creds": {
                 "protocol": "https",
