@@ -60,7 +60,10 @@ def generate_schema_reference(
                 "",
             ]
         )
+    print(cls)
+    print(cls.__fields__)
     for name, field in cls.__fields__.items():
+        print()
         values = dict(
             name=name,
             description=field.field_info.description,
@@ -68,12 +71,14 @@ def generate_schema_reference(
             default=field.default,
             required=field.required,
         )
+        print(values)
         # TODO: If the field doesn't have description (e.g. BaseConfiguration.type), we could fallback to docstring
         if values["description"]:
             if overrides and name in overrides:
                 values.update(overrides[name])
             field_type = next(iter(get_args(field.annotation)), None)
             # TODO: This is a dirty workaround
+            print(field_type)
             if field_type:
                 if field.annotation.__name__ == "Annotated":
                     if field_type.__name__ == "Optional":
