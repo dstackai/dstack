@@ -18,7 +18,7 @@ from dstack._internal.core.models.repos.virtual import VirtualRepoInfo, VirtualR
 
 AnyRunRepoData = Union[RemoteRunRepoData, LocalRunRepoData, VirtualRunRepoData]
 
-AnyRepoInfo = Union[RemoteRepoInfo, LocalRepoInfo, VirtualRepoInfo]
+AnyRepoInfo = Union[RemoteRepoInfo, RemoteRunRepoData, LocalRepoInfo, VirtualRepoInfo]
 
 
 class RepoHead(CoreModel):
