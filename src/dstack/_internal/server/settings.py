@@ -20,6 +20,7 @@ SERVER_ENVIRONMENT = os.getenv("DSTACK_SERVER_ENVIRONMENT", "dev")
 
 ROOT_LOG_LEVEL = os.getenv("DSTACK_SERVER_ROOT_LOG_LEVEL", "ERROR").upper()
 LOG_LEVEL = os.getenv("DSTACK_SERVER_LOG_LEVEL", "WARNING").upper()
+LOG_FORMAT = os.getenv("DSTACK_SERVER_LOG_FORMAT", "rich").lower()
 
 ALEMBIC_MIGRATIONS_LOCATION = os.getenv(
     "DSTACK_ALEMBIC_MIGRATIONS_LOCATION", "dstack._internal.server:migrations"

@@ -66,6 +66,20 @@ async def lifespan(app: FastAPI):
     configure_logging()
     await migrate()
     async with get_session_ctx() as session:
+        console.print(
+            """[purple]╱╱╭╮╱╱╭╮╱╱╱╱╱╱╭╮
+╱╱┃┃╱╭╯╰╮╱╱╱╱╱┃┃
+╭━╯┣━┻╮╭╋━━┳━━┫┃╭╮
+┃╭╮┃━━┫┃┃╭╮┃╭━┫╰╯╯
+┃╰╯┣━━┃╰┫╭╮┃╰━┫╭╮╮
+╰━━┻━━┻━┻╯╰┻━━┻╯╰╯
+╭━━┳━━┳━┳╮╭┳━━┳━╮
+┃━━┫┃━┫╭┫╰╯┃┃━┫╭╯
+┣━━┃┃━┫┃╰╮╭┫┃━┫┃
+╰━━┻━━┻╯╱╰╯╰━━┻╯
+[/]"""
+        )
+
         admin, _ = await get_or_create_admin_user(session=session)
         default_project, project_created = await get_or_create_default_project(
             session=session, user=admin
@@ -87,8 +101,9 @@ async def lifespan(app: FastAPI):
                     await server_config_manager.apply_config(session=session, owner=admin)
                 console.print(f"[code]✓[/] Applied [code]{server_config_dir}[/]")
         with console.status("Initializing gateways..."):
-            await init_gateways(session=session)
-        console.print("[code]✓[/] Initialized gateways")
+            gateways_num = await init_gateways(session=session)
+        if gateways_num:
+            console.print("[code]✓[/] Initialized gateways")
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
@@ -100,9 +115,9 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
-    console.print(f"\nThe admin token is [code]{admin.token}[/]")
+    console.print(f"\nThe [code]admin[/] token is [code]{admin.token}[/]")
     console.print(
-        f"The dstack server [code]{dstack_version}[/] is running at [code]{SERVER_URL}[/]\n"
+        f"The dstack server [yellow]{dstack_version}[/] is running at [code]{SERVER_URL}[/]\n"
     )
     for func in _ON_STARTUP_HOOKS:
         await func(app)
