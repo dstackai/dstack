@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import sys
 
 from pythonjsonlogger import jsonlogger
@@ -19,25 +18,27 @@ class AsyncioCancelledErrorFilter(logging.Filter):
 
 
 def configure_logging():
-    default_formatter = "rich"
-    log_format = os.getenv("DSTACK_SERVER_LOG_FORMAT", default_formatter)
-    if log_format == "rich":
-        formatter = logging.Formatter(fmt="%(message)s", datefmt="[%X]")
-        handler = DstackRichHandler(console=console)
-    else:
-        formatters = {
-            "standard": logging.Formatter(
-                fmt="%(levelname)s %(asctime)s.%(msecs)03d %(name)s %(message)s",
-                datefmt="%Y-%m-%dT%H:%M:%S",
-            ),
-            "json": jsonlogger.JsonFormatter(
-                "%(asctime)s %(name)s %(levelname)s %(message)s",
-                json_ensure_ascii=False,
-                rename_fields={"name": "logger", "asctime": "timestamp"},
-            ),
-        }
-        formatter = formatters.get(log_format, formatters[default_formatter])
-        handler = logging.StreamHandler(stream=sys.stdout)
+    formatters = {
+        "rich": logging.Formatter(fmt="%(message)s", datefmt="[%X]"),
+        "standard": logging.Formatter(
+            fmt="%(levelname)s %(asctime)s.%(msecs)03d %(name)s %(message)s",
+            datefmt="%Y-%m-%dT%H:%M:%S",
+        ),
+        "json": jsonlogger.JsonFormatter(
+            "%(asctime)s %(name)s %(levelname)s %(message)s",
+            json_ensure_ascii=False,
+            rename_fields={"name": "logger", "asctime": "timestamp", "levelname": "level"},
+        ),
+    }
+    handlers = {
+        "rich": DstackRichHandler(console=console),
+        "standard": logging.StreamHandler(stream=sys.stdout),
+        "json": logging.StreamHandler(stream=sys.stdout),
+    }
+    if settings.LOG_FORMAT not in formatters:
+        raise ValueError(f"Invalid settings.LOG_FORMAT: {settings.LOG_FORMAT}")
+    formatter = formatters.get(settings.LOG_FORMAT)
+    handler = handlers.get(settings.LOG_FORMAT)
     handler.setFormatter(formatter)
     handler.addFilter(AsyncioCancelledErrorFilter())
     root_logger = logging.getLogger(None)
