@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional
 
 import requests
+from requests import Response
 
 from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.utils.ssh import get_public_key_fingerprint
@@ -64,7 +65,7 @@ class CudoApiClient:
         resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
         return resp.json()
 
-    def _make_request(self, method: str, path: str, data: Any = None) -> Dict:
+    def _make_request(self, method: str, path: str, data: Any = None) -> Response:
         try:
             response = requests.request(
                 method=method,
