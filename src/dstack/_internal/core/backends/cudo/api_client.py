@@ -19,11 +19,9 @@ class CudoApiClient:
             return False
         return True
 
-    def get_user_details(self):
+    def get_user_details(self) -> Dict:
         resp = self._make_request("GET", "/auth")
-        if resp.ok:
-            data = resp.json()
-            return data
+        return resp.json()
 
     def create_virtual_machine(
         self,
@@ -62,11 +60,11 @@ class CudoApiClient:
         resp = self._make_request("POST", f"/projects/{project_id}/vm", data)
         return resp.json()
 
-    def terminate_virtual_machine(self, vm_id: str, project_id):
+    def terminate_virtual_machine(self, vm_id: str, project_id) -> Dict:
         resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
         return resp.json()
 
-    def _make_request(self, method: str, path: str, data: Any = None):
+    def _make_request(self, method: str, path: str, data: Any = None) -> Dict:
         try:
             response = requests.request(
                 method=method,

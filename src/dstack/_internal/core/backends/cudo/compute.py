@@ -11,7 +11,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.cudo.api_client import CudoApiClient
 from dstack._internal.core.backends.cudo.config import CudoConfig
-from dstack._internal.core.errors import BackendError, NoCapacityError
+from dstack._internal.core.errors import BackendError, ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -81,17 +81,20 @@ class CudoCompute(Compute):
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
         commands = get_shim_commands(authorized_keys=public_keys)
-
-        startup_script = " ".join([" && ".join(commands)])
+        gpus_no = len(instance_offer.instance.resources.gpus)
+        shim_commands = " ".join([" && ".join(commands)])
+        startup_script = (
+            shim_commands if gpus_no > 0 else f"{install_docker_script()} && {shim_commands}"
+        )
         try:
             resp_data = self.api_client.create_virtual_machine(
                 project_id=self.config.project_id,
                 boot_disk_storage_class="STORAGE_CLASS_NETWORK",
                 boot_disk_size_gib=disk_size,
                 book_disk_id=f"{instance_config.instance_name}_disk_id",
-                boot_disk_image_id="ubuntu-2204-nvidia-535-docker-v20240214",
+                boot_disk_image_id=_get_image_id(gpus_no > 0),
                 data_center_id=instance_offer.region,
-                gpus=len(instance_offer.instance.resources.gpus),
+                gpus=gpus_no,
                 machine_type=instance_offer.instance.name,
                 memory_gib=memory_size,
                 vcpus=instance_offer.instance.resources.cpus,
@@ -145,3 +148,13 @@ class CudoCompute(Compute):
                 logger.debug("The instance with name %s not found", instance_id)
                 return
             raise BackendError(e.response.text)
+
+
+def _get_image_id(cuda: bool) -> str:
+    image_name = "ubuntu-2204-nvidia-535-docker-v20240214" if cuda else "ubuntu-2204"
+    return image_name
+
+
+def install_docker_script():
+    commands = 'export DEBIAN_FRONTEND="noninteractive" && mkdir -p /etc/apt/keyrings && curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && apt-get update && apt-get --assume-yes install docker-ce docker-ce-cli containerd.io docker-compose-plugin'
+    return commands
