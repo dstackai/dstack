@@ -138,6 +138,7 @@ class GCPCompute(Compute):
                 instance_id=instance_name,
                 region=zone,
                 ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
+                internal_ip=instance.network_interfaces[0].network_i_p,
                 username="ubuntu",
                 ssh_port=22,
                 dockerized=True,

@@ -62,6 +62,7 @@ async def process_submitted_jobs():
                     JobModel.id.not_in(SUBMITTED_PROCESSING_JOBS_IDS),
                     JobModel.run_id.not_in(PROCESSING_RUNS_IDS),
                 )
+                .order_by(JobModel.job_num, JobModel.last_processed_at.asc())
                 .limit(1)  # TODO process multiple at once
             )
             job_model = res.scalar()
@@ -108,6 +109,14 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     run = run_model_to_run(run_model)
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+    master_job = find_job(run.jobs, job_model.replica_num, 0)
+    # Wait until the master job is provisioned to provision in the same cluster
+    if job.job_spec.job_num != 0:
+        if master_job.job_submissions[-1].job_provisioning_data is None:
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
+        # master_job_jpd = JobProvisioningData.__response__.parse_obj(master_job.job_submissions[-1].job_provisioning_data)
 
     async with PROCESSING_POOL_LOCK:
         pool_instances = get_pool_instances(pool)
@@ -275,6 +284,7 @@ async def _run_job(
                 instance_type=offer.instance,
                 instance_id=launched_instance_info.instance_id,
                 hostname=launched_instance_info.ip_address,
+                internal_ip=launched_instance_info.internal_ip,
                 region=launched_instance_info.region,
                 price=offer.price,
                 username=launched_instance_info.username,

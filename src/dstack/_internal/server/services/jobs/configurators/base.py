@@ -38,22 +38,7 @@ class JobConfigurator(ABC):
         self.run_spec = run_spec
 
     def get_job_specs(self, replica_num: int) -> List[JobSpec]:
-        job_spec = JobSpec(
-            replica_num=replica_num,  # TODO(egor-s): add to env variables in the runner
-            job_num=0,
-            job_name=self.run_spec.run_name
-            + f"-0-{replica_num}",  # TODO(egor-s): use actual job_num
-            app_specs=self._app_specs(),
-            commands=self._commands(),
-            env=self._env(),
-            home_dir=self._home_dir(),
-            image_name=self._image_name(),
-            max_duration=self._max_duration(),
-            registry_auth=self._registry_auth(),
-            requirements=self._requirements(),
-            retry_policy=self._retry_policy(),
-            working_dir=self._working_dir(),
-        )
+        job_spec = self._get_job_spec(replica_num=replica_num, job_num=0, jobs_per_replica=1)
         return [job_spec]
 
     @abstractmethod
@@ -75,6 +60,30 @@ class JobConfigurator(ABC):
     @abstractmethod
     def _ports(self) -> List[PortMapping]:
         pass
+
+    def _get_job_spec(
+        self,
+        replica_num: int,
+        job_num: int,
+        jobs_per_replica: int,
+    ) -> JobSpec:
+        job_spec = JobSpec(
+            replica_num=replica_num,  # TODO(egor-s): add to env variables in the runner
+            job_num=job_num,
+            job_name=f"{self.run_spec.run_name}-{job_num}-{replica_num}",
+            jobs_per_replica=jobs_per_replica,
+            app_specs=self._app_specs(),
+            commands=self._commands(),
+            env=self._env(),
+            home_dir=self._home_dir(),
+            image_name=self._image_name(),
+            max_duration=self._max_duration(),
+            registry_auth=self._registry_auth(),
+            requirements=self._requirements(),
+            retry_policy=self._retry_policy(),
+            working_dir=self._working_dir(),
+        )
+        return job_spec
 
     def _commands(self) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format

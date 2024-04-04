@@ -79,6 +79,7 @@ class LaunchedInstanceInfo(CoreModel):
     instance_id: str
     region: str
     ip_address: str
+    internal_ip: Optional[str] = None
     username: str
     ssh_port: int  # could be different from 22 for some backends
     dockerized: bool  # True if backend starts shim

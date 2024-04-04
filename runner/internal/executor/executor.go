@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -26,6 +27,7 @@ type RunExecutor struct {
 
 	run             schemas.RunSpec
 	jobSpec         schemas.JobSpec
+	clusterInfo     schemas.ClusterInfo
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
 	codePath        string
@@ -161,6 +163,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
 	ex.run = body.RunSpec
 	ex.jobSpec = body.JobSpec
+	ex.clusterInfo = body.ClusterInfo
 	ex.secrets = body.Secrets
 	ex.repoCredentials = body.RepoCredentials
 	ex.state = WaitCode
@@ -184,8 +187,12 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	jobEnvs := map[string]string{
-		"RUN_NAME": ex.run.RunName,
-		"REPO_ID":  ex.run.RepoId,
+		"RUN_NAME":              ex.run.RunName,
+		"REPO_ID":               ex.run.RepoId,
+		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
+		"DSTACK_NODE_RANK":      strconv.Itoa(ex.jobSpec.JobNum),
+		"DSTACK_NODES_NUM":      strconv.Itoa(ex.jobSpec.JobsPerReplica),
+		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(ex.clusterInfo.GPUSPerJob),
 	}
 	workingDir, err := joinRelPath(ex.workingDir, ex.jobSpec.WorkingDir)
 	if err != nil {

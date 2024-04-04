@@ -161,6 +161,7 @@ class JobSpec(CoreModel):
     replica_num: int = 0  # default value for backward compatibility
     job_num: int
     job_name: str
+    jobs_per_replica: int = 1  # default value for backward compatibility
     app_specs: Optional[List[AppSpec]]
     commands: List[str]
     env: Dict[str, str]
@@ -178,6 +179,7 @@ class JobProvisioningData(CoreModel):
     instance_type: InstanceType
     instance_id: str
     hostname: str
+    internal_ip: Optional[str]
     region: str
     price: float
     username: str
@@ -185,6 +187,11 @@ class JobProvisioningData(CoreModel):
     dockerized: bool  # True if backend starts shim
     ssh_proxy: Optional[SSHConnectionParams]
     backend_data: Optional[str]  # backend-specific data in json
+
+
+class ClusterInfo(CoreModel):
+    master_job_ip: str
+    gpus_per_job: int
 
 
 class JobSubmission(CoreModel):
