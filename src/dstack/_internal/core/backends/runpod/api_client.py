@@ -1,6 +1,7 @@
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
+from requests import Response
 
 from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
 
@@ -18,11 +19,9 @@ class RunpodApiClient:
             return False
         return True
 
-    def get_user_details(self):
+    def get_user_details(self) -> Dict:
         resp = self._make_request({"query": user_details_query, "variable": {}})
-        if resp.ok:
-            data = resp.json()
-            return data
+        return resp.json()
 
     def create_pod(
         self,
@@ -46,7 +45,7 @@ class RunpodApiClient:
         template_id: Optional[str] = None,
         network_volume_id: Optional[str] = None,
         allowed_cuda_versions: Optional[list] = None,
-    ) -> dict:
+    ) -> Dict:
         resp = self._make_request(
             {
                 "query": generate_pod_deployment_mutation(
@@ -73,23 +72,20 @@ class RunpodApiClient:
                 )
             }
         )
-        if resp.ok:
-            data = resp.json()
-            return data["data"]["podFindAndDeployOnDemand"]
+        data = resp.json()
+        return data["data"]["podFindAndDeployOnDemand"]
 
-    def get_pod(self, pod_id: str):
+    def get_pod(self, pod_id: str) -> Dict:
         resp = self._make_request({"query": generate_pod_query(pod_id)})
-        if resp.ok:
-            data = resp.json()
-            return data["data"]["pod"]
+        data = resp.json()
+        return data["data"]["pod"]
 
-    def terminate_pod(self, pod_id: str):
+    def terminate_pod(self, pod_id: str) -> Dict:
         resp = self._make_request({"query": generate_pod_terminate_mutation(pod_id)})
-        if resp.ok:
-            data = resp.json()
-            return data["data"]
+        data = resp.json()
+        return data["data"]
 
-    def _make_request(self, data: Any = None):
+    def _make_request(self, data: Any = None) -> Response:
         try:
             response = requests.request(
                 method="POST",
@@ -119,7 +115,7 @@ query myself {
 """
 
 
-def generate_pod_query(pod_id):
+def generate_pod_query(pod_id) -> str:
     """
     Generate a query for a specific GPU type
     """
@@ -185,7 +181,7 @@ def generate_pod_deployment_mutation(
     template_id=None,
     network_volume_id=None,
     allowed_cuda_versions: Optional[List[str]] = None,
-):
+) -> str:
     """
     Generates a mutation to deploy a pod on demand.
     """
