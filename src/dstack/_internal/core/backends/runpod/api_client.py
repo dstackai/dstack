@@ -1,3 +1,4 @@
+import time
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -105,6 +106,16 @@ class RunpodApiClient:
             ):
                 raise BackendInvalidCredentialsError(e.response.text)
             raise
+
+    def wait_for_instance(self, instance_id) -> Optional[Dict]:
+        WAIT_FOR_INSTANCE_ATTEMPTS = 60
+        WAIT_FOR_INSTANCE_INTERVAL = 1
+        for _ in range(WAIT_FOR_INSTANCE_ATTEMPTS):
+            pod = self.get_pod(instance_id)
+            if pod["runtime"] is not None:
+                return pod
+            time.sleep(WAIT_FOR_INSTANCE_INTERVAL)
+        return
 
 
 user_details_query = """

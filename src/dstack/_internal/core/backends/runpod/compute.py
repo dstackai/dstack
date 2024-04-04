@@ -1,4 +1,3 @@
-import time
 from typing import List, Optional
 
 from dstack._internal import settings
@@ -9,7 +8,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.errors import BackendError, ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -89,15 +88,16 @@ class RunpodCompute(Compute):
 
         instance_id = resp["id"]
         # Wait until VM State is Active. This is necessary to get the ip_address.
-        pod = self.api_client.get_pod(instance_id)
-        while pod["runtime"] is None:
-            pod = self.api_client.get_pod(resp["id"])
-            time.sleep(1)
+        pod = self.api_client.wait_for_instance(instance_id)
+        if pod is None:
+            raise ComputeError(f"Wait instance {instance_id} timeout")
+
         for port in pod["runtime"]["ports"]:
             if port["privatePort"] == 22:
                 ip = port["ip"]
                 publicPort = port["publicPort"]
                 break
+
         return LaunchedInstanceInfo(
             instance_id=instance_id,
             ip_address=ip.strip(),
