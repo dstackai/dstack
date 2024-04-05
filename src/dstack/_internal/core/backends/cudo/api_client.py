@@ -35,7 +35,7 @@ class CudoApiClient:
         gpus: int,
         machine_type: str,
         memory_gib: int,
-        password: str,
+        password: Optional[str],
         vcpus: int,
         vm_id: str,
         customSshKeys,
@@ -61,11 +61,11 @@ class CudoApiClient:
         resp = self._make_request("POST", f"/projects/{project_id}/vm", data)
         return resp.json()
 
-    def terminate_virtual_machine(self, vm_id: str, project_id) -> Dict:
+    def terminate_virtual_machine(self, vm_id: str, project_id: str) -> Dict:
         resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
         return resp.json()
 
-    def _make_request(self, method: str, path: str, data: Any = None) -> Response:
+    def _make_request(self, method: str, path: str, data: Optional[Dict] = None) -> Response:
         try:
             response = requests.request(
                 method=method,
