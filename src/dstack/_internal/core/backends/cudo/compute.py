@@ -86,12 +86,14 @@ class CudoCompute(Compute):
         startup_script = (
             shim_commands if gpus_no > 0 else f"{install_docker_script()} && {shim_commands}"
         )
+
+        boot_disk_id = f"{instance_config.instance_name}_{instance_offer.region}_disk_id"
         try:
             resp_data = self.api_client.create_virtual_machine(
                 project_id=self.config.project_id,
                 boot_disk_storage_class="STORAGE_CLASS_NETWORK",
                 boot_disk_size_gib=disk_size,
-                book_disk_id=f"{instance_config.instance_name}_disk_id",
+                book_disk_id=boot_disk_id.replace("-", "_"),
                 boot_disk_image_id=_get_image_id(gpus_no > 0),
                 data_center_id=instance_offer.region,
                 gpus=gpus_no,
