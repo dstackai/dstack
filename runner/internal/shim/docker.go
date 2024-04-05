@@ -138,6 +138,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	d.executorError = FindExecutorError(runnerDir)
 	d.state = Pending
 	d.currentContainer = ""
+
 	return nil
 }
 
