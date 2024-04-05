@@ -29,3 +29,7 @@ class Repo(ABC):
     @abstractmethod
     def write_code_file(self, fp: BinaryIO) -> str:
         pass
+
+    @abstractmethod
+    def get_repo_info(self) -> "repos.AnyRepoInfo":
+        pass
