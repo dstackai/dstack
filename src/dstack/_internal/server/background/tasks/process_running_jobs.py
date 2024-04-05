@@ -351,9 +351,12 @@ def _process_pulling_with_shim(
                 f"Executor error: {container_status.executor_error}"
             )
             return False
-        if container_status.container_name == job_model.job_name:
+        if (
+            container_status.container_name == job_model.job_name
+            and container_status.state == "pending"
+        ):
             logger.error(
-                "The docker container of the job '%s' is not working: exit code: %s, error %s",
+                "The docker container of the job '%s' is not working: exit code: %s, error %r",
                 job_model.job_name,
                 container_status.exit_code,
                 container_status.error,
