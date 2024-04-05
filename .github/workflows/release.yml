@@ -146,6 +146,10 @@ jobs:
           cp README.md src
           python setup.py sdist bdist_wheel -v
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*        
+      - name: Set output
+        run: |
+          LATEST=$(python -c "from packaging import version as pkg_version; print('' if pkg_version.parse('$VERSION').is_prerelease else '1', end='')")
+          echo "LATEST=$LATEST" >> "$GITHUB_OUTPUT"
 
   update-get-dstack-tag:
     needs: [ pypi-upload ]
@@ -185,8 +189,10 @@ jobs:
           docker buildx build --platform linux/amd64 --build-arg VERSION=$VERSION --push --provenance=false --tag dstackai/dstack:$VERSION-amd64 -f release/Dockerfile .
           docker manifest create dstackai/dstack:$VERSION --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
           docker manifest push dstackai/dstack:$VERSION
-          docker manifest create dstackai/dstack:latest --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
-          docker manifest push dstackai/dstack:latest
+          if [ -n "${{ needs.pypi-upload.outputs.LATEST }}" ]; then
+            docker manifest create dstackai/dstack:latest --amend dstackai/dstack:$VERSION-arm64 --amend dstackai/dstack:$VERSION-amd64
+            docker manifest push dstackai/dstack:latest
+          fi
       - name: Docker Hub Description
         uses: peter-evans/dockerhub-description@v4
         with:
@@ -218,9 +224,11 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           aws s3 cp configuration.json "s3://dstack-runner-downloads/$VERSION/schemas/configuration.json" --acl public-read
-          aws s3 cp configuration.json "s3://dstack-runner-downloads/latest/schemas/configuration.json" --acl public-read
-          aws s3 cp profiles.json "s3://dstack-runner-downloads/$VERSION/schemas/profiles.json" --acl public-read
-          aws s3 cp profiles.json "s3://dstack-runner-downloads/latest/schemas/profiles.json" --acl public-read
+          aws s3 cp profiles.json "s3://dstack-runner-downloads/$VERSION/schemas/profiles.json" --acl public-read      
+          if [ -n "${{ needs.pypi-upload.outputs.LATEST }}" ]; then
+            aws s3 cp configuration.json "s3://dstack-runner-downloads/latest/schemas/configuration.json" --acl public-read
+            aws s3 cp profiles.json "s3://dstack-runner-downloads/latest/schemas/profiles.json" --acl public-read
+          fi
 
   gateway-build:
     runs-on: ubuntu-latest
