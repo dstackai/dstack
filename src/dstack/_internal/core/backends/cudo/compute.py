@@ -116,6 +116,9 @@ class CudoCompute(Compute):
             # code 9: Vm cannot be assigned ip from network. Network full
             if response_code == 9:
                 raise BackendError(details.get("message"))
+            # code 6: A disk with that id already exists
+            if response_code == 6:
+                raise BackendError(details.get("message"))
 
         for _ in range(_WAIT_FOR_INSTANCE_ATTEMPTS):
             vm = self.api_client.get_vm(self.config.project_id, instance_config.instance_name)
