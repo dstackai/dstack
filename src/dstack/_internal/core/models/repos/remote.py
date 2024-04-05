@@ -76,14 +76,6 @@ class RemoteRunRepoData(RemoteRepoInfo):
             else:
                 return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
 
-    def to_info(self) -> RemoteRepoInfo:
-        return RemoteRepoInfo(
-            repo_host_name=self.repo_host_name,
-            repo_port=self.repo_port,
-            repo_user_name=self.repo_user_name,
-            repo_name=self.repo_name,
-        )
-
 
 class RemoteRepo(Repo):
     """
@@ -207,6 +199,14 @@ class RemoteRepo(Repo):
         if self.run_repo_data.repo_diff is not None:
             fp.write(self.run_repo_data.repo_diff.encode())
         return get_sha256(fp)
+
+    def get_repo_info(self) -> RemoteRepoInfo:
+        return RemoteRepoInfo(
+            repo_host_name=self.run_repo_data.repo_host_name,
+            repo_port=self.run_repo_data.repo_port,
+            repo_user_name=self.run_repo_data.repo_user_name,
+            repo_name=self.run_repo_data.repo_name,
+        )
 
 
 class _DiffCollector:

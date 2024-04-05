@@ -77,6 +77,11 @@ class LocalRepo(Repo):
             )
         return get_sha256(fp)
 
+    def get_repo_info(self) -> LocalRepoInfo:
+        return LocalRepoInfo(
+            repo_dir=self.run_repo_data.repo_dir,
+        )
+
 
 class TarIgnore(GitIgnore):
     def __call__(self, tarinfo: tarfile.TarInfo) -> Optional[tarfile.TarInfo]:
