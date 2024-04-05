@@ -5,7 +5,6 @@ on:
     inputs:
       release_tag:
         description: "dstack version"
-        default: false
 
 jobs:
   docs-deploy:
