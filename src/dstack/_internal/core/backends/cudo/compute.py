@@ -88,6 +88,9 @@ class CudoCompute(Compute):
         )
 
         boot_disk_id = f"{instance_config.instance_name}_{instance_offer.region}_disk_id"
+
+        vm_id = f"{instance_config.instance_name}-{instance_offer.region}"
+
         try:
             resp_data = self.api_client.create_virtual_machine(
                 project_id=self.config.project_id,
@@ -100,7 +103,7 @@ class CudoCompute(Compute):
                 machine_type=instance_offer.instance.name,
                 memory_gib=memory_size,
                 vcpus=instance_offer.instance.resources.cpus,
-                vm_id=instance_config.instance_name,
+                vm_id=vm_id,
                 start_script=startup_script,
                 password=None,
                 custom_ssh_keys=public_keys,

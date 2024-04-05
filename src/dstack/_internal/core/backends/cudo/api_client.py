@@ -4,9 +4,12 @@ import requests
 from requests import Response
 
 from dstack._internal.core.errors import BackendInvalidCredentialsError
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import get_public_key_fingerprint
 
 API_URL = "https://rest.compute.cudo.org/v1"
+
+logger = get_logger(__name__)
 
 
 class CudoApiClient:
