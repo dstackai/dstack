@@ -243,7 +243,7 @@ async def get_run_plan(
     creation_policy = profile.creation_policy or CreationPolicy.REUSE_OR_CREATE
 
     # TODO(egor-s): do we need to generate all replicas here?
-    jobs = get_jobs_from_run_spec(run_spec, replica_num=0)
+    jobs = await get_jobs_from_run_spec(run_spec, replica_num=0)
 
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
@@ -390,7 +390,7 @@ async def submit_run(
         await gateways.register_service(session, run_model)
 
     for replica_num in range(replicas):
-        jobs = get_jobs_from_run_spec(run_spec, replica_num=replica_num)
+        jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
         for job in jobs:
             job_model = create_job_model_for_new_submission(
                 run_model=run_model,
@@ -853,7 +853,7 @@ async def scale_run_replicas(session: AsyncSession, run_model: RunModel, replica
         for replica_num in range(
             len(active_replicas) + scheduled_replicas, len(active_replicas) + replicas_diff
         ):
-            jobs = get_jobs_from_run_spec(run_spec, replica_num=replica_num)
+            jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
             for job in jobs:
                 job_model = create_job_model_for_new_submission(
                     run_model=run_model,

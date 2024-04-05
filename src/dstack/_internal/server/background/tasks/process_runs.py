@@ -159,7 +159,7 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
             session.add(new_job_model)
     # Create missing replicas
     for replica_num in range(scheduled_replicas, replicas):
-        jobs = get_jobs_from_run_spec(run.run_spec, replica_num=replica_num)
+        jobs = await get_jobs_from_run_spec(run.run_spec, replica_num=replica_num)
         for job in jobs:
             job_model = create_job_model_for_new_submission(
                 run_model=run_model,

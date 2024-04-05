@@ -1,6 +1,17 @@
 import asyncio
 from functools import partial
-from typing import Awaitable, Callable, Iterable, List, Sequence, Set, Tuple, TypeVar, Union
+from typing import (
+    Awaitable,
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 from typing_extensions import ParamSpec
 
@@ -73,3 +84,16 @@ async def wait_to_lock(lock: asyncio.Lock, locked: Set[KeyT], key: KeyT, *, dela
                 locked.add(key)
                 return
         await asyncio.sleep(delay)
+
+
+def join_byte_stream_checked(stream: Iterable[bytes], max_size: int) -> Optional[bytes]:
+    """
+    Join an iterable of `bytes` values into one `bytes` value,
+    unless its size exceeds `max_size`.
+    """
+    result = b""
+    for chunk in stream:
+        if len(result) + len(chunk) > max_size:
+            return None
+        result += chunk
+    return result

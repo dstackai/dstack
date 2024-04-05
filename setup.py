@@ -59,6 +59,8 @@ BASE_DEPS = [
     "python-multipart",
     "filelock",
     "docker>=6.0.0",
+    "python-dxf>=11.0.0",
+    "cachetools",
     "dnspython",
     "grpcio>=1.50",  # indirect
     "gpuhunt>=0.0.9rc1",

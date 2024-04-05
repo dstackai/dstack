@@ -3,7 +3,7 @@ from typing import Any, Optional
 import pytest
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.configurations import parse
+from dstack._internal.core.models.configurations import RegistryAuth, parse
 from dstack._internal.core.models.resources import Range
 
 
@@ -50,3 +50,12 @@ class TestParseConfiguration:
                     },
                 )
             )
+
+
+def test_registry_auth_hashable():
+    """
+    RegistryAuth instances should be hashable
+    to be used as cache keys in _get_image_config
+    """
+    registry_auth = RegistryAuth(username="username", password="password")
+    hash(registry_auth)
