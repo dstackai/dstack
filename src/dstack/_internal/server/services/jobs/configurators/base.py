@@ -159,7 +159,10 @@ class JobConfigurator(ABC):
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
         )
 
-    def _working_dir(self) -> str:
+    def _working_dir(self) -> Optional[str]:
+        """
+        None means default working directory
+        """
         return self.run_spec.working_dir
 
     def _python(self) -> str:

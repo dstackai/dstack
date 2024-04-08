@@ -37,3 +37,6 @@ class TaskJobConfigurator(JobConfigurator):
 
     def _ports(self) -> List[PortMapping]:
         return self.run_spec.configuration.ports
+
+    def _working_dir(self) -> Optional[str]:
+        return None if not self._shell_commands() else super()._working_dir()
