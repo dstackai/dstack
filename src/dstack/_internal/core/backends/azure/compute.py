@@ -1,6 +1,6 @@
 import base64
 import re
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceExistsError
@@ -135,7 +135,7 @@ class AzureCompute(Compute):
                 computer_name="runnervm",
             )
             logger.info("Request succeeded")
-            public_ip = _get_vm_public_ip(
+            public_ip, private_ip = _get_vm_public_private_ips(
                 network_client=self._network_client,
                 resource_group=self.config.resource_group,
                 vm=vm,
@@ -143,6 +143,7 @@ class AzureCompute(Compute):
             return LaunchedInstanceInfo(
                 instance_id=vm.name,
                 ip_address=public_ip,
+                internal_ip=private_ip,
                 region=location,
                 username="ubuntu",
                 ssh_port=22,
@@ -220,7 +221,7 @@ class AzureCompute(Compute):
             computer_name="gatewayvm",
         )
         logger.info("Request succeeded")
-        public_ip = _get_vm_public_ip(
+        public_ip, _ = _get_vm_public_private_ips(
             network_client=self._network_client,
             resource_group=self.config.resource_group,
             vm=vm,
@@ -424,11 +425,11 @@ def _launch_instance(
     return vm
 
 
-def _get_vm_public_ip(
+def _get_vm_public_private_ips(
     network_client: network_mgmt.NetworkManagementClient,
     resource_group: str,
     vm: VirtualMachine,
-) -> str:
+) -> Tuple[str, str]:
     nic_id = vm.network_profile.network_interfaces[0].id
     nic_name = azure_utils.get_resource_name_from_resource_id(nic_id)
     nic = network_client.network_interfaces.get(
@@ -438,7 +439,9 @@ def _get_vm_public_ip(
     public_ip_id = nic.ip_configurations[0].public_ip_address.id
     public_ip_name = azure_utils.get_resource_name_from_resource_id(public_ip_id)
     public_ip = network_client.public_ip_addresses.get(resource_group, public_ip_name)
-    return public_ip.ip_address
+
+    private_ip = nic.ip_configurations[0].private_ip_address
+    return public_ip.ip_address, private_ip
 
 
 def _terminate_instance(
