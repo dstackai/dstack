@@ -1,5 +1,4 @@
 from typing import Any, Dict, List, Optional
-
 import requests
 from requests import Response
 
