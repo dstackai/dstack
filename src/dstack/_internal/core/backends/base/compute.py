@@ -2,7 +2,7 @@ import os
 import re
 from abc import ABC, abstractmethod
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import git
 import requests
@@ -18,6 +18,9 @@ from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirem
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+DSTACK_WORKING_DIR = "/root/.dstack"
 
 
 class Compute(ABC):
@@ -93,28 +96,31 @@ def get_instance_name(run: Run, job: Job) -> str:
     return f"{run.project_name}-{job.job_spec.job_name}"
 
 
-def get_user_data(
-    authorized_keys: List[str],
-    cloud_config_kwargs: Optional[Dict[Any, Any]] = None,
-) -> str:
+def get_user_data(authorized_keys: List[str]) -> str:
     commands = get_shim_commands(authorized_keys)
     return get_cloud_config(
         runcmd=[["sh", "-c", " && ".join(commands)]],
         ssh_authorized_keys=authorized_keys,
-        **(cloud_config_kwargs or {}),
     )
+
+
+def get_shim_env(build: str, authorized_keys: List[str]) -> Dict[str, str]:
+    build = get_dstack_runner_version()
+    envs = {
+        "DSTACK_RUNNER_LOG_LEVEL": "6",
+        "DSTACK_RUNNER_VERSION": build,
+        "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
+        "DSTACK_HOME": DSTACK_WORKING_DIR,
+    }
+    return envs
 
 
 def get_shim_commands(authorized_keys: List[str]) -> List[str]:
     build = get_dstack_runner_version()
-    env = {
-        "DSTACK_RUNNER_LOG_LEVEL": "6",
-        "DSTACK_RUNNER_VERSION": build,
-        "DSTACK_PUBLIC_SSH_KEY": "\n".join(authorized_keys),
-        "DSTACK_HOME": "/root/.dstack",
-    }
-    commands = get_dstack_shim(build)
-    for k, v in env.items():
+    commands = get_shim_pre_start_commands(
+        build,
+    )
+    for k, v in get_shim_env(build, authorized_keys).items():
         commands += [f'export "{k}={v}"']
     commands += get_run_shim_script()
     return commands
@@ -133,7 +139,7 @@ def get_cloud_config(**config) -> str:
     return "#cloud-config\n" + yaml.dump(config, default_flow_style=False)
 
 
-def get_dstack_shim(build: str) -> List[str]:
+def get_shim_pre_start_commands(build: str) -> List[str]:
     bucket = "dstack-runner-downloads-stgn"
     if settings.DSTACK_VERSION is not None:
         bucket = "dstack-runner-downloads"
@@ -141,15 +147,16 @@ def get_dstack_shim(build: str) -> List[str]:
     url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
 
     return [
-        f'sudo curl --connect-timeout 60 --max-time 240 --retry 1 --output /usr/local/bin/dstack-shim "{url}"',
+        f'sudo curl --compressed --connect-timeout 60 --max-time 240 --retry 1 --output /usr/local/bin/dstack-shim "{url}"',
         "sudo chmod +x /usr/local/bin/dstack-shim",
+        f"sudo mkdir {DSTACK_WORKING_DIR} -p",
     ]
 
 
 def get_run_shim_script() -> List[str]:
     dev_flag = "" if settings.DSTACK_VERSION is not None else "--dev"
     return [
-        f"mkdir /root/.dstack -p && nohup dstack-shim {dev_flag} docker --keep-container >/root/.dstack/shim.log 2>&1 &"
+        f"nohup dstack-shim {dev_flag} docker --keep-container >{DSTACK_WORKING_DIR}/shim.log 2>&1 &",
     ]
 
 

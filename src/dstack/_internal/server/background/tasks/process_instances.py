@@ -1,7 +1,8 @@
 import datetime
+import ipaddress
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, cast
 from uuid import UUID
 
 import requests
@@ -9,11 +10,30 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+from dstack._internal import settings
 from dstack._internal.core.backends import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
-from dstack._internal.core.errors import BackendError, ProvisioningError
+from dstack._internal.core.backends.base.compute import (
+    DSTACK_WORKING_DIR,
+    get_dstack_runner_version,
+    get_shim_env,
+    get_shim_pre_start_commands,
+)
+from dstack._internal.core.backends.remote.provisioning import (
+    get_host_info,
+    get_paramiko_connection,
+    host_info_to_instance_type,
+    run_pre_start_commands,
+    run_shim_as_systemd_service,
+    upload_envs,
+)
+from dstack._internal.core.errors import BackendError, ConfigurationError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    InstanceAvailability,
     InstanceConfiguration,
+    InstanceOfferWithAvailability,
+    InstanceRuntime,
+    RemoteConnectionInfo,
 )
 from dstack._internal.core.models.profiles import Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
@@ -31,10 +51,16 @@ from dstack._internal.server.services.runs import get_create_instance_offers
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.ssh import (
+    convert_pkcs8_to_pem,
+    rsa_pkey_from_str,
+)
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
 TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
+
+PROVISIONING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
 
 
 @dataclass
@@ -75,7 +101,10 @@ async def process_instances() -> None:
     try:
         for instance in instances:
             if instance.status == InstanceStatus.PENDING:
-                await create_instance(instance.id)
+                if instance.remote_connection_info is not None:
+                    await add_remote(instance.id)
+                else:
+                    await create_instance(instance.id)
             if instance.status in (
                 InstanceStatus.PROVISIONING,
                 InstanceStatus.IDLE,
@@ -86,6 +115,135 @@ async def process_instances() -> None:
                 await terminate(instance.id)
     finally:
         PROCESSING_POOL_IDS.difference_update(i.id for i in instances)
+
+
+async def add_remote(instance_id: UUID) -> None:
+    async with get_session_ctx() as session:
+        instance = (
+            await session.scalars(
+                select(InstanceModel)
+                .where(InstanceModel.id == instance_id)
+                .options(joinedload(InstanceModel.project))
+            )
+        ).one()
+
+        retry_duration_deadline = instance.created_at.replace(
+            tzinfo=datetime.timezone.utc
+        ) + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
+        if retry_duration_deadline < get_current_datetime():
+            instance.status = InstanceStatus.TERMINATED
+            instance.deleted = True
+            instance.deleted_at = get_current_datetime()
+            instance.termination_reason = "The proivisioning timeout expired"
+            await session.commit()
+            logger.warning(
+                "Failed to start the instance in %s seconds. Terminate instance %s",
+                PROVISIONING_TIMEOUT_SECONDS,
+                instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
+            )
+            return
+
+        try:
+            remote_details = RemoteConnectionInfo.parse_raw(
+                cast(str, instance.remote_connection_info)
+            )
+
+            # Prepare connection key
+            try:
+                private_string = [
+                    sk.private for sk in remote_details.ssh_keys if sk.private is not None
+                ][0]
+            except IndexError:
+                logger.error("There are no ssh private key")
+                raise ConfigurationError("The SSH private key is not provided")
+            pkey = rsa_pkey_from_str(convert_pkcs8_to_pem(private_string))
+
+            with get_paramiko_connection(
+                remote_details.ssh_user, remote_details.host, remote_details.port, pkey
+            ) as client:
+                logger.info(f"connected to {remote_details.ssh_user} {remote_details.host}")
+
+                runner_build = get_dstack_runner_version()
+
+                # Upload envs
+                shim_envs = get_shim_env(
+                    runner_build, authorized_keys=[sk.public for sk in remote_details.ssh_keys]
+                )
+                upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
+                logger.debug("The dstack-shim environemnt variables has been installed")
+
+                # Execute pre start commands
+                shim_pre_start_commands = get_shim_pre_start_commands(runner_build)
+                run_pre_start_commands(client, shim_pre_start_commands)
+                logger.debug("The script for installing dstack has been executed")
+
+                # Run dstack-shim as a systemd service
+                run_shim_as_systemd_service(
+                    client=client,
+                    working_dir=DSTACK_WORKING_DIR,
+                    dev=settings.DSTACK_VERSION is None,
+                )
+
+                # Get host info
+                host_info = get_host_info(client, DSTACK_WORKING_DIR)
+                logger.debug("Received a host_info %s", host_info)
+
+        except ProvisioningError:
+            instance.last_retry_at = get_current_datetime()
+            await session.commit()
+            return
+
+        instance_type = host_info_to_instance_type(host_info)
+
+        addresses = []
+        for address in host_info.get("addresses", []):
+            try:
+                addresses.append(str(ipaddress.IPv4Address(address.rstrip("/32"))))
+            except ipaddress.AddressValueError:
+                continue
+        internal_ip = addresses[0] if addresses else None
+
+        jpd = JobProvisioningData(
+            backend=BackendType.REMOTE,
+            instance_type=instance_type,
+            instance_id="instance_id",
+            hostname=remote_details.host,
+            region="remote",
+            price=0,
+            internal_ip=internal_ip,
+            username=remote_details.ssh_user,
+            ssh_port=22,
+            dockerized=True,
+            backend_data=None,
+            ssh_proxy=None,
+        )
+
+        instance.status = InstanceStatus.IDLE
+        instance.backend = BackendType.REMOTE
+
+        instance.region = "remote"
+
+        instance_offer = InstanceOfferWithAvailability(
+            backend=BackendType.REMOTE,
+            instance=instance_type,
+            region="remote",
+            price=0,
+            availability=InstanceAvailability.AVAILABLE,
+            instance_runtime=InstanceRuntime.SHIM,
+        )
+
+        instance.price = 0
+        instance.offer = instance_offer.json()
+        instance.job_provisioning_data = jpd.json()
+
+        instance.started_at = get_current_datetime()
+        instance.last_retry_at = get_current_datetime()
+
+        await session.commit()
 
 
 async def create_instance(instance_id: UUID) -> None:
@@ -436,14 +594,18 @@ async def terminate(instance_id: UUID) -> None:
 
         if instance.job_provisioning_data is not None:
             jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
-            backends = await backends_services.get_project_backends(project=instance.project)
-            backend = next((b for b in backends if b.TYPE == jpd.backend), None)
-            if backend is None:
-                raise ValueError(f"there is no backend {jpd.backend}")
+            if jpd.backend != BackendType.REMOTE:
+                backends = await backends_services.get_project_backends(project=instance.project)
+                backend = next((b for b in backends if b.TYPE == jpd.backend), None)
+                if backend is None:
+                    raise ValueError(f"there is no backend {jpd.backend}")
 
-            await run_async(
-                backend.compute().terminate_instance, jpd.instance_id, jpd.region, jpd.backend_data
-            )
+                await run_async(
+                    backend.compute().terminate_instance,
+                    jpd.instance_id,
+                    jpd.region,
+                    jpd.backend_data,
+                )
 
         instance.deleted = True
         instance.deleted_at = get_current_datetime()

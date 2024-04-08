@@ -3,9 +3,8 @@ from typing import List, Optional
 from pydantic import parse_obj_as
 
 import dstack._internal.server.schemas.pools as schemas_pools
-from dstack._internal.core.models.pools import Pool, PoolInstances
-from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.instances import SSHKey
+from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
 from dstack.api.server._group import APIClientGroup
 
@@ -41,18 +40,22 @@ class PoolAPIClient(APIClientGroup):
     def add_remote(
         self,
         project_name: str,
-        resources: ResourcesSpec,
-        profile: Profile,
+        pool_name: Optional[str],
         instance_name: Optional[str],
+        region: Optional[str],
         host: str,
-        port: str,
-    ) -> bool:
+        port: int,
+        ssh_user: str,
+        ssh_keys: List[SSHKey],
+    ) -> Instance:
         body = AddRemoteInstanceRequest(
-            profile=profile,
+            pool_name=pool_name,
             instance_name=instance_name,
+            region=region,
             host=host,
             port=port,
-            resources=resources,
+            ssh_user=ssh_user,
+            ssh_keys=ssh_keys,
         )
         result = self._request(f"/api/project/{project_name}/pool/add_remote", body=body.json())
-        return bool(result.json())
+        return parse_obj_as(Instance.__response__, result.json())

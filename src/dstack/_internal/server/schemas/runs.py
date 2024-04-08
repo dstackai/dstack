@@ -5,7 +5,6 @@ from uuid import UUID
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, RunSpec
 
 
@@ -40,11 +39,13 @@ class CreateInstanceRequest(CoreModel):
 
 
 class AddRemoteInstanceRequest(CoreModel):
+    pool_name: Optional[str]
     instance_name: Optional[str]
+    region: Optional[str]
     host: str
-    port: str
-    resources: ResourcesSpec
-    profile: Profile
+    port: int
+    ssh_user: str
+    ssh_keys: List[SSHKey]
 
 
 class SubmitRunRequest(CoreModel):
