@@ -26,7 +26,13 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, RunModel
+from dstack._internal.server.models import (
+    InstanceModel,
+    JobModel,
+    PoolModel,
+    ProjectModel,
+    RunModel,
+)
 from dstack._internal.server.services.jobs import (
     PROCESSING_POOL_LOCK,
     SUBMITTED_PROCESSING_JOBS_IDS,
@@ -62,7 +68,7 @@ async def process_submitted_jobs():
                     JobModel.id.not_in(SUBMITTED_PROCESSING_JOBS_IDS),
                     JobModel.run_id.not_in(PROCESSING_RUNS_IDS),
                 )
-                .order_by(JobModel.job_num, JobModel.last_processed_at.asc())
+                .order_by(JobModel.last_processed_at.asc())
                 .limit(1)  # TODO process multiple at once
             )
             job_model = res.scalar()
@@ -100,60 +106,37 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
     profile = run_spec.profile
 
-    # Try to provision on an instance from the pool
-    pool = await get_or_create_pool_by_name(
-        session=session,
-        project=project_model,
-        pool_name=profile.pool_name,
-    )
-
     run = run_model_to_run(run_model)
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+
     master_job = find_job(run.jobs, job_model.replica_num, 0)
+    master_job_provisioning_data = None
     # Wait until the master job is provisioned to provision in the same cluster
     if job.job_spec.job_num != 0:
         if master_job.job_submissions[-1].job_provisioning_data is None:
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
-        # master_job_jpd = JobProvisioningData.__response__.parse_obj(master_job.job_submissions[-1].job_provisioning_data)
-
-    async with PROCESSING_POOL_LOCK:
-        pool_instances = get_pool_instances(pool)
-
-        requirements = Requirements(
-            resources=run_spec.configuration.resources,
-            max_price=profile.max_price,
-            spot=job.job_spec.requirements.spot,
+        master_job_provisioning_data = JobProvisioningData.__response__.parse_obj(
+            master_job.job_submissions[-1].job_provisioning_data
         )
-        relevant_instances = filter_pool_instances(
-            pool_instances=pool_instances,
-            profile=profile,
-            requirements=requirements,
-            status=InstanceStatus.IDLE,
-        )
-        if len(relevant_instances) > 0:
-            sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
-            instance = sorted_instances[0]
-            instance.status = InstanceStatus.BUSY
-            instance.job = job_model
-            logger.info(
-                "The job %s switched instance %s status to BUSY",
-                job_model.job_name,
-                instance.name,
-                extra={
-                    "instance_name": instance.name,
-                    "instance_status": InstanceStatus.BUSY.value,
-                },
-            )
 
-            logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
-            job_model.job_provisioning_data = instance.job_provisioning_data
-            job_model.used_instance_id = instance.id
-            job_model.status = JobStatus.PROVISIONING
-            job_model.last_processed_at = common_utils.get_current_datetime()
-            await session.commit()
-            return
+    # Try to provision on an instance from the pool
+    pool = await get_or_create_pool_by_name(
+        session=session,
+        project=project_model,
+        pool_name=run_spec.profile.pool_name,
+    )
+    instance = await _run_job_on_pool_instance(
+        session=session,
+        pool=pool,
+        run_spec=run_spec,
+        job_model=job_model,
+        job=job,
+        master_job_provisioning_data=master_job_provisioning_data,
+    )
+    if instance is not None:
+        return
 
     if profile.creation_policy == CreationPolicy.REUSE:
         logger.debug("%s: reuse instance failed", fmt(job_model))
@@ -164,80 +147,115 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         return
 
     # Create a new cloud instance
-    # TODO: create VM (backend.compute().create_instance)
-    run_job_result = await _run_job(
+    run_job_result = await _run_job_on_new_instance(
         project_model=project_model,
         job_model=job_model,
         run=run,
         job=job,
         project_ssh_public_key=project_model.ssh_public_key,
         project_ssh_private_key=project_model.ssh_private_key,
+        master_job_provisioning_data=master_job_provisioning_data,
     )
-
     if run_job_result is None:
         logger.debug("%s: provisioning failed", fmt(job_model))
         job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-    else:
-        logger.info("%s: now is provisioning a new instance", fmt(job_model))
+        job_model.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
+        return
 
-        job_provisioning_data, offer = run_job_result
-        job_model.job_provisioning_data = job_provisioning_data.json()
-        job_model.status = JobStatus.PROVISIONING
-
-        termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
-        termination_idle_time = profile.termination_idle_time
-        if termination_idle_time is None:
-            termination_idle_time = DEFAULT_RUN_TERMINATION_IDLE_TIME
-        if not job_provisioning_data.dockerized:
-            # terminate vastai/k8s instances immediately
-            termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
-            termination_idle_time = 0
-        instance = InstanceModel(
-            name=job.job_spec.job_name,  # TODO: make new name
-            project=project_model,
-            pool=pool,
-            created_at=common_utils.get_current_datetime(),
-            started_at=common_utils.get_current_datetime(),
-            status=InstanceStatus.PROVISIONING,
-            job_provisioning_data=job_provisioning_data.json(),
-            offer=offer.json(),
-            termination_policy=termination_policy,
-            termination_idle_time=termination_idle_time,
-            job=job_model,
-            backend=offer.backend,
-            price=offer.price,
-            region=offer.region,
-        )
-        logger.info(
-            "The job %s created the new instance %s",
-            job_model.job_name,
-            instance.name,
-            extra={
-                "instance_name": instance.name,
-                "instance_status": InstanceStatus.PROVISIONING.value,
-            },
-        )
-        session.add(instance)
-        await session.flush()  # to get im.id
-        job_model.used_instance_id = instance.id
+    logger.info("%s: now is provisioning a new instance", fmt(job_model))
+    job_provisioning_data, offer = run_job_result
+    job_model.job_provisioning_data = job_provisioning_data.json()
+    job_model.status = JobStatus.PROVISIONING
+    instance = _create_instance_model_for_job(
+        project_model=project_model,
+        pool=pool,
+        run_spec=run_spec,
+        job_model=job_model,
+        job=job,
+        job_provisioning_data=job_provisioning_data,
+        offer=offer,
+    )
+    logger.info(
+        "The job %s created the new instance %s",
+        job_model.job_name,
+        instance.name,
+        extra={
+            "instance_name": instance.name,
+            "instance_status": InstanceStatus.PROVISIONING.value,
+        },
+    )
+    session.add(instance)
+    await session.flush()  # to get im.id
+    job_model.used_instance_id = instance.id
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
 
 
-async def _run_job(
+async def _run_job_on_pool_instance(
+    session: AsyncSession,
+    pool: PoolModel,
+    run_spec: RunSpec,
+    job_model: JobModel,
+    job: Job,
+    master_job_provisioning_data: Optional[JobProvisioningData] = None,
+) -> Optional[InstanceModel]:
+    async with PROCESSING_POOL_LOCK:
+        pool_instances = get_pool_instances(pool)
+        requirements = Requirements(
+            resources=run_spec.configuration.resources,
+            max_price=run_spec.profile.max_price,
+            spot=job.job_spec.requirements.spot,
+        )
+        relevant_instances = filter_pool_instances(
+            pool_instances=pool_instances,
+            profile=run_spec.profile,
+            requirements=requirements,
+            status=InstanceStatus.IDLE,
+            multinode=job.job_spec.jobs_per_replica > 1,
+            master_job_provisioning_data=master_job_provisioning_data,
+        )
+        if len(relevant_instances) == 0:
+            return None
+        sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
+        instance = sorted_instances[0]
+        instance.status = InstanceStatus.BUSY
+        instance.job = job_model
+        logger.info(
+            "The job %s switched instance %s status to BUSY",
+            job_model.job_name,
+            instance.name,
+            extra={
+                "instance_name": instance.name,
+                "instance_status": InstanceStatus.BUSY.value,
+            },
+        )
+        logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
+        job_model.job_provisioning_data = instance.job_provisioning_data
+        job_model.used_instance_id = instance.id
+        job_model.status = JobStatus.PROVISIONING
+        job_model.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
+        return instance
+
+
+async def _run_job_on_new_instance(
     project_model: ProjectModel,
     job_model: JobModel,
     run: Run,
     job: Job,
     project_ssh_public_key: str,
     project_ssh_private_key: str,
+    master_job_provisioning_data: Optional[JobProvisioningData] = None,
 ) -> Optional[Tuple[JobProvisioningData, InstanceOfferWithAvailability]]:
     offers = await get_offers_by_requirements(
         project=project_model,
         profile=run.run_spec.profile,
         requirements=job.job_spec.requirements,
         exclude_not_available=True,
+        multinode=job.job_spec.jobs_per_replica > 1,
+        master_job_provisioning_data=master_job_provisioning_data,
     )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
@@ -295,3 +313,40 @@ async def _run_job(
             )
             return job_provisioning_data, offer
     return None
+
+
+def _create_instance_model_for_job(
+    project_model: ProjectModel,
+    pool: PoolModel,
+    run_spec: RunSpec,
+    job_model: JobModel,
+    job: Job,
+    job_provisioning_data: JobProvisioningData,
+    offer: InstanceOfferWithAvailability,
+) -> InstanceModel:
+    profile = run_spec.profile
+    termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
+    termination_idle_time = profile.termination_idle_time
+    if termination_idle_time is None:
+        termination_idle_time = DEFAULT_RUN_TERMINATION_IDLE_TIME
+    if not job_provisioning_data.dockerized:
+        # terminate vastai/k8s instances immediately
+        termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+        termination_idle_time = 0
+    instance = InstanceModel(
+        name=job.job_spec.job_name,  # TODO: make new name
+        project=project_model,
+        pool=pool,
+        created_at=common_utils.get_current_datetime(),
+        started_at=common_utils.get_current_datetime(),
+        status=InstanceStatus.PROVISIONING,
+        job_provisioning_data=job_provisioning_data.json(),
+        offer=offer.json(),
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
+        job=job_model,
+        backend=offer.backend,
+        price=offer.price,
+        region=offer.region,
+    )
+    return instance

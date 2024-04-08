@@ -13,6 +13,10 @@ from sqlalchemy.orm import joinedload
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
+from dstack._internal.core.backends import (
+    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
+    BACKENDS_WITH_MULTINODE_SUPPORT,
+)
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import (
     RepoDoesNotExistError,
@@ -40,6 +44,7 @@ from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
     JobPlan,
+    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobSubmission,
@@ -58,6 +63,7 @@ from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
+    PoolModel,
     ProjectModel,
     RepoModel,
     RunModel,
@@ -97,16 +103,6 @@ from dstack._internal.server.services.users import get_user_model_by_name
 from dstack._internal.server.utils.common import wait_to_lock, wait_unlock
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
-
-BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
-    BackendType.AWS,
-    BackendType.AZURE,
-    BackendType.CUDO,
-    BackendType.DATACRUNCH,
-    BackendType.GCP,
-    BackendType.LAMBDA,
-    BackendType.TENSORDOCK,
-]
 
 logger = get_logger(__name__)
 
@@ -246,34 +242,21 @@ async def get_run_plan(
     profile = run_spec.profile
     creation_policy = profile.creation_policy or CreationPolicy.REUSE_OR_CREATE
 
+    # TODO(egor-s): do we need to generate all replicas here?
+    jobs = get_jobs_from_run_spec(run_spec, replica_num=0)
+
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
     )
-
-    requirements = Requirements(
-        resources=run_spec.configuration.resources,
-        max_price=profile.max_price,
-        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.AUTO),
+    pool_offers = _get_pool_offers(
+        pool=pool,
+        run_spec=run_spec,
+        job=jobs[0],
     )
-    pool_filtered_instances = filter_pool_instances(
-        pool_instances=get_pool_instances(pool),
-        profile=profile,
-        requirements=requirements,
-    )
-    pool_offers: List[InstanceOfferWithAvailability] = []
-    for instance in pool_filtered_instances:
-        offer = InstanceOfferWithAvailability.__response__.parse_raw(instance.offer)
-        offer.availability = InstanceAvailability.BUSY
-        if instance.status == InstanceStatus.IDLE:
-            offer.availability = InstanceAvailability.IDLE
-        pool_offers.append(offer)
-
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
-    # TODO(egor-s): do we need to generate all replicas here?
-    jobs = get_jobs_from_run_spec(run_spec, replica_num=0)
-    job_plans = []
 
+    job_plans = []
     for job in jobs:
         job_offers: List[InstanceOfferWithAvailability] = []
         job_offers.extend(pool_offers)
@@ -284,6 +267,7 @@ async def get_run_plan(
                 profile=profile,
                 requirements=job.job_spec.requirements,
                 exclude_not_available=False,
+                multinode=job.job_spec.jobs_per_replica > 1,
             )
             job_offers.extend(offer for _, offer in offers)
 
@@ -309,6 +293,8 @@ async def get_offers_by_requirements(
     profile: Profile,
     requirements: Requirements,
     exclude_not_available=False,
+    multinode: bool = False,
+    master_job_provisioning_data: Optional[JobProvisioningData] = None,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
@@ -320,10 +306,20 @@ async def get_offers_by_requirements(
     ):
         profile.backends = None
 
-    if profile.backends is not None:
-        backends = [
-            b for b in backends if b.TYPE in profile.backends or b.TYPE == BackendType.DSTACK
-        ]
+    backend_types = profile.backends
+    regions = profile.regions
+    if multinode:
+        if not backend_types:
+            backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
+    # For multi-node, restrict backend and region.
+    # The default behavior is to provision all nodes in the same backend and region.
+    if master_job_provisioning_data is not None:
+        backend_types = [master_job_provisioning_data.backend]
+        regions = [master_job_provisioning_data.region]
+
+    if backend_types is not None:
+        backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
 
     offers = await backends_services.get_instance_offers(
         backends=backends,
@@ -334,11 +330,11 @@ async def get_offers_by_requirements(
     # Filter offers again for backends since a backend
     # can return offers of different backend types (e.g. BackendType.DSTACK).
     # The first filter should remain as an optimization.
-    if profile.backends is not None:
-        offers = [(b, o) for b, o in offers if o.backend in profile.backends]
+    if backend_types is not None:
+        offers = [(b, o) for b, o in offers if o.backend in backend_types]
 
-    if profile.regions is not None:
-        offers = [(b, o) for b, o in offers if o.region in profile.regions]
+    if regions is not None:
+        offers = [(b, o) for b, o in offers if o.region in regions]
 
     if profile.instance_types is not None:
         offers = [(b, o) for b, o in offers if o.instance.name in profile.instance_types]
@@ -664,6 +660,35 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
 
 
 _PROJECTS_TO_RUN_NAMES_LOCK = {}
+
+
+def _get_pool_offers(
+    pool: PoolModel,
+    run_spec: RunSpec,
+    job: Job,
+) -> List[InstanceOfferWithAvailability]:
+    profile = run_spec.profile
+    requirements = Requirements(
+        resources=run_spec.configuration.resources,
+        max_price=profile.max_price,
+        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.AUTO),
+    )
+    pool_filtered_instances = filter_pool_instances(
+        pool_instances=get_pool_instances(pool),
+        profile=profile,
+        requirements=requirements,
+        multinode=job.job_spec.jobs_per_replica > 1,
+    )
+    pool_offers: List[InstanceOfferWithAvailability] = []
+    for instance in pool_filtered_instances:
+        if instance.offer is None:
+            continue
+        offer = InstanceOfferWithAvailability.__response__.parse_raw(instance.offer)
+        offer.availability = InstanceAvailability.BUSY
+        if instance.status == InstanceStatus.IDLE:
+            offer.availability = InstanceAvailability.IDLE
+        pool_offers.append(offer)
+    return pool_offers
 
 
 async def _generate_run_name(

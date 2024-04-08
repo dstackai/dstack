@@ -159,6 +159,8 @@ class Run(ABC):
         self,
         start_time: Optional[datetime] = None,
         diagnose: bool = False,
+        replica_num: int = 0,
+        job_num: int = 0,
     ) -> Iterable[bytes]:
         """
         Iterate through run's log messages
@@ -173,13 +175,19 @@ class Run(ABC):
         if diagnose is False and self._ssh_attach is not None:
             yield from self._attached_logs()
         else:
+            job = None
+            for j in self._run.jobs:
+                if j.job_spec.replica_num == replica_num and j.job_spec.job_num == job_num:
+                    job = j
+            if job is None:
+                return []
             next_start_time = start_time
             while True:
                 resp = self._api_client.logs.poll(
                     project_name=self._project,
                     body=PollLogsRequest(
                         run_name=self.name,
-                        job_submission_id=self._run.jobs[0].job_submissions[0].id,
+                        job_submission_id=job.job_submissions[-1].id,
                         start_time=next_start_time,
                         end_time=None,
                         descending=False,
@@ -187,7 +195,7 @@ class Run(ABC):
                     ),
                 )
                 if len(resp.logs) == 0:
-                    return
+                    return []
                 for log in resp.logs:
                     yield base64.b64decode(log.message)
                 next_start_time = resp.logs[-1].timestamp

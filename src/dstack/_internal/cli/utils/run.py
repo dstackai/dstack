@@ -141,7 +141,7 @@ def generate_runs_table(
 
         for job in run.jobs:
             job_row = {
-                "NAME": f"  replica {job.job_spec.replica_num}",  # TODO(egor-s): show job_num
+                "NAME": f"  replica {job.job_spec.replica_num}\n  job_num {job.job_spec.job_num}",
                 "STATUS": job.job_submissions[-1].status,
                 "SUBMITTED": pretty_date(job.job_submissions[-1].submitted_at),
                 "ERROR": job.job_submissions[-1].termination_reason,

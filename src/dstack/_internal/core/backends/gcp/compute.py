@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 from typing import Callable, Dict, List, Optional
 
@@ -73,9 +74,15 @@ class GCPCompute(Compute):
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
+        # Old instances have region set to zone, e.g. us-central1-a.
+        # New instance have region set to region, e.g. us-central1. Zone in stored in backend_data.
+        zone = region
+        if backend_data is not None:
+            backend_data_dict = json.loads(backend_data)
+            zone = backend_data_dict["zone"]
         try:
             self.instances_client.delete(
-                project=self.config.project_id, zone=region, instance=instance_id
+                project=self.config.project_id, zone=zone, instance=instance_id
             )
         except google.api_core.exceptions.NotFound:
             pass
@@ -136,14 +143,14 @@ class GCPCompute(Compute):
             )
             return LaunchedInstanceInfo(
                 instance_id=instance_name,
-                region=zone,
+                region=instance_offer.region,
                 ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
                 internal_ip=instance.network_interfaces[0].network_i_p,
                 username="ubuntu",
                 ssh_port=22,
                 dockerized=True,
                 ssh_proxy=None,
-                backend_data=None,
+                backend_data=json.dumps({"zone": zone}),
             )
         raise NoCapacityError()
 
