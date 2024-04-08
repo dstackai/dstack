@@ -69,7 +69,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     offers.add_column("PRICE")
     offers.add_column()
 
-    job_plan.offers = job_plan.offers[:offers_limit]
+    # job_plan.offers = job_plan.offers[:offers_limit]
 
     for i, offer in enumerate(job_plan.offers, start=1):
         r = offer.instance.resources
