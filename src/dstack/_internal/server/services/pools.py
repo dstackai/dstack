@@ -19,16 +19,16 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
-    Gpu,
     InstanceAvailability,
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
+    RemoteConnectionInfo,
     Resources,
+    SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.server import settings
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel
@@ -248,52 +248,51 @@ async def generate_instance_name(
 
 async def add_remote(
     session: AsyncSession,
-    resources: ResourcesSpec,
     project: ProjectModel,
-    profile: Profile,
+    pool_name: Optional[str],
     instance_name: Optional[str],
+    region: Optional[str],
     host: str,
-    port: str,
-) -> bool:
-    pool_model = await get_or_create_pool_by_name(session, project, profile.pool_name)
-
-    profile.pool_name = pool_model.name
+    port: int,
+    ssh_user: str,
+    ssh_keys: List[SSHKey],
+) -> Instance:
+    pool_model = await get_or_create_pool_by_name(session, project, pool_name)
+    pool_model_name = pool_model.name
     if instance_name is None:
-        instance_name = await generate_instance_name(session, project, profile.pool_name)
+        instance_name = await generate_instance_name(session, project, pool_model_name)
 
-    gpus = []
-    if resources.gpu is not None:
-        gpus = [
-            Gpu(name=resources.gpu.name, memory_mib=resources.gpu.memory)
-        ] * resources.gpu.count.min
-
-    instance_resource = Resources(
-        cpus=resources.cpu.min, memory_mib=resources.memory.min, gpus=gpus, spot=False
-    )
+    # TODO: doc - will overwrite after remote connected
+    instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
+    instance_type = InstanceType(name="remote", resources=instance_resource)
 
     local = JobProvisioningData(
         backend=BackendType.REMOTE,
-        instance_type=InstanceType(name="local", resources=instance_resource),
+        instance_type=instance_type,
         instance_id=instance_name,
         hostname=host,
-        region="",
+        region=region or "remote",
+        internal_ip=None,
         price=0,
-        username="",
-        ssh_port=22,
+        username=ssh_user,
+        ssh_port=port,
         dockerized=False,
         backend_data="",
         ssh_proxy=None,
     )
     offer = InstanceOfferWithAvailability(
         backend=BackendType.REMOTE,
-        instance=InstanceType(
-            name="instance",
-            resources=instance_resource,
-        ),
-        region="",  # TODO: add region
+        instance=instance_type,
+        region=region or "remote",
         price=0.0,
         availability=InstanceAvailability.AVAILABLE,
     )
+
+    ssh_connection_info = None
+    if ssh_user and ssh_keys:
+        ssh_connection_info = RemoteConnectionInfo(
+            host=host, port=port, ssh_user=ssh_user, ssh_keys=ssh_keys
+        ).json()
 
     im = InstanceModel(
         name=instance_name,
@@ -304,16 +303,18 @@ async def add_remote(
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PENDING,
         job_provisioning_data=local.json(),
+        remote_connection_info=ssh_connection_info,
         offer=offer.json(),
         region=offer.region,
         price=offer.price,
-        termination_policy=profile.termination_policy,
-        termination_idle_time=profile.termination_idle_time,
+        termination_policy=TerminationPolicy.DONT_DESTROY,
+        termination_idle_time=0,
     )
     session.add(im)
     await session.commit()
 
-    return True
+    instance = instance_model_to_instance(im)
+    return instance
 
 
 def filter_pool_instances(
@@ -334,6 +335,10 @@ def filter_pool_instances(
         if profile.instance_name is not None and instance.name != profile.instance_name:
             continue
         if status is not None and instance.status != status:
+            continue
+
+        if instance.backend == BackendType.REMOTE:
+            instances.append(instance)
             continue
 
         # TODO: remove on prod

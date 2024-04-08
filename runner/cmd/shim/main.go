@@ -2,18 +2,27 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
 
+	execute "github.com/alexellis/go-execute/v2"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
+	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sys/unix"
 )
 
 // Version is a build-time variable. The value is overridden by ldflags.
@@ -22,6 +31,7 @@ var Version string
 func main() {
 	var args shim.CLIArgs
 	args.Docker.SSHPort = 10022
+	var serviceMode bool
 
 	app := &cli.App{
 		Name:    "dstack-shim",
@@ -94,8 +104,18 @@ func main() {
 						Destination: &args.Docker.PublicSSHKey,
 						EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
 					},
+					&cli.BoolFlag{
+						Name:        "service",
+						Usage:       "Start as a service",
+						Destination: &serviceMode,
+						EnvVars:     []string{"DSTACK_SERVICE_MODE"},
+					},
 				},
 				Action: func(c *cli.Context) error {
+					if serviceMode {
+						writeHostInfo()
+					}
+
 					if args.Runner.BinaryPath == "" {
 						if err := args.DownloadRunner(); err != nil {
 							return cli.Exit(err, 1)
@@ -156,4 +176,135 @@ func getDstackHome(flag string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(home, consts.DstackDirPath), nil
+}
+
+func writeHostInfo() {
+	// host_info exist
+	if _, err := os.Stat(consts.HostInfoFile); !errors.Is(err, os.ErrNotExist) {
+		return
+	}
+
+	type Message struct {
+		GpuName   string   `json:"gpu_name"`
+		GpuMemory string   `json:"gpu_memory"`
+		GpuCount  int      `json:"gpu_count"`
+		Adresses  []string `json:"addresses"`
+		DiskSize  uint64   `json:"disk_size"`
+		NumCPUs   int      `json:"cpus"`
+		Memory    uint64   `json:"memory"`
+	}
+
+	gpuCount := 0
+	gpuMemory := ""
+	gpuName := ""
+	gpus := getGpuInfo()
+	if len(gpus) != 0 {
+		gpuCount = len(gpus)
+		gpuMemory = gpus[0][1]
+		gpuName = gpus[0][0]
+	}
+	m := Message{
+		GpuName:   gpuName,
+		GpuMemory: gpuMemory,
+		GpuCount:  gpuCount,
+		Adresses:  getInterfaces(),
+		DiskSize:  getDiskSize(),
+		NumCPUs:   runtime.NumCPU(),
+		Memory:    getMemory(),
+	}
+
+	b, _ := json.Marshal(m)
+	fmt.Println(string(b))
+	err := os.WriteFile(consts.HostInfoFile, b, 0755) //nolint:gosec
+	if err != nil {
+		panic(err)
+	}
+}
+
+func getGpuInfo() [][]string {
+	cmd := execute.ExecTask{
+		Command: "docker",
+		Args: []string{"run",
+			"--rm",
+			"--gpus", "all",
+			"dstackai/base:py3.11-0.4rc4-cuda-12.1",
+			"nvidia-smi", "--query-gpu=gpu_name,memory.total", "--format=csv"},
+		StreamStdio: false,
+	}
+
+	res, err := cmd.Execute(context.Background())
+	if err != nil {
+		return [][]string{} // GPU not found
+	}
+
+	if res.ExitCode != 0 {
+		return [][]string{} // GPU not found
+	}
+
+	r := csv.NewReader(strings.NewReader(res.Stdout))
+
+	var gpus [][]string
+
+	// Skip header
+	if _, err := r.Read(); err != nil {
+		panic("canot read csv")
+	}
+
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("gpu record %v\n", record)
+		gpus = append(gpus, record)
+	}
+	return gpus
+}
+
+func getInterfaces() []string {
+	var addresses []string
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		panic("cannot get interfaces")
+	}
+	for _, i := range ifaces {
+		addrs, err := i.Addrs()
+		if err != nil {
+			panic("cannot get addrs")
+		}
+
+		for _, addr := range addrs {
+			switch v := addr.(type) {
+			case *net.IPNet:
+				fmt.Println(v.IP)
+				if v.IP.IsLoopback() {
+					continue
+				}
+				addresses = append(addresses, addr.String())
+			}
+		}
+	}
+	return addresses
+}
+
+func getDiskSize() uint64 {
+	var stat unix.Statfs_t
+	wd, err := os.Getwd()
+	if err != nil {
+		panic("cannot get disk size")
+	}
+	unix.Statfs(wd, &stat)
+	size := stat.Bavail * uint64(stat.Bsize)
+	return size
+}
+
+func getMemory() uint64 {
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		panic("cannot get emeory")
+	}
+	return v.Total
 }

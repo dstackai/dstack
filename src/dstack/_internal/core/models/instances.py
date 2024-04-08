@@ -57,6 +57,13 @@ class SSHKey(CoreModel):
     private: Optional[str] = None
 
 
+class RemoteConnectionInfo(CoreModel):
+    host: str
+    port: int
+    ssh_user: str
+    ssh_keys: List[SSHKey]
+
+
 class DockerConfig(CoreModel):
     registry_auth: Optional[RegistryAuth]
     image: Optional[DockerImage]

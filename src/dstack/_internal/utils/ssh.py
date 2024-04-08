@@ -1,10 +1,13 @@
+import io
 import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Dict, Optional
 
+import paramiko
 from filelock import FileLock
 from paramiko.config import SSHConfig
 from paramiko.pkey import PKey, PublicBlob
@@ -13,6 +16,7 @@ from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 
 logger = get_logger(__name__)
+
 
 default_ssh_config_path = "~/.ssh/config"
 
@@ -116,3 +120,33 @@ def update_ssh_config(path: PathLike, host: str, options: Dict[str, str]):
                 for k, v in options.items():
                     f.write(f"    {k} {v}\n")
             f.flush()
+
+
+def convert_pkcs8_to_pem(private_string: str) -> str:
+    if not private_string.startswith("-----BEGIN PRIVATE KEY-----"):
+        return private_string
+
+    with tempfile.NamedTemporaryFile(mode="w+") as key_file:
+        key_file.write(private_string)
+        key_file.flush()
+        cmd = ["ssh-keygen", "-p", "-m", "PEM", "-f", key_file.name, "-y", "-q", "-N", ""]
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as e:
+            logger.error("Fail to convert ssh key: stdout=%s, stderr=%s", e.stdout, e.stderr)
+
+        key_file.seek(0)
+        private_string = key_file.read()
+    return private_string
+
+
+def rsa_pkey_from_str(private_string: str) -> PKey:
+    key_file = io.StringIO(private_string.strip())
+    pkey = paramiko.RSAKey.from_private_key(key_file)
+    key_file.close()
+    return pkey

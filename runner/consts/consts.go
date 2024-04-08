@@ -12,13 +12,10 @@ const RunnerLogFileName = "runner.log"
 // Error-containing messages will be identified by this signature
 const ExecutorFailedSignature = "Executor failed"
 
+const HostInfoFile = "host_info.json"
+
 // GPU constants
-const (
-	NVIDIA_CUDA_IMAGE        = "dstackai/cuda:11.8.0-base-ubuntu20.04"
-	NVIDIA_SMI_CMD           = "nvidia-smi --query-gpu=name,memory.total --format=csv,noheader"
-	NVIDIA_RUNTIME           = "nvidia"
-	NVIDIA_DRIVER_INIT_ERROR = "stderr: nvidia-container-cli: initialization error: nvml error: driver not loaded: unknown"
-)
+const NVIDIA_RUNTIME = "nvidia"
 
 // JOB ports
 const (

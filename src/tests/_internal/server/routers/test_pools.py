@@ -6,8 +6,8 @@ from freezegun import freeze_time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.instances import SSHKey
+from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import PoolModel
@@ -326,9 +326,10 @@ class TestAddRemote:
         remote = AddRemoteInstanceRequest(
             instance_name="test_instance_name",
             host="localhost",
-            port="22",
-            resources=ResourcesSpec(cpu=1),
-            profile=Profile(name="test_profile"),
+            port=22,
+            pool_name="pool_name",
+            ssh_user="user",
+            ssh_keys=[SSHKey(public="abc")],
         )
         response = client.post(
             f"/api/project/{project.name}/pool/add_remote",
@@ -347,9 +348,10 @@ class TestAddRemote:
         remote = AddRemoteInstanceRequest(
             instance_name="test_instance_name",
             host="localhost",
-            port="22",
-            resources=ResourcesSpec(cpu=1),
-            profile=Profile(name="test_profile"),
+            port=22,
+            pool_name="pool_name",
+            ssh_user="user",
+            ssh_keys=[SSHKey(public="abc")],
         )
         response = client.post(
             f"/api/project/{project.name}/pool/add_remote",
@@ -357,7 +359,10 @@ class TestAddRemote:
             json=remote.dict(),
         )
         assert response.status_code == 200
-        assert response.json() == True
+
+        data = response.json()
+        assert data["status"] == "pending"
+        assert data["name"] == "test_instance_name"
 
 
 class TestRemoveInstance:
@@ -368,9 +373,10 @@ class TestRemoveInstance:
         remote = AddRemoteInstanceRequest(
             instance_name="test_instance_name",
             host="localhost",
-            port="22",
-            resources=ResourcesSpec(cpu=1),
-            profile=Profile(name="test_profile"),
+            port=22,
+            pool_name="pool_name",
+            ssh_user="user",
+            ssh_keys=[SSHKey(public="abc")],
         )
         response = client.post(
             f"/api/project/{project.name}/pool/add_remote",

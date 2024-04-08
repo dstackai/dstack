@@ -343,6 +343,8 @@ class InstanceModel(BaseModel):
 
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
 
+    remote_connection_info: Mapped[Optional[str]] = mapped_column(Text)
+
     # current job
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
     job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="immediate")

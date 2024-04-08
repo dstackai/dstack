@@ -1,7 +1,9 @@
 import argparse
+import getpass
 import time
+import urllib.parse
 from pathlib import Path
-from typing import Sequence
+from typing import Optional, Sequence, Tuple
 
 from rich.console import Group
 from rich.live import Live
@@ -107,20 +109,6 @@ class PoolCommand(APIBaseCommand):
         add_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )
-        add_parser.add_argument(
-            "--remote",
-            help="Add remote runner as an instance",
-            dest="remote",
-            action="store_true",
-            default=False,
-        )
-        add_parser.add_argument("--remote-host", help="Remote runner host", dest="remote_host")
-        add_parser.add_argument(
-            "--remote-port", help="Remote runner port", dest="remote_port", default=10999
-        )
-        add_parser.add_argument(
-            "--name", dest="instance_name", help="Set the name of the instance"
-        )
         register_profile_args(add_parser, pool_add=True)
         register_resource_args(add_parser)
         add_parser.set_defaults(subfunc=self._add)
@@ -160,6 +148,27 @@ class PoolCommand(APIBaseCommand):
             "--pool", dest="pool_name", help="The name of the pool", required=True
         )
         set_default_parser.set_defaults(subfunc=self._set_default)
+
+        # add-ssh
+        add_ssh = subparsers.add_parser(
+            "add-ssh",
+            help="Add remote instance to pool",
+            formatter_class=self._parser.formatter_class,
+        )
+        add_ssh.add_argument("destination")
+        add_ssh.add_argument("-p", help="SSH port to connect", dest="ssh_port", type=int)
+        add_ssh.add_argument(
+            "-i",
+            metavar="SSH_PRIVATE_KEY",
+            help="The private SSH key path for SSH",
+            type=Path,
+            dest="ssh_identity_file",
+        )
+        add_ssh.add_argument("-l", help="User to login", dest="login_name")
+        add_ssh.add_argument("--region", help="Host region", dest="region")
+        add_ssh.add_argument("--pool", help="Pool name", dest="pool_name")
+        add_ssh.add_argument("--name", dest="instance_name", help="Set the name of the instance")
+        add_ssh.set_defaults(subfunc=self._add_ssh)
 
     def _list(self, args: argparse.Namespace) -> None:
         pools = self.api.client.pool.list(self.api.project)
@@ -235,21 +244,6 @@ class PoolCommand(APIBaseCommand):
         profile = load_profile(Path.cwd(), args.profile)
         apply_profile_args(args, profile, pool_add=True)
 
-        # Add remote instance
-        if args.remote:
-            result = self.api.client.pool.add_remote(
-                self.api.project,
-                resources,
-                profile,
-                args.instance_name,
-                args.remote_host,
-                args.remote_port,
-            )
-            if not result:
-                console.print(f"[error]Failed to add remote instance {args.instance_name!r}[/]")
-            # TODO(egor-s): print on success
-            return
-
         spot = get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND)
 
         requirements = Requirements(
@@ -277,18 +271,80 @@ class PoolCommand(APIBaseCommand):
             console.print("\nExiting...")
             return
 
-        # TODO(egor-s): user pub key must be added during the `run`, not `pool add`
+        # TODO(egor-s): user key must be added during the `run`, not `pool add`
+        user_priv_key = Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
         user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
-        pub_key = SSHKey(public=user_pub_key)
+        user_ssh_key = SSHKey(public=user_pub_key, private=user_priv_key)
+
         try:
             with console.status("Creating instance..."):
                 # TODO: Instance name is not passed, so --instance does not work.
                 # There is profile.instance_name but it makes sense for `dstack run` only.
-                instance = self.api.runs.create_instance(profile, requirements, pub_key)
+                instance = self.api.runs.create_instance(profile, requirements, user_ssh_key)
         except ServerClientError as e:
             raise CLIError(e.msg)
         console.print()
         print_instance_table([instance])
+
+    def _add_ssh(self, args: argparse.Namespace) -> None:
+        super()._command(args)
+
+        ssh_keys = []
+
+        try:
+            # TODO: user key must be added during the `run`, not `pool add`
+            user_priv_key = Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
+            user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
+            user_ssh_key = SSHKey(public=user_pub_key, private=user_priv_key)
+            ssh_keys.append(user_ssh_key)
+        except OSError:
+            pass
+
+        if args.ssh_identity_file:
+            try:
+                ssh_key = SSHKey(
+                    public=args.ssh_identity_file.with_suffix(".pub").read_text(),
+                    private=args.ssh_identity_file.read_text(),
+                )
+                ssh_keys.append(ssh_key)
+            except OSError:
+                console.print("[error]Unable to read the public key.[/]")
+                return
+
+        login, ssh_host, port = parse_destination(args.destination)
+
+        ssh_port = 22
+        if port is not None:
+            ssh_port = port
+        if args.ssh_port is not None:
+            ssh_port = args.ssh_port
+
+        ssh_user = args.login_name
+        if ssh_user is None:
+            ssh_user = login
+        if ssh_user is None:
+            try:
+                ssh_user = getpass.getuser()
+            except OSError:
+                console.print("[error]Set the user name with the `-l` parameter.[/]")
+                return
+
+        result = self.api.client.pool.add_remote(
+            project_name=self.api.project,
+            pool_name=args.pool_name,
+            instance_name=args.instance_name,
+            region=args.region,
+            host=ssh_host,
+            port=ssh_port,
+            ssh_user=ssh_user,
+            ssh_keys=ssh_keys,
+        )
+        if not result:
+            console.print(f"[error]Failed to add remote instance {args.instance_name!r}[/]")
+            return
+        console.print(
+            f"Remote instance [code]{result.name!r}[/] has been added with status [secondary]{result.status.upper()}[/]"
+        )
 
     def _command(self, args: argparse.Namespace) -> None:
         super()._command(args)
@@ -477,3 +533,25 @@ def register_resource_args(parser: argparse.ArgumentParser) -> None:
         default=None,
         type=disk_spec,
     )
+
+
+def parse_destination(destination: str) -> Tuple[Optional[str], str, Optional[int]]:
+    port = None
+    netloc = destination
+
+    if destination.startswith("ssh://"):
+        parse_result = urllib.parse.urlparse(destination)
+        netloc, _, netloc_port = parse_result.netloc.partition(":")
+        try:
+            port = int(netloc_port)
+        except ValueError:
+            pass
+
+    head, sep, tail = netloc.partition("@")
+    if sep == "@":
+        login = head
+        host = tail
+    else:
+        login = None
+        host = head
+    return login, host, port
