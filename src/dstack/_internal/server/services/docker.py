@@ -19,7 +19,7 @@ REGISTRY_REQUEST_TIMEOUT = 20
 
 
 @dataclass
-class DXFAuth:
+class DXFAuthAdapter:
     registry_auth: Optional[RegistryAuth]
 
     def __call__(self, dxf: DXF, response: requests.Response) -> None:
@@ -68,7 +68,7 @@ def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> 
     registry_client = DXF(
         host=image.registry or DEFAULT_REGISTRY,
         repo=image.repo,
-        auth=DXFAuth(registry_auth),
+        auth=DXFAuthAdapter(registry_auth),
         timeout=REGISTRY_REQUEST_TIMEOUT,
     )
 
