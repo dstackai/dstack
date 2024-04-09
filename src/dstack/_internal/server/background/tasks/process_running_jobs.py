@@ -12,6 +12,7 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
+    ClusterInfo,
     Job,
     JobSpec,
     JobStatus,
@@ -100,6 +101,22 @@ async def _process_job(job_id: UUID):
         job_provisioning_data = job_submission.job_provisioning_data
         job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
 
+        # Wait until all other jobs in the replica are provisioned
+        for other_job in run.jobs:
+            if (
+                other_job.job_spec.replica_num == job.job_spec.replica_num
+                and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
+            ):
+                job_model.last_processed_at = common_utils.get_current_datetime()
+                await session.commit()
+                return
+
+        master_job = find_job(run.jobs, job_model.replica_num, 0)
+        cluster_info = ClusterInfo(
+            master_job_ip=master_job.job_submissions[-1].job_provisioning_data.internal_ip or "",
+            gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
+        )
+
         server_ssh_private_key = project.ssh_private_key
         secrets = {}  # TODO secrets
         repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
@@ -141,6 +158,7 @@ async def _process_job(job_id: UUID):
                     run,
                     job_model,
                     job,
+                    cluster_info,
                     code,
                     secrets,
                     repo_creds,
@@ -180,6 +198,7 @@ async def _process_job(job_id: UUID):
                     run,
                     job_model,
                     job,
+                    cluster_info,
                     code,
                     secrets,
                     repo_creds,
@@ -234,6 +253,7 @@ def _process_provisioning_no_shim(
     run: Run,
     job_model: JobModel,
     job: Job,
+    cluster_info: ClusterInfo,
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
@@ -258,6 +278,7 @@ def _process_provisioning_no_shim(
         run=run,
         job_model=job_model,
         job=job,
+        cluster_info=cluster_info,
         code=code,
         secrets=secrets,
         repo_credentials=repo_credentials,
@@ -319,6 +340,7 @@ def _process_pulling_with_shim(
     run: Run,
     job_model: JobModel,
     job: Job,
+    cluster_info: ClusterInfo,
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
@@ -374,6 +396,7 @@ def _process_pulling_with_shim(
         run=run,
         job_model=job_model,
         job=job,
+        cluster_info=cluster_info,
         code=code,
         secrets=secrets,
         repo_credentials=repo_credentials,
@@ -449,6 +472,7 @@ def _submit_job_to_runner(
     run: Run,
     job_model: JobModel,
     job: Job,
+    cluster_info: ClusterInfo,
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
@@ -462,6 +486,7 @@ def _submit_job_to_runner(
     runner_client.submit_job(
         run_spec=run.run_spec,
         job_spec=job.job_spec,
+        cluster_info=cluster_info,
         secrets=secrets,
         repo_credentials=repo_credentials,
     )

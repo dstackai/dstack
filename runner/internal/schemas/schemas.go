@@ -15,6 +15,7 @@ type LogEvent struct {
 type SubmitBody struct {
 	RunSpec         RunSpec           `json:"run_spec"`
 	JobSpec         JobSpec           `json:"job_spec"`
+	ClusterInfo     ClusterInfo       `json:"cluster_info"`
 	Secrets         map[string]string `json:"secrets"`
 	RepoCredentials *RepoCredentials  `json:"repo_credentials"`
 }
@@ -37,12 +38,20 @@ type RunSpec struct {
 }
 
 type JobSpec struct {
-	Commands    []string          `json:"commands"`
-	Entrypoint  []string          `json:"entrypoint"`
-	Env         map[string]string `json:"env"`
-	Gateway     *Gateway          `json:"gateway"`
-	MaxDuration int               `json:"max_duration"`
-	WorkingDir  string            `json:"working_dir"`
+	ReplicaNum     int               `json:"replica_num"`
+	JobNum         int               `json:"job_num"`
+	JobsPerReplica int               `json:"jobs_per_replica"`
+	Commands       []string          `json:"commands"`
+	Entrypoint     []string          `json:"entrypoint"`
+	Env            map[string]string `json:"env"`
+	Gateway        *Gateway          `json:"gateway"`
+	MaxDuration    int               `json:"max_duration"`
+	WorkingDir     string            `json:"working_dir"`
+}
+
+type ClusterInfo struct {
+	MasterJobIP string `json:"master_job_ip"`
+	GPUSPerJob  int    `json:"gpus_per_job"`
 }
 
 type RepoCredentials struct {

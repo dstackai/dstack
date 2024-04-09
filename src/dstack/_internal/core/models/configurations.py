@@ -201,6 +201,7 @@ class TaskConfiguration(BaseConfigurationWithPorts):
     """
 
     type: Literal["task"] = "task"
+    nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
     commands: Annotated[CommandsList, Field(description="The bash commands to run")]
 
 

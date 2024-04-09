@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.backends import BACKENDS_WITH_MULTINODE_SUPPORT
 from dstack._internal.core.backends.base.offers import (
     offer_to_catalog_item,
     requirements_to_query_filter,
@@ -321,6 +322,8 @@ def filter_pool_instances(
     requirements: Requirements,
     *,
     status: Optional[InstanceStatus] = None,
+    multinode: bool = False,
+    master_job_provisioning_data: Optional[JobProvisioningData] = None,
 ) -> List[InstanceModel]:
     """
     Filter instances by `instance_name`, `backends`, `resources`, `spot_policy`, `max_price`, `status`
@@ -340,10 +343,22 @@ def filter_pool_instances(
 
         if profile.backends is not None and instance.backend not in profile.backends:
             continue
+
+        if multinode and instance.backend not in BACKENDS_WITH_MULTINODE_SUPPORT:
+            continue
+
+        if master_job_provisioning_data is not None and (
+            instance.backend != master_job_provisioning_data.backend
+            or instance.region != master_job_provisioning_data.region
+        ):
+            continue
+
         candidates.append(instance)
 
     query_filter = requirements_to_query_filter(requirements)
     for instance in candidates:
+        if instance.offer is None:
+            continue
         offer = InstanceOffer.__response__.parse_raw(instance.offer)
         catalog_item = offer_to_catalog_item(offer)
         if gpuhunt.matches(catalog_item, query_filter):

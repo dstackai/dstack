@@ -6,7 +6,7 @@ from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
-from dstack._internal.core.models.runs import JobSpec, JobStatus, RunSpec
+from dstack._internal.core.models.runs import ClusterInfo, JobSpec, JobStatus, RunSpec
 
 
 class JobStateEvent(CoreModel):
@@ -49,6 +49,9 @@ class SubmitBody(CoreModel):
         JobSpec,
         Field(
             include={
+                "replica_num",
+                "job_num",
+                "jobs_per_replica",
                 "commands",
                 "entrypoint",
                 "env",
@@ -58,6 +61,7 @@ class SubmitBody(CoreModel):
             }
         ),
     ]
+    cluster_info: Annotated[Optional[ClusterInfo], Field(include=True)]
     secrets: Annotated[Optional[Dict[str, str]], Field(include=True)]
     repo_credentials: Annotated[Optional[RemoteRepoCreds], Field(include=True)]
 

@@ -134,6 +134,7 @@ def get_dev_env_run_plan_dict(
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
                     "job_num": 0,
+                    "jobs_per_replica": 1,
                     "max_duration": None,
                     "registry_auth": None,
                     "requirements": {
@@ -248,6 +249,7 @@ def get_dev_env_run_dict(
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
                     "job_num": 0,
+                    "jobs_per_replica": 1,
                     "max_duration": None,
                     "registry_auth": None,
                     "requirements": {
