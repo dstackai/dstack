@@ -11,7 +11,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.cudo.api_client import CudoApiClient
 from dstack._internal.core.backends.cudo.config import CudoConfig
-from dstack._internal.core.errors import BackendError, ComputeError, NoCapacityError
+from dstack._internal.core.errors import BackendError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -99,7 +99,7 @@ class CudoCompute(Compute):
                 machine_type=instance_offer.instance.name,
                 memory_gib=memory_size,
                 vcpus=instance_offer.instance.resources.cpus,
-                vm_id=instance_offer.instance.name,
+                vm_id=instance_config.instance_name,
                 start_script=startup_script,
                 password=None,
                 custom_ssh_keys=public_keys,
