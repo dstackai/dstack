@@ -21,6 +21,7 @@ type HealthcheckResponse struct {
 
 type PullResponse struct {
 	State         string `json:"state"`
+	ExecutorError string `json:"executor_error"`
 	ContainerName string `json:"container_name"`
 	Status        string `json:"status"`
 	Running       bool   `json:"running"`

@@ -137,7 +137,7 @@ class TestProcessSubmittedJobs:
                 repo_id=repo.name,
                 profile=Profile(
                     name="default",
-                    retry_policy=ProfileRetryPolicy(retry=True, limit=3600),
+                    retry_policy=ProfileRetryPolicy(retry=True, duration=3600),
                 ),
             ),
         )

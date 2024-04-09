@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/runner/api"
 	"github.com/sirupsen/logrus"
@@ -23,7 +24,7 @@ func start(tempDir string, homeDir string, workingDir string, httpPort int, logL
 		return tracerr.Errorf("Failed to create temp directory: %w", err)
 	}
 
-	defaultLogFile, err := log.CreateAppendFile(filepath.Join(tempDir, "default.log"))
+	defaultLogFile, err := log.CreateAppendFile(filepath.Join(tempDir, consts.RunnerDefaultLogFileName))
 	if err != nil {
 		return tracerr.Errorf("Failed to create default log file: %w", err)
 	}

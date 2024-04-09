@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -63,14 +64,14 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string) *RunExecu
 
 // Run must be called after SetJob and SetCodePath
 func (ex *RunExecutor) Run(ctx context.Context) (err error) {
-	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "runner.log"))
+	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
 	if err != nil {
 		ex.SetJobState(ctx, states.Failed)
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = runnerLogFile.Close() }()
 
-	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "job.log"))
+	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerJobLogFileName))
 	if err != nil {
 		ex.SetJobState(ctx, states.Failed)
 		return gerrors.Wrap(err)
@@ -91,7 +92,8 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	}()
 	defer func() {
 		if err != nil {
-			log.Error(ctx, "Executor failed", "err", err)
+			// TODO: refactor error handling and logs
+			log.Error(ctx, consts.ExecutorFailedSignature, "err", err)
 		}
 	}()
 
@@ -110,7 +112,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	}
 	defer cleanupCredentials()
 
-	//var gatewayControl *gateway.SSHControl
+	// var gatewayControl *gateway.SSHControl
 	//if ex.run.Configuration.Type == "service" {
 	//	log.Info(ctx, "Forwarding service port to the gateway", "hostname", ex.jobSpec.Gateway.Hostname)
 	//	gatewayControl, err = gateway.NewSSHControl(ex.jobSpec.Gateway.Hostname, ex.jobSpec.Gateway.SSHKey)

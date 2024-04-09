@@ -57,7 +57,7 @@ For more details on policies and their defaults, refer to [`.dstack/profiles.yml
 !!! info "Idle duration"
     If the instance remains idle for the configured duration, `dstack` removes it and deletes all cloud resources.
 
-### `dstack pool remove`
+### dstack pool remove
 
 To remove an instance from the pool manually, use the `dstack pool remove` command. 
 

@@ -218,7 +218,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
                 not in {JobTerminationReason.DONE_BY_RUNNER, JobTerminationReason.SCALED_DOWN}
             ):
                 if await is_retry_enabled(session, job, retry_policy):
-                    if await is_retry_limit_exceeded(session, job, retry_policy):
+                    if await is_retry_duration_exceeded(session, job, retry_policy):
                         replica_statuses.add(RunStatus.FAILED)
                         run_termination_reasons.add(RunTerminationReason.RETRY_LIMIT_EXCEEDED)
                     else:
@@ -329,12 +329,12 @@ async def is_retry_enabled(
     return False
 
 
-async def is_retry_limit_exceeded(
+async def is_retry_duration_exceeded(
     session: AsyncSession, job: JobModel, retry_policy: ProfileRetryPolicy
 ) -> bool:
-    if retry_policy.limit is not None and get_current_datetime() - job.submitted_at.replace(
+    if retry_policy.duration is not None and get_current_datetime() - job.submitted_at.replace(
         tzinfo=datetime.timezone.utc
-    ) > datetime.timedelta(seconds=retry_policy.limit):
+    ) > datetime.timedelta(seconds=retry_policy.duration):
         return True
     return False
 

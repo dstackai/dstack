@@ -22,9 +22,9 @@ Orchestrate GPU workloads effortlessly on any cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source engine for running GPU workloads on any cloud.
-It works with a wide range of cloud GPU providers (AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, etc.)
-as well as on-premises servers.
+`dstack` is an open-source engine for running GPU workloads.
+It works with a wide range of cloud providers (AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, CUDO, etc.)
+as well as on-prem servers.
 
 ## Latest news ✨
 

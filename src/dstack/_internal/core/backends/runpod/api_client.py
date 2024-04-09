@@ -103,7 +103,10 @@ class RunpodApiClient:
                 raise BackendError(response.json()["errors"][0]["message"])
             return response
         except requests.HTTPError as e:
-            if e.response.status_code in (requests.codes.forbidden, requests.codes.unauthorized):
+            if e.response is not None and e.response.status_code in (
+                requests.codes.forbidden,
+                requests.codes.unauthorized,
+            ):
                 raise BackendInvalidCredentialsError(e.response.text)
             raise
 

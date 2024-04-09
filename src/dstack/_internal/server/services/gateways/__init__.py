@@ -448,13 +448,14 @@ async def get_gateway_connection(
     return conn
 
 
-async def init_gateways(session: AsyncSession):
+async def init_gateways(session: AsyncSession) -> int:
     res = await session.execute(
         select(GatewayComputeModel).where(GatewayComputeModel.deleted == False)
     )
     gateway_computes = res.scalars().all()
 
-    logger.debug(f"Connecting to {len(gateway_computes)} gateways...")
+    if len(gateway_computes) > 0:
+        logger.debug(f"Connecting to {len(gateway_computes)} gateways...")
     for gateway, error in await gather_map_async(
         gateway_computes,
         lambda g: gateway_connections_pool.add(g.ip_address, g.ssh_private_key),
@@ -483,6 +484,7 @@ async def init_gateways(session: AsyncSession):
     ):
         if isinstance(error, Exception):
             logger.warning("Failed to configure gateway %s: %r", conn.ip_address, error)
+    return len(gateway_computes)
 
 
 async def _update_gateway(connection: GatewayConnection, build: str):

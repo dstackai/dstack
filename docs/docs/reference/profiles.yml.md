@@ -18,7 +18,7 @@ profiles:
     max_duration: 1d # (Optional) The maximum duration of the run.
 
     retry:
-      retry-limit: 3h # (Optional) To wait for capacity
+      retry-duration: 3h # (Optional) To wait for capacity
     
     backends: [azure, lambda]  # (Optional) Use only listed backends 
 

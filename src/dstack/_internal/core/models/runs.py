@@ -49,7 +49,7 @@ class JobStatus(str, Enum):
 
 class RetryPolicy(CoreModel):
     retry: bool
-    limit: Optional[int]
+    duration: Optional[int]
 
 
 class RunTerminationReason(str, Enum):
@@ -97,6 +97,8 @@ class JobTerminationReason(str, Enum):
     # Set by the runner
     CONTAINER_EXITED_WITH_ERROR = "container_exited_with_error"
     PORTS_BINDING_FAILED = "ports_binding_failed"
+    CREATING_CONTAINER_ERROR = "creating_container_error"
+    EXECUTOR_ERROR = "executor_error"
 
     def to_status(self) -> JobStatus:
         mapping = {
@@ -111,6 +113,8 @@ class JobTerminationReason(str, Enum):
             self.TERMINATED_BY_SERVER: JobStatus.TERMINATED,
             self.CONTAINER_EXITED_WITH_ERROR: JobStatus.FAILED,
             self.PORTS_BINDING_FAILED: JobStatus.FAILED,
+            self.CREATING_CONTAINER_ERROR: JobStatus.FAILED,
+            self.EXECUTOR_ERROR: JobStatus.FAILED,
         }
         return mapping[self]
 
@@ -201,6 +205,7 @@ class JobSubmission(CoreModel):
     finished_at: Optional[datetime]
     status: JobStatus
     termination_reason: Optional[JobTerminationReason]
+    termination_reason_message: Optional[str]
     job_provisioning_data: Optional[JobProvisioningData]
 
     @property

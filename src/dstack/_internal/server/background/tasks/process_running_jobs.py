@@ -212,15 +212,18 @@ async def _process_job(job_id: UUID):
                     run_model,
                     job_model,
                 )
+                if not success:
+                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
 
             if not success:  # kill the job
                 logger.warning(
-                    "%s: failed because runner is not available, age=%s",
+                    "%s: failed because runner is not available or return an error,  age=%s",
                     fmt(job_model),
                     job_submission.age,
                 )
                 job_model.status = JobStatus.TERMINATING
-                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+                if not job_model.termination_reason:
+                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
                 # job will be terminated and instance will be emptied by process_terminating_jobs
 
         if (
@@ -357,18 +360,34 @@ def _process_pulling_with_shim(
 
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
     resp = runner_client.healthcheck()
-    if resp is None:
+    if resp is None or container_status.state == "pending":
+        if container_status.executor_error:
+            logger.error(
+                "The docker container of the job '%s' stops with executor error: %s",
+                job_model.job_name,
+                container_status.executor_error,
+            )
+            logger.debug("runner healthcheck: %s", container_status.dict())
+            job_model.termination_reason = JobTerminationReason.EXECUTOR_ERROR
+            job_model.termination_reason_message = (
+                f"Executor error: {container_status.executor_error}"
+            )
+            return False
         if (
-            container_status.state == "pending"
-            and container_status.container_name == job_model.job_name
+            container_status.container_name == job_model.job_name
+            and container_status.state == "pending"
         ):
             logger.error(
-                "The docker container of the job '%s' is not working: exit code: %s, error %s",
+                "The docker container of the job '%s' is not working: exit code: %s, error %r",
                 job_model.job_name,
                 container_status.exit_code,
                 container_status.error,
             )
             logger.debug("runner healthcheck: %s", container_status.dict())
+            job_model.termination_reason = JobTerminationReason.CREATING_CONTAINER_ERROR
+            job_model.termination_reason_message = (
+                f"Failed to run docker pull or docker create: {container_status.error}"
+            )
             return False
         return True  # runner is not available yet, but shim is alive (pulling)
 

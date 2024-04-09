@@ -7,7 +7,7 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, Duration
 
-DEFAULT_RETRY_LIMIT = 3600
+DEFAULT_RETRY_DURATION = 3600
 DEFAULT_POOL_NAME = "default-pool"
 
 DEFAULT_RUN_TERMINATION_IDLE_TIME = 5 * 60  # 5 minutes
@@ -46,19 +46,19 @@ def parse_max_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]
 
 class ProfileRetryPolicy(CoreModel):
     retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
-    limit: Annotated[
+    duration: Annotated[
         Optional[Union[int, str]],
         Field(description="The maximum period of retrying the run, e.g., 4h or 1d"),
     ] = None
 
-    _validate_limit = validator("limit", pre=True, allow_reuse=True)(parse_duration)
+    _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
 
     @root_validator()
     @classmethod
     def _validate_fields(cls, field_values):
-        if field_values["retry"] and "limit" not in field_values:
-            field_values["limit"] = DEFAULT_RETRY_LIMIT
-        if field_values.get("limit") is not None:
+        if field_values["retry"] and "duration" not in field_values:
+            field_values["duration"] = DEFAULT_RETRY_DURATION
+        if field_values.get("duration") is not None:
             field_values["retry"] = True
         return field_values
 

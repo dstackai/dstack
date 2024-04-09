@@ -579,10 +579,10 @@ async def create_instance(
     if termination_idle_time is None:
         termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
 
-    retry_policy = RetryPolicy(retry=False, limit=None)
+    retry_policy = RetryPolicy(retry=False, duration=None)
     if profile.retry_policy is not None:
         retry_policy.retry = profile.retry_policy.retry
-        retry_policy.limit = parse_duration(profile.retry_policy.limit)
+        retry_policy.duration = parse_duration(profile.retry_policy.duration)
 
     instance = InstanceModel(
         name=instance_name,
@@ -596,7 +596,7 @@ async def create_instance(
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
         retry_policy=retry_policy.retry,
-        retry_policy_duration=retry_policy.limit,
+        retry_policy_duration=retry_policy.duration,
     )
     logger.info(
         "Added a new instance %s",
