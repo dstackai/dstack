@@ -191,7 +191,7 @@ class RunCommand(APIBaseCommand):
 
             # After reading the logs, the run may not be marked as finished immediately.
             # Give the run some time to transit into a finished state before aborting it.
-            for _ in range(5):
+            for _ in range(15):
                 run.refresh()
                 if run.status.is_finished():
                     if run.status == RunStatus.FAILED:
