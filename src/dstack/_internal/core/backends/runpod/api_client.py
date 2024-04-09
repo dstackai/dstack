@@ -108,13 +108,13 @@ class RunpodApiClient:
             raise
 
     def wait_for_instance(self, instance_id) -> Optional[Dict]:
-        WAIT_FOR_INSTANCE_ATTEMPTS = 60
-        WAIT_FOR_INSTANCE_INTERVAL = 1
-        for _ in range(WAIT_FOR_INSTANCE_ATTEMPTS):
+        wait_for_instance_attempts = 60
+        wait_for_instance_interval = 1
+        for _ in range(wait_for_instance_attempts):
             pod = self.get_pod(instance_id)
             if pod["runtime"] is not None:
                 return pod
-            time.sleep(WAIT_FOR_INSTANCE_INTERVAL)
+            time.sleep(wait_for_instance_interval)
         return
 
 
