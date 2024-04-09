@@ -1,11 +1,15 @@
 from typing import Any, Dict, List, Optional
 
 import requests
+from requests import Response
 
 from dstack._internal.core.errors import BackendInvalidCredentialsError
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import get_public_key_fingerprint
 
 API_URL = "https://rest.compute.cudo.org/v1"
+
+logger = get_logger(__name__)
 
 
 class CudoApiClient:
@@ -19,11 +23,9 @@ class CudoApiClient:
             return False
         return True
 
-    def get_user_details(self):
+    def get_user_details(self) -> Dict:
         resp = self._make_request("GET", "/auth")
-        if resp.ok:
-            data = resp.json()
-            return data
+        return resp.json()
 
     def create_virtual_machine(
         self,
@@ -36,7 +38,7 @@ class CudoApiClient:
         gpus: int,
         machine_type: str,
         memory_gib: int,
-        password: str,
+        password: Optional[str],
         vcpus: int,
         vm_id: str,
         customSshKeys,
@@ -62,11 +64,11 @@ class CudoApiClient:
         resp = self._make_request("POST", f"/projects/{project_id}/vm", data)
         return resp.json()
 
-    def terminate_virtual_machine(self, vm_id: str, project_id):
+    def terminate_virtual_machine(self, vm_id: str, project_id: str) -> Dict:
         resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
         return resp.json()
 
-    def _make_request(self, method: str, path: str, data: Any = None):
+    def _make_request(self, method: str, path: str, data: Any = None) -> Response:
         try:
             response = requests.request(
                 method=method,
