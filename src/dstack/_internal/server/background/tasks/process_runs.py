@@ -320,6 +320,8 @@ async def is_retry_enabled(
 ) -> bool:
     # retry for spot instances only
     if retry_policy.retry and job.termination_reason in JOB_TERMINATION_REASONS_TO_RETRY:
+        if job.used_instance_id is None:
+            return False
         instance = await session.get(InstanceModel, job.used_instance_id)
         if instance is None or instance.offer is None:
             return False
