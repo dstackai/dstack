@@ -67,7 +67,7 @@ class CudoApiClient:
         resp = self._make_request("POST", f"/projects/{project_id}/vms/{vm_id}/terminate")
         return resp.json()
 
-    def _make_request(self, method: str, path: str, data: Optional[Dict] = None) -> Response:
+    def _make_request(self, method: str, path: str, data: Any = None) -> Response:
         try:
             response = requests.request(
                 method=method,
