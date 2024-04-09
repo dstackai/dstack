@@ -58,6 +58,7 @@ async def list_runs(
         prev_submitted_at=body.prev_submitted_at,
         prev_run_id=body.prev_run_id,
         limit=body.limit,
+        ascending=body.ascending,
     )
 
 

@@ -129,6 +129,7 @@ async def list_user_runs(
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
+    ascending: bool,
 ) -> List[Run]:
     if project_name is None and repo_id is not None:
         return []
@@ -163,6 +164,7 @@ async def list_user_runs(
         prev_submitted_at=prev_submitted_at,
         prev_run_id=prev_run_id,
         limit=limit,
+        ascending=ascending,
     )
     runs = []
     for r in run_models:
@@ -184,6 +186,7 @@ async def list_projects_run_models(
     prev_submitted_at: Optional[datetime],
     prev_run_id: Optional[uuid.UUID],
     limit: int,
+    ascending: bool,
 ) -> List[RunModel]:
     filters = [RunModel.deleted == False, RunModel.project_id.in_(p.id for p in projects)]
     if repo is not None:
@@ -193,19 +196,38 @@ async def list_projects_run_models(
     if only_active:
         filters.append(RunModel.status.not_in(RunStatus.finished_statuses()))
     if prev_submitted_at is not None:
-        if prev_run_id is None:
-            filters.append(RunModel.submitted_at < prev_submitted_at)
-        else:
-            filters.append(
-                or_(
-                    RunModel.submitted_at < prev_submitted_at,
-                    and_(RunModel.submitted_at == prev_submitted_at, RunModel.id > prev_run_id),
+        if ascending:
+            if prev_run_id is None:
+                filters.append(RunModel.submitted_at > prev_submitted_at)
+            else:
+                filters.append(
+                    or_(
+                        RunModel.submitted_at > prev_submitted_at,
+                        and_(
+                            RunModel.submitted_at == prev_submitted_at, RunModel.id < prev_run_id
+                        ),
+                    )
                 )
-            )
+        else:
+            if prev_run_id is None:
+                filters.append(RunModel.submitted_at < prev_submitted_at)
+            else:
+                filters.append(
+                    or_(
+                        RunModel.submitted_at < prev_submitted_at,
+                        and_(
+                            RunModel.submitted_at == prev_submitted_at, RunModel.id > prev_run_id
+                        ),
+                    )
+                )
+    order_by = (RunModel.submitted_at.desc(), RunModel.id)
+    if ascending:
+        order_by = (RunModel.submitted_at.asc(), RunModel.id.desc())
+
     res = await session.execute(
         select(RunModel)
         .where(*filters)
-        .order_by(RunModel.submitted_at.desc(), RunModel.id)
+        .order_by(*order_by)
         .limit(limit)
         .options(joinedload(RunModel.user))
     )

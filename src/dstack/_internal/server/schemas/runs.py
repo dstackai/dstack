@@ -17,6 +17,7 @@ class ListRunsRequest(CoreModel):
     prev_submitted_at: Optional[datetime]
     prev_run_id: Optional[UUID]
     limit: int = 1000
+    ascending: bool = False
 
 
 class GetRunRequest(CoreModel):
