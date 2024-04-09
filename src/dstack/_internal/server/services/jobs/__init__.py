@@ -52,16 +52,16 @@ TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 TERMINATING_PROCESSING_JOBS_IDS = set()
 
 
-def get_jobs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[Job]:
+async def get_jobs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[Job]:
     return [
         Job(job_spec=s, job_submissions=[])
-        for s in get_job_specs_from_run_spec(run_spec, replica_num)
+        for s in await get_job_specs_from_run_spec(run_spec, replica_num)
     ]
 
 
-def get_job_specs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[JobSpec]:
+async def get_job_specs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[JobSpec]:
     job_configurator = _get_job_configurator(run_spec)
-    job_specs = job_configurator.get_job_specs(replica_num=replica_num)
+    job_specs = await job_configurator.get_job_specs(replica_num=replica_num)
     return job_specs
 
 

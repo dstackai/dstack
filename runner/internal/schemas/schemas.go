@@ -46,7 +46,7 @@ type JobSpec struct {
 	Env            map[string]string `json:"env"`
 	Gateway        *Gateway          `json:"gateway"`
 	MaxDuration    int               `json:"max_duration"`
-	WorkingDir     string            `json:"working_dir"`
+	WorkingDir     *string           `json:"working_dir"`
 }
 
 type ClusterInfo struct {

@@ -196,19 +196,22 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"DSTACK_NODES_NUM":      strconv.Itoa(ex.jobSpec.JobsPerReplica),
 		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(ex.clusterInfo.GPUSPerJob),
 	}
-	workingDir, err := joinRelPath(ex.workingDir, ex.jobSpec.WorkingDir)
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
 	cmd.Env = makeEnv(ex.homeDir, jobEnvs, ex.jobSpec.Env, ex.secrets)
-	cmd.Dir = workingDir
 	cmd.Cancel = func() error {
 		// returns error on Windows
 		return gerrors.Wrap(cmd.Process.Signal(os.Interrupt))
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
+
+	if ex.jobSpec.WorkingDir != nil {
+		workingDir, err := joinRelPath(ex.workingDir, *ex.jobSpec.WorkingDir)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		cmd.Dir = workingDir
+	}
 
 	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
 

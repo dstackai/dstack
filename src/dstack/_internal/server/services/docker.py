@@ -1,16 +1,33 @@
-from enum import Enum
-from typing import Optional
+from dataclasses import dataclass
+from typing import List, Optional
 
 import requests
+from dxf import DXF
+from dxf.exceptions import DXFError
+from pydantic import Field, ValidationError, validator
+from typing_extensions import Annotated
 
+from dstack._internal.core.errors import DockerRegistryError
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.server.utils.common import join_byte_stream_checked
 
-manifests_media_types = [
-    "application/vnd.oci.image.index.v1+json",
-    "application/vnd.oci.image.manifest.v1+json",
-    "application/vnd.docker.distribution.manifest.v2+json",
-    "application/vnd.docker.distribution.manifest.list.v2+json",
-]
+DEFAULT_PLATFORM = "linux/amd64"
+DEFAULT_REGISTRY = "index.docker.io"
+MAX_CONFIG_OBJECT_SIZE = 2**22  # 4 MiB
+REGISTRY_REQUEST_TIMEOUT = 20
+
+
+@dataclass
+class DXFAuthAdapter:
+    registry_auth: Optional[RegistryAuth]
+
+    def __call__(self, dxf: DXF, response: requests.Response) -> None:
+        dxf.authenticate(
+            username=self.registry_auth.username if self.registry_auth else None,
+            password=self.registry_auth.password if self.registry_auth else None,
+            response=response,
+        )
 
 
 class DockerImage(CoreModel):
@@ -24,66 +41,54 @@ class DockerImage(CoreModel):
     digest: Optional[str]
 
 
-class DockerPlatform(str, Enum):
-    x86 = "amd64"
-    arm = "arm64"
+class ImageConfig(CoreModel):
+    entrypoint: Annotated[Optional[List[str]], Field(alias="Entrypoint")] = None
+    cmd: Annotated[Optional[List[str]], Field(alias="Cmd")] = None
 
 
-class DockerRegistryClient:
-    def __init__(self):
-        self.registry: Optional[str] = None
-        self.repo: Optional[str] = None
-        self.s = requests.Session()
+class ImageConfigObject(CoreModel):
+    config: ImageConfig = ImageConfig()
 
-    def auth(self, repo: str, *, registry: Optional[str] = None, token: Optional[str] = None):
-        self.registry = registry
-        self.repo = repo
-
-        if not token:
-            auth_host = registry
-            params = {"scope": f"repository:{repo}:pull"}
-            if not registry:
-                auth_host = "auth.docker.io"
-                params["service"] = "registry.docker.io"
-
-            r = requests.get(f"https://{auth_host}/token", params=params)
-            r.raise_for_status()
-            token = r.json()["token"]
-        self.s.headers = {"Authorization": f"Bearer {token}"}
-
-    def manifests(self, tag: str = "latest", *, accept: Optional[str] = None) -> dict:
-        registry_host = self.registry or "registry-1.docker.io"
-        r = self.s.get(
-            f"https://{registry_host}/v2/{self.repo}/manifests/{tag}",
-            headers={"Accept": accept or ",".join(manifests_media_types)},
-        )
-        r.raise_for_status()
-        return r.json()
-
-    def blobs(self, digest: str) -> dict:
-        registry_host = self.registry or "registry-1.docker.io"
-        r = self.s.get(f"https://{registry_host}/v2/{self.repo}/blobs/{digest}")
-        r.raise_for_status()
-        return r.json()
+    @validator("config", pre=True)
+    def config_set_default_if_null(cls, value):
+        return ImageConfig() if value is None else value
 
 
-def get_image_config(
-    image: str, *, platform: DockerPlatform = DockerPlatform.x86, token: Optional[str] = None
-) -> dict:
-    image = parse_image_name(image)
-    client = DockerRegistryClient()
-    client.auth(image.repo, registry=image.registry, token=token)
+class ImageManifestConfigField(CoreModel):
+    digest: str
 
-    manifest = client.manifests(image.digest or image.tag)
-    if "config" not in manifest:  # manifest index/list, pick the right platform
-        for m in manifest["manifests"]:
-            if m["platform"]["architecture"] == platform.value:
-                manifest = client.manifests(m["digest"], accept=m["mediaType"])
-                break
-        else:
-            raise RuntimeError("No manifest for the specified platform")
 
-    return client.blobs(manifest["config"]["digest"])
+class ImageManifest(CoreModel):
+    config: ImageManifestConfigField
+
+
+def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> ImageConfigObject:
+    image = parse_image_name(image_name)
+
+    registry_client = DXF(
+        host=image.registry or DEFAULT_REGISTRY,
+        repo=image.repo,
+        auth=DXFAuthAdapter(registry_auth),
+        timeout=REGISTRY_REQUEST_TIMEOUT,
+    )
+
+    with registry_client:
+        try:
+            manifest_resp = registry_client.get_manifest(
+                alias=image.digest or image.tag, platform=DEFAULT_PLATFORM
+            )
+            manifest = ImageManifest.__response__.parse_raw(manifest_resp)
+            config_stream = registry_client.pull_blob(manifest.config.digest)
+            config_resp = join_byte_stream_checked(config_stream, MAX_CONFIG_OBJECT_SIZE)
+            if config_resp is None:
+                raise DockerRegistryError(
+                    "Image config object exceeds the size limit of "
+                    f"{MAX_CONFIG_OBJECT_SIZE} bytes"
+                )
+            return ImageConfigObject.__response__.parse_raw(config_resp)
+
+        except (DXFError, requests.RequestException, ValidationError) as e:
+            raise DockerRegistryError(e)
 
 
 def parse_image_name(image: str) -> DockerImage:

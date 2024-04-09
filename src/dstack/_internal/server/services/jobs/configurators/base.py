@@ -3,7 +3,10 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
+from cachetools import TTLCache, cached
+
 import dstack.version as version
+from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.configurations import (
     ConfigurationType,
     PortMapping,
@@ -19,6 +22,8 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
+from dstack._internal.server.services.docker import ImageConfig, get_image_config
+from dstack._internal.server.utils.common import run_async
 
 
 def get_default_python_verison() -> str:
@@ -37,8 +42,8 @@ class JobConfigurator(ABC):
     def __init__(self, run_spec: RunSpec):
         self.run_spec = run_spec
 
-    def get_job_specs(self, replica_num: int) -> List[JobSpec]:
-        job_spec = self._get_job_spec(replica_num=replica_num, job_num=0, jobs_per_replica=1)
+    async def get_job_specs(self, replica_num: int) -> List[JobSpec]:
+        job_spec = await self._get_job_spec(replica_num=replica_num, job_num=0, jobs_per_replica=1)
         return [job_spec]
 
     @abstractmethod
@@ -61,7 +66,7 @@ class JobConfigurator(ABC):
     def _ports(self) -> List[PortMapping]:
         pass
 
-    def _get_job_spec(
+    async def _get_job_spec(
         self,
         replica_num: int,
         job_num: int,
@@ -73,7 +78,7 @@ class JobConfigurator(ABC):
             job_name=f"{self.run_spec.run_name}-{job_num}-{replica_num}",
             jobs_per_replica=jobs_per_replica,
             app_specs=self._app_specs(),
-            commands=self._commands(),
+            commands=await self._commands(),
             env=self._env(),
             home_dir=self._home_dir(),
             image_name=self._image_name(),
@@ -85,7 +90,7 @@ class JobConfigurator(ABC):
         )
         return job_spec
 
-    def _commands(self) -> List[str]:
+    async def _commands(self) -> List[str]:
         if self.run_spec.configuration.entrypoint is not None:  # docker-like format
             entrypoint = shlex.split(self.run_spec.configuration.entrypoint)
             commands = self.run_spec.configuration.commands
@@ -96,8 +101,22 @@ class JobConfigurator(ABC):
             entrypoint = ["/bin/sh", "-i", "-c"]
             commands = [_join_shell_commands(self._shell_commands())]
         else:  # custom docker image without commands
-            raise NotImplementedError()  # TODO read docker image manifest
-        return entrypoint + commands
+            image_config = await run_async(
+                _get_image_config,
+                self.run_spec.configuration.image,
+                self.run_spec.configuration.registry_auth,
+            )
+            entrypoint = image_config.entrypoint or []
+            commands = image_config.cmd or []
+
+        result = entrypoint + commands
+        if not result:
+            raise ServerClientError(
+                "Could not determine what command to run. "
+                "Please specify either `commands` or `entrypoint` in your run configuration"
+            )
+
+        return result
 
     def _app_specs(self) -> List[AppSpec]:
         specs = []
@@ -110,15 +129,6 @@ class JobConfigurator(ABC):
                 )
             )
         return specs
-
-    def _entrypoint(self) -> Optional[List[str]]:
-        if self.run_spec.configuration.entrypoint is not None:
-            return shlex.split(self.run_spec.configuration.entrypoint)
-        if self.run_spec.configuration.image is None:  # dstackai/base
-            return ["/bin/bash", "-i", "-c"]
-        if self._commands():  # custom docker image with commands
-            return ["/bin/sh", "-i", "-c"]
-        return None
 
     def _env(self) -> Dict[str, str]:
         return self.run_spec.configuration.env
@@ -149,7 +159,10 @@ class JobConfigurator(ABC):
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
         )
 
-    def _working_dir(self) -> str:
+    def _working_dir(self) -> Optional[str]:
+        """
+        None means default working directory
+        """
         return self.run_spec.working_dir
 
     def _python(self) -> str:
@@ -168,3 +181,13 @@ def _join_shell_commands(commands: List[str], env: Optional[Dict[str, str]] = No
             cmd = "{ %s }" % cmd
         commands[i] = cmd
     return " && ".join(commands)
+
+
+@cached(TTLCache(maxsize=2048, ttl=80))
+def _get_image_config(image: str, registry_auth: Optional[RegistryAuth]) -> ImageConfig:
+    try:
+        return get_image_config(image, registry_auth).config
+    except DockerRegistryError as e:
+        raise ServerClientError(
+            f"Error pulling configuration for image {image!r} from the docker registry: {e}"
+        )

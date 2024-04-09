@@ -11,10 +11,10 @@ DEFAULT_MAX_DURATION_SECONDS = 72 * 3600
 class TaskJobConfigurator(JobConfigurator):
     TYPE: ConfigurationType = ConfigurationType.TASK
 
-    def get_job_specs(self, replica_num: int) -> List[JobSpec]:
+    async def get_job_specs(self, replica_num: int) -> List[JobSpec]:
         job_specs = []
         for job_num in range(self.run_spec.configuration.nodes):
-            job_spec = self._get_job_spec(
+            job_spec = await self._get_job_spec(
                 replica_num=replica_num,
                 job_num=job_num,
                 jobs_per_replica=self.run_spec.configuration.nodes,
@@ -37,3 +37,6 @@ class TaskJobConfigurator(JobConfigurator):
 
     def _ports(self) -> List[PortMapping]:
         return self.run_spec.configuration.ports
+
+    def _working_dir(self) -> Optional[str]:
+        return None if not self._shell_commands() else super()._working_dir()

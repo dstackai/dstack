@@ -120,3 +120,7 @@ class SSHKeyError(SSHError):
 
 class SSHPortInUseError(SSHError):
     pass
+
+
+class DockerRegistryError(DstackError):
+    pass

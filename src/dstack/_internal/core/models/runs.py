@@ -175,7 +175,7 @@ class JobSpec(CoreModel):
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
     retry_policy: RetryPolicy
-    working_dir: str
+    working_dir: Optional[str]
 
 
 class JobProvisioningData(CoreModel):

@@ -39,6 +39,9 @@ class RegistryAuth(CoreModel):
         password (str): The password or access token
     """
 
+    class Config:
+        frozen = True
+
     username: Annotated[str, Field(description="The username")]
     password: Annotated[str, Field(description="The password or access token")]
 
@@ -179,6 +182,16 @@ class BaseConfigurationWithPorts(BaseConfiguration):
         return v
 
 
+class BaseConfigurationWithCommands(BaseConfiguration):
+    commands: Annotated[CommandsList, Field(description="The bash commands to run")] = []
+
+    @root_validator
+    def check_image_or_commands_present(cls, values):
+        if not values.get("commands") and not values.get("image"):
+            raise ValueError("Either `commands` or `image` must be set")
+        return values
+
+
 class DevEnvironmentConfiguration(BaseConfigurationWithPorts):
     type: Literal["dev-environment"] = "dev-environment"
     ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
@@ -186,7 +199,7 @@ class DevEnvironmentConfiguration(BaseConfigurationWithPorts):
     init: Annotated[CommandsList, Field(description="The bash commands to run")] = []
 
 
-class TaskConfiguration(BaseConfigurationWithPorts):
+class TaskConfiguration(BaseConfigurationWithPorts, BaseConfigurationWithCommands):
     """
     Attributes:
         commands (List[str]): The bash commands to run
@@ -202,10 +215,9 @@ class TaskConfiguration(BaseConfigurationWithPorts):
 
     type: Literal["task"] = "task"
     nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
-    commands: Annotated[CommandsList, Field(description="The bash commands to run")]
 
 
-class ServiceConfiguration(BaseConfiguration):
+class ServiceConfiguration(BaseConfigurationWithCommands):
     """
     Attributes:
         commands (List[str]): The bash commands to run
@@ -224,7 +236,6 @@ class ServiceConfiguration(BaseConfiguration):
     """
 
     type: Literal["service"] = "service"
-    commands: Annotated[CommandsList, Field(description="The bash commands to run")]
     port: Annotated[
         Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
         Field(description="The port, that application listens to or the mapping"),
