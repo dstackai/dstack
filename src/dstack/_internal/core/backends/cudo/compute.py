@@ -102,7 +102,7 @@ class CudoCompute(Compute):
                 vm_id=instance_config.instance_name,
                 start_script=startup_script,
                 password=None,
-                custom_ssh_keys=public_keys,
+                customSshKeys=public_keys,
             )
         except requests.HTTPError as e:
             try:
