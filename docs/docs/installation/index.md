@@ -274,7 +274,24 @@ There are two ways to configure GCP: using a service account or using the defaul
     ```
 
 ??? info "Required GCP permissions"
-    The `Service Account User` and `Compute Admin` roles are sufficient for `dstack` to work.
+    The following GCP permissions are sufficient for `dstack` to work:
+
+    ```
+    compute.disks.create
+    compute.firewalls.create
+    compute.images.useReadOnly
+    compute.instances.create
+    compute.instances.delete
+    compute.instances.get
+    compute.instances.setLabels
+    compute.instances.setMetadata
+    compute.instances.setTags
+    compute.networks.updatePolicy
+    compute.regions.list
+    compute.subnetworks.use
+    compute.subnetworks.useExternalIp
+    compute.zoneOperations.get
+    ```
 
 ### Lambda
 

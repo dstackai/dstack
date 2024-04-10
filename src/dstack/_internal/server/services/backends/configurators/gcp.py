@@ -1,12 +1,7 @@
 import json
-from typing import Dict, List
-
-import googleapiclient.discovery
-import googleapiclient.errors
-from google.auth.credentials import Credentials
+from typing import List
 
 from dstack._internal.core.backends.gcp import GCPBackend, auth
-from dstack._internal.core.backends.gcp import utils as gcp_utils
 from dstack._internal.core.backends.gcp.config import GCPConfig
 from dstack._internal.core.errors import BackendAuthError, ServerClientError
 from dstack._internal.core.models.backends.base import (
@@ -174,25 +169,11 @@ class GCPConfigurator(Configurator):
     ) -> BackendModel:
         if config.regions is None:
             config.regions = DEFAULT_REGIONS
-        credentials, _ = auth.authenticate(creds=config.creds)
-        service_account_email = getattr(credentials, "service_account_email", None)
-        if service_account_email is None:
-            service_account_email = self._get_or_create_service_account(
-                credentials=credentials,
-                project_id=config.project_id,
-                name=gcp_utils.get_service_account_name(project.name),
-            )
-            self._grant_roles_to_service_account(
-                credentials=credentials,
-                project_id=config.project_id,
-                service_account_email=service_account_email,
-            )
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
             config=GCPStoredConfig(
                 **GCPConfigInfo.__response__.parse_obj(config).dict(),
-                service_account_email=service_account_email,
             ).json(),
             auth=GCPCreds.parse_obj(config.creds).json(),
         )
@@ -229,64 +210,3 @@ class GCPConfigurator(Configurator):
         for region_name in REGIONS:
             element.values.append(ConfigElementValue(value=region_name, label=region_name))
         return element
-
-    def _get_or_create_service_account(
-        self, credentials: Credentials, project_id: str, name: str
-    ) -> str:
-        iam_service = googleapiclient.discovery.build("iam", "v1", credentials=credentials)
-        try:
-            service_account = (
-                iam_service.projects()
-                .serviceAccounts()
-                .create(
-                    name="projects/" + project_id,
-                    body={
-                        "accountId": name,
-                        "serviceAccount": {
-                            "displayName": name,
-                        },
-                    },
-                )
-                .execute()
-            )
-            return service_account["email"]
-        except googleapiclient.errors.HttpError as e:
-            if e.status_code == 409:
-                return gcp_utils.get_service_account_email(project_id, name)
-            elif e.status_code == 403:
-                raise ServerClientError(
-                    "Not enough permissions. Default credentials must have Service Account Admin role.",
-                )
-            raise e
-
-    def _grant_roles_to_service_account(
-        self, credentials: Credentials, project_id: str, service_account_email: str
-    ):
-        service = googleapiclient.discovery.build(
-            "cloudresourcemanager", "v1", credentials=credentials
-        )
-        try:
-            policy = service.projects().getIamPolicy(resource=project_id).execute()
-            self._add_roles_to_policy(
-                policy=policy,
-                service_account_email=service_account_email,
-                roles=self._get_service_account_roles(),
-            )
-            service.projects().setIamPolicy(resource=project_id, body={"policy": policy}).execute()
-        except googleapiclient.errors.HttpError as e:
-            if e.status_code == 403:
-                raise ServerClientError(
-                    "Not enough permissions. Default credentials must have Security Admin role.",
-                )
-            raise e
-
-    def _get_service_account_roles(self) -> List[str]:
-        return [
-            "roles/compute.admin",
-            "roles/iam.serviceAccountUser",
-        ]
-
-    def _add_roles_to_policy(self, policy: Dict, service_account_email: str, roles: List[str]):
-        member = f"serviceAccount:{service_account_email}"
-        for role in roles:
-            policy["bindings"].append({"role": role, "members": [member]})

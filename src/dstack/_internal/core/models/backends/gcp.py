@@ -52,4 +52,4 @@ class GCPConfigValues(CoreModel):
 
 
 class GCPStoredConfig(GCPConfigInfo):
-    service_account_email: str
+    pass
