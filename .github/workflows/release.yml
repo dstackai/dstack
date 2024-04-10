@@ -126,6 +126,9 @@ jobs:
   pypi-upload:
     needs: [ python-test, runner-upload ]
     runs-on: ubuntu-latest
+    outputs:
+      LATEST: ${{ steps.set_latest.outputs.LATEST }
+      name: Set latest variable
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python 3.9
@@ -135,7 +138,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install wheel twine
+          pip install wheel twine packaging
+      - name: Set output
+        id: set_latest
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          LATEST=$(python -c "from packaging import version as pkg_version; print('' if pkg_version.parse('$VERSION').is_prerelease else '1', end='')")
+          echo "LATEST=$LATEST" >> "$GITHUB_OUTPUT"
       - name: Upload pip package
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
@@ -146,11 +155,6 @@ jobs:
           cp README.md src
           python setup.py sdist bdist_wheel -v
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*        
-      - name: Set output
-        run: |
-          pip install packaging
-          LATEST=$(python -c "from packaging import version as pkg_version; print('' if pkg_version.parse('$VERSION').is_prerelease else '1', end='')")
-          echo "LATEST=$LATEST" >> "$GITHUB_OUTPUT"
 
   update-get-dstack-tag:
     needs: [ pypi-upload ]
