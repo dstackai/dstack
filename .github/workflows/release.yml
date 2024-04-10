@@ -148,6 +148,7 @@ jobs:
           python -m twine upload --repository pypi --username ${{ secrets.PYPI_USERNAME }} --password ${{ secrets.PYPI_PASSWORD }} dist/*        
       - name: Set output
         run: |
+          pip install packaging
           LATEST=$(python -c "from packaging import version as pkg_version; print('' if pkg_version.parse('$VERSION').is_prerelease else '1', end='')")
           echo "LATEST=$LATEST" >> "$GITHUB_OUTPUT"
 
