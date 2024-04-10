@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -111,7 +111,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	if !d.dockerParams.DockerKeepContainer() {
 		defer func() {
 			log.Println("Deleting container")
-			err := d.client.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{Force: true})
+			err := d.client.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
 			if err != nil {
 				log.Printf("ContainerRemove error: %s\n", err.Error())
 			}
@@ -168,7 +168,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 	if !strings.Contains(taskParams.ImageName, ":") {
 		taskParams.ImageName += ":latest"
 	}
-	images, err := client.ImageList(ctx, types.ImageListOptions{
+	images, err := client.ImageList(ctx, image.ListOptions{
 		Filters: filters.NewArgs(filters.Arg("reference", taskParams.ImageName)),
 	})
 	if err != nil {
@@ -180,7 +180,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 		return nil
 	}
 
-	opts := types.ImagePullOptions{}
+	opts := image.PullOptions{}
 	regAuth, _ := taskParams.EncodeRegistryAuth()
 	if regAuth != "" {
 		opts.RegistryAuth = regAuth
@@ -261,7 +261,7 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		log.Printf("Cleanup routine: Cannot stop container: %s", err)
 	}
 
-	removeOptions := types.ContainerRemoveOptions{Force: true}
+	removeOptions := container.RemoveOptions{Force: true}
 	err = client.ContainerRemove(ctx, taskParams.ContainerName, removeOptions)
 	if err != nil {
 		log.Printf("Cleanup routine: Cannot remove container: %s", err)
@@ -301,7 +301,7 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 }
 
 func runContainer(ctx context.Context, client docker.APIClient, containerID string) error {
-	if err := client.ContainerStart(ctx, containerID, types.ContainerStartOptions{}); err != nil {
+	if err := client.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
 		return tracerr.Wrap(err)
 	}
 
