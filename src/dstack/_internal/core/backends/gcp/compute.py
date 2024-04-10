@@ -128,7 +128,6 @@ class GCPCompute(Compute):
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,
                 zone=zone,
-                service_account=self.config.service_account_email,
             )
             try:
                 operation = self.instances_client.insert(request=request)

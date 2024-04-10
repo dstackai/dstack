@@ -680,7 +680,6 @@ class TestCreateBackend:
         ) as authenticate_mock:
             default_creds_available_mock.return_value = False
             credentials_mock = Mock()
-            credentials_mock.service_account_email = "test"
             authenticate_mock.return_value = credentials_mock, "test_project"
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
