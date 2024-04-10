@@ -3,8 +3,9 @@ import logging
 import sys
 
 from pythonjsonlogger import jsonlogger
+from rich.logging import RichHandler
 
-from dstack._internal.cli.utils.common import DstackRichHandler, console
+from dstack._internal.cli.utils.common import console
 from dstack._internal.server import settings
 
 
@@ -31,7 +32,7 @@ def configure_logging():
         ),
     }
     handlers = {
-        "rich": DstackRichHandler(console=console, show_path=False),
+        "rich": RichHandler(console=console, show_path=False),
         "standard": logging.StreamHandler(stream=sys.stdout),
         "json": logging.StreamHandler(stream=sys.stdout),
     }
