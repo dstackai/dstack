@@ -31,7 +31,7 @@ def configure_logging():
         ),
     }
     handlers = {
-        "rich": DstackRichHandler(console=console),
+        "rich": DstackRichHandler(console=console, show_path=False),
         "standard": logging.StreamHandler(stream=sys.stdout),
         "json": logging.StreamHandler(stream=sys.stdout),
     }
