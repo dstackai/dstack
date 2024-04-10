@@ -127,7 +127,7 @@ jobs:
     needs: [ python-test, runner-upload ]
     runs-on: ubuntu-latest
     outputs:
-      LATEST: ${{ steps.set_latest.outputs.LATEST }
+      LATEST: ${{ steps.set_latest.outputs.LATEST }}
       name: Set latest variable
     steps:
       - uses: actions/checkout@v3
