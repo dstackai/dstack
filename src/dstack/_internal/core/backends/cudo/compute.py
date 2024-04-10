@@ -145,7 +145,8 @@ class CudoCompute(Compute):
         ssh_key_pub: str,
         region: str,
         project_id: str,
-    ) -> LaunchedGatewayInfo:
+    ) -> JobProvisioningData:
+
         vm = self.get_gateway_machine(region)
         try:
             resp_data = self.api_client.create_virtual_machine(
@@ -206,7 +207,7 @@ class CudoCompute(Compute):
             if vm.get("dataCenterId") == region and vm.get("countVmAvailable") > 0
         ]
         if not vms:
-            return None
+            raise NoCapacityError("No hosts available for your specified region")
         for vm in vms:
             vm["price"] = round(float(vm["totalVcpuPriceHr"]["value"]), 5)
         +(round(float(vm["totalMemoryPriceHr"]["value"]), 5))
