@@ -6,7 +6,6 @@ from dstack._internal.core.models.gateways import AnyModel
 
 
 def complete_service_model(model_info: AnyModel):
-    model_info = model_info.copy(deep=True)
     if model_info.type == "chat" and model_info.format == "tgi":
         if model_info.chat_template is None or model_info.eos_token is None:
             tokenizer_config = get_tokenizer_config(model_info.name)
