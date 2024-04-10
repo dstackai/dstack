@@ -109,3 +109,7 @@ class CudoApiClient:
     def get_vm(self, project_id, vm_id) -> Dict:
         resp = self._make_request("GET", f"/projects/{project_id}/vms/{vm_id}")
         return resp.json()
+
+    def get_cpu_only_machine_types(self, vcpu, memory):
+        resp = self._make_request("GET", f"/vms/machine-types?vcpu={vcpu}&memory_gib={memory}")
+        return resp.json()

@@ -1,9 +1,11 @@
+import time
 from typing import List, Optional
 
 import requests
 
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
+    get_gateway_user_data,
     get_instance_name,
     get_shim_commands,
 )
@@ -16,6 +18,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
+    LaunchedGatewayInfo,
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
@@ -24,6 +27,11 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+_WAIT_FOR_INSTANCE_ATTEMPTS = 30
+_WAIT_FOR_INSTANCE_INTERVAL = 2
+_GATEWAY_CPU = 1
+_GATEWAY_MEMORY = 2
+_GATEWAY_DISK_SIZE = 30
 class CudoCompute(Compute):
     def __init__(self, config: CudoConfig):
         self.config = config
@@ -130,6 +138,82 @@ class CudoCompute(Compute):
             backend_data=None,
         )
         return launched_instance
+
+    def create_gateway(
+        self,
+        instance_name: str,
+        ssh_key_pub: str,
+        region: str,
+        project_id: str,
+    ) -> LaunchedGatewayInfo:
+        vm = self.get_gateway_machine(region)
+        try:
+            resp_data = self.api_client.create_virtual_machine(
+                project_id=self.config.project_id,
+                boot_disk_storage_class="STORAGE_CLASS_NETWORK",
+                boot_disk_size_gib=_GATEWAY_DISK_SIZE,
+                book_disk_id=f"{instance_name}_disk_id",
+                boot_disk_image_id="ubuntu-2204",
+                data_center_id=region,
+                gpus=None,
+                machine_type=vm["machineType"],
+                memory_gib=_GATEWAY_MEMORY,
+                vcpus=_GATEWAY_CPU,
+                vm_id=instance_name,
+                start_script=get_gateway_user_data(ssh_key_pub),
+                password=None,
+                customSshKeys=[ssh_key_pub],
+            )
+        except requests.HTTPError as e:
+            try:
+                details = e.response.json()
+                response_code = details.get("code")
+            except ValueError:
+                raise BackendError(e)
+
+            # code 3: There are no hosts available for your specified virtual machine.
+            if response_code == 3:
+                raise NoCapacityError(details.get("message"))
+            # code 9: Vm cannot be assigned ip from network. Network full
+            if response_code == 9:
+                raise BackendError(details.get("message"))
+            # code 6: A disk with that id already exists
+            if response_code == 6:
+                raise BackendError(details.get("message"))
+
+        for _ in range(_WAIT_FOR_INSTANCE_ATTEMPTS):
+            vm = self.api_client.get_vm(self.config.project_id, instance_name)
+            if vm["VM"]["state"] == "FAILED":
+                raise BackendError("VM entered FAILED state", vm)
+            if vm["VM"]["state"] == "ACTIVE":
+                break
+            time.sleep(_WAIT_FOR_INSTANCE_INTERVAL)
+        else:
+            raise BackendError("Failed waiting for VM to become ACTIVE", vm)
+
+        return LaunchedGatewayInfo(
+            instance_id=resp_data["id"],
+            ip_address=vm["VM"]["publicIpAddress"],
+            region=resp_data["vm"]["regionId"],
+        )
+
+    def get_gateway_machine(self, region):
+        machine_types = self.api_client.get_cpu_only_machine_types(_GATEWAY_CPU, _GATEWAY_MEMORY)
+        machine_types = machine_types["hostConfigs"]
+        vms = [
+            vm
+            for vm in machine_types
+            if vm.get("dataCenterId") == region and vm.get("countVmAvailable") > 0
+        ]
+        if not vms:
+            return None
+        for vm in vms:
+            vm["price"] = round(float(vm["totalVcpuPriceHr"]["value"]), 5)
+        +(round(float(vm["totalMemoryPriceHr"]["value"]), 5))
+        +(round(float(vm["storageGibPriceHr"]["value"]), 5) * _GATEWAY_DISK_SIZE)
+        +(round(float(vm["storageGibPriceHr"]["value"]), 5))
+        vms_sorted = sorted(vms, key=lambda x: x["price"])
+        return vms_sorted[0]
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
