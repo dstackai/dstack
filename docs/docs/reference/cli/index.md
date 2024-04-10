@@ -190,7 +190,7 @@ $ dstack pool delete --help
 
 ### dstack gateway
 
-A gateway is required for running services. It handles ingress traffic, authentication, domain mapping, model mapping
+A gateway is required for running services. It handles ingress traffic, authorization, domain mapping, model mapping
 for the OpenAI-compatible endpoint, and so on.
 
 ##### dstack gateway list

@@ -45,8 +45,8 @@ $ dstack run . -f infinity/serve.dstack.yml
 Once the service is up, you can query it at 
 `https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
-!!! info "Authentication"
-    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
+!!! info "Authorization"
+    By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`.
 
 ### OpenAI interface
 

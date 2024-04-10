@@ -208,15 +208,15 @@ $ dstack run . -f deployment/sdxl/serve.dstack.yml
 Once the service is up, you can query it at 
 `https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
-!!! info "Authentication"
-    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
+!!! info "Authorization"
+    By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`.
 
 <div class="termy">
 
 ```shell
 $ curl -X POST --location https://yellow-cat-1.mydomain.com/generate \
     -H 'Content-Type: application/json' \
-    -H 'Authentication: "Bearer &lt;dstack token&gt;"' \
+    -H 'Authorization: "Bearer &lt;dstack token&gt;"' \
     -d '{ "prompt": "A cat in a hat" }'
 ```
 

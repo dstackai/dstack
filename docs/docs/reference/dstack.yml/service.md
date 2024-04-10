@@ -185,10 +185,10 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
     `shm_size`, e.g. set it to `16GB`.
 
-#### Authentication
+#### Authorization
 
-By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
-Authentication can be disabled by setting `auth` to `false`.
+By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`.
+Authorization can be disabled by setting `auth` to `false`.
 
 <div editor-title="serve.dstack.yml"> 
 

@@ -11,12 +11,12 @@ To deploy an LLM as a service using vLLM, you have to define the following confi
 ```yaml
 type: service
 
-python: "3.11"
+image: vllm/vllm-openai:latest
 env:
   - MODEL=NousResearch/Llama-2-7b-chat-hf
+  - PYTHONPATH=/workspace 
 commands:
-  - pip install vllm
-  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+  - python3 -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
 port: 8000
 
 resources:
@@ -50,14 +50,14 @@ $ dstack run . -f deployment/vllm/serve.dstack.yml
 Once the service is up, you can query it at 
 `https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
-!!! info "Authentication"
-    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
+!!! info "Authorization"
+    By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`.
 
 [//]: # (<div class="termy">)
 [//]: # (```shell)
 [//]: # ($ curl -X POST --location https://yellow-cat-1.example.com/v1/completions \)
 [//]: # (    -H "Content-Type: application/json" \)
-[//]: # (    -H 'Authentication: "Bearer &lt;dstack token&gt;"' \)
+[//]: # (    -H 'Authorization: "Bearer &lt;dstack token&gt;"' \)
 [//]: # (    -d '{)
 [//]: # (          "model": "NousResearch/Llama-2-7b-chat-hf",)
 [//]: # (          "prompt": "San Francisco is a",)

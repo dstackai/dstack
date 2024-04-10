@@ -54,8 +54,8 @@ $ dstack run . -f deployment/tgi/serve.dstack.yml
 Once the service is up, you'll be able to 
 access it at `https://<run name>.<gateway domain>`.
 
-!!! info "Authentication"
-    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
+!!! info "Authorization"
+    By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`.
 
 <div class="termy">
 
@@ -64,7 +64,7 @@ $ curl https://yellow-cat-1.example.com/generate \
     -X POST \
     -d '{"inputs":"&lt;s&gt;[INST] What is your favourite condiment?[/INST]"}' \
     -H 'Content-Type: application/json' \
-    -H 'Authentication: "Bearer &lt;dstack token&gt;"'
+    -H 'Authorization: "Bearer &lt;dstack token&gt;"'
 ```
 
 </div>

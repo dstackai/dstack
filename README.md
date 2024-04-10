@@ -9,7 +9,7 @@
 </h1>
 
 <h3 align="center">
-Orchestrate GPU workloads effortlessly on any cloud
+Orchestrate GPU workloads effortlessly
 </h3>
 
 <p align="center">
@@ -22,16 +22,15 @@ Orchestrate GPU workloads effortlessly on any cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source engine for running GPU workloads.
-It works with a wide range of cloud providers (AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, CUDO, etc.)
-as well as on-prem servers.
+`dstack` is an open-source orchestration engine for running AI workloads. It supports a wide range of cloud providers (such as AWS, GCP, Azure,
+Lambda, TensorDock, Vast.ai, CUDO, etc.) as well as on-premises infrastructure.
 
 ## Latest news ✨
 
 - [2024/03] [dstack 0.17.0: Service auto-scaling, and other improvements](https://dstack.ai/changelog/0.17.0/) (Release)
 - [2024/02] [dstack 0.16.0: Pools](https://dstack.ai/changelog/0.16.0/) (Release)
 - [2024/02] [dstack 0.15.1: Kubernetes integration](https://dstack.ai/changelog/0.15.1/) (Release)
-- [2024/01] [dstack 0.15.0: Resources, authentication, and more](https://dstack.ai/changelog/0.15.0/) (Release)
+- [2024/01] [dstack 0.15.0: Resources, authorization, and more](https://dstack.ai/changelog/0.15.0/) (Release)
 - [2024/01] [dstack 0.14.0: OpenAI-compatible endpoints](https://dstack.ai/changelog/0.14.0/) (Release)
 
 ## Installation
@@ -101,7 +100,7 @@ cloud, enabling port forwarding to your local machine for convenient access.
 Services make it very easy to deploy any kind of model or web application as public endpoints.
 
 Use any serving frameworks and specify required resources. dstack deploys it in the configured
-backend, handles authentication, and provides an OpenAI-compatible interface if needed.
+backend, handles authorization, and provides an OpenAI-compatible interface if needed.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="650"/>
 

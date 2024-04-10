@@ -44,8 +44,8 @@ $ dstack run . -f deployment/tae/serve.dstack.yml
 Once the service is up, you can query it at 
 `https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
-!!! info "Authentication"
-    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
+!!! info "Authorization"
+    By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`.
 
 <div class="termy">
 
@@ -53,7 +53,7 @@ Once the service is up, you can query it at
 $ curl https://yellow-cat-1.example.com \
     -X POST \
     -H 'Content-Type: application/json' \
-    -H 'Authentication: "Bearer &lt;dstack token&gt;"' \
+    -H 'Authorization: "Bearer &lt;dstack token&gt;"' \
     -d '{"inputs":"What is Deep Learning?"}'
 
 [[0.010704354,-0.033910684,0.004793657,-0.0042832214,0.07551489,0.028702762,0.03985837,0.021956133,...]]

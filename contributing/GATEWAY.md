@@ -30,7 +30,7 @@ The dstack server keeps a bidirectional tunnel with each GatewayCompute for the 
 - The tunnel from the server to the gateway is used to manage the gateway: register and unregister services and replicas.
 - The tunnel from the gateway to the server is used to authenticate requests to the gateway based on dstack's tokens.
 
-Authentication responses are cached for 60 seconds. If the server is not responding, the request is denied.
+Authorization responses are cached for 60 seconds. If the server is not responding, the request is denied.
 
 ## Nginx
 
@@ -40,9 +40,9 @@ Authentication responses are cached for 60 seconds. If the server is not respond
 
 If there are no replicas, the service configuration always returns 503; otherwise, the upstream with replicas is used. The upstream handles load balancing for us. `dstack-gateway` uses Unix sockets for SSH tunnels to avoid port conflicts between services.
 
-Service authentication is handled with the `localhost:8000/auth` endpoint if needed. `dstack-gateway` may request services without authentication and HTTPS, for example, from the OpenAI interface.
+Service authorization is handled with the `localhost:8000/auth` endpoint if needed. `dstack-gateway` may request services without authorization and HTTPS, for example, from the OpenAI interface.
 
-Entrypoint configurations forward requests back to `dstack-gateway`, to a specific module (e.g., OpenAI). Authentication is handled by those modules.
+Entrypoint configurations forward requests back to `dstack-gateway`, to a specific module (e.g., OpenAI). Authorization is handled by those modules.
 
 ## Gateway registry
 

@@ -51,14 +51,14 @@ $ dstack run . -f deployment/ollama/serve.dstack.yml
 Once the service is up, you can query it at 
 `https://<run name>.<gateway domain>` (using the domain set up for the gateway):
 
-!!! info "Authentication"
-    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
+!!! info "Authorization"
+    By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`.
 
 [//]: # (<div class="termy">)
 [//]: # (```shell)
 [//]: # ($ curl -X POST --location https://yellow-cat-1.example.com/v1/completions \)
 [//]: # (    -H "Content-Type: application/json" \)
-[//]: # (    -H 'Authentication: "Bearer &lt;dstack token&gt;"' \)
+[//]: # (    -H 'Authorization: "Bearer &lt;dstack token&gt;"' \)
 [//]: # (    -d '{)
 [//]: # (          "model": "NousResearch/Llama-2-7b-chat-hf",)
 [//]: # (          "prompt": "San Francisco is a",)

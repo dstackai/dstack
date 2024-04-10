@@ -3,7 +3,7 @@
 Services make it very easy to deploy any kind of model or web application as public endpoints.
 
 Use any serving frameworks and specify required resources. `dstack` deploys it in the configured backend, handles
-authentication, auto-scaling, and provides an OpenAI-compatible interface if needed.
+authorization, auto-scaling, and provides an OpenAI-compatible interface if needed.
 
 ??? info "Prerequisites"
 
@@ -241,9 +241,9 @@ max price, regions, instance types, and [much more](../reference/cli/index.md#ds
 
 One the service is up, its endpoint is accessible at `https://<run name>.<gateway domain>`.
 
-#### Authentication
+#### Authorization
     
-By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`. 
+By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`. 
 
 <div class="termy">
 
@@ -252,12 +252,12 @@ $ curl https://yellow-cat-1.example.com/generate \
     -X POST \
     -d '{"inputs":"&lt;s&gt;[INST] What is your favourite condiment?[/INST]"}' \
     -H 'Content-Type: application/json' \
-    -H 'Authentication: "Bearer &lt;dstack token&gt;"'
+    -H 'Authorization: "Bearer &lt;dstack token&gt;"'
 ```
 
 </div>
 
-Authentication can be disabled by setting `auth` to `false` in the service configuration file.
+Authorization can be disabled by setting `auth` to `false` in the service configuration file.
 
 #### OpenAI interface
 

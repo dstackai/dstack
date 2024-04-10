@@ -120,8 +120,8 @@ $ dstack run . -f llms/mixtral/tgi.dstack.yml
 
 Once the service is up, you'll be able to access it at `https://<run name>.<gateway domain>`.
 
-!!! info "Authentication"
-    By default, the service endpoint requires the `Authentication` header with `"Bearer <dstack token>"`.
+!!! info "Authorization"
+    By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`.
 
 #### OpenAI interface
 

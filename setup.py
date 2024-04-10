@@ -131,7 +131,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="dstack is an open-source engine for running GPU workloads across any cloud provider.",
+    description="dstack is an open-source orchestration engine for running AI workloads on any cloud or on-premises.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.8",
