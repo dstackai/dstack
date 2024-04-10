@@ -195,9 +195,11 @@ class ServerConfigManager:
             self._save_config(self.config)
 
     async def sync_config(self, session: AsyncSession):
-        self.config = await self._init_config(session=session, init_backends=False)
-        if self.config is not None:
-            self._save_config(self.config)
+        # Disable config.yml sync for https://github.com/dstackai/dstack/issues/815.
+        return
+        # self.config = await self._init_config(session=session, init_backends=False)
+        # if self.config is not None:
+        #     self._save_config(self.config)
 
     async def apply_config(self, session: AsyncSession, owner: UserModel):
         if self.config is None:
