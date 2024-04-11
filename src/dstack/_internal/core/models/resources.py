@@ -183,6 +183,9 @@ class DiskSpec(CoreModel):
         return v
 
 
+DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))
+
+
 class ResourcesSpec(CoreModel):
     """
     The minimum resources requirements for the run.
@@ -208,7 +211,7 @@ class ResourcesSpec(CoreModel):
     memory: Range[Memory] = DEFAULT_MEMORY_SIZE
     shm_size: Optional[Memory] = None
     gpu: Optional[GPUSpec] = None
-    disk: Optional[DiskSpec] = None
+    disk: Optional[DiskSpec] = DEFAULT_DISK
 
 
 IntRangeLike = Union[Range[Union[int, str]], int, str]
@@ -274,4 +277,4 @@ class ResourcesSpecSchema(CoreModel):
             description="The GPU requirements. Can be set to a number, a string (e.g. `A100`, `80GB:2`, etc.), or an object; see [examples](#examples)"
         ),
     ] = None
-    disk: Annotated[Optional[DiskLike], Field(description="The disk resources")] = None
+    disk: Annotated[Optional[DiskLike], Field(description="The disk resources")] = DEFAULT_DISK
