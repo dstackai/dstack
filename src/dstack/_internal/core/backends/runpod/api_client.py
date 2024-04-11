@@ -100,8 +100,8 @@ class RunpodApiClient:
                 )
             }
         )
-        data = resp.json()
-        return data["data"]["podFindAndDeployOnDemand"]
+        data = resp.json()["data"]
+        return data["podRentInterruptable"] if bid_per_gpu else data["podFindAndDeployOnDemand"]
 
     def get_pod(self, pod_id: str) -> Dict:
         resp = self._make_request({"query": generate_pod_query(pod_id)})
@@ -395,7 +395,6 @@ def generate_pod_rent_interruptable_mutation(
 
     # Format input fields
     input_string = ", ".join(input_fields)
-    print(f"{input_string}")
     return f"""
         mutation {{
           podRentInterruptable(

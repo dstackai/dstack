@@ -77,6 +77,7 @@ class RunpodCompute(Compute):
             support_public_ip=True,
             docker_args=get_docker_args(authorized_keys),
             ports="10022/tcp",
+            bid_per_gpu=instance_offer.price if instance_offer.instance.resources.spot else None,
         )
         instance_id = resp["id"]
         return JobProvisioningData(
