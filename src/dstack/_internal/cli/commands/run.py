@@ -153,7 +153,7 @@ class RunCommand(APIBaseCommand):
             raise CLIError(e.msg)
 
         if args.detach:
-            console.print("Run submitted, detaching...")
+            console.print(f"Run [code]{run.name}[/] submitted, detaching...")
             return
 
         abort_at_exit = True
