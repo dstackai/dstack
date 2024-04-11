@@ -278,20 +278,21 @@ async def get_run_plan(
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
 
+    # Get offers once for all jobs
+    if creation_policy == CreationPolicy.REUSE_OR_CREATE:
+        offers = await get_offers_by_requirements(
+            project=project,
+            profile=profile,
+            requirements=jobs[0].job_spec.requirements,
+            exclude_not_available=False,
+            multinode=jobs[0].job_spec.jobs_per_replica > 1,
+        )
+
     job_plans = []
     for job in jobs:
         job_offers: List[InstanceOfferWithAvailability] = []
         job_offers.extend(pool_offers)
-
-        if creation_policy == CreationPolicy.REUSE_OR_CREATE:
-            offers = await get_offers_by_requirements(
-                project=project,
-                profile=profile,
-                requirements=job.job_spec.requirements,
-                exclude_not_available=False,
-                multinode=job.job_spec.jobs_per_replica > 1,
-            )
-            job_offers.extend(offer for _, offer in offers)
+        job_offers.extend(offer for _, offer in offers)
 
         # TODO(egor-s): merge job_offers and pool_offers based on (availability, use/create, price)
         job_plan = JobPlan(
@@ -305,7 +306,10 @@ async def get_run_plan(
     run_spec.profile.pool_name = pool.name  # write pool name back for the client
     run_spec.run_name = run_name  # restore run_name
     run_plan = RunPlan(
-        project_name=project.name, user=user.name, run_spec=run_spec, job_plans=job_plans
+        project_name=project.name,
+        user=user.name,
+        run_spec=run_spec,
+        job_plans=job_plans,
     )
     return run_plan
 
