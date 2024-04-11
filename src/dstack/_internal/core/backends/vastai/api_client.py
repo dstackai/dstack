@@ -9,8 +9,6 @@ import dstack._internal.server.services.docker as docker
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.configurations import RegistryAuth
 
-DISK_SIZE = 80  # TODO(egor-s): use requirements instead
-
 
 class VastAIAPIClient:
     def __init__(self, api_key: str):
@@ -40,6 +38,7 @@ class VastAIAPIClient:
         bundle_id: Union[str, int],
         image_name: str,
         onstart: str,
+        disk_size: int,
         registry_auth: Optional[RegistryAuth] = None,
     ) -> dict:
         """
@@ -63,7 +62,7 @@ class VastAIAPIClient:
         payload = {
             "client_id": "me",
             "image": image_name,
-            "disk": DISK_SIZE,
+            "disk": disk_size,
             "label": instance_name,
             "env": {
                 "-p 10022:10022": "1",

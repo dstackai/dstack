@@ -8,7 +8,7 @@ from gpuhunt.providers.vastai import VastAIProvider
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import get_docker_commands, get_instance_name
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.backends.vastai.api_client import DISK_SIZE, VastAIAPIClient
+from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
 from dstack._internal.core.backends.vastai.config import VastAIConfig
 from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
@@ -22,7 +22,9 @@ from dstack._internal.core.models.runs import Job, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-POLLING_INTERVAL = 10
+
+_WAIT_FOR_INSTANCE_ATTEMPTS = 30
+_WAIT_FOR_INSTANCE_INTERVAL = 5
 
 
 class VastAICompute(Compute):
@@ -38,7 +40,6 @@ class VastAICompute(Compute):
                     "inet_down": {"gt": 128},
                     "verified": {"eq": True},
                     "cuda_max_good": {"gte": 11.8},
-                    "disk_space": {"gte": DISK_SIZE},
                 }
             )
         )
@@ -80,27 +81,30 @@ class VastAICompute(Compute):
             bundle_id=instance_offer.instance.name,
             image_name=job.job_spec.image_name,
             onstart=" && ".join(commands),
+            disk_size=round(instance_offer.instance.resources.disk.size_mib / 1024),
             registry_auth=registry_auth,
         )
         instance_id = resp["new_contract"]
         try:
-            while (resp := self.api_client.get_instance(instance_id))[
-                "actual_status"
-            ] != "running":
-                if (
-                    resp["actual_status"] == "created"
-                    and ": OCI runtime create failed:" in resp["status_msg"]
-                ):
-                    raise ComputeError(resp["status_msg"])
-                # if resp["actual_status"] == "exited":
-                #     raise ComputeError(resp["status_msg"])
-                logger.debug(
-                    "Waiting %s: %s", instance_id, {k: v for k, v in resp.items() if "stat" in k}
-                )
-                time.sleep(POLLING_INTERVAL)
-
+            for _ in range(_WAIT_FOR_INSTANCE_ATTEMPTS):
+                resp = self.api_client.get_instance(instance_id)
+                if resp is not None:
+                    if resp["actual_status"] == "running":
+                        break
+                    if (
+                        resp["actual_status"] == "created"
+                        and ": OCI runtime create failed:" in resp["status_msg"]
+                    ):
+                        raise ComputeError(resp["status_msg"])
+                    logger.debug(
+                        "Waiting %s: %s",
+                        instance_id,
+                        {k: v for k, v in resp.items() if "stat" in k},
+                    )
+                time.sleep(_WAIT_FOR_INSTANCE_INTERVAL)
+            else:
+                raise ComputeError("Failed waiting for VM to become running", resp)
         except (requests.HTTPError, ComputeError):
-            logger.warning("Failed to launch instance %s, request termination", instance_id)
             self.terminate_instance(instance_id, instance_offer.region)
             raise
         return LaunchedInstanceInfo(
