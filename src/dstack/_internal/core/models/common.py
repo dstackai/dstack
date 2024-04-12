@@ -1,7 +1,27 @@
 import re
 from typing import Union
 
-from pydantic_duality import DualBaseModel
+from pydantic_duality import DualBaseModel, DualBaseModelMeta
+
+
+# Change DualBaseModelMeta so that model parsed with MyModel.__response__
+# would pass the check for isinstance(instance, MyModel).
+class CoreModelMeta(DualBaseModelMeta):
+    """Metaclass used for custom types."""
+
+    def __instancecheck__(cls, instance) -> bool:
+        return (
+            type.__instancecheck__(cls, instance)
+            or isinstance(instance, cls.__request__)
+            or isinstance(instance, cls.__response__)
+        )
+
+    def __subclasscheck__(cls, subclass: type):
+        return (
+            type.__subclasscheck__(cls, subclass)
+            or issubclass(subclass, cls.__request__)
+            or issubclass(subclass, cls.__request__)
+        )
 
 
 # DualBaseModel creates two classes for the model:
@@ -9,7 +29,9 @@ from pydantic_duality import DualBaseModel
 # and another with extra = "ignore" (CoreModel.__response__).
 # This allows to use the same model both for a strict parsing of the user input and
 # for a permissive parsing of the server responses.
-class CoreModel(DualBaseModel):
+
+
+class CoreModel(DualBaseModel, metaclass=CoreModelMeta):
     pass
 
 
