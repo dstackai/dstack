@@ -44,6 +44,7 @@ from dstack._internal.core.models.backends.base import (
     ConfigElementValue,
     ConfigMultiElement,
 )
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
@@ -107,14 +108,17 @@ class AzureConfigurator(Configurator):
         )
         if config.creds is None:
             return config_values
-        if isinstance(config.creds, AzureDefaultCreds) and not settings.DEFAULT_CREDS_ENABLED:
+        if (
+            is_core_model_instance(config.creds, AzureDefaultCreds)
+            and not settings.DEFAULT_CREDS_ENABLED
+        ):
             raise_invalid_credentials_error(fields=[["creds"]])
-        if isinstance(config.creds, AzureClientCreds):
+        if is_core_model_instance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         try:
             credential, creds_tenant_id = auth.authenticate(config.creds)
         except BackendAuthError:
-            if isinstance(config.creds, AzureClientCreds):
+            if is_core_model_instance(config.creds, AzureClientCreds):
                 raise_invalid_credentials_error(
                     fields=[
                         ["creds", "tenant_id"],
@@ -146,7 +150,7 @@ class AzureConfigurator(Configurator):
     ) -> BackendModel:
         if config.locations is None:
             config.locations = DEFAULT_LOCATIONS
-        if isinstance(config.creds, AzureClientCreds):
+        if is_core_model_instance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         credential, _ = auth.authenticate(config.creds)
         resource_group = self._create_resource_group(

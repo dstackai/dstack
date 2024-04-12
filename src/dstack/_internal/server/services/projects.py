@@ -11,6 +11,7 @@ from dstack._internal.core.models.backends.dstack import (
     DstackBaseBackendConfigInfo,
     DstackConfigInfo,
 )
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.projects import Member, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
@@ -280,7 +281,7 @@ def project_model_to_project(project_model: ProjectModel) -> Project:
             logger.warning("Configurator for backend %s not found", b.type)
             continue
         config_info = configurator.get_config_info(model=b, include_creds=False)
-        if isinstance(config_info, DstackConfigInfo):
+        if is_core_model_instance(config_info, DstackConfigInfo):
             for backend_type in config_info.base_backends:
                 backends.append(
                     BackendInfo(

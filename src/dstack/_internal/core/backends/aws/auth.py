@@ -4,6 +4,7 @@ from boto3.session import Session
 
 from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.backends.aws import AnyAWSCreds, AWSAccessKeyCreds
+from dstack._internal.core.models.common import is_core_model_instance
 
 
 def authenticate(creds: AnyAWSCreds, region: str) -> Session:
@@ -13,7 +14,7 @@ def authenticate(creds: AnyAWSCreds, region: str) -> Session:
 
 
 def get_session(creds: AnyAWSCreds, region: str) -> Session:
-    if isinstance(creds, AWSAccessKeyCreds):
+    if is_core_model_instance(creds, AWSAccessKeyCreds):
         return boto3.session.Session(
             region_name=region,
             aws_access_key_id=creds.access_key,

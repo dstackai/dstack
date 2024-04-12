@@ -13,6 +13,7 @@ from dstack._internal.core.models.backends.gcp import (
     GCPDefaultCreds,
     GCPServiceAccountCreds,
 )
+from dstack._internal.core.models.common import is_core_model_instance
 
 
 def authenticate(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
@@ -26,7 +27,7 @@ def authenticate(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
 
 
 def get_credentials(creds: AnyGCPCreds) -> Tuple[Credentials, Optional[str]]:
-    if isinstance(creds, GCPServiceAccountCreds):
+    if is_core_model_instance(creds, GCPServiceAccountCreds):
         try:
             service_account_info = json.loads(creds.data)
             credentials = service_account.Credentials.from_service_account_info(

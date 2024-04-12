@@ -21,6 +21,7 @@ from dstack._internal.core.models.backends.gcp import (
     GCPServiceAccountCreds,
     GCPStoredConfig,
 )
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
@@ -141,12 +142,15 @@ class GCPConfigurator(Configurator):
         )
         if config.creds is None:
             return config_values
-        if isinstance(config.creds, GCPDefaultCreds) and not settings.DEFAULT_CREDS_ENABLED:
+        if (
+            is_core_model_instance(config.creds, GCPDefaultCreds)
+            and not settings.DEFAULT_CREDS_ENABLED
+        ):
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
             _, project_id = auth.authenticate(creds=config.creds)
         except BackendAuthError:
-            if isinstance(config.creds, GCPServiceAccountCreds):
+            if is_core_model_instance(config.creds, GCPServiceAccountCreds):
                 raise_invalid_credentials_error(fields=[["creds", "data"]])
             else:
                 raise_invalid_credentials_error(fields=[["creds"]])
