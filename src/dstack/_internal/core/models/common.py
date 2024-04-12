@@ -20,7 +20,7 @@ class CoreModelMeta(DualBaseModelMeta):
         return (
             type.__subclasscheck__(cls, subclass)
             or issubclass(subclass, cls.__request__)
-            or issubclass(subclass, cls.__request__)
+            or issubclass(subclass, cls.__response__)
         )
 
 
