@@ -1,5 +1,5 @@
 import re
-from typing import Type, Union
+from typing import Any, Type, Union
 
 from pydantic_duality import DualBaseModel
 
@@ -47,7 +47,7 @@ class Duration(int):
         raise ValueError(f"Cannot parse the duration {v}")
 
 
-def is_core_model_instance(instance: CoreModel, class_: Type[CoreModel]) -> bool:
+def is_core_model_instance(instance: Any, class_: Type[CoreModel]) -> bool:
     """
     Implements isinstance check for CoreModel such that
     models parsed with MyModel.__response__ pass the check against MyModel.
