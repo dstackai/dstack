@@ -4,7 +4,8 @@ import sys
 
 from pythonjsonlogger import jsonlogger
 
-from dstack._internal.cli.utils.common import DstackRichHandler, console
+from dstack._internal.cli.utils.common import console
+from dstack._internal.cli.utils.rich import DstackRichHandler
 from dstack._internal.server import settings
 
 

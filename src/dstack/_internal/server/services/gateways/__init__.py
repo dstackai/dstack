@@ -448,7 +448,7 @@ async def get_gateway_connection(
     return conn
 
 
-async def init_gateways(session: AsyncSession) -> int:
+async def init_gateways(session: AsyncSession):
     res = await session.execute(
         select(GatewayComputeModel).where(GatewayComputeModel.deleted == False)
     )
@@ -484,7 +484,6 @@ async def init_gateways(session: AsyncSession) -> int:
     ):
         if isinstance(error, Exception):
             logger.warning("Failed to configure gateway %s: %r", conn.ip_address, error)
-    return len(gateway_computes)
 
 
 async def _update_gateway(connection: GatewayConnection, build: str):

@@ -94,16 +94,13 @@ async def lifespan(app: FastAPI):
                 with console.status("Initializing the default configuration..."):
                     await server_config_manager.init_config(session=session)
                 console.print(
-                    f"[code]✓[/] Initialized the default configuration at [code]{server_config_dir}[/]"
+                    f"[code]✓[/] Initialized the default configuration at [code]{server_config_dir}[/]\n"
                 )
             else:
                 with console.status(f"Applying [code]{server_config_dir}[/]..."):
                     await server_config_manager.apply_config(session=session, owner=admin)
-                console.print(f"[code]✓[/] Applied [code]{server_config_dir}[/]")
-        with console.status("Initializing gateways..."):
-            gateways_num = await init_gateways(session=session)
-        if gateways_num:
-            console.print("[code]✓[/] Initialized gateways")
+                console.print(f"[code]✓[/] Applied [code]{server_config_dir}[/]\n")
+        await init_gateways(session=session)
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
