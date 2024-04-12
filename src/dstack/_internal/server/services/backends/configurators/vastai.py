@@ -30,9 +30,6 @@ REGIONS = []
 class VastAIConfigurator(Configurator):
     TYPE: BackendType = BackendType.VASTAI
 
-    def get_default_configs(self) -> List[VastAIConfigInfoWithCreds]:
-        return []
-
     def get_config_values(self, config: VastAIConfigInfoWithCredsPartial) -> VastAIConfigValues:
         config_values = VastAIConfigValues()
         if config.creds is None:

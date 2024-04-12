@@ -39,9 +39,6 @@ DEFAULT_REGION = "CA-MTL-1"
 class RunpodConfigurator(Configurator):
     TYPE: BackendType = BackendType.RUNPOD
 
-    def get_default_configs(self) -> List[RunpodConfigInfoWithCreds]:
-        return []
-
     def get_config_values(self, config: RunpodConfigInfoWithCredsPartial) -> RunpodConfigValues:
         config_values = RunpodConfigValues()
         if config.creds is None:

@@ -32,9 +32,6 @@ REGIONS = ["eu-north1-c"]
 class NebiusConfigurator(Configurator):
     TYPE: BackendType = BackendType.NEBIUS
 
-    def get_default_configs(self) -> List[NebiusConfigInfoWithCreds]:
-        return []
-
     def get_config_values(self, config: NebiusConfigInfoWithCredsPartial) -> NebiusConfigValues:
         config_values = NebiusConfigValues()
         if config.creds is None:

@@ -31,9 +31,6 @@ DEFAULT_REGION = "FIN-01"
 class DataCrunchConfigurator(Configurator):
     TYPE: BackendType = BackendType.DATACRUNCH
 
-    def get_default_configs(self) -> List[DataCrunchConfigInfoWithCreds]:
-        return []
-
     def get_config_values(
         self, config: DataCrunchConfigInfoWithCredsPartial
     ) -> DataCrunchConfigValues:

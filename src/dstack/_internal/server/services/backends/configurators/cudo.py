@@ -37,9 +37,6 @@ DEFAULT_REGION = "no-luster-1"
 class CudoConfigurator(Configurator):
     TYPE: BackendType = BackendType.CUDO
 
-    def get_default_configs(self) -> List[CudoConfigInfoWithCreds]:
-        return []
-
     def get_config_values(self, config: CudoConfigInfoWithCredsPartial) -> CudoConfigValues:
         config_values = CudoConfigValues()
         if config.creds is None:
