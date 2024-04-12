@@ -8,6 +8,7 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration
 from dstack._internal.core.models.gateways import AnyModel
+from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
@@ -192,14 +193,28 @@ class BaseConfigurationWithCommands(BaseConfiguration):
         return values
 
 
-class DevEnvironmentConfiguration(BaseConfigurationWithPorts):
-    type: Literal["dev-environment"] = "dev-environment"
+class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
     version: Annotated[Optional[str], Field(description="The version of the IDE")]
     init: Annotated[CommandsList, Field(description="The bash commands to run")] = []
 
 
-class TaskConfiguration(BaseConfigurationWithPorts, BaseConfigurationWithCommands):
+class DevEnvironmentConfiguration(
+    ProfileParams, BaseConfigurationWithPorts, DevEnvironmentConfigurationParams
+):
+    type: Literal["dev-environment"] = "dev-environment"
+
+
+class TaskConfigurationParams(CoreModel):
+    nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
+
+
+class TaskConfiguration(
+    ProfileParams,
+    BaseConfigurationWithCommands,
+    BaseConfigurationWithPorts,
+    TaskConfigurationParams,
+):
     """
     Attributes:
         commands (List[str]): The bash commands to run
@@ -214,31 +229,12 @@ class TaskConfiguration(BaseConfigurationWithPorts, BaseConfigurationWithCommand
     """
 
     type: Literal["task"] = "task"
-    nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
 
 
-class ServiceConfiguration(BaseConfigurationWithCommands):
-    """
-    Attributes:
-        commands (List[str]): The bash commands to run
-        port (PortMapping): The port, that application listens to or the mapping
-        env (Dict[str, str]): The mapping or the list of environment variables
-        image (Optional[str]): The name of the Docker image to run
-        python (Optional[str]): The major version of Python
-        entrypoint (Optional[str]): The Docker entrypoint
-        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
-        home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
-        model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
-        auth (bool): Enable the authorization. Defaults to `True`.
-        replicas Range[int]: The range of the number of replicas. Defaults to `1`.
-        scaling: Optional[ScalingSpec]: The auto-scaling configuration.
-    """
-
-    type: Literal["service"] = "service"
+class ServiceConfigurationParams(CoreModel):
     port: Annotated[
         Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
-        Field(description="The port, that application listens to or the mapping"),
+        Field(description="The port, that application listens on or the mapping"),
     ]
     model: Annotated[
         Optional[AnyModel],
@@ -287,6 +283,29 @@ class ServiceConfiguration(BaseConfigurationWithCommands):
         if replicas.min == replicas.max and scaling:
             raise ValueError("To use `scaling`, `replicas` must be set to a range.")
         return values
+
+
+class ServiceConfiguration(
+    ProfileParams, BaseConfigurationWithCommands, ServiceConfigurationParams
+):
+    """
+    Attributes:
+        commands (List[str]): The bash commands to run
+        port (PortMapping): The port, that application listens to or the mapping
+        env (Dict[str, str]): The mapping or the list of environment variables
+        image (Optional[str]): The name of the Docker image to run
+        python (Optional[str]): The major version of Python
+        entrypoint (Optional[str]): The Docker entrypoint
+        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
+        home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
+        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
+        model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
+        auth (bool): Enable the authorization. Defaults to `True`.
+        replicas Range[int]: The range of the number of replicas. Defaults to `1`.
+        scaling: Optional[ScalingSpec]: The auto-scaling configuration.
+    """
+
+    type: Literal["service"] = "service"
 
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]
