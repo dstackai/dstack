@@ -91,19 +91,19 @@ async def lifespan(app: FastAPI):
                 os.path.expanduser("~"), "~", 1
             )
             if not config_loaded:
-                with console.status("Initializing the default configuration..."):
-                    await server_config_manager.init_config(session=session)
-                console.print(
-                    f"[code]✓[/] Initialized the default configuration at [code]{server_config_dir}[/]"
+                logger.info("Initializing the default configuration...", {"show_path": False})
+                await server_config_manager.init_config(session=session)
+                logger.info(
+                    f"Initialized the default configuration at [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]",
+                    {"show_path": False},
                 )
             else:
-                with console.status(f"Applying [code]{server_config_dir}[/]..."):
-                    await server_config_manager.apply_config(session=session, owner=admin)
-                console.print(f"[code]✓[/] Applied [code]{server_config_dir}[/]")
-        with console.status("Initializing gateways..."):
-            gateways_num = await init_gateways(session=session)
-        if gateways_num:
-            console.print("[code]✓[/] Initialized gateways")
+                logger.info(
+                    f"Applying [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]...",
+                    {"show_path": False},
+                )
+                await server_config_manager.apply_config(session=session, owner=admin)
+        await init_gateways(session=session)
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
@@ -115,9 +115,10 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
-    console.print(f"\nThe [code]admin[/] token is [code]{admin.token}[/]")
-    console.print(
-        f"The dstack server [yellow]{dstack_version}[/] is running at [code]{SERVER_URL}[/]\n"
+    logger.info(f"The [code]admin[/] token is [code]{admin.token}[/]", {"show_path": False})
+    logger.info(
+        f"The dstack server [yellow]{dstack_version}[/] is running at {SERVER_URL}",
+        {"show_path": False},
     )
     for func in _ON_STARTUP_HOOKS:
         await func(app)
