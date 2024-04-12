@@ -22,40 +22,31 @@ class DstackLogRender:
         log_time: Optional[datetime] = None,
         time_format: Union[str, FormatTimeCallable] = "[%x %X]",
         level: Text = Text(),
-        path: Optional[str] = None,
-        line_no: Optional[int] = None,
-        link_path: Optional[str] = None,
     ) -> "ConsoleRenderable":
-        from rich.containers import Renderables
+        from rich.table import Table
 
+        output = Table.grid(padding=(0, 1))
+        output.expand = True
+        output.add_column(style="log.time")
+        output.add_column(style="log.level", width=8)
+        output.add_column(ratio=1, style="log.message", overflow="fold")
         row: List["RenderableType"] = []
         log_time = log_time or console.get_datetime()
         time_format = time_format
         if callable(time_format):
             log_time_display = time_format(log_time)
         else:
-            log_time_display = Text(log_time.strftime(time_format), end=" ", style="log.time")
+            log_time_display = Text(log_time.strftime(time_format))
         if log_time_display == self._last_time:
             row.append(Text(" " * len(log_time_display)))
         else:
             row.append(log_time_display)
             self._last_time = log_time_display
-        level.end = " " * (9 - len(level))
-        level.style = "log.level"
         row.append(level)
-
-        path_text = Text(style="log.path", overflow="fold", end=" ")
-        path_text.append(path, style=f"link file://{link_path}" if link_path else "")
-        if line_no:
-            path_text.append(":")
-            path_text.append(
-                f"{line_no}",
-                style=f"link file://{link_path}#{line_no}" if link_path else "",
-            )
-        row.append(path_text)
         row.extend(message_renderable)
 
-        return Renderables(row)
+        output.add_row(*row)
+        return output
 
 
 class DstackRichHandler(RichHandler):
@@ -63,6 +54,10 @@ class DstackRichHandler(RichHandler):
 
     def emit(self, record: logging.LogRecord) -> None:
         """Invoked by logging."""
+        show_path = True
+        if isinstance(record.args, dict):
+            if "show_path" in record.args:
+                show_path = record.args["show_path"]
         message = self.format(record)
         traceback = None
         if self.rich_tracebacks and record.exc_info and record.exc_info != (None, None, None):
@@ -90,8 +85,10 @@ class DstackRichHandler(RichHandler):
                     record.asctime = formatter.formatTime(record, formatter.datefmt)
                 message = formatter.formatMessage(record)
 
+        if show_path:
+            message = self.prepend_path(message, record)
+        setattr(record, "markup", True)
         message_renderable = self.render_message(record, message)
-        path = record.name
         level = self.get_level_text(record)
         time_format = None if self.formatter is None else self.formatter.datefmt
         log_time = datetime.fromtimestamp(record.created)
@@ -102,12 +99,26 @@ class DstackRichHandler(RichHandler):
             log_time=log_time,
             time_format=time_format,
             level=level,
-            path=path,
-            line_no=record.lineno,
-            link_path=record.pathname if self.enable_link_path else None,
         )
 
         try:
-            self.console.print(log_renderable, soft_wrap=True)
+            self.console.print(log_renderable)
         except Exception:
             self.handleError(record)
+
+    def prepend_path(self, message, record):
+        path = ""
+        if self.enable_link_path and record.pathname:
+            path = path + f"[link=file://{record.pathname}"
+            path = path + "]"
+        path = path + record.name
+        if self.enable_link_path and record.pathname:
+            path = path + "[/link]"
+        if record.lineno:
+            if self.enable_link_path and record.pathname:
+                path = path + f"[link=file://{record.pathname}#{record.lineno}]"
+            path = path + f":{record.lineno}"
+            if self.enable_link_path and record.pathname:
+                path = path + "[/link]"
+        message = f"[log.path]{path}[/] " + message
+        return message

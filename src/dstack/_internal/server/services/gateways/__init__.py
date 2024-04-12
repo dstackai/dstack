@@ -455,7 +455,7 @@ async def init_gateways(session: AsyncSession):
     gateway_computes = res.scalars().all()
 
     if len(gateway_computes) > 0:
-        logger.debug(f"Connecting to {len(gateway_computes)} gateways...")
+        logger.info(f"Connecting to {len(gateway_computes)} gateways...", {"show_path": False})
     for gateway, error in await gather_map_async(
         gateway_computes,
         lambda g: gateway_connections_pool.add(g.ip_address, g.ssh_private_key),
