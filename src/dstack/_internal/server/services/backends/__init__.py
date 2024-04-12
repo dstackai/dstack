@@ -166,7 +166,7 @@ async def create_backend(
     if backend is not None:
         raise ResourceExistsError()
     await run_async(configurator.get_config_values, config)
-    backend = configurator.create_backend(project=project, config=config)
+    backend = await run_async(configurator.create_backend, project=project, config=config)
     session.add(backend)
     await session.commit()
     clear_backend_cache(project.name)
@@ -188,7 +188,7 @@ async def update_backend(
     if config_info is None:
         raise ServerClientError("Backend does not exist")
     await run_async(configurator.get_config_values, config)
-    backend = configurator.create_backend(project=project, config=config)
+    backend = await run_async(configurator.create_backend, project=project, config=config)
     await session.execute(
         update(BackendModel)
         .where(

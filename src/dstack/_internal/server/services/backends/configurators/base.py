@@ -16,13 +16,12 @@ from dstack._internal.server.models import BackendModel, ProjectModel
 class Configurator(ABC):
     TYPE: BackendType
 
-    @abstractmethod
     def get_default_configs(self) -> List[AnyConfigInfoWithCreds]:
         """
         Tries to detect backend creds on the machine and
         automatically construct backend configs from the creds.
         """
-        pass
+        return []
 
     @abstractmethod
     def get_config_values(self, config: AnyConfigInfoWithCredsPartial) -> AnyConfigValues:

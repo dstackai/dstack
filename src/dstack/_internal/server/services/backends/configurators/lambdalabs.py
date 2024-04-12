@@ -44,9 +44,6 @@ DEFAULT_REGION = "us-east-1"
 class LambdaConfigurator(Configurator):
     TYPE: BackendType = BackendType.LAMBDA
 
-    def get_default_configs(self) -> List[LambdaConfigInfoWithCreds]:
-        return []
-
     def get_config_values(self, config: LambdaConfigInfoWithCredsPartial) -> LambdaConfigValues:
         config_values = LambdaConfigValues()
         if config.creds is None:

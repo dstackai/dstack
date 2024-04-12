@@ -30,9 +30,6 @@ REGIONS = []
 class TensorDockConfigurator(Configurator):
     TYPE: BackendType = BackendType.TENSORDOCK
 
-    def get_default_configs(self) -> List[TensorDockConfigInfoWithCreds]:
-        return []
-
     def get_config_values(
         self, config: TensorDockConfigInfoWithCredsPartial
     ) -> TensorDockConfigValues:

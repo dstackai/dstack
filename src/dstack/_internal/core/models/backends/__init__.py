@@ -73,6 +73,7 @@ from dstack._internal.core.models.backends.vastai import (
 )
 from dstack._internal.core.models.common import CoreModel
 
+# Backend config returned by the API
 AnyConfigInfoWithoutCreds = Union[
     AWSConfigInfo,
     AzureConfigInfo,
@@ -88,6 +89,10 @@ AnyConfigInfoWithoutCreds = Union[
     DstackConfigInfo,
     DstackBaseBackendConfigInfo,
 ]
+
+# Same as AnyConfigInfoWithoutCreds but also includes creds.
+# Used to create/update backend.
+# Also returned by the API to project admins so that they can see/update backend creds.
 AnyConfigInfoWithCreds = Union[
     AWSConfigInfoWithCreds,
     AzureConfigInfoWithCreds,
@@ -102,6 +107,12 @@ AnyConfigInfoWithCreds = Union[
     VastAIConfigInfoWithCreds,
     DstackConfigInfo,
 ]
+
+AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
+
+# Same as AnyConfigInfoWithCreds but some fields may be optional.
+# Used for interactive setup with validation and suggestions (e.g. via UI).
+# If the backend does not need interactive setup, it's the same as AnyConfigInfoWithCreds.
 AnyConfigInfoWithCredsPartial = Union[
     AWSConfigInfoWithCredsPartial,
     AzureConfigInfoWithCredsPartial,
@@ -116,9 +127,8 @@ AnyConfigInfoWithCredsPartial = Union[
     VastAIConfigInfoWithCredsPartial,
     DstackConfigInfo,
 ]
-AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 
-
+# Suggestions for unfilled fields used in interactive setup.
 AnyConfigValues = Union[
     AWSConfigValues,
     AzureConfigValues,
@@ -135,6 +145,8 @@ AnyConfigValues = Union[
 ]
 
 
+# In case we'll support multiple backends of the same type,
+# this adds backend name to backend config.
 class BackendInfo(CoreModel):
     name: str
     config: AnyConfigInfoWithoutCreds
