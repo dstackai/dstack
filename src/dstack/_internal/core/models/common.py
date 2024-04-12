@@ -49,7 +49,7 @@ class Duration(int):
 
 def is_core_model_instance(instance: CoreModel, class_: Type[CoreModel]) -> bool:
     """
-    Implements isintance check for CoreModel such that
+    Implements isinstance check for CoreModel such that
     models parsed with MyModel.__response__ pass the check against MyModel.
     See https://github.com/dstackai/dstack/issues/1124
     """
