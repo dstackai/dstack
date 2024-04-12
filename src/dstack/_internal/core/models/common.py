@@ -1,27 +1,7 @@
 import re
-from typing import Union
+from typing import Type, Union
 
-from pydantic_duality import DualBaseModel, DualBaseModelMeta
-
-
-# Change DualBaseModelMeta so that model parsed with MyModel.__response__
-# would pass the check for isinstance(instance, MyModel).
-class CoreModelMeta(DualBaseModelMeta):
-    """Metaclass used for custom types."""
-
-    def __instancecheck__(cls, instance) -> bool:
-        return (
-            type.__instancecheck__(cls, instance)
-            or isinstance(instance, cls.__request__)
-            or isinstance(instance, cls.__response__)
-        )
-
-    def __subclasscheck__(cls, subclass: type):
-        return (
-            type.__subclasscheck__(cls, subclass)
-            or issubclass(subclass, cls.__request__)
-            or issubclass(subclass, cls.__response__)
-        )
+from pydantic_duality import DualBaseModel
 
 
 # DualBaseModel creates two classes for the model:
@@ -29,9 +9,7 @@ class CoreModelMeta(DualBaseModelMeta):
 # and another with extra = "ignore" (CoreModel.__response__).
 # This allows to use the same model both for a strict parsing of the user input and
 # for a permissive parsing of the server responses.
-
-
-class CoreModel(DualBaseModel, metaclass=CoreModelMeta):
+class CoreModel(DualBaseModel):
     pass
 
 
@@ -67,3 +45,12 @@ class Duration(int):
             }[unit]
             return cls(amount * multiplier)
         raise ValueError(f"Cannot parse the duration {v}")
+
+
+def is_core_model_instance(instance: CoreModel, class_: Type[CoreModel]) -> bool:
+    """
+    Implements isintance check for CoreModel such that
+    models parsed with MyModel.__response__ pass the check against MyModel.
+    See https://github.com/dstackai/dstack/issues/1124
+    """
+    return isinstance(instance, class_) or isinstance(instance, class_.__response__)

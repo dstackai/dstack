@@ -18,6 +18,7 @@ from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -36,7 +37,7 @@ logger = get_logger(__name__)
 class AWSCompute(Compute):
     def __init__(self, config: AWSConfig):
         self.config = config
-        if isinstance(config.creds, AWSAccessKeyCreds):
+        if is_core_model_instance(config.creds, AWSAccessKeyCreds):
             self.session = boto3.Session(
                 aws_access_key_id=config.creds.access_key,
                 aws_secret_access_key=config.creds.secret_key,

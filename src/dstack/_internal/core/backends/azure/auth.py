@@ -10,6 +10,7 @@ from dstack._internal.core.models.backends.azure import (
     AzureClientCreds,
     AzureDefaultCreds,
 )
+from dstack._internal.core.models.common import is_core_model_instance
 
 AzureCredential = Union[ClientSecretCredential, DefaultAzureCredential]
 
@@ -21,7 +22,7 @@ def authenticate(creds: AnyAzureCreds) -> Tuple[AzureCredential, str]:
 
 
 def get_credential(creds: AnyAzureCreds) -> Tuple[AzureCredential, str]:
-    if isinstance(creds, AzureClientCreds):
+    if is_core_model_instance(creds, AzureClientCreds):
         credential = ClientSecretCredential(
             tenant_id=creds.tenant_id,
             client_id=creds.client_id,
