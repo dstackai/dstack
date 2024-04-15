@@ -1,9 +1,8 @@
 from typing import List, Optional
 
-from dstack._internal import settings
 from dstack._internal.core.backends.base import Compute
 from dstack._internal.core.backends.base.compute import (
-    get_dstack_runner_version,
+    get_docker_commands,
     get_instance_name,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -76,7 +75,7 @@ class RunpodCompute(Compute):
             min_memory_in_gb=memory_size,
             support_public_ip=True,
             docker_args=get_docker_args(authorized_keys),
-            ports="22/tcp",
+            ports="10022/tcp",
         )
 
         instance_id = resp["id"]
@@ -86,7 +85,7 @@ class RunpodCompute(Compute):
             raise ComputeError(f"Wait instance {instance_id} timeout")
 
         for port in pod["runtime"]["ports"]:
-            if port["privatePort"] == 22:
+            if port["privatePort"] == 10022:
                 ip = port["ip"]
                 publicPort = port["publicPort"]
                 break
@@ -115,25 +114,9 @@ class RunpodCompute(Compute):
 
 
 def get_docker_args(authorized_keys):
-    authorized_keys_content = "\\n".join(authorized_keys).strip()
-    update_and_setup_ssh = f'apt update; DEBIAN_FRONTEND=noninteractive apt-get install openssh-server -y;mkdir -p ~/.ssh;cd $_;chmod 700 ~/.ssh;echo \\"{authorized_keys_content}\\" >> authorized_keys;chmod 700 authorized_keys'
-    env_cmd = "env >> ~/.ssh/environment"
-    sed_cmd = r"sed -ie \"1s@^@export PATH=\\\"''$PATH'':\\$PATH\\\"\\n\\n@\" ~/.profile"
-    rm_rf = "rm -rf /etc/ssh/ssh_host_*"
-    ssh_key_gen = "ssh-keygen -A > /dev/null"
-    runner = "/usr/local/bin/dstack-runner"
-
-    build = get_dstack_runner_version()
-    bucket = "dstack-runner-downloads-stgn"
-    if settings.DSTACK_VERSION is not None:
-        bucket = "dstack-runner-downloads"
-    url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
-
-    runner_commands = [
-        f'curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} \\"{url}\\"',
-        f"chmod +x {runner}",
-        f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
-    ]
-    runner_commands = " && ".join(runner_commands)
-
-    return f"bash -c '{update_and_setup_ssh} && {env_cmd} && {sed_cmd} && {rm_rf} && {ssh_key_gen} && service ssh start && {runner_commands}; sleep infinity'"
+    commands = get_docker_commands(authorized_keys, False)
+    command = " && ".join(commands)
+    command_escaped = command.replace('"', '\\"')
+    command_escaped = command_escaped.replace("'", '\\"')
+    command_escaped = command_escaped.replace("\n", "\\n")
+    return f"bash -c '{command_escaped}'"
