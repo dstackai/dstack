@@ -162,9 +162,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             if isinstance(e, ContainerTimeoutError)
             else JobTerminationReason.CONTAINER_EXITED_WITH_ERROR
         )
-        logger.debug("%s: provisioning failed, error: %s", fmt(job_model), e)
+        logger.debug("%s: provisioning failed: %s", fmt(job_model), e)
         job_model.status = JobStatus.TERMINATING
         job_model.termination_reason = reason
+        job_model.termination_reason_message = str(e)
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
         return
@@ -290,7 +291,7 @@ async def _run_job_on_new_instance(
                 project_ssh_public_key,
                 project_ssh_private_key,
             )
-        except (ContainerTimeoutError, ContainerTimeoutError):
+        except (ContainerTimeoutError, RunContainerError):
             raise
         except BackendError as e:
             logger.warning(
