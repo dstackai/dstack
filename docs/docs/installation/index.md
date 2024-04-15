@@ -384,6 +384,34 @@ projects:
 
 </div>
 
+### RunPod
+
+Log into your [RunPod](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click 
+the button to create a key.
+
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: runpod
+    creds:
+      type: api_key
+      api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+```
+
+</div>
+
+!!! warning "NOTE:"
+    If you're using a custom Docker image, its entrypoint cannot be anything other than `/bin/bash` or `/bin/sh`. 
+    See the [issue](https://github.com/dstackai/dstack/issues/1137) for more details.
+
+!!! info "NOTE:"
+    The `runpod` backend supports on-demand instances only. Spot instance support coming soon.
+
 ### DataCrunch
 
 Log into your [DataCrunch](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.

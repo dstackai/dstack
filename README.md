@@ -23,15 +23,15 @@ Orchestrate GPU workloads effortlessly
 </div>
 
 `dstack` is an open-source orchestration engine for running AI workloads. It supports a wide range of cloud providers (such as AWS, GCP, Azure,
-Lambda, TensorDock, Vast.ai, CUDO, etc.) as well as on-premises infrastructure.
+Lambda, TensorDock, Vast.ai, CUDO, RunPod, etc.) as well as on-premises infrastructure.
 
 ## Latest news ✨
 
+- [2024/04] [dstack 0.18.0: RunPod integration, multi-node tasks, and more](https://dstack.ai/changelog/0.18.0/) (Release)
 - [2024/03] [dstack 0.17.0: Service auto-scaling, and other improvements](https://dstack.ai/changelog/0.17.0/) (Release)
 - [2024/02] [dstack 0.16.0: Pools](https://dstack.ai/changelog/0.16.0/) (Release)
 - [2024/02] [dstack 0.15.1: Kubernetes integration](https://dstack.ai/changelog/0.15.1/) (Release)
 - [2024/01] [dstack 0.15.0: Resources, authorization, and more](https://dstack.ai/changelog/0.15.0/) (Release)
-- [2024/01] [dstack 0.14.0: OpenAI-compatible endpoints](https://dstack.ai/changelog/0.14.0/) (Release)
 
 ## Installation
 
