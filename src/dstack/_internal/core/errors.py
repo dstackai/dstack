@@ -86,6 +86,14 @@ class ComputeError(BackendError):
     pass
 
 
+class RunContainerError(BackendError):
+    pass
+
+
+class ContainerTimeoutError(BackendError):
+    pass
+
+
 class NoCapacityError(ComputeError):
     pass
 
