@@ -82,6 +82,7 @@ class RunpodCompute(Compute):
         # Wait until VM State is Active. This is necessary to get the ip_address.
         pod = self.api_client.wait_for_instance(instance_id)
         if pod is None:
+            self.terminate_instance(instance_id, region="")
             raise ComputeError(f"Wait instance {instance_id} timeout")
 
         for port in pod["runtime"]["ports"]:
