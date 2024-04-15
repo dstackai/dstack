@@ -251,7 +251,7 @@ class RunSpec(CoreModel):
 
     class Config:
         @staticmethod
-        def schema_extra(schema: dict[str, Any], model: Type["RunSpec"]) -> None:
+        def schema_extra(schema: Dict[str, Any], model: Type) -> None:
             prop = schema.get("properties", {})
             prop.pop("merged_profile", None)
 
