@@ -156,6 +156,8 @@ def get_docker_commands(
         # note: &> redirection doesn't work in /bin/sh
         # check in sshd is here, install if not
         "if ! command -v sshd >/dev/null 2>&1; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server || yum install -y openssh-server; fi",
+        # install curl if necessary
+        "if ! command -v curl >/dev/null 2>&1; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y curl || yum install -y curl; fi",
         # prohibit password authentication
         'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
         # create ssh dirs and add public key
