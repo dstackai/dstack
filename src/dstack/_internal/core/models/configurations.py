@@ -119,7 +119,7 @@ class BaseConfiguration(CoreModel):
     ]
     python: Annotated[
         Optional[PythonVersion],
-        Field(description="The major version of Python\nMutually exclusive with the image"),
+        Field(description="The major version of Python. Mutually exclusive with `image`"),
     ]
     env: Annotated[
         Union[

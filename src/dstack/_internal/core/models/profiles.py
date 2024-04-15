@@ -83,7 +83,7 @@ class ProfileParams(CoreModel):
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
-            description="The policy for provisioning spot or on-demand instances: spot, on-demand, or auto"
+            description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`"
         ),
     ]
     retry_policy: Annotated[
@@ -92,7 +92,7 @@ class ProfileParams(CoreModel):
     max_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],
         Field(
-            description="The maximum duration of a run (e.g., `2h`, `1d`, etc). After it elapses, the run is forced to stop."
+            description="The maximum duration of a run (e.g., `2h`, `1d`, etc). After it elapses, the run is forced to stop. Defaults to `off`"
         ),
     ]
     max_price: Annotated[
@@ -100,18 +100,26 @@ class ProfileParams(CoreModel):
     ]
     pool_name: Annotated[
         Optional[str],
-        Field(description="The name of the pool. If not set, dstack will use the default name."),
+        Field(description="The name of the pool. If not set, dstack will use the default name"),
     ]
     instance_name: Annotated[Optional[str], Field(description="The name of the instance")]
     creation_policy: Annotated[
-        Optional[CreationPolicy], Field(description="The policy for using instances from the pool")
+        Optional[CreationPolicy],
+        Field(
+            description="The policy for using instances from the pool. Defaults to `reuse-or-create`"
+        ),
     ]
     termination_policy: Annotated[
-        Optional[TerminationPolicy], Field(description="The policy for termination instances")
+        Optional[TerminationPolicy],
+        Field(
+            description="The policy for termination instances. Defaults to `destroy-after-idle`"
+        ),
     ]
     termination_idle_time: Annotated[
         Optional[Union[str, int]],
-        Field(description="Time to wait before destroying the idle instance"),
+        Field(
+            description="Time to wait before destroying the idle instance. Defaults to `5m` for `dstack run` and to `3d` for `dstack pool add`"
+        ),
     ]
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
