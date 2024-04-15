@@ -588,13 +588,13 @@ async def create_instance(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
     )
-    image = parse_image_name(get_default_image(get_default_python_verison()))
+    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
     instance_config = InstanceConfiguration(
         project_name=project.name,
         instance_name=instance_name,
         ssh_keys=[user_ssh_key, project_ssh_key],
         job_docker_config=DockerConfig(
-            image=image,
+            image=dstack_default_image,
             registry_auth=None,
         ),
         user=user.name,

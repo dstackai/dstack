@@ -61,20 +61,13 @@ class RunpodCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
-        launched_instance_info = self.create_instance(instance_offer, instance_config)
-        return launched_instance_info
 
-    def create_instance(
-        self,
-        instance_offer: InstanceOfferWithAvailability,
-        instance_config: InstanceConfiguration,
-    ) -> LaunchedInstanceInfo:
         authorized_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
         resp = self.api_client.create_pod(
             name=instance_config.instance_name,
-            image_name="runpod/pytorch:2.1.1-py3.10-cuda12.1.1-devel-ubuntu22.04",
+            image_name=job.job_spec.image_name,
             gpu_type_id=instance_offer.instance.name,
             cloud_type="ALL",  # ["ALL", "COMMUNITY", "SECURE"]:
             gpu_count=len(instance_offer.instance.resources.gpus),
