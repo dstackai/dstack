@@ -152,11 +152,11 @@ class ProfilesConfig(CoreModel):
     class Config:
         schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
-    def default(self) -> Profile:
+    def default(self) -> Optional[Profile]:
         for p in self.profiles:
             if p.default:
                 return p
-        return Profile(name="default")
+        return None
 
     def get(self, name: str) -> Profile:
         for p in self.profiles:

@@ -1,7 +1,17 @@
 # profiles.yml
 
-Instead of configuring run options through[`dstack run`](cli/index.md#dstack-run), 
-you can do so via `.dstack/profiles.yml` in the root folder of the project. 
+Instead of configuring run options as [`dstack run`](cli/index.md#dstack-run) arguments 
+or `.dstack.yml` parameters, you can defines those options in `profiles.yml`
+and reuse them across different run configurations.
+`dstack` supports repository-level profiles defined in `$REPO_ROOT/.dstack/profiles.yml`
+and global profiles defined in `~/.dstack/profiles.yml`.
+
+Profiles parameters are resolved with the following priority:
+
+1. `dstack run` arguments
+2. `.dstack.yml` parameters
+3. Repository-level profiles from `$REPO_ROOT/.dstack/profiles.yml`
+4. Global profiles from `~/.dstack/profiles.yml`
 
 ## Example
 
