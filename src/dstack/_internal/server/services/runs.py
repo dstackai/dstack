@@ -261,8 +261,8 @@ async def get_run_plan(
     if run_spec.run_name is not None:
         _validate_run_name(run_spec.run_name)
 
-    profile = run_spec.profile
-    creation_policy = profile.creation_policy or CreationPolicy.REUSE_OR_CREATE
+    profile = run_spec.merged_profile
+    creation_policy = profile.creation_policy
 
     # TODO(egor-s): do we need to generate all replicas here?
     jobs = await get_jobs_from_run_spec(run_spec, replica_num=0)
@@ -693,7 +693,7 @@ def _get_pool_offers(
     run_spec: RunSpec,
     job: Job,
 ) -> List[InstanceOfferWithAvailability]:
-    profile = run_spec.profile
+    profile = run_spec.merged_profile
     requirements = Requirements(
         resources=run_spec.configuration.resources,
         max_price=profile.max_price,

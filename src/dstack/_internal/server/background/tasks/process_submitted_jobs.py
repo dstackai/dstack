@@ -11,7 +11,6 @@ from dstack._internal.core.models.instances import (
     LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.profiles import (
-    DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
     TerminationPolicy,
 )
@@ -104,7 +103,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     run_model = res.scalar_one()
     project_model = run_model.project
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-    profile = run_spec.profile
+    profile = run_spec.merged_profile
 
     run = run_model_to_run(run_model)
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
@@ -125,7 +124,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     pool = await get_or_create_pool_by_name(
         session=session,
         project=project_model,
-        pool_name=run_spec.profile.pool_name,
+        pool_name=profile.pool_name,
     )
     instance = await _run_job_on_pool_instance(
         session=session,
@@ -201,16 +200,17 @@ async def _run_job_on_pool_instance(
     job: Job,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
 ) -> Optional[InstanceModel]:
+    profile = run_spec.merged_profile
     async with PROCESSING_POOL_LOCK:
         pool_instances = get_pool_instances(pool)
         requirements = Requirements(
             resources=run_spec.configuration.resources,
-            max_price=run_spec.profile.max_price,
+            max_price=profile.max_price,
             spot=job.job_spec.requirements.spot,
         )
         relevant_instances = filter_pool_instances(
             pool_instances=pool_instances,
-            profile=run_spec.profile,
+            profile=profile,
             requirements=requirements,
             status=InstanceStatus.IDLE,
             multinode=job.job_spec.jobs_per_replica > 1,
@@ -251,7 +251,7 @@ async def _run_job_on_new_instance(
 ) -> Optional[Tuple[JobProvisioningData, InstanceOfferWithAvailability]]:
     offers = await get_offers_by_requirements(
         project=project_model,
-        profile=run.run_spec.profile,
+        profile=run.run_spec.merged_profile,
         requirements=job.job_spec.requirements,
         exclude_not_available=True,
         multinode=job.job_spec.jobs_per_replica > 1,
@@ -324,11 +324,9 @@ def _create_instance_model_for_job(
     job_provisioning_data: JobProvisioningData,
     offer: InstanceOfferWithAvailability,
 ) -> InstanceModel:
-    profile = run_spec.profile
-    termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
+    profile = run_spec.merged_profile
+    termination_policy = profile.termination_policy
     termination_idle_time = profile.termination_idle_time
-    if termination_idle_time is None:
-        termination_idle_time = DEFAULT_RUN_TERMINATION_IDLE_TIME
     if not job_provisioning_data.dockerized:
         # terminate vastai/k8s instances immediately
         termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE

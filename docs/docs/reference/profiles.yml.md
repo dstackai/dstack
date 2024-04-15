@@ -29,11 +29,16 @@ profiles:
 
 You can mark any profile as default or pass its name via `--profile` to `dstack run`.
 
-## YAML reference
+### Root reference
 
 #SCHEMA# dstack._internal.core.models.profiles.Profile
     overrides:
+      show_root_heading: false
       max_price:
         type: 'Optional[float]'
 
+### `retry_policy`
+
 #SCHEMA# dstack._internal.core.models.profiles.ProfileRetryPolicy
+    overrides:
+      show_root_heading: false

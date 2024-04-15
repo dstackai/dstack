@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, Optional, Union
 
-from pydantic import Field, confloat, root_validator, validator
+from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
@@ -48,7 +48,7 @@ class ProfileRetryPolicy(CoreModel):
     retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
     duration: Annotated[
         Optional[Union[int, str]],
-        Field(description="The maximum period of retrying the run, e.g., 4h or 1d"),
+        Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
     ] = None
 
     _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
@@ -63,33 +63,27 @@ class ProfileRetryPolicy(CoreModel):
         return field_values
 
 
-class Profile(CoreModel):
-    name: Annotated[
-        str,
-        Field(
-            description="The name of the profile that can be passed as `--profile` to `dstack run`"
-        ),
-    ]
+class ProfileParams(CoreModel):
     backends: Annotated[
         Optional[List[BackendType]],
-        Field(description='The backends to consider for provisionig (e.g., "[aws, gcp]")'),
+        Field(description="The backends to consider for provisionig (e.g., `[aws, gcp]`)"),
     ]
     regions: Annotated[
         Optional[List[str]],
         Field(
-            description='The regions to consider for provisionig (e.g., "[eu-west-1, us-west4, westeurope]")'
+            description="The regions to consider for provisionig (e.g., `[eu-west-1, us-west4, westeurope]`)"
         ),
     ]
     instance_types: Annotated[
         Optional[List[str]],
         Field(
-            description='The cloud-specific instance types to consider for provisionig (e.g., "[p3.8xlarge, n1-standard-4]")'
+            description="The cloud-specific instance types to consider for provisionig (e.g., `[p3.8xlarge, n1-standard-4]`)"
         ),
     ]
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
-            description="The policy for provisioning spot or on-demand instances: spot, on-demand, or auto"
+            description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`"
         ),
     ]
     retry_policy: Annotated[
@@ -98,30 +92,35 @@ class Profile(CoreModel):
     max_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],
         Field(
-            description="The maximum duration of a run (e.g., 2h, 1d, etc). After it elapses, the run is forced to stop."
+            description="The maximum duration of a run (e.g., `2h`, `1d`, etc). After it elapses, the run is forced to stop. Defaults to `off`"
         ),
     ]
     max_price: Annotated[
-        Optional[confloat(gt=0.0)], Field(description="The maximum price per hour, in dollars")
+        Optional[float], Field(description="The maximum price per hour, in dollars", gt=0.0)
     ]
-    default: Annotated[
-        bool, Field(description="If set to true, `dstack run` will use this profile by default.")
-    ] = False
     pool_name: Annotated[
         Optional[str],
-        Field(description="The name of the pool. If not set, dstack will use the default name."),
-    ] = None
+        Field(description="The name of the pool. If not set, dstack will use the default name"),
+    ]
     instance_name: Annotated[Optional[str], Field(description="The name of the instance")]
     creation_policy: Annotated[
-        Optional[CreationPolicy], Field(description="The policy for using instances from the pool")
-    ] = CreationPolicy.REUSE_OR_CREATE
+        Optional[CreationPolicy],
+        Field(
+            description="The policy for using instances from the pool. Defaults to `reuse-or-create`"
+        ),
+    ]
     termination_policy: Annotated[
-        Optional[TerminationPolicy], Field(description="The policy for termination instances")
-    ] = TerminationPolicy.DESTROY_AFTER_IDLE
+        Optional[TerminationPolicy],
+        Field(
+            description="The policy for termination instances. Defaults to `destroy-after-idle`"
+        ),
+    ]
     termination_idle_time: Annotated[
         Optional[Union[str, int]],
-        Field(description="Time to wait before destroying the idle instance"),
-    ] = DEFAULT_RUN_TERMINATION_IDLE_TIME
+        Field(
+            description="Time to wait before destroying the idle instance. Defaults to `5m` for `dstack run` and to `3d` for `dstack pool add`"
+        ),
+    ]
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
@@ -129,6 +128,22 @@ class Profile(CoreModel):
     _validate_termination_idle_time = validator(
         "termination_idle_time", pre=True, allow_reuse=True
     )(parse_duration)
+
+
+class ProfileProps(CoreModel):
+    name: Annotated[
+        str,
+        Field(
+            description="The name of the profile that can be passed as `--profile` to `dstack run`"
+        ),
+    ]
+    default: Annotated[
+        bool, Field(description="If set to true, `dstack run` will use this profile by default.")
+    ] = False
+
+
+class Profile(ProfileProps, ProfileParams):
+    pass
 
 
 class ProfilesConfig(CoreModel):

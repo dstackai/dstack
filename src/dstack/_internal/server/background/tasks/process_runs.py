@@ -178,7 +178,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
     We handle fails, scaling, and status changes.
     """
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-    retry_policy = run_spec.profile.retry_policy or ProfileRetryPolicy()
+    retry_policy = run_spec.merged_profile.retry_policy or ProfileRetryPolicy()
     retry_single_job = can_retry_single_job(run_spec)
 
     run_statuses: Set[RunStatus] = set()

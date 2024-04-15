@@ -142,11 +142,11 @@ class JobConfigurator(ABC):
         return get_default_image(self._python())
 
     def _max_duration(self) -> Optional[int]:
-        if self.run_spec.profile.max_duration is None:
+        if self.run_spec.merged_profile.max_duration is None:
             return self._default_max_duration()
-        if self.run_spec.profile.max_duration == "off":
+        if self.run_spec.merged_profile.max_duration == "off":
             return None
-        return self.run_spec.profile.max_duration
+        return self.run_spec.merged_profile.max_duration
 
     def _registry_auth(self) -> Optional[RegistryAuth]:
         return self.run_spec.configuration.registry_auth
@@ -155,7 +155,7 @@ class JobConfigurator(ABC):
         spot_policy = self._spot_policy()
         return Requirements(
             resources=self.run_spec.configuration.resources,
-            max_price=self.run_spec.profile.max_price,
+            max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
         )
 

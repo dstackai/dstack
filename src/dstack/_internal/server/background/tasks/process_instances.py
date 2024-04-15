@@ -410,15 +410,16 @@ async def terminate(instance_id: UUID) -> None:
             )
         ).one()
 
-        jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
-        backends = await backends_services.get_project_backends(project=instance.project)
-        backend = next((b for b in backends if b.TYPE == jpd.backend), None)
-        if backend is None:
-            raise ValueError(f"there is no backend {jpd.backend}")
+        if instance.job_provisioning_data is not None:
+            jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
+            backends = await backends_services.get_project_backends(project=instance.project)
+            backend = next((b for b in backends if b.TYPE == jpd.backend), None)
+            if backend is None:
+                raise ValueError(f"there is no backend {jpd.backend}")
 
-        await run_async(
-            backend.compute().terminate_instance, jpd.instance_id, jpd.region, jpd.backend_data
-        )
+            await run_async(
+                backend.compute().terminate_instance, jpd.instance_id, jpd.region, jpd.backend_data
+            )
 
         instance.deleted = True
         instance.deleted_at = get_current_datetime()

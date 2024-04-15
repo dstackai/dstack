@@ -95,13 +95,11 @@ class RunCommand(APIBaseCommand):
             self.api.ssh_identity_file = (
                 ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
             )
-
             profile = load_profile(Path.cwd(), args.profile)
-            apply_profile_args(args, profile)
-
             configuration_path, conf = load_configuration(
                 Path.cwd(), args.working_dir, args.configuration_file
             )
+            apply_profile_args(args, conf)
             logger.debug("Configuration loaded: %s", configuration_path)
             parser = argparse.ArgumentParser()
             configurator = run_configurators_mapping[ConfigurationType(conf.type)]

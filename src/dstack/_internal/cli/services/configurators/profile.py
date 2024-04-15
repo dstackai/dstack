@@ -1,6 +1,8 @@
 import argparse
 import os
+from typing import Union
 
+from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.profiles import (
     DEFAULT_INSTANCE_RETRY_DURATION,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
@@ -143,68 +145,72 @@ def register_profile_args(parser: argparse.ArgumentParser, pool_add: bool = Fals
     )
 
 
-def apply_profile_args(args: argparse.Namespace, profile: Profile, pool_add: bool = False):
+def apply_profile_args(
+    args: argparse.Namespace,
+    profile_settings: Union[Profile, AnyRunConfiguration],
+    pool_add: bool = False,
+):
     """
-    Overrides `profile` settings with arguments registered by `register_profile_args()`.
+    Overrides `profile_settings` settings with arguments registered by `register_profile_args()`.
     """
     # TODO: Re-assigned profile attributes are not validated by pydantic.
     # So the validation will only be done by the server.
     # Consider setting validate_assignment=True for modified pydantic models.
     if args.backends:
-        profile.backends = args.backends
+        profile_settings.backends = args.backends
     if args.regions:
-        profile.regions = args.regions
+        profile_settings.regions = args.regions
     if args.instance_types:
-        profile.instance_types = args.instance_types
+        profile_settings.instance_types = args.instance_types
     if args.max_price is not None:
-        profile.max_price = args.max_price
+        profile_settings.max_price = args.max_price
     if not pool_add:
         if args.max_duration is not None:
-            profile.max_duration = args.max_duration
+            profile_settings.max_duration = args.max_duration
 
     if args.pool_name:
-        profile.pool_name = args.pool_name
+        profile_settings.pool_name = args.pool_name
 
     if args.idle_duration is not None:
-        profile.termination_idle_time = args.idle_duration
+        profile_settings.termination_idle_time = args.idle_duration
     if pool_add and args.idle_duration is None:
-        profile.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
+        profile_settings.termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
 
     if args.dont_destroy:
-        profile.termination_policy = TerminationPolicy.DONT_DESTROY
+        profile_settings.termination_policy = TerminationPolicy.DONT_DESTROY
     if not pool_add:
         if args.instance_name:
-            profile.instance_name = args.instance_name
+            profile_settings.instance_name = args.instance_name
         if args.creation_policy_reuse:
-            profile.creation_policy = CreationPolicy.REUSE
+            profile_settings.creation_policy = CreationPolicy.REUSE
 
     if args.spot_policy is not None:
-        profile.spot_policy = args.spot_policy
+        profile_settings.spot_policy = args.spot_policy
     if pool_add and args.spot_policy is None:  # ONDEMAND by default for `dstack pool add`
-        profile.spot_policy = SpotPolicy.ONDEMAND
+        profile_settings.spot_policy = SpotPolicy.ONDEMAND
 
     if not pool_add:
         if args.retry_policy is not None:
-            if not profile.retry_policy:
-                profile.retry_policy = ProfileRetryPolicy()
-            profile.retry_policy.retry = args.retry_policy
+            if not profile_settings.retry_policy:
+                profile_settings.retry_policy = ProfileRetryPolicy()
+            profile_settings.retry_policy.retry = args.retry_policy
         elif args.retry_duration is not None:
-            if not profile.retry_policy:
-                profile.retry_policy = ProfileRetryPolicy()
-            profile.retry_policy.retry = True
-            profile.retry_policy.duration = args.retry_duration
+            if not profile_settings.retry_policy:
+                profile_settings.retry_policy = ProfileRetryPolicy()
+            profile_settings.retry_policy.retry = True
+            profile_settings.retry_policy.duration = args.retry_duration
     else:
         if args.retry_policy is not None:
-            if not profile.retry_policy:
-                profile.retry_policy = ProfileRetryPolicy()
-            profile.retry_policy.retry = args.retry_policy
-            if profile.retry_policy.retry:
-                profile.retry_policy.duration = DEFAULT_INSTANCE_RETRY_DURATION
+            if not profile_settings.retry_policy:
+                profile_settings.retry_policy = ProfileRetryPolicy()
+            profile_settings.retry_policy.retry = args.retry_policy
+            if profile_settings.retry_policy.retry:
+                profile_settings.retry_policy.duration = DEFAULT_INSTANCE_RETRY_DURATION
         elif args.retry_duration is not None:
-            if not profile.retry_policy:
-                profile.retry_policy = ProfileRetryPolicy()
-            profile.retry_policy.retry = True
-            profile.retry_policy.duration = args.retry_duration  # --retry-duration
+            if not profile_settings.retry_policy:
+                profile_settings.retry_policy = ProfileRetryPolicy()
+            profile_settings.retry_policy.retry = True
+            profile_settings.retry_policy.duration = args.retry_duration  # --retry-duration
 
 
 def max_duration(v: str) -> int:
