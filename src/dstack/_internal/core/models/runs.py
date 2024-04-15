@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
@@ -251,7 +251,7 @@ class RunSpec(CoreModel):
 
     class Config:
         @staticmethod
-        def schema_extra(schema: dict[str, Any], model: type["RunSpec"]) -> None:
+        def schema_extra(schema: dict[str, Any], model: Type["RunSpec"]) -> None:
             prop = schema.get("properties", {})
             prop.pop("merged_profile", None)
 
