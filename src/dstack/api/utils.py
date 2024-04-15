@@ -45,6 +45,9 @@ def load_profile(repo_dir: PathLike, profile_name: Optional[str]) -> Profile:
     if global_profile is not None:
         return global_profile
 
+    if profile_name is None:
+        return Profile(name="default")
+
     raise ConfigurationError(f"No such profile: {profile_name}")
 
 
