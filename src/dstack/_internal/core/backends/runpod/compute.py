@@ -7,7 +7,11 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
-from dstack._internal.core.errors import BackendError, ComputeError
+from dstack._internal.core.errors import (
+    BackendError,
+    ContainerTimeoutError,
+    RunContainerError,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -83,7 +87,11 @@ class RunpodCompute(Compute):
         pod = self.api_client.wait_for_instance(instance_id)
         if pod is None:
             self.terminate_instance(instance_id, region="")
-            raise ComputeError(f"Wait instance {instance_id} timeout")
+            raise ContainerTimeoutError(f"Wait instance {instance_id} timeout")
+
+        if pod["runtime"].get("ports") is None:
+            self.terminate_instance(instance_id, region="")
+            raise RunContainerError(f"The instance {instance_id} failed to start")
 
         for port in pod["runtime"]["ports"]:
             if port["privatePort"] == 10022:
