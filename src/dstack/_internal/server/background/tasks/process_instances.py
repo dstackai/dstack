@@ -291,8 +291,8 @@ async def check_shim(instance_id: UUID) -> None:
             return
 
         ssh_private_key = instance.project.ssh_private_key
-        instance_health: Union[Optional[HealthStatus], bool] = instance_healthcheck(
-            ssh_private_key, job_provisioning_data
+        instance_health: Union[Optional[HealthStatus], bool] = await run_async(
+            instance_healthcheck, ssh_private_key, job_provisioning_data
         )
         if isinstance(instance_health, bool) or instance_health is None:
             health = HealthStatus(healthy=False, reason="SSH or tunnel error")

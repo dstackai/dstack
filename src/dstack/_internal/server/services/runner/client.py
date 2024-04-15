@@ -95,7 +95,7 @@ class ShimClient:
 
     def healthcheck(self, unmask_exeptions: bool = False) -> Optional[HealthcheckResponse]:
         try:
-            resp = requests.get(self._url("/api/healthcheck"))
+            resp = requests.get(self._url("/api/healthcheck"), timeout=5)
             resp.raise_for_status()
             return HealthcheckResponse.__response__.parse_obj(resp.json())
         except requests.exceptions.RequestException:
