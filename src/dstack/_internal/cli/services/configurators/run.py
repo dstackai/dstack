@@ -7,6 +7,7 @@ import dstack._internal.core.models.resources as resources
 from dstack._internal.cli.services.args import disk_spec, env_var, gpu_spec, port_mapping
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import (
     BaseConfiguration,
     BaseConfigurationWithPorts,
@@ -63,7 +64,7 @@ class BaseRunConfigurator:
             conf.resources.disk = args.disk_spec
 
         for k, v in conf.env.items():
-            if isinstance(v, EnvSentinel):
+            if is_core_model_instance(v, EnvSentinel):
                 try:
                     conf.env[k] = v.from_env(os.environ)
                 except ValueError as e:
