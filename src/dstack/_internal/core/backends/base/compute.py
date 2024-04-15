@@ -148,18 +148,14 @@ def get_gateway_user_data(authorized_key: str) -> str:
     )
 
 
-def get_docker_commands(authorized_keys: List[str]) -> List[str]:
+def get_docker_commands(
+    authorized_keys: List[str], fix_path_in_dot_profile: bool = True
+) -> List[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
     commands = [
         # note: &> redirection doesn't work in /bin/sh
         # check in sshd is here, install if not
-        (
-            "if ! command -v sshd >/dev/null 2>&1; then { "
-            "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server; "
-            "} || { "
-            "yum -y install openssh-server; "
-            "}; fi"
-        ),
+        "if ! command -v sshd >/dev/null 2>&1; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server || yum install -y openssh-server; fi",
         # prohibit password authentication
         'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
         # create ssh dirs and add public key
@@ -169,7 +165,9 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
         "chmod 600 ~/.ssh/authorized_keys",
         # preserve environment variables for SSH clients
         "env >> ~/.ssh/environment",
-        "sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile",
+        "sed -ie '1s@^@export PATH=\"'\"$PATH\"':$PATH\"\\n\\n@' ~/.profile"
+        if fix_path_in_dot_profile
+        else ":",
         # regenerate host keys
         "rm -rf /etc/ssh/ssh_host_*",
         "ssh-keygen -A > /dev/null",
@@ -187,7 +185,7 @@ def get_docker_commands(authorized_keys: List[str]) -> List[str]:
     url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-runner-linux-amd64"
 
     commands += [
-        f'curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} "{url}"',
+        f"curl --connect-timeout 60 --max-time 240 --retry 1 --output {runner} {url}",
         f"chmod +x {runner}",
         f"{runner} --log-level 6 start --http-port 10999 --temp-dir /tmp/runner --home-dir /root --working-dir /workflow",
     ]
