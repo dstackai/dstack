@@ -46,10 +46,12 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         return DEFAULT_MAX_DURATION_SECONDS
 
     def _retry_policy(self) -> RetryPolicy:
-        return RetryPolicy.parse_obj(self.run_spec.profile.retry_policy or ProfileRetryPolicy())
+        return RetryPolicy.parse_obj(
+            self.run_spec.merged_profile.retry_policy or ProfileRetryPolicy()
+        )
 
     def _spot_policy(self) -> SpotPolicy:
-        return self.run_spec.profile.spot_policy or SpotPolicy.ONDEMAND
+        return self.run_spec.merged_profile.spot_policy or SpotPolicy.ONDEMAND
 
     def _ports(self) -> List[PortMapping]:
         return self.run_spec.configuration.ports

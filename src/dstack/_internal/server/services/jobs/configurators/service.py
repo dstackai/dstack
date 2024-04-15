@@ -17,10 +17,12 @@ class ServiceJobConfigurator(JobConfigurator):
 
     def _retry_policy(self) -> RetryPolicy:
         # convert ProfileRetryPolicy to RetryPolicy
-        return RetryPolicy.parse_obj(self.run_spec.profile.retry_policy or ProfileRetryPolicy())
+        return RetryPolicy.parse_obj(
+            self.run_spec.merged_profile.retry_policy or ProfileRetryPolicy()
+        )
 
     def _spot_policy(self) -> SpotPolicy:
-        return self.run_spec.profile.spot_policy or SpotPolicy.AUTO
+        return self.run_spec.merged_profile.spot_policy or SpotPolicy.AUTO
 
     def _ports(self) -> List[PortMapping]:
         return []

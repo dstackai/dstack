@@ -2,18 +2,29 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import UUID4, Field
+from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.configurations import AnyRunConfiguration, RegistryAuth
+from dstack._internal.core.models.configurations import (
+    AnyRunConfiguration,
+    RegistryAuth,
+    RunConfiguration,
+)
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
     SSHConnectionParams,
 )
-from dstack._internal.core.models.profiles import Profile, SpotPolicy
+from dstack._internal.core.models.profiles import (
+    DEFAULT_RUN_TERMINATION_IDLE_TIME,
+    CreationPolicy,
+    Profile,
+    ProfileParams,
+    SpotPolicy,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils import common as common_utils
@@ -235,6 +246,34 @@ class RunSpec(CoreModel):
     configuration: Annotated[AnyRunConfiguration, Field(discriminator="type")]
     profile: Profile
     ssh_key_pub: str
+    # TODO: make merged_profile a computed field after migrating to pydanticV2
+    merged_profile: Annotated[Profile, Field(exclude=True)] = None
+
+    class Config:
+        @staticmethod
+        def schema_extra(schema: dict[str, Any], model: type["RunSpec"]) -> None:
+            prop = schema.get("properties", {})
+            prop.pop("merged_profile", None)
+
+    @root_validator
+    def _merged_profile(cls, values) -> Dict:
+        try:
+            merged_profile = Profile.parse_obj(values["profile"])
+            conf = RunConfiguration.parse_obj(values["configuration"]).__root__
+        except KeyError:
+            raise ValueError("Missing profile or configuration")
+        for key in ProfileParams.__fields__:
+            conf_val = getattr(conf, key, None)
+            if conf_val is not None:
+                setattr(merged_profile, key, conf_val)
+        if merged_profile.creation_policy is None:
+            merged_profile.creation_policy = CreationPolicy.REUSE_OR_CREATE
+        if merged_profile.termination_policy is None:
+            merged_profile.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
+        if merged_profile.termination_idle_time is None:
+            merged_profile.termination_idle_time = DEFAULT_RUN_TERMINATION_IDLE_TIME
+        values["merged_profile"] = merged_profile
+        return values
 
 
 class ServiceModelSpec(CoreModel):

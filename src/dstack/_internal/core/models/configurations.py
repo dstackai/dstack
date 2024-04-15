@@ -2,7 +2,7 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Mapping, Optional, Union
 
-from pydantic import BaseModel, Field, ValidationError, conint, constr, root_validator, validator
+from pydantic import Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
@@ -311,7 +311,7 @@ class ServiceConfiguration(
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]
 
 
-class RunConfiguration(BaseModel):
+class RunConfiguration(CoreModel):
     __root__: Annotated[
         AnyRunConfiguration,
         Field(discriminator="type"),

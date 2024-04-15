@@ -236,7 +236,7 @@ class GPUSpecSchema(CoreModel):
     total_memory: Annotated[
         Optional[MemoryRangeLike],
         Field(
-            description="The total VRAM size (e.g., 32GB). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
+            description="The total VRAM size (e.g., `32GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
         ),
     ] = None
     compute_capability: Annotated[

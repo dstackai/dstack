@@ -48,7 +48,7 @@ class ProfileRetryPolicy(CoreModel):
     retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
     duration: Annotated[
         Optional[Union[int, str]],
-        Field(description="The maximum period of retrying the run, e.g., 4h or 1d"),
+        Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
     ] = None
 
     _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
@@ -66,18 +66,18 @@ class ProfileRetryPolicy(CoreModel):
 class ProfileParams(CoreModel):
     backends: Annotated[
         Optional[List[BackendType]],
-        Field(description='The backends to consider for provisionig (e.g., "[aws, gcp]")'),
+        Field(description="The backends to consider for provisionig (e.g., `[aws, gcp]`)"),
     ]
     regions: Annotated[
         Optional[List[str]],
         Field(
-            description='The regions to consider for provisionig (e.g., "[eu-west-1, us-west4, westeurope]")'
+            description="The regions to consider for provisionig (e.g., `[eu-west-1, us-west4, westeurope]`)"
         ),
     ]
     instance_types: Annotated[
         Optional[List[str]],
         Field(
-            description='The cloud-specific instance types to consider for provisionig (e.g., "[p3.8xlarge, n1-standard-4]")'
+            description="The cloud-specific instance types to consider for provisionig (e.g., `[p3.8xlarge, n1-standard-4]`)"
         ),
     ]
     spot_policy: Annotated[
@@ -92,7 +92,7 @@ class ProfileParams(CoreModel):
     max_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],
         Field(
-            description="The maximum duration of a run (e.g., 2h, 1d, etc). After it elapses, the run is forced to stop."
+            description="The maximum duration of a run (e.g., `2h`, `1d`, etc). After it elapses, the run is forced to stop."
         ),
     ]
     max_price: Annotated[
@@ -101,18 +101,18 @@ class ProfileParams(CoreModel):
     pool_name: Annotated[
         Optional[str],
         Field(description="The name of the pool. If not set, dstack will use the default name."),
-    ] = None
+    ]
     instance_name: Annotated[Optional[str], Field(description="The name of the instance")]
     creation_policy: Annotated[
         Optional[CreationPolicy], Field(description="The policy for using instances from the pool")
-    ] = CreationPolicy.REUSE_OR_CREATE
+    ]
     termination_policy: Annotated[
         Optional[TerminationPolicy], Field(description="The policy for termination instances")
-    ] = TerminationPolicy.DESTROY_AFTER_IDLE
+    ]
     termination_idle_time: Annotated[
         Optional[Union[str, int]],
         Field(description="Time to wait before destroying the idle instance"),
-    ] = DEFAULT_RUN_TERMINATION_IDLE_TIME
+    ]
 
     _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
         parse_max_duration
