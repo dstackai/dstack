@@ -1,10 +1,12 @@
 import time
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 import requests
 from requests import Response
 
 from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
+from dstack._internal.utils.common import get_current_datetime
 
 API_URL = "https://api.runpod.io/graphql"
 
@@ -108,9 +110,11 @@ class RunpodApiClient:
             raise
 
     def wait_for_instance(self, instance_id) -> Optional[Dict]:
-        wait_for_instance_attempts = 60
-        wait_for_instance_interval = 1
-        for _ in range(wait_for_instance_attempts):
+        start = get_current_datetime()
+        wait_for_instance_interval = 5
+        # To change the status to "running," the image must be pulled and then started.
+        # We have to wait for 20 minutes while a large image is pulled.
+        while get_current_datetime() < (start + timedelta(minutes=20)):
             pod = self.get_pod(instance_id)
             if pod["runtime"] is not None:
                 return pod
