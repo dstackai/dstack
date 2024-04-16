@@ -104,6 +104,7 @@ class APIClient:
         logger.debug("POST /%s", path)
         for _ in range(_MAX_RETRIES):
             try:
+                # TODO: set adequate timeout here or everywhere the method is used
                 resp = self._s.post(f"{self._base_url}/{path}", **kwargs)
                 break
             except requests.exceptions.ConnectionError as e:

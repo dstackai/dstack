@@ -2,7 +2,7 @@ target-version = "py38"
 line-length = 99
 
 [lint]
-select = ['E', 'F', 'I' ,'Q', 'W', 'PGH', 'FLY']
+select = ['E', 'F', 'I' ,'Q', 'W', 'PGH', 'FLY', 'S113']
 ignore =[
   'E501',
   'E712',

@@ -22,7 +22,7 @@ def complete_service_model(model_info: AnyModel):
 def get_tokenizer_config(model_id: str) -> dict:
     try:
         resp = requests.get(
-            f"https://huggingface.co/{model_id}/resolve/main/tokenizer_config.json"
+            f"https://huggingface.co/{model_id}/resolve/main/tokenizer_config.json", timeout=10
         )
         if resp.status_code == 403:
             raise ConfigurationError("Private HF models are not supported")

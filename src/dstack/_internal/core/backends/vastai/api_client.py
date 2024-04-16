@@ -14,7 +14,7 @@ class VastAIAPIClient:
     def __init__(self, api_key: str):
         self.api_url = "https://console.vast.ai/api/v0".rstrip("/")
         self.api_key = api_key
-        self.s = requests.Session()
+        self.s = requests.Session()  # TODO: set adequate timeout everywhere the session is used
         retries = Retry(
             total=5,
             backoff_factor=1,

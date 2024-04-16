@@ -17,6 +17,7 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger("nebius")
 API_URL = "api.ai.nebius.cloud"
+REQUEST_TIMEOUT = 15
 
 
 class NebiusAPIClient:
@@ -45,7 +46,7 @@ class NebiusAPIClient:
             headers={"kid": self.service_account["id"]},
         )
 
-        resp = requests.post(payload["aud"], json={"jwt": jwt_token})
+        resp = requests.post(payload["aud"], json={"jwt": jwt_token}, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         iam_token = resp.json()["iamToken"]
         self.s.headers["Authorization"] = f"Bearer {iam_token}"
@@ -54,7 +55,7 @@ class NebiusAPIClient:
     def compute_zones_list(self) -> List[dict]:
         logger.debug("Fetching compute zones")
         self.get_token()
-        resp = self.s.get(self.url("compute", "/zones"))
+        resp = self.s.get(self.url("compute", "/zones"), timeout=REQUEST_TIMEOUT)
         self.raise_for_status(resp)
         return resp.json()["zones"]
 
@@ -68,6 +69,7 @@ class NebiusAPIClient:
                 name=name,
                 **kwargs,
             ),
+            timeout=REQUEST_TIMEOUT,
         )
         self.raise_for_status(resp)
         return resp.json()
@@ -82,6 +84,7 @@ class NebiusAPIClient:
                 name=name,
                 **kwargs,
             ),
+            timeout=REQUEST_TIMEOUT,
         )
         self.raise_for_status(resp)
         return resp.json()
@@ -118,6 +121,7 @@ class NebiusAPIClient:
                 v4CidrBlocks=cird_blocks,
                 **kwargs,
             ),
+            timeout=REQUEST_TIMEOUT,
         )
         self.raise_for_status(resp)
         return resp.json()
@@ -147,6 +151,7 @@ class NebiusAPIClient:
                 ruleSpecs=rule_specs,
                 **kwargs,
             ),
+            timeout=REQUEST_TIMEOUT,
         )
         self.raise_for_status(resp)
         return resp.json()
@@ -165,7 +170,9 @@ class NebiusAPIClient:
     def vpc_security_groups_delete(self, security_group_id: str):
         logger.debug("Deleting security group %s", security_group_id)
         self.get_token()
-        resp = self.s.delete(self.url("vpc", f"/securityGroups/{security_group_id}"))
+        resp = self.s.delete(
+            self.url("vpc", f"/securityGroups/{security_group_id}"), timeout=REQUEST_TIMEOUT
+        )
         self.raise_for_status(resp)
 
     def compute_instances_create(
@@ -215,6 +222,7 @@ class NebiusAPIClient:
                 ],
                 **kwargs,
             ),
+            timeout=REQUEST_TIMEOUT,
         )
         self.raise_for_status(resp)
         return resp.json()
@@ -236,7 +244,9 @@ class NebiusAPIClient:
     def compute_instances_delete(self, instance_id: str):
         logger.debug("Deleting instance %s", instance_id)
         self.get_token()
-        resp = self.s.delete(self.url("compute", f"/instances/{instance_id}"))
+        resp = self.s.delete(
+            self.url("compute", f"/instances/{instance_id}"), timeout=REQUEST_TIMEOUT
+        )
         self.raise_for_status(resp)
 
     def compute_instances_get(self, instance_id: str, full: bool = False) -> dict:
@@ -247,6 +257,7 @@ class NebiusAPIClient:
             params=dict(
                 view="FULL" if full else "BASIC",
             ),
+            timeout=REQUEST_TIMEOUT,
         )
         self.raise_for_status(resp)
         return resp.json()
@@ -277,6 +288,7 @@ class NebiusAPIClient:
                     pageToken=page_token,
                     **params,
                 ),
+                timeout=REQUEST_TIMEOUT,
             )
             self.raise_for_status(resp)
             data = resp.json()
