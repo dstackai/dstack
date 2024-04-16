@@ -116,9 +116,7 @@ class AzureCompute(Compute):
                     resource_group=self.config.resource_group,
                     location=location,
                 ),
-                managed_identity=azure_utils.get_runner_managed_identity_name(
-                    resource_group=self.config.resource_group
-                ),
+                managed_identity=None,
                 image_reference=_get_image_ref(
                     compute_client=self._compute_client,
                     location=location,

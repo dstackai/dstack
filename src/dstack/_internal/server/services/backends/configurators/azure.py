@@ -1,16 +1,11 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Tuple
-from uuid import UUID, uuid5
 
 from azure.core.credentials import TokenCredential
-from azure.mgmt import authorization as autharization_mgmt
-from azure.mgmt import msi as msi_mgmt
 from azure.mgmt import network as network_mgmt
 from azure.mgmt import resource as resource_mgmt
 from azure.mgmt import subscription as subscription_mgmt
-from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
-from azure.mgmt.msi.models import Identity
 from azure.mgmt.network.models import (
     AddressSpace,
     NetworkSecurityGroup,
@@ -159,18 +154,6 @@ class AzureConfigurator(Configurator):
             location=MAIN_LOCATION,
             project_name=project.name,
         )
-        runner_principal_id = self._create_runner_managed_identity(
-            credential=credential,
-            subscription_id=config.subscription_id,
-            resource_group=resource_group,
-            location=MAIN_LOCATION,
-        )
-        self._grant_roles_to_runner_managed_identity(
-            credential=credential,
-            subscription_id=config.subscription_id,
-            resource_group=resource_group,
-            runner_principal_id=runner_principal_id,
-        )
         self._create_network_resources(
             credential=credential,
             subscription_id=config.subscription_id,
@@ -294,36 +277,6 @@ class AzureConfigurator(Configurator):
             location=location,
         )
 
-    def _create_runner_managed_identity(
-        self,
-        credential: auth.AzureCredential,
-        subscription_id: str,
-        resource_group: str,
-        location: str,
-    ) -> str:
-        msi_manager = ManagedIdentityManager(
-            credential=credential,
-            subscription_id=subscription_id,
-        )
-        return msi_manager.create_managed_identity(
-            resource_group=resource_group,
-            location=location,
-            name=azure_utils.get_runner_managed_identity_name(resource_group),
-        )
-
-    def _grant_roles_to_runner_managed_identity(
-        self,
-        credential: auth.AzureCredential,
-        subscription_id: str,
-        resource_group: str,
-        runner_principal_id: str,
-    ):
-        roles_manager = RolesManager(credential=credential, subscription_id=subscription_id)
-        roles_manager.grant_vm_contributor_role(
-            resource_group=resource_group,
-            principal_id=runner_principal_id,
-        )
-
     def _create_network_resources(
         self,
         credential: auth.AzureCredential,
@@ -379,53 +332,6 @@ class ResourceManager:
 
 def _get_resource_group_name(project_name: str) -> str:
     return f"dstack-{project_name}"
-
-
-class ManagedIdentityManager:
-    def __init__(self, credential: TokenCredential, subscription_id: str):
-        self.msi_client = msi_mgmt.ManagedServiceIdentityClient(
-            credential=credential, subscription_id=subscription_id
-        )
-
-    def create_managed_identity(
-        self,
-        resource_group: str,
-        name: str,
-        location: str,
-    ) -> str:
-        identity: Identity = self.msi_client.user_assigned_identities.create_or_update(
-            resource_group_name=resource_group,
-            resource_name=name,
-            parameters=Identity(
-                location=location,
-            ),
-        )
-        return identity.principal_id
-
-
-class RolesManager:
-    def __init__(self, credential: TokenCredential, subscription_id: str):
-        self.subscription_id = subscription_id
-        self.authorization_client = autharization_mgmt.AuthorizationManagementClient(
-            credential=credential, subscription_id=subscription_id
-        )
-
-    def grant_vm_contributor_role(
-        self,
-        resource_group: str,
-        principal_id: str,
-        principal_type: str = "ServicePrincipal",
-    ):
-        self.authorization_client.role_assignments.create(
-            scope=azure_utils.get_resource_group_id(self.subscription_id, resource_group),
-            role_assignment_name=uuid5(UUID(principal_id), f"VM {resource_group} contributor"),
-            parameters=RoleAssignmentCreateParameters(
-                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#virtual-machine-contributor
-                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c",
-                principal_id=principal_id,
-                principal_type=principal_type,
-            ),
-        )
 
 
 class NetworkManager:
