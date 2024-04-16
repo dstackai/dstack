@@ -86,6 +86,7 @@ AZURE_DEPS = [
 
 GCP_DEPS = [
     "google-auth>=2.3.0",  # indirect
+    "google-cloud-storage>=2.0.0",
     "google-cloud-compute>=1.5.0",
     "google-cloud-logging>=2.0.0",
     "google-api-python-client>=2.80.0",
