@@ -151,7 +151,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
     SUBSCRIPTION_ID=...
     az ad sp create-for-rbac 
         --name dstack-app \
-        --role Owner \ 
+        --role $DSTACK_ROLE \ 
         --scopes /subscriptions/$SUBSCRIPTION_ID \ 
         --query "{ tenant_id: tenant, client_id: appId, client_secret: password }"
     ```
@@ -208,8 +208,44 @@ There are two ways to configure Azure: using a client secret or using the defaul
     ```
 
 ??? info "Required Azure permissions"
-    You must have the `Owner` permission for the Azure subscription.
-    Please, [let us know](https://discord.gg/u8SmfwPpMd) if your use case requires more granular Azure permissions.
+    The following Azure permissions are sufficient for `dstack` to work:
+    ```
+    {
+        "properties": {
+            "roleName": "dstack-role",
+            "description": "Minimal reqired permissions for using Azure with dstack",
+            "assignableScopes": [
+                "/subscriptions/${YOUR_SUBSCRIPTION_ID}"
+            ],
+            "permissions": [
+                {
+                  "actions": [
+                      "Microsoft.Authorization/*/read",
+                      "Microsoft.Compute/availabilitySets/*",
+                      "Microsoft.Compute/locations/*",
+                      "Microsoft.Compute/virtualMachines/*",
+                      "Microsoft.Compute/virtualMachineScaleSets/*",
+                      "Microsoft.Compute/cloudServices/*",
+                      "Microsoft.Compute/disks/write",
+                      "Microsoft.Compute/disks/read",
+                      "Microsoft.Compute/disks/delete",
+                      "Microsoft.Network/networkSecurityGroups/*",
+                      "Microsoft.Network/locations/*",
+                      "Microsoft.Network/virtualNetworks/*",
+                      "Microsoft.Network/networkInterfaces/*",
+                      "Microsoft.Network/publicIPAddresses/*",
+                      "Microsoft.Resources/subscriptions/resourceGroups/read",
+                      "Microsoft.Resources/subscriptions/resourceGroups/write",
+                      "Microsoft.Resources/subscriptions/read"
+                  ],
+                  "notActions": [],
+                  "dataActions": [],
+                  "notDataActions": []
+                }
+            ]
+        }
+    }
+    ```
 
 ### GCP
 
