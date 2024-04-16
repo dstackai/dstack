@@ -97,63 +97,56 @@ class AzureCompute(Compute):
             location,
         )
         ssh_pub_keys = instance_config.get_public_keys()
-        try:
-            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-            vm = _launch_instance(
-                compute_client=self._compute_client,
-                subscription_id=self.config.subscription_id,
+        disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+        vm = _launch_instance(
+            compute_client=self._compute_client,
+            subscription_id=self.config.subscription_id,
+            location=location,
+            resource_group=self.config.resource_group,
+            network_security_group=azure_utils.get_default_network_security_group_name(
+                resource_group=self.config.resource_group,
                 location=location,
+            ),
+            network=azure_utils.get_default_network_name(
                 resource_group=self.config.resource_group,
-                network_security_group=azure_utils.get_default_network_security_group_name(
-                    resource_group=self.config.resource_group,
-                    location=location,
-                ),
-                network=azure_utils.get_default_network_name(
-                    resource_group=self.config.resource_group,
-                    location=location,
-                ),
-                subnet=azure_utils.get_default_subnet_name(
-                    resource_group=self.config.resource_group,
-                    location=location,
-                ),
-                managed_identity=azure_utils.get_runner_managed_identity_name(
-                    resource_group=self.config.resource_group
-                ),
-                image_reference=_get_image_ref(
-                    compute_client=self._compute_client,
-                    location=location,
-                    cuda=len(instance_offer.instance.resources.gpus) > 0,
-                ),
-                vm_size=instance_offer.instance.name,
-                # instance_name includes region because Azure may create an instance resource
-                # even when provisioning fails.
-                instance_name=f"{instance_config.instance_name}-{instance_offer.region}",
-                user_data=get_user_data(authorized_keys=ssh_pub_keys),
-                ssh_pub_keys=ssh_pub_keys,
-                spot=instance_offer.instance.resources.spot,
-                disk_size=disk_size,
-                computer_name="runnervm",
-            )
-            logger.info("Request succeeded")
-            public_ip, private_ip = _get_vm_public_private_ips(
-                network_client=self._network_client,
+                location=location,
+            ),
+            subnet=azure_utils.get_default_subnet_name(
                 resource_group=self.config.resource_group,
-                vm=vm,
-            )
-            return LaunchedInstanceInfo(
-                instance_id=vm.name,
-                ip_address=public_ip,
-                internal_ip=private_ip,
-                region=location,
-                username="ubuntu",
-                ssh_port=22,
-                dockerized=True,
-                backend_data=None,
-            )
-        except NoCapacityError:
-            logger.info("Failed to request instance in %s", location)
-        logger.info("Failed to request instance")
-        raise NoCapacityError()
+                location=location,
+            ),
+            managed_identity=None,
+            image_reference=_get_image_ref(
+                compute_client=self._compute_client,
+                location=location,
+                cuda=len(instance_offer.instance.resources.gpus) > 0,
+            ),
+            vm_size=instance_offer.instance.name,
+            # instance_name includes region because Azure may create an instance resource
+            # even when provisioning fails.
+            instance_name=f"{instance_config.instance_name}-{instance_offer.region}",
+            user_data=get_user_data(authorized_keys=ssh_pub_keys),
+            ssh_pub_keys=ssh_pub_keys,
+            spot=instance_offer.instance.resources.spot,
+            disk_size=disk_size,
+            computer_name="runnervm",
+        )
+        logger.info("Request succeeded")
+        public_ip, private_ip = _get_vm_public_private_ips(
+            network_client=self._network_client,
+            resource_group=self.config.resource_group,
+            vm=vm,
+        )
+        return LaunchedInstanceInfo(
+            instance_id=vm.name,
+            ip_address=public_ip,
+            internal_ip=private_ip,
+            region=location,
+            username="ubuntu",
+            ssh_port=22,
+            dockerized=True,
+            backend_data=None,
+        )
 
     def run_job(
         self,
@@ -418,8 +411,9 @@ def _launch_instance(
         )
     except ResourceExistsError as e:
         # May occur if no quota or quota exceeded
-        if e.error.code in ["SkuNotAvailable", "OperationNotAllowed"]:
-            raise NoCapacityError()
+        if e.error is not None and e.error.code in ["SkuNotAvailable", "OperationNotAllowed"]:
+            message = e.error.message if e.error.message is not None else ""
+            raise NoCapacityError(message)
         raise e
     vm = poller.result()
     return vm

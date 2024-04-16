@@ -77,27 +77,17 @@ AWS_DEPS = [
 
 AZURE_DEPS = [
     "azure-identity>=1.12.0",
-    "azure-keyvault-secrets>=4.6.0",
-    "azure-storage-blob>=12.15.0",
-    "azure-monitor-query>=1.2.0",
     "azure-mgmt-subscription>=3.1.1",
     "azure-mgmt-compute>=29.1.0",
     "azure-mgmt-network==23.0.0b2",
     "azure-mgmt-resource>=22.0.0",
     "azure-mgmt-authorization>=3.0.0",
-    "azure-mgmt-storage>=21.0.0",
-    "azure-mgmt-keyvault>=10.1.0",
-    "azure-mgmt-loganalytics==13.0.0b6",
-    "azure-mgmt-msi",
-    "azure-mgmt-monitor",
-    "azure-graphrbac",
 ]
 
 GCP_DEPS = [
     "google-auth>=2.3.0",  # indirect
     "google-cloud-storage>=2.0.0",
     "google-cloud-compute>=1.5.0",
-    "google-cloud-secret-manager>=2.0.0",
     "google-cloud-logging>=2.0.0",
     "google-api-python-client>=2.80.0",
     "google-cloud-billing>=1.11.0",
