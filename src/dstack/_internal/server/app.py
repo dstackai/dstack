@@ -115,9 +115,9 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
-    logger.info(f"The [code]admin[/] token is [code]{admin.token}[/]", {"show_path": False})
+    logger.info(f"The admin token is {admin.token}", {"show_path": False})
     logger.info(
-        f"The dstack server [yellow]{dstack_version}[/] is running at {SERVER_URL}",
+        f"The dstack server {dstack_version} is running at {SERVER_URL}",
         {"show_path": False},
     )
     for func in _ON_STARTUP_HOOKS:

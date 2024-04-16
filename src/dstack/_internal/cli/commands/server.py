@@ -31,8 +31,8 @@ class ServerCommand(BaseCommand):
             "-l",
             "--log-level",
             type=str,
-            help="Server logging level. Defaults to WARNING.",
-            default=os.getenv("DSTACK_SERVER_LOG_LEVEL", "WARNING"),
+            help="Server logging level. Defaults to INFO.",
+            default=os.getenv("DSTACK_SERVER_LOG_LEVEL", "INFO"),
         )
         self._parser.add_argument(
             "--default",

@@ -247,19 +247,19 @@ $ dstack gateway update --help
 
 ## Environment variables
 
-| Name                              | Description                                   | Default            |
-|-----------------------------------|-----------------------------------------------|--------------------|
-| `DSTACK_CLI_LOG_LEVEL`            | Configures CLI logging level                  | `CRITICAL`         |
-| `DSTACK_PROFILE`                  | Has the same effect as `--profile`            | `None`             |
-| `DSTACK_PROJECT`                  | Has the same effect as `--project`            | `None`             |
-| `DSTACK_DEFAULT_CREDS_DISABLED`   | Disables default credentials detection if set | `None`             |
-| `DSTACK_LOCAL_BACKEND_ENABLED`    | Enables local backend for debug if set        | `None`             |
-| `DSTACK_RUNNER_VERSION`           | Sets exact runner version for debug           | `latest`           |
-| `DSTACK_SERVER_ADMIN_TOKEN`       | Has the same effect as `--token`              | `None`             |
-| `DSTACK_SERVER_DIR`               | Sets path to store data and server configs    | `~/.dstack/server` |
-| `DSTACK_SERVER_HOST`              | Has the same effect as `--host`               | `127.0.0.1`        |
-| `DSTACK_SERVER_LOG_LEVEL`         | Has the same effect as `--log-level`          | `WARNING`          |
-| `DSTACK_SERVER_LOG_FORMAT`        | Sets format of log output                     | `standard`         |
-| `DSTACK_SERVER_PORT`              | Has the same effect as `--port`               | `3000`             |
-| `DSTACK_SERVER_ROOT_LOG_LEVEL`    | Sets root logger log level                    | `ERROR`            |
-| `DSTACK_SERVER_UVICORN_LOG_LEVEL` | Sets uvicorn logger log level                 | `ERROR`            |
+| Name                              | Description                                                   | Default            |
+|-----------------------------------|---------------------------------------------------------------|--------------------|
+| `DSTACK_CLI_LOG_LEVEL`            | Configures CLI logging level                                  | `INFO`             |
+| `DSTACK_PROFILE`                  | Has the same effect as `--profile`                            | `None`             |
+| `DSTACK_PROJECT`                  | Has the same effect as `--project`                            | `None`             |
+| `DSTACK_DEFAULT_CREDS_DISABLED`   | Disables default credentials detection if set                 | `None`             |
+| `DSTACK_LOCAL_BACKEND_ENABLED`    | Enables local backend for debug if set                        | `None`             |
+| `DSTACK_RUNNER_VERSION`           | Sets exact runner version for debug                           | `latest`           |
+| `DSTACK_SERVER_ADMIN_TOKEN`       | Has the same effect as `--token`                              | `None`             |
+| `DSTACK_SERVER_DIR`               | Sets path to store data and server configs                    | `~/.dstack/server` |
+| `DSTACK_SERVER_HOST`              | Has the same effect as `--host`                               | `127.0.0.1`        |
+| `DSTACK_SERVER_LOG_LEVEL`         | Has the same effect as `--log-level`                          | `INFO`             |
+| `DSTACK_SERVER_LOG_FORMAT`        | Sets format of log output. Can be `rich`, `standard`, `json`. | `rich`             |
+| `DSTACK_SERVER_PORT`              | Has the same effect as `--port`                               | `3000`             |
+| `DSTACK_SERVER_ROOT_LOG_LEVEL`    | Sets root logger log level                                    | `ERROR`            |
+| `DSTACK_SERVER_UVICORN_LOG_LEVEL` | Sets uvicorn logger log level                                 | `ERROR`            |

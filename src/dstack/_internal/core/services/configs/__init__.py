@@ -7,11 +7,14 @@ import filelock
 import yaml
 from pydantic import ValidationError
 
-from dstack._internal.cli.utils.common import confirm_ask, console
+from dstack._internal.cli.utils.common import confirm_ask
 from dstack._internal.core.models.config import GlobalConfig, ProjectConfig, RepoConfig
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.utils.common import get_dstack_dir
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
+
+logger = get_logger(__name__)
 
 
 class ConfigManager:
@@ -138,6 +141,6 @@ def update_default_project(
                 name=project_name, url=url, token=token, default=set_it_as_default
             )
             config_manager.save()
-            console.print(
-                f"[code]✓[/] Configured the [code]{project_name}[/] project in [code]{config_dir}[/]"
+            logger.info(
+                f"Configured the {project_name} project in {config_dir}", {"show_path": False}
             )

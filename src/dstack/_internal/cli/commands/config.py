@@ -7,6 +7,9 @@ from dstack._internal.cli.commands import BaseCommand
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.services.configs import ConfigManager
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConfigCommand(BaseCommand):
@@ -79,4 +82,6 @@ class ConfigCommand(BaseCommand):
                 name=args.project, url=args.url, token=args.token, default=set_it_as_default
             )
             config_manager.save()
-        console.print(f"Configuration updated at [code]{config_manager.config_filepath}[/]")
+        logger.info(
+            f"Configuration updated at {config_manager.config_filepath}", {"show_path": False}
+        )

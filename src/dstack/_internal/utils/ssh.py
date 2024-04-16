@@ -64,11 +64,11 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
                     f.write(include + content)
             except PermissionError:
                 logger.warning(
-                    f"Couldn't update `[code]{ssh_config_path}[/]` due to a permissions problem.\n\n"
-                    f"The `[code]vscode://vscode-remote/ssh-remote+<run name>/workflow[/]` link and "
-                    f"the `[code]ssh <run name>[/]` command won't work.\n\n"
-                    f"To fix this, make sure `[code]{ssh_config_path}[/]` is writable, or add "
-                    f"`[code]Include {path}[/]` to the top of `[code]{ssh_config_path}[/]` manually.",
+                    f"Couldn't update `{ssh_config_path}` due to a permissions problem.\n\n"
+                    f"The `vscode://vscode-remote/ssh-remote+<run name>/workflow` link and "
+                    f"the `ssh <run name>` command won't work.\n\n"
+                    f"To fix this, make sure `{ssh_config_path}` is writable, or add "
+                    f"`Include {path}` to the top of `{ssh_config_path}` manually.",
                     extra={"markup": True},
                 )
 
