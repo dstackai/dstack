@@ -17,7 +17,7 @@ from dstack._internal.server.schemas.runner import (
 
 REMOTE_SHIM_PORT = 10998
 REMOTE_RUNNER_PORT = 10999
-REQUEST_TIMEOUT = 5
+REQUEST_TIMEOUT = 15
 
 
 class RunnerClient:
