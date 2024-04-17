@@ -63,7 +63,7 @@ class RunnerClient:
         resp.raise_for_status()
 
     def upload_code(self, file: Union[BinaryIO, bytes]):
-        resp = requests.post(self._url("/api/upload_code"), data=file, timeout=15)
+        resp = requests.post(self._url("/api/upload_code"), data=file, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
 
     def run_job(self):
