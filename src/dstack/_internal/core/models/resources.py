@@ -161,6 +161,9 @@ class GPUSpec(CoreModel):
         return v
 
 
+MIN_DISK_SIZE = 50
+
+
 class DiskSpec(CoreModel):
     """
     The disk spec
@@ -181,6 +184,14 @@ class DiskSpec(CoreModel):
         if isinstance(v, (str, int, float)):
             return {"size": v}
         return v
+
+    @validator("size")
+    def validate_size(cls, size):
+        if size.min is not None and size.min < MIN_DISK_SIZE:
+            raise ValueError(f"Min disk size should be >= {MIN_DISK_SIZE}GB")
+        if size.max is not None and size.max < MIN_DISK_SIZE:
+            raise ValueError(f"Max disk size should be >= {MIN_DISK_SIZE}GB")
+        return size
 
 
 DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))
