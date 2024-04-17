@@ -219,6 +219,7 @@ def get_latest_runner_build() -> Optional[str]:
         params={
             "status": "success",
         },
+        timeout=10,
     )
     resp.raise_for_status()
 
@@ -239,7 +240,7 @@ def get_dstack_gateway_wheel(build: str) -> str:
     channel = "release" if settings.DSTACK_RELEASE else "stgn"
     base_url = f"https://dstack-gateway-downloads.s3.amazonaws.com/{channel}"
     if build == "latest":
-        r = requests.get(f"{base_url}/latest-version")
+        r = requests.get(f"{base_url}/latest-version", timeout=5)
         r.raise_for_status()
         build = r.text.strip()
         logger.debug("Found the latest gateway build: %s", build)

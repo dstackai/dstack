@@ -17,6 +17,7 @@ from dstack._internal.server.schemas.runner import (
 
 REMOTE_SHIM_PORT = 10998
 REMOTE_RUNNER_PORT = 10999
+REQUEST_TIMEOUT = 15
 
 
 class RunnerClient:
@@ -31,7 +32,7 @@ class RunnerClient:
 
     def healthcheck(self) -> Optional[HealthcheckResponse]:
         try:
-            resp = requests.get(self._url("/api/healthcheck"))
+            resp = requests.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
             return HealthcheckResponse.__response__.parse_obj(resp.json())
         except requests.exceptions.RequestException:
@@ -57,26 +58,27 @@ class RunnerClient:
             self._url("/api/submit"),
             data=body.json(),
             headers={"Content-Type": "application/json"},
+            timeout=REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
 
     def upload_code(self, file: Union[BinaryIO, bytes]):
-        resp = requests.post(self._url("/api/upload_code"), data=file)
+        resp = requests.post(self._url("/api/upload_code"), data=file, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
 
     def run_job(self):
-        resp = requests.post(self._url("/api/run"))
+        resp = requests.post(self._url("/api/run"), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
 
-    def pull(self, timestamp: int, timeout: int = 5) -> PullResponse:
+    def pull(self, timestamp: int) -> PullResponse:
         resp = requests.get(
-            self._url("/api/pull"), params={"timestamp": timestamp}, timeout=timeout
+            self._url("/api/pull"), params={"timestamp": timestamp}, timeout=REQUEST_TIMEOUT
         )
         resp.raise_for_status()
         return PullResponse.__response__.parse_obj(resp.json())
 
     def stop(self):
-        resp = requests.post(self._url("/api/stop"))
+        resp = requests.post(self._url("/api/stop"), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
 
     def _url(self, path: str) -> str:
@@ -95,7 +97,7 @@ class ShimClient:
 
     def healthcheck(self, unmask_exeptions: bool = False) -> Optional[HealthcheckResponse]:
         try:
-            resp = requests.get(self._url("/api/healthcheck"), timeout=5)
+            resp = requests.get(self._url("/api/healthcheck"), timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
             return HealthcheckResponse.__response__.parse_obj(resp.json())
         except requests.exceptions.RequestException:
@@ -122,16 +124,17 @@ class ShimClient:
         resp = requests.post(
             self._url("/api/submit"),
             json=post_body,
+            timeout=REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
 
     def stop(self, force: bool = False):
         body = StopBody(force=force)
-        resp = requests.post(self._url("/api/stop"), json=body.dict())
+        resp = requests.post(self._url("/api/stop"), json=body.dict(), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
 
     def pull(self) -> PullBody:
-        resp = requests.get(self._url("/api/pull"))
+        resp = requests.get(self._url("/api/pull"), timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         return PullBody.__response__.parse_obj(resp.json())
 

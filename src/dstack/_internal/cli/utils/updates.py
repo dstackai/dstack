@@ -35,6 +35,7 @@ def get_latest_version() -> Optional[str]:
                 "anonymous_installation_id": anonymous_installation_id(),
                 "version": version.__version__,
             },
+            timeout=5,
         )
         if response.status_code == 200:
             return response.text.strip()

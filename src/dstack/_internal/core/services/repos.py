@@ -38,7 +38,7 @@ def get_local_repo_credentials(
     original_hostname: Optional[str] = None,
 ) -> RemoteRepoCreds:
     url = repo_data.make_url(RepoProtocol.HTTPS)  # no auth
-    r = requests.get(f"{url}/info/refs?service=git-upload-pack")
+    r = requests.get(f"{url}/info/refs?service=git-upload-pack", timeout=10)
     if r.status_code == 200:
         return RemoteRepoCreds(protocol=RepoProtocol.HTTPS, private_key=None, oauth_token=None)
 

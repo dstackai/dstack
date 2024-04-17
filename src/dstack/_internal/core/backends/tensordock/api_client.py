@@ -15,7 +15,7 @@ class TensorDockAPIClient:
         self.api_url = "https://marketplace.tensordock.com/api/v0".rstrip("/")
         self.api_key = api_key
         self.api_token = api_token
-        self.s = requests.Session()
+        self.s = requests.Session()  # TODO: set adequate timeout everywhere the session is used
 
     def auth_test(self) -> bool:
         resp = self.s.post(
