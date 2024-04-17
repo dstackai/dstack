@@ -28,7 +28,14 @@ from dstack._internal.server.utils.common import run_async
 
 def get_default_python_verison() -> str:
     version_info = sys.version_info
-    return PythonVersion(f"{version_info.major}.{version_info.minor}").value
+    python_version_str = f"{version_info.major}.{version_info.minor}"
+    try:
+        return PythonVersion(python_version_str).value
+    except ValueError:
+        raise ServerClientError(
+            "Failed to use the system Python version. "
+            f"Python {python_version_str} is not supported."
+        )
 
 
 def get_default_image(python_version: str) -> str:
