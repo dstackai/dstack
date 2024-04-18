@@ -97,7 +97,9 @@ class RunTerminationReason(str, Enum):
 class JobTerminationReason(str, Enum):
     # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
+    FAILED_TO_START_DUE_TO_PROVISIONING_ERROR = "failed_to_start_due_to_provisioning_error"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
+    WAITING_INSTANCE_LIMIT_EXCEEDED = "waiting_instance_limit_exceeded"
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
     TERMINATED_BY_USER = "terminated_by_user"
     GATEWAY_ERROR = "gateway_error"
@@ -193,12 +195,15 @@ class JobProvisioningData(CoreModel):
     backend: BackendType
     instance_type: InstanceType
     instance_id: str
-    hostname: str
+    # hostname may not be set immediately after instance provisioning
+    hostname: Optional[str]
     internal_ip: Optional[str]
     region: str
     price: float
     username: str
-    ssh_port: int  # could be different from 22 for some backends
+    # ssh_port be different from 22 for some backends.
+    # ssh_port may not be set immediately after instance provisioning
+    ssh_port: Optional[int]
     dockerized: bool  # True if backend starts shim
     ssh_proxy: Optional[SSHConnectionParams]
     backend_data: Optional[str]  # backend-specific data in json

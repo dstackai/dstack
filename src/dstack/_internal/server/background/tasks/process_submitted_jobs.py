@@ -5,10 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import BackendError, ContainerTimeoutError, RunContainerError
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
-    LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
@@ -146,29 +145,15 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         return
 
     # Create a new cloud instance
-    try:
-        run_job_result = await _run_job_on_new_instance(
-            project_model=project_model,
-            job_model=job_model,
-            run=run,
-            job=job,
-            project_ssh_public_key=project_model.ssh_public_key,
-            project_ssh_private_key=project_model.ssh_private_key,
-            master_job_provisioning_data=master_job_provisioning_data,
-        )
-    except (ContainerTimeoutError, RunContainerError) as e:
-        reason = (
-            JobTerminationReason.CREATING_CONTAINER_ERROR
-            if isinstance(e, ContainerTimeoutError)
-            else JobTerminationReason.CONTAINER_EXITED_WITH_ERROR
-        )
-        logger.debug("%s: provisioning failed: %s", fmt(job_model), e)
-        job_model.status = JobStatus.TERMINATING
-        job_model.termination_reason = reason
-        job_model.termination_reason_message = str(e)
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
-        return
+    run_job_result = await _run_job_on_new_instance(
+        project_model=project_model,
+        job_model=job_model,
+        run=run,
+        job=job,
+        project_ssh_public_key=project_model.ssh_public_key,
+        project_ssh_private_key=project_model.ssh_private_key,
+        master_job_provisioning_data=master_job_provisioning_data,
+    )
     if run_job_result is None:
         logger.debug("%s: provisioning failed", fmt(job_model))
         job_model.status = JobStatus.TERMINATING
@@ -283,7 +268,7 @@ async def _run_job_on_new_instance(
             offer.price,
         )
         try:
-            launched_instance_info: LaunchedInstanceInfo = await run_async(
+            job_provisioning_data = await run_async(
                 backend.compute().run_job,
                 run,
                 job,
@@ -291,8 +276,7 @@ async def _run_job_on_new_instance(
                 project_ssh_public_key,
                 project_ssh_private_key,
             )
-        except (ContainerTimeoutError, RunContainerError):
-            raise
+            return job_provisioning_data, offer
         except BackendError as e:
             logger.warning(
                 "%s: %s launch in %s/%s failed: %s",
@@ -312,22 +296,6 @@ async def _run_job_on_new_instance(
                 offer.region,
             )
             continue
-        else:
-            job_provisioning_data = JobProvisioningData(
-                backend=backend.TYPE,
-                instance_type=offer.instance,
-                instance_id=launched_instance_info.instance_id,
-                hostname=launched_instance_info.ip_address,
-                internal_ip=launched_instance_info.internal_ip,
-                region=launched_instance_info.region,
-                price=offer.price,
-                username=launched_instance_info.username,
-                ssh_port=launched_instance_info.ssh_port,
-                dockerized=launched_instance_info.dockerized,
-                ssh_proxy=launched_instance_info.ssh_proxy,
-                backend_data=launched_instance_info.backend_data,
-            )
-            return job_provisioning_data, offer
     return None
 
 

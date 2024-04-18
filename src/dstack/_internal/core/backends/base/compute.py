@@ -13,9 +13,8 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
     LaunchedGatewayInfo,
-    LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,20 +35,48 @@ class Compute(ABC):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
+        """
+        Launches a new instance for the job. It should return `JobProvisioningData` ASAP.
+        If required to wait to get the IP address or SSH port, return partially filled `JobProvisioningData`
+        and implement `update_provisioning_data()`.
+        """
+        pass
+
+    @abstractmethod
+    def terminate_instance(
+        self, instance_id: str, region: str, backend_data: Optional[str] = None
+    ) -> None:
+        """
+        Terminates an instance by `instance_id`. If instance does not exist,
+        it should not raise errors but return silently.
+        """
         pass
 
     def create_instance(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
+        """
+        Launches a new instance. It should return `JobProvisioningData` ASAP.
+        If required to wait to get the IP address or SSH port, return partially filled `JobProvisioningData`
+        and implement `update_provisioning_data()`.
+        """
         raise NotImplementedError()
 
-    @abstractmethod
-    def terminate_instance(
-        self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+    ):
+        """
+        This method is called if `JobProvisioningData` returned from `run_job()`/`create_instance()`
+        is not complete, e.g. missing `hostname` or `ssh_port`.
+        It can be used if getting complete provisioning data takes a long of time.
+        It should not wait but return immediately.
+        If it raises `ProvisioningError`, there will be no further attempts to update the provisioning data,
+        and the run will be terminated.
+        """
         pass
 
     def create_gateway(

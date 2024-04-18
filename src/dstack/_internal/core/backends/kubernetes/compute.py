@@ -30,11 +30,10 @@ from dstack._internal.core.models.instances import (
     InstanceRuntime,
     InstanceType,
     LaunchedGatewayInfo,
-    LaunchedInstanceInfo,
     Resources,
     SSHConnectionParams,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.common import parse_memory
 from dstack._internal.utils.logging import get_logger
 
@@ -92,7 +91,7 @@ class KubernetesCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_name = get_instance_name(run, job)
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
@@ -167,10 +166,14 @@ class KubernetesCompute(Compute):
             ),
         )
         service_ip = service_response.spec.cluster_ip
-        return LaunchedInstanceInfo(
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
             instance_id=instance_name,
-            ip_address=service_ip,
+            hostname=service_ip,
+            internal_ip=None,
             region="local",
+            price=instance_offer.price,
             username="root",
             ssh_port=RUNNER_SSH_PORT,
             dockerized=False,

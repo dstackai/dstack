@@ -1,4 +1,3 @@
-import time
 from typing import List, Optional
 
 import requests
@@ -11,23 +10,18 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.cudo.api_client import CudoApiClient
 from dstack._internal.core.backends.cudo.config import CudoConfig
-from dstack._internal.core.errors import BackendError, NoCapacityError
+from dstack._internal.core.errors import BackendError, NoCapacityError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    LaunchedInstanceInfo,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-_WAIT_FOR_INSTANCE_ATTEMPTS = 30
-_WAIT_FOR_INSTANCE_INTERVAL = 2
 
 
 class CudoCompute(Compute):
@@ -58,7 +52,7 @@ class CudoCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),
@@ -69,14 +63,13 @@ class CudoCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
-        launched_instance_info = self.create_instance(instance_offer, instance_config)
-        return launched_instance_info
+        return self.create_instance(instance_offer, instance_config)
 
     def create_instance(
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         public_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
@@ -88,7 +81,6 @@ class CudoCompute(Compute):
         )
 
         vm_id = f"{instance_config.instance_name}-{instance_offer.region}"
-
         try:
             resp_data = self.api_client.create_virtual_machine(
                 project_id=self.config.project_id,
@@ -123,22 +115,17 @@ class CudoCompute(Compute):
             if response_code == 6:
                 raise BackendError(details.get("message"))
 
-        for _ in range(_WAIT_FOR_INSTANCE_ATTEMPTS):
-            vm = self.api_client.get_vm(self.config.project_id, vm_id)
-            if vm["VM"]["state"] == "FAILED":
-                raise BackendError("VM entered FAILED state", vm)
-            if vm["VM"]["state"] == "ACTIVE":
-                break
-            time.sleep(_WAIT_FOR_INSTANCE_INTERVAL)
-        else:
-            raise BackendError("Failed waiting for VM to become ACTIVE", vm)
-
-        launched_instance = LaunchedInstanceInfo(
+        launched_instance = JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
             instance_id=resp_data["id"],
-            ip_address=vm["VM"]["publicIpAddress"],
+            hostname=None,
+            internal_ip=None,
             region=resp_data["vm"]["regionId"],
+            price=instance_offer.price,
             ssh_port=22,
             username="root",
+            ssh_proxy=None,
             dockerized=True,
             backend_data=None,
         )
@@ -154,6 +141,16 @@ class CudoCompute(Compute):
                 logger.debug("The instance with name %s not found", instance_id)
                 return
             raise BackendError(e.response.text)
+
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+    ):
+        vm = self.api_client.get_vm(self.config.project_id, provisioning_data.instance_id)
+        if vm["VM"]["state"] == "ACTIVE":
+            provisioning_data.hostname = vm["VM"]["publicIpAddress"]
+        if vm["VM"]["state"] == "FAILED":
+            raise ProvisioningError("VM entered FAILED state", vm)
 
 
 def _get_image_id(cuda: bool) -> str:

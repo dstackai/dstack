@@ -13,7 +13,6 @@ from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceRuntime,
-    LaunchedInstanceInfo,
 )
 from dstack._internal.core.models.profiles import Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
@@ -201,7 +200,7 @@ async def create_instance(instance_id: UUID) -> None:
                 instance_offer.price,
             )
             try:
-                launched_instance_info: LaunchedInstanceInfo = await run_async(
+                job_provisioning_data = await run_async(
                     backend.compute().create_instance,
                     instance_offer,
                     instance_configuration,
@@ -219,19 +218,6 @@ async def create_instance(instance_id: UUID) -> None:
             except NotImplementedError:
                 # skip a backend without create_instance support, continue with next backend and offer
                 continue
-            job_provisioning_data = JobProvisioningData(
-                backend=backend.TYPE,
-                instance_type=instance_offer.instance,
-                instance_id=launched_instance_info.instance_id,
-                hostname=launched_instance_info.ip_address,
-                region=launched_instance_info.region,
-                price=instance_offer.price,
-                username=launched_instance_info.username,
-                ssh_port=launched_instance_info.ssh_port,
-                dockerized=launched_instance_info.dockerized,
-                backend_data=launched_instance_info.backend_data,
-                ssh_proxy=None,
-            )
 
             instance.status = InstanceStatus.PROVISIONING
             instance.backend = backend.TYPE
