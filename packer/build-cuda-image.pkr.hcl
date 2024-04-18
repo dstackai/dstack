@@ -35,6 +35,10 @@ build {
   }
 
   provisioner "shell" {
+    script = "provisioners/install-nvidia-docker.sh"
+  }
+
+  provisioner "shell" {
     environment_vars = ["IMAGE_VERSION=${var.image_version}"]
     script           = "provisioners/docker-image-with-cuda.sh"
   }
