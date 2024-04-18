@@ -364,11 +364,8 @@ async def wait_for_instance_provisioning_data(
         "Waiting for instance %s to become running",
         instance.name,
     )
-    timeout_interval = _get_instance_timeout_interval(backend_type=instance.backend)
-    provisioning_time_threshold = (
-        instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
-    )
-    if get_current_datetime() > provisioning_time_threshold:
+    provisioning_deadline = _get_provisioning_deadline(instance)
+    if get_current_datetime() > provisioning_deadline:
         logger.warning(
             "Instance %s failed because instance has not become running in time", instance.name
         )
