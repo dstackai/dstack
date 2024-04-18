@@ -97,7 +97,6 @@ class RunTerminationReason(str, Enum):
 class JobTerminationReason(str, Enum):
     # Set by the server
     FAILED_TO_START_DUE_TO_NO_CAPACITY = "failed_to_start_due_to_no_capacity"
-    FAILED_TO_START_DUE_TO_PROVISIONING_ERROR = "failed_to_start_due_to_provisioning_error"
     INTERRUPTED_BY_NO_CAPACITY = "interrupted_by_no_capacity"
     WAITING_INSTANCE_LIMIT_EXCEEDED = "waiting_instance_limit_exceeded"
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
@@ -117,6 +116,7 @@ class JobTerminationReason(str, Enum):
         mapping = {
             self.FAILED_TO_START_DUE_TO_NO_CAPACITY: JobStatus.FAILED,
             self.INTERRUPTED_BY_NO_CAPACITY: JobStatus.FAILED,
+            self.WAITING_INSTANCE_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.WAITING_RUNNER_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.TERMINATED_BY_USER: JobStatus.TERMINATED,
             self.GATEWAY_ERROR: JobStatus.FAILED,

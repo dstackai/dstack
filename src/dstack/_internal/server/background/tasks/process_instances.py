@@ -9,15 +9,16 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import BackendError
+from dstack._internal.core.backends import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+from dstack._internal.core.errors import BackendError, ProvisioningError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
-    InstanceRuntime,
 )
 from dstack._internal.core.models.profiles import Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel
+from dstack._internal.server.models import InstanceModel, ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.jobs import (
     PROCESSING_POOL_IDS,
@@ -34,9 +35,6 @@ from dstack._internal.utils.logging import get_logger
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
 TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
-
-# Terminate instance if the instance has not provisioning within 10 minutes
-PROVISIONING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
 
 
 @dataclass
@@ -58,11 +56,11 @@ async def process_instances() -> None:
                 select(InstanceModel).where(
                     InstanceModel.status.in_(
                         [
-                            InstanceStatus.PROVISIONING,
-                            InstanceStatus.TERMINATING,
-                            InstanceStatus.IDLE,
-                            InstanceStatus.BUSY,
                             InstanceStatus.PENDING,
+                            InstanceStatus.PROVISIONING,
+                            InstanceStatus.BUSY,
+                            InstanceStatus.IDLE,
+                            InstanceStatus.TERMINATING,
                         ]
                     ),
                     InstanceModel.id.not_in(PROCESSING_POOL_IDS),
@@ -83,7 +81,7 @@ async def process_instances() -> None:
                 InstanceStatus.IDLE,
                 InstanceStatus.BUSY,
             ):
-                await check_shim(instance.id)
+                await check_instance(instance.id)
             if instance.status == InstanceStatus.TERMINATING:
                 await terminate(instance.id)
     finally:
@@ -101,17 +99,15 @@ async def create_instance(instance_id: UUID) -> None:
         ).one()
 
         if instance.retry_policy and instance.retry_policy_duration is not None:
-            retry_duration_deadline = instance.created_at.replace(
-                tzinfo=datetime.timezone.utc
-            ) + timedelta(seconds=instance.retry_policy_duration)
-            if retry_duration_deadline < get_current_datetime():
+            retry_duration_deadline = _get_retry_duration_deadline(instance)
+            if get_current_datetime() > retry_duration_deadline:
                 instance.status = InstanceStatus.TERMINATED
                 instance.deleted = True
                 instance.deleted_at = get_current_datetime()
-                instance.termination_reason = "The retry's duration expired"
+                instance.termination_reason = "Retry duration expired"
                 await session.commit()
                 logger.warning(
-                    "The retry's duration expired. Terminate instance %s",
+                    "Retry duration expired. Terminate instance %s",
                     instance.name,
                     extra={
                         "instance_name": instance.name,
@@ -182,18 +178,17 @@ async def create_instance(instance_id: UUID) -> None:
             instance.last_retry_at = get_current_datetime()
             await session.commit()
             logger.debug(
-                "No offers for %s. Next retry",
+                "No offers for instance %s. Next retry",
                 instance.name,
                 extra={"instance_name": instance.name},
             )
             return
 
         for backend, instance_offer in offers:
-            # cannot create an instance in vastai/k8s. skip
-            if instance_offer.instance_runtime == InstanceRuntime.RUNNER:
+            if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
                 continue
             logger.debug(
-                "trying %s in %s/%s for $%0.4f per hour",
+                "Trying %s in %s/%s for $%0.4f per hour",
                 instance_offer.instance.name,
                 instance_offer.backend.value,
                 instance_offer.region,
@@ -228,7 +223,6 @@ async def create_instance(instance_id: UUID) -> None:
             instance.started_at = get_current_datetime()
             instance.last_retry_at = get_current_datetime()
 
-            await session.commit()
             logger.info(
                 "Created instance %s",
                 instance.name,
@@ -237,7 +231,7 @@ async def create_instance(instance_id: UUID) -> None:
                     "instance_status": InstanceStatus.PROVISIONING.value,
                 },
             )
-
+            await session.commit()
             return
 
         instance.last_retry_at = get_current_datetime()
@@ -246,9 +240,9 @@ async def create_instance(instance_id: UUID) -> None:
             instance.status = InstanceStatus.TERMINATED
             instance.deleted = True
             instance.deleted_at = get_current_datetime()
-            instance.termination_reason = "There were no offers found"
+            instance.termination_reason = "No offers found"
             logger.info(
-                "There were no offers found. Terminated instance %s",
+                "No offers found. Terminated instance %s",
                 instance.name,
                 extra={
                     "instance_name": instance.name,
@@ -259,7 +253,7 @@ async def create_instance(instance_id: UUID) -> None:
         await session.commit()
 
 
-async def check_shim(instance_id: UUID) -> None:
+async def check_instance(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
             await session.scalars(
@@ -268,11 +262,20 @@ async def check_shim(instance_id: UUID) -> None:
                 .options(joinedload(InstanceModel.project))
             )
         ).one()
+
         job_provisioning_data = JobProvisioningData.__response__.parse_raw(
             instance.job_provisioning_data
         )
 
-        # skip check vastai/k8s
+        if job_provisioning_data.hostname is None:
+            await wait_for_instance_provisioning_data(
+                project=instance.project,
+                instance=instance,
+                job_provisioning_data=job_provisioning_data,
+            )
+            await session.commit()
+            return
+
         if not job_provisioning_data.dockerized:
             return
 
@@ -285,13 +288,16 @@ async def check_shim(instance_id: UUID) -> None:
         else:
             health = instance_health
 
+        logger.debug(
+            "Check instance %s status. shim health: %s",
+            instance.name,
+            health,
+            extra={"instance_name": instance.name, "shim_health": health},
+        )
+
         if health.healthy:
-            logger.debug(
-                "check instance %s status: shim health is OK",
-                instance.name,
-                extra={"instance_name": instance.name},
-            )
             instance.termination_deadline = None
+            # FIXME why health_status is None?
             instance.health_status = None
 
             if instance.status == InstanceStatus.PROVISIONING:
@@ -299,7 +305,7 @@ async def check_shim(instance_id: UUID) -> None:
                     InstanceStatus.IDLE if instance.job_id is None else InstanceStatus.BUSY
                 )
                 logger.info(
-                    "The instance %s has switched to %s status",
+                    "Instance %s has switched to %s status",
                     instance.name,
                     instance.status.value,
                     extra={
@@ -307,58 +313,93 @@ async def check_shim(instance_id: UUID) -> None:
                         "instance_status": instance.status.value,
                     },
                 )
-                await session.commit()
-        else:
-            logger.debug(
-                "check instance %s status: shim health: %s",
-                instance.name,
-                health,
-                extra={"instance_name": instance.name, "shim_health": health},
-            )
-
-            if instance.termination_deadline is None:
-                instance.termination_deadline = (
-                    get_current_datetime() + TERMINATION_DEADLINE_OFFSET
-                )
-            instance.health_status = health.reason
-
-            if instance.status in (InstanceStatus.IDLE, InstanceStatus.BUSY):
-                logger.warning(
-                    "instance %s shim is not available",
-                    instance.name,
-                    extra={"instance_name": instance.name},
-                )
-                deadline = instance.termination_deadline.replace(tzinfo=datetime.timezone.utc)
-                if get_current_datetime() > deadline:
-                    instance.status = InstanceStatus.TERMINATING
-                    instance.termination_reason = "Termination deadline"
-                    logger.warning(
-                        "Shim is not available. mark instance %s as TERMINATED",
-                        instance.name,
-                        extra={
-                            "instance_name": instance.name,
-                            "instance_status": InstanceStatus.TERMINATED.value,
-                        },
-                    )
-
-            if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
-                provisioning_time_threshold = instance.started_at.replace(
-                    tzinfo=datetime.timezone.utc
-                ) + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
-                expire_provisioning = provisioning_time_threshold < get_current_datetime()
-                if expire_provisioning:
-                    instance.status = InstanceStatus.TERMINATING
-                    logger.warning(
-                        "The instance %s can't start in %s seconds. Marked as TERMINATED",
-                        instance.name,
-                        PROVISIONING_TIMEOUT_SECONDS,
-                        extra={
-                            "instance_name": instance.name,
-                            "instance_status": InstanceStatus.TERMINATED.value,
-                        },
-                    )
-
             await session.commit()
+            return
+
+        if instance.termination_deadline is None:
+            instance.termination_deadline = get_current_datetime() + TERMINATION_DEADLINE_OFFSET
+
+        instance.health_status = health.reason
+
+        if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
+            provisioning_deadline = _get_provisioning_deadline(instance)
+            if get_current_datetime() > provisioning_deadline:
+                instance.status = InstanceStatus.TERMINATING
+                logger.warning(
+                    "Instance %s has not started in time. Marked as TERMINATING",
+                    instance.name,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATING.value,
+                    },
+                )
+        elif instance.status in (InstanceStatus.IDLE, InstanceStatus.BUSY):
+            logger.warning(
+                "Instance %s shim is not available",
+                instance.name,
+                extra={"instance_name": instance.name},
+            )
+            deadline = instance.termination_deadline.replace(tzinfo=datetime.timezone.utc)
+            if get_current_datetime() > deadline:
+                instance.status = InstanceStatus.TERMINATING
+                instance.termination_reason = "Termination deadline"
+                logger.warning(
+                    "Instance %s shim waiting timeout. Marked as TERMINATING",
+                    instance.name,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATING.value,
+                    },
+                )
+
+        await session.commit()
+
+
+async def wait_for_instance_provisioning_data(
+    project: ProjectModel,
+    instance: InstanceModel,
+    job_provisioning_data: JobProvisioningData,
+):
+    logger.debug(
+        "Waiting for instance %s to become running",
+        instance.name,
+    )
+    timeout_interval = _get_instance_timeout_interval(backend_type=instance.backend)
+    provisioning_time_threshold = (
+        instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
+    )
+    if get_current_datetime() > provisioning_time_threshold:
+        logger.warning(
+            "Instance %s failed because instance has not become running in time", instance.name
+        )
+        instance.status = InstanceStatus.TERMINATING
+        instance.termination_reason = "Instance has not become running in time"
+    else:
+        backend = await backends_services.get_project_backend_by_type(
+            project=project,
+            backend_type=job_provisioning_data.backend,
+        )
+        if backend is None:
+            logger.warning(
+                "Cannot stop instance %s because instance's backend is not configured",
+                instance.name,
+            )
+        else:
+            try:
+                backend.compute().update_provisioning_data(job_provisioning_data)
+                instance.job_provisioning_data = job_provisioning_data.json()
+            except ProvisioningError as e:
+                logger.warning(
+                    "Error while waiting for instance %s to become running: %s",
+                    instance.name,
+                    repr(e),
+                )
+                instance.status = InstanceStatus.TERMINATING
+                instance.termination_reason = "Error while waiting for instance to become running"
+            except Exception:
+                logger.exception(
+                    "Got exception when updating instance %s provisioning data", instance.name
+                )
 
 
 @runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)
@@ -424,7 +465,7 @@ async def terminate(instance_id: UUID) -> None:
         await session.commit()
 
 
-async def terminate_idle_instance() -> None:
+async def terminate_idle_instances() -> None:
     async with get_session_ctx() as session:
         async with PROCESSING_POOL_LOCK:
             res = await session.execute(
@@ -449,8 +490,7 @@ async def terminate_idle_instance() -> None:
                 idle_seconds = instance.termination_idle_time
                 delta = datetime.timedelta(seconds=idle_seconds)
 
-                current_time = get_current_datetime().replace(tzinfo=datetime.timezone.utc)
-
+                current_time = get_current_datetime()
                 if last_time + delta < current_time:
                     jpd = JobProvisioningData.__response__.parse_raw(
                         instance.job_provisioning_data
@@ -463,7 +503,6 @@ async def terminate_idle_instance() -> None:
                     instance.finished_at = get_current_datetime()
                     instance.status = InstanceStatus.TERMINATED
                     instance.termination_reason = "Idle timeout"
-
                     idle_time = current_time - last_time
                     logger.info(
                         "Instance %s terminated by termination policy: idle time %ss",
@@ -474,5 +513,21 @@ async def terminate_idle_instance() -> None:
                             "instance_status": InstanceStatus.TERMINATED.value,
                         },
                     )
-
             await session.commit()
+
+
+def _get_retry_duration_deadline(instance: InstanceModel) -> datetime.datetime:
+    return instance.created_at.replace(tzinfo=datetime.timezone.utc) + timedelta(
+        seconds=instance.retry_policy_duration
+    )
+
+
+def _get_provisioning_deadline(instance: InstanceModel) -> datetime.datetime:
+    timeout_interval = _get_instance_timeout_interval(backend_type=instance.backend)
+    return instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
+
+
+def _get_instance_timeout_interval(backend_type: BackendType) -> timedelta:
+    if backend_type == BackendType.RUNPOD:
+        return timedelta(seconds=1200)
+    return timedelta(seconds=600)
