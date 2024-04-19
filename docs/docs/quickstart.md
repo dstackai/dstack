@@ -88,9 +88,9 @@ or `train.dstack.yml` are both acceptable).
     image: ghcr.io/huggingface/text-generation-inference:latest
     env:
       - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
-    port: 80
     commands:
-      - text-generation-launcher --port 80 --trust-remote-code
+      - text-generation-launcher --port 8000 --trust-remote-code
+    port: 8000
 
     # (Optional) Configure `gpu`, `memory`, `disk`, etc
     resources:
@@ -133,5 +133,5 @@ To exclude any files from uploading, use `.gitignore`.
 
 1. Read about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
     [services](concepts/services.md), and [pools](concepts/pools.md) 
-2. Browse [examples](../examples/index.md)
-3. Join the [Discord server](https://discord.gg/u8SmfwPpMd)
+2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md)
+3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

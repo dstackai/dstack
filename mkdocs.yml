@@ -50,7 +50,7 @@ theme:
     #    - navigation.instant
     #    - toc.integrate
     - navigation.sections
-    - navigation.expand
+    #    - navigation.expand
     - navigation.top
     - announce.dismiss
     - navigation.tracking
@@ -72,30 +72,18 @@ plugins:
         color: "#FFFFFF"
         font_family: "Roboto"
 #      debug: true
-      cards_layout_dir: layouts
+      cards_layout_dir: docs/layouts
       cards_layout: custom
   - search
   - redirects:
       redirect_maps:
-        'quickstart.md': 'docs/index.md'
-        'docs/quick-start.md': 'docs/quickstart.md'
-        'docs/guides/projects.md': 'docs/installation/index.md'
-        'docs/configuration/server.md': 'docs/installation/index.md'
-        'guides/clouds.md': 'docs/installation/index.md'
-        'examples/llama-index-weaviate.md': 'examples/llama-index.md'
-        'examples/finetuning-llama-2.md': 'examples/qlora.md'
-        'examples/text-generation-inference.md': 'examples/tgi.md'
-        'examples/stable-diffusion-xl.md': 'examples/sdxl.md'
-        'learn/mixtral.md': 'examples/mixtral.md'
-        'learn/tei.md': 'examples/tei.md'
-        'learn/llama-index.md': 'examples/llama-index.md'
-        'learn/qlora.md': 'examples/qlora.md'
-        'learn/tgi.md': 'examples/tgi.md'
-        'learn/sdxl.md': 'examples/sdxl.md'
-        'learn/vllm.md': 'examples/vllm.md'
-        'docs/guides/dev-environments.md': 'docs/concepts/dev-environments.md'
-        'docs/guides/tasks.md': 'docs/concepts/tasks.md'
-        'docs/guides/services.md': 'docs/concepts/services.md'
+        'examples/tgi.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md'
+        'examples/vllm.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md'
+        'examples/olama.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/olama/README.md'
+        'examples/tae.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/tae/README.md'
+        'examples/infinity.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/infinity/README.md'
+        'examples/qlora.md': 'https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/qlora/README.md'
+        'examples/mixtral.md': 'https://github.com/dstackai/dstack/blob/master/examples/llms/mixtral/README.md'
         'blog/2024/02/08/resources-authentication-and-more.md': 'changelog/posts/0.15.0.md'
         'blog/2024/01/19/openai-endpoints-preview.md': 'changelog/posts/0.14.0.md'
         'blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more.md': 'changelog/posts/0.13.0.md'
@@ -205,24 +193,10 @@ nav:
           - API:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
-  - Examples:
-    - examples/index.md
-    - Deployment:
-        - Text Generation Inference: examples/tgi.md
-        - vLLM: examples/vllm.md
-        - Ollama: examples/ollama.md
-        - Text Embedding Interface: examples/tei.md
-        - SDXL: examples/sdxl.md
-        - Infinity: examples/infinity.md
-    - Fine-tuning:
-        - QLoRA: examples/qlora.md
-    - RAG:
-        - Llama Index: examples/llama-index.md
-    - LLMs:
-        - Mixtral 8x7B: examples/mixtral.md
+  - Examples: https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank
   - Changelog:
       - changelog/index.md
   - Blog:
       - blog/index.md
-  - Discord: https://discord.gg/u8SmfwPpMd
-  - GitHub: https://github.com/dstackai/dstack
+  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
+  - GitHub: https://github.com/dstackai/dstack" target="_blank

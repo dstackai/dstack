@@ -300,6 +300,6 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 
 ## What's next?
 
-1. Check the [Text Generation Inference](../../examples/tgi.md) and [vLLM](../../examples/vllm.md) examples
+1. Check the [Text Generation Inference :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md) and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md) examples
 2. Check the [`.dstack.yml` reference](../reference/dstack.yml/service.md) for more details and examples
-3. Browse [all examples](../../examples/index.md)
+3. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md)

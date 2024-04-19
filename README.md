@@ -9,12 +9,12 @@
 </h1>
 
 <h3 align="center">
-Orchestrate GPU workloads effortlessly
+Orchestrate AI workloads in any cloud
 </h3>
 
 <p align="center">
 <a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> •
-<a href="https://dstack.ai/examples" target="_blank"><b>Examples</b></a> •
+<a href="https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank"><b>Examples</b></a> •
 <a href="https://discord.gg/u8SmfwPpMd" target="_blank"><b>Discord</b></a>
 </p>
 

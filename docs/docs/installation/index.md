@@ -49,7 +49,7 @@ There are two ways to configure AWS: using an access key or using the default cr
 
 === "Access key"
 
-    Create an access key by following the [this guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get).
+    Create an access key by following the [this guide :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get).
     Once you've downloaded the `.csv` file with your IAM user's Access key ID and Secret access key, proceed to 
     configure the backend.
     
@@ -145,7 +145,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
 === "Client secret"
 
-    A client secret can be created using the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+    A client secret can be created using the [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
 
     ```shell
     SUBSCRIPTION_ID=...
@@ -177,7 +177,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
 === "Default credentials"
 
-    Obtain the `subscription_id` and `tenant_id` via the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+    Obtain the `subscription_id` and `tenant_id` via the [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
     
     ```shell
     az account show --query "{subscription_id: id, tenant_id: tenantId}"
@@ -263,10 +263,10 @@ There are two ways to configure GCP: using a service account or using the defaul
 
 === "Service account"
 
-    To create a service account, follow [this guide](https://cloud.google.com/iam/docs/service-accounts-create).
+    To create a service account, follow [this guide :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/service-accounts-create).
     Make sure to grant it the `Service Account User` and `Compute Admin` roles.
     
-    After setting up the service account [create a key](https://cloud.google.com/iam/docs/keys-create-delete) for it 
+    After setting up the service account [create a key :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/keys-create-delete) for it
     and download the corresponding JSON file.
     
     Then go ahead and configure the backend by specifying the downloaded file path.
@@ -331,7 +331,7 @@ There are two ways to configure GCP: using a service account or using the defaul
 
 ### Lambda
 
-Log into your [Lambda Cloud](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
+Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
 button to create a new API key.
 
 Then, go ahead and configure the backend:
@@ -352,7 +352,7 @@ projects:
 
 ### TensorDock
 
-Log into your [TensorDock](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
+Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
 section to create a new authorization key.
 
 Then, go ahead and configure the backend:
@@ -377,7 +377,7 @@ projects:
 
 ### Vast.ai
 
-Log into your [Vast.ai](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
+Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
 API Key.
 
 Then, go ahead and configure the backend:
@@ -401,7 +401,7 @@ projects:
 
 ### CUDO
 
-Log into your [CUDO Compute](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
+Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
 
 Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
 
@@ -422,7 +422,7 @@ projects:
 
 ### RunPod
 
-Log into your [RunPod](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click 
+Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
 the button to create a key.
 
 Then proceed to configuring the backend.
@@ -443,14 +443,14 @@ projects:
 
 !!! warning "NOTE:"
     If you're using a custom Docker image, its entrypoint cannot be anything other than `/bin/bash` or `/bin/sh`. 
-    See the [issue](https://github.com/dstackai/dstack/issues/1137) for more details.
+    See the [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1137) for more details.
 
 !!! info "NOTE:"
     The `runpod` backend supports on-demand instances only. Spot instance support coming soon.
 
 ### DataCrunch
 
-Log into your [DataCrunch](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
+Log into your [DataCrunch :material-arrow-top-right-thin:{ .external }](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
 Then, go ahead and configure the backend:
 
@@ -475,7 +475,7 @@ projects:
 
 ??? info "Prerequisite"
     To use GPUs with Kubernetes, the cluster must be installed with the 
-    [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html).
+    [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html).
     
     [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
 
@@ -615,5 +615,5 @@ Configuration is updated at ~/.dstack/config.yml
 ## What's next?
 
 1. Follow [quickstart](../quickstart.md)
-2. Browse [examples](../../examples/index.md)
-3. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)
+2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md)
+3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

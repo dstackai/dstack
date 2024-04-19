@@ -1,0 +1,11 @@
+type: service
+# This service deploys a "Hello world" Streamlit app
+
+image: python:3.11
+commands:
+  - pip3 install streamlit
+  - streamlit hello
+port: 8501
+
+# Disable authentication
+auth: false

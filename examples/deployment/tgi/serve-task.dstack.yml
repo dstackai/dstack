@@ -1,0 +1,18 @@
+type: task
+# This service runs Llama 2 with TGI
+
+image: ghcr.io/huggingface/text-generation-inference:latest
+env:
+  - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+commands:
+  - text-generation-launcher --port 8000 --trust-remote-code
+port: 8000
+
+resources:
+  gpu: 24GB
+
+# (Optional) Enable the OpenAI-compatible endpoint
+model:
+  format: tgi
+  type: chat
+  name: mistralai/Mistral-7B-Instruct-v0.1

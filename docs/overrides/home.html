@@ -109,10 +109,11 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Orchestrate GPU workloads effortlessly</h1>
+                <h1>Orchestrate AI workloads in any cloud</h1>
 
-                <p>dstack is an open-source orchestration engine for cost-effectively running AI workloads
-                    in the cloud as well as on-premises.</p>
+                <p>
+                    dstack is an open-source orchestration engine for running AI workloads at scale in any cloud or data center, leveraging the open-source ecosystem.
+                </p>
             </div>
 
             <div class="tx-landing__hero_buttons">
@@ -281,106 +282,95 @@
 
         <div class="tx-landing__highlights">
             <div class="tx-landing__highlights_text">
-                <h2>Featured examples</h2>
+                <h2 id="examples">Examples</h2>
+                <!--<p class="tx-landing__bottom_cta_text">
+                    dstack is easy to use with any open-source frameworks and models.
+                </p>-->
             </div>
 
             <div class="tx-landing__highlights_grid">
-                <a href="/examples/mixtral" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/llms/mixtral/README.md" target="_blank" class="feature-cell">
                     <h3>
                         Mixtral 8x7B
                     </h3>
 
                     <p>
-                        Deploy <strong>Mixtral 8x7B</strong> as a service using <strong>vLLM</strong>,
-                        an open-source serving library.
+                        Deploy Mixtral 8x7B as a service using vLLM, an open-source serving library.
                     </p>
 
                     <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
                         <div class="feature-tag">LLMs</div>
                     </div>
                 </a>
 
-                <a href="/examples/tei" class="feature-cell">
-                    <h3>
-                        Text Embeddings Inference
-                    </h3>
-
-                    <p>
-                        Deploy text embeddings models using <strong>Services</strong> and <strong>TEI</strong>,
-                        an open-source text embeddings toolkit by Hugging Face.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Embeddings</div>
-                    </div>
-                </a>
-
-                <a href="/examples/llama-index" class="feature-cell">
-                    <h3>
-                        Llama Index
-                    </h3>
-
-                    <p>
-                        Use <strong>Llama Index</strong> and <strong>Weaviate</strong> to enhance the capabilities
-                        of LLMs with the context of your data.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">RAG</div>
-                    </div>
-                </a>
-
-                <a href="/examples/qlora" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/qlora/README.md" target="_blank" class="feature-cell">
                     <h3>
                         QLoRA
                     </h3>
 
                     <p>
-                        Fine-tune <strong>Llama 2</strong> on a custom dataset, with QLoRA
-                        and your own script, using <strong>Tasks</strong>.
+                        Fine-tune Llama 2 on a custom dataset using the PEFT and TRL,
+                        open-source training libraries.
                     </p>
 
                     <div class="feature-tags">
                         <div class="feature-tag">Fine-tuning</div>
+                        <div class="feature-tag">LLMs</div>
                     </div>
                 </a>
 
-                <a href="/examples/tgi" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md" target="_blank" class="feature-cell">
                     <h3>
                         Text Generation Inference
                     </h3>
 
                     <p>
-                        Deploy LLMs using <strong>Services</strong> and <strong>TGI</strong>, an
-                        open-source serving framework by Hugging Face.
+                        Deploy LLMs using TGI, an open-source serving library.
                     </p>
 
                     <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
                         <div class="feature-tag">LLMs</div>
                     </div>
                 </a>
 
-                <a href="/examples/vllm" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md" target="_blank" class="feature-cell">
                     <h3>
                         vLLM
                     </h3>
 
                     <p>
-                        Deploy LLMs with <strong>Services</strong> and <strong>vLLM</strong>,
-                        an open-source serving library.
+                        Deploy LLMs with vLLM, an open-source serving library.
 
                         <br><br>
                     </p>
 
                     <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
                         <div class="feature-tag">LLMs</div>
+                    </div>
+                </a>
+
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/tei/README.md" target="_blank" class="feature-cell">
+                    <h3>
+                        Text Embeddings Inference
+                    </h3>
+
+                    <p>
+                        Deploy a text embeddings model using TEI, an open-source serving library.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">Embeddings</div>
                     </div>
                 </a>
             </div>
 
             <p>
-                <a href="/examples" target="_blank"
-                   class="md-button md-button-secondary small">Browse all examples
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank"
+                class="md-button md-button-secondary small external">Browse all examples
                 </a>
             </p>
         </div>
@@ -415,7 +405,7 @@
             <div class="tx-landing__plans_cards">
                 <div class="plans_card open_source">
                     <div class="plans_card__title">Open-source</div>
-                    <div class="plans_card__subtitle">Use either your own cloud accounts or your on-premise servers.<br><br><br></div>
+                    <div class="plans_card__subtitle">Self-hosted. Use with your own cloud accounts or bare metals.</div>
 
                     <div class="plans_card__services">
                         <div class="plans_card__service-item">
@@ -461,18 +451,15 @@
                     </div>
 
                     <div class="plans_card__buttons">
-                        <a href="/docs/installation" target="_blank"
-                           class="md-button md-button--primary small">Install open-source</a>
-                        <div class="plans_card__buttons_subtitle">100% open-source and free.</div>
-                    </div>
+                        <a href="/docs/installation"
+                           class="md-button md-button--primary">Install open-source</a>
+                            <div class="plans_card__buttons_subtitle">Always free.</div>
+                        </div>
                 </div>
 
                 <div class="plans_card dstack_sky">
                     <div class="plans_card__title">dstack Sky</div>
-                    <div class="plans_card__subtitle">
-                        Access GPUs at the best rates possible through our cloud marketplace. No need for your own cloud accounts.
-                        <br><br>
-                    </div>
+                    <div class="plans_card__subtitle">Fully-managed by dstack. No cloud account is required.</div>
 
                     <div class="plans_card__services">
                         <div class="plans_card__service-item">
@@ -513,22 +500,57 @@
                     </div>
 
                     <div class="plans_card__buttons">
-                        <a href="https://sky.dstack.ai" target="_blank"
-                           class="md-button md-button--primary sky small">
-                            <span>Sign up for free</span>
+                        <script>
+                            function sign_in_on_click() {
+                                window.open("https://sky.dstack.ai", '_blank').focus();
+                            }
+                        </script>
+                        <a href="javascript:void(0)" onclick="sign_in_on_click()"
+                           class="md-button md-button--primary sky external">
+                            <span>Sign up now</span>
                             <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
                         </a>
-                        <div class="plans_card__buttons_subtitle">Pay per compute. No commission.</div>
+                        <div class="plans_card__buttons_subtitle">Best GPU prices. No commision.</div>
                     </div>
+                </div>
+
+                <div class="plans_card enterprise">
+                    <div class="plans_card__title">Enterprise</div>
+                    <div class="plans_card__subtitle">Self-hosted. The open-source features, plus security, compliance, and more.</div>
+
+                    <div class="plans_card__services">
+                        <div class="plans_card__service-item">
+                            <img width="38" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                                style="padding-top: 5px">
+                            <div class="plans_card__service-name">Amazon Web Services</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="24" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <div class="plans_card__service-name">Azure</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="30" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">Google Cloud Platform</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="24" height="24" src="/assets/images/kubernetes-logo.svg" title="Kubernetes">
+                            <div class="plans_card__service-name">Kubernetes</div>
+                        </div>
+                    </div>
+
+                    <div class="plans_card__buttons">
+                        <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
+                        class="md-button md-button-secondary external">Book a demo</a>
+                            <div class="plans_card__buttons_subtitle">Contact us for pricing.</div>
+                        </div>
                 </div>
             </div>
         </div>
 
-        <div>
-            <p style="font-size: 90%; font-weight: 600">Looking for the enterprise version? Contact <a href="mailto:hello@dstack.ai">our sales</a>.
-            </p>
-        </div>
-
+        <!--
         <div class="tx-faq">
             <div class="tx-landing__highlights_text">
                 <h2>FAQ</h2>
@@ -557,19 +579,20 @@
                 </div>
             </div>
         </div>
+        -->
 
         <div class="tx-landing__bottom_cta">
             <div class="tx-landing__highlights_text">
                 <h2>Community</h2>
-                <!--<p class="tx-landing__bottom_cta_text">
-                    Need help, have questions, or simply want to stay updated?
-                </p>-->
+                <p class="tx-landing__bottom_cta_text">
+                    Got questions, need help, or want to stay updated?
+                </p>
 
                 <!--<a href="/docs" class="md-button md-button-secondary">
                     <span>Documentation</span>
                 </a>-->
 
-                <a href="https://discord.gg/u8SmfwPpMd" class="md-button md-button-secondary discord">
+                <a href="https://discord.gg/u8SmfwPpMd" class="md-button md-button-secondary discord external">
                     Join Discord
                 </a>
             </div>

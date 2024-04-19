@@ -1,0 +1,6 @@
+type: dev-environment
+# This configuration launches a blank dev environment
+
+python: "3.11"
+
+ide: vscode

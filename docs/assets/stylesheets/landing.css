@@ -196,22 +196,22 @@
 }
 
 .md-typeset .md-button {
-    min-width: 200px;
+    min-width: 225px;
     padding: 0.55em 2em;
-    font-size: 21px;
+    font-size: 20px;
 }
 
 .md-typeset .md-button.small {
-    min-width: 175px;
-    padding: 0.6em 2em;
-    font-size: 20px;
+    min-width: 150px;
+    padding: 0.5em 1.9em;
+    font-size: 19px;
 }
 
 .md-typeset .md-button {
     vertical-align: middle;
 }
 
-.md-typeset .md-button--primary:hover {
+.md-typeset .md-button-secondary:hover, .md-typeset .md-button--primary:hover {
     transform: translateY(-2px);
     transition: opacity .2s ease,transform .2s ease;
 }
@@ -225,12 +225,17 @@
     transition: opacity .2s ease,transform .2s ease;
 }
 
-.md-typeset .md-button--primary:hover .icon {
+.md-typeset .md-button-secondary .icon, .md-typeset .md-button--primary .icon {
+    color: #a91ffe;
+}
+.md-typeset .md-button-secondary:hover .icon, .md-typeset .md-button--primary:hover .icon {
+    color: #a91ffe;
     transform: translateX(3px)
 }
 
-.md-header__buttons .md-button--primary, .md-header__buttons .md-button--primary:hover,
-.md-typeset .md-button--primary, .md-typeset .md-button--primary:hover {
+
+[data-md-color-primary=white] .md-header__buttons .md-button--primary, [data-md-color-primary=white].md-header__buttons .md-button--primary:hover,
+[data-md-color-primary=white] .md-typeset .md-button--primary, [data-md-color-primary=white] .md-typeset .md-button--primary:hover {
     background: rgba(0, 0, 0, 0.87);
     border: 1.5px solid black;
     border-radius: 1px;
@@ -240,6 +245,24 @@
 .md-header__buttons .md-button-secondary {
     font-weight: 400 !important;
     white-space: nowrap;
+}
+
+.md-button-secondary.external:after {
+    content: url('data:image/svg+xml,<svg fill="rgba(138, 5, 220, 1)" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
+    line-height: 14px;
+    margin-left: 5px;
+    position: relative;
+    top: 3px;
+    margin-right: -7px;
+}
+
+.md-button--primary.sky.external:after {
+    content: url('data:image/svg+xml,<svg fill="white" xmlns="http://www.w3.org/2000/svg" width="21px" height="21px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
+    line-height: 14px;
+    margin-left: 5px;
+    position: relative;
+    top: 2px;
+    margin-right: -7px;
 }
 
 .md-header__buttons .md-button-secondary,
@@ -334,15 +357,17 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 9px 18px;
-    border-radius: 3px;
-    font-size: 0.9em;
+    padding: 11px 20px;
+    font-size: 0.85em;
     font-weight: 400;
     line-height: 1.44;
     color: black;
-    margin-top: 10px;
-    border: 0.5px solid black;
+    margin-top: 20px;
     margin-right: 10px;
+    border-radius: 0;
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-width: 0.75px;
+    border-style: solid;
 }
 
 .tx-landing__highlights_grid > a, .tx-landing__highlights_grid > a:hover {
@@ -389,6 +414,8 @@
     grid-gap: 2rem;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    padding-top: 40px;
+    padding-bottom: 20px;
 }
 
 .tx-landing__highlights_grid .feature-icon svg {
@@ -406,10 +433,10 @@
 }
 
 .tx-landing__highlights_grid h3 {
-    font-size: 1.3em;
+    font-size: 1.2em;
     font-weight: 800;
     border-bottom: none;
-    padding-bottom: 0.1em;
+    padding-bottom: 0.2em;
     margin-top: 0;
 }
 
@@ -444,12 +471,12 @@
 }
 
 .tx-landing__major_feature {
-    font-size: 1.05em;
+    font-size: 1.025em;
     margin-top: 5em;
 }
 
 .tx-landing__bottom_cta_text {
-    font-size: 1.1em;
+    font-size: 0.95em;
     max-width: 500px;
 }
 
@@ -630,9 +657,18 @@
     border: 1px solid transparent;
 }
 
+.plans_card.open_source {
+}
+
 .plans_card.dstack_sky {
-    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.015), rgba(0, 42, 255, 0.015), rgba(225, 101, 254, 0.025));
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.0125), rgba(0, 42, 255, 0.0125), rgba(225, 101, 254, 0.0225));
     border-color: #0048ff;
+    border-image: none;
+}
+
+.plans_card.enterprise {
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.0125), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.07));
+    border-color: #8587e2;
     border-image: none;
 }
 
@@ -645,35 +681,36 @@
     border-radius: 0;
     border-width: 0.5px;
     border-style: solid;
-    padding: 38px 20px 38px 46px
+    padding: 38px 28px 38px 46px
 }
 
 .plans_card__title {
-    margin-bottom: 0.9rem;
+    margin-bottom: 0.7rem;
     font-size: 1.5em;
     font-weight: 800;
     line-height: 1.33;
 }
 
 .plans_card__subtitle {
-    margin-bottom: 1.4rem;
-    font-size: 0.96em;
+    margin-bottom: 1.2rem;
+    font-size: 0.9em;
     line-height: 1.44;
     color: black;
 }
 
 .plans_card__buttons_subtitle {
-    margin-top: 10px;
-    margin-left: 10px;
+    margin-top: 18px;
+    margin-left: 5px;
     color: #202128;
-    font-size: 0.6rem;
+    font-size: 0.65rem;
+    line-height: 22px;
 }
 
 .plans_card__services {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-bottom: 2.4rem;
+    margin-bottom: 1.8rem;
 }
 
 .plans_card__service-item {
@@ -683,7 +720,7 @@
     padding: 7px 16px;
     border-radius: 30px;
     border: 0.5px solid black;
-    font-size: .88em;
+    font-size: .85em;
     line-height: 1.44;
     color: #2A292D;
 }

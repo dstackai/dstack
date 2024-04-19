@@ -1,0 +1,18 @@
+type: task
+# This task fine-tunes Llama 2 with QLoRA. Learn more at https://dstack.ai/examples/qlora/
+
+python: "3.11"
+
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - tensorboard --logdir results/runs &
+  - python fine-tuning/qlora/train.py --merge_and_push ${{ run.args }}
+ports:
+  - 6006
+
+resources:
+  gpu: 16GB..24GB
