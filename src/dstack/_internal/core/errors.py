@@ -86,19 +86,15 @@ class ComputeError(BackendError):
     pass
 
 
-class RunContainerError(BackendError):
-    pass
-
-
-class ContainerTimeoutError(BackendError):
-    pass
-
-
 class NoCapacityError(ComputeError):
     pass
 
 
-class ResourceNotFoundError(ComputeError):
+class ProvisioningError(ComputeError):
+    pass
+
+
+class ComputeResourceNotFoundError(ComputeError):
     pass
 
 

@@ -13,6 +13,7 @@ from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
+    InstanceStatus,
     Job,
     JobSpec,
     JobStatus,
@@ -99,6 +100,13 @@ async def _process_job(job_id: UUID):
         run = run_model_to_run(run_model)
         job_submission = job_model_to_job_submission(job_model)
         job_provisioning_data = job_submission.job_provisioning_data
+        if job_provisioning_data is None:
+            logger.error("%s: job_provisioning_data of an active job is None", fmt(job_model))
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            return
+
         job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
 
         # Wait until all other jobs in the replica are provisioned
@@ -122,63 +130,65 @@ async def _process_job(job_id: UUID):
         repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
 
         initial_status = job_model.status
-        if (
-            initial_status == JobStatus.PROVISIONING
-        ):  # fails are acceptable until timeout is exceeded
-            if job_provisioning_data.dockerized:
-                logger.debug(
-                    "%s: process provisioning job with shim, age=%s",
-                    fmt(job_model),
-                    job_submission.age,
-                )
-                success = await run_async(
-                    _process_provisioning_with_shim,
-                    server_ssh_private_key,
-                    job_provisioning_data,
-                    job_model,
-                    secrets,
-                    job.job_spec.registry_auth,
-                )
+        if initial_status == JobStatus.PROVISIONING:
+            if job_provisioning_data.hostname is None:
+                await _wait_for_instance_provisioning_data(job_model=job_model)
             else:
-                logger.debug(
-                    "%s: process provisioning job without shim, age=%s",
-                    fmt(job_model),
-                    job_submission.age,
-                )
-                code = await _get_job_code(
-                    session=session,
-                    project=project,
-                    repo=repo_model,
-                    code_hash=run.run_spec.repo_code_hash,
-                )
-                success = await run_async(
-                    _process_provisioning_no_shim,
-                    server_ssh_private_key,
-                    job_provisioning_data,
-                    run,
-                    job_model,
-                    job,
-                    cluster_info,
-                    code,
-                    secrets,
-                    repo_creds,
-                )
-
-            if not success:
-                # check timeout
-                if job_submission.age > _get_runner_timeout_interval(
-                    job_provisioning_data.backend
-                ):
-                    logger.warning(
-                        "%s: failed because runner has not become available in time, age=%s",
+                # fails are acceptable until timeout is exceeded
+                if job_provisioning_data.dockerized:
+                    logger.debug(
+                        "%s: process provisioning job with shim, age=%s",
                         fmt(job_model),
                         job_submission.age,
                     )
-                    job_model.status = JobStatus.TERMINATING
-                    job_model.termination_reason = (
-                        JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+                    success = await run_async(
+                        _process_provisioning_with_shim,
+                        server_ssh_private_key,
+                        job_provisioning_data,
+                        job_model,
+                        secrets,
+                        job.job_spec.registry_auth,
                     )
-                    # instance will be emptied by process_terminating_jobs
+                else:
+                    logger.debug(
+                        "%s: process provisioning job without shim, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
+                    )
+                    code = await _get_job_code(
+                        session=session,
+                        project=project,
+                        repo=repo_model,
+                        code_hash=run.run_spec.repo_code_hash,
+                    )
+                    success = await run_async(
+                        _process_provisioning_no_shim,
+                        server_ssh_private_key,
+                        job_provisioning_data,
+                        run,
+                        job_model,
+                        job,
+                        cluster_info,
+                        code,
+                        secrets,
+                        repo_creds,
+                    )
+
+                if not success:
+                    # check timeout
+                    if job_submission.age > _get_runner_timeout_interval(
+                        job_provisioning_data.backend
+                    ):
+                        logger.warning(
+                            "%s: failed because runner has not become available in time, age=%s",
+                            fmt(job_model),
+                            job_submission.age,
+                        )
+                        job_model.status = JobStatus.TERMINATING
+                        job_model.termination_reason = (
+                            JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+                        )
+                        # instance will be emptied by process_terminating_jobs
 
         else:  # fails are not acceptable
             if initial_status == JobStatus.PULLING:
@@ -246,6 +256,33 @@ async def _process_job(job_id: UUID):
 
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
+
+
+async def _wait_for_instance_provisioning_data(job_model: JobModel):
+    """
+    This function will be called until instance IP address appears
+    in `job_model.instance.job_provisioning_data` or instance is terminated on timeout.
+    """
+    if job_model.instance is None:
+        logger.error(
+            "%s: cannot update job_provisioning_data. job_model.instance is None.",
+            fmt(job_model),
+        )
+        return
+    if job_model.instance.job_provisioning_data is None:
+        logger.error(
+            "%s: cannot update job_provisioning_data. job_model.job_provisioning_data is None.",
+            fmt(job_model),
+        )
+        return
+
+    if job_model.instance.status == InstanceStatus.TERMINATED:
+        job_model.status = JobStatus.TERMINATING
+        # TODO use WAITING_INSTANCE_LIMIT_EXCEEDED after 0.19.x
+        job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        return
+
+    job_model.job_provisioning_data = job_model.instance.job_provisioning_data
 
 
 @runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT], retries=1)

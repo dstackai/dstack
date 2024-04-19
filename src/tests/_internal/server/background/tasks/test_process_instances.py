@@ -9,15 +9,19 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
-    LaunchedInstanceInfo,
     Resources,
 )
 from dstack._internal.core.models.profiles import Profile, TerminationPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobStatus, RetryPolicy
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobProvisioningData,
+    JobStatus,
+    RetryPolicy,
+)
 from dstack._internal.server.background.tasks.process_instances import (
     HealthStatus,
     process_instances,
-    terminate_idle_instance,
+    terminate_idle_instances,
 )
 from dstack._internal.server.background.tasks.process_instances import (
     create_instance as task_create_instance,
@@ -231,7 +235,7 @@ class TestIdleTime:
         with patch(
             "dstack._internal.server.background.tasks.process_instances.terminate_job_provisioning_data_instance"
         ):
-            await terminate_idle_instance()
+            await terminate_idle_instances()
 
         await session.refresh(instance)
 
@@ -279,9 +283,7 @@ class TestCreateInstance:
     async def test_create_instance(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         pool = await create_pool(session, project)
-
         instance = await create_instance(session, project, pool)
-
         with patch(
             "dstack._internal.server.background.tasks.process_instances.get_create_instance_offers"
         ) as get_create_instance_offers:
@@ -299,20 +301,24 @@ class TestCreateInstance:
             backend_mock = Mock()
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = [offer]
-            backend_mock.compute.return_value.create_instance.return_value = LaunchedInstanceInfo(
+            backend_mock.compute.return_value.create_instance.return_value = JobProvisioningData(
+                backend=offer.backend,
+                instance_type=offer.instance,
                 instance_id="instance_id",
-                region="us",
-                ip_address="1.1.1.1",
+                hostname="1.1.1.1",
+                internal_ip=None,
+                region=offer.region,
+                price=offer.price,
                 username="ubuntu",
                 ssh_port=22,
+                ssh_proxy=None,
                 dockerized=True,
+                backend_data=None,
             )
             get_create_instance_offers.return_value = [(backend_mock, offer)]
-
             await task_create_instance(instance_id=instance.id)
 
         await session.refresh(instance)
-
         assert instance.status == InstanceStatus.PROVISIONING
 
     @pytest.mark.asyncio
@@ -323,13 +329,10 @@ class TestCreateInstance:
         instance = await create_instance(
             session, project, pool, profile=profile, status=InstanceStatus.TERMINATING
         )
-
         await task_create_instance(instance_id=instance.id)
-
         await session.refresh(instance)
-
         assert instance.status == InstanceStatus.TERMINATED
-        assert instance.termination_reason == "The retry's duration expired"
+        assert instance.termination_reason == "Retry duration expired"
 
     @pytest.mark.asyncio
     async def test_retry_delay(self, test_db, session: AsyncSession):
@@ -344,13 +347,10 @@ class TestCreateInstance:
             profile=profile,
             status=InstanceStatus.TERMINATING,
         )
-
         last_retry = get_current_datetime() - dt.timedelta(seconds=10)
         instance.last_retry_at = last_retry
         session.add(instance)
         await session.commit()
-
         await task_create_instance(instance_id=instance.id)
         await session.refresh(instance)
-
         assert instance.last_retry_at.replace(tzinfo=dt.timezone.utc) == last_retry

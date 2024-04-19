@@ -15,7 +15,7 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.gcp.config import GCPConfig
-from dstack._internal.core.errors import NoCapacityError, ResourceNotFoundError
+from dstack._internal.core.errors import ComputeResourceNotFoundError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -24,11 +24,10 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
     LaunchedGatewayInfo,
-    LaunchedInstanceInfo,
     Resources,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 
 
 class GCPCompute(Compute):
@@ -91,7 +90,7 @@ class GCPCompute(Compute):
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_name = instance_config.instance_name
 
         authorized_keys = instance_config.get_public_keys()
@@ -140,11 +139,14 @@ class GCPCompute(Compute):
             instance = self.instances_client.get(
                 project=self.config.project_id, zone=zone, instance=instance_name
             )
-            return LaunchedInstanceInfo(
+            return JobProvisioningData(
+                backend=instance_offer.backend,
+                instance_type=instance_offer.instance,
                 instance_id=instance_name,
-                region=instance_offer.region,
-                ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
+                hostname=instance.network_interfaces[0].access_configs[0].nat_i_p,
                 internal_ip=instance.network_interfaces[0].network_i_p,
+                region=instance_offer.region,
+                price=instance_offer.price,
                 username="ubuntu",
                 ssh_port=22,
                 dockerized=True,
@@ -160,7 +162,7 @@ class GCPCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
@@ -171,8 +173,7 @@ class GCPCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
-        launched_instance_info = self.create_instance(instance_offer, instance_config)
-        return launched_instance_info
+        return self.create_instance(instance_offer, instance_config)
 
     def create_gateway(
         self,
@@ -191,7 +192,7 @@ class GCPCompute(Compute):
                 zone = i.zones[0].split("/")[-1]
                 break
         else:
-            raise ResourceNotFoundError()
+            raise ComputeResourceNotFoundError()
 
         request = compute_v1.InsertInstanceRequest()
         request.zone = zone

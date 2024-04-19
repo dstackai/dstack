@@ -7,17 +7,15 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.datacrunch.api_client import DataCrunchAPIClient
 from dstack._internal.core.backends.datacrunch.config import DataCrunchConfig
-from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    LaunchedInstanceInfo,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger("datacrunch.compute")
@@ -68,7 +66,7 @@ class DataCrunchCompute(Compute):
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         public_keys = instance_config.get_public_keys()
         ssh_ids = []
         for ssh_public_key in public_keys:
@@ -122,22 +120,20 @@ class DataCrunchCompute(Compute):
             },
         )
 
-        running_instance = self.api_client.wait_for_instance(instance.id)
-        if running_instance is None:
-            raise ComputeError(f"Wait instance {instance.id!r} timeout")
-
-        launched_instance = LaunchedInstanceInfo(
-            instance_id=running_instance.id,
-            ip_address=running_instance.ip,
-            region=running_instance.location,
-            ssh_port=22,
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
+            instance_id=instance.id,
+            hostname=None,
+            internal_ip=None,
+            region=instance.location,
+            price=instance_offer.price,
             username="root",
+            ssh_port=22,
             dockerized=True,
             ssh_proxy=None,
             backend_data=None,
         )
-
-        return launched_instance
 
     def run_job(
         self,
@@ -146,7 +142,7 @@ class DataCrunchCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=job.job_spec.job_name,  # TODO: generate name
@@ -157,10 +153,17 @@ class DataCrunchCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
-        launched_instance_info = self.create_instance(instance_offer, instance_config)
-        return launched_instance_info
+        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
         self.api_client.delete_instance(instance_id)
+
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+    ):
+        instance = self.api_client.get_instance_by_id(provisioning_data.instance_id)
+        if instance is not None and instance.status == "running":
+            provisioning_data.hostname = instance.ip

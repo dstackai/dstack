@@ -1,4 +1,3 @@
-import time
 from typing import Optional
 
 from datacrunch import DataCrunchClient
@@ -47,16 +46,6 @@ class DataCrunchAPIClient:
             return self.client.instances.get_by_id(instance_id)
         except APIException:
             return None
-
-    def wait_for_instance(self, instance_id: str) -> Optional[Instance]:
-        WAIT_FOR_INSTANCE_ATTEMPTS = 60
-        WAIT_FOR_INSTANCE_INTERVAL = 10
-        for _ in range(WAIT_FOR_INSTANCE_ATTEMPTS):
-            instance = self.get_instance_by_id(instance_id)
-            if instance is not None and instance.status == "running":
-                return instance
-            time.sleep(WAIT_FOR_INSTANCE_INTERVAL)
-        return
 
     def deploy_instance(
         self,

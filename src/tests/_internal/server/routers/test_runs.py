@@ -14,13 +14,13 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
-    LaunchedInstanceInfo,
     Resources,
     SSHKey,
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
+    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobTerminationReason,
@@ -917,13 +917,19 @@ class TestCreateInstance:
             )
             backend = Mock()
             backend.compute.return_value.get_offers.return_value = [offer]
-            backend.compute.return_value.create_instance.return_value = LaunchedInstanceInfo(
+            backend.compute.return_value.create_instance.return_value = JobProvisioningData(
+                backend=offer.backend,
+                instance_type=offer.instance,
                 instance_id="test_instance",
-                region="eu",
-                ip_address="127.0.0.1",
+                hostname="1.1.1.1",
+                internal_ip=None,
+                region=offer.region,
+                price=offer.price,
                 username="ubuntu",
                 ssh_port=22,
-                dockerized=False,
+                ssh_proxy=None,
+                dockerized=True,
+                backend_data=None,
             )
             backend.TYPE = BackendType.AWS
             run_plan_by_req.return_value = [(backend, offer)]

@@ -1,8 +1,6 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import Field
-
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.configurations import RegistryAuth
@@ -73,18 +71,6 @@ class InstanceConfiguration(CoreModel):
 
     def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]
-
-
-class LaunchedInstanceInfo(CoreModel):
-    instance_id: str
-    region: str
-    ip_address: str
-    internal_ip: Optional[str] = None
-    username: str
-    ssh_port: int  # could be different from 22 for some backends
-    dockerized: bool  # True if backend starts shim
-    ssh_proxy: Optional[SSHConnectionParams] = Field(default=None)
-    backend_data: Optional[str] = Field(default=None)  # backend-specific data in json
 
 
 class InstanceRuntime(Enum):

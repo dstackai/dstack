@@ -10,7 +10,7 @@ import sqlalchemy.orm as sa_orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.gateways as gateways
-from dstack._internal.core.errors import ResourceNotFoundError, SSHError
+from dstack._internal.core.errors import ComputeResourceNotFoundError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ConfigurationType
 from dstack._internal.core.models.runs import (
@@ -100,7 +100,7 @@ def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
     for job in jobs:
         if job.job_spec.replica_num == replica_num and job.job_spec.job_num == job_num:
             return job
-    raise ResourceNotFoundError(
+    raise ComputeResourceNotFoundError(
         f"Job with replica_num={replica_num} and job_num={job_num} not found"
     )
 

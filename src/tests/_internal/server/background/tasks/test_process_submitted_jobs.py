@@ -11,11 +11,15 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceType,
-    LaunchedInstanceInfo,
     Resources,
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, ProfileRetryPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobStatus, JobTerminationReason
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobProvisioningData,
+    JobStatus,
+    JobTerminationReason,
+)
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
 from dstack._internal.server.models import JobModel
 from dstack._internal.server.services.pools import (
@@ -90,13 +94,19 @@ class TestProcessSubmittedJobs:
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = [offer]
-            backend_mock.compute.return_value.run_job.return_value = LaunchedInstanceInfo(
+            backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
+                backend=offer.backend,
+                instance_type=offer.instance,
                 instance_id="instance_id",
-                region="us",
-                ip_address="1.1.1.1",
+                hostname="1.1.1.1",
+                internal_ip=None,
+                region=offer.region,
+                price=offer.price,
                 username="ubuntu",
                 ssh_port=22,
+                ssh_proxy=None,
                 dockerized=True,
+                backend_data=None,
             )
             await process_submitted_jobs()
             m.assert_called_once()

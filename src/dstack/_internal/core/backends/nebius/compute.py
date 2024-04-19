@@ -21,10 +21,9 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    LaunchedInstanceInfo,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 
 MEGABYTE = 1024**2
 INSTANCE_PULL_INTERVAL = 10
@@ -55,7 +54,7 @@ class NebiusCompute(Compute):
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         cuda = len(instance_offer.instance.resources.gpus) > 0
         security_group_id = self._get_security_group_id(project_name=instance_config.project_name)
         subnet_id = self._get_subnet_id(zone=instance_offer.region)
@@ -97,12 +96,16 @@ class NebiusCompute(Compute):
         except Exception:
             self.terminate_instance(instance_id, instance_offer.region)
             raise
-        return LaunchedInstanceInfo(
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
             instance_id=instance_id,
-            ip_address=instance["networkInterfaces"][0]["primaryV4Address"]["oneToOneNat"][
+            hostname=instance["networkInterfaces"][0]["primaryV4Address"]["oneToOneNat"][
                 "address"
             ],
+            internal_ip=None,
             region=instance_offer.region,
+            price=instance_offer.price,
             username="ubuntu",
             ssh_port=22,
             dockerized=True,
@@ -117,7 +120,7 @@ class NebiusCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
@@ -128,9 +131,7 @@ class NebiusCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
-
-        launched_instance_info = self.create_instance(instance_offer, instance_config)
-        return launched_instance_info
+        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None

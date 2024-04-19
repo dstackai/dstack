@@ -25,10 +25,9 @@ from dstack._internal.core.models.instances import (
     InstanceOffer,
     InstanceOfferWithAvailability,
     LaunchedGatewayInfo,
-    LaunchedInstanceInfo,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -101,7 +100,7 @@ class AWSCompute(Compute):
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         project_name = instance_config.project_name
         ec2 = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
@@ -150,11 +149,14 @@ class AWSCompute(Compute):
                 ec2_client.cancel_spot_instance_requests(
                     SpotInstanceRequestIds=[instance.spot_instance_request_id]
                 )
-            return LaunchedInstanceInfo(
+            return JobProvisioningData(
+                backend=instance_offer.backend,
+                instance_type=instance_offer.instance,
                 instance_id=instance.instance_id,
-                ip_address=instance.public_ip_address,
+                hostname=instance.public_ip_address,
                 internal_ip=instance.private_ip_address,
                 region=instance_offer.region,
+                price=instance_offer.price,
                 username="ubuntu",
                 ssh_port=22,
                 dockerized=True,  # because `dstack-shim docker` is used
@@ -172,7 +174,7 @@ class AWSCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
@@ -183,8 +185,7 @@ class AWSCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
-        launched_instance_info = self.create_instance(instance_offer, instance_config)
-        return launched_instance_info
+        return self.create_instance(instance_offer, instance_config)
 
     def create_gateway(
         self,
@@ -192,7 +193,7 @@ class AWSCompute(Compute):
         ssh_key_pub: str,
         region: str,
         project_id: str,
-    ) -> LaunchedGatewayInfo:
+    ) -> JobProvisioningData:
         ec2 = self.session.resource("ec2", region_name=region)
         ec2_client = self.session.client("ec2", region_name=region)
         tags = [

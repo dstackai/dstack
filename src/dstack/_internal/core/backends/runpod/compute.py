@@ -9,18 +9,15 @@ from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
 from dstack._internal.core.errors import (
     BackendError,
-    ContainerTimeoutError,
-    RunContainerError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    LaunchedInstanceInfo,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -53,7 +50,7 @@ class RunpodCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),
@@ -81,30 +78,17 @@ class RunpodCompute(Compute):
             docker_args=get_docker_args(authorized_keys),
             ports="10022/tcp",
         )
-
         instance_id = resp["id"]
-        # Wait until VM State is Active. This is necessary to get the ip_address.
-        pod = self.api_client.wait_for_instance(instance_id)
-        if pod is None:
-            self.terminate_instance(instance_id, region="")
-            raise ContainerTimeoutError(f"Wait instance {instance_id} timeout")
-
-        if pod["runtime"].get("ports") is None:
-            self.terminate_instance(instance_id, region="")
-            raise RunContainerError(f"The instance {instance_id} failed to start")
-
-        for port in pod["runtime"]["ports"]:
-            if port["privatePort"] == 10022:
-                ip = port["ip"]
-                publicPort = port["publicPort"]
-                break
-
-        return LaunchedInstanceInfo(
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
             instance_id=instance_id,
-            ip_address=ip.strip(),
+            hostname=None,
+            internal_ip=None,
             region=instance_offer.region,
+            price=instance_offer.price,
             username="root",
-            ssh_port=int(publicPort),
+            ssh_port=None,
             dockerized=False,
             ssh_proxy=None,
             backend_data=None,
@@ -120,6 +104,22 @@ class RunpodCompute(Compute):
                 logger.debug("The instance with name %s not found", instance_id)
                 return
             raise
+
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+    ):
+        instance_id = provisioning_data.instance_id
+        pod = self.api_client.get_pod(instance_id)
+        if pod is None or pod["runtime"] is None:
+            return
+        ports = pod["runtime"].get("ports")
+        if ports is None:
+            return
+        for port in pod["runtime"]["ports"]:
+            if port["privatePort"] == 10022:
+                provisioning_data.hostname = port["ip"]
+                provisioning_data.ssh_port = port["publicPort"]
 
 
 def get_docker_args(authorized_keys):

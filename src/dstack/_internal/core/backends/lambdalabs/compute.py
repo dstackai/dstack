@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 import time
 from threading import Thread
-from typing import Dict, List, Optional, Tuple, cast
+from typing import Dict, List, Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -22,10 +22,9 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    LaunchedInstanceInfo,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 
 _SHIM_CONFIG_FILEPATH = "/home/ubuntu/.dstack/config.json"
 
@@ -53,7 +52,7 @@ class LambdaCompute(Compute):
 
     def create_instance(
         self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
         # shim is asssumed to be run under root
         launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"
@@ -75,15 +74,56 @@ class LambdaCompute(Compute):
         if user_ssh_key is None:
             user_ssh_key = setup_ssh_key
 
-        return _run_instance(
+        user_ssh_public_key = user_ssh_key.public
+        project_ssh_private_key = setup_ssh_key.private
+        project_ssh_public_key = setup_ssh_key.public
+
+        _, project_key_name = _add_ssh_keys(
             api_client=self.api_client,
-            region=instance_offer.region,
+            user_ssh_public_key=user_ssh_public_key,
+            project_ssh_public_key=project_ssh_public_key,
+        )
+        instances_ids = self.api_client.launch_instances(
+            region_name=instance_offer.region,
             instance_type_name=instance_offer.instance.name,
-            user_ssh_public_key=user_ssh_key.public,
-            project_ssh_public_key=setup_ssh_key.public,
-            project_ssh_private_key=cast(str, setup_ssh_key.private),
-            instance_name=instance_config.instance_name,
-            launch_command=launch_command,
+            ssh_key_names=[project_key_name],
+            name=instance_config.instance_name,
+            quantity=1,
+            file_system_names=[],
+        )
+        instance_id = instances_ids[0]
+        # TODO remove waiting
+        instance_info = _wait_for_instance(self.api_client, instance_id)
+
+        if instance_info is None:
+            raise BackendError("Didn't receive instance_info response in time")
+
+        thread = Thread(
+            target=_start_runner,
+            kwargs={
+                "hostname": instance_info["ip"],
+                "project_ssh_private_key": project_ssh_private_key,
+                "user_ssh_public_key": user_ssh_public_key,
+                "config": _ShimConfig(instance_id=instance_id, api_key=self.api_client.api_key),
+                "launch_command": launch_command,
+            },
+            daemon=True,
+        )
+        thread.start()
+
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
+            instance_id=instance_id,
+            hostname=instance_info["ip"],
+            internal_ip=None,
+            region=instance_offer.region,
+            price=instance_offer.price,
+            username="ubuntu",
+            ssh_port=22,
+            dockerized=True,
+            ssh_proxy=None,
+            backend_data=None,
         )
 
     def run_job(
@@ -93,7 +133,7 @@ class LambdaCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
@@ -106,9 +146,7 @@ class LambdaCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
-
-        launched_instance_info = self.create_instance(instance_offer, instance_config)
-        return launched_instance_info
+        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
@@ -135,60 +173,6 @@ class LambdaCompute(Compute):
                 InstanceOfferWithAvailability(**offer.dict(), availability=availability)
             )
         return availability_offers
-
-
-def _run_instance(
-    api_client: LambdaAPIClient,
-    region: str,
-    instance_type_name: str,
-    user_ssh_public_key: str,
-    project_ssh_public_key: str,
-    project_ssh_private_key: str,
-    instance_name: str,
-    launch_command: str,
-) -> LaunchedInstanceInfo:
-    _, project_key_name = _add_ssh_keys(
-        api_client=api_client,
-        user_ssh_public_key=user_ssh_public_key,
-        project_ssh_public_key=project_ssh_public_key,
-    )
-    instances_ids = api_client.launch_instances(
-        region_name=region,
-        instance_type_name=instance_type_name,
-        ssh_key_names=[project_key_name],
-        name=instance_name,
-        quantity=1,
-        file_system_names=[],
-    )
-    instance_id = instances_ids[0]
-    instance_info = _wait_for_instance(api_client, instance_id)
-
-    if instance_info is None:
-        raise BackendError("Didn't receive instance_info response")
-
-    thread = Thread(
-        target=_start_runner,
-        kwargs={
-            "hostname": instance_info["ip"],
-            "project_ssh_private_key": project_ssh_private_key,
-            "user_ssh_public_key": user_ssh_public_key,
-            "config": _ShimConfig(instance_id=instance_id, api_key=api_client.api_key),
-            "launch_command": launch_command,
-        },
-        daemon=True,
-    )
-    thread.start()
-
-    return LaunchedInstanceInfo(
-        instance_id=instance_id,
-        ip_address=instance_info["ip"],
-        region=region,
-        username="ubuntu",
-        ssh_port=22,
-        dockerized=True,
-        ssh_proxy=None,
-        backend_data=None,
-    )
 
 
 def _add_ssh_keys(

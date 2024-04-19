@@ -1,8 +1,6 @@
-import time
 from typing import List, Optional
 
 import gpuhunt
-import requests
 from gpuhunt.providers.vastai import VastAIProvider
 
 from dstack._internal.core.backends.base import Compute
@@ -10,21 +8,17 @@ from dstack._internal.core.backends.base.compute import get_docker_commands, get
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.vastai.api_client import VastAIAPIClient
 from dstack._internal.core.backends.vastai.config import VastAIConfig
-from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
     InstanceRuntime,
-    LaunchedInstanceInfo,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-_WAIT_FOR_INSTANCE_ATTEMPTS = 30
-_WAIT_FOR_INSTANCE_INTERVAL = 5
 
 
 class VastAICompute(Compute):
@@ -71,7 +65,7 @@ class VastAICompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
@@ -85,34 +79,16 @@ class VastAICompute(Compute):
             registry_auth=registry_auth,
         )
         instance_id = resp["new_contract"]
-        try:
-            for _ in range(_WAIT_FOR_INSTANCE_ATTEMPTS):
-                resp = self.api_client.get_instance(instance_id)
-                if resp is not None:
-                    if resp["actual_status"] == "running":
-                        break
-                    if (
-                        resp["actual_status"] == "created"
-                        and ": OCI runtime create failed:" in resp["status_msg"]
-                    ):
-                        raise ComputeError(resp["status_msg"])
-                    logger.debug(
-                        "Waiting %s: %s",
-                        instance_id,
-                        {k: v for k, v in resp.items() if "stat" in k},
-                    )
-                time.sleep(_WAIT_FOR_INSTANCE_INTERVAL)
-            else:
-                raise ComputeError("Failed waiting for VM to become running", resp)
-        except (requests.HTTPError, ComputeError):
-            self.terminate_instance(instance_id, instance_offer.region)
-            raise
-        return LaunchedInstanceInfo(
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
             instance_id=instance_id,
-            ip_address=resp["public_ipaddr"].strip(),
+            hostname=None,
+            internal_ip=None,
             region=instance_offer.region,
+            price=instance_offer.price,
             username="root",
-            ssh_port=int(resp["ports"]["10022/tcp"][0]["HostPort"]),
+            ssh_port=None,
             dockerized=False,
             ssh_proxy=None,
             backend_data=None,
@@ -122,3 +98,18 @@ class VastAICompute(Compute):
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
         self.api_client.destroy_instance(instance_id)
+
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+    ):
+        resp = self.api_client.get_instance(provisioning_data.instance_id)
+        if resp is not None:
+            if resp["actual_status"] == "running":
+                provisioning_data.hostname = resp["public_ipaddr"].strip()
+                provisioning_data.ssh_port = int(resp["ports"]["10022/tcp"][0]["HostPort"])
+            if (
+                resp["actual_status"] == "created"
+                and ": OCI runtime create failed:" in resp["status_msg"]
+            ):
+                raise ProvisioningError(resp["status_msg"])

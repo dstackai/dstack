@@ -14,10 +14,9 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    LaunchedInstanceInfo,
     SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -47,7 +46,7 @@ class TensorDockCompute(Compute):
         self,
         instance_offer: InstanceOfferWithAvailability,
         instance_config: InstanceConfiguration,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
         try:
             resp = self.api_client.deploy_single(
@@ -86,10 +85,14 @@ class TensorDockCompute(Compute):
         except requests.HTTPError as e:
             logger.warning("Got error from tensordock: %s", e)
             raise NoCapacityError()
-        return LaunchedInstanceInfo(
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
             instance_id=resp["server"],
-            ip_address=resp["ip"],
+            hostname=resp["ip"],
+            internal_ip=None,
             region=instance_offer.region,
+            price=instance_offer.price,
             username="user",
             ssh_port={v: k for k, v in resp["port_forwards"].items()}["22"],
             dockerized=True,
@@ -104,7 +107,7 @@ class TensorDockCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+    ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
@@ -115,9 +118,7 @@ class TensorDockCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
-
-        launched_instance_info = self.create_instance(instance_offer, instance_config)
-        return launched_instance_info
+        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
