@@ -31,7 +31,11 @@ from dstack._internal.core.backends.remote.provisioning import (
 )
 =======
 from dstack._internal.core.backends import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+<<<<<<< HEAD
 >>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+=======
+>>>>>>> a9d95e49 (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+>>>>>>> 0250323d (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 from dstack._internal.core.errors import BackendError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
@@ -42,7 +46,11 @@ from dstack._internal.core.models.instances import (
     InstanceRuntime,
     RemoteConnectionInfo,
 =======
+<<<<<<< HEAD
 >>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+=======
+>>>>>>> a9d95e49 (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+>>>>>>> 0250323d (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 )
 from dstack._internal.core.models.profiles import Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
@@ -51,7 +59,11 @@ from dstack._internal.server.models import InstanceModel, ProjectModel
 <<<<<<< HEAD
 from dstack._internal.server.schemas.runner import HealthcheckResponse
 =======
+<<<<<<< HEAD
 >>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+=======
+>>>>>>> a9d95e49 (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+>>>>>>> 0250323d (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.jobs import (
     PROCESSING_POOL_IDS,
@@ -77,7 +89,11 @@ TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
 PROVISIONING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
 
 =======
+<<<<<<< HEAD
 >>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+=======
+>>>>>>> a9d95e49 (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+>>>>>>> 0250323d (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 
 logger = get_logger(__name__)
 
@@ -125,7 +141,11 @@ async def process_instances() -> None:
 <<<<<<< HEAD
 
 =======
+<<<<<<< HEAD
 >>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+=======
+>>>>>>> a9d95e49 (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+>>>>>>> 0250323d (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
             if instance.status == InstanceStatus.TERMINATING:
                 await terminate(instance.id)
     finally:
@@ -520,7 +540,11 @@ async def check_instance(instance_id: UUID) -> None:
         if health:
 =======
         if health.healthy:
+<<<<<<< HEAD
 >>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+=======
+>>>>>>> a9d95e49 (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+>>>>>>> 0250323d (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
             instance.termination_deadline = None
             # FIXME why health_status is None?
             instance.health_status = None
@@ -624,7 +648,11 @@ async def wait_for_instance_provisioning_data(
                 logger.exception(
                     "Got exception when updating instance %s provisioning data", instance.name
                 )
+<<<<<<< HEAD
 >>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+=======
+>>>>>>> a9d95e49 (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+>>>>>>> 0250323d (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 
 
 async def wait_for_instance_provisioning_data(

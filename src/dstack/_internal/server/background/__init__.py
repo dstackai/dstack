@@ -28,7 +28,11 @@ def start_background_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(process_instances, IntervalTrigger(seconds=10))
 =======
     _scheduler.add_job(process_instances, IntervalTrigger(seconds=5))
+<<<<<<< HEAD
 >>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+=======
+>>>>>>> a9d95e49 (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
+>>>>>>> 0250323d (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
     _scheduler.add_job(terminate_idle_instances, IntervalTrigger(seconds=10))
     _scheduler.add_job(process_runs, IntervalTrigger(seconds=1))
     _scheduler.add_job(process_gateways, IntervalTrigger(seconds=15))
