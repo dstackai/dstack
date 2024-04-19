@@ -9,7 +9,6 @@
     "azure_vm_size": "Standard_DS1_v2",
     "build_prefix": "",
     "docker_version": "20.10.17",
-    "cuda_drivers_version": "535.54.03-1",
     "image_version": ""
   },
   "builders": [{
@@ -19,13 +18,13 @@
     "tenant_id": "{{user `azure_tenant_id`}}",
     "subscription_id": "{{user `azure_subscription_id`}}",
     "managed_image_resource_group_name": "dstack-resources-westeurope",
-    "managed_image_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
+    "managed_image_name": "{{user `build_prefix`}}dstack-grid-{{user `image_version` | clean_resource_name}}",
     "os_type": "Linux",
     "image_publisher": "canonical",
     "image_offer": "0001-com-ubuntu-server-jammy",
     "image_sku": "22_04-lts-gen2",
     "azure_tags": {
-        "Name": "DSTACK-CUDA"
+        "Name": "DSTACK-GRID"
     },
     "location": "{{user `azure_location`}}",
     "vm_size": "{{user `azure_vm_size`}}"
@@ -65,8 +64,7 @@
     },
     {
       "type": "shell",
-      "environment_vars": ["CUDA_DRIVERS_VERSION={{user `cuda_drivers_version`}}"],
-      "script": "provisioners/cuda.sh"
+      "script": "provisioners/install-nvidia-grid-driver-for-azure.sh"
     },
     {
       "type": "shell",

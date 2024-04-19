@@ -1,4 +1,5 @@
 import base64
+import enum
 import re
 from typing import List, Optional, Tuple
 
@@ -47,6 +48,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
+    InstanceType,
     LaunchedGatewayInfo,
     SSHKey,
 )
@@ -118,7 +120,7 @@ class AzureCompute(Compute):
             image_reference=_get_image_ref(
                 compute_client=self._compute_client,
                 location=location,
-                cuda=len(instance_offer.instance.resources.gpus) > 0,
+                variant=VMImageVariant.from_instance_type(instance_offer.instance),
             ),
             vm_size=instance_offer.instance.name,
             # instance_name includes region because Azure may create an instance resource
@@ -228,6 +230,30 @@ class AzureCompute(Compute):
         )
 
 
+class VMImageVariant(enum.Enum):
+    GRID = enum.auto()
+    CUDA = enum.auto()
+    STANDARD = enum.auto()
+
+    @classmethod
+    def from_instance_type(cls, instance: InstanceType) -> "VMImageVariant":
+        if "_A10_v5" in instance.name:
+            return cls.GRID
+        elif len(instance.resources.gpus) > 0:
+            return cls.CUDA
+        else:
+            return cls.STANDARD
+
+    def get_image_name(self) -> str:
+        name = "dstack-"
+        if self is self.GRID:
+            name += "grid-"
+        elif self is self.CUDA:
+            name += "cuda-"
+        name += version.base_image
+        return name
+
+
 _SUPPORTED_VM_SERIES_PATTERNS = [
     r"D(\d+)s_v3",  # Dsv3-series
     r"E(\d+)i?s_v4",  # Esv4-series
@@ -291,16 +317,12 @@ def _vm_type_available(vm_resource: ResourceSku) -> bool:
 def _get_image_ref(
     compute_client: compute_mgmt.ComputeManagementClient,
     location: str,
-    cuda: bool,
+    variant: VMImageVariant,
 ) -> ImageReference:
-    image_name = "dstack-"
-    if cuda:
-        image_name += "cuda-"
-    image_name += version.base_image
     image = compute_client.community_gallery_images.get(
         location=location,
         public_gallery_name="dstack-ebac134d-04b9-4c2b-8b6c-ad3e73904aa7",  # Gen2
-        gallery_image_name=image_name,
+        gallery_image_name=variant.get_image_name(),
     )
     return ImageReference(community_gallery_image_id=image.unique_id)
 
