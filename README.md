@@ -117,13 +117,13 @@ idle duration, etc.
 
 Here are some featured examples:
 
-- [TGI](https://dstack.ai/examples/tgi/)
-- [vLLM](https://dstack.ai/examples/vllm/)
-- [Ollama](https://dstack.ai/examples/ollama/)
-- [SDXL](https://dstack.ai/examples/sdxl/)
-- [QLoRA](https://dstack.ai/examples/qlora/)
+- [Mixtral](examples/llms/mixtral/README.md)
+- [TGI](examples/deployment/tgi/README.md)
+- [vLLM](examples/deployment/vllm/README.md)
+- [Ollama](examples/deployment/ollama/README.md)
+- [QLoRA](examples/fine-tuning/qlora/README.md)
 
-Browse [dstack.ai/examples](https://dstack.ai/examples) for more examples.
+Browse [examples](examples/README.md) for more examples.
 
 ## More information
 

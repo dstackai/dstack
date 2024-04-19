@@ -12,7 +12,7 @@ Lambda, TensorDock, Vast.ai, CUDO, RunPod, etc.) as well as on-premises infrastr
 
 ## How does it work?
 
-1. [Install](installation/index.md) the open-source version of `dstack` and configure your own cloud accounts, or sign up with [dstack Sky](https://sky.dstack.ai) 
+1. [Install](installation/index.md) the open-source version of `dstack` and configure your own cloud accounts, or sign up with [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai)
 2. Define configurations such as [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
    and [services](concepts/services.md).
 3. Run configurations via `dstack`'s CLI or API.

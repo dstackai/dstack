@@ -3,7 +3,7 @@
 ??? info "Prerequisites"
     To use the open-source version, make sure to [install the server](installation/index.md) and configure backends.
 
-    If you're using [dstack Sky](https://sky.dstack.ai), install the CLI and run the `dstack config` command:
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai), install the CLI and run the `dstack config` command:
     
     ![](../assets/images/dstack-cloud-config.png){ width=800 }
 
