@@ -1,5 +1,5 @@
 type: task
-# This task runs Llama 2 with vllm. Learn more at https://dstack.ai/examples/vllm/
+# This task runs Llama 2 with vllm
 
 image: vllm/vllm-openai:latest
 env:
