@@ -1082,9 +1082,9 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         display: none;
     }
 
-    .md-tabs__item:nth-child(5) {
+    /**.md-tabs__item:nth-child(5) {
         display: none;
-    }
+    }*/
 
     .md-tabs__item:nth-child(6) {
         padding-right: 0.7rem;
@@ -1109,7 +1109,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         visibility: visible;
     }
 
-    .md-tabs__item:nth-child(3) .md-tabs__link:after {
+    .md-tabs__item:nth-child(3) .md-tabs__link:after, .md-tabs__item:nth-child(4) .md-tabs__link:after {
         content: url('data:image/svg+xml,<svg fill="black" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
         line-height: 14px;
         margin-left: 5px;

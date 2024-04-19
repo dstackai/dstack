@@ -59,10 +59,6 @@ theme:
 # Plugins
 plugins:
   - blog:
-      blog_dir: changelog
-      post_url_format: "{slug}"
-      blog_toc: true
-  - blog:
       blog_dir: blog
       post_url_format: "{slug}"
       blog_toc: true
@@ -84,18 +80,33 @@ plugins:
         'examples/infinity.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/infinity/README.md'
         'examples/qlora.md': 'https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/qlora/README.md'
         'examples/mixtral.md': 'https://github.com/dstackai/dstack/blob/master/examples/llms/mixtral/README.md'
-        'blog/2024/02/08/resources-authentication-and-more.md': 'changelog/posts/0.15.0.md'
-        'blog/2024/01/19/openai-endpoints-preview.md': 'changelog/posts/0.14.0.md'
-        'blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more.md': 'changelog/posts/0.13.0.md'
-        'blog/2023/11/21/vastai.md': 'changelog/posts/0.12.3.md'
-        'blog/2023/10/31/tensordock.md': 'changelog/posts/0.12.2.md'
-        'blog/2023/10/18/simplified-cloud-setup.md': 'changelog/posts/0.12.0.md'
-        'blog/2023/08/22/multiple-clouds.md': 'changelog/posts/0.11.0.md'
-        'blog/2023/08/07/services-preview.md': 'changelog/posts/0.10.7.md'
-        'blog/2023/07/14/lambda-cloud-ga-and-docker-support.md': 'changelog/posts/0.10.5.md'
-        'blog/2023/05/22/azure-support-better-ui-and-more.md': 'changelog/posts/0.9.1.md'
-        'blog/2023/04/11/introducing-dstack-hub.md': 'changelog/posts/0.7.0.md'
-        'blog/2023/03/13/gcp-support-just-landed.md': 'changelog/posts/0.2.md'
+        'blog/2024/02/08/resources-authentication-and-more.md': 'https://github.com/dstackai/dstack/releases/0.15.0'
+        'blog/2024/01/19/openai-endpoints-preview.md': 'https://github.com/dstackai/dstack/releases/0.14.0'
+        'blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more.md': 'https://github.com/dstackai/dstack/releases/0.13.0'
+        'blog/2023/11/21/vastai.md': 'https://github.com/dstackai/dstack/releases/0.12.3'
+        'blog/2023/10/31/tensordock.md': 'https://github.com/dstackai/dstack/releases/0.12.2'
+        'blog/2023/10/18/simplified-cloud-setup.md': 'https://github.com/dstackai/dstack/releases/0.12.0'
+        'blog/2023/08/22/multiple-clouds.md': 'https://github.com/dstackai/dstack/releases/0.11'
+        'blog/2023/08/07/services-preview.md': 'https://github.com/dstackai/dstack/releases/0.10.7'
+        'blog/2023/07/14/lambda-cloud-ga-and-docker-support.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
+        'blog/2023/05/22/azure-support-better-ui-and-more.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
+        'blog/2023/03/13/gcp-support-just-landed.md': 'https://github.com/dstackai/dstack/releases/0.2'
+        'changelog/0.2.md': 'https://github.com/dstackai/dstack/releases/0.2'
+        'changelog/0.9.1.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
+        'changelog/0.10.5.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
+        'changelog/0.10.7.md': 'https://github.com/dstackai/dstack/releases/0.10.7'
+        'changelog/0.11.0.md': 'https://github.com/dstackai/dstack/releases/0.11'
+        'changelog/0.12.0.md': 'https://github.com/dstackai/dstack/releases/0.12.0'
+        'changelog/0.12.2.md': 'https://github.com/dstackai/dstack/releases/0.12.2'
+        'changelog/0.12.3.md': 'https://github.com/dstackai/dstack/releases/0.12.3'
+        'changelog/0.13.0.md': 'https://github.com/dstackai/dstack/releases/0.13.0'
+        'changelog/0.14.0.md': 'https://github.com/dstackai/dstack/releases/0.14.0'
+        'changelog/0.15.0.md': 'https://github.com/dstackai/dstack/releases/0.15.0'
+        'changelog/0.15.1.md': 'https://github.com/dstackai/dstack/releases/0.15.1'
+        'changelog/0.16.0.md': 'https://github.com/dstackai/dstack/releases/0.16.0'
+        'changelog/0.16.1.md': 'https://github.com/dstackai/dstack/releases/0.16.1'
+        'changelog/0.17.0.md': 'https://github.com/dstackai/dstack/releases/0.17.0'
+        'changelog/0.18.0.md': 'https://github.com/dstackai/dstack/releases/0.18.0'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -194,8 +205,7 @@ nav:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
   - Examples: https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank
-  - Changelog:
-      - changelog/index.md
+  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
   - Blog:
       - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
