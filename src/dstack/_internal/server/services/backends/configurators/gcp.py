@@ -161,8 +161,6 @@ class GCPConfigurator(Configurator):
         ):
             raise ServerClientError(msg="Wrong project_id", fields=[["project_id"]])
         config_values.project_id = self._get_project_id_element(selected=project_id)
-        if config.project_id is None:
-            return config_values
         config_values.regions = self._get_regions_element(
             selected=config.regions or DEFAULT_REGIONS
         )
