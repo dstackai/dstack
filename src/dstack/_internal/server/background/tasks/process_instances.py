@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+<<<<<<< HEAD
 from dstack._internal import settings
 from dstack._internal.core.backends import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
 from dstack._internal.core.backends.base.compute import (
@@ -28,20 +29,29 @@ from dstack._internal.core.backends.remote.provisioning import (
     run_shim_as_systemd_service,
     upload_envs,
 )
+=======
+from dstack._internal.core.backends import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+>>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 from dstack._internal.core.errors import BackendError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
+<<<<<<< HEAD
     InstanceOfferWithAvailability,
     InstanceRuntime,
     RemoteConnectionInfo,
+=======
+>>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 )
 from dstack._internal.core.models.profiles import Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, ProjectModel
+<<<<<<< HEAD
 from dstack._internal.server.schemas.runner import HealthcheckResponse
+=======
+>>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.jobs import (
     PROCESSING_POOL_IDS,
@@ -63,8 +73,11 @@ PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 
 TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
 
+<<<<<<< HEAD
 PROVISIONING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
 
+=======
+>>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 
 logger = get_logger(__name__)
 
@@ -109,7 +122,10 @@ async def process_instances() -> None:
                 InstanceStatus.BUSY,
             ):
                 await check_instance(instance.id)
+<<<<<<< HEAD
 
+=======
+>>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
             if instance.status == InstanceStatus.TERMINATING:
                 await terminate(instance.id)
     finally:
@@ -500,7 +516,11 @@ async def check_instance(instance_id: UUID) -> None:
             extra={"instance_name": instance.name, "shim_health": health},
         )
 
+<<<<<<< HEAD
         if health:
+=======
+        if health.healthy:
+>>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
             instance.termination_deadline = None
             # FIXME why health_status is None?
             instance.health_status = None
@@ -558,6 +578,53 @@ async def check_instance(instance_id: UUID) -> None:
                 )
 
         await session.commit()
+<<<<<<< HEAD
+=======
+
+
+async def wait_for_instance_provisioning_data(
+    project: ProjectModel,
+    instance: InstanceModel,
+    job_provisioning_data: JobProvisioningData,
+):
+    logger.debug(
+        "Waiting for instance %s to become running",
+        instance.name,
+    )
+    provisioning_deadline = _get_provisioning_deadline(instance)
+    if get_current_datetime() > provisioning_deadline:
+        logger.warning(
+            "Instance %s failed because instance has not become running in time", instance.name
+        )
+        instance.status = InstanceStatus.TERMINATING
+        instance.termination_reason = "Instance has not become running in time"
+    else:
+        backend = await backends_services.get_project_backend_by_type(
+            project=project,
+            backend_type=job_provisioning_data.backend,
+        )
+        if backend is None:
+            logger.warning(
+                "Cannot stop instance %s because instance's backend is not configured",
+                instance.name,
+            )
+        else:
+            try:
+                backend.compute().update_provisioning_data(job_provisioning_data)
+                instance.job_provisioning_data = job_provisioning_data.json()
+            except ProvisioningError as e:
+                logger.warning(
+                    "Error while waiting for instance %s to become running: %s",
+                    instance.name,
+                    repr(e),
+                )
+                instance.status = InstanceStatus.TERMINATING
+                instance.termination_reason = "Error while waiting for instance to become running"
+            except Exception:
+                logger.exception(
+                    "Got exception when updating instance %s provisioning data", instance.name
+                )
+>>>>>>> 9a3158ff (Refactor backends to wait for instance IP address outside run_job/create_instance (#1149))
 
 
 async def wait_for_instance_provisioning_data(
