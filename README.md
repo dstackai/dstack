@@ -117,7 +117,7 @@ idle duration, etc.
 
 Here are some featured examples:
 
-- [Mixtral](examples/llms/mixtral/README.md)
+- [Llama 3](examples/llms/llama3/README.md)
 - [TGI](examples/deployment/tgi/README.md)
 - [vLLM](examples/deployment/vllm/README.md)
 - [Ollama](examples/deployment/ollama/README.md)
