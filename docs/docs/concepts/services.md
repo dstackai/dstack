@@ -37,7 +37,7 @@ authorization, auto-scaling, and provides an OpenAI-compatible interface if need
     In case your service has the [model mapping](#configure-model-mapping) configured, `dstack` will 
     automatically make your model available at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
 
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai), the gateway is set up for you.
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, the gateway is set up for you.
 
 ## Define a configuration
 
@@ -300,6 +300,6 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 
 ## What's next?
 
-1. Check the [Text Generation Inference :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md) and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md) examples
+1. Check the [Text Generation Inference :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md){:target="_blank"} examples
 2. Check the [`.dstack.yml` reference](../reference/dstack.yml/service.md) for more details and examples
-3. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md)
+3. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md){:target="_blank"}

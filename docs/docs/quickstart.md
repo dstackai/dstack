@@ -3,7 +3,7 @@
 ??? info "Prerequisites"
     To use the open-source version, make sure to [install the server](installation/index.md) and configure backends.
 
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai), install the CLI and run the `dstack config` command:
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, install the CLI and run the `dstack config` command:
     
     ![](../assets/images/dstack-cloud-config.png){ width=800 }
 
@@ -133,5 +133,5 @@ To exclude any files from uploading, use `.gitignore`.
 
 1. Read about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
     [services](concepts/services.md), and [pools](concepts/pools.md) 
-2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md)
+2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md){:target="_blank"}
 3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

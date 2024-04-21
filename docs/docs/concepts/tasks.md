@@ -195,6 +195,6 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 
 ## What's next?
 
-1. Check the [QLoRA :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/qlora/README.md) example
+1. Check the [QLoRA :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/qlora/README.md){:target="_blank"} example
 2. Check the [`.dstack.yml` reference](../reference/dstack.yml/task.md) for more details and examples
-3. Browse [all examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md)
+3. Browse [all examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md){:target="_blank"}

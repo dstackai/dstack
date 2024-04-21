@@ -12,7 +12,7 @@ Lambda, TensorDock, Vast.ai, CUDO, RunPod, etc.) as well as on-premises infrastr
 
 ## How does it work?
 
-1. [Install](installation/index.md) the open-source version of `dstack` and configure your own cloud accounts, or sign up with [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai)
+1. [Install](installation/index.md) the open-source version of `dstack` and configure your own cloud accounts, or sign up with [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}
 2. Define configurations such as [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
    and [services](concepts/services.md).
 3. Run configurations via `dstack`'s CLI or API.
@@ -28,5 +28,5 @@ Lambda, TensorDock, Vast.ai, CUDO, RunPod, etc.) as well as on-premises infrastr
 ## Where do I start?
 
 1. Follow [quickstart](quickstart.md)
-2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md)
-3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
+2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md){:target="_blank"}
+3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}

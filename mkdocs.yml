@@ -188,6 +188,7 @@ nav:
           - Overview: docs/index.md
           - Installation: docs/installation/index.md
           - Quickstart: docs/quickstart.md
+          - Protips: docs/protips.md
       - Concepts:
           - Dev environments: docs/concepts/dev-environments.md
           - Tasks: docs/concepts/tasks.md
