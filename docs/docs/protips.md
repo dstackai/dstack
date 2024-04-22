@@ -67,7 +67,7 @@ $ dstack run . -f app.dstack.yml
 
 </div>
 
-This allows you to access the remote `8501` port on `localhost:8501` while you the CLI is attached.
+This allows you to access the remote `8501` port on `localhost:8501` while the CLI is attached.
 
 ??? info "Port mapping"
     If you want to override the local port, use the `--port` option:
@@ -146,7 +146,7 @@ and reuse them across configurations.
 This can be handy, for example, for configuring parameters such as `max_duration`, `max_price`, `termination_idle_duration`,
 `regions`, etc.
 
-Set `d`efault to true in your profile, and it will be applied automatically to any run.
+Set `default` to `true` in your profile, and it will be applied automatically to any run.
 
 ## Attached mode
 
