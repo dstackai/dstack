@@ -1,13 +1,13 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.0
+    rev: v0.4.1
     hooks:
       - id: ruff
         name: ruff common
         args: ['--fix']
       - id: ruff-format
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.56.1
+    rev: v1.56.2
     hooks:
       - id: golangci-lint-full
         entry: bash -c 'cd runner && golangci-lint run -D depguard --presets import,module,unused "$@"'
