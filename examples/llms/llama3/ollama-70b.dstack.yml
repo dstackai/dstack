@@ -1,5 +1,5 @@
 type: service
-# Deploys Llama 3 with Ollama
+# Deploys Llama 3 70B with Ollama
 
 image: ollama/ollama
 commands:

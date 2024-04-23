@@ -1,15 +1,13 @@
 # Services
 
-Services make it very easy to deploy any kind of model or web application as public endpoints.
+Services make it very easy to deploy any kind of model or application as public,
+secure, and scalable endpoints.
 
-Use any serving frameworks and specify required resources. `dstack` deploys it in the configured backend, handles
-authorization, auto-scaling, and provides an OpenAI-compatible interface if needed.
-
-??? info "Prerequisites"
+??? info "Gateway"
 
     If you're using the open-source server, you first have to set up a gateway.
 
-    ### Set up a gateway
+    ### Gateway { style="display:none" }
 
     For example, if your domain is `example.com`, go ahead and run the 
     `dstack gateway create` command:
@@ -39,7 +37,7 @@ authorization, auto-scaling, and provides an OpenAI-compatible interface if need
 
     If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, the gateway is set up for you.
 
-## Define a configuration
+## Configuration
 
 First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `train.dstack.yml`
 are both acceptable).
@@ -69,7 +67,7 @@ If image is not specified, `dstack` uses its own (pre-configured with Python, Co
 !!! info ".dstack.yml"
     For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/service.md).
 
-### Configure environment variables
+### Environment variables
 
 Environment variables can be set either within the configuration file or passed via the CLI.
 
@@ -93,7 +91,7 @@ If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TO
 
 For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
 
-### Configure model mapping
+### Model mapping
 
 By default, if you run a service, its endpoint is accessible at `https://<run name>.<gateway domain>`.
 
@@ -166,7 +164,7 @@ and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-com
 
     If you encounter any other issues, please make sure to file a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
-### Configure replicas and auto-scaling
+### Replicas and scaling
 
 By default, `dstack` runs a single replica of the service.
 You can configure the number of replicas as well as the auto-scaling policy.
@@ -203,7 +201,11 @@ If you specify the minimum number of replicas as `0`, the service will scale dow
 [//]: # (??? info "Cold start")
 [//]: # (    Scaling up from zero could take several minutes, considering the provisioning of a new instance and the pulling of a large model.)
 
-## Run the configuration
+??? info "Profiles"
+    In case you'd like to reuse certain parameters (such as spot policy, retry and max duration,
+    max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+
+## Running
 
 To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
 configuration file path, and any other options.
@@ -230,18 +232,22 @@ Service is published at https://yellow-cat-1.example.com
 
 When `dstack` submits the task, it uses the current folder contents.
 
-!!! info "Exclude files"
+??? info ".gitignore"
     If there are large files or folders you'd like to avoid uploading, 
-    you can list them in either `.gitignore` or `.dstackignore`.
+    you can list them in `.gitignore`.
 
 The `dstack run` command allows specifying many things, including spot policy, retry and max duration, 
 max price, regions, instance types, and [much more](../reference/cli/index.md#dstack-run).
 
-### Service endpoint
+## Service endpoint
 
 One the service is up, its endpoint is accessible at `https://<run name>.<gateway domain>`.
 
-#### Authorization
+!!! info "Model endpoint"
+    In case the service has the [model mapping](#model-mapping) configured, you will also be able
+    to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
+
+### Authorization
     
 By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`. 
 
@@ -259,42 +265,13 @@ $ curl https://yellow-cat-1.example.com/generate \
 
 Authorization can be disabled by setting `auth` to `false` in the service configuration file.
 
-#### OpenAI interface
+## Managing runs
 
-In case the service has the [model mapping](#configure-model-mapping) configured, you will also be able 
-to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
-
-```python
-from openai import OpenAI
-
-
-client = OpenAI(
-  base_url="https://gateway.example.com",
-  api_key="<dstack token>"
-)
-
-completion = client.chat.completions.create(
-  model="mistralai/Mistral-7B-Instruct-v0.1",
-  messages=[
-    {"role": "user", "content": "Compose a poem that explains the concept of recursion in programming."}
-  ]
-)
-
-print(completion.choices[0].message)
-```
-
-## Configure profiles
-
-In case you'd like to reuse certain parameters (such as spot policy, retry and max duration, 
-max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
-
-## Manage runs
-
-### Stop a run
+**Stopping runs**
 
 When you use [`dstack stop`](../reference/cli/index.md#dstack-stop), the service and its cloud resources are deleted.
 
-### List runs 
+**Listing runs**
 
 The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
 

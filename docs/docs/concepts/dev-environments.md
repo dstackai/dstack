@@ -1,12 +1,9 @@
 # Dev environments
 
-Before submitting a task or deploying a model, you may want to run code interactively.
-Dev environments allow you to do exactly that. 
+Before scheduling a task or deploying a model, you may want to run code interactively. Dev environments allow you to
+provision a remote machine set up with your code and favorite IDE with just one command.
 
-You specify the required environment and resources, then run it. `dstack` provisions the dev
-environment in the configured backend and enables access via your desktop IDE.
-
-## Define a configuration
+## Configuration
 
 First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are
 both acceptable).
@@ -33,7 +30,7 @@ If image is not specified, `dstack` uses its own (pre-configured with Python, Co
 !!! info ".dstack.yml"
     For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/dev-environment.md).
 
-### Configure environment variables
+### Environment variables
 
 Environment variables can be set either within the configuration file or passed via the CLI.
 
@@ -56,7 +53,11 @@ If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TO
 
 For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
 
-## Run the configuration
+??? info "Profiles"
+    In case you'd like to reuse certain parameters (such as spot policy, retry and max duration,
+    max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+
+## Running
 
 To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
 configuration file path, and other options.
@@ -84,9 +85,9 @@ To open in VS Code Desktop, use this link:
 
 When `dstack` provisions the dev environment, it uses the current folder contents.
 
-!!! info "Exclude files"
+!!! info ".gitignore"
     If there are large files or folders you'd like to avoid uploading, 
-    you can list them in either `.gitignore` or `.dstackignore`.
+    you can list them in `.gitignore`.
 
 The `dstack run` command allows specifying many things, including spot policy, retry and max duration, 
 max price, regions, instance types, and [much more](../reference/cli/index.md#dstack-run).
@@ -110,20 +111,15 @@ $ ssh fast-moth-1
 
 </div>
 
-## Configure profiles
+## Managing runs
 
-In case you'd like to reuse certain parameters (such as spot policy, retry and max duration, 
-max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
-
-## Manage runs
-
-### Stop a run
+**Stopping runs**
 
 Once the run exceeds the max duration,
 or when you use [`dstack stop`](../reference/cli/index.md#dstack-stop), 
 the dev environment and its cloud resources are deleted.
 
-### List runs 
+**Listing runs**
 
 The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
 

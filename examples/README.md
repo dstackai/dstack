@@ -41,11 +41,11 @@ dstack run . -f examples/deployment/vllm/serve.dstack.yml
 
 Here are some featured examples:
 
-- [Llama 3](examples/llms/llama3/README.md)
-- [TGI](examples/deployment/tgi/README.md)
-- [vLLM](examples/deployment/vllm/README.md)
-- [Ollama](examples/deployment/ollama/README.md)
-- [QLoRA](examples/fine-tuning/qlora/README.md)
+- [Llama 3](llms/llama3/README.md)
+- [TGI](deployment/tgi/README.md)
+- [vLLM](deployment/vllm/README.md)
+- [Ollama](deployment/ollama/README.md)
+- [QLoRA](fine-tuning/qlora/README.md)
 
 Browse [deployment](deployment), [fine-tuning](deployment), [llms](llms), and [misc](misc) for more.
 

@@ -207,7 +207,7 @@ corresponding service quotas for each type of instance in each region.
     - `Preemtible H100 GPUs` (spot H100)
 
 ??? info "Azure"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/compute/resource-usage){:target="_blank"} on Compute Engine service quotas.
+    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/azure/quotas/quickstart-increase-quota-portal){:target="_blank"} on Compute Engine service quotas.
     The relevant service quotas include:
 
     - `Total Regional Spot vCPUs` (any spot instances)
