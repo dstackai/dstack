@@ -224,11 +224,13 @@ func writeHostInfo() {
 func getGpuInfo() [][]string {
 	cmd := execute.ExecTask{
 		Command: "docker",
-		Args: []string{"run",
+		Args: []string{
+			"run",
 			"--rm",
 			"--gpus", "all",
 			"dstackai/base:py3.11-0.4rc4-cuda-12.1",
-			"nvidia-smi", "--query-gpu=gpu_name,memory.total", "--format=csv"},
+			"nvidia-smi", "--query-gpu=gpu_name,memory.total", "--format=csv",
+		},
 		StreamStdio: false,
 	}
 
