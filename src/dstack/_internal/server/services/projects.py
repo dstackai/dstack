@@ -312,6 +312,8 @@ def register_create_project_hook(func: Callable[[AsyncSession, ProjectModel], Aw
 
 
 async def _check_projects_quota(session: AsyncSession, user: UserModel):
+    if user.global_role == GlobalRole.ADMIN:
+        return
     owned_projects = await list_user_owned_project_models(session=session, user=user)
     if len(owned_projects) >= user.projects_quota:
         raise ServerClientError("User project quota exceeded")
