@@ -34,6 +34,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.server import settings
 from dstack._internal.utils.common import get_current_datetime
 
 constraint_naming_convention = {
@@ -61,7 +62,9 @@ class UserModel(BaseModel):
 
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
-    projects_quota: Mapped[int] = mapped_column(Integer, default=3)
+    projects_quota: Mapped[int] = mapped_column(
+        Integer, default=settings.USER_PROJECT_DEFAULT_QUOTA
+    )
 
 
 class ProjectModel(BaseModel):

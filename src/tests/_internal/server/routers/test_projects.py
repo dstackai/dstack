@@ -156,7 +156,7 @@ class TestCreateProject:
         self, test_db, session: AsyncSession
     ):
         user = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
-        for i in range(3):
+        for i in range(10):
             response = client.post(
                 "/api/projects/create",
                 headers=get_auth_headers(user.token),
@@ -166,12 +166,23 @@ class TestCreateProject:
         response = client.post(
             "/api/projects/create",
             headers=get_auth_headers(user.token),
-            json={"project_name": "project4"},
+            json={"project_name": "project11"},
         )
         assert response.status_code == 400
         assert response.json() == {
             "detail": [{"code": "error", "msg": "User project quota exceeded"}]
         }
+
+    @pytest.mark.asyncio
+    async def test_no_project_quota_for_global_admins(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, name="owner", global_role=GlobalRole.ADMIN)
+        for i in range(12):
+            response = client.post(
+                "/api/projects/create",
+                headers=get_auth_headers(user.token),
+                json={"project_name": f"project{i}"},
+            )
+            assert response.status_code == 200, response.json()
 
 
 class TestDeleteProject:
