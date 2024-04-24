@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 import pydantic_core
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 import dstack.gateway.openai.store as openai_store
 import dstack.gateway.version
@@ -42,6 +43,16 @@ async def lifespan(app: FastAPI):
 
 configure_logging(logging.DEBUG)
 app = FastAPI(lifespan=lifespan)
+
+# TODO: add CORS only to openai routers once fastapi supports it.
+# See https://github.com/tiangolo/fastapi/pull/11010
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=".*",
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(auth_router, prefix="/auth")
 app.include_router(config_router, prefix="/api/config")
 app.include_router(openai_router, prefix="/api/openai")
