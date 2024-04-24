@@ -397,9 +397,8 @@ def _process_pulling_with_shim(
 
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
     resp = runner_client.healthcheck()
-    error_states = ("pending", "running")
-    if resp is None or container_status.state in error_states:
-        if container_status.executor_error and container_status.state in error_states:
+    if resp is None or container_status.state == "pending":
+        if container_status.executor_error:
             logger.error(
                 "The docker container of the job '%s' stops with executor error: %s",
                 job_model.job_name,
