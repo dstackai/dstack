@@ -52,6 +52,7 @@ def create_app() -> FastAPI:
     if settings.SENTRY_DSN is not None:
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
+            release=DSTACK_VERSION,
             environment=settings.SERVER_ENVIRONMENT,
             enable_tracing=True,
             traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
