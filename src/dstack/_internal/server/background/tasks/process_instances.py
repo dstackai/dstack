@@ -195,7 +195,8 @@ async def add_remote(instance_id: UUID) -> None:
                 host_info = get_host_info(client, DSTACK_WORKING_DIR)
                 logger.debug("Received a host_info %s", host_info)
 
-        except ProvisioningError:
+        except ProvisioningError as e:
+            logger.warning("Provisioning could not be completed because of the error: %s", e)
             instance.last_retry_at = get_current_datetime()
             await session.commit()
             return
