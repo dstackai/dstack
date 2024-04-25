@@ -355,7 +355,7 @@ def _add_ingress_security_group_rule_if_missing(
     security_group_id: str,
     rule: Dict,
 ) -> bool:
-    if _rule_exists(rule, security_group["IpPermissions"]):
+    if _rule_exists(rule, security_group.get("IpPermissions", [])):
         return False
     ec2_client.authorize_security_group_ingress(
         GroupId=security_group_id,
@@ -370,7 +370,7 @@ def _add_egress_security_group_rule_if_missing(
     security_group_id: str,
     rule: Dict,
 ) -> bool:
-    if _rule_exists(rule, security_group["IpPermissionsEgress"]):
+    if _rule_exists(rule, security_group.get("IpPermissionsEgress", [])):
         return False
     ec2_client.authorize_security_group_egress(
         GroupId=security_group_id,
