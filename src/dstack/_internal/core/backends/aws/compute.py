@@ -113,9 +113,9 @@ class AWSCompute(Compute):
             {"Key": "dstack_user", "Value": instance_config.user},
         ]
         try:
-            vpc_id, subnet_id = _get_vpc_id_subnet_id_or_error(
+            vpc_id, subnet_id = get_vpc_id_subnet_id_or_error(
                 ec2_client=ec2_client,
-                vpc_name=self.config.vpc_name,
+                config=self.config,
                 region=instance_offer.region,
             )
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
@@ -243,7 +243,35 @@ def _supported_instances(offer: InstanceOffer) -> bool:
     return False
 
 
-def _get_vpc_id_subnet_id_or_error(
+def get_vpc_id_subnet_id_or_error(
+    ec2_client: botocore.client.BaseClient,
+    config: AWSConfig,
+    region: str,
+) -> Tuple[str, str]:
+    if config.vpc_ids is not None:
+        vpc_id = config.vpc_ids.get(region)
+        if vpc_id is None:
+            raise ComputeError(f"No VPC ID configured for region {region}")
+        vpc = aws_resources.get_vpc_by_vpc_id(ec2_client=ec2_client, vpc_id=vpc_id)
+        if vpc is None:
+            raise ComputeError(f"Failed to find VPC {vpc_id} in region {region}")
+
+        subnet_id = aws_resources.get_subnet_id_for_vpc(
+            ec2_client=ec2_client,
+            vpc_id=vpc_id,
+        )
+        if subnet_id is not None:
+            return vpc_id, subnet_id
+        raise ComputeError(f"Failed to find public subnet for VPC {vpc_id}")
+
+    return _get_vpc_id_subnet_id_by_vpc_name_or_error(
+        ec2_client=ec2_client,
+        vpc_name=config.vpc_name,
+        region=region,
+    )
+
+
+def _get_vpc_id_subnet_id_by_vpc_name_or_error(
     ec2_client: botocore.client.BaseClient,
     vpc_name: Optional[str],
     region: str,

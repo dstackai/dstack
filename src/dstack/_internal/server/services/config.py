@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import yaml
 from pydantic import BaseModel, Field, root_validator
@@ -32,6 +32,9 @@ class AWSConfig(CoreModel):
     type: Annotated[Literal["aws"], Field(description="The type of the backend")] = "aws"
     regions: Optional[List[str]] = None
     vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    vpc_ids: Annotated[
+        Optional[Dict[str, str]], Field(description="The mapping from AWS regions to VPC IDs")
+    ] = None
     creds: AnyAWSCreds = Field(..., description="The credentials", discriminator="type")
 
 
