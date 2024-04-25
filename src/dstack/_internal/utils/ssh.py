@@ -137,6 +137,8 @@ def convert_pkcs8_to_pem(private_string: str) -> str:
                 capture_output=True,
                 text=True,
             )
+        except FileNotFoundError:
+            logger.error("Use a PEM key or install ssh-keygen to convert it automatically")
         except subprocess.CalledProcessError as e:
             logger.error("Fail to convert ssh key: stdout=%s, stderr=%s", e.stdout, e.stderr)
 
@@ -150,3 +152,8 @@ def rsa_pkey_from_str(private_string: str) -> PKey:
     pkey = paramiko.RSAKey.from_private_key(key_file)
     key_file.close()
     return pkey
+
+
+def generate_public_key(private_key: PKey) -> str:
+    public_key = private_key.get_base64()
+    return public_key
