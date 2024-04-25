@@ -145,20 +145,32 @@ def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
 
 @contextmanager
 def get_paramiko_connection(
-    ssh_user: str, host: str, port: int, pkey: paramiko.PKey
+    ssh_user: str, host: str, port: int, pkeys: List[paramiko.PKey]
 ) -> Generator[paramiko.SSHClient, None, None]:
-    try:
-        with paramiko.SSHClient() as client:
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(
-                username=ssh_user,
-                hostname=host,
-                port=port,
-                pkey=pkey,
-                look_for_keys=False,
-                allow_agent=False,
-                timeout=SSH_CONNECT_TIMEOUT,
+    with paramiko.SSHClient() as client:
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        for pkey in pkeys:
+            conn_url = f"{ssh_user}@{host}:{port}"
+            try:
+                logger.debug("Try to connect to %s with key %s", conn_url, pkey.fingerprint)
+                client.connect(
+                    username=ssh_user,
+                    hostname=host,
+                    port=port,
+                    pkey=pkey,
+                    look_for_keys=False,
+                    allow_agent=False,
+                    timeout=SSH_CONNECT_TIMEOUT,
+                )
+            except paramiko.AuthenticationException:
+                continue  # try next key
+            except (paramiko.SSHException, OSError) as e:
+                raise ProvisioningError() from e
+            else:
+                yield client
+                return
+        else:
+            keys_fp = ", ".join(f"{pk.fingerprint!r}" for pk in pkeys)
+            raise ProvisioningError(
+                f"SSH connection to the {conn_url} user with keys [{keys_fp}] was unsuccessful"
             )
-            yield client
-    except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e

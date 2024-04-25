@@ -52,7 +52,6 @@ from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import (
-    convert_pkcs8_to_pem,
     rsa_pkey_from_str,
 )
 
@@ -153,17 +152,17 @@ async def add_remote(instance_id: UUID) -> None:
             )
 
             # Prepare connection key
-            try:
-                private_string = [
-                    sk.private for sk in remote_details.ssh_keys if sk.private is not None
-                ][0]
-            except IndexError:
+            pkeys = [
+                rsa_pkey_from_str(sk.private)
+                for sk in remote_details.ssh_keys
+                if sk.private is not None
+            ]
+            if not pkeys:
                 logger.error("There are no ssh private key")
                 raise ConfigurationError("The SSH private key is not provided")
-            pkey = rsa_pkey_from_str(convert_pkcs8_to_pem(private_string))
 
             with get_paramiko_connection(
-                remote_details.ssh_user, remote_details.host, remote_details.port, pkey
+                remote_details.ssh_user, remote_details.host, remote_details.port, pkeys
             ) as client:
                 logger.info(f"connected to {remote_details.ssh_user} {remote_details.host}")
 
