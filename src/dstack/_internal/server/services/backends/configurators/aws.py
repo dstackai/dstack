@@ -3,8 +3,7 @@ from typing import List
 
 from boto3.session import Session
 
-from dstack._internal.core.backends.aws import AWSBackend, auth
-from dstack._internal.core.backends.aws.compute import get_vpc_id_subnet_id_or_error
+from dstack._internal.core.backends.aws import AWSBackend, auth, compute
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.errors import BackendAuthError, ComputeError, ServerClientError
 from dstack._internal.core.models.backends.aws import (
@@ -142,7 +141,7 @@ class AWSConfigurator(Configurator):
         for region in regions:
             ec2_client = session.client("ec2", region_name=region)
             try:
-                get_vpc_id_subnet_id_or_error(
+                compute.get_vpc_id_subnet_id_or_error(
                     ec2_client=ec2_client,
                     config=AWSConfig.parse_obj(config),
                     region=region,

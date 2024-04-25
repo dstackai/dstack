@@ -94,7 +94,7 @@ class TestServerConfigManager:
                 yaml.dump(config, f)
             with patch("boto3.session.Session"), patch.object(
                 settings, "SERVER_CONFIG_FILE_PATH", config_filepath
-            ):
+            ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
                 manager = ServerConfigManager()
                 manager.load_config()
                 await manager.apply_config(session, owner)

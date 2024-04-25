@@ -117,7 +117,9 @@ class TestGetBackendConfigValuesAWS:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ) as authenticate_mock, patch(
+            "dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"
+        ):
             default_creds_available_mock.return_value = True
             response = client.post(
                 "/api/backends/config_values",
@@ -645,7 +647,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:  # noqa: F841
+        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -793,7 +795,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -857,7 +859,7 @@ class TestUpdateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:  # noqa: F841
+        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/update",
@@ -956,5 +958,6 @@ class TestGetConfigInfo:
             "type": "aws",
             "regions": json.loads(backend.config)["regions"],
             "vpc_name": None,
+            "vpc_ids": None,
             "creds": json.loads(backend.auth),
         }
