@@ -28,6 +28,7 @@ from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_ME
 from dstack._internal.core.models.runs import InstanceStatus, Requirements, get_policy_map
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.ssh import convert_pkcs8_to_pem, generate_public_key, rsa_pkey_from_str
 from dstack.api._public.resources import Resources
 from dstack.api.utils import load_profile
 
@@ -273,7 +274,10 @@ class PoolCommand(APIBaseCommand):
 
         # TODO(egor-s): user key must be added during the `run`, not `pool add`
         user_priv_key = Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
-        user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
+        try:
+            user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
+        except FileNotFoundError:
+            user_pub_key = generate_public_key(rsa_pkey_from_str(user_priv_key))
         user_ssh_key = SSHKey(public=user_pub_key, private=user_priv_key)
 
         try:
@@ -293,8 +297,13 @@ class PoolCommand(APIBaseCommand):
 
         try:
             # TODO: user key must be added during the `run`, not `pool add`
-            user_priv_key = Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
-            user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
+            user_priv_key = convert_pkcs8_to_pem(
+                Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
+            )
+            try:
+                user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
+            except FileNotFoundError:
+                user_pub_key = generate_public_key(rsa_pkey_from_str(user_priv_key))
             user_ssh_key = SSHKey(public=user_pub_key, private=user_priv_key)
             ssh_keys.append(user_ssh_key)
         except OSError:
@@ -302,10 +311,12 @@ class PoolCommand(APIBaseCommand):
 
         if args.ssh_identity_file:
             try:
-                ssh_key = SSHKey(
-                    public=args.ssh_identity_file.with_suffix(".pub").read_text(),
-                    private=args.ssh_identity_file.read_text(),
-                )
+                private_key = convert_pkcs8_to_pem(args.ssh_identity_file.read_text())
+                try:
+                    pub_key = args.ssh_identity_file.with_suffix(".pub").read_text()
+                except FileNotFoundError:
+                    pub_key = generate_public_key(rsa_pkey_from_str(private_key))
+                ssh_key = SSHKey(public=pub_key, private=private_key)
                 ssh_keys.append(ssh_key)
             except OSError:
                 console.print("[error]Unable to read the public key.[/]")
