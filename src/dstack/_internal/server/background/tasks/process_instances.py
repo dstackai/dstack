@@ -126,6 +126,10 @@ async def add_remote(instance_id: UUID) -> None:
             )
         ).one()
 
+        if instance.status == InstanceStatus.PENDING:
+            instance.status = InstanceStatus.PROVISIONING
+            await session.commit()
+
         retry_duration_deadline = instance.created_at.replace(
             tzinfo=datetime.timezone.utc
         ) + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
