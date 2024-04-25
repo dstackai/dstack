@@ -324,6 +324,13 @@ def get_default_vpc_id(ec2_client: botocore.client.BaseClient) -> Optional[str]:
     return None
 
 
+def get_vpc_by_vpc_id(ec2_client: botocore.client.BaseClient, vpc_id: str) -> Optional[str]:
+    response = ec2_client.describe_vpcs(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
+    if "Vpcs" in response and len(response["Vpcs"]) > 0:
+        return response["Vpcs"][0]
+    return None
+
+
 def get_subnet_id_for_vpc(
     ec2_client: botocore.client.BaseClient,
     vpc_id: str,

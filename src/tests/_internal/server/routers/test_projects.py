@@ -63,6 +63,7 @@ class TestListProjects:
                             "type": backend.type,
                             "regions": json.loads(backend.config)["regions"],
                             "vpc_name": None,
+                            "vpc_ids": None,
                         },
                     }
                 ],

@@ -1,9 +1,11 @@
 import json
 from typing import List
 
-from dstack._internal.core.backends.aws import AWSBackend, auth
+from boto3.session import Session
+
+from dstack._internal.core.backends.aws import AWSBackend, auth, compute
 from dstack._internal.core.backends.aws.config import AWSConfig
-from dstack._internal.core.errors import BackendAuthError
+from dstack._internal.core.errors import BackendAuthError, ComputeError, ServerClientError
 from dstack._internal.core.models.backends.aws import (
     AnyAWSConfigInfo,
     AWSAccessKeyCreds,
@@ -76,7 +78,7 @@ class AWSConfigurator(Configurator):
         ):
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
-            auth.authenticate(creds=config.creds, region=MAIN_REGION)
+            session = auth.authenticate(creds=config.creds, region=MAIN_REGION)
         except Exception:
             if is_core_model_instance(config.creds, AWSAccessKeyCreds):
                 raise_invalid_credentials_error(
@@ -89,6 +91,10 @@ class AWSConfigurator(Configurator):
                 raise_invalid_credentials_error(fields=[["creds"]])
         config_values.regions = self._get_regions_element(
             selected=config.regions or DEFAULT_REGIONS
+        )
+        self._check_vpc_config(
+            session=session,
+            config=config,
         )
         return config_values
 
@@ -125,3 +131,20 @@ class AWSConfigurator(Configurator):
         for r in REGION_VALUES:
             element.values.append(ConfigElementValue(value=r, label=r))
         return element
+
+    def _check_vpc_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
+        if config.vpc_name is not None and config.vpc_ids is not None:
+            raise ServerClientError(msg="Only one of vpc_name and vpc_ids can be specified")
+        regions = config.regions
+        if regions is None:
+            regions = DEFAULT_REGIONS
+        for region in regions:
+            ec2_client = session.client("ec2", region_name=region)
+            try:
+                compute.get_vpc_id_subnet_id_or_error(
+                    ec2_client=ec2_client,
+                    config=AWSConfig.parse_obj(config),
+                    region=region,
+                )
+            except ComputeError as e:
+                raise ServerClientError(e.args[0])

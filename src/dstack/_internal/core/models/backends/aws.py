@@ -1,3 +1,5 @@
+from typing import Dict
+
 from pydantic import Field
 from typing_extensions import Annotated, List, Literal, Optional, Union
 
@@ -9,6 +11,7 @@ class AWSConfigInfo(CoreModel):
     type: Literal["aws"] = "aws"
     regions: Optional[List[str]] = None
     vpc_name: Optional[str] = None
+    vpc_ids: Optional[Dict[str, str]] = None
 
 
 class AWSAccessKeyCreds(CoreModel):
@@ -41,6 +44,8 @@ class AWSConfigInfoWithCredsPartial(CoreModel):
     type: Literal["aws"] = "aws"
     creds: Optional[AnyAWSCreds]
     regions: Optional[List[str]]
+    vpc_name: Optional[str]
+    vpc_ids: Optional[Dict[str, str]]
 
 
 class AWSConfigValues(CoreModel):
