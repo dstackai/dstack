@@ -449,7 +449,6 @@ async def check_instance(instance_id: UUID) -> None:
             return
 
         ssh_private_key = instance.project.ssh_private_key
-
         if instance.remote_connection_info is not None:
             remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
                 instance.remote_connection_info
