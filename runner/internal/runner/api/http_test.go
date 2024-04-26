@@ -14,10 +14,11 @@ import (
 type DummyRunner struct {
 	State           shim.RunnerStatus
 	ContainerStatus shim.ContainerStatus
+	JobResult       shim.JobResult
 }
 
-func (ds DummyRunner) GetState() (shim.RunnerStatus, shim.ContainerStatus, string) {
-	return ds.State, ds.ContainerStatus, ""
+func (ds DummyRunner) GetState() (shim.RunnerStatus, shim.ContainerStatus, string, shim.JobResult) {
+	return ds.State, ds.ContainerStatus, "", ds.JobResult
 }
 
 func (ds DummyRunner) Run(context.Context, shim.DockerImageConfig) error {

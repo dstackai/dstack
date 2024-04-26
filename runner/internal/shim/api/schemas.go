@@ -20,15 +20,16 @@ type HealthcheckResponse struct {
 }
 
 type PullResponse struct {
-	State         string `json:"state"`
-	ExecutorError string `json:"executor_error"`
-	ContainerName string `json:"container_name"`
-	Status        string `json:"status"`
-	Running       bool   `json:"running"`
-	OOMKilled     bool   `json:"oom_killed"`
-	Dead          bool   `json:"dead"`
-	ExitCode      int    `json:"exit_code"`
-	Error         string `json:"error"`
+	State         string         `json:"state"`
+	ExecutorError string         `json:"executor_error"`
+	ContainerName string         `json:"container_name"`
+	Status        string         `json:"status"`
+	Running       bool           `json:"running"`
+	OOMKilled     bool           `json:"oom_killed"`
+	Dead          bool           `json:"dead"`
+	ExitCode      int            `json:"exit_code"`
+	Error         string         `json:"error"`
+	Result        shim.JobResult `json:"result"`
 }
 
 type StopResponse struct {

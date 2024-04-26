@@ -83,6 +83,11 @@ class StopBody(CoreModel):
     force: bool = False
 
 
+class JobResult(CoreModel):
+    reason: str
+    reason_message: str
+
+
 class PullBody(CoreModel):
     state: str
     executor_error: Optional[str]
@@ -93,3 +98,4 @@ class PullBody(CoreModel):
     dead: Optional[bool]
     exit_code: Optional[int]
     error: Optional[str]
+    result: Optional[JobResult]
