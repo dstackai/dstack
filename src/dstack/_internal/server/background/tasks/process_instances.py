@@ -1,6 +1,5 @@
 import datetime
 import ipaddress
-from dataclasses import dataclass
 from datetime import timedelta
 from typing import Dict, Optional, Union, cast
 from uuid import UUID
@@ -21,6 +20,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.remote.provisioning import (
     get_host_info,
     get_paramiko_connection,
+    get_shim_healthcheck,
     host_info_to_instance_type,
     run_pre_start_commands,
     run_shim_as_systemd_service,
@@ -39,13 +39,15 @@ from dstack._internal.core.models.profiles import Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, ProjectModel
+from dstack._internal.server.schemas.runner import HealthcheckResponse
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.jobs import (
     PROCESSING_POOL_IDS,
     PROCESSING_POOL_LOCK,
     terminate_job_provisioning_data_instance,
 )
-from dstack._internal.server.services.runner import client
+from dstack._internal.server.services.runner import client as runner_client
+from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import get_create_instance_offers
 from dstack._internal.server.utils.common import run_async
@@ -60,15 +62,6 @@ PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
 TERMINATION_DEADLINE_OFFSET = timedelta(minutes=20)
 
 PROVISIONING_TIMEOUT_SECONDS = 10 * 60  # 10 minutes in seconds
-
-
-@dataclass
-class HealthStatus:
-    healthy: bool
-    reason: str
-
-    def __str__(self) -> str:
-        return self.reason
 
 
 logger = get_logger(__name__)
@@ -204,6 +197,10 @@ async def add_remote(instance_id: UUID) -> None:
                 host_info = get_host_info(client, DSTACK_WORKING_DIR)
                 logger.debug("Received a host_info %s", host_info)
 
+                raw_health = get_shim_healthcheck(client)
+                health_response = HealthcheckResponse.__response__.parse_raw(raw_health)
+                health = runner_client.health_response_to_health_status(health_response)
+
         except ProvisioningError as e:
             logger.warning("Provisioning could not be completed because of the error: %s", e)
             instance.status = InstanceStatus.PENDING
@@ -236,7 +233,7 @@ async def add_remote(instance_id: UUID) -> None:
             ssh_proxy=None,
         )
 
-        instance.status = InstanceStatus.IDLE
+        instance.status = InstanceStatus.IDLE if health else InstanceStatus.PROVISIONING
         instance.backend = BackendType.REMOTE
 
         instance.region = "remote"
@@ -474,7 +471,7 @@ async def check_instance(instance_id: UUID) -> None:
             extra={"instance_name": instance.name, "shim_health": health},
         )
 
-        if health.healthy:
+        if health:
             instance.termination_deadline = None
             # FIXME why health_status is None?
             instance.health_status = None
@@ -578,22 +575,14 @@ async def wait_for_instance_provisioning_data(
                 )
 
 
-@runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)
+@runner_ssh_tunnel(ports=[runner_client.REMOTE_SHIM_PORT], retries=1)
 def instance_healthcheck(*, ports: Dict[int, int]) -> HealthStatus:
-    shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
+    shim_client = runner_client.ShimClient(port=ports[runner_client.REMOTE_SHIM_PORT])
     try:
         resp = shim_client.healthcheck(unmask_exeptions=True)
-
         if resp is None:
             return HealthStatus(healthy=False, reason="Unknown reason")
-
-        if resp.service == "dstack-shim":
-            return HealthStatus(healthy=True, reason="Service is OK")
-        else:
-            return HealthStatus(
-                healthy=False,
-                reason=f"Service name is {resp.service}, service version: {resp.version}",
-            )
+        return runner_client.health_response_to_health_status(resp)
     except requests.RequestException as e:
         return HealthStatus(healthy=False, reason=f"Can't request shim: {e}")
     except Exception as e:
