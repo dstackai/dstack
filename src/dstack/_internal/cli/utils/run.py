@@ -84,7 +84,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
             availability = offer.availability.value.replace("_", " ").lower()
         offers.add_row(
             f"{i}",
-            offer.backend,
+            offer.backend.replace("remote", "ssh"),
             offer.region,
             offer.instance.name,
             r.pretty_format(),
@@ -151,7 +151,7 @@ def generate_runs_table(
             if jpd is not None:
                 job_row.update(
                     {
-                        "BACKEND": jpd.backend.value,
+                        "BACKEND": jpd.backend.value.replace("remote", "ssh"),
                         "REGION": jpd.region,
                         "INSTANCE": jpd.instance_type.name,
                         "RESOURCES": jpd.instance_type.resources.pretty_format(),
