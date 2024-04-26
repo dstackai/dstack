@@ -276,7 +276,7 @@ async def add_remote(
         price=0,
         username=ssh_user,
         ssh_port=port,
-        dockerized=False,
+        dockerized=True,
         backend_data="",
         ssh_proxy=None,
     )
