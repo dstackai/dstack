@@ -279,6 +279,7 @@ async def get_run_plan(
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
 
     # Get offers once for all jobs
+    offers = []
     if creation_policy == CreationPolicy.REUSE_OR_CREATE:
         offers = await get_offers_by_requirements(
             project=project,
