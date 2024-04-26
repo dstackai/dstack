@@ -146,9 +146,11 @@ def get_shim_pre_start_commands(build: str) -> List[str]:
 
     url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
 
+    dstack_shim_binary_path = "/usr/local/bin/dstack-shim"
+
     return [
-        f'sudo curl --compressed --connect-timeout 60 --max-time 240 --retry 1 --output /usr/local/bin/dstack-shim "{url}"',
-        "sudo chmod +x /usr/local/bin/dstack-shim",
+        f'sudo curl -s --compressed --connect-timeout 60 --max-time 240 --retry 1 --output {dstack_shim_binary_path} "{url}"',
+        f"sudo chmod +x {dstack_shim_binary_path}",
         f"sudo mkdir {DSTACK_WORKING_DIR} -p",
     ]
 
