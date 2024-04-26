@@ -99,17 +99,22 @@ async def process_instances() -> None:
 
     try:
         for instance in instances:
+            if (
+                instance.status == InstanceStatus.PENDING
+                and instance.remote_connection_info is not None
+            ):
+                await add_remote(instance.id)
+
             if instance.status == InstanceStatus.PENDING:
-                if instance.remote_connection_info is not None:
-                    await add_remote(instance.id)
-                else:
-                    await create_instance(instance.id)
+                await create_instance(instance.id)
+
             if instance.status in (
                 InstanceStatus.PROVISIONING,
                 InstanceStatus.IDLE,
                 InstanceStatus.BUSY,
             ):
                 await check_instance(instance.id)
+
             if instance.status == InstanceStatus.TERMINATING:
                 await terminate(instance.id)
     finally:
@@ -197,6 +202,7 @@ async def add_remote(instance_id: UUID) -> None:
 
         except ProvisioningError as e:
             logger.warning("Provisioning could not be completed because of the error: %s", e)
+            instance.status = InstanceStatus.PENDING
             instance.last_retry_at = get_current_datetime()
             await session.commit()
             return
