@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import BinaryIO, Dict, Optional, Union
 
 import requests
@@ -18,6 +19,18 @@ from dstack._internal.server.schemas.runner import (
 REMOTE_SHIM_PORT = 10998
 REMOTE_RUNNER_PORT = 10999
 REQUEST_TIMEOUT = 15
+
+
+@dataclass
+class HealthStatus:
+    healthy: bool
+    reason: str
+
+    def __str__(self) -> str:
+        return self.reason
+
+    def __bool__(self) -> bool:
+        return self.healthy
 
 
 class RunnerClient:
@@ -140,3 +153,13 @@ class ShimClient:
 
     def _url(self, path: str) -> str:
         return f"{'https' if self.secure else 'http'}://{self.hostname}:{self.port}/{path.lstrip('/')}"
+
+
+def health_response_to_health_status(data: HealthcheckResponse) -> HealthStatus:
+    if data.service == "dstack-shim":
+        return HealthStatus(healthy=True, reason="Service is OK")
+    else:
+        return HealthStatus(
+            healthy=False,
+            reason=f"Service name is {data.service}, service version: {data.version}",
+        )
