@@ -53,7 +53,23 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
         raise ProvisioningError() from e
 
 
-def run_pre_start_commands(client: paramiko.SSHClient, shim_pre_start_commands: List[str]) -> None:
+def run_pre_start_commands(
+    client: paramiko.SSHClient, shim_pre_start_commands: List[str], authorized_keys: List[str]
+) -> None:
+    try:
+        authorized_keys_content = "\n".join(authorized_keys).strip()
+        _, stdout, stderr = client.exec_command(
+            f"echo '\n{authorized_keys_content}' >> ~/.ssh/authorized_keys", timeout=5
+        )
+        out = stdout.read().strip().decode()
+        err = stderr.read().strip().decode()
+        if out or err:
+            raise ProvisioningError(
+                f"The command 'authorized_keys' didn't work. stdout: {out}, stderr: {err}"
+            )
+    except (paramiko.SSHException, OSError) as e:
+        raise ProvisioningError() from e
+
     script = " && ".join(shim_pre_start_commands)
     try:
         _, stdout, stderr = client.exec_command(f"sudo sh -c '{script}'", timeout=120)
@@ -138,6 +154,22 @@ def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any
         time.sleep(3)
     else:
         raise ProvisioningError("Cannot get host_info")
+
+
+def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
+    try:
+        _, stdout, stderr = client.exec_command(
+            "sleep 5 && curl -s http://localhost:10998/api/healthcheck", timeout=15
+        )
+        out = stdout.read().strip().decode()
+        err = stderr.read().strip().decode()
+        if err:
+            raise ProvisioningError(
+                f"The command 'get_shim_healthcheck' didn't work. stdout: {out}, stderr: {err}"
+            )
+        return out
+    except (paramiko.SSHException, OSError) as e:
+        raise ProvisioningError() from e
 
 
 def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:

@@ -155,5 +155,5 @@ def rsa_pkey_from_str(private_string: str) -> PKey:
 
 
 def generate_public_key(private_key: PKey) -> str:
-    public_key = private_key.get_base64()
+    public_key = f"{private_key.get_name()} {private_key.get_base64()}"
     return public_key
