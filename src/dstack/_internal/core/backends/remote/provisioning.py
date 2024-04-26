@@ -41,7 +41,7 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
     tmp_file_path = f"/tmp/{DSTACK_SHIM_ENV_FILE}"
     sftp_upload(client, tmp_file_path, dot_env)
     try:
-        cmd = f"sudo mv {tmp_file_path} {working_dir}/"
+        cmd = f"sudo mkdir -p {working_dir} && sudo mv {tmp_file_path} {working_dir}/"
         _, stdout, stderr = client.exec_command(cmd, timeout=10)
         out = stdout.read().strip()
         err = stderr.read().strip()
