@@ -172,17 +172,17 @@ async def add_remote(instance_id: UUID) -> None:
 
                 runner_build = get_dstack_runner_version()
 
+                # Execute pre start commands
+                shim_pre_start_commands = get_shim_pre_start_commands(runner_build)
+                run_pre_start_commands(client, shim_pre_start_commands)
+                logger.debug("The script for installing dstack has been executed")
+
                 # Upload envs
                 shim_envs = get_shim_env(
                     runner_build, authorized_keys=[sk.public for sk in remote_details.ssh_keys]
                 )
                 upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
                 logger.debug("The dstack-shim environemnt variables has been installed")
-
-                # Execute pre start commands
-                shim_pre_start_commands = get_shim_pre_start_commands(runner_build)
-                run_pre_start_commands(client, shim_pre_start_commands)
-                logger.debug("The script for installing dstack has been executed")
 
                 # Run dstack-shim as a systemd service
                 run_shim_as_systemd_service(
