@@ -177,5 +177,5 @@ def get_paramiko_connection(
         else:
             keys_fp = ", ".join(f"{pk.fingerprint!r}" for pk in pkeys)
             raise ProvisioningError(
-                f"SSH connection to the {conn_url} user with keys [{keys_fp}] was unsuccessful"
+                f"SSH connection to the {conn_url} with keys [{keys_fp}] was unsuccessful"
             )

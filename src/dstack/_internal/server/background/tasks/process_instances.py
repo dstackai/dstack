@@ -442,6 +442,13 @@ async def check_instance(instance_id: UUID) -> None:
             return
 
         ssh_private_key = instance.project.ssh_private_key
+
+        if instance.remote_connection_info is not None:
+            remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
+                instance.remote_connection_info
+            )
+            ssh_private_key = remote_conn_info.ssh_keys[0].private
+
         instance_health: Union[Optional[HealthStatus], bool] = await run_async(
             instance_healthcheck, ssh_private_key, job_provisioning_data
         )
