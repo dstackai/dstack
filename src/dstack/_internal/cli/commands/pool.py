@@ -411,7 +411,7 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
 
         row = [
             instance.name,
-            instance.backend or "",
+            (instance.backend or "").replace("remote", "ssh"),
             instance.region or "",
             resources,
             spot,
@@ -479,7 +479,7 @@ def print_offers_table(
             availability = offer.availability.value.replace("_", " ").title()
         offers_table.add_row(
             f"{index}",
-            offer.backend,
+            offer.backend.replace("remote", "ssh"),
             offer.region,
             offer.instance.name,
             resources.pretty_format(),

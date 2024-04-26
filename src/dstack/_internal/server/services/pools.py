@@ -264,7 +264,7 @@ async def add_remote(
 
     # TODO: doc - will overwrite after remote connected
     instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
-    instance_type = InstanceType(name="remote", resources=instance_resource)
+    instance_type = InstanceType(name="ssh", resources=instance_resource)
 
     local = JobProvisioningData(
         backend=BackendType.REMOTE,
