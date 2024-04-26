@@ -13,6 +13,7 @@ import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import ComputeResourceNotFoundError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.models.instances import RemoteConnectionInfo
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     Job,
@@ -142,8 +143,22 @@ _configuration_type_to_configurator_class_map = {c.TYPE: c for c in _job_configu
 
 async def stop_runner(session: AsyncSession, job_model: JobModel):
     project = await session.get(ProjectModel, job_model.project_id)
+    ssh_private_key = project.ssh_private_key
+
+    res = await session.execute(
+        sa.select(InstanceModel).where(
+            InstanceModel.project_id == job_model.project_id, InstanceModel.job_id == job_model.id
+        )
+    )
+    instance: Optional[InstanceModel] = res.scalar()
+
+    if instance and instance.remote_connection_info is not None:
+        remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
+            instance.remote_connection_info
+        )
+        ssh_private_key = remote_conn_info.ssh_keys[0].private
     try:
-        await run_async(_stop_runner, job_model, project.ssh_private_key)
+        await run_async(_stop_runner, job_model, ssh_private_key)
         delay_job_instance_termination(job_model)
     except SSHError:
         logger.debug("%s: failed to stop runner", fmt(job_model))
@@ -199,7 +214,15 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             if job_model.job_provisioning_data is not None:
                 jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
                 logger.debug("%s: stopping container", fmt(job_model))
-                await stop_container(job_model, jpd, instance.project.ssh_private_key)
+                ssh_private_key = instance.project.ssh_private_key
+                if instance and instance.remote_connection_info is not None:
+                    remote_conn_info: RemoteConnectionInfo = (
+                        RemoteConnectionInfo.__response__.parse_raw(
+                            instance.remote_connection_info
+                        )
+                    )
+                    ssh_private_key = remote_conn_info.ssh_keys[0].private
+                await stop_container(job_model, jpd, ssh_private_key)
 
             if instance.status == InstanceStatus.BUSY:
                 instance.status = InstanceStatus.IDLE

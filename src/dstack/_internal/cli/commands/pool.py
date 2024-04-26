@@ -157,14 +157,15 @@ class PoolCommand(APIBaseCommand):
             formatter_class=self._parser.formatter_class,
         )
         add_ssh.add_argument("destination")
-        add_ssh.add_argument("-p", help="SSH port to connect", dest="ssh_port", type=int)
         add_ssh.add_argument(
             "-i",
             metavar="SSH_PRIVATE_KEY",
             help="The private SSH key path for SSH",
             type=Path,
             dest="ssh_identity_file",
+            required=True,
         )
+        add_ssh.add_argument("-p", help="SSH port to connect", dest="ssh_port", type=int)
         add_ssh.add_argument("-l", help="User to login", dest="login_name")
         add_ssh.add_argument("--region", help="Host region", dest="region")
         add_ssh.add_argument("--pool", help="Pool name", dest="pool_name")
@@ -294,20 +295,6 @@ class PoolCommand(APIBaseCommand):
         super()._command(args)
 
         ssh_keys = []
-
-        try:
-            # TODO: user key must be added during the `run`, not `pool add`
-            user_priv_key = convert_pkcs8_to_pem(
-                Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
-            )
-            try:
-                user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
-            except FileNotFoundError:
-                user_pub_key = generate_public_key(rsa_pkey_from_str(user_priv_key))
-            user_ssh_key = SSHKey(public=user_pub_key, private=user_priv_key)
-            ssh_keys.append(user_ssh_key)
-        except OSError:
-            pass
 
         if args.ssh_identity_file:
             try:

@@ -10,6 +10,7 @@ import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.core.models.instances import RemoteConnectionInfo
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
@@ -126,6 +127,16 @@ async def _process_job(job_id: UUID):
         )
 
         server_ssh_private_key = project.ssh_private_key
+        if (
+            job_model.instance is not None
+            and job_model.instance.remote_connection_info is not None
+            and job_provisioning_data.dockerized
+        ):
+            remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
+                job_model.instance.remote_connection_info
+            )
+            server_ssh_private_key = remote_conn_info.ssh_keys[0].private
+
         secrets = {}  # TODO secrets
         repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
 
