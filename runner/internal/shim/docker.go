@@ -30,6 +30,7 @@ import (
 // TODO: Allow for configuration via cli arguments or environment variables.
 const ImagePullTimeout time.Duration = 20 * time.Minute
 
+// Depricated: Remove on next release (0.19)
 type ContainerStatus struct {
 	ContainerID   string
 	ContainerName string
@@ -41,6 +42,11 @@ type ContainerStatus struct {
 	Error         string
 }
 
+type JobResult struct {
+	Reason        string `json:"reason"`
+	ReasonMessage string `json:"reason_message"`
+}
+
 type DockerRunner struct {
 	client           *docker.Client
 	dockerParams     DockerParameters
@@ -49,8 +55,9 @@ type DockerRunner struct {
 
 	cancelPull context.CancelFunc
 
-	containerStatus ContainerStatus
-	executorError   string
+	containerStatus ContainerStatus // TODO: remove on next release (0.19)
+	executorError   string          // TODO: remove on next release (0.19)
+	jobResult       JobResult
 }
 
 func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
@@ -73,6 +80,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	d.containerStatus = ContainerStatus{
 		ContainerName: cfg.ContainerName,
 	}
+	d.executorError = ""
 
 	pullCtx, cancel := context.WithTimeout(ctx, ImagePullTimeout)
 	defer cancel()
@@ -85,6 +93,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 		errMessage := fmt.Sprintf("pullImage error: %s", err.Error())
 		d.containerStatus.Error = errMessage
 		log.Print(errMessage + "\n")
+		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		return err
 	}
 
@@ -94,6 +103,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 		errMessage := fmt.Sprintf("Cannot create dir for runner: %s", err.Error())
 		d.containerStatus.Error = errMessage
 		log.Print(errMessage + "\n")
+		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		return err
 	}
 
@@ -104,6 +114,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 		d.state = Pending
 		errMessage := fmt.Sprintf("createContainer error: %s", err.Error())
 		d.containerStatus.Error = errMessage
+		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		log.Print(errMessage + "\n")
 		return err
 	}
@@ -130,6 +141,11 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 		d.containerStatus, _ = inspectContainer(d.client, containerID)
 		d.executorError = FindExecutorError(runnerDir)
 		d.currentContainer = ""
+		var errMessage string = d.containerStatus.Error
+		if d.containerStatus.OOMKilled {
+			errMessage = "Container killed by OOM"
+		}
+		d.jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: errMessage}
 		return err
 	}
 
@@ -138,6 +154,12 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	d.executorError = FindExecutorError(runnerDir)
 	d.state = Pending
 	d.currentContainer = ""
+
+	var jobResult = JobResult{Reason: "DONE_BY_RUNNER"}
+	if d.containerStatus.ExitCode != 0 {
+		jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: d.containerStatus.Error}
+	}
+	d.jobResult = jobResult
 
 	return nil
 }
@@ -160,8 +182,8 @@ func (d *DockerRunner) Stop(force bool) {
 	}
 }
 
-func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus, string) {
-	return d.state, d.containerStatus, d.executorError
+func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus, string, JobResult) {
+	return d.state, d.containerStatus, d.executorError, d.jobResult
 }
 
 func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerImageConfig) error {

@@ -23,7 +23,7 @@ func (s *ShimServer) HealthcheckGetHandler(w http.ResponseWriter, r *http.Reques
 func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	state, _, _ := s.runner.GetState()
+	state, _, _, _ := s.runner.GetState()
 	if state != shim.Pending {
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
@@ -48,7 +48,7 @@ func (s *ShimServer) PullGetHandler(w http.ResponseWriter, r *http.Request) (int
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	state, containerStatus, executorError := s.runner.GetState()
+	state, containerStatus, executorError, jobResult := s.runner.GetState()
 
 	return &PullResponse{
 		State:         string(state),
@@ -60,6 +60,7 @@ func (s *ShimServer) PullGetHandler(w http.ResponseWriter, r *http.Request) (int
 		Dead:          containerStatus.Dead,
 		ExitCode:      containerStatus.ExitCode,
 		Error:         containerStatus.Error,
+		Result:        jobResult,
 	}, nil
 }
 
@@ -67,8 +68,7 @@ func (s *ShimServer) StopPostHandler(w http.ResponseWriter, r *http.Request) (in
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	state, _, _ := s.runner.GetState()
-
+	state, _, _, _ := s.runner.GetState()
 	if state == shim.Pending {
 		return &StopResponse{
 			State: string(state),

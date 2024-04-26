@@ -406,8 +406,26 @@ def _process_pulling_with_shim(
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
     container_status = shim_client.pull()  # raises error if shim is down, causes retry
 
+    shim_status = container_status
+
+    if shim_status.status == "pending" and shim_status.result:
+        logger.error(
+            "The docker container of the job '%s' stops with error: %s(%s)",
+            job_model.job_name,
+            shim_status.result.reason,
+            shim_status.result.reason_message,
+        )
+        logger.debug("shim status: %s", container_status.dict())
+        job_model.termination_reason = JobTerminationReason[shim_status.result.reason.upper()]
+        job_model.termination_reason_message = shim_status.result.reason_message
+        return False
+    if shim_status.status in ("pulling", "creating"):
+        return True
+
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
     resp = runner_client.healthcheck()
+
+    # TODO: Remove in release 0.19
     if resp is None or container_status.state == "pending":
         if container_status.executor_error:
             logger.error(
