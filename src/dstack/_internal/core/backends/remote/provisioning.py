@@ -42,15 +42,12 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
     sftp_upload(client, tmp_file_path, dot_env)
     try:
         cmd = f"sudo mkdir -p {working_dir} && sudo mv {tmp_file_path} {working_dir}/"
-        _, stdout, stderr = client.exec_command(cmd, timeout=10)
-        out = stdout.read().strip()
-        err = stderr.read().strip()
+        _, stdout, stderr = client.exec_command(cmd, timeout=20)
+        out = stdout.read().strip().decode()
+        err = stderr.read().strip().decode()
         if out or err:
-            logger.warning(
-                "The command '%s' didn't work. stdout: %s, stderr: %s",
-                tmp_file_path,
-                out.decode(),
-                err.decode(),
+            raise ProvisioningError(
+                f"The command 'upload_envs' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
         raise ProvisioningError() from e
@@ -59,7 +56,13 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
 def run_pre_start_commands(client: paramiko.SSHClient, shim_pre_start_commands: List[str]) -> None:
     script = " && ".join(shim_pre_start_commands)
     try:
-        client.exec_command(f"sudo sh -c '{script}'", timeout=100)
+        _, stdout, stderr = client.exec_command(f"sudo sh -c '{script}'", timeout=120)
+        out = stdout.read().strip().decode()
+        err = stderr.read().strip().decode()
+        if out or err:
+            raise ProvisioningError(
+                f"The command 'run_pre_start_commands' didn't work. stdout: {out}, stderr: {err}"
+            )
     except (paramiko.SSHException, OSError) as e:
         raise ProvisioningError() from e
 
@@ -89,13 +92,19 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
     sftp_upload(client, "/tmp/dstack-shim.service", stripped_shim_service)
 
     try:
-        client.exec_command(
-            "sudo mv /tmp/dstack-shim.service /etc/systemd/system/dstack-shim.service", timeout=10
-        )
-        client.exec_command("sudo systemctl daemon-reload", timeout=10)
-        client.exec_command("sudo systemctl --no-block enable dstack-shim", timeout=10)
-        client.exec_command("sudo systemctl start dstack-shim", timeout=10)
-
+        cmd = """\
+            sudo mv /tmp/dstack-shim.service /etc/systemd/system/dstack-shim.service && \
+            sudo systemctl daemon-reload && \
+            sudo systemctl --quiet enable dstack-shim && \
+            sudo systemctl start dstack-shim
+        """
+        _, stdout, stderr = client.exec_command(cmd, timeout=100)
+        out = stdout.read().strip().decode()
+        err = stderr.read().strip().decode()
+        if out or err:
+            raise ProvisioningError(
+                f"The command 'run_shim_as_systemd_service' didn't work. stdout: {out}, stderr: {err}"
+            )
     except (paramiko.SSHException, OSError) as e:
         raise ProvisioningError() from e
 
@@ -117,12 +126,14 @@ def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any
                 host_info = json.loads(host_info_json)
                 return host_info
             except ValueError:  # JSON parse error
-                _, stdout, _ = client.exec_command("sudo systemctl  status dstack-shim.service")
+                _, stdout, _ = client.exec_command("sudo systemctl status dstack-shim.service")
                 status = stdout.read()
                 for raw_line in status.splitlines():
                     line = raw_line.decode()
                     if line.strip().startswith("Active: failed"):
-                        raise ProvisioningError("The dstack-shim service doesn't start")
+                        raise ProvisioningError(
+                            f"The dstack-shim service doesn't start: {line.strip()}"
+                        )
 
         time.sleep(3)
     else:
