@@ -41,12 +41,17 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
     tmp_file_path = f"/tmp/{DSTACK_SHIM_ENV_FILE}"
     sftp_upload(client, tmp_file_path, dot_env)
     try:
-        _, stdout, _ = client.exec_command(
-            f"sudo mv {tmp_file_path} {working_dir}/{DSTACK_SHIM_ENV_FILE}", timeout=10
-        )
-        output = stdout.read()
-        if output:
-            logger.warning("Cannot move %s: %s", tmp_file_path, output.decode())
+        cmd = f"sudo mv {tmp_file_path} {working_dir}/"
+        _, stdout, stderr = client.exec_command(cmd, timeout=10)
+        out = stdout.read().strip()
+        err = stderr.read().strip()
+        if out or err:
+            logger.warning(
+                "The command '%s' didn't work. stdout: %s, stderr: %s",
+                tmp_file_path,
+                out.decode(),
+                err.decode(),
+            )
     except (paramiko.SSHException, OSError) as e:
         raise ProvisioningError() from e
 
