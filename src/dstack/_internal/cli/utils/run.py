@@ -81,7 +81,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
             InstanceAvailability.IDLE,
             InstanceAvailability.BUSY,
         }:
-            availability = offer.availability.value.replace("_", " ").title()
+            availability = offer.availability.value.replace("_", " ").lower()
         offers.add_row(
             f"{i}",
             offer.backend,
