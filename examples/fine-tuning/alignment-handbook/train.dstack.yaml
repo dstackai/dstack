@@ -3,17 +3,16 @@ type: task
 python: "3.11"
 
 env:
-  - FT_MODEL_CONFIG_PATH=configs/sample_config.yaml
-  - NUM_OF_ACCELERATORS=<Number of accelerators specified>
+  - CONFIG_PATH=configs/sample_config.yaml
+  - NUM_ACCELERATORS=<Number of accelerators specified>
 
-  - HF_TOKEN=<Your Hugging Face access token>
-  - WANDB_API_KEY=<Your Weights&Biases API key>
+  - HUGGING_FACE_HUB_TOKEN=<Your Hugging Face access token>
 
 commands:
   - conda install cuda
   - git clone https://github.com/huggingface/alignment-handbook.git
   - mkdir -p alignment-handbook/recipes/custom/
-  - cp "$FT_MODEL_CONFIG_PATH" alignment-handbook/recipes/custom/config.yaml
+  - cp "$CONFIG_PATH" alignment-handbook/recipes/custom/config.yaml
 
   - cd alignment-handbook
   - python -m pip install .
@@ -22,7 +21,7 @@ commands:
   - pip install wandb
   - wandb login $WANDB_API_KEY
 
-  - ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/multi_gpu.yaml --num_processes=$NUM_OF_ACCELERATORS scripts/run_sft.py recipes/custom/config.yaml
+  - ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/multi_gpu.yaml --num_processes=$NUM_ACCELERATORS scripts/run_sft.py recipes/custom/config.yaml
 ports:
   - 6006
   
