@@ -15,10 +15,14 @@ dependencies = [
     "httpx",
     "jinja2",
     "uvicorn",
+    "aiocache",
 ]
 
 [tool.setuptools.package-data]
-"dstack.gateway" = ["systemd/resources/*"]
+"dstack.gateway" = [
+    "resources/nginx/*",
+    "resources/systemd/*",
+]
 
 [tool.setuptools.dynamic]
 version = {attr = "dstack.gateway.version.__version__"}

@@ -2,7 +2,6 @@ import tarfile
 from pathlib import Path
 from typing import BinaryIO, Optional
 
-from pydantic import BaseModel
 from typing_extensions import Literal
 
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
@@ -77,6 +76,11 @@ class LocalRepo(Repo):
                 filter=TarIgnore(self.run_repo_data.repo_dir, globs=[".git"]),
             )
         return get_sha256(fp)
+
+    def get_repo_info(self) -> LocalRepoInfo:
+        return LocalRepoInfo(
+            repo_dir=self.run_repo_data.repo_dir,
+        )
 
 
 class TarIgnore(GitIgnore):

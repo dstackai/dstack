@@ -28,10 +28,13 @@ class TestListBackendTypes:
         assert response.json() == [
             "aws",
             "azure",
+            "cudo",
             "datacrunch",
             "gcp",
+            "kubernetes",
             "lambda",
             "nebius",
+            "runpod",
             "tensordock",
             "vastai",
         ]
@@ -114,7 +117,9 @@ class TestGetBackendConfigValuesAWS:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ) as authenticate_mock, patch(
+            "dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"
+        ):
             default_creds_available_mock.return_value = True
             response = client.post(
                 "/api/backends/config_values",
@@ -642,7 +647,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -677,7 +682,6 @@ class TestCreateBackend:
         ) as authenticate_mock:
             default_creds_available_mock.return_value = False
             credentials_mock = Mock()
-            credentials_mock.service_account_email = "test"
             authenticate_mock.return_value = credentials_mock, "test_project"
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -741,10 +745,6 @@ class TestCreateBackend:
         ) as SubscriptionClientMock, patch(
             "azure.mgmt.resource.ResourceManagementClient"
         ) as ResourceManagementClientMock, patch(
-            "azure.mgmt.msi.ManagedServiceIdentityClient"
-        ) as ManagedServiceIdentityClientMock, patch(
-            "azure.mgmt.authorization.AuthorizationManagementClient"
-        ) as AuthorizationManagementClientMock, patch(
             "azure.mgmt.network.NetworkManagementClient"
         ) as NetworkManagementClientMock:
             authenticate_mock.return_value = None, "test_tenant"
@@ -762,10 +762,6 @@ class TestCreateBackend:
             resource_client_mock.resource_groups.create_or_update.return_value = (
                 resource_group_mock
             )
-            msi_client_mock = ManagedServiceIdentityClientMock.return_value
-            identity_mock = Mock()
-            identity_mock.principal_id = "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"
-            msi_client_mock.user_assigned_identities.create_or_update.return_value = identity_mock
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
@@ -774,8 +770,6 @@ class TestCreateBackend:
             authenticate_mock.assert_called()
             SubscriptionClientMock.assert_called()
             ResourceManagementClientMock.assert_called()
-            ManagedServiceIdentityClientMock.assert_called()
-            AuthorizationManagementClientMock.assert_called()
             NetworkManagementClientMock.assert_called()
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
@@ -801,7 +795,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -815,7 +809,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ) as authenticate_mock:  # noqa: F841
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -865,7 +859,7 @@ class TestUpdateBackend:
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
             response = client.post(
                 f"/api/project/{project.name}/backends/update",
@@ -963,5 +957,7 @@ class TestGetConfigInfo:
         assert response.json() == {
             "type": "aws",
             "regions": json.loads(backend.config)["regions"],
+            "vpc_name": None,
+            "vpc_ids": None,
             "creds": json.loads(backend.auth),
         }

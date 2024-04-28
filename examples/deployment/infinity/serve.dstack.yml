@@ -1,0 +1,12 @@
+type: service
+# This service deploys an embeddings model with Infinity
+
+image: michaelf34/infinity:latest
+env:
+  - MODEL_ID=BAAI/bge-small-en-v1.5
+commands:
+  - infinity_emb --model-name-or-path $MODEL_ID --port 8000
+port: 8000
+
+resources:
+  gpu: 16GB..

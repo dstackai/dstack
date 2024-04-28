@@ -1,0 +1,13 @@
+target-version = "py38"
+line-length = 99
+
+[lint]
+select = ['E', 'F', 'I' ,'Q', 'W', 'PGH', 'FLY', 'S113']
+ignore =[
+  'E501',
+  'E712',
+]
+
+[lint.isort]
+known-first-party = ["dstack"]
+known-third-party = ["mkdocs_gen_files", "datacrunch"]

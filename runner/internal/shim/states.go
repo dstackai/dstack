@@ -1,7 +1,10 @@
 package shim
 
+type RunnerStatus string
+
 const (
-	WaitRegistryAuth = "waiting_for_registry_auth"
-	Pulling          = "pulling"
-	Running          = "running"
+	Pending  RunnerStatus = "pending"
+	Pulling  RunnerStatus = "pulling"
+	Creating RunnerStatus = "creating"
+	Running  RunnerStatus = "running"
 )

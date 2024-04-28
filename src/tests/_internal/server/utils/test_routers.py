@@ -21,7 +21,6 @@ class TestCheckClientServerCompatibility:
         [
             ("0.12.4", "0.12.4"),
             ("0.12.4", "0.12.5"),
-            ("0.12.5", "0.12.4"),
             ("1.0.5", "1.0.6"),
             ("0.12.4", "0.12.5rc1"),
         ],
@@ -56,6 +55,8 @@ class TestCheckClientServerCompatibility:
     @pytest.mark.parametrize(
         "client_version,server_version",
         [
+            # no forward-compatibility at all (see https://github.com/dstackai/dstack/issues/1162)
+            ("0.12.5", "0.12.4"),
             ("0.13.0", "0.12.4"),
             ("1.12.0", "0.12.0"),
         ],

@@ -1,36 +1,17 @@
-from typing import Any, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from pydantic import Field, root_validator, validator
-from pydantic.fields import ModelField
 from pydantic.generics import GenericModel
-from typing_extensions import Annotated, get_args, get_origin
+from typing_extensions import Annotated
 
-from dstack._internal.core.models.common import ForbidExtra
-
-# TODO(egor-s): add docstrings for API
-
-
-def force_type(v: Any, field: ModelField) -> Any:
-    """
-    Force the first argument of the Union.
-    The rest of the options are presented for flexible typing only.
-    """
-    origin, args = get_origin(field.type_), get_args(field.type_)
-    if origin is Union:
-        # this check is safe for required fields too
-        if not isinstance(v, (args[0], type(None))):
-            raise ValueError("Invalid type")
-    return v
-
+from dstack._internal.core.models.common import CoreModel
 
 T = TypeVar("T", bound=Union[int, float])
 
 
 class Range(GenericModel, Generic[T]):
-    min: Optional[Union[T, float, int, str]]
-    max: Optional[Union[T, float, int, str]]
-
-    _force_type = validator("*", allow_reuse=True)(force_type)
+    min: Optional[T]
+    max: Optional[T]
 
     class Config:
         extra = "forbid"
@@ -61,11 +42,11 @@ class Range(GenericModel, Generic[T]):
             raise ValueError(f"Invalid range order: {min}..{max}")
         return values
 
-    def __str__(self):
+    def __str__(self) -> str:
         min = self.min if self.min is not None else ""
         max = self.max if self.max is not None else ""
         if min == max:
-            return f"{min}"
+            return str(min)
         return f"{min}..{max}"
 
 
@@ -76,10 +57,10 @@ class Memory(float):
 
     @classmethod
     def __get_validators__(cls):
-        yield cls.validate
+        yield cls.parse
 
     @classmethod
-    def validate(cls, v: Any) -> "Memory":
+    def parse(cls, v: Any) -> "Memory":
         if isinstance(v, (float, int)):
             return cls(v)
         if isinstance(v, str):
@@ -118,7 +99,12 @@ class ComputeCapability(Tuple[int, int]):
         return f"{self[0]}.{self[1]}"
 
 
-class GPU(ForbidExtra):
+DEFAULT_CPU_COUNT = Range[int](min=2)
+DEFAULT_MEMORY_SIZE = Range[Memory](min=Memory.parse("8GB"))
+DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
+
+
+class GPUSpec(CoreModel):
     """
     The GPU spec
 
@@ -130,28 +116,11 @@ class GPU(ForbidExtra):
         compute_capability (Optional[float]): The minimum compute capability of the GPU (e.g., `7.5`)
     """
 
-    name: Annotated[
-        Optional[Union[List[str], str]], Field(description="The GPU name or list of names")
-    ] = None
-    count: Annotated[Union[Range[int], int, str], Field(description="The number of GPUs")] = Range[
-        int
-    ](min=1, max=1)
-    memory: Annotated[
-        Optional[Union[Range[Memory], float, int, str]],
-        Field(description="The VRAM size (e.g., 16GB)"),
-    ] = None
-    total_memory: Annotated[
-        Optional[Union[Range[Memory], float, int, str]],
-        Field(description="The total VRAM size (e.g., 32GB)"),
-    ] = None
-    compute_capability: Annotated[
-        Optional[Union[ComputeCapability, float, str]],
-        Field(description="The minimum compute capability of the GPU (e.g., 7.5)"),
-    ] = None
-
-    _force_type = validator(
-        "count", "memory", "total_memory", "compute_capability", allow_reuse=True
-    )(force_type)
+    name: Optional[List[str]] = None
+    count: Range[int] = DEFAULT_GPU_COUNT
+    memory: Optional[Range[Memory]] = None
+    total_memory: Optional[Range[Memory]] = None
+    compute_capability: Optional[ComputeCapability] = None
 
     @classmethod
     def __get_validators__(cls):
@@ -192,7 +161,10 @@ class GPU(ForbidExtra):
         return v
 
 
-class Disk(ForbidExtra):
+MIN_DISK_SIZE = 50
+
+
+class DiskSpec(CoreModel):
     """
     The disk spec
 
@@ -200,11 +172,7 @@ class Disk(ForbidExtra):
         size (Range[Memory]): The size of the disk (e.g., `"100GB"`)
     """
 
-    size: Annotated[
-        Union[Range[Memory], float, int, str], Field(description="The disk size (e.g., 100GB)")
-    ]
-
-    _force_type = validator("size", allow_reuse=True)(force_type)
+    size: Range[Memory]
 
     @classmethod
     def __get_validators__(cls):
@@ -217,39 +185,107 @@ class Disk(ForbidExtra):
             return {"size": v}
         return v
 
+    @validator("size")
+    def validate_size(cls, size):
+        if size.min is not None and size.min < MIN_DISK_SIZE:
+            raise ValueError(f"Min disk size should be >= {MIN_DISK_SIZE}GB")
+        if size.max is not None and size.max < MIN_DISK_SIZE:
+            raise ValueError(f"Max disk size should be >= {MIN_DISK_SIZE}GB")
+        return size
 
-class Resources(ForbidExtra):
+
+DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))
+
+
+class ResourcesSpec(CoreModel):
     """
     The minimum resources requirements for the run.
 
     Attributes:
         cpu (Optional[Range[int]]): The number of CPUs
         memory (Optional[Range[Memory]]): The size of RAM memory (e.g., `"16GB"`)
-        gpu (Optional[GPU]): The GPU spec
-        shm_size (Optional[Range[Memory]]): The of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this.
-        disk (Optional[Disk]): The disk spec
+        gpu (Optional[GPUSpec]): The GPU spec
+        shm_size (Optional[Range[Memory]]): The size of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this
+        disk (Optional[DiskSpec]): The disk spec
     """
 
-    cpu: Annotated[
-        Optional[Union[Range[int], int, str]], Field(description="The number of CPU cores")
-    ] = Range[int](min=2)
+    class Config:
+        @staticmethod
+        def schema_extra(schema: Dict[str, Any]):
+            schema.clear()
+            # replace strict schema with a more permissive one
+            ref_template = "#/definitions/ResourcesSpec/definitions/{model}"
+            for field, value in ResourcesSpecSchema.schema(ref_template=ref_template).items():
+                schema[field] = value
+
+    cpu: Range[int] = DEFAULT_CPU_COUNT
+    memory: Range[Memory] = DEFAULT_MEMORY_SIZE
+    shm_size: Optional[Memory] = None
+    gpu: Optional[GPUSpec] = None
+    disk: Optional[DiskSpec] = DEFAULT_DISK
+
+
+IntRangeLike = Union[Range[Union[int, str]], int, str]
+MemoryRangeLike = Union[Range[Union[Memory, float, int, str]], float, int, str]
+MemoryLike = Union[Memory, float, int, str]
+GPULike = Union[GPUSpec, "GPUSpecSchema", int, str]
+DiskLike = Union[DiskSpec, "DiskSpecSchema", float, int, str]
+ComputeCapabilityLike = Union[ComputeCapability, float, str]
+
+
+class GPUSpecSchema(CoreModel):
+    name: Annotated[
+        Optional[Union[List[str], str]], Field(description="The GPU name or list of names")
+    ] = None
+    count: Annotated[IntRangeLike, Field(description="The number of GPUs")] = DEFAULT_GPU_COUNT
     memory: Annotated[
-        Optional[Union[Range[Memory], float, int, str]],
-        Field(description="The RAM size (e.g., 8GB)"),
-    ] = Range[Memory](min="8GB")
-    shm_size: Annotated[
-        Optional[Union[Memory, float, int, str]],
+        Optional[MemoryRangeLike],
         Field(
-            description="The size of shared memory (e.g., 8GB). "
-            "If you are using parallel communicating processes (e.g., dataloaders in PyTorch), "
-            "you may need to configure this."
+            description="The VRAM size (e.g., `16GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
         ),
     ] = None
-    gpu: Annotated[Optional[Union[GPU, int, str]], Field(description="The GPU resources")] = None
-    disk: Annotated[
-        Optional[Union[Disk, float, int, str]], Field(description="The disk resources")
+    total_memory: Annotated[
+        Optional[MemoryRangeLike],
+        Field(
+            description="The total VRAM size (e.g., `32GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
+        ),
+    ] = None
+    compute_capability: Annotated[
+        Optional[ComputeCapabilityLike],
+        Field(description="The minimum compute capability of the GPU (e.g., `7.5`)"),
     ] = None
 
-    _force_type = validator("cpu", "memory", "shm_size", "gpu", "disk", allow_reuse=True)(
-        force_type
+
+class DiskSpecSchema(CoreModel):
+    size: Annotated[
+        MemoryRangeLike,
+        Field(
+            description="The disk size. Can be a string (e.g., `100GB` or `100GB..`) or an object"
+            "; see [examples](#examples)"
+        ),
+    ]
+
+
+class ResourcesSpecSchema(CoreModel):
+    cpu: Annotated[Optional[IntRangeLike], Field(description="The number of CPU cores")] = (
+        DEFAULT_CPU_COUNT
     )
+    memory: Annotated[
+        Optional[MemoryRangeLike],
+        Field(description="The RAM size (e.g., `8GB`)"),
+    ] = DEFAULT_MEMORY_SIZE
+    shm_size: Annotated[
+        Optional[MemoryLike],
+        Field(
+            description="The size of shared memory (e.g., `8GB`). "
+            "If you are using parallel communicating processes (e.g., dataloaders in PyTorch), "
+            "you may need to configure this"
+        ),
+    ] = None
+    gpu: Annotated[
+        Optional[GPULike],
+        Field(
+            description="The GPU requirements. Can be set to a number, a string (e.g. `A100`, `80GB:2`, etc.), or an object; see [examples](#examples)"
+        ),
+    ] = None
+    disk: Annotated[Optional[DiskLike], Field(description="The disk resources")] = DEFAULT_DISK

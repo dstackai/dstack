@@ -20,13 +20,16 @@ func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (
 	defer s.executor.RUnlock()
 	return &schemas.HealthcheckResponse{
 		Service: "dstack-runner",
+		Version: s.version,
 	}, nil
 }
 
 func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.executor.Lock()
 	defer s.executor.Unlock()
-	if s.executor.GetRunnerState() != executor.WaitSubmit {
+	state := s.executor.GetRunnerState()
+	if state != executor.WaitSubmit {
+		log.Warning(r.Context(), "Executor doesn't wait submit", "current_state", state)
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
@@ -60,9 +63,8 @@ func (s *Server) uploadCodePostHandler(w http.ResponseWriter, r *http.Request) (
 	if _, err = io.Copy(file, r.Body); err != nil {
 		if err.Error() == "http: request body too large" {
 			return nil, &api.Error{Status: http.StatusRequestEntityTooLarge}
-		} else {
-			return nil, gerrors.Wrap(err)
 		}
+		return nil, gerrors.Wrap(err)
 	}
 
 	s.executor.SetCodePath(codePath)
@@ -76,10 +78,10 @@ func (s *Server) runPostHandler(w http.ResponseWriter, r *http.Request) (interfa
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
-	runCtx := context.Background()
-	runCtx, s.cancelRun = context.WithCancel(runCtx)
+	var runCtx context.Context
+	runCtx, s.cancelRun = context.WithCancel(context.Background())
 	go func() {
-		_ = s.executor.Run(runCtx) // todo handle error
+		_ = s.executor.Run(runCtx) // INFO: all errors are handled inside the Run()
 		s.jobBarrierCh <- nil      // notify server that job finished
 	}()
 	s.executor.SetRunnerState(executor.ServeLogs)

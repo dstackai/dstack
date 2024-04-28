@@ -1,17 +1,16 @@
-from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from dstack._internal.core.backends.base.compute import Compute, get_dstack_runner_version
+from dstack._internal.core.backends.base.compute import Compute
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOfferWithAvailability,
-    InstanceState,
+    InstanceRuntime,
     InstanceType,
-    LaunchedInstanceInfo,
     Resources,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -31,16 +30,34 @@ class LocalCompute(Compute):
                 region="local",
                 price=0.00,
                 availability=InstanceAvailability.AVAILABLE,
+                instance_runtime=InstanceRuntime.RUNNER,
             )
         ]
-
-    def get_instance_state(self, instance_id: str, region: str) -> InstanceState:
-        return InstanceState.RUNNING
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ):
         pass
+
+    def create_instance(
+        self,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+    ) -> JobProvisioningData:
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
+            instance_id="local",
+            hostname="127.0.0.1",
+            internal_ip=None,
+            region="",
+            price=instance_offer.price,
+            username="root",
+            ssh_port=10022,
+            ssh_proxy=None,
+            dockerized=True,
+            backend_data=None,
+        )
 
     def run_job(
         self,
@@ -49,27 +66,18 @@ class LocalCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
-        authorized_keys = "\\n".join(
-            [
-                run.run_spec.ssh_key_pub.strip(),
-                project_ssh_public_key.strip(),
-            ]
-        )
-        logger.info(
-            "Running job in LocalBackend. To start processing, run: `"
-            f"DSTACK_BACKEND=local "
-            "DSTACK_RUNNER_LOG_LEVEL=6 "
-            f"DSTACK_RUNNER_VERSION={get_dstack_runner_version()} "
-            f"DSTACK_IMAGE_NAME={job.job_spec.image_name} "
-            f'DSTACK_PUBLIC_SSH_KEY="{authorized_keys}" ./shim --dev docker --keep-container`',
-        )
-        return LaunchedInstanceInfo(
+    ) -> JobProvisioningData:
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
             instance_id="local",
-            ip_address="127.0.0.1",
+            hostname="127.0.0.1",
+            internal_ip=None,
             region="",
+            price=instance_offer.price,
             username="root",
             ssh_port=10022,
-            dockerized=False,
+            ssh_proxy=None,
+            dockerized=True,
             backend_data=None,
         )

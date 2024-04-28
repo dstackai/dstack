@@ -3,6 +3,7 @@ import uuid
 import requests
 import yaml
 
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceType
 from dstack._internal.utils.logging import get_logger
 
@@ -14,7 +15,7 @@ class TensorDockAPIClient:
         self.api_url = "https://marketplace.tensordock.com/api/v0".rstrip("/")
         self.api_key = api_key
         self.api_token = api_token
-        self.s = requests.Session()
+        self.s = requests.Session()  # TODO: set adequate timeout everywhere the session is used
 
     def auth_test(self) -> bool:
         resp = self.s.post(
@@ -85,9 +86,12 @@ class TensorDockAPIClient:
             },
         )
         resp.raise_for_status()
-        data = resp.json()
-        if not data["success"]:
-            raise requests.HTTPError(data)
+        try:
+            data = resp.json()
+            if not data["success"]:
+                raise BackendError(data)
+        except ValueError:  # json parsing error
+            raise BackendError(resp.text)
 
     def _url(self, path):
         return f"{self.api_url}/{path.lstrip('/')}"

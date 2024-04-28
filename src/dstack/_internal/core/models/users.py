@@ -1,7 +1,9 @@
 import enum
 from typing import Optional
 
-from pydantic import UUID4, BaseModel
+from pydantic import UUID4
+
+from dstack._internal.core.models.common import CoreModel
 
 
 class ProjectRole(str, enum.Enum):
@@ -14,14 +16,14 @@ class GlobalRole(str, enum.Enum):
     USER = "user"
 
 
-class User(BaseModel):
+class User(CoreModel):
     id: UUID4
     username: str
     global_role: GlobalRole
     email: Optional[str]
 
 
-class UserTokenCreds(BaseModel):
+class UserTokenCreds(CoreModel):
     token: str
 
 

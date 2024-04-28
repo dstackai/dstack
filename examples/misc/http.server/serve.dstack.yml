@@ -1,0 +1,10 @@
+type: service
+# This service deploys a simple HTTP server
+
+python: "3.11"
+commands:
+  - python3 -m http.server
+port: 8000
+
+# Disable authentication
+auth: false

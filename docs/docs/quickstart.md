@@ -1,5 +1,14 @@
 # Quickstart
 
+??? info "Prerequisites"
+    To use the open-source version, make sure to [install the server](installation/index.md) and configure backends.
+
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, install the CLI and run the `dstack config` command:
+    
+    ![](../assets/images/dstack-cloud-config.png){ width=800 }
+
+    Once the CLI is set up, follow the quickstart.
+
 ## Initialize a repo
 
 To use `dstack`'s CLI in a folder, first run [`dstack init`](reference/cli/index.md#dstack-init) within that folder.
@@ -29,9 +38,15 @@ or `train.dstack.yml` are both acceptable).
     ```yaml
     type: dev-environment
 
-    python: "3.11" # (Optional) If not specified, your local version is used
+    # Use either `python` or `image` to configure environment
+    python: "3.11"
+    # image: ghcr.io/huggingface/text-generation-inference:latest
     
     ide: vscode
+
+    # (Optional) Configure `gpu`, `memory`, `disk`, etc
+    resources:
+      gpu: 80GB
     ```
 
     </div>
@@ -45,16 +60,21 @@ or `train.dstack.yml` are both acceptable).
     ```yaml
     type: task
 
-    python: "3.11" # (Optional) If not specified, your local version is used
-    
+    python: "3.11"
+    env:
+      - HF_HUB_ENABLE_HF_TRANSFER=1
     commands:
-      - pip install -r requirements.txt
-      - python train.py
+      - pip install -r fine-tuning/qlora/requirements.txt
+      - python fine-tuning/qlora/train.py
+
+    # (Optional) Configure `gpu`, `memory`, `disk`, etc
+    resources:
+      gpu: 80GB
     ```
 
     </div>
 
-    Ensure `requirements.txt` and `train.py` are in your folder; you can take them from our [`examples`](https://github.com/dstackai/dstack-examples/tree/main/fine-tuning/qlora).
+    Ensure `requirements.txt` and `train.py` are in your folder. You can take them from [`dstack-examples`](https://github.com/dstackai/dstack-examples/tree/main/fine-tuning/qlora).
 
 === "Service"
 
@@ -66,27 +86,28 @@ or `train.dstack.yml` are both acceptable).
     type: service
 
     image: ghcr.io/huggingface/text-generation-inference:latest
-    
-    env: 
-      - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ 
-    
-    port: 80
-    
+    env:
+      - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
     commands:
-      - text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code
+      - text-generation-launcher --port 8000 --trust-remote-code
+    port: 8000
+
+    # (Optional) Configure `gpu`, `memory`, `disk`, etc
+    resources:
+      gpu: 80GB
     ```
-    
+
     </div>
 
 ## Run configuration
 
 Run a configuration using the [`dstack run`](reference/cli/index.md#dstack-run) command, followed by the working directory path (e.g., `.`), the path to the
-configuration file, and  run options (e.g., configuring hardware resources, spot policy, etc.)
+configuration file, and run options (e.g., configuring hardware resources, spot policy, etc.)
 
 <div class="termy">
 
 ```shell
-$ dstack run . -f train.dstack.yml --gpu A100
+$ dstack run . -f train.dstack.yml
 
  BACKEND     REGION         RESOURCES                     SPOT  PRICE
  tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
@@ -110,7 +131,7 @@ To exclude any files from uploading, use `.gitignore`.
 
 ## What's next?
 
-1. Learn more about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
-    and [services](concepts/services.md)
-2. Browse [examples](../examples/index.md)
-3. Join the [Discord server](https://discord.gg/u8SmfwPpMd)
+1. Read about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
+    [services](concepts/services.md), and [pools](concepts/pools.md) 
+2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md){:target="_blank"}
+3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

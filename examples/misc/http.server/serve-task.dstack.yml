@@ -1,0 +1,10 @@
+type: task
+# This task runs a simple HTTP server
+
+python: "3.11"
+
+commands:
+  - python3 -m http.server
+
+ports:
+  - 8000

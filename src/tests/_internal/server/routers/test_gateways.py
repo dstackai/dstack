@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,10 +26,18 @@ from dstack._internal.server.testing.common import (
 client = TestClient(app)
 
 
+class AsyncContextManager:
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        pass
+
+
 class TestListAndGetGateways:
     @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post(f"/api/project/main/gateways/list")
+        response = client.post("/api/project/main/gateways/list")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
@@ -115,7 +123,7 @@ class TestListAndGetGateways:
             json={"name": "missing"},
             headers=get_auth_headers(user.token),
         )
-        assert response.status_code == 404
+        assert response.status_code == 400
 
 
 class TestCreateGateway:
@@ -142,7 +150,9 @@ class TestCreateGateway:
         backend = await create_backend(session, project.id)
         with patch(
             "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m:
+        ) as m, patch(
+            "dstack._internal.server.services.gateways.gateway_connections_pool.add"
+        ) as pool_add:
             aws = Mock()
             m.return_value = [(backend, aws)]
             aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
@@ -150,7 +160,8 @@ class TestCreateGateway:
                 ip_address="2.2.2.2",
                 region="us",
             )
-
+            pool_add.return_value = MagicMock()
+            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
             response = client.post(
                 f"/api/project/{project.name}/gateways/create",
                 json={"name": "test", "backend_type": "aws", "region": "us"},
@@ -158,6 +169,7 @@ class TestCreateGateway:
             )
             m.assert_called_once()
             aws.compute.return_value.create_gateway.assert_called_once()
+            pool_add.assert_called_once()
         assert response.status_code == 200
         assert response.json() == {
             "name": "test",
@@ -180,7 +192,11 @@ class TestCreateGateway:
         backend = await create_backend(session, project.id)
         with patch(
             "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m, patch("dstack._internal.server.services.gateways.random_names.generate_name") as g:
+        ) as m, patch(
+            "dstack._internal.server.services.gateways.random_names.generate_name"
+        ) as g, patch(
+            "dstack._internal.server.services.gateways.gateway_connections_pool.add"
+        ) as pool_add:
             g.return_value = "random-name"
             aws = Mock()
             m.return_value = [(backend, aws)]
@@ -189,7 +205,8 @@ class TestCreateGateway:
                 ip_address="2.2.2.2",
                 region="us",
             )
-
+            pool_add.return_value = MagicMock()
+            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
             response = client.post(
                 f"/api/project/{project.name}/gateways/create",
                 json={"name": None, "backend_type": "aws", "region": "us"},
@@ -198,6 +215,7 @@ class TestCreateGateway:
             g.assert_called_once()
             m.assert_called_once()
             aws.compute.return_value.create_gateway.assert_called_once()
+            pool_add.assert_called_once()
         assert response.status_code == 200
         assert response.json() == {
             "name": "random-name",
@@ -273,7 +291,7 @@ class TestDefaultGateway:
     async def test_default_gateway_is_missing(self, test_db, session: AsyncSession):
         project = await create_project(session)
         backend = await create_backend(session, project.id)
-        gateway = await create_gateway(session, project.id, backend.id)
+        await create_gateway(session, project.id, backend.id)
 
         res = await get_project_default_gateway(session, project)
         assert res is None

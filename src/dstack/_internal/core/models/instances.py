@@ -1,31 +1,23 @@
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel
-
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.server.services.docker import DockerImage
 from dstack._internal.utils.common import pretty_resources
 
 
-class InstanceState(str, Enum):
-    NOT_FOUND = "not_found"
-    PROVISIONING = "provisioning"
-    RUNNING = "running"
-    STOPPED = "stopped"
-    STOPPING = "stopping"
-    TERMINATED = "terminated"
-
-
-class Gpu(BaseModel):
+class Gpu(CoreModel):
     name: str
     memory_mib: int
 
 
-class Disk(BaseModel):
+class Disk(CoreModel):
     size_mib: int
 
 
-class Resources(BaseModel):
+class Resources(CoreModel):
     cpus: int
     memory_mib: int
     gpus: List[Gpu]
@@ -49,19 +41,48 @@ class Resources(BaseModel):
         return pretty_resources(**resources)
 
 
-class InstanceType(BaseModel):
+class InstanceType(CoreModel):
     name: str
     resources: Resources
 
 
-class LaunchedInstanceInfo(BaseModel):
-    instance_id: str
-    ip_address: str
-    region: str
+class SSHConnectionParams(CoreModel):
+    hostname: str
     username: str
-    ssh_port: int  # could be different from 22 for some backends
-    dockerized: bool  # True if JumpProxy is needed
-    backend_data: Optional[str]  # backend-specific data in json
+    port: int
+
+
+class SSHKey(CoreModel):
+    public: str
+    private: Optional[str] = None
+
+
+class RemoteConnectionInfo(CoreModel):
+    host: str
+    port: int
+    ssh_user: str
+    ssh_keys: List[SSHKey]
+
+
+class DockerConfig(CoreModel):
+    registry_auth: Optional[RegistryAuth]
+    image: Optional[DockerImage]
+
+
+class InstanceConfiguration(CoreModel):
+    project_name: str
+    instance_name: str  # unique in pool
+    ssh_keys: List[SSHKey]
+    job_docker_config: Optional[DockerConfig]
+    user: str  # dstack user name
+
+    def get_public_keys(self) -> List[str]:
+        return [ssh_key.public.strip() for ssh_key in self.ssh_keys]
+
+
+class InstanceRuntime(Enum):
+    SHIM = "shim"
+    RUNNER = "runner"
 
 
 class InstanceAvailability(Enum):
@@ -69,9 +90,18 @@ class InstanceAvailability(Enum):
     AVAILABLE = "available"
     NOT_AVAILABLE = "not_available"
     NO_QUOTA = "no_quota"
+    IDLE = "idle"
+    BUSY = "busy"
+
+    def is_available(self) -> bool:
+        return self in {
+            InstanceAvailability.UNKNOWN,
+            InstanceAvailability.AVAILABLE,
+            InstanceAvailability.IDLE,
+        }
 
 
-class InstanceOffer(BaseModel):
+class InstanceOffer(CoreModel):
     backend: BackendType
     instance: InstanceType
     region: str
@@ -80,9 +110,10 @@ class InstanceOffer(BaseModel):
 
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
+    instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
 
 
-class LaunchedGatewayInfo(BaseModel):
+class LaunchedGatewayInfo(CoreModel):
     instance_id: str
     ip_address: str
     region: str

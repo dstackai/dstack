@@ -1,6 +1,5 @@
 import asyncio
 import heapq
-import time
 from typing import List, Optional, Tuple, Type, Union
 
 from sqlalchemy import delete, update
@@ -9,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import (
+    BackendError,
     BackendInvalidCredentialsError,
     BackendNotAvailable,
     ResourceExistsError,
@@ -21,10 +21,9 @@ from dstack._internal.core.models.backends import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
-    InstanceAvailability,
     InstanceOfferWithAvailability,
 )
-from dstack._internal.core.models.runs import Job
+from dstack._internal.core.models.runs import Requirements
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import Configurator
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
@@ -49,6 +48,14 @@ try:
 except ImportError:
     pass
 
+try:
+    from dstack._internal.server.services.backends.configurators.cudo import (
+        CudoConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(CudoConfigurator)
+except ImportError:
+    pass
 
 try:
     from dstack._internal.server.services.backends.configurators.datacrunch import (
@@ -67,6 +74,15 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.server.services.backends.configurators.kubernetes import (
+        KubernetesConfigurator,
+    )
+
+    _CONFIGURATOR_CLASSES.append(KubernetesConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.server.services.backends.configurators.lambdalabs import (
         LambdaConfigurator,
     )
@@ -79,6 +95,13 @@ try:
     from dstack._internal.server.services.backends.configurators.nebius import NebiusConfigurator
 
     _CONFIGURATOR_CLASSES.append(NebiusConfigurator)
+except ImportError:
+    pass
+
+try:
+    from dstack._internal.server.services.backends.configurators.runpod import RunpodConfigurator
+
+    _CONFIGURATOR_CLASSES.append(RunpodConfigurator)
 except ImportError:
     pass
 
@@ -143,7 +166,7 @@ async def create_backend(
     if backend is not None:
         raise ResourceExistsError()
     await run_async(configurator.get_config_values, config)
-    backend = configurator.create_backend(project=project, config=config)
+    backend = await run_async(configurator.create_backend, project=project, config=config)
     session.add(backend)
     await session.commit()
     clear_backend_cache(project.name)
@@ -165,7 +188,7 @@ async def update_backend(
     if config_info is None:
         raise ServerClientError("Backend does not exist")
     await run_async(configurator.get_config_values, config)
-    backend = configurator.create_backend(project=project, config=config)
+    backend = await run_async(configurator.create_backend, project=project, config=config)
     await session.execute(
         update(BackendModel)
         .where(
@@ -284,27 +307,37 @@ async def get_project_backend_model_by_type(
     return None
 
 
-_NOT_AVAILABLE = {InstanceAvailability.NOT_AVAILABLE, InstanceAvailability.NO_QUOTA}
-
-
 async def get_instance_offers(
-    backends: List[Backend], job: Job, exclude_not_available: bool = False
+    backends: List[Backend], requirements: Requirements, exclude_not_available: bool = False
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     """
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
-    tasks = [
-        run_async(backend.compute().get_offers, job.job_spec.requirements) for backend in backends
-    ]
-    offers_by_backend = [
-        [
-            (backend, offer)
-            for offer in backend_offers
-            if not exclude_not_available or offer.availability not in _NOT_AVAILABLE
-        ]
-        for backend, backend_offers in zip(backends, await asyncio.gather(*tasks))
-    ]
+    tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
+    offers_by_backend = []
+    for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):
+        if isinstance(result, BackendError):
+            logger.warning(
+                "Failed to get offers from backend %s: %s",
+                backend.TYPE,
+                repr(result),
+            )
+            continue
+        elif isinstance(result, BaseException):
+            logger.error(
+                "Got exception when requesting offers from backend %s",
+                backend.TYPE,
+                exc_info=result,
+            )
+            continue
+        offers_by_backend.append(
+            [
+                (backend, offer)
+                for offer in result
+                if not exclude_not_available or offer.availability.is_available()
+            ]
+        )
     # Merge preserving order for every backend
     offers = heapq.merge(*offers_by_backend, key=lambda i: i[1].price)
-    # Put NOT_AVAILABLE and NO_QUOTA instances at the end, do not sort by price
-    return sorted(offers, key=lambda i: i[1].availability in _NOT_AVAILABLE)
+    # Put NOT_AVAILABLE, NO_QUOTA, and BUSY instances at the end, do not sort by price
+    return sorted(offers, key=lambda i: not i[1].availability.is_available())

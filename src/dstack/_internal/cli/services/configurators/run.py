@@ -1,18 +1,19 @@
 import argparse
-import re
+import os
 import subprocess
-from typing import Dict, List, Optional, Tuple, Type
-
-from pydantic import parse_obj_as
+from typing import Dict, List, Optional, Type
 
 import dstack._internal.core.models.resources as resources
+from dstack._internal.cli.services.args import disk_spec, env_var, gpu_spec, port_mapping
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import (
     BaseConfiguration,
     BaseConfigurationWithPorts,
     ConfigurationType,
     DevEnvironmentConfiguration,
+    EnvSentinel,
     PortMapping,
     ServiceConfiguration,
     TaskConfiguration,
@@ -56,11 +57,18 @@ class BaseRunConfigurator:
             for k, v in args.envs:
                 conf.env[k] = v
         if args.gpu_spec:
-            gpu = (conf.resources.gpu or resources.GPU()).dict()
+            gpu = (conf.resources.gpu or resources.GPUSpec()).dict()
             gpu.update(args.gpu_spec)
-            conf.resources.gpu = resources.GPU.parse_obj(gpu)
+            conf.resources.gpu = resources.GPUSpec.parse_obj(gpu)
         if args.disk_spec:
             conf.resources.disk = args.disk_spec
+
+        for k, v in conf.env.items():
+            if is_core_model_instance(v, EnvSentinel):
+                try:
+                    conf.env[k] = v.from_env(os.environ)
+                except ValueError as e:
+                    raise ConfigurationError(*e.args)
 
         cls.interpolate_run_args(conf.setup, unknown)
 
@@ -129,26 +137,6 @@ class ServiceRunConfigurator(BaseRunConfigurator):
         super().apply(args, unknown, conf)
 
         cls.interpolate_run_args(conf.commands, unknown)
-
-
-def env_var(v: str) -> Tuple[str, str]:
-    r = re.match(r"^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$", v)
-    if r is None:
-        raise ValueError(v)
-    key, value = r.groups()
-    return key, value
-
-
-def gpu_spec(v: str) -> Dict:
-    return resources.GPU.parse(v)
-
-
-def disk_spec(v: str) -> resources.Disk:
-    return parse_obj_as(resources.Disk, v)
-
-
-def port_mapping(v: str) -> PortMapping:
-    return PortMapping.parse(v)
 
 
 def merge_ports(conf: List[PortMapping], args: List[PortMapping]) -> Dict[int, PortMapping]:

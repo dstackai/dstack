@@ -1,8 +1,10 @@
 import os
+import shlex
 import subprocess
 import tempfile
 from typing import Dict, Optional
 
+from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
@@ -18,6 +20,7 @@ class SSHTunnel:
         ports: Dict[int, int],
         control_sock_path: PathLike,
         options: Dict[str, str],
+        ssh_config_path: str = "none",
     ):
         """
         :param ports: Mapping { remote port -> local port }
@@ -27,21 +30,38 @@ class SSHTunnel:
         self.ports = ports
         self.control_sock_path = control_sock_path
         self.options = options
+        self.ssh_config_path = ssh_config_path
 
     def open(self):
         # ControlMaster and ControlPath are always set
-        command = ["ssh", "-f", "-N", "-M", "-S", self.control_sock_path, "-i", self.id_rsa_path]
+        command = [
+            "ssh",
+            "-F",
+            self.ssh_config_path,
+            "-f",
+            "-N",
+            "-M",
+            "-S",
+            self.control_sock_path,
+            "-i",
+            self.id_rsa_path,
+        ]
         for k, v in self.options.items():
             command += ["-o", f"{k}={v}"]
         for port_remote, port_local in self.ports.items():
             command += ["-L", f"{port_local}:localhost:{port_remote}"]
         command += [self.host]
-
-        r = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # Using stderr=subprocess.PIPE may block subprocess.run.
+        # Redirect stderr to file to get ssh error message
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            r = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=f)
+        with open(f.name, "r+b") as f:
+            error = f.read()
+        os.remove(f.name)
         if r.returncode == 0:
             return
-        logger.debug("SSH tunnel failed: %s", r.stderr)
-        raise get_ssh_error(r.stderr)
+        logger.debug("SSH tunnel failed: %s", error)
+        raise get_ssh_error(error)
 
     def close(self):
         command = ["ssh", "-S", self.control_sock_path, "-O", "exit", self.host]
@@ -69,6 +89,7 @@ class RunnerTunnel(SSHTunnel):
         id_rsa: str,
         *,
         control_sock_path: Optional[PathLike] = None,
+        ssh_proxy: Optional[SSHConnectionParams] = None,
         disconnect_delay: int = 5,
     ):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -79,19 +100,37 @@ class RunnerTunnel(SSHTunnel):
             f.write(id_rsa)
         if control_sock_path is None:
             control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
+        options = {}
+        if ssh_proxy is not None:
+            proxy_command = ["ssh", "-i", id_rsa_path, "-W", "%h:%p"]
+            proxy_command += [
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
+            ]
+            proxy_command += [
+                "-p",
+                str(ssh_proxy.port),
+                f"{ssh_proxy.username}@{ssh_proxy.hostname}",
+            ]
+            options["ProxyCommand"] = shlex.join(proxy_command)
+        options.update(
+            {
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+                "ExitOnForwardFailure": "yes",
+                "ConnectTimeout": "3",
+                # "ControlPersist": f"{disconnect_delay}s",
+                "Port": str(ssh_port),
+            }
+        )
         super().__init__(
             host=f"{user}@{hostname}",
             id_rsa_path=id_rsa_path,
             ports=ports,
             control_sock_path=control_sock_path,
-            options={
-                "StrictHostKeyChecking": "no",
-                "UserKnownHostsFile": "/dev/null",
-                "ExitOnForwardFailure": "yes",
-                "ConnectTimeout": "1",
-                # "ControlPersist": f"{disconnect_delay}s",
-                "Port": ssh_port,
-            },
+            options=options,
         )
 
     # def close(self):
@@ -113,15 +152,17 @@ class ClientTunnel(SSHTunnel):
         host: str,
         ports: Dict[int, int],
         id_rsa_path: PathLike,
+        ssh_config_path: str,
         control_sock_path: Optional[str] = None,
     ):
-        self.temp_dir = tempfile.TemporaryDirectory() if not control_sock_path else None
+        if control_sock_path is None:
+            self.temp_dir = tempfile.TemporaryDirectory()
+            control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
         super().__init__(
             host=host,
             id_rsa_path=id_rsa_path,
             ports=ports,
-            control_sock_path=os.path.join(self.temp_dir.name, "control.sock")
-            if not control_sock_path
-            else control_sock_path,
+            control_sock_path=control_sock_path,
             options={},
+            ssh_config_path=ssh_config_path,
         )

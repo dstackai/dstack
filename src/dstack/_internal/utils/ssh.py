@@ -1,15 +1,22 @@
+import io
 import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Dict, Optional
 
+import paramiko
 from filelock import FileLock
 from paramiko.config import SSHConfig
 from paramiko.pkey import PKey, PublicBlob
 
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
+
+logger = get_logger(__name__)
+
 
 default_ssh_config_path = "~/.ssh/config"
 
@@ -29,7 +36,7 @@ def get_host_config(hostname: str, ssh_config_path: PathLike = default_ssh_confi
 
 
 def make_ssh_command_for_git(identity_file: PathLike) -> str:
-    return f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={identity_file}"
+    return f"ssh -F none -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o IdentitiesOnly=yes -F /dev/null -o IdentityFile={identity_file}"
 
 
 def try_ssh_key_passphrase(identity_file: PathLike, passphrase: str = "") -> bool:
@@ -56,8 +63,18 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
             with open(ssh_config_path, "r") as f:
                 content = f.read()
         if include not in content:
-            with open(ssh_config_path, "w") as f:
-                f.write(include + content)
+            try:
+                with open(ssh_config_path, "w") as f:
+                    f.write(include + content)
+            except PermissionError:
+                logger.warning(
+                    f"Couldn't update `{ssh_config_path}` due to a permissions problem.\n\n"
+                    f"The `vscode://vscode-remote/ssh-remote+<run name>/workflow` link and "
+                    f"the `ssh <run name>` command won't work.\n\n"
+                    f"To fix this, make sure `{ssh_config_path}` is writable, or add "
+                    f"`Include {path}` to the top of `{ssh_config_path}` manually.",
+                    extra={"markup": True},
+                )
 
 
 def get_ssh_config(path: PathLike, host: str) -> Optional[Dict[str, str]]:
@@ -91,7 +108,7 @@ def update_ssh_config(path: PathLike, host: str, options: Dict[str, str]):
         if os.path.exists(path):
             with open(path, "r") as f:
                 for line in f:
-                    m = re.match(rf"^Host\s+(\S+)$", line.strip())
+                    m = re.match(r"^Host\s+(\S+)$", line.strip())
                     if m is not None:
                         copy_mode = m.group(1) != host
                     if copy_mode:
@@ -103,3 +120,40 @@ def update_ssh_config(path: PathLike, host: str, options: Dict[str, str]):
                 for k, v in options.items():
                     f.write(f"    {k} {v}\n")
             f.flush()
+
+
+def convert_pkcs8_to_pem(private_string: str) -> str:
+    if not private_string.startswith("-----BEGIN PRIVATE KEY-----"):
+        return private_string
+
+    with tempfile.NamedTemporaryFile(mode="w+") as key_file:
+        key_file.write(private_string)
+        key_file.flush()
+        cmd = ["ssh-keygen", "-p", "-m", "PEM", "-f", key_file.name, "-y", "-q", "-N", ""]
+        try:
+            subprocess.run(
+                cmd,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError:
+            logger.error("Use a PEM key or install ssh-keygen to convert it automatically")
+        except subprocess.CalledProcessError as e:
+            logger.error("Fail to convert ssh key: stdout=%s, stderr=%s", e.stdout, e.stderr)
+
+        key_file.seek(0)
+        private_string = key_file.read()
+    return private_string
+
+
+def rsa_pkey_from_str(private_string: str) -> PKey:
+    key_file = io.StringIO(private_string.strip())
+    pkey = paramiko.RSAKey.from_private_key(key_file)
+    key_file.close()
+    return pkey
+
+
+def generate_public_key(private_key: PKey) -> str:
+    public_key = f"{private_key.get_name()} {private_key.get_base64()}"
+    return public_key

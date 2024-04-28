@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source toolkit for running GPU workloads on any cloud. It simplifies development, training, and deployment of gen AI models.
+  dstack is an open-source engine that automates infrastructure provisioning on any cloud — for development, training, and deployment of AI models.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -60,42 +60,58 @@ theme:
 plugins:
   - blog:
       blog_dir: blog
+      post_url_format: "{slug}"
       blog_toc: true
   - social:
       cards_layout_options:
         background_color: "black"
         color: "#FFFFFF"
-        font_family: Roboto
+        font_family: "Roboto"
 #      debug: true
-      cards_layout_dir: layouts
+      cards_layout_dir: docs/layouts
       cards_layout: custom
   - search
   - redirects:
       redirect_maps:
-        'quickstart.md': 'docs/index.md'
-        'docs/quick-start.md': 'docs/quickstart.md'
-        'docs/guides/projects.md': 'docs/installation/index.md'
-        'docs/configuration/server.md': 'docs/installation/index.md'
-        'guides/clouds.md': 'docs/installation/index.md'
-        'examples/llama-index-weaviate.md': 'examples/llama-index.md'
-        'examples/finetuning-llama-2.md': 'examples/qlora.md'
-        'examples/text-generation-inference.md': 'examples/tgi.md'
-        'examples/stable-diffusion-xl.md': 'examples/sdxl.md'
-        'examples/vllm.md': 'examples/vllm.md'
-        'learn/mixtral.md': 'examples/mixtral.md'
-        'learn/tei.md': 'examples/tei.md'
-        'learn/llama-index.md': 'examples/llama-index.md'
-        'learn/qlora.md': 'examples/qlora.md'
-        'learn/tgi.md': 'examples/tgi.md'
-        'learn/sdxl.md': 'examples/sdxl.md'
-        'learn/vllm.md': 'examples/vllm.md'
-        'guides/dev-environments.md': 'concepts/dev-environments.md'
-        'guides/tasks.md': 'concepts/tasks.md'
-        'guides/services.md': 'concepts/services.md'
+        'examples/tgi.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md'
+        'examples/vllm.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md'
+        'examples/olama.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/olama/README.md'
+        'examples/tae.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/tae/README.md'
+        'examples/infinity.md': 'https://github.com/dstackai/dstack/blob/master/examples/deployment/infinity/README.md'
+        'examples/qlora.md': 'https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/qlora/README.md'
+        'examples/mixtral.md': 'https://github.com/dstackai/dstack/blob/master/examples/llms/mixtral/README.md'
+        'blog/2024/02/08/resources-authentication-and-more.md': 'https://github.com/dstackai/dstack/releases/0.15.0'
+        'blog/2024/01/19/openai-endpoints-preview.md': 'https://github.com/dstackai/dstack/releases/0.14.0'
+        'blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more.md': 'https://github.com/dstackai/dstack/releases/0.13.0'
+        'blog/2023/11/21/vastai.md': 'https://github.com/dstackai/dstack/releases/0.12.3'
+        'blog/2023/10/31/tensordock.md': 'https://github.com/dstackai/dstack/releases/0.12.2'
+        'blog/2023/10/18/simplified-cloud-setup.md': 'https://github.com/dstackai/dstack/releases/0.12.0'
+        'blog/2023/08/22/multiple-clouds.md': 'https://github.com/dstackai/dstack/releases/0.11'
+        'blog/2023/08/07/services-preview.md': 'https://github.com/dstackai/dstack/releases/0.10.7'
+        'blog/2023/07/14/lambda-cloud-ga-and-docker-support.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
+        'blog/2023/05/22/azure-support-better-ui-and-more.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
+        'blog/2023/03/13/gcp-support-just-landed.md': 'https://github.com/dstackai/dstack/releases/0.2'
+        'changelog/0.2.md': 'https://github.com/dstackai/dstack/releases/0.2'
+        'changelog/0.9.1.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
+        'changelog/0.10.5.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
+        'changelog/0.10.7.md': 'https://github.com/dstackai/dstack/releases/0.10.7'
+        'changelog/0.11.0.md': 'https://github.com/dstackai/dstack/releases/0.11'
+        'changelog/0.12.0.md': 'https://github.com/dstackai/dstack/releases/0.12.0'
+        'changelog/0.12.2.md': 'https://github.com/dstackai/dstack/releases/0.12.2'
+        'changelog/0.12.3.md': 'https://github.com/dstackai/dstack/releases/0.12.3'
+        'changelog/0.13.0.md': 'https://github.com/dstackai/dstack/releases/0.13.0'
+        'changelog/0.14.0.md': 'https://github.com/dstackai/dstack/releases/0.14.0'
+        'changelog/0.15.0.md': 'https://github.com/dstackai/dstack/releases/0.15.0'
+        'changelog/0.15.1.md': 'https://github.com/dstackai/dstack/releases/0.15.1'
+        'changelog/0.16.0.md': 'https://github.com/dstackai/dstack/releases/0.16.0'
+        'changelog/0.16.1.md': 'https://github.com/dstackai/dstack/releases/0.16.1'
+        'changelog/0.17.0.md': 'https://github.com/dstackai/dstack/releases/0.17.0'
+        'changelog/0.18.0.md': 'https://github.com/dstackai/dstack/releases/0.18.0'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
         - scripts/docs/gen_cli_reference.py
+        - scripts/docs/gen_openapi_reference.py
         - scripts/docs/gen_schema_reference.py
   - mkdocstrings:
       handlers:
@@ -103,6 +119,7 @@ plugins:
           options:
             docstring_style: google
             show_source: false
+  - render_swagger
 
 # Extensions
 markdown_extensions:
@@ -168,35 +185,29 @@ nav:
   - Home: index.md
   - Docs:
       - Getting started:
-          - Introduction: docs/index.md
+          - Overview: docs/index.md
           - Installation: docs/installation/index.md
           - Quickstart: docs/quickstart.md
+          - Protips: docs/protips.md
       - Concepts:
-#          - Overview: docs/guides/index.md
           - Dev environments: docs/concepts/dev-environments.md
           - Tasks: docs/concepts/tasks.md
           - Services: docs/concepts/services.md
+          - Pools: docs/concepts/pools.md
       - Reference:
-          - CLI: docs/reference/cli/index.md
-          - API: docs/reference/api/python/index.md
-          - .dstack.yml: docs/reference/dstack.yml.md
-          - server/config.yml: docs/reference/server/config.yml.md
+          - .dstack.yml:
+              - dev-environment: docs/reference/dstack.yml/dev-environment.md
+              - task: docs/reference/dstack.yml/task.md
+              - service: docs/reference/dstack.yml/service.md
           - profiles.yml: docs/reference/profiles.yml.md
-  - Examples:
-    - examples/index.md
-    - LLMs:
-        - Mixtral 8x7B: examples/mixtral.md
-    - Fine-tuning:
-        - QLoRA: examples/qlora.md
-    - Deployment:
-        - vLLM: examples/vllm.md
-        - Text Generation Inference: examples/tgi.md
-        - Text Embedding Interface: examples/tei.md
-        - SDXL: examples/sdxl.md
-    - RAG:
-        - Llama Index: examples/llama-index.md
-#  - Blog:
-#      - blog/index.md
-  - Discord: https://discord.gg/u8SmfwPpMd
-  - Platform: platform.md
-  - GitHub: https://github.com/dstackai/dstack
+          - CLI: docs/reference/cli/index.md
+          - server/config.yml: docs/reference/server/config.yml.md
+          - API:
+              - Python API: docs/reference/api/python/index.md
+              - REST API: docs/reference/api/rest/index.md
+  - Examples: https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank
+  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
+  - Blog:
+      - blog/index.md
+  - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
+  - GitHub: https://github.com/dstackai/dstack" target="_blank

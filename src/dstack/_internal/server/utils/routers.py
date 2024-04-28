@@ -1,11 +1,10 @@
 from typing import Dict, List, Optional
 
-from fastapi import HTTPException, Request, Response, status
+from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from packaging import version
 
 from dstack._internal.core.errors import ServerClientError
-from dstack._internal.server import settings
 
 
 def error_detail(msg: str, code: Optional[str] = None, **kwargs) -> Dict:
@@ -66,11 +65,9 @@ def check_client_server_compatibility(
     Returns `JSONResponse` with error if client/server versions are incompatible.
     Returns `None` otherwise.
     """
-    if server_version is None:
+    if client_version is None or server_version is None:
         return None
     parsed_server_version = version.parse(server_version)
-    if client_version is None:
-        return error_incompatible_versions(client_version, server_version, ask_cli_update=True)
     # latest allows client to bypass compatibility check (e.g. frontend)
     if client_version == "latest":
         return None
@@ -85,6 +82,8 @@ def check_client_server_compatibility(
                 )
             },
         )
+    # We preserve backward-compatibility across micro releases,
+    # but do not preserve forward-compatibility.
     if parsed_client_version < parsed_server_version and (
         parsed_client_version.major < parsed_server_version.major
         or parsed_client_version.minor < parsed_server_version.minor
@@ -93,6 +92,7 @@ def check_client_server_compatibility(
     elif parsed_client_version > parsed_server_version and (
         parsed_client_version.major > parsed_server_version.major
         or parsed_client_version.minor > parsed_server_version.minor
+        or parsed_client_version.micro > parsed_server_version.micro
     ):
         return error_incompatible_versions(client_version, server_version, ask_cli_update=False)
     return None

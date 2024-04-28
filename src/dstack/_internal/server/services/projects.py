@@ -2,10 +2,16 @@ import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import delete, select, update
+from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
 from dstack._internal.core.models.backends import BackendInfo
+from dstack._internal.core.models.backends.dstack import (
+    DstackBaseBackendConfigInfo,
+    DstackConfigInfo,
+)
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.projects import Member, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
@@ -63,13 +69,15 @@ async def get_project_by_name(
 
 
 async def create_project(session: AsyncSession, user: UserModel, project_name: str) -> Project:
-    project = await get_project_model_by_name(session=session, project_name=project_name)
+    project = await get_project_model_by_name(
+        session=session, project_name=project_name, ignore_case=True
+    )
     if project is not None:
         raise ResourceExistsError()
     await _check_projects_quota(session=session, user=user)
     project = await create_project_model(
         session=session,
-        user=user,
+        owner=user,
         project_name=project_name,
     )
     await add_project_member(
@@ -78,11 +86,13 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
         user=user,
         project_role=ProjectRole.ADMIN,
     )
-    project = await get_project_model_by_name_or_error(session=session, project_name=project_name)
+    project_model = await get_project_model_by_name_or_error(
+        session=session, project_name=project_name
+    )
     for hook in _CREATE_PROJECT_HOOKS:
-        await hook(session, project)
-    await session.refresh(project)  # a hook may change project
-    return project_model_to_project(project)
+        await hook(session, project_model)
+    await session.refresh(project_model)  # a hook may change project
+    return project_model_to_project(project_model)
 
 
 async def delete_projects(
@@ -99,6 +109,8 @@ async def delete_projects(
         for project in user_projects:
             if not _is_project_admin(user=user, project=project):
                 raise ForbiddenError()
+        if all(name in projects_names for name in user_project_names):
+            raise ServerClientError("Cannot delete the only project")
     timestamp = str(int(get_current_datetime().timestamp()))
     new_project_name = "_deleted_" + timestamp + ProjectModel.name
     await session.execute(
@@ -198,15 +210,14 @@ async def list_project_models(
 
 
 async def get_project_model_by_name(
-    session: AsyncSession,
-    project_name: str,
+    session: AsyncSession, project_name: str, ignore_case: bool = True
 ) -> Optional[ProjectModel]:
-    res = await session.execute(
-        select(ProjectModel).where(
-            ProjectModel.name == project_name,
-            ProjectModel.deleted == False,
-        )
-    )
+    filters = [ProjectModel.deleted == False]
+    if ignore_case:
+        filters.append(safunc.lower(ProjectModel.name) == safunc.lower(project_name))
+    else:
+        filters.append(ProjectModel.name == project_name)
+    res = await session.execute(select(ProjectModel).where(*filters))
     return res.scalar()
 
 
@@ -237,14 +248,14 @@ async def get_project_model_by_id_or_error(
 
 
 async def create_project_model(
-    session: AsyncSession, user: UserModel, project_name: str
+    session: AsyncSession, owner: UserModel, project_name: str
 ) -> ProjectModel:
     private_bytes, public_bytes = await run_async(
         generate_rsa_key_pair_bytes, f"{project_name}@dstack"
     )
     project = ProjectModel(
         id=uuid.uuid4(),
-        owner_id=user.id,
+        owner_id=owner.id,
         name=project_name,
         ssh_private_key=private_bytes.decode(),
         ssh_public_key=public_bytes.decode(),
@@ -270,11 +281,20 @@ def project_model_to_project(project_model: ProjectModel) -> Project:
             logger.warning("Configurator for backend %s not found", b.type)
             continue
         config_info = configurator.get_config_info(model=b, include_creds=False)
-        backend_info = BackendInfo(
-            name=b.type,
-            config=config_info,
-        )
-        backends.append(backend_info)
+        if is_core_model_instance(config_info, DstackConfigInfo):
+            for backend_type in config_info.base_backends:
+                backends.append(
+                    BackendInfo(
+                        name=backend_type, config=DstackBaseBackendConfigInfo(type=backend_type)
+                    )
+                )
+        else:
+            backends.append(
+                BackendInfo(
+                    name=b.type,
+                    config=config_info,
+                )
+            )
     return Project(
         project_id=project_model.id,
         project_name=project_model.name,
@@ -292,6 +312,8 @@ def register_create_project_hook(func: Callable[[AsyncSession, ProjectModel], Aw
 
 
 async def _check_projects_quota(session: AsyncSession, user: UserModel):
+    if user.global_role == GlobalRole.ADMIN:
+        return
     owned_projects = await list_user_owned_project_models(session=session, user=user)
     if len(owned_projects) >= user.projects_quota:
         raise ServerClientError("User project quota exceeded")

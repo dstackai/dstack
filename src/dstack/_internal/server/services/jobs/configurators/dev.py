@@ -9,8 +9,8 @@ from dstack._internal.server.services.jobs.configurators.extensions.vscode impor
 DEFAULT_MAX_DURATION_SECONDS = 6 * 3600
 
 INSTALL_IPYKERNEL = (
-    f"(echo pip install ipykernel... && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
-    f'echo "no pip, ipykernel was not installed"'
+    "(echo pip install ipykernel... && pip install -q --no-cache-dir ipykernel 2> /dev/null) || "
+    'echo "no pip, ipykernel was not installed"'
 )
 
 
@@ -26,7 +26,8 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         super().__init__(run_spec)
 
     def _shell_commands(self) -> List[str]:
-        commands = []
+        # preserve environment variables for SSH clients
+        commands = ["env >> ~/.ssh/environment"]
         commands += self.ide.get_install_commands()
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup
@@ -45,10 +46,12 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         return DEFAULT_MAX_DURATION_SECONDS
 
     def _retry_policy(self) -> RetryPolicy:
-        return RetryPolicy.parse_obj(self.run_spec.profile.retry_policy or ProfileRetryPolicy())
+        return RetryPolicy.parse_obj(
+            self.run_spec.merged_profile.retry_policy or ProfileRetryPolicy()
+        )
 
     def _spot_policy(self) -> SpotPolicy:
-        return self.run_spec.profile.spot_policy or SpotPolicy.ONDEMAND
+        return self.run_spec.merged_profile.spot_policy or SpotPolicy.ONDEMAND
 
     def _ports(self) -> List[PortMapping]:
         return self.run_spec.configuration.ports

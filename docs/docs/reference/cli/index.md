@@ -55,7 +55,7 @@ $ dstack run . --help
 </div>
 
 ??? info ".gitignore"
-When running anything via CLI, `dstack` uses the exact version of code from your project directory.
+    When running anything via CLI, `dstack` uses the exact version of code from your project directory.
 
     If there are large files, consider creating a `.gitignore` file to exclude them for better performance.
 
@@ -117,9 +117,81 @@ $ dstack config --help
 
 </div>
 
+### dstack pool
+
+Pools allow for managing the lifecycle of instances and reusing them across runs. 
+The default pool is created automatically.
+
+##### dstack pool add
+
+The `dstack pool add` command adds an instance to a pool. If no pool name is specified, the instance goes to the default pool.
+
+<div class="termy">
+
+```shell
+$ dstack pool add --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool ps
+
+The `dstack pool ps` command lists all active instances of a pool.
+If no pool name is specified, default pool instances are displayed.
+
+<div class="termy">
+
+```shell
+$ dstack pool ps --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool create
+
+The `dstack pool create` command creates a new pool.
+
+<div class="termy">
+
+```shell
+$ dstack pool create --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool list
+
+The `dstack pool list` lists all existing pools.
+
+<div class="termy">
+
+```shell
+$ dstack pool delete --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool delete
+
+The `dstack pool delete` command deletes a specified pool.
+
+<div class="termy">
+
+```shell
+$ dstack pool delete --help
+#GENERATE#
+```
+
+</div>
+
 ### dstack gateway
 
-A gateway is required for running services.
+A gateway is required for running services. It handles ingress traffic, authorization, domain mapping, model mapping
+for the OpenAI-compatible endpoint, and so on.
 
 ##### dstack gateway list
 
@@ -175,18 +247,19 @@ $ dstack gateway update --help
 
 ## Environment variables
 
-| Name                              | Description                                   | Default            |
-|-----------------------------------|-----------------------------------------------|--------------------|
-| `DSTACK_CLI_LOG_LEVEL`            | Configures CLI logging level                  | `CRITICAL`         |
-| `DSTACK_PROFILE`                  | Has the same effect as `--profile`            | `None`             |
-| `DSTACK_PROJECT`                  | Has the same effect as `--project`            | `None`             |
-| `DSTACK_DEFAULT_CREDS_DISABLED`   | Disables default credentials detection if set | `None`             |
-| `DSTACK_LOCAL_BACKEND_ENABLED`    | Enables local backend for debug if set        | `None`             |
-| `DSTACK_RUNNER_VERSION`           | Sets exact runner version for debug           | `latest`           |
-| `DSTACK_SERVER_ADMIN_TOKEN`       | Has the same effect as `--token`              | `None`             |
-| `DSTACK_SERVER_DIR`               | Sets path to store data and server configs    | `~/.dstack/server` |
-| `DSTACK_SERVER_HOST`              | Has the same effect as `--host`               | `127.0.0.1`        |
-| `DSTACK_SERVER_LOG_LEVEL`         | Has the same effect as `--log-level`          | `WARNING`          |
-| `DSTACK_SERVER_PORT`              | Has the same effect as `--port`               | `3000`             |
-| `DSTACK_SERVER_ROOT_LOG_LEVEL`    | Sets root logger log level                    | `ERROR`            |
-| `DSTACK_SERVER_UVICORN_LOG_LEVEL` | Sets uvicorn logger log level                 | `ERROR`            |
+| Name                              | Description                                                   | Default            |
+|-----------------------------------|---------------------------------------------------------------|--------------------|
+| `DSTACK_CLI_LOG_LEVEL`            | Configures CLI logging level                                  | `INFO`             |
+| `DSTACK_PROFILE`                  | Has the same effect as `--profile`                            | `None`             |
+| `DSTACK_PROJECT`                  | Has the same effect as `--project`                            | `None`             |
+| `DSTACK_DEFAULT_CREDS_DISABLED`   | Disables default credentials detection if set                 | `None`             |
+| `DSTACK_LOCAL_BACKEND_ENABLED`    | Enables local backend for debug if set                        | `None`             |
+| `DSTACK_RUNNER_VERSION`           | Sets exact runner version for debug                           | `latest`           |
+| `DSTACK_SERVER_ADMIN_TOKEN`       | Has the same effect as `--token`                              | `None`             |
+| `DSTACK_SERVER_DIR`               | Sets path to store data and server configs                    | `~/.dstack/server` |
+| `DSTACK_SERVER_HOST`              | Has the same effect as `--host`                               | `127.0.0.1`        |
+| `DSTACK_SERVER_LOG_LEVEL`         | Has the same effect as `--log-level`                          | `INFO`             |
+| `DSTACK_SERVER_LOG_FORMAT`        | Sets format of log output. Can be `rich`, `standard`, `json`. | `rich`             |
+| `DSTACK_SERVER_PORT`              | Has the same effect as `--port`                               | `3000`             |
+| `DSTACK_SERVER_ROOT_LOG_LEVEL`    | Sets root logger log level                                    | `ERROR`            |
+| `DSTACK_SERVER_UVICORN_LOG_LEVEL` | Sets uvicorn logger log level                                 | `ERROR`            |

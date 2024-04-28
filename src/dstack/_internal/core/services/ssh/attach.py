@@ -5,6 +5,7 @@ import time
 from typing import Optional, Tuple
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.core.services.ssh.tunnel import ClientTunnel
@@ -42,28 +43,49 @@ class SSHAttach:
         ports_lock: PortsLock,
         run_name: str,
         dockerized: bool,
+        ssh_proxy: Optional[SSHConnectionParams] = None,
         control_sock_path: Optional[str] = None,
+        local_backend: bool = False,
     ):
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
         self.run_name = run_name
+        self.ssh_config_path = str(ConfigManager().dstack_ssh_config_path)
         self.tunnel = ClientTunnel(
-            run_name, self.ports, id_rsa_path=id_rsa_path, control_sock_path=control_sock_path
+            run_name,
+            self.ports,
+            id_rsa_path=id_rsa_path,
+            control_sock_path=control_sock_path,
+            ssh_config_path=self.ssh_config_path,
         )
-        self.host_config = {
-            "HostName": hostname,
-            "Port": ssh_port,
-            "User": user,
-            "IdentityFile": id_rsa_path,
-            "StrictHostKeyChecking": "no",
-            "UserKnownHostsFile": "/dev/null",
-        }
-        if dockerized:
+        self.ssh_proxy = ssh_proxy
+        if ssh_proxy is None:
+            self.host_config = {
+                "HostName": hostname,
+                "Port": ssh_port,
+                "User": user,
+                "IdentityFile": id_rsa_path,
+                "IdentitiesOnly": "yes",
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+            }
+        else:
+            self.host_config = {
+                "HostName": ssh_proxy.hostname,
+                "Port": ssh_proxy.port,
+                "User": ssh_proxy.username,
+                "IdentityFile": id_rsa_path,
+                "IdentitiesOnly": "yes",
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+            }
+        if dockerized and not local_backend:
             self.container_config = {
                 "HostName": "localhost",
                 "Port": 10022,
                 "User": "root",
                 "IdentityFile": id_rsa_path,
+                "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
                 "ControlPath": self.tunnel.control_sock_path,
@@ -71,14 +93,30 @@ class SSHAttach:
                 "ControlPersist": "yes",
                 "ProxyJump": f"{run_name}-host",
             }
+        elif ssh_proxy is not None:
+            self.container_config = {
+                "HostName": hostname,
+                "Port": ssh_port,
+                "User": user,
+                "IdentityFile": id_rsa_path,
+                "IdentitiesOnly": "yes",
+                "StrictHostKeyChecking": "no",
+                "UserKnownHostsFile": "/dev/null",
+                "ControlPath": self.tunnel.control_sock_path,
+                "ControlMaster": "auto",
+                "ControlPersist": "yes",
+                "ProxyJump": f"{run_name}-jump-host",
+            }
         else:
             self.container_config = None
-        self.ssh_config_path = str(ConfigManager().dstack_ssh_config_path)
 
     def attach(self):
         include_ssh_config(self.ssh_config_path)
         if self.container_config is None:
             update_ssh_config(self.ssh_config_path, self.run_name, self.host_config)
+        elif self.ssh_proxy is not None:
+            update_ssh_config(self.ssh_config_path, f"{self.run_name}-jump-host", self.host_config)
+            update_ssh_config(self.ssh_config_path, self.run_name, self.container_config)
         else:
             update_ssh_config(self.ssh_config_path, f"{self.run_name}-host", self.host_config)
             update_ssh_config(self.ssh_config_path, self.run_name, self.container_config)
@@ -99,6 +137,7 @@ class SSHAttach:
 
     def detach(self):
         self.tunnel.close()
+        update_ssh_config(self.ssh_config_path, f"{self.run_name}-jump-host", {})
         update_ssh_config(self.ssh_config_path, f"{self.run_name}-host", {})
         update_ssh_config(self.ssh_config_path, self.run_name, {})
 

@@ -16,26 +16,46 @@ from dstack._internal.server.models import BackendModel, ProjectModel
 class Configurator(ABC):
     TYPE: BackendType
 
-    @abstractmethod
     def get_default_configs(self) -> List[AnyConfigInfoWithCreds]:
-        pass
+        """
+        Tries to detect backend creds on the machine and
+        automatically construct backend configs from the creds.
+        """
+        return []
 
     @abstractmethod
     def get_config_values(self, config: AnyConfigInfoWithCredsPartial) -> AnyConfigValues:
+        """
+        Validates backend config and returns possible values for unfilled config parameters.
+        """
         pass
 
     @abstractmethod
     def create_backend(
         self, project: ProjectModel, config: AnyConfigInfoWithCreds
     ) -> BackendModel:
+        """
+        Creates BackendModel given backend config and creds.
+        It may perform backend initialization, create
+        cloud resources such as networks and managed identites, and
+        save additional configuration parameters.
+        """
         pass
 
     @abstractmethod
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyConfigInfo:
+        """
+        Constructs backend's ConfigInfo to be returned in API responses.
+        Project admins may need to see backend's creds. In this case `include_creds` will be True.
+        Otherwise, no sensitive information should be included.
+        """
         pass
 
     @abstractmethod
     def get_backend(self, model: BackendModel) -> Backend:
+        """
+        Returns Backend instance from config and creds stored in `model`.
+        """
         pass
 
 

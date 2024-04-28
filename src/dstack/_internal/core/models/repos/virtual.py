@@ -79,3 +79,6 @@ class VirtualRepo(Repo):
                 info.size = len(content)
                 t.addfile(info, fileobj=io.BytesIO(initial_bytes=content))
         return get_sha256(fp)
+
+    def get_repo_info(self) -> VirtualRepoInfo:
+        return VirtualRepoInfo()

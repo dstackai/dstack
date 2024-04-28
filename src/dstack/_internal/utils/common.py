@@ -2,7 +2,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 
 def get_dstack_dir() -> Path:
@@ -150,3 +150,31 @@ def remove_prefix(text: str, prefix: str) -> str:
     if text.startswith(prefix):
         return text[len(prefix) :]
     return text
+
+
+MEMORY_UNITS = {
+    "B": 1,
+    "K": 2**10,
+    "M": 2**20,
+    "G": 2**30,
+    "T": 2**40,
+    "P": 2**50,
+}
+
+
+def parse_memory(memory: str, as_untis: str = "M") -> float:
+    """
+    Converts memory units to the units specified.
+    >>> parse_memory("512Ki", as_units="M")
+    0.5
+    >>> parse_memory("2Mi", as_units="K")
+    2048
+    """
+    m = re.fullmatch(r"(\d+) *([kmgtp])(i|b)", memory.strip().lower())
+    if not m:
+        raise ValueError(f"Invalid memory: {memory}")
+    value = int(m.group(1))
+    units = m.group(2)
+    value_in_bytes = value * MEMORY_UNITS[units.upper()]
+    result = value_in_bytes / MEMORY_UNITS[as_untis.upper()]
+    return result

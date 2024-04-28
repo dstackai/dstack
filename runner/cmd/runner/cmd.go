@@ -7,6 +7,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// Version is a build-time variable. The value is overridden by ldflags.
+var Version string
+
 func App() {
 	var paths struct{ tempDir, homeDir, workingDir string }
 	var httpPort int
@@ -56,7 +59,10 @@ func App() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					start(paths.tempDir, paths.homeDir, paths.workingDir, httpPort, logLevel)
+					err := start(paths.tempDir, paths.homeDir, paths.workingDir, httpPort, logLevel, Version)
+					if err != nil {
+						return cli.Exit(err, 1)
+					}
 					return nil
 				},
 			},

@@ -15,12 +15,12 @@ from dstack.api.server._group import APIClientGroup
 class ProjectsAPIClient(APIClientGroup):
     def list(self) -> List[Project]:
         resp = self._request("/api/projects/list")
-        return parse_obj_as(List[Project], resp.json())
+        return parse_obj_as(List[Project.__response__], resp.json())
 
     def create(self, project_name: str) -> Project:
         body = CreateProjectRequest(project_name=project_name)
         resp = self._request("/api/projects/create", body=body.json())
-        return parse_obj_as(Project, resp.json())
+        return parse_obj_as(Project.__response__, resp.json())
 
     def delete(self, projects_names: List[str]):
         body = DeleteProjectsRequest(projects_names=projects_names)
@@ -28,9 +28,9 @@ class ProjectsAPIClient(APIClientGroup):
 
     def get(self, project_name: str) -> Project:
         resp = self._request(f"/api/projects/{project_name}/get")
-        return parse_obj_as(Project, resp.json())
+        return parse_obj_as(Project.__response__, resp.json())
 
     def set_members(self, project_name: str, members: List[MemberSetting]) -> Project:
         body = SetProjectMembersRequest(members=members)
         resp = self._request(f"/api/projects/{project_name}/set_members", body=body.json())
-        return parse_obj_as(Project, resp.json())
+        return parse_obj_as(Project.__response__, resp.json())

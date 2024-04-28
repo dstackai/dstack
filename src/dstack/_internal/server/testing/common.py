@@ -7,18 +7,36 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import DevEnvironmentConfiguration
-from dstack._internal.core.models.instances import InstanceType, Resources
-from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.configurations import (
+    AnyRunConfiguration,
+    DevEnvironmentConfiguration,
+)
+from dstack._internal.core.models.instances import InstanceConfiguration, InstanceType, Resources
+from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_NAME,
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    Profile,
+)
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.runs import JobErrorCode, JobProvisioningData, JobStatus, RunSpec
+from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobProvisioningData,
+    JobStatus,
+    JobTerminationReason,
+    Requirements,
+    RunSpec,
+    RunStatus,
+)
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server.models import (
     BackendModel,
     GatewayComputeModel,
     GatewayModel,
+    InstanceModel,
     JobModel,
+    PoolModel,
     ProjectModel,
     RepoModel,
     RunModel,
@@ -136,8 +154,11 @@ async def create_repo(
 def get_run_spec(
     run_name: str,
     repo_id: str,
-    profile: Optional[Profile] = Profile(name="default"),
+    profile: Optional[Profile] = None,
+    configuration: Optional[AnyRunConfiguration] = None,
 ) -> RunSpec:
+    if profile is None:
+        profile = Profile(name="default")
     return RunSpec(
         run_name=run_name,
         repo_id=repo_id,
@@ -145,7 +166,7 @@ def get_run_spec(
         repo_code_hash=None,
         working_dir=".",
         configuration_path="dstack.yaml",
-        configuration=DevEnvironmentConfiguration(ide="vscode"),
+        configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
         ssh_key_pub="",
     )
@@ -157,16 +178,20 @@ async def create_run(
     repo: RepoModel,
     user: UserModel,
     run_name: str = "test-run",
-    status: JobStatus = JobStatus.SUBMITTED,
+    status: RunStatus = RunStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     run_spec: Optional[RunSpec] = None,
+    run_id: Optional[UUID] = None,
 ) -> RunModel:
     if run_spec is None:
         run_spec = get_run_spec(
             run_name=run_name,
             repo_id=repo.name,
         )
+    if run_id is None:
+        run_id = uuid.uuid4()
     run = RunModel(
+        id=run_id,
         project_id=project.id,
         repo_id=repo.id,
         user_id=user.id,
@@ -174,6 +199,7 @@ async def create_run(
         run_name=run_name,
         status=status,
         run_spec=run_spec.json(),
+        last_processed_at=submitted_at,
     )
     session.add(run)
     await session.commit()
@@ -187,24 +213,30 @@ async def create_job(
     status: JobStatus = JobStatus.SUBMITTED,
     submitted_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
-    error_code: Optional[JobErrorCode] = None,
+    termination_reason: Optional[JobTerminationReason] = None,
     job_provisioning_data: Optional[JobProvisioningData] = None,
+    instance: Optional[InstanceModel] = None,
+    job_num: int = 0,
+    replica_num: int = 0,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
-    job_spec = get_job_specs_from_run_spec(run_spec)[0]
+    job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
     job = JobModel(
         project_id=run.project_id,
         run_id=run.id,
         run_name=run.run_name,
-        job_num=0,
-        job_name=run.run_name + "-0",
+        job_num=job_num,
+        job_name=run.run_name + f"-0-{replica_num}",
+        replica_num=replica_num,
         submission_num=submission_num,
         submitted_at=submitted_at,
         last_processed_at=last_processed_at,
         status=status,
-        error_code=error_code,
+        termination_reason=termination_reason,
         job_spec_data=job_spec.json(),
         job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
+        instance=instance,
+        used_instance_id=instance.id if instance is not None else None,
     )
     session.add(job)
     await session.commit()
@@ -226,6 +258,7 @@ def get_job_provisioning_data() -> JobProvisioningData:
         ssh_port=22,
         dockerized=False,
         backend_data=None,
+        ssh_proxy=None,
     )
 
 
@@ -271,3 +304,113 @@ async def create_gateway_compute(
     session.add(gateway_compute)
     await session.commit()
     return gateway_compute
+
+
+async def create_pool(
+    session: AsyncSession,
+    project: ProjectModel,
+    pool_name: Optional[str] = None,
+) -> PoolModel:
+    pool_name = pool_name if pool_name is not None else DEFAULT_POOL_NAME
+    pool = PoolModel(
+        name=pool_name,
+        project=project,
+        project_id=project.id,
+    )
+    session.add(pool)
+    await session.commit()
+    return pool
+
+
+async def create_instance(
+    session: AsyncSession,
+    project: ProjectModel,
+    pool: PoolModel,
+    status: InstanceStatus = InstanceStatus.IDLE,
+    created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    finished_at: Optional[datetime] = None,
+    spot: bool = False,
+    profile: Optional[Profile] = None,
+    requirements: Optional[Requirements] = None,
+    instance_configuration: Optional[InstanceConfiguration] = None,
+) -> InstanceModel:
+    job_provisioning_data = {
+        "backend": "datacrunch",
+        "instance_type": {
+            "name": "instance",
+            "resources": {
+                "cpus": 1,
+                "memory_mib": 512,
+                "gpus": [],
+                "spot": spot,
+                "disk": {"size_mib": 102400},
+                "description": "",
+            },
+        },
+        "instance_id": "running_instance.id",
+        "ssh_proxy": None,
+        "hostname": "running_instance.ip",
+        "region": "running_instance.location",
+        "price": 0.1,
+        "username": "root",
+        "ssh_port": 22,
+        "dockerized": True,
+        "backend_data": None,
+    }
+    offer = {
+        "backend": "datacrunch",
+        "instance": {
+            "name": "instance",
+            "resources": {
+                "cpus": 2,
+                "memory_mib": 12000,
+                "gpus": [],
+                "spot": spot,
+                "disk": {"size_mib": 102400},
+                "description": "",
+            },
+        },
+        "region": "en",
+        "price": 1,
+        "availability": "available",
+    }
+
+    if profile is None:
+        profile = Profile(name="test_name")
+
+    if requirements is None:
+        requirements = Requirements(resources=ResourcesSpec(cpu=1))
+
+    if instance_configuration is None:
+        instance_configuration = InstanceConfiguration(
+            project_name="test_proj",
+            instance_name="test_instance_name",
+            ssh_keys=[],
+            user="test_user",
+        )
+
+    im = InstanceModel(
+        name="test_instance",
+        pool=pool,
+        project=project,
+        status=status,
+        created_at=created_at,
+        started_at=created_at,
+        finished_at=finished_at,
+        job_provisioning_data=json.dumps(job_provisioning_data),
+        offer=json.dumps(offer),
+        price=1,
+        region="eu-west",
+        backend=BackendType.DATACRUNCH,
+        termination_idle_time=DEFAULT_POOL_TERMINATION_IDLE_TIME,
+        profile=profile.json(),
+        requirements=requirements.json(),
+        instance_configuration=instance_configuration.json(),
+        retry_policy=profile.retry_policy.retry if profile.retry_policy is not None else False,
+        retry_policy_duration=profile.retry_policy.duration
+        if profile.retry_policy is not None
+        else 123,
+    )
+    session.add(im)
+    await session.commit()
+    return im

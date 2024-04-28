@@ -37,7 +37,7 @@ class ChatCompletionsChoice(BaseModel):
 
 class ChatCompletionsChunkChoice(BaseModel):
     delta: object
-    logprobs: Optional[object]
+    logprobs: object = {}
     finish_reason: Optional[FinishReason]
     index: int
 
@@ -53,7 +53,7 @@ class ChatCompletionsResponse(BaseModel):
     choices: List[ChatCompletionsChoice]
     created: int
     model: str
-    system_fingerprint: str
+    system_fingerprint: str = ""
     object: Literal["chat.completion"] = "chat.completion"
     usage: ChatCompletionsUsage
 
@@ -63,7 +63,7 @@ class ChatCompletionsChunk(BaseModel):
     choices: List[ChatCompletionsChunkChoice]
     created: int
     model: str
-    system_fingerprint: str
+    system_fingerprint: str = ""
     object: Literal["chat.completion.chunk"] = "chat.completion.chunk"
 
 

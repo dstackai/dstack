@@ -21,7 +21,7 @@
     font-weight: 800;
 }
 
-.tx-landing__hero_text h1 .gradient {
+/*.tx-landing__hero_text h1*/ .gradient {
     background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -144,7 +144,7 @@
 }
 
 .md-header__buttons .md-button.discord:before,
-.tx-container .md-button.discord:before {
+.md-typeset .md-button.discord:before {
     position: relative;
     top: 5px;
     content: '';
@@ -159,12 +159,28 @@
     background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
 }
 
+.md-header__buttons .md-button.github:before,
+.md-typeset .md-button.github:before {
+    position: relative;
+    top: 5px;
+    content: '';
+    width: 26px;
+    height: 26px;
+    display: inline-block;
+    -webkit-mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 496 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>') no-repeat 50% 50%;
+    mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 496 512"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>') no-repeat 50% 50%;
+    -webkit-mask-size: cover;
+    mask-size: cover;
+    margin-right: 5px;
+    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
+}
+
 .md-header__buttons {
     margin-left: auto;
 }
 
 .md-header__buttons .md-button,
-.tx-container .md-button {
+.md-typeset .md-button {
     margin-top: 1.2rem;
     margin-bottom: 1.5rem;
     font-size: 22px;
@@ -172,35 +188,35 @@
     text-align: center;
     border-radius: 3px;
     border-color: transparent;
-    margin-right: 15px;
+    margin-right: 5px;
 }
 
 .md-header__buttons .md-button {
     font-size: 19px;
 }
 
-.tx-container .md-button {
-    min-width: 200px;
+.md-typeset .md-button {
+    min-width: 225px;
     padding: 0.55em 2em;
-    font-size: 21px;
-}
-
-.tx-container .md-button.small {
-    min-width: 175px;
-    padding: 0.4em 1.7em;
     font-size: 20px;
 }
 
-.tx-container .md-button {
+.md-typeset .md-button.small {
+    min-width: 150px;
+    padding: 0.5em 1.9em;
+    font-size: 19px;
+}
+
+.md-typeset .md-button {
     vertical-align: middle;
 }
 
-.tx-container .md-button--primary:hover {
+.md-typeset .md-button-secondary:hover, .md-typeset .md-button--primary:hover {
     transform: translateY(-2px);
     transition: opacity .2s ease,transform .2s ease;
 }
 
-.tx-container .md-button .icon {
+.md-typeset .md-button .icon {
     display: inline-block;
     position: relative;
     width: 15px;
@@ -209,13 +225,20 @@
     transition: opacity .2s ease,transform .2s ease;
 }
 
-.tx-container .md-button--primary:hover .icon {
+.md-typeset .md-button-secondary .icon, .md-typeset .md-button--primary .icon {
+    color: #a91ffe;
+}
+.md-typeset .md-button-secondary:hover .icon, .md-typeset .md-button--primary:hover .icon {
+    color: #a91ffe;
     transform: translateX(3px)
 }
 
-.md-header__buttons .md-button--primary,
-.tx-container .md-button--primary {
-    background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
+
+[data-md-color-primary=white] .md-header__buttons .md-button--primary, [data-md-color-primary=white].md-header__buttons .md-button--primary:hover,
+[data-md-color-primary=white] .md-typeset .md-button--primary, [data-md-color-primary=white] .md-typeset .md-button--primary:hover {
+    background: rgba(0, 0, 0, 0.87);
+    border: 1.5px solid black;
+    border-radius: 1px;
 }
 
 .md-header__buttons .md-button--primary,
@@ -224,8 +247,28 @@
     white-space: nowrap;
 }
 
+.md-button-secondary.external:after {
+    content: url('data:image/svg+xml,<svg fill="rgba(138, 5, 220, 1)" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
+    line-height: 14px;
+    margin-left: 5px;
+    position: relative;
+    top: 3px;
+    margin-right: -7px;
+}
+
+.md-button--primary.sky.external:after {
+    content: url('data:image/svg+xml,<svg fill="white" xmlns="http://www.w3.org/2000/svg" width="21px" height="21px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
+    line-height: 14px;
+    margin-left: 5px;
+    position: relative;
+    top: 2px;
+    margin-right: -7px;
+}
+
 .md-header__buttons .md-button-secondary,
-.tx-container .md-button-secondary {
+.md-typeset .md-button-secondary,
+.md-header__buttons .md-button-secondary:hover,
+.md-typeset .md-button-secondary:hover {
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
     border-width: 1.5px;
     border-style: solid;
@@ -234,11 +277,14 @@
     -webkit-text-fill-color: transparent;
 }
 
-.md-header__buttons .md-button-secondary:hover,
-.tx-container .md-button-secondary:hover {
-    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+.md-header__buttons {
+    padding-top: 11px;
+}
+
+.md-header__buttons .md-button-secondary {
+    border-width: 1.5px;
+    font-weight: 400 !important;
+    font-size: 0.85rem;
 }
 
 @media screen and (max-width: 76.1875em) {
@@ -282,8 +328,8 @@
 }
 
 .tx-landing__highlights_grid .feature-cell {
-    padding: 35px 40px 40px;
-    border-radius: 5px;
+    padding: 40px 35px 40px 40px;
+    border-radius: 0;
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
     border-width: 0.75px;
     border-style: solid;
@@ -311,14 +357,17 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 15px;
-    border-radius: 3px;
-    font-size: 0.8em;
+    padding: 11px 20px;
+    font-size: 0.85em;
     font-weight: 400;
     line-height: 1.44;
     color: black;
-    margin-top: 10px;
-    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.05), rgba(0, 42, 255, 0.05), rgba(225, 101, 254, 0.05));
+    margin-top: 20px;
+    margin-right: 10px;
+    border-radius: 0;
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-width: 0.75px;
+    border-style: solid;
 }
 
 .tx-landing__highlights_grid > a, .tx-landing__highlights_grid > a:hover {
@@ -365,6 +414,8 @@
     grid-gap: 2rem;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    padding-top: 40px;
+    padding-bottom: 20px;
 }
 
 .tx-landing__highlights_grid .feature-icon svg {
@@ -382,14 +433,17 @@
 }
 
 .tx-landing__highlights_grid h3 {
-    font-size: 1.3em;
+    font-size: 1.2em;
     font-weight: 800;
     border-bottom: none;
-    padding-bottom: 0.1em;
+    padding-bottom: 0.2em;
     margin-top: 0;
-    background: -webkit-linear-gradient(45deg, #6e14ed, #bf04e9, #bf04e9);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+}
+
+.tx-landing__highlights_grid p {
+    font-size: 17px;
+    margin-top: 20px;
+    margin-bottom: 20px;
 }
 
 .tx-landing__features {
@@ -417,12 +471,12 @@
 }
 
 .tx-landing__major_feature {
-    font-size: 1.05em;
+    font-size: 1.025em;
     margin-top: 5em;
 }
 
 .tx-landing__bottom_cta_text {
-    font-size: 1.1em;
+    font-size: 0.95em;
     max-width: 500px;
 }
 
@@ -445,7 +499,7 @@
     max-width: 500px;
     margin-top: 0.75em;
     margin-bottom: 0.75em;
-    background: -webkit-linear-gradient(45deg, #ff00ff, #8500ff);
+    background: var(--md-typeset-a-color);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -1.5px;
@@ -493,8 +547,15 @@
     margin-bottom: 2rem;
 }
 
-.tx-footer .md-main__inner {
+.tx-footer {
     padding-top: 2.5rem;
+}
+
+.md-footer__inner {
+    padding: 0;
+}
+
+.tx-footer .md-main__inner {
     border-width: 0;
     /*border-top-width: 0.6px;*/
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
@@ -582,14 +643,6 @@
     text-align: center;
 }
 
-.tx-landing__plans_text h2 .gradient {
-    background: linear-gradient(90deg, #4631C8 -1.29%, #CD4AE2 88.05%, #FFD43C 111.26%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    padding-right: 4px;
-    margin-right: -4px;
-}
-
 .tx-landing__plans_cards {
     display: grid;
     flex-wrap: wrap;
@@ -597,44 +650,67 @@
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
 }
 
+.md-header__buttons .md-button--primary.sky, .md-header__buttons .md-button--primary.sky:hover,
+.md-typeset .md-button--primary.sky, .md-typeset .md-button--primary.sky:hover {
+    background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
+    border-radius: 3px;
+    border: 1px solid transparent;
+}
+
+.plans_card.open_source {
+}
+
+.plans_card.dstack_sky {
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.0125), rgba(0, 42, 255, 0.0125), rgba(225, 101, 254, 0.0225));
+    border-color: #0048ff;
+    border-image: none;
+}
+
+.plans_card.enterprise {
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.0125), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.07));
+    border-color: #8587e2;
+    border-image: none;
+}
+
 .plans_card {
     display: flex;
     flex-direction: column;
-    max-width: 445px;
+    /*min-width: 445px;*/
     width: 100%;
-    border-radius: 5px;
-    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+    border-color: black;
+    border-radius: 0;
     border-width: 0.5px;
     border-style: solid;
-    padding: 38px 20px 38px 46px
+    padding: 38px 28px 38px 46px
 }
 
 .plans_card__title {
-    margin-bottom: 0.9rem;
+    margin-bottom: 0.7rem;
     font-size: 1.5em;
     font-weight: 800;
     line-height: 1.33;
 }
 
 .plans_card__subtitle {
-    margin-bottom: 1.4rem;
-    font-size: 0.98em;
+    margin-bottom: 1.2rem;
+    font-size: 0.9em;
     line-height: 1.44;
-    color: #696F86;
+    color: black;
 }
 
 .plans_card__buttons_subtitle {
-    margin-top: 10px;
-    margin-left: 10px;
+    margin-top: 18px;
+    margin-left: 5px;
     color: #202128;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
+    line-height: 22px;
 }
 
 .plans_card__services {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 2.4rem;
+    gap: 10px;
+    margin-bottom: 1.8rem;
 }
 
 .plans_card__service-item {
@@ -644,7 +720,7 @@
     padding: 7px 16px;
     border-radius: 30px;
     border: 0.5px solid black;
-    font-size: .88em;
+    font-size: .85em;
     line-height: 1.44;
     color: #2A292D;
 }

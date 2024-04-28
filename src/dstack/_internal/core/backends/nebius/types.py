@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, TypedDict
+from typing import TypedDict
 
 
 class ServiceAccount(TypedDict):

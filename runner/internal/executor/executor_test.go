@@ -5,14 +5,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/dstackai/dstack/runner/internal/schemas"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/dstackai/dstack/runner/internal/schemas"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // todo test get history
@@ -141,6 +142,7 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 func makeTestExecutor(t *testing.T) *RunExecutor {
 	t.Helper()
 	baseDir, err := filepath.EvalSymlinks(t.TempDir())
+	workingDir := "."
 	require.NoError(t, err)
 
 	body := schemas.SubmitBody{
@@ -157,7 +159,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 			Commands:    []string{"/bin/bash", "-c"},
 			Env:         make(map[string]string),
 			MaxDuration: 0, // no timeout
-			WorkingDir:  ".",
+			WorkingDir:  &workingDir,
 		},
 		Secrets:         make(map[string]string),
 		RepoCredentials: &schemas.RepoCredentials{Protocol: "https"},

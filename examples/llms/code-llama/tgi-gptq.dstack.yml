@@ -1,0 +1,23 @@
+type: service
+# This service deploys Code Llama 70B (GPTQ) with TGI
+
+image: ghcr.io/huggingface/text-generation-inference:latest
+env:
+  - MODEL_ID=TheBloke/CodeLlama-70B-Instruct-GPTQ
+commands:
+  - text-generation-server download-weights $MODEL_ID --trust-remote-code
+  - text-generation-launcher
+    --port 80
+    --trust-remote-code
+    --quantize gptq
+port: 80
+
+resources:
+  gpu: 80GB
+
+# (Optional) Enable the OpenAI-compatible endpoint
+model:
+  type: chat
+  name: TheBloke/CodeLlama-70B-Instruct-GPTQ
+  format: tgi
+  eos_token: "<step>"

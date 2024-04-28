@@ -2,6 +2,7 @@
 Populates CLI reference pages with actual command output.
 Finds the pattern in docs/references/cli/*.md and replace it with the output of the command.
 """
+
 import logging
 import os
 import re

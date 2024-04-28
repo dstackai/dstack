@@ -3,6 +3,7 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
     AnyConfigInfoWithCredsPartial,
@@ -16,10 +17,12 @@ from dstack._internal.server.schemas.backends import DeleteBackendsRequest
 from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin
 from dstack._internal.server.services import backends
 from dstack._internal.server.services.config import ServerConfigManager
-from dstack._internal.server.utils.routers import error_not_found
 
 root_router = APIRouter(prefix="/api/backends", tags=["backends"])
 project_router = APIRouter(prefix="/api/project/{project_name}/backends", tags=["backends"])
+
+
+# These routes are not currently in use since backend UI configuration is disabled.
 
 
 @root_router.post("/list_types")
@@ -83,5 +86,5 @@ async def get_backend_config_info(
     _, project = user_project
     config_info = await backends.get_config_info(project=project, backend_type=backend_name)
     if config_info is None:
-        raise error_not_found()
+        raise ResourceNotExistsError()
     return config_info

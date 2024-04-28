@@ -30,6 +30,7 @@ def create_instance_struct(
     accelerators: List[compute_v1.AcceleratorConfig],
     spot: bool,
     user_data: str,
+    authorized_keys: List[str],
     labels: Dict[str, str],
     tags: List[str],
     instance_name: str,
@@ -75,6 +76,9 @@ def create_instance_struct(
 
     metadata_items = [
         compute_v1.Items(key="user-data", value=user_data),
+        compute_v1.Items(
+            key="ssh-keys", value="\n".join(f"ubuntu:{key}" for key in authorized_keys)
+        ),
     ]
     instance.metadata = compute_v1.Metadata(items=metadata_items)
 
@@ -112,7 +116,7 @@ def create_runner_firewall_rules(
     network: str = "global/networks/default",
 ):
     firewall_rule = compute_v1.Firewall()
-    firewall_rule.name = f"dstack-ssh-in-" + network.replace("/", "-")
+    firewall_rule.name = "dstack-ssh-in-" + network.replace("/", "-")
     firewall_rule.direction = "INGRESS"
 
     allowed_ssh_port = compute_v1.Allowed()

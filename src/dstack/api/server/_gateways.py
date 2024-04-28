@@ -17,12 +17,12 @@ from dstack.api.server._group import APIClientGroup
 class GatewaysAPIClient(APIClientGroup):
     def list(self, project_name: str) -> List[Gateway]:
         resp = self._request(f"/api/project/{project_name}/gateways/list")
-        return parse_obj_as(List[Gateway], resp.json())
+        return parse_obj_as(List[Gateway.__response__], resp.json())
 
     def get(self, project_name: str, gateway_name: str) -> Gateway:
         body = GetGatewayRequest(name=gateway_name)
         resp = self._request(f"/api/project/{project_name}/gateways/get", body=body.json())
-        return parse_obj_as(Gateway, resp.json())
+        return parse_obj_as(Gateway.__response__, resp.json())
 
     def create(
         self,
@@ -33,7 +33,7 @@ class GatewaysAPIClient(APIClientGroup):
     ) -> Gateway:
         body = CreateGatewayRequest(name=gateway_name, backend_type=backend_type, region=region)
         resp = self._request(f"/api/project/{project_name}/gateways/create", body=body.json())
-        return parse_obj_as(Gateway, resp.json())
+        return parse_obj_as(Gateway.__response__, resp.json())
 
     def delete(self, project_name: str, gateways_names: List[str]) -> None:
         body = DeleteGatewaysRequest(names=gateways_names)
@@ -50,4 +50,4 @@ class GatewaysAPIClient(APIClientGroup):
         resp = self._request(
             f"/api/project/{project_name}/gateways/set_wildcard_domain", body=body.json()
         )
-        return parse_obj_as(Gateway, resp.json())
+        return parse_obj_as(Gateway.__response__, resp.json())

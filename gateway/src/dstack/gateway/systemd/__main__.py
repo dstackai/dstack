@@ -31,13 +31,13 @@ def install_action(args):
 
     print("Writing service file...")
     service_file = importlib.resources.read_text(
-        "dstack.gateway.systemd.resources", service_path.name
+        "dstack.gateway.resources.systemd", service_path.name
     )
     service_path.write_text(service_file.format(working_dir=working_dir.as_posix()))
 
     for script_name in ["start.sh", "update.sh"]:
         print(f"Writing {script_name} script...")
-        script = importlib.resources.read_text("dstack.gateway.systemd.resources", script_name)
+        script = importlib.resources.read_text("dstack.gateway.resources.systemd", script_name)
         script_path = working_dir / script_name
         script_path.write_text(script)
         os.chown(script_path, uid, gid)

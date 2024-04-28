@@ -17,7 +17,7 @@ from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
 from dstack._internal.core.models.configurations import ConfigurationType
-from dstack._internal.core.models.runs import JobErrorCode
+from dstack._internal.core.models.runs import JobTerminationReason
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
@@ -30,7 +30,7 @@ NOTSET = object()
 
 class RunCommand(APIBaseCommand):
     NAME = "run"
-    DESCRIPTION = "Run .dstack.yml configuration"
+    DESCRIPTION = "Run a configuration"
     DEFAULT_HELP = False
 
     def _register(self):
@@ -95,13 +95,11 @@ class RunCommand(APIBaseCommand):
             self.api.ssh_identity_file = (
                 ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
             )
-
             profile = load_profile(Path.cwd(), args.profile)
-            apply_profile_args(args, profile)
-
             configuration_path, conf = load_configuration(
                 Path.cwd(), args.working_dir, args.configuration_file
             )
+            apply_profile_args(args, conf)
             logger.debug("Configuration loaded: %s", configuration_path)
             parser = argparse.ArgumentParser()
             configurator = run_configurators_mapping[ConfigurationType(conf.type)]
@@ -115,12 +113,19 @@ class RunCommand(APIBaseCommand):
                     repo=repo,
                     configuration_path=configuration_path,
                     backends=profile.backends,
+                    regions=profile.regions,
+                    instance_types=profile.instance_types,
                     spot_policy=profile.spot_policy,  # pass profile piece by piece
                     retry_policy=profile.retry_policy,
                     max_duration=profile.max_duration,
                     max_price=profile.max_price,
                     working_dir=args.working_dir,
                     run_name=args.run_name,
+                    pool_name=profile.pool_name,
+                    instance_name=profile.instance_name,
+                    creation_policy=profile.creation_policy,
+                    termination_policy=profile.termination_policy,
+                    termination_policy_idle=profile.termination_idle_time,
                 )
         except ConfigurationError as e:
             raise CLIError(str(e))
@@ -146,7 +151,7 @@ class RunCommand(APIBaseCommand):
             raise CLIError(e.msg)
 
         if args.detach:
-            console.print("Run submitted, detaching...")
+            console.print(f"Run [code]{run.name}[/] submitted, detaching...")
             return
 
         abort_at_exit = True
@@ -156,10 +161,13 @@ class RunCommand(APIBaseCommand):
                     RunStatus.SUBMITTED,
                     RunStatus.PENDING,
                     RunStatus.PROVISIONING,
-                    RunStatus.PULLING,
                 ):
+                    job_statuses = "\n".join(
+                        f"  - {job.job_spec.job_name} [secondary]({job.job_submissions[-1].status.value})[/]"
+                        for job in run._run.jobs
+                    )
                     status.update(
-                        f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]"
+                        f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]\n{job_statuses}"
                     )
                     time.sleep(5)
                     run.refresh()
@@ -179,10 +187,16 @@ class RunCommand(APIBaseCommand):
                 else:
                     console.print("[error]Failed to attach, exiting...[/]")
 
-            run.refresh()
-            if run.status.is_finished():
-                _print_fail_message(run)
-                abort_at_exit = False
+            # After reading the logs, the run may not be marked as finished immediately.
+            # Give the run some time to transit into a finished state before aborting it.
+            for _ in range(15):
+                run.refresh()
+                if run.status.is_finished():
+                    if run.status == RunStatus.FAILED:
+                        _print_fail_message(run)
+                    abort_at_exit = False
+                    break
+                time.sleep(1)
         except KeyboardInterrupt:
             try:
                 if not confirm_ask("\nStop the run before detaching?"):
@@ -192,7 +206,7 @@ class RunCommand(APIBaseCommand):
                 # Gently stop the run and wait for it to finish
                 with console.status("Stopping..."):
                     run.stop(abort=False)
-                    while not (run.status.is_finished() or run.status == RunStatus.TERMINATING):
+                    while not run.status.is_finished():
                         time.sleep(2)
                         run.refresh()
                 console.print("Stopped")
@@ -208,25 +222,37 @@ class RunCommand(APIBaseCommand):
 
 
 def _print_fail_message(run: Run):
-    error_code = _get_run_error_code(run)
+    termination_reason = _get_run_termination_reason(run)
     message = "Run failed due to unknown reason. Check CLI and server logs."
-    if _get_run_error_code(run) == JobErrorCode.FAILED_TO_START_DUE_TO_NO_CAPACITY:
+    if termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         message = (
             "All provisioning attempts failed. "
             "This is likely due to cloud providers not having enough capacity. "
             "Check CLI and server logs for more details."
         )
-    elif error_code is not None:
+    elif termination_reason == JobTerminationReason.CREATING_CONTAINER_ERROR:
         message = (
-            f"Run failed with error code {error_code}. "
+            "Cannot create container. "
+            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message} "
+            "Check CLI and server logs for more details."
+        )
+    elif termination_reason == JobTerminationReason.EXECUTOR_ERROR:
+        message = (
+            "There is an error with git auth/clone or with command execution "
+            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message} "
+            "Check CLI and server logs for more details."
+        )
+    elif termination_reason is not None:
+        message = (
+            f"Run failed with error code {termination_reason}. "
             "Check CLI and server logs for more details."
         )
     console.print(f"[error]{message}[/]")
 
 
-def _get_run_error_code(run: Run) -> Optional[JobErrorCode]:
+def _get_run_termination_reason(run: Run) -> Optional[JobTerminationReason]:
     job = run._run.jobs[0]
     if len(job.job_submissions) == 0:
         return None
     job_submission = job.job_submissions[0]
-    return job_submission.error_code
+    return job_submission.termination_reason

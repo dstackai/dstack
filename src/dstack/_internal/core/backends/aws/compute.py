@@ -1,12 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import boto3
 import botocore.client
 import botocore.exceptions
 
 import dstack._internal.core.backends.aws.resources as aws_resources
-import dstack.version as version
 from dstack._internal import settings
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.backends.base.compute import (
@@ -16,18 +15,19 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.errors import NoCapacityError
+from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    InstanceState,
     LaunchedGatewayInfo,
-    LaunchedInstanceInfo,
+    SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 class AWSCompute(Compute):
     def __init__(self, config: AWSConfig):
         self.config = config
-        if isinstance(config.creds, AWSAccessKeyCreds):
+        if is_core_model_instance(config.creds, AWSAccessKeyCreds):
             self.session = boto3.Session(
                 aws_access_key_id=config.creds.access_key,
                 aws_secret_access_key=config.creds.secret_key,
@@ -84,28 +84,9 @@ class AWSCompute(Compute):
             )
         return availability_offers
 
-    def get_instance_state(self, instance_id: str, region: str) -> InstanceState:
-        client = self.session.client("ec2", region_name=region)
-        try:
-            response = client.describe_instances(InstanceIds=[instance_id])
-            state = response["Reservations"][0]["Instances"][0]["State"]["Name"]
-        except botocore.exceptions.ClientError as e:
-            if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
-                return InstanceState.NOT_FOUND
-            else:
-                raise e
-        return {
-            "pending": InstanceState.PROVISIONING,
-            "running": InstanceState.RUNNING,
-            "shutting-down": InstanceState.STOPPING,
-            "terminated": InstanceState.TERMINATED,
-            "stopping": InstanceState.STOPPING,
-            "stopped": InstanceState.STOPPED,
-        }[state]
-
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
-    ):
+    ) -> None:
         client = self.session.client("ec2", region_name=region)
         try:
             client.terminate_instances(InstanceIds=[instance_id])
@@ -115,6 +96,77 @@ class AWSCompute(Compute):
             else:
                 raise e
 
+    def create_instance(
+        self,
+        instance_offer: InstanceOfferWithAvailability,
+        instance_config: InstanceConfiguration,
+    ) -> JobProvisioningData:
+        project_name = instance_config.project_name
+        ec2 = self.session.resource("ec2", region_name=instance_offer.region)
+        ec2_client = self.session.client("ec2", region_name=instance_offer.region)
+        iam_client = self.session.client("iam", region_name=instance_offer.region)
+
+        tags = [
+            {"Key": "Name", "Value": instance_config.instance_name},
+            {"Key": "owner", "Value": "dstack"},
+            {"Key": "dstack_project", "Value": project_name},
+            {"Key": "dstack_user", "Value": instance_config.user},
+        ]
+        try:
+            vpc_id, subnet_id = get_vpc_id_subnet_id_or_error(
+                ec2_client=ec2_client,
+                config=self.config,
+                region=instance_offer.region,
+            )
+            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+            response = ec2.create_instances(
+                **aws_resources.create_instances_struct(
+                    disk_size=disk_size,
+                    image_id=aws_resources.get_image_id(
+                        ec2_client=ec2_client,
+                        cuda=len(instance_offer.instance.resources.gpus) > 0,
+                    ),
+                    instance_type=instance_offer.instance.name,
+                    iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
+                        iam_client=iam_client,
+                        project_id=project_name,
+                    ),
+                    user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
+                    tags=tags,
+                    security_group_id=aws_resources.create_security_group(
+                        ec2_client=ec2_client,
+                        project_id=project_name,
+                        vpc_id=vpc_id,
+                    ),
+                    spot=instance_offer.instance.resources.spot,
+                    subnet_id=subnet_id,
+                )
+            )
+            instance = response[0]
+            instance.wait_until_running()
+            instance.reload()  # populate instance.public_ip_address
+            if instance_offer.instance.resources.spot:  # it will not terminate the instance
+                ec2_client.cancel_spot_instance_requests(
+                    SpotInstanceRequestIds=[instance.spot_instance_request_id]
+                )
+            return JobProvisioningData(
+                backend=instance_offer.backend,
+                instance_type=instance_offer.instance,
+                instance_id=instance.instance_id,
+                hostname=instance.public_ip_address,
+                internal_ip=instance.private_ip_address,
+                region=instance_offer.region,
+                price=instance_offer.price,
+                username="ubuntu",
+                ssh_port=22,
+                dockerized=True,  # because `dstack-shim docker` is used
+                ssh_proxy=None,
+                backend_data=None,
+            )
+        except botocore.exceptions.ClientError as e:
+            logger.warning("Got botocore.exceptions.ClientError: %s", e)
+            raise NoCapacityError()
+
     def run_job(
         self,
         run: Run,
@@ -122,64 +174,18 @@ class AWSCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
-        project_id = run.project_name
-        ec2 = self.session.resource("ec2", region_name=instance_offer.region)
-        ec2_client = self.session.client("ec2", region_name=instance_offer.region)
-        iam_client = self.session.client("iam", region_name=instance_offer.region)
-
-        tags = [
-            {"Key": "Name", "Value": get_instance_name(run, job)},
-            {"Key": "owner", "Value": "dstack"},
-            {"Key": "dstack_project", "Value": project_id},
-            {"Key": "dstack_user", "Value": run.user},
-        ]
-        try:
-            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-            response = ec2.create_instances(
-                **aws_resources.create_instances_struct(
-                    disk_size=disk_size,
-                    image_id=aws_resources.get_image_id(
-                        ec2_client, len(instance_offer.instance.resources.gpus) > 0
-                    ),
-                    instance_type=instance_offer.instance.name,
-                    iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
-                        iam_client, project_id
-                    ),
-                    user_data=get_user_data(
-                        backend=BackendType.AWS,
-                        image_name=job.job_spec.image_name,
-                        authorized_keys=[
-                            run.run_spec.ssh_key_pub.strip(),
-                            project_ssh_public_key.strip(),
-                        ],
-                        registry_auth_required=job.job_spec.registry_auth is not None,
-                    ),
-                    tags=tags,
-                    security_group_id=aws_resources.create_security_group(ec2_client, project_id),
-                    spot=instance_offer.instance.resources.spot,
-                )
-            )
-            instance = response[0]
-            instance.wait_until_running()
-            instance.reload()  # populate instance.public_ip_address
-
-            if instance_offer.instance.resources.spot:  # it will not terminate the instance
-                ec2_client.cancel_spot_instance_requests(
-                    SpotInstanceRequestIds=[instance.spot_instance_request_id]
-                )
-            return LaunchedInstanceInfo(
-                instance_id=instance.instance_id,
-                ip_address=instance.public_ip_address,
-                region=instance_offer.region,
-                username="ubuntu",
-                ssh_port=22,
-                dockerized=True,  # because `dstack-shim docker` is used
-                backend_data=None,
-            )
-        except botocore.exceptions.ClientError as e:
-            logger.warning("Got botocore.exceptions.ClientError: %s", e)
-            raise NoCapacityError()
+    ) -> JobProvisioningData:
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
+                SSHKey(public=project_ssh_public_key.strip()),
+            ],
+            job_docker_config=None,
+            user=run.user,
+        )
+        return self.create_instance(instance_offer, instance_config)
 
     def create_gateway(
         self,
@@ -187,7 +193,7 @@ class AWSCompute(Compute):
         ssh_key_pub: str,
         region: str,
         project_id: str,
-    ) -> LaunchedGatewayInfo:
+    ) -> JobProvisioningData:
         ec2 = self.session.resource("ec2", region_name=region)
         ec2_client = self.session.client("ec2", region_name=region)
         tags = [
@@ -206,7 +212,8 @@ class AWSCompute(Compute):
                 user_data=get_gateway_user_data(ssh_key_pub),
                 tags=tags,
                 security_group_id=aws_resources.create_gateway_security_group(
-                    ec2_client, project_id
+                    ec2_client=ec2_client,
+                    project_id=project_id,
                 ),
                 spot=False,
             )
@@ -214,7 +221,6 @@ class AWSCompute(Compute):
         instance = response[0]
         instance.wait_until_running()
         instance.reload()  # populate instance.public_ip_address
-
         return LaunchedGatewayInfo(
             instance_id=instance.instance_id,
             region=region,
@@ -222,7 +228,7 @@ class AWSCompute(Compute):
         )
 
 
-def _has_quota(quotas: Dict[str, float], instance_name: str) -> bool:
+def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
     if instance_name.startswith("p"):
         return quotas.get("P/OnDemand", 0) > 0
     if instance_name.startswith("g"):
@@ -235,3 +241,58 @@ def _supported_instances(offer: InstanceOffer) -> bool:
         if offer.instance.name.startswith(family):
             return True
     return False
+
+
+def get_vpc_id_subnet_id_or_error(
+    ec2_client: botocore.client.BaseClient,
+    config: AWSConfig,
+    region: str,
+) -> Tuple[str, str]:
+    if config.vpc_ids is not None:
+        vpc_id = config.vpc_ids.get(region)
+        if vpc_id is None:
+            raise ComputeError(f"No VPC ID configured for region {region}")
+        vpc = aws_resources.get_vpc_by_vpc_id(ec2_client=ec2_client, vpc_id=vpc_id)
+        if vpc is None:
+            raise ComputeError(f"Failed to find VPC {vpc_id} in region {region}")
+
+        subnet_id = aws_resources.get_subnet_id_for_vpc(
+            ec2_client=ec2_client,
+            vpc_id=vpc_id,
+        )
+        if subnet_id is not None:
+            return vpc_id, subnet_id
+        raise ComputeError(f"Failed to find public subnet for VPC {vpc_id}")
+
+    return _get_vpc_id_subnet_id_by_vpc_name_or_error(
+        ec2_client=ec2_client,
+        vpc_name=config.vpc_name,
+        region=region,
+    )
+
+
+def _get_vpc_id_subnet_id_by_vpc_name_or_error(
+    ec2_client: botocore.client.BaseClient,
+    vpc_name: Optional[str],
+    region: str,
+) -> Tuple[str, str]:
+    if vpc_name is not None:
+        vpc_id = aws_resources.get_vpc_id_by_name(
+            ec2_client=ec2_client,
+            vpc_name=vpc_name,
+        )
+        if vpc_id is None:
+            raise ComputeError(f"No VPC named {vpc_name} in region {region}")
+    else:
+        vpc_id = aws_resources.get_default_vpc_id(ec2_client=ec2_client)
+        if vpc_id is None:
+            raise ComputeError(f"No default VPC in region {region}")
+    subnet_id = aws_resources.get_subnet_id_for_vpc(
+        ec2_client=ec2_client,
+        vpc_id=vpc_id,
+    )
+    if subnet_id is not None:
+        return vpc_id, subnet_id
+    if vpc_name is not None:
+        raise ComputeError(f"Failed to find public subnet for VPC {vpc_name} in region {region}")
+    raise ComputeError(f"Failed to find public subnet for default VPC in region {region}")

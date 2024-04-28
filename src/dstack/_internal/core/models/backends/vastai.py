@@ -1,20 +1,18 @@
-from typing import List, Optional, Union
-
-from pydantic import BaseModel
-from typing_extensions import Literal
+from pydantic.fields import Field
+from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 
 
-class VastAIConfigInfo(BaseModel):
+class VastAIConfigInfo(CoreModel):
     type: Literal["vastai"] = "vastai"
     regions: Optional[List[str]] = None
 
 
-class VastAIAPIKeyCreds(ForbidExtra):
-    type: Literal["api_key"] = "api_key"
-    api_key: str
+class VastAIAPIKeyCreds(CoreModel):
+    type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"
+    api_key: Annotated[str, Field(description="The API key")]
 
 
 AnyVastAICreds = VastAIAPIKeyCreds
@@ -30,13 +28,13 @@ class VastAIConfigInfoWithCreds(VastAIConfigInfo):
 AnyVastAIConfigInfo = Union[VastAIConfigInfo, VastAIConfigInfoWithCreds]
 
 
-class VastAIConfigInfoWithCredsPartial(BaseModel):
+class VastAIConfigInfoWithCredsPartial(CoreModel):
     type: Literal["vastai"] = "vastai"
     creds: Optional[AnyVastAICreds]
     regions: Optional[List[str]]
 
 
-class VastAIConfigValues(BaseModel):
+class VastAIConfigValues(CoreModel):
     type: Literal["vastai"] = "vastai"
     regions: Optional[ConfigMultiElement]
 

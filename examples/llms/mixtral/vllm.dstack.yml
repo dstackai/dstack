@@ -1,0 +1,23 @@
+type: service
+# This service deploys Mixtral with vLLM
+
+python: "3.11"
+env:
+  - HUGGING_FACE_HUB_TOKEN
+commands:
+  - pip install vllm
+  - python -m vllm.entrypoints.openai.api_server
+    --model mistralai/Mixtral-8x7B-Instruct-v0.1
+    --host 0.0.0.0
+    --tensor-parallel-size 2 # Should match the number of GPUs
+port: 8000
+
+resources:
+  gpu: 80GB:2
+  disk: 200GB
+
+# (Optional) Enable the OpenAI-compatible endpoint
+model:
+  type: chat
+  name: TheBloke/Mixtral-8x7B-Instruct-v0.1-GPTQ
+  format: openai

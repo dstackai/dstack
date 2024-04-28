@@ -1,31 +1,61 @@
+from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
-from pydantic import BaseModel
+from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.instances import SSHKey
+from dstack._internal.core.models.profiles import Profile
+from dstack._internal.core.models.runs import Requirements, RunSpec
 
-from dstack._internal.core.models.runs import RunSpec
 
-
-class ListRunsRequest(BaseModel):
+class ListRunsRequest(CoreModel):
     project_name: Optional[str]
     repo_id: Optional[str]
+    username: Optional[str]
+    only_active: bool = False
+    prev_submitted_at: Optional[datetime]
+    prev_run_id: Optional[UUID]
+    limit: int = 1000
+    ascending: bool = False
 
 
-class GetRunRequest(BaseModel):
+class GetRunRequest(CoreModel):
     run_name: str
 
 
-class GetRunPlanRequest(BaseModel):
+class GetRunPlanRequest(CoreModel):
     run_spec: RunSpec
 
 
-class SubmitRunRequest(BaseModel):
+class GetOffersRequest(CoreModel):
+    profile: Profile
+    requirements: Requirements
+
+
+class CreateInstanceRequest(CoreModel):
+    profile: Profile
+    requirements: Requirements
+    ssh_key: SSHKey
+
+
+class AddRemoteInstanceRequest(CoreModel):
+    pool_name: Optional[str]
+    instance_name: Optional[str]
+    region: Optional[str]
+    host: str
+    port: int
+    ssh_user: str
+    ssh_keys: List[SSHKey]
+
+
+class SubmitRunRequest(CoreModel):
     run_spec: RunSpec
 
 
-class StopRunsRequest(BaseModel):
+class StopRunsRequest(CoreModel):
     runs_names: List[str]
     abort: bool
 
 
-class DeleteRunsRequest(BaseModel):
+class DeleteRunsRequest(CoreModel):
     runs_names: List[str]

@@ -1,15 +1,13 @@
 # Services
 
-With `dstack`, you can use the CLI or API to deploy models or web apps.
-Provide the commands, port, and choose the Python version or a Docker image.
+Services make it very easy to deploy any kind of model or application as public,
+secure, and scalable endpoints.
 
-`dstack` handles the deployment on configured cloud GPU provider(s) with the necessary resources.
-
-??? info "Prerequisites"
+??? info "Gateway"
 
     If you're using the open-source server, you first have to set up a gateway.
 
-    ### Set up a gateway
+    ### Gateway { style="display:none" }
 
     For example, if your domain is `example.com`, go ahead and run the 
     `dstack gateway create` command:
@@ -31,14 +29,15 @@ Provide the commands, port, and choose the Python version or a Docker image.
     Afterward, in your domain's DNS settings, add an `A` DNS record for `*.example.com` 
     pointing to the IP address of the gateway.
     
-    This way, if you run a service, `dstack` will make its endpoint available at 
-    `https://<run-name>.example.com`.
+    Now, if you run a service, `dstack` will make its endpoint available at 
+    `https://<run name>.<gateway domain>`.
 
-If you're using the cloud version of `dstack`, the gateway is set up for you.
+    In case your service has the [model mapping](#configure-model-mapping) configured, `dstack` will 
+    automatically make your model available at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
 
-## Using the CLI
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, the gateway is set up for you.
 
-### Define a configuration
+## Configuration
 
 First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `train.dstack.yml`
 are both acceptable).
@@ -49,35 +48,172 @@ are both acceptable).
 type: service
 
 image: ghcr.io/huggingface/text-generation-inference:latest
-
-env: 
-  - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ 
-
-port: 80
-
+env:
+  - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
 commands:
-  - text-generation-launcher --hostname 0.0.0.0 --port 80 --trust-remote-code
+  - text-generation-launcher --port 8000 --trust-remote-code
+port: 8000
+
+resources:
+  gpu: 80GB
 ```
 
 </div>
 
-By default, `dstack` uses its own Docker images to run dev environments, 
-which are pre-configured with Python, Conda, and essential CUDA drivers.
+The YAML file allows you to specify your own Docker image, environment variables, 
+resource requirements, etc.
+If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
 
-!!! info "Configuration options"
-    Configuration file allows you to specify a custom Docker image, environment variables, and many other 
-    options.
-    For more details, refer to the [Reference](../reference/dstack.yml.md#service).
+!!! info ".dstack.yml"
+    For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/service.md).
 
-### Run the configuration
+### Environment variables
 
-To run a configuration, use the `dstack run` command followed by the working directory path, 
-configuration file path, and any other options (e.g., for requesting hardware resources).
+Environment variables can be set either within the configuration file or passed via the CLI.
+
+```yaml
+type: service
+
+image: ghcr.io/huggingface/text-generation-inference:latest
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+commands:
+  - text-generation-launcher --port 8000 --trust-remote-code
+port: 8000
+
+resources:
+  gpu: 80GB
+```
+
+If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
+`dstack` will require the value to be passed via the CLI or set in the current process.
+
+For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
+
+### Model mapping
+
+By default, if you run a service, its endpoint is accessible at `https://<run name>.<gateway domain>`.
+
+If you run a model, you can optionally configure the mapping to make it accessible via the 
+OpenAI-compatible interface.
+
+<div editor-title="serve.dstack.yml"> 
+
+```yaml
+type: service
+
+image: ghcr.io/huggingface/text-generation-inference:latest
+env:
+  - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+commands:
+  - text-generation-launcher --port 8000 --trust-remote-code
+port: 8000
+  
+resources:
+  gpu: 80GB
+  
+# Enable the OpenAI-compatible endpoint   
+model:
+  type: chat
+  name: mistralai/Mistral-7B-Instruct-v0.1
+  format: tgi
+```
+
+</div>
+
+In this case, with such a configuration, once the service is up, you'll be able to access the model at
+`https://gateway.<gateway domain>` via the OpenAI-compatible interface.
+
+The `format` supports only `tgi` (Text Generation Inference) 
+and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-compatible mode).
+
+??? info "Chat template"
+
+    By default, `dstack` loads the [chat template](https://huggingface.co/docs/transformers/main/en/chat_templating) 
+    from the model's repository. If it is not present there, manual configuration is required.
+    
+    ```yaml
+    type: service
+    
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    env:
+      - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ
+    commands:
+      - text-generation-launcher --port 8000 --trust-remote-code --quantize gptq
+    port: 8000
+    
+    resources:
+      gpu: 80GB
+      
+    # Enable the OpenAI-compatible endpoint
+    model:
+      type: chat
+      name: TheBloke/Llama-2-13B-chat-GPTQ
+      format: tgi
+      chat_template: "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ '<s>[INST] ' + content.strip() + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content.strip() + ' </s>' }}{% endif %}{% endfor %}"
+      eos_token: "</s>"
+    ```
+
+    ##### Limitations
+
+    Please note that model mapping is an experimental feature with the following limitations:
+    
+    1. Doesn't work if your `chat_template` uses `bos_token`. As a workaround, replace `bos_token` inside `chat_template` with the token content itself.
+    2. Doesn't work if `eos_token` is defined in the model repository as a dictionary. As a workaround, set `eos_token` manually, as shown in the example above (see Chat template).
+
+    If you encounter any other issues, please make sure to file a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
+
+### Replicas and scaling
+
+By default, `dstack` runs a single replica of the service.
+You can configure the number of replicas as well as the auto-scaling policy.
+
+<div editor-title="serve.dstack.yml"> 
+
+```yaml
+type: service
+
+python: "3.11"
+env:
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
+
+replicas: 1..4
+scaling:
+  metric: rps
+  target: 10
+
+# Enable the OpenAI-compatible endpoint
+model:
+  format: openai
+  type: chat
+  name: NousResearch/Llama-2-7b-chat-hf
+```
+
+</div>
+
+If you specify the minimum number of replicas as `0`, the service will scale down to zero when there are no requests.
+
+[//]: # (??? info "Cold start")
+[//]: # (    Scaling up from zero could take several minutes, considering the provisioning of a new instance and the pulling of a large model.)
+
+??? info "Profiles"
+    In case you'd like to reuse certain parameters (such as spot policy, retry and max duration,
+    max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+
+## Running
+
+To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
+configuration file path, and any other options.
 
 <div class="termy">
 
 ```shell
-$ dstack run . -f serve.dstack.yml --gpu A100
+$ dstack run . -f serve.dstack.yml
 
  BACKEND     REGION         RESOURCES                     SPOT  PRICE
  tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
@@ -89,25 +225,58 @@ Continue? [y/n]: y
 Provisioning...
 ---> 100%
 
-Serving HTTP on https://yellow-cat-1.example.com ...
+Service is published at https://yellow-cat-1.example.com
 ```
 
 </div>
 
-Once the service is deployed, its endpoint will be available at
-`https://<run-name>.<domain-name>` (using the domain [set up for the gateway](#set-up-a-gateway)).
+When `dstack` submits the task, it uses the current folder contents.
 
-!!! info "Run options"
-    The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
-    and many other options (incl. spot instances, disk size, max price, max duration, retry policy, etc.).
-    For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
+??? info ".gitignore"
+    If there are large files or folders you'd like to avoid uploading, 
+    you can list them in `.gitignore`.
 
-[//]: # (TODO: Example)
+The `dstack run` command allows specifying many things, including spot policy, retry and max duration, 
+max price, regions, instance types, and [much more](../reference/cli/index.md#dstack-run).
 
-What's next?
+## Service endpoint
 
-1. Check the [Text Generation Inference](../../examples/tgi.md) and [vLLM](../../examples/vllm.md) examples
-2. Read about [dev environments](../concepts/dev-environments.md) 
-    and [tasks](../concepts/tasks.md)
-3. Browse [examples](../../examples/index.md)
-4. Check the [reference](../reference/dstack.yml.md#service)
+One the service is up, its endpoint is accessible at `https://<run name>.<gateway domain>`.
+
+!!! info "Model endpoint"
+    In case the service has the [model mapping](#model-mapping) configured, you will also be able
+    to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
+
+### Authorization
+    
+By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`. 
+
+<div class="termy">
+
+```shell
+$ curl https://yellow-cat-1.example.com/generate \
+    -X POST \
+    -d '{"inputs":"&lt;s&gt;[INST] What is your favourite condiment?[/INST]"}' \
+    -H 'Content-Type: application/json' \
+    -H 'Authorization: "Bearer &lt;dstack token&gt;"'
+```
+
+</div>
+
+Authorization can be disabled by setting `auth` to `false` in the service configuration file.
+
+## Managing runs
+
+**Stopping runs**
+
+When you use [`dstack stop`](../reference/cli/index.md#dstack-stop), the service and its cloud resources are deleted.
+
+**Listing runs**
+
+The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
+
+## What's next?
+
+1. Check the [Text Generation Inference :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md){:target="_blank"} examples
+2. Check the [`.dstack.yml` reference](../reference/dstack.yml/service.md) for more details and examples
+3. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md){:target="_blank"}

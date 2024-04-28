@@ -1,35 +1,33 @@
-from typing import List, Optional, Union
-
-from pydantic import BaseModel, Field
-from typing_extensions import Literal
+from pydantic import Field
+from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.backends.base import ConfigElement, ConfigMultiElement
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 
 
-class AzureConfigInfo(BaseModel):
+class AzureConfigInfo(CoreModel):
     type: Literal["azure"] = "azure"
     tenant_id: str
     subscription_id: str
     locations: Optional[List[str]] = None
 
 
-class AzureClientCreds(ForbidExtra):
-    type: Literal["client"] = "client"
-    client_id: str
-    client_secret: str
+class AzureClientCreds(CoreModel):
+    type: Annotated[Literal["client"], Field(description="The type of credentials")] = "client"
+    client_id: Annotated[str, Field(description="The client ID")]
+    client_secret: Annotated[str, Field(description="The client secret")]
     # if tenant_id is missing, it will be populated from config info
     tenant_id: Optional[str]
 
 
-class AzureDefaultCreds(ForbidExtra):
-    type: Literal["default"] = "default"
+class AzureDefaultCreds(CoreModel):
+    type: Annotated[Literal["default"], Field(description="The type of credentials")] = "default"
 
 
 AnyAzureCreds = Union[AzureClientCreds, AzureDefaultCreds]
 
 
-class AzureCreds(BaseModel):
+class AzureCreds(CoreModel):
     __root__: AnyAzureCreds = Field(..., discriminator="type")
 
 
@@ -40,7 +38,7 @@ class AzureConfigInfoWithCreds(AzureConfigInfo):
 AnyAzureConfigInfo = Union[AzureConfigInfo, AzureConfigInfoWithCreds]
 
 
-class AzureConfigInfoWithCredsPartial(BaseModel):
+class AzureConfigInfoWithCredsPartial(CoreModel):
     type: Literal["azure"] = "azure"
     creds: Optional[AnyAzureCreds]
     tenant_id: Optional[str]
@@ -48,7 +46,7 @@ class AzureConfigInfoWithCredsPartial(BaseModel):
     locations: Optional[List[str]]
 
 
-class AzureConfigValues(BaseModel):
+class AzureConfigValues(CoreModel):
     type: Literal["azure"] = "azure"
     default_creds: bool = False
     tenant_id: Optional[ConfigElement]

@@ -5,10 +5,11 @@ from typing import BinaryIO, Optional
 
 import git
 import giturlparse
-from pydantic import BaseModel, Field
+from pydantic import Field
 from typing_extensions import Literal
 
 from dstack._internal.core.errors import DstackError
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo, RepoProtocol
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.path import PathLike
@@ -19,7 +20,7 @@ class RepoError(DstackError):
     pass
 
 
-class RemoteRepoCreds(BaseModel):
+class RemoteRepoCreds(CoreModel):
     protocol: RepoProtocol
     private_key: Optional[str]
     oauth_token: Optional[str]
@@ -198,6 +199,14 @@ class RemoteRepo(Repo):
         if self.run_repo_data.repo_diff is not None:
             fp.write(self.run_repo_data.repo_diff.encode())
         return get_sha256(fp)
+
+    def get_repo_info(self) -> RemoteRepoInfo:
+        return RemoteRepoInfo(
+            repo_host_name=self.run_repo_data.repo_host_name,
+            repo_port=self.run_repo_data.repo_port,
+            repo_user_name=self.run_repo_data.repo_user_name,
+            repo_name=self.run_repo_data.repo_name,
+        )
 
 
 class _DiffCollector:

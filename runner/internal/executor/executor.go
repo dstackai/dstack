@@ -8,11 +8,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -26,6 +28,7 @@ type RunExecutor struct {
 
 	run             schemas.RunSpec
 	jobSpec         schemas.JobSpec
+	clusterInfo     schemas.ClusterInfo
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
 	codePath        string
@@ -61,14 +64,14 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string) *RunExecu
 
 // Run must be called after SetJob and SetCodePath
 func (ex *RunExecutor) Run(ctx context.Context) (err error) {
-	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "runner.log"))
+	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
 	if err != nil {
 		ex.SetJobState(ctx, states.Failed)
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = runnerLogFile.Close() }()
 
-	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "job.log"))
+	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerJobLogFileName))
 	if err != nil {
 		ex.SetJobState(ctx, states.Failed)
 		return gerrors.Wrap(err)
@@ -89,7 +92,8 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	}()
 	defer func() {
 		if err != nil {
-			log.Error(ctx, "Executor failed", "err", err)
+			// TODO: refactor error handling and logs
+			log.Error(ctx, consts.ExecutorFailedSignature, "err", err)
 		}
 	}()
 
@@ -108,7 +112,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	}
 	defer cleanupCredentials()
 
-	//var gatewayControl *gateway.SSHControl
+	// var gatewayControl *gateway.SSHControl
 	//if ex.run.Configuration.Type == "service" {
 	//	log.Info(ctx, "Forwarding service port to the gateway", "hostname", ex.jobSpec.Gateway.Hostname)
 	//	gatewayControl, err = gateway.NewSSHControl(ex.jobSpec.Gateway.Hostname, ex.jobSpec.Gateway.SSHKey)
@@ -161,6 +165,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
 	ex.run = body.RunSpec
 	ex.jobSpec = body.JobSpec
+	ex.clusterInfo = body.ClusterInfo
 	ex.secrets = body.Secrets
 	ex.repoCredentials = body.RepoCredentials
 	ex.state = WaitCode
@@ -184,22 +189,29 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
 	jobEnvs := map[string]string{
-		"RUN_NAME": ex.run.RunName,
-		"REPO_ID":  ex.run.RepoId,
-	}
-	workingDir, err := joinRelPath(ex.workingDir, ex.jobSpec.WorkingDir)
-	if err != nil {
-		return gerrors.Wrap(err)
+		"RUN_NAME":              ex.run.RunName,
+		"REPO_ID":               ex.run.RepoId,
+		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
+		"DSTACK_NODE_RANK":      strconv.Itoa(ex.jobSpec.JobNum),
+		"DSTACK_NODES_NUM":      strconv.Itoa(ex.jobSpec.JobsPerReplica),
+		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(ex.clusterInfo.GPUSPerJob),
 	}
 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
 	cmd.Env = makeEnv(ex.homeDir, jobEnvs, ex.jobSpec.Env, ex.secrets)
-	cmd.Dir = workingDir
 	cmd.Cancel = func() error {
 		// returns error on Windows
 		return gerrors.Wrap(cmd.Process.Signal(os.Interrupt))
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
+
+	if ex.jobSpec.WorkingDir != nil {
+		workingDir, err := joinRelPath(ex.workingDir, *ex.jobSpec.WorkingDir)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		cmd.Dir = workingDir
+	}
 
 	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
 

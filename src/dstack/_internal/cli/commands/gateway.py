@@ -8,7 +8,7 @@ from dstack._internal.core.models.backends.base import BackendType
 
 class GatewayCommand(APIBaseCommand):
     NAME = "gateway"
-    DESCRIPTION = "Manage project gateways"
+    DESCRIPTION = "Manage gateways"
 
     def _register(self):
         super()._register()
@@ -27,7 +27,9 @@ class GatewayCommand(APIBaseCommand):
             "create", help="Add a gateway", formatter_class=self._parser.formatter_class
         )
         create_parser.set_defaults(subfunc=self._create)
-        create_parser.add_argument("--backend", choices=["aws", "gcp", "azure"], required=True)
+        create_parser.add_argument(
+            "--backend", choices=["aws", "azure", "gcp", "kubernetes"], required=True
+        )
         create_parser.add_argument("--region", required=True)
         create_parser.add_argument(
             "--set-default", action="store_true", help="Set as default gateway for the project"
@@ -58,7 +60,7 @@ class GatewayCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        # TODO handle 404 and other errors
+        # TODO handle errors
         args.subfunc(args)
 
     def _list(self, args: argparse.Namespace):

@@ -1,10 +1,12 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import UUID4, BaseModel, Field
+from pydantic import UUID4, Field
+
+from dstack._internal.core.models.common import CoreModel
 
 
-class PollLogsRequest(BaseModel):
+class PollLogsRequest(CoreModel):
     run_name: str
     job_submission_id: UUID4
     start_time: Optional[datetime]

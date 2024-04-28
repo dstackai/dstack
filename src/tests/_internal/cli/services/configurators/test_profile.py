@@ -57,15 +57,15 @@ class TestProfileArgs:
         assert profile.dict() == modified.dict()
 
     def test_no_retry(self):
-        profile = Profile(name="test", retry_policy=ProfileRetryPolicy(retry=True, limit=3600))
+        profile = Profile(name="test", retry_policy=ProfileRetryPolicy(retry=True, duration=3600))
         modified, _ = apply_args(profile, ["--no-retry"])
         profile.retry_policy.retry = False
         assert profile.dict() == modified.dict()
 
-    def test_retry_limit(self):
+    def test_retry_duration(self):
         profile = Profile(name="test")
-        modified, _ = apply_args(profile, ["--retry-limit", "1h"])
-        profile.retry_policy = ProfileRetryPolicy(retry=True, limit=3600)
+        modified, _ = apply_args(profile, ["--retry-duration", "1h"])
+        profile.retry_policy = ProfileRetryPolicy(retry=True, duration=3600)
         assert profile.dict() == modified.dict()
 
 

@@ -1,15 +1,17 @@
 import re
 from enum import Enum
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Mapping, Optional, Union
 
-from pydantic import BaseModel, Field, ValidationError, conint, constr, validator
+from pydantic import Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel, Duration
+from dstack._internal.core.models.gateways import AnyModel
+from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
-from dstack._internal.core.models.resources import Resources
+from dstack._internal.core.models.resources import Range, ResourcesSpec
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -26,9 +28,10 @@ class PythonVersion(str, Enum):
     PY39 = "3.9"
     PY310 = "3.10"
     PY311 = "3.11"
+    PY312 = "3.12"
 
 
-class RegistryAuth(ForbidExtra):
+class RegistryAuth(CoreModel):
     """
     Credentials for pulling a private Docker image.
 
@@ -37,11 +40,14 @@ class RegistryAuth(ForbidExtra):
         password (str): The password or access token
     """
 
-    username: Annotated[Optional[str], Field(description="The username")]
+    class Config:
+        frozen = True
+
+    username: Annotated[str, Field(description="The username")]
     password: Annotated[str, Field(description="The password or access token")]
 
 
-class PortMapping(ForbidExtra):
+class PortMapping(CoreModel):
     local_port: Optional[ValidPort] = None
     container_port: ValidPort
 
@@ -66,7 +72,7 @@ class PortMapping(ForbidExtra):
         return PortMapping(local_port=local_port, container_port=int(container_port))
 
 
-class Artifact(ForbidExtra):
+class Artifact(CoreModel):
     path: Annotated[
         str, Field(description="The path to the folder that must be stored as an output artifact")
     ]
@@ -78,16 +84,30 @@ class Artifact(ForbidExtra):
     ] = False
 
 
-class ModelInfo(ForbidExtra):
-    type: Annotated[Literal["chat"], Field(description="The type of the model")]
-    name: Annotated[str, Field(description="The name of the model")]
-    format: Annotated[Literal["tgi"], Field(description="The serving format")]
+class ScalingSpec(CoreModel):
+    metric: Annotated[Literal["rps"], Field(description="The target metric to track")]
+    target: Annotated[float, Field(description="The target value of the metric")]
+    scale_up_delay: Annotated[
+        Duration, Field(description="The delay in seconds before scaling up")
+    ] = Duration.parse("5m")
+    scale_down_delay: Annotated[
+        Duration, Field(description="The delay in seconds before scaling down")
+    ] = Duration.parse("10m")
 
-    chat_template: Optional[str] = None  # TODO(egor-s): use discriminator and root model
-    eos_token: Optional[str] = None
+
+class EnvSentinel(CoreModel):
+    key: str
+
+    def from_env(self, env: Mapping[str, str]) -> str:
+        if self.key in env:
+            return env[self.key]
+        raise ValueError(f"Environment variable {self.key} is not set")
+
+    def __str__(self):
+        return f"EnvSentinel({self.key})"
 
 
-class BaseConfiguration(ForbidExtra):
+class BaseConfiguration(CoreModel):
     type: Literal["none"]
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
@@ -99,16 +119,19 @@ class BaseConfiguration(ForbidExtra):
     ]
     python: Annotated[
         Optional[PythonVersion],
-        Field(description="The major version of Python\nMutually exclusive with the image"),
+        Field(description="The major version of Python. Mutually exclusive with `image`"),
     ]
     env: Annotated[
-        Union[List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*=.*$")], Dict[str, str]],
+        Union[
+            List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*(=.*$|$)")],
+            Dict[str, Union[str, EnvSentinel]],
+        ],
         Field(description="The mapping or the list of environment variables"),
     ] = {}
     setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
     resources: Annotated[
-        Resources, Field(description="The resources requirements to run the configuration")
-    ] = Resources()
+        ResourcesSpec, Field(description="The resources requirements to run the configuration")
+    ] = ResourcesSpec()
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -125,7 +148,20 @@ class BaseConfiguration(ForbidExtra):
     @validator("env")
     def convert_env(cls, v) -> Dict[str, str]:
         if isinstance(v, list):
-            return dict(pair.split(sep="=", maxsplit=1) for pair in v)
+            d = {}
+            for var in v:
+                if "=" not in var:
+                    if var not in d:
+                        d[var] = EnvSentinel(key=var)
+                    else:
+                        raise ValueError(f"Duplicate environment variable: {var}")
+                else:
+                    k, val = var.split("=", maxsplit=1)
+                    if k not in d:
+                        d[k] = val
+                    else:
+                        raise ValueError(f"Duplicate environment variable: {var}")
+            return d
         return v
 
     def get_repo(self) -> Repo:
@@ -147,14 +183,38 @@ class BaseConfigurationWithPorts(BaseConfiguration):
         return v
 
 
-class DevEnvironmentConfiguration(BaseConfigurationWithPorts):
-    type: Literal["dev-environment"] = "dev-environment"
+class BaseConfigurationWithCommands(BaseConfiguration):
+    commands: Annotated[CommandsList, Field(description="The bash commands to run")] = []
+
+    @root_validator
+    def check_image_or_commands_present(cls, values):
+        if not values.get("commands") and not values.get("image"):
+            raise ValueError("Either `commands` or `image` must be set")
+        return values
+
+
+class DevEnvironmentConfigurationParams(CoreModel):
     ide: Annotated[Literal["vscode"], Field(description="The IDE to run")]
     version: Annotated[Optional[str], Field(description="The version of the IDE")]
     init: Annotated[CommandsList, Field(description="The bash commands to run")] = []
 
 
-class TaskConfiguration(BaseConfigurationWithPorts):
+class DevEnvironmentConfiguration(
+    ProfileParams, BaseConfigurationWithPorts, DevEnvironmentConfigurationParams
+):
+    type: Literal["dev-environment"] = "dev-environment"
+
+
+class TaskConfigurationParams(CoreModel):
+    nodes: Annotated[int, Field(description="Number of nodes", ge=1)] = 1
+
+
+class TaskConfiguration(
+    ProfileParams,
+    BaseConfigurationWithCommands,
+    BaseConfigurationWithPorts,
+    TaskConfigurationParams,
+):
     """
     Attributes:
         commands (List[str]): The bash commands to run
@@ -165,35 +225,28 @@ class TaskConfiguration(BaseConfigurationWithPorts):
         entrypoint (Optional[str]): The Docker entrypoint
         registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        resources (Optional[Resources]): The requirements to run the configuration.
+        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
     """
 
     type: Literal["task"] = "task"
-    commands: Annotated[CommandsList, Field(description="The bash commands to run")]
 
 
-class ServiceConfiguration(BaseConfiguration):
-    """
-    Attributes:
-        commands (List[str]): The bash commands to run
-        port (PortMapping): The port, that application listens to or the mapping
-        env (Dict[str, str]): The mapping or the list of environment variables
-        image (Optional[str]): The name of the Docker image to run
-        python (Optional[str]): The major version of Python
-        entrypoint (Optional[str]): The Docker entrypoint
-        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
-        home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        resources (Optional[Resources]): The requirements to run the configuration.
-    """
-
-    type: Literal["service"] = "service"
-    commands: Annotated[CommandsList, Field(description="The bash commands to run")]
+class ServiceConfigurationParams(CoreModel):
     port: Annotated[
         Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
-        Field(description="The port, that application listens to or the mapping"),
+        Field(description="The port, that application listens on or the mapping"),
     ]
     model: Annotated[
-        Optional[ModelInfo], Field(description="The model info for OpenAI interface")
+        Optional[AnyModel],
+        Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
+    ] = None
+    auth: Annotated[bool, Field(description="Enable the authorization")] = True
+    replicas: Annotated[
+        Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],
+        Field(description="The range "),
+    ] = Range[int](min=1, max=1)
+    scaling: Annotated[
+        Optional[ScalingSpec], Field(description="The auto-scaling configuration")
     ] = None
 
     @validator("port")
@@ -204,11 +257,61 @@ class ServiceConfiguration(BaseConfiguration):
             return PortMapping.parse(v)
         return v
 
+    @validator("replicas")
+    def convert_replicas(cls, v: Any) -> Range[int]:
+        if isinstance(v, str) and ".." in v:
+            min, max = v.replace(" ", "").split("..")
+            v = Range(min=min or 0, max=max or None)
+        elif isinstance(v, (int, float)):
+            v = Range(min=v, max=v)
+        if v.max is None:
+            raise ValueError("The maximum number of replicas is required")
+        if v.min < 0:
+            raise ValueError("The minimum number of replicas must be greater than or equal to 0")
+        if v.max < v.min:
+            raise ValueError(
+                "The maximum number of replicas must be greater than or equal to the minium number of replicas"
+            )
+        return v
+
+    @root_validator()
+    def validate_scaling(cls, values):
+        scaling = values.get("scaling")
+        replicas = values.get("replicas")
+        if replicas.min != replicas.max and not scaling:
+            raise ValueError("When you set `replicas` to a range, ensure to specify `scaling`.")
+        if replicas.min == replicas.max and scaling:
+            raise ValueError("To use `scaling`, `replicas` must be set to a range.")
+        return values
+
+
+class ServiceConfiguration(
+    ProfileParams, BaseConfigurationWithCommands, ServiceConfigurationParams
+):
+    """
+    Attributes:
+        commands (List[str]): The bash commands to run
+        port (PortMapping): The port, that application listens to or the mapping
+        env (Dict[str, str]): The mapping or the list of environment variables
+        image (Optional[str]): The name of the Docker image to run
+        python (Optional[str]): The major version of Python
+        entrypoint (Optional[str]): The Docker entrypoint
+        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
+        home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
+        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
+        model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
+        auth (bool): Enable the authorization. Defaults to `True`.
+        replicas Range[int]: The range of the number of replicas. Defaults to `1`.
+        scaling: Optional[ScalingSpec]: The auto-scaling configuration.
+    """
+
+    type: Literal["service"] = "service"
+
 
 AnyRunConfiguration = Union[DevEnvironmentConfiguration, TaskConfiguration, ServiceConfiguration]
 
 
-class RunConfiguration(BaseModel):
+class RunConfiguration(CoreModel):
     __root__: Annotated[
         AnyRunConfiguration,
         Field(discriminator="type"),

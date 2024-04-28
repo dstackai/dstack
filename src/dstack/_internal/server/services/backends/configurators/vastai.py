@@ -30,9 +30,6 @@ REGIONS = []
 class VastAIConfigurator(Configurator):
     TYPE: BackendType = BackendType.VASTAI
 
-    def get_default_configs(self) -> List[VastAIConfigInfoWithCreds]:
-        return []
-
     def get_config_values(self, config: VastAIConfigInfoWithCredsPartial) -> VastAIConfigValues:
         config_values = VastAIConfigValues()
         if config.creds is None:
@@ -49,22 +46,24 @@ class VastAIConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=VastAIStoredConfig(**VastAIConfigInfo.parse_obj(config).dict()).json(),
+            config=VastAIStoredConfig(
+                **VastAIConfigInfo.__response__.parse_obj(config).dict()
+            ).json(),
             auth=VastAICreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyVastAIConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return VastAIConfigInfoWithCreds.parse_obj(config)
-        return VastAIConfigInfo.parse_obj(config)
+            return VastAIConfigInfoWithCreds.__response__.parse_obj(config)
+        return VastAIConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> VastAIBackend:
         config = self._get_backend_config(model)
         return VastAIBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> VastAIConfig:
-        return VastAIConfig(
+        return VastAIConfig.__response__(
             **json.loads(model.config),
             creds=VastAICreds.parse_raw(model.auth),
         )

@@ -17,6 +17,7 @@ from dstack._internal.server.routers import (
     backends,
     gateways,
     logs,
+    pools,
     projects,
     repos,
     runs,
@@ -24,7 +25,7 @@ from dstack._internal.server.routers import (
     users,
 )
 from dstack._internal.server.services.config import ServerConfigManager
-from dstack._internal.server.services.gateways import update_gateways
+from dstack._internal.server.services.gateways import gateway_connections_pool, init_gateways
 from dstack._internal.server.services.projects import get_or_create_default_project
 from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
@@ -48,10 +49,10 @@ logger = get_logger(__name__)
 
 
 def create_app() -> FastAPI:
-
     if settings.SENTRY_DSN is not None:
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
+            release=DSTACK_VERSION,
             environment=settings.SERVER_ENVIRONMENT,
             enable_tracing=True,
             traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
@@ -66,6 +67,20 @@ async def lifespan(app: FastAPI):
     configure_logging()
     await migrate()
     async with get_session_ctx() as session:
+        console.print(
+            """[purple]╱╱╭╮╱╱╭╮╱╱╱╱╱╱╭╮
+╱╱┃┃╱╭╯╰╮╱╱╱╱╱┃┃
+╭━╯┣━┻╮╭╋━━┳━━┫┃╭╮
+┃╭╮┃━━┫┃┃╭╮┃╭━┫╰╯╯
+┃╰╯┣━━┃╰┫╭╮┃╰━┫╭╮╮
+╰━━┻━━┻━┻╯╰┻━━┻╯╰╯
+╭━━┳━━┳━┳╮╭┳━━┳━╮
+┃━━┫┃━┫╭┫╰╯┃┃━┫╭╯
+┣━━┃┃━┫┃╰╮╭┫┃━┫┃
+╰━━┻━━┻╯╱╰╯╰━━┻╯
+[/]"""
+        )
+
         admin, _ = await get_or_create_admin_user(session=session)
         default_project, project_created = await get_or_create_default_project(
             session=session, user=admin
@@ -77,16 +92,19 @@ async def lifespan(app: FastAPI):
                 os.path.expanduser("~"), "~", 1
             )
             if not config_loaded:
-                console.print(
-                    f"Initializing the default configuration at [code]{server_config_dir}[/]..."
-                )
+                logger.info("Initializing the default configuration...", {"show_path": False})
                 await server_config_manager.init_config(session=session)
-            else:
-                console.print(
-                    f"Applying server configuration from [code]{server_config_dir}[/]..."
+                logger.info(
+                    f"Initialized the default configuration at [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]",
+                    {"show_path": False},
                 )
-                await server_config_manager.apply_config(session=session)
-        await update_gateways(session=session)
+            else:
+                logger.info(
+                    f"Applying [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]...",
+                    {"show_path": False},
+                )
+                await server_config_manager.apply_config(session=session, owner=admin)
+        await init_gateways(session=session)
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
@@ -98,14 +116,16 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
-    console.print(
-        f"The dstack server [code]{dstack_version}[/] is running at [code]{SERVER_URL}[/]"
+    logger.info(f"The admin token is {admin.token}", {"show_path": False})
+    logger.info(
+        f"The dstack server {dstack_version} is running at {SERVER_URL}",
+        {"show_path": False},
     )
-    console.print(f"The admin token is [code]{admin.token}[/].")
     for func in _ON_STARTUP_HOOKS:
         await func(app)
     yield
     scheduler.shutdown()
+    await gateway_connections_pool.remove_all()
 
 
 _ON_STARTUP_HOOKS = []
@@ -125,6 +145,7 @@ def add_no_api_version_check_routes(paths: List[str]):
 def register_routes(app: FastAPI):
     app.include_router(users.router)
     app.include_router(projects.router)
+    app.include_router(pools.router)
     app.include_router(backends.root_router)
     app.include_router(backends.project_router)
     app.include_router(repos.router)

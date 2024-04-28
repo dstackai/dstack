@@ -14,10 +14,6 @@ class ForbiddenError(ServerError):
     pass
 
 
-class NotFoundError(ServerError):
-    pass
-
-
 class ClientError(DstackError):
     pass
 
@@ -94,7 +90,11 @@ class NoCapacityError(ComputeError):
     pass
 
 
-class ResourceNotFoundError(ComputeError):
+class ProvisioningError(ComputeError):
+    pass
+
+
+class ComputeResourceNotFoundError(ComputeError):
     pass
 
 
@@ -123,4 +123,8 @@ class SSHKeyError(SSHError):
 
 
 class SSHPortInUseError(SSHError):
+    pass
+
+
+class DockerRegistryError(DstackError):
     pass

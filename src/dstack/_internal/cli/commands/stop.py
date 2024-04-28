@@ -7,7 +7,7 @@ from dstack._internal.core.errors import CLIError
 
 class StopCommand(APIBaseCommand):
     NAME = "stop"
-    DESCRIPTION = "Stop the run"
+    DESCRIPTION = "Stop a run"
 
     def _register(self):
         super()._register()

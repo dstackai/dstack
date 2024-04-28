@@ -62,6 +62,8 @@ class TestListProjects:
                         "config": {
                             "type": backend.type,
                             "regions": json.loads(backend.config)["regions"],
+                            "vpc_name": None,
+                            "vpc_ids": None,
                         },
                     }
                 ],
@@ -123,11 +125,39 @@ class TestCreateProject:
         }
 
     @pytest.mark.asyncio
+    async def test_return_400_if_project_name_is_taken(self, test_db, session: AsyncSession):
+        user = await create_user(session=session)
+        with patch("uuid.uuid4") as m:
+            m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+            response = client.post(
+                "/api/projects/create",
+                headers=get_auth_headers(user.token),
+                json={"project_name": "TestProject"},
+            )
+        assert response.status_code == 200
+        # Project name uniqueness check should be case insensitive
+        for project_name in ["testproject", "TestProject", "TESTPROJECT"]:
+            with patch("uuid.uuid4") as m:
+                m.return_value = UUID("2b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+                response = client.post(
+                    "/api/projects/create",
+                    headers=get_auth_headers(user.token),
+                    json={"project_name": project_name},
+                )
+            assert response.status_code == 400
+        res = await session.execute(
+            select(ProjectModel).where(
+                ProjectModel.name.in_(["TestProject", "testproject", "TestProject", "TESTPROJECT"])
+            )
+        )
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.asyncio
     async def test_returns_400_if_user_project_quota_exceeded(
         self, test_db, session: AsyncSession
     ):
         user = await create_user(session=session, name="owner", global_role=GlobalRole.USER)
-        for i in range(3):
+        for i in range(10):
             response = client.post(
                 "/api/projects/create",
                 headers=get_auth_headers(user.token),
@@ -137,12 +167,23 @@ class TestCreateProject:
         response = client.post(
             "/api/projects/create",
             headers=get_auth_headers(user.token),
-            json={"project_name": f"project4"},
+            json={"project_name": "project11"},
         )
         assert response.status_code == 400
         assert response.json() == {
             "detail": [{"code": "error", "msg": "User project quota exceeded"}]
         }
+
+    @pytest.mark.asyncio
+    async def test_no_project_quota_for_global_admins(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, name="owner", global_role=GlobalRole.ADMIN)
+        for i in range(12):
+            response = client.post(
+                "/api/projects/create",
+                headers=get_auth_headers(user.token),
+                json={"project_name": f"project{i}"},
+            )
+            assert response.status_code == 200, response.json()
 
 
 class TestDeleteProject:
@@ -151,7 +192,7 @@ class TestDeleteProject:
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
-    async def test_deletes_projects(self, test_db, session: AsyncSession):
+    async def test_cannot_delete_the_only_project(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -162,9 +203,31 @@ class TestDeleteProject:
             headers=get_auth_headers(user.token),
             json={"projects_names": [project.name]},
         )
-        assert response.status_code == 200
+        assert response.status_code == 400
         await session.refresh(project)
-        assert project.deleted
+        assert not project.deleted
+
+    @pytest.mark.asyncio
+    async def test_deletes_projects(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project1 = await create_project(session=session, owner=user, name="project1")
+        await add_project_member(
+            session=session, project=project1, user=user, project_role=ProjectRole.ADMIN
+        )
+        project2 = await create_project(session=session, owner=user, name="project2")
+        await add_project_member(
+            session=session, project=project2, user=user, project_role=ProjectRole.ADMIN
+        )
+        response = client.post(
+            "/api/projects/delete",
+            headers=get_auth_headers(user.token),
+            json={"projects_names": [project1.name]},
+        )
+        assert response.status_code == 200
+        await session.refresh(project1)
+        await session.refresh(project2)
+        assert project1.deleted
+        assert not project2.deleted
 
     @pytest.mark.asyncio
     async def test_returns_403_if_not_project_admin(self, test_db, session: AsyncSession):

@@ -1,20 +1,18 @@
-from typing import List, Optional, Union
-
-from pydantic import BaseModel, Field
-from typing_extensions import Literal
+from pydantic.fields import Field
+from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 
 
-class LambdaConfigInfo(BaseModel):
+class LambdaConfigInfo(CoreModel):
     type: Literal["lambda"] = "lambda"
     regions: Optional[List[str]] = None
 
 
-class LambdaAPIKeyCreds(ForbidExtra):
-    type: Literal["api_key"] = "api_key"
-    api_key: str
+class LambdaAPIKeyCreds(CoreModel):
+    type: Annotated[Literal["api_key"], Field(description="The type of credentials")] = "api_key"
+    api_key: Annotated[str, Field(description="The API key")]
 
 
 AnyLambdaCreds = LambdaAPIKeyCreds
@@ -30,13 +28,13 @@ class LambdaConfigInfoWithCreds(LambdaConfigInfo):
 AnyLambdaConfigInfo = Union[LambdaConfigInfo, LambdaConfigInfoWithCreds]
 
 
-class LambdaConfigInfoWithCredsPartial(BaseModel):
+class LambdaConfigInfoWithCredsPartial(CoreModel):
     type: Literal["lambda"] = "lambda"
     creds: Optional[AnyLambdaCreds]
     regions: Optional[List[str]]
 
 
-class LambdaConfigValues(BaseModel):
+class LambdaConfigValues(CoreModel):
     type: Literal["lambda"] = "lambda"
     regions: Optional[ConfigMultiElement]
 

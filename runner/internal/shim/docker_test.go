@@ -31,7 +31,8 @@ func TestDocker_SSHServer(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	assert.NoError(t, RunDocker(ctx, params, &apiAdapterMock{}))
+	dockerRunner, _ := NewDockerRunner(params)
+	assert.NoError(t, dockerRunner.Run(ctx, DockerImageConfig{ImageName: "ubuntu"}))
 }
 
 // TestDocker_SSHServerConnect pulls ubuntu image (without sshd), installs openssh-server and tries to connect via SSH
@@ -56,15 +57,18 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
+	dockerRunner, _ := NewDockerRunner(params)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		assert.NoError(t, RunDocker(ctx, params, &apiAdapterMock{}))
+		assert.NoError(t, dockerRunner.Run(ctx, DockerImageConfig{ImageName: "ubuntu"}))
 	}()
 
 	for i := 0; i < timeout; i++ {
 		cmd := exec.Command("ssh",
+			"-F", "none",
 			"-o", "StrictHostKeyChecking=no",
 			"-o", "UserKnownHostsFile=/dev/null",
 			"-i", tempDir+"/id_rsa",
@@ -89,10 +93,6 @@ type dockerParametersMock struct {
 	publicSSHKey string
 }
 
-func (c *dockerParametersMock) DockerImageName() string {
-	return "ubuntu"
-}
-
 func (c *dockerParametersMock) DockerKeepContainer() bool {
 	return false
 }
@@ -110,19 +110,13 @@ func (c *dockerParametersMock) DockerPorts() []int {
 	return ports
 }
 
-func (c *dockerParametersMock) DockerMounts() ([]mount.Mount, error) {
+func (c *dockerParametersMock) DockerMounts(string) ([]mount.Mount, error) {
 	return nil, nil
 }
 
-type apiAdapterMock struct{}
-
-func (s *apiAdapterMock) GetRegistryAuth() <-chan string {
-	ch := make(chan string)
-	close(ch)
-	return ch
+func (c *dockerParametersMock) MakeRunnerDir() (string, error) {
+	return "", nil
 }
-
-func (s *apiAdapterMock) SetState(string) {}
 
 /* Utilities */
 

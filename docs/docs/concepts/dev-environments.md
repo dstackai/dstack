@@ -1,12 +1,9 @@
 # Dev environments
 
-Before submitting a long-running task or deploying a model, you may want to experiment 
-interactively using your IDE, terminal, or Jupyter notebooks.
+Before scheduling a task or deploying a model, you may want to run code interactively. Dev environments allow you to
+provision a remote machine set up with your code and favorite IDE with just one command.
 
-With `dstack`, you can provision a dev environment with the required cloud resources, 
-code, and environment via a single command.
-
-## Define a configuration
+## Configuration
 
 First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `dev.dstack.yml` are
 both acceptable).
@@ -16,27 +13,59 @@ both acceptable).
 ```yaml
 type: dev-environment
 
-python: "3.11" # (Optional) If not specified, your local version is used
+python: "3.11"
 
 ide: vscode
+
+resources:
+  gpu: 80GB
 ```
 
 </div>
 
-!!! info "Configuration options"
-    You can specify your own Docker image, configure environment variables, etc.
-    If no image is specified, `dstack` uses its own Docker image (pre-configured with Python, Conda, and essential CUDA drivers).
-    For more details, refer to the [Reference](../reference/dstack.yml.md#dev-environment).
+The YAML file allows you to specify your own Docker image, environment variables, 
+resource requirements, etc.
+If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
 
-## Run the configuration
+!!! info ".dstack.yml"
+    For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/dev-environment.md).
 
-To run a configuration, use the `dstack run` command followed by the working directory path, 
-configuration file path, and any other options (e.g., for requesting hardware resources).
+### Environment variables
+
+Environment variables can be set either within the configuration file or passed via the CLI.
+
+```yaml
+type: dev-environment
+
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - HF_HUB_ENABLE_HF_TRANSFER=1
+
+python: "3.11"
+ide: vscode
+
+resources:
+  gpu: 80GB
+```
+
+If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
+`dstack` will require the value to be passed via the CLI or set in the current process.
+
+For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
+
+??? info "Profiles"
+    In case you'd like to reuse certain parameters (such as spot policy, retry and max duration,
+    max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+
+## Running
+
+To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
+configuration file path, and other options.
 
 <div class="termy">
 
 ```shell
-$ dstack run . -f .dstack.yml --gpu A100
+$ dstack run . -f .dstack.yml
 
  BACKEND     REGION         RESOURCES                     SPOT  PRICE
  tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
@@ -45,7 +74,7 @@ $ dstack run . -f .dstack.yml --gpu A100
  
 Continue? [y/n]: y
 
-Provisioning...
+Provisioning `fast-moth-1`...
 ---> 100%
 
 To open in VS Code Desktop, use this link:
@@ -54,28 +83,48 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
-!!! info "Run options"
-    The `dstack run` command allows you to use `--gpu` to request GPUs (e.g. `--gpu A100` or `--gpu 80GB` or `--gpu A100:4`, etc.),
-    and many other options (incl. spot instances, disk size, max price, max duration, retry policy, etc.).
-    For more details, refer to the [Reference](../reference/cli/index.md#dstack-run).
+When `dstack` provisions the dev environment, it uses the current folder contents.
 
-Once the dev environment is provisioned, click the link to open the environment in your desktop IDE.
+!!! info ".gitignore"
+    If there are large files or folders you'd like to avoid uploading, 
+    you can list them in `.gitignore`.
+
+The `dstack run` command allows specifying many things, including spot policy, retry and max duration, 
+max price, regions, instance types, and [much more](../reference/cli/index.md#dstack-run).
+
+### IDE
+
+To open the dev environment in your desktop IDE, use the link from the output 
+(such as `vscode://vscode-remote/ssh-remote+fast-moth-1/workflow`).
 
 ![](../../assets/images/dstack-vscode-jupyter.png){ width=800 }
 
-!!! info "Port forwarding"
-    When running a dev environment, `dstack` forwards the remote ports to `localhost` for secure 
-    and convenient access.
+### SSH
 
-No need to worry about copying code, setting up environment, IDE, etc. `dstack` handles it all 
-automatically.
+Alternatively, you can connect to the dev environment via SSH:
 
-??? info ".gitignore"
-    When running a dev environment, `dstack` uses the exact version of code from your project directory. 
+<div class="termy">
 
-    If there are large files, consider creating a `.gitignore` file to exclude them for better performance.
+```shell
+$ ssh fast-moth-1
+```
+
+</div>
+
+## Managing runs
+
+**Stopping runs**
+
+Once the run exceeds the max duration,
+or when you use [`dstack stop`](../reference/cli/index.md#dstack-stop), 
+the dev environment and its cloud resources are deleted.
+
+**Listing runs**
+
+The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
+
+[//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
 
 ## What's next?
 
-1. Browse [examples](../../examples/index.md)
-2. Check the [reference](../reference/dstack.yml.md#dev-environment)
+1. Check the [`.dstack.yml` reference](../reference/dstack.yml/dev-environment.md) for more details and examples

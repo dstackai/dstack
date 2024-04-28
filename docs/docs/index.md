@@ -1,21 +1,23 @@
 # What is dstack?
 
-`dstack` is an open-source toolkit and orchestration engine for running GPU workloads. 
-It works seamlessly with top cloud GPU providers (AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, etc.)
+`dstack` is an open-source orchestration engine for running AI workloads. It supports a wide range of cloud providers (such as AWS, GCP, Azure,
+Lambda, TensorDock, Vast.ai, CUDO, RunPod, etc.) as well as on-premises infrastructure.
 
-### Why use dstack?
+## Why use dstack?
 
 1. Designed for development, training, and deployment of gen AI models.
-2. Efficiently utilizes GPUs across regions and cloud providers.
-3. Compatible with any frameworks.
+2. Efficiently utilizes compute across cloud providers and on-prem servers.
+3. Compatible with any training, fine-tuning, and serving frameworks, as well as other third-party tools.
 4. 100% open-source.
 
-### How does it work?
+## How does it work?
 
-1. Install the open-source `dstack` server and configure cloud credentials (or opt for the cloud version.) 
-2. Define run configurations such as dev environments, tasks, and services.
-3. Execute configurations via the CLI or API. The `dstack` server automatically provisions cloud resources, handles 
-   containers, logs, network, and everything else.
+1. [Install](installation/index.md) the open-source version of `dstack` and configure your own cloud accounts, or sign up with [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}
+2. Define configurations such as [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
+   and [services](concepts/services.md).
+3. Run configurations via `dstack`'s CLI or API.
+[//]: # (The `dstack` server automatically provisions cloud resources, handles containers, logs, network, and everything else.)
+4. Use [pools](concepts/pools.md) to manage instances and on-prem servers.
 
 [//]: # (### Coming soon)
 
@@ -23,9 +25,8 @@ It works seamlessly with top cloud GPU providers (AWS, GCP, Azure, Lambda, Tenso
 [//]: # (2. Auto-scalable services)
 [//]: # (3. Integration with Kubernetes)
 
-### Where do I start?
+## Where do I start?
 
-1. [Install the server](installation/index.md) (or <a href="#" data-tally-open="w7K17R">sign up</a> with the cloud version)
-2. Follow [quickstart](quickstart.md)
-3. Browse [examples](../examples/index.md)
-4. Join the community via [Discord](https://discord.gg/u8SmfwPpMd)
+1. Follow [quickstart](quickstart.md)
+2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md){:target="_blank"}
+3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}

@@ -1,47 +1,22 @@
 # Installation
 
-Follow this guide to install the open-source version of `dstack` server.
+To install `dstack`, use `pip`:
 
-## Set up the server `
-
-=== "pip"
-
-    <div class="termy">
+<div class="termy">
     
     ```shell
     $ pip install "dstack[all]" -U
-    $ dstack server
-
-    Applying configuration from ~/.dstack/server/config.yml...
-
-    The server is running at http://127.0.0.1:3000/
-    The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
     ```
-    
-    </div>
 
-=== "Docker"
+</div>
 
-    <div class="termy">
-    
-    ```shell
-    $ docker run -p 3000:3000 -v $HOME/.dstack/server/:/root/.dstack/server dstackai/dstack
+To use the open-source version of `dstack`, you have to configure 
+your cloud accounts via `~/.dstack/server/config.yml` and start the `dstack` server.
 
-    Applying configuration from ~/.dstack/server/config.yml...
+## Configure backends
 
-    The server is running at http://127.0.0.1:3000/.
-    The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
-    ```
-        
-    </div>
-
-!!! info "NOTE:"
-    For flexibility, `dstack` server allows you to configure multiple project. The default project is `main`.
-
-### Configure credentials
-
-To let `dstack` run workloads in your cloud account(s), you need to configure cloud credentials 
-in `~/.dstack/server/config.yml` under the `backends` property of the respective project.
+To configure cloud accounts, create the    
+`~/.dstack/server/config.yml` file, and configure each cloud under the `backends` property.
 
 <div editor-title="~/.dstack/server/config.yml">
 
@@ -58,17 +33,23 @@ projects:
 
 </div>
 
-!!! info "Default credentials"
-    If you have default AWS, GCP, or Azure credentials on your machine, the `dstack` server will pick them up automatically.
-    Otherwise, you have to configure them manually.
+Refer below for examples on how to configure a specific cloud provider.
 
-#### AWS
+??? info "Projects"
+    For flexibility, `dstack` server permits you to configure backends for multiple projects. 
+    If you intend to use only one project, name it `main`.
+
+[//]: # (!!! info "Default credentials")
+[//]: # (    If you have default AWS, GCP, or Azure credentials on your machine, the `dstack` server will pick them up automatically.)
+[//]: # (    Otherwise, you have to configure them manually.)
+
+### AWS
 
 There are two ways to configure AWS: using an access key or using the default credentials.
 
 === "Access key"
 
-    Create an access key by following the [this guide](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get).
+    Create an access key by following the [this guide :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get).
     Once you've downloaded the `.csv` file with your IAM user's Access key ID and Secret access key, proceed to 
     configure the backend.
     
@@ -158,19 +139,19 @@ There are two ways to configure AWS: using an access key or using the default cr
     }
     ```
 
-#### Azure
+### Azure
 
 There are two ways to configure Azure: using a client secret or using the default credentials.
 
 === "Client secret"
 
-    A client secret can be created using the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+    A client secret can be created using the [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
 
     ```shell
     SUBSCRIPTION_ID=...
     az ad sp create-for-rbac 
         --name dstack-app \
-        --role Owner \ 
+        --role $DSTACK_ROLE \ 
         --scopes /subscriptions/$SUBSCRIPTION_ID \ 
         --query "{ tenant_id: tenant, client_id: appId, client_secret: password }"
     ```
@@ -196,7 +177,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
 === "Default credentials"
 
-    Obtain the `subscription_id` and `tenant_id` via the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+    Obtain the `subscription_id` and `tenant_id` via the [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
     
     ```shell
     az account show --query "{subscription_id: id, tenant_id: tenantId}"
@@ -227,10 +208,46 @@ There are two ways to configure Azure: using a client secret or using the defaul
     ```
 
 ??? info "Required Azure permissions"
-    You must have the `Owner` permission for the Azure subscription.
-    Please, [let us know](https://discord.gg/u8SmfwPpMd) if your use case requires more granular Azure permissions.
+    The following Azure permissions are sufficient for `dstack` to work:
+    ```
+    {
+        "properties": {
+            "roleName": "dstack-role",
+            "description": "Minimal reqired permissions for using Azure with dstack",
+            "assignableScopes": [
+                "/subscriptions/${YOUR_SUBSCRIPTION_ID}"
+            ],
+            "permissions": [
+                {
+                  "actions": [
+                      "Microsoft.Authorization/*/read",
+                      "Microsoft.Compute/availabilitySets/*",
+                      "Microsoft.Compute/locations/*",
+                      "Microsoft.Compute/virtualMachines/*",
+                      "Microsoft.Compute/virtualMachineScaleSets/*",
+                      "Microsoft.Compute/cloudServices/*",
+                      "Microsoft.Compute/disks/write",
+                      "Microsoft.Compute/disks/read",
+                      "Microsoft.Compute/disks/delete",
+                      "Microsoft.Network/networkSecurityGroups/*",
+                      "Microsoft.Network/locations/*",
+                      "Microsoft.Network/virtualNetworks/*",
+                      "Microsoft.Network/networkInterfaces/*",
+                      "Microsoft.Network/publicIPAddresses/*",
+                      "Microsoft.Resources/subscriptions/resourceGroups/read",
+                      "Microsoft.Resources/subscriptions/resourceGroups/write",
+                      "Microsoft.Resources/subscriptions/read"
+                  ],
+                  "notActions": [],
+                  "dataActions": [],
+                  "notDataActions": []
+                }
+            ]
+        }
+    }
+    ```
 
-#### GCP
+### GCP
 
 ??? info "Enable APIs"
     First, ensure the required APIs are enabled in your GCP `project_id`.
@@ -246,10 +263,10 @@ There are two ways to configure GCP: using a service account or using the defaul
 
 === "Service account"
 
-    To create a service account, follow [this guide](https://cloud.google.com/iam/docs/service-accounts-create).
+    To create a service account, follow [this guide :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/service-accounts-create).
     Make sure to grant it the `Service Account User` and `Compute Admin` roles.
     
-    After setting up the service account [create a key](https://cloud.google.com/iam/docs/keys-create-delete) for it 
+    After setting up the service account [create a key :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/keys-create-delete) for it
     and download the corresponding JSON file.
     
     Then go ahead and configure the backend by specifying the downloaded file path.
@@ -293,11 +310,28 @@ There are two ways to configure GCP: using a service account or using the defaul
     ```
 
 ??? info "Required GCP permissions"
-    The `Service Account User` and `Compute Admin` roles are sufficient for `dstack` to work.
+    The following GCP permissions are sufficient for `dstack` to work:
 
-#### Lambda
+    ```
+    compute.disks.create
+    compute.firewalls.create
+    compute.images.useReadOnly
+    compute.instances.create
+    compute.instances.delete
+    compute.instances.get
+    compute.instances.setLabels
+    compute.instances.setMetadata
+    compute.instances.setTags
+    compute.networks.updatePolicy
+    compute.regions.list
+    compute.subnetworks.use
+    compute.subnetworks.useExternalIp
+    compute.zoneOperations.get
+    ```
 
-Log into your [Lambda Cloud](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
+### Lambda
+
+Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
 button to create a new API key.
 
 Then, go ahead and configure the backend:
@@ -316,9 +350,9 @@ projects:
 
 </div>
 
-#### TensorDock
+### TensorDock
 
-Log into your [TensorDock](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
+Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
 section to create a new authorization key.
 
 Then, go ahead and configure the backend:
@@ -341,9 +375,9 @@ projects:
 !!! info "NOTE:"
     The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
 
-#### Vast AI
+### Vast.ai
 
-Log into your [Vast AI](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
+Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
 API Key.
 
 Then, go ahead and configure the backend:
@@ -365,9 +399,58 @@ projects:
 !!! info "NOTE:"
     Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
-#### DataCrunch
+### CUDO
 
-Log into your [DataCrunch](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
+Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
+
+Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: cudo
+    project_id: my-cudo-project
+    creds:
+      type: api_key
+      api_key: 7487240a466624b48de22865589
+```
+
+</div>
+
+### RunPod
+
+Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
+the button to create a key.
+
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+  - type: runpod
+    creds:
+      type: api_key
+      api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+```
+
+</div>
+
+!!! warning "NOTE:"
+    If you're using a custom Docker image, its entrypoint cannot be anything other than `/bin/bash` or `/bin/sh`. 
+    See the [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1137) for more details.
+
+!!! info "NOTE:"
+    The `runpod` backend supports on-demand instances only. Spot instance support coming soon.
+
+### DataCrunch
+
+Log into your [DataCrunch :material-arrow-top-right-thin:{ .external }](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
 Then, go ahead and configure the backend:
 
@@ -386,46 +469,151 @@ projects:
 
 </div>
 
-### Configure regions
+### Kubernetes
 
-In addition to credentials, each cloud (except TensorDock, Vast AI, and DataCrunch) optionally allows for region configuration.
+`dstack` supports both self-managed, and managed Kubernetes clusters.
 
-<div editor-title="~/.dstack/server/config.yml">
+??? info "Prerequisite"
+    To use GPUs with Kubernetes, the cluster must be installed with the 
+    [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html).
+    
+    [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
 
-```yaml
-projects:
-- name: main
-  backends:
-  - type: aws
-    regions: [us-west-2, eu-west-1]
-    creds:
-      type: access_key
-      access_key: AIZKISCVKUKO5AAKLAEH
-      secret_key: QSbmpqJIUBn1V5U3pyM9S6lwwiu8/fOJ2dgfwFdW
-```
+To configure a Kubernetes backend, specify the path to the kubeconfig file, 
+and the port that `dstack` can use for proxying SSH traffic.
+In case of a self-managed cluster, also specify the IP address of any node in the cluster.
 
-</div>
+[//]: # (TODO: Mention that the Kind context has to be selected via `current-context` )
 
-If regions aren't specified, `dstack` will use all available regions.
+=== "Self-managed"
 
-After you update `~/.dstack/server/config.yml`, make sure to restart the server.
+    Here's how to configure the backend to use a self-managed cluster.
 
-## Set up the client
+    <div editor-title="~/.dstack/server/config.yml">
 
-The client is configured via `~/.dstack/config.yml` with the server address, user token, and
-the project name. 
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: kubernetes
+        kubeconfig:
+          filename: ~/.kube/config
+        networking:
+          ssh_host: localhost # The external IP address of any node
+          ssh_port: 32000 # Any port accessible outside of the cluster
+    ```
 
-If you run `dstack server` on the same machine, it automatically
-updates the client configuration for the default project (`main`).
+    </div>
 
-To configure the client on a different machine or for other projects, use [`dstack config`](../reference/cli/index.md#dstack-config).
+    The port specified to `ssh_port` must be accessible outside of the cluster.
+    
+    For example, if you are using Kind, make sure to add it via `extraPortMappings`:
+
+    <div editor-title="installation/kind-config.yml"> 
+
+    ```yaml
+    kind: Cluster
+    apiVersion: kind.x-k8s.io/v1alpha4
+    nodes:
+    - role: control-plane
+      extraPortMappings:
+      - containerPort: 32000 # Must be same as `ssh_port`
+        hostPort: 32000 # Must be same as `ssh_port`
+    ```
+
+    </div>
+
+[//]: # (TODO: Elaborate on the Kind's IP address on Linux)
+
+=== "Managed"
+    Here's how to configure the backend to use a managed cluster (AWS, GCP, Azure).
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: kubernetes
+        kubeconfig:
+          filename: ~/.kube/config
+        networking:
+          ssh_port: 32000 # Any port accessible outside of the cluster
+    ```
+
+    </div>
+
+    The port specified to `ssh_port` must be accessible outside of the cluster.
+    
+    For example, if you are using EKS, make sure to add it via an ingress rule
+    of the corresponding security group:
+
+    ```shell
+    aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
+    ```
+
+[//]: # (TODO: Elaborate on gateways, and what backends allow configuring them)
+
+[//]: # (TODO: Should we automatically detect ~/.kube/config)
+
+## Start the server
+
+Once the `~/.dstack/server/config.yml` file is configured, proceed to start the server:
+
+=== "pip"
+
+    <div class="termy">
+    
+    ```shell
+    $ dstack server
+
+    Applying ~/.dstack/server/config.yml...
+
+    The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
+    The server is running at http://127.0.0.1:3000/
+    ```
+    
+    </div>
+
+=== "Docker"
+
+    <div class="termy">
+    
+    ```shell
+    $ docker run -p 3000:3000 -v $HOME/.dstack/server/:/root/.dstack/server dstackai/dstack
+
+    Applying ~/.dstack/server/config.yml...
+
+    The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
+    The server is running at http://127.0.0.1:3000/
+    ```
+        
+    </div>
+
+[//]: # (After you update `~/.dstack/server/config.yml`, make sure to restart the server.)
+
+## Configure the CLI
+
+To point the CLI to the `dstack` server, you need to configure `~/.dstack/config.yml` 
+with the server address, user token and project name.
 
 <div class="termy">
 
 ```shell
-$ dstack config --server &lt;your server adddress&gt; --project &lt;your project name&gt; --token &lt;your user token&gt;
+$ dstack config --url http://127.0.0.1:3000 \
+    --project main \
+    --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
     
-Configurated is updated at ~/.dstack/config.yml
+Configuration is updated at ~/.dstack/config.yml
 ```
 
 </div>
+
+[//]: # (The `dstack server` command automatically updates `~/.dstack/config.yml`)
+[//]: # (with the `main` project.)
+
+## What's next?
+
+1. Follow [quickstart](../quickstart.md)
+2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md)
+3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

@@ -9,12 +9,12 @@
 </h1>
 
 <h3 align="center">
-Orchestrate GPU workloads effortlessly on any cloud
+Orchestrate AI workloads in any cloud
 </h3>
 
 <p align="center">
 <a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> •
-<a href="https://dstack.ai/examples" target="_blank"><b>Examples</b></a> •
+<a href="https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank"><b>Examples</b></a> •
 <a href="https://discord.gg/u8SmfwPpMd" target="_blank"><b>Discord</b></a>
 </p>
 
@@ -22,19 +22,16 @@ Orchestrate GPU workloads effortlessly on any cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source toolkit and orchestration engine for running GPU workloads. 
-It's designed for development, training, and deployment of gen AI models on any cloud.
-
-Supported providers: AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, and DataCrunch.
+`dstack` is an open-source orchestration engine for running AI workloads. It supports a wide range of cloud providers (such as AWS, GCP, Azure,
+Lambda, TensorDock, Vast.ai, CUDO, RunPod, etc.) as well as on-premises infrastructure.
 
 ## Latest news ✨
 
-- [2024/01] [dstack 0.14.0rc1: OpenAI-compatible endpoints](https://dstack.ai/blog/2024/01/19/openai-endpoints-preview/) (Preview)
-- [2023/12] [dstack 0.13.0: Disk size, CUDA 12.1, Mixtral, and more](https://dstack.ai/blog/2023/12/22/disk-size-cuda-12-1-mixtral-and-more/) (Release)
-- [2023/11] [dstack 0.12.3: Vast.ai integration](https://dstack.ai/blog/2023/11/21/vastai/) (Release)
-- [2023/10] [dstack 0.12.2: TensorDock integration](https://dstack.ai/blog/2023/10/31/tensordock/) (Release)
-- [2023/09] [RAG with Llama Index and Weaviate](https://dstack.ai/examples/llama-index/) (Example)
-- [2023/08] [Fine-tuning with QLoRA](https://dstack.ai/examples/qlora/) (Example)
+- [2024/04] [dstack 0.18.0: RunPod integration, multi-node tasks, and more](https://dstack.ai/changelog/0.18.0/) (Release)
+- [2024/03] [dstack 0.17.0: Service auto-scaling, and other improvements](https://dstack.ai/changelog/0.17.0/) (Release)
+- [2024/02] [dstack 0.16.0: Pools](https://dstack.ai/changelog/0.16.0/) (Release)
+- [2024/02] [dstack 0.15.1: Kubernetes integration](https://dstack.ai/changelog/0.15.1/) (Release)
+- [2024/01] [dstack 0.15.0: Resources, authorization, and more](https://dstack.ai/changelog/0.15.0/) (Release)
 
 ## Installation
 
@@ -48,7 +45,7 @@ The easiest way to install the server, is via `pip`:
 pip install "dstack[all]" -U
 ```
 
-### Configure credentials
+### Configure backends
 
 If you have default AWS, GCP, or Azure credentials on your machine, the `dstack` server will pick them up automatically.
 
@@ -65,10 +62,10 @@ To start the server, use the `dstack server` command:
 ```shell
 $ dstack server
 
-Applying configuration from ~/.dstack/server/config.yml...
+Applying ~/.dstack/server/config.yml...
 
-The server is running at http://127.0.0.1:3000/
 The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
+The server is running at http://127.0.0.1:3000/
 ```
 
 </div>
@@ -83,28 +80,56 @@ Below is a live demo of how it works with the CLI.
 
 ### Dev environments
 
-Dev environments allow you to quickly provision a machine with a pre-configured environment, resources, IDE, code, etc.
+You specify the required environment and resources, then run it. dstack provisions the dev
+environment in the cloud and enables access via your desktop IDE.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif" width="650"/>
 
 ### Tasks
 
-Tasks make it very easy to run any scripts, be it for training, data processing, or web apps. They allow you to pre-configure the environment, resources, code, etc.
+Tasks allow for convenient scheduling of any kind of batch jobs, such as training, fine-tuning,
+or data processing, as well as running web applications.
+
+Specify the environment and resources, then run it. dstack executes the task in the
+cloud, enabling port forwarding to your local machine for convenient access.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="650"/>
 
 ### Services
 
-Services make it easy to deploy models and apps cost-effectively as public endpoints, allowing you to use any frameworks.
+Services make it very easy to deploy any kind of model or web application as public endpoints.
 
-<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service.gif" width="650"/>
+Use any serving frameworks and specify required resources. dstack deploys it in the configured
+backend, handles authorization, and provides an OpenAI-compatible interface if needed.
+
+<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="650"/>
+
+### Pools
+
+Pools simplify managing the lifecycle of cloud instances and enable their efficient reuse across runs.
+
+You can have instances provisioned in the cloud automatically, or add them manually, configuring the required resources,
+idle duration, etc.
+
+<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-pool.gif" width="650"/>
+
+## Examples
+
+Here are some featured examples:
+
+- [Llama 3](examples/llms/llama3/README.md)
+- [TGI](examples/deployment/tgi/README.md)
+- [vLLM](examples/deployment/vllm/README.md)
+- [Ollama](examples/deployment/ollama/README.md)
+- [QLoRA](examples/fine-tuning/qlora/README.md)
+
+Browse [examples](examples/README.md) for more examples.
 
 ## More information
 
 For additional information and examples, see the following links:
 
 - [Docs](https://dstack.ai/docs)
-- [Examples](https://dstack.ai/examples)
 - [Discord](https://discord.gg/u8SmfwPpMd)
 
 ## Licence

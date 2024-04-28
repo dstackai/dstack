@@ -2,35 +2,42 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
 
-	"github.com/dstackai/dstack/runner/internal/gerrors"
+	execute "github.com/alexellis/go-execute/v2"
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
-	"github.com/dstackai/dstack/runner/internal/shim/backends"
+	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/sys/unix"
 )
 
+// Version is a build-time variable. The value is overridden by ldflags.
+var Version string
+
 func main() {
-	var backendName string
 	var args shim.CLIArgs
 	args.Docker.SSHPort = 10022
+	var serviceMode bool
 
 	app := &cli.App{
 		Name:    "dstack-shim",
-		Usage:   "Starts dstack-runner or docker container. Kills the VM on exit.",
+		Usage:   "Starts dstack-runner or docker container.",
 		Version: Version,
 		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "backend",
-				Usage:       "Cloud backend provider",
-				Required:    true,
-				Destination: &backendName,
-				EnvVars:     []string{"DSTACK_BACKEND"},
-			},
 			/* Shim Parameters */
 			&cli.PathFlag{
 				Name:        "home",
@@ -86,18 +93,6 @@ func main() {
 				Flags: []cli.Flag{
 					/* Docker Parameters */
 					&cli.BoolFlag{
-						Name:        "with-auth",
-						Usage:       "Waits for registry credentials",
-						Destination: &args.Docker.RegistryAuthRequired,
-					},
-					&cli.StringFlag{
-						Name:        "image",
-						Usage:       "Docker image name",
-						Required:    true,
-						Destination: &args.Docker.ImageName,
-						EnvVars:     []string{"DSTACK_IMAGE_NAME"},
-					},
-					&cli.BoolFlag{
 						Name:        "keep-container",
 						Usage:       "Do not delete container on exit",
 						Destination: &args.Docker.KeepContainer,
@@ -109,50 +104,62 @@ func main() {
 						Destination: &args.Docker.PublicSSHKey,
 						EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
 					},
+					&cli.BoolFlag{
+						Name:        "service",
+						Usage:       "Start as a service",
+						Destination: &serviceMode,
+						EnvVars:     []string{"DSTACK_SERVICE_MODE"},
+					},
 				},
 				Action: func(c *cli.Context) error {
-					if args.Runner.BinaryPath == "" {
-						if err := args.Download("linux"); err != nil {
-							return gerrors.Wrap(err)
-						}
-						defer func() { _ = os.Remove(args.Runner.BinaryPath) }()
+					if serviceMode {
+						writeHostInfo()
 					}
 
-					log.Printf("Backend: %s\n", backendName)
+					if args.Runner.BinaryPath == "" {
+						if err := args.DownloadRunner(); err != nil {
+							return cli.Exit(err, 1)
+						}
+					}
+
 					args.Runner.TempDir = "/tmp/runner"
 					args.Runner.HomeDir = "/root"
 					args.Runner.WorkingDir = "/workflow"
 
 					var err error
+
+					// set dstack home path
 					args.Shim.HomeDir, err = getDstackHome(args.Shim.HomeDir)
 					if err != nil {
-						return gerrors.Wrap(err)
+						return cli.Exit(err, 1)
 					}
-					log.Printf("Docker: %+v\n", args)
+					log.Printf("Config Shim: %+v\n", args.Shim)
+					log.Printf("Config Runner: %+v\n", args.Runner)
+					log.Printf("Config Docker: %+v\n", args.Docker)
 
-					server := api.NewShimServer(fmt.Sprintf(":%d", args.Shim.HTTPPort), args.Docker.RegistryAuthRequired)
-					return gerrors.Wrap(server.RunDocker(context.TODO(), &args))
-				},
-			},
-			{
-				Name:  "subprocess",
-				Usage: "Docker-less mode",
-				Action: func(c *cli.Context) error {
-					return gerrors.New("not implemented")
+					dockerRunner, err := shim.NewDockerRunner(args)
+					if err != nil {
+						return cli.Exit(err, 1)
+					}
+
+					address := fmt.Sprintf(":%d", args.Shim.HTTPPort)
+					shimServer := api.NewShimServer(address, dockerRunner, Version)
+
+					defer func() {
+						shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancelShutdown()
+						_ = shimServer.HttpServer.Shutdown(shutdownCtx)
+					}()
+
+					if err := shimServer.HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+						return cli.Exit(err, 1)
+					}
+
+					return nil
 				},
 			},
 		},
 	}
-
-	defer func() {
-		backend, err := backends.NewBackend(context.TODO(), backendName)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if err = backend.Terminate(context.TODO()); err != nil {
-			log.Fatal(err)
-		}
-	}()
 
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
@@ -163,9 +170,143 @@ func getDstackHome(flag string) (string, error) {
 	if flag != "" {
 		return flag, nil
 	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", gerrors.Wrap(err)
+		return "", err
 	}
-	return filepath.Join(home, ".dstack"), nil
+	return filepath.Join(home, consts.DstackDirPath), nil
+}
+
+func writeHostInfo() {
+	// host_info exist
+	if _, err := os.Stat(consts.HostInfoFile); !errors.Is(err, os.ErrNotExist) {
+		return
+	}
+
+	type Message struct {
+		GpuName   string   `json:"gpu_name"`
+		GpuMemory string   `json:"gpu_memory"`
+		GpuCount  int      `json:"gpu_count"`
+		Adresses  []string `json:"addresses"`
+		DiskSize  uint64   `json:"disk_size"`
+		NumCPUs   int      `json:"cpus"`
+		Memory    uint64   `json:"memory"`
+	}
+
+	gpuCount := 0
+	gpuMemory := ""
+	gpuName := ""
+	gpus := getGpuInfo()
+	if len(gpus) != 0 {
+		gpuCount = len(gpus)
+		gpuMemory = gpus[0][1]
+		gpuName = gpus[0][0]
+	}
+	m := Message{
+		GpuName:   gpuName,
+		GpuMemory: gpuMemory,
+		GpuCount:  gpuCount,
+		Adresses:  getInterfaces(),
+		DiskSize:  getDiskSize(),
+		NumCPUs:   runtime.NumCPU(),
+		Memory:    getMemory(),
+	}
+
+	b, _ := json.Marshal(m)
+	fmt.Println(string(b))
+	err := os.WriteFile(consts.HostInfoFile, b, 0755) //nolint:gosec
+	if err != nil {
+		panic(err)
+	}
+}
+
+func getGpuInfo() [][]string {
+	cmd := execute.ExecTask{
+		Command: "docker",
+		Args: []string{
+			"run",
+			"--rm",
+			"--gpus", "all",
+			"dstackai/base:py3.11-0.4rc4-cuda-12.1",
+			"nvidia-smi", "--query-gpu=gpu_name,memory.total", "--format=csv",
+		},
+		StreamStdio: false,
+	}
+
+	res, err := cmd.Execute(context.Background())
+	if err != nil {
+		return [][]string{} // GPU not found
+	}
+
+	if res.ExitCode != 0 {
+		return [][]string{} // GPU not found
+	}
+
+	r := csv.NewReader(strings.NewReader(res.Stdout))
+
+	var gpus [][]string
+
+	// Skip header
+	if _, err := r.Read(); err != nil {
+		panic("canot read csv")
+	}
+
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("gpu record %v\n", record)
+		gpus = append(gpus, record)
+	}
+	return gpus
+}
+
+func getInterfaces() []string {
+	var addresses []string
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		panic("cannot get interfaces")
+	}
+	for _, i := range ifaces {
+		addrs, err := i.Addrs()
+		if err != nil {
+			panic("cannot get addrs")
+		}
+
+		for _, addr := range addrs {
+			switch v := addr.(type) {
+			case *net.IPNet:
+				fmt.Println(v.IP)
+				if v.IP.IsLoopback() {
+					continue
+				}
+				addresses = append(addresses, addr.String())
+			}
+		}
+	}
+	return addresses
+}
+
+func getDiskSize() uint64 {
+	var stat unix.Statfs_t
+	wd, err := os.Getwd()
+	if err != nil {
+		panic("cannot get disk size")
+	}
+	unix.Statfs(wd, &stat)
+	size := stat.Bavail * uint64(stat.Bsize)
+	return size
+}
+
+func getMemory() uint64 {
+	v, err := mem.VirtualMemory()
+	if err != nil {
+		panic("cannot get emeory")
+	}
+	return v.Total
 }

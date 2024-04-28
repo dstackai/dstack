@@ -15,14 +15,16 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.lambdalabs.api_client import LambdaAPIClient
 from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
+from dstack._internal.core.errors import BackendError, ConfigurationError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    LaunchedInstanceInfo,
+    SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 
 _SHIM_CONFIG_FILEPATH = "/home/ubuntu/.dstack/config.json"
 
@@ -48,6 +50,82 @@ class LambdaCompute(Compute):
         offers_with_availability = self._get_offers_with_availability(offers)
         return offers_with_availability
 
+    def create_instance(
+        self, instance_offer: InstanceOfferWithAvailability, instance_config: InstanceConfiguration
+    ) -> JobProvisioningData:
+        commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
+        # shim is asssumed to be run under root
+        launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"
+
+        setup_ssh_key = None
+        user_ssh_key = None
+        for ssh_key in instance_config.ssh_keys:
+            if setup_ssh_key is not None and user_ssh_key is not None:
+                break
+            if setup_ssh_key is None and ssh_key.private is not None:
+                setup_ssh_key = ssh_key
+                continue
+            if user_ssh_key is None:
+                user_ssh_key = ssh_key
+
+        if setup_ssh_key is None:
+            raise ConfigurationError("Provide ssh key with private part for instance setup")
+
+        if user_ssh_key is None:
+            user_ssh_key = setup_ssh_key
+
+        user_ssh_public_key = user_ssh_key.public
+        project_ssh_private_key = setup_ssh_key.private
+        project_ssh_public_key = setup_ssh_key.public
+
+        _, project_key_name = _add_ssh_keys(
+            api_client=self.api_client,
+            user_ssh_public_key=user_ssh_public_key,
+            project_ssh_public_key=project_ssh_public_key,
+        )
+        instances_ids = self.api_client.launch_instances(
+            region_name=instance_offer.region,
+            instance_type_name=instance_offer.instance.name,
+            ssh_key_names=[project_key_name],
+            name=instance_config.instance_name,
+            quantity=1,
+            file_system_names=[],
+        )
+        instance_id = instances_ids[0]
+        # TODO remove waiting
+        instance_info = _wait_for_instance(self.api_client, instance_id)
+
+        if instance_info is None:
+            raise BackendError("Didn't receive instance_info response in time")
+
+        thread = Thread(
+            target=_start_runner,
+            kwargs={
+                "hostname": instance_info["ip"],
+                "project_ssh_private_key": project_ssh_private_key,
+                "user_ssh_public_key": user_ssh_public_key,
+                "config": _ShimConfig(instance_id=instance_id, api_key=self.api_client.api_key),
+                "launch_command": launch_command,
+            },
+            daemon=True,
+        )
+        thread.start()
+
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
+            instance_id=instance_id,
+            hostname=instance_info["ip"],
+            internal_ip=None,
+            region=instance_offer.region,
+            price=instance_offer.price,
+            username="ubuntu",
+            ssh_port=22,
+            dockerized=True,
+            ssh_proxy=None,
+            backend_data=None,
+        )
+
     def run_job(
         self,
         run: Run,
@@ -55,28 +133,20 @@ class LambdaCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
-        commands = get_shim_commands(
-            backend=BackendType.LAMBDA,
-            image_name=job.job_spec.image_name,
-            authorized_keys=[
-                run.run_spec.ssh_key_pub.strip(),
-                project_ssh_public_key.strip(),
+    ) -> JobProvisioningData:
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(
+                    public=project_ssh_public_key.strip(), private=project_ssh_private_key.strip()
+                ),
+                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
             ],
-            registry_auth_required=job.job_spec.registry_auth is not None,
+            job_docker_config=None,
+            user=run.user,
         )
-        # shim is asssumed to be run under root
-        launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"
-        return _run_instance(
-            api_client=self.api_client,
-            region=instance_offer.region,
-            instance_type_name=instance_offer.instance.name,
-            user_ssh_public_key=run.run_spec.ssh_key_pub,
-            project_ssh_public_key=project_ssh_public_key,
-            project_ssh_private_key=project_ssh_private_key,
-            instance_name=get_instance_name(run, job),
-            launch_command=launch_command,
-        )
+        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
@@ -103,54 +173,6 @@ class LambdaCompute(Compute):
                 InstanceOfferWithAvailability(**offer.dict(), availability=availability)
             )
         return availability_offers
-
-
-def _run_instance(
-    api_client: LambdaAPIClient,
-    region: str,
-    instance_type_name: str,
-    user_ssh_public_key: str,
-    project_ssh_public_key: str,
-    project_ssh_private_key: str,
-    instance_name: str,
-    launch_command: str,
-) -> LaunchedInstanceInfo:
-    _, project_key_name = _add_ssh_keys(
-        api_client=api_client,
-        user_ssh_public_key=user_ssh_public_key,
-        project_ssh_public_key=project_ssh_public_key,
-    )
-    instances_ids = api_client.launch_instances(
-        region_name=region,
-        instance_type_name=instance_type_name,
-        ssh_key_names=[project_key_name],
-        name=instance_name,
-        quantity=1,
-        file_system_names=[],
-    )
-    instance_id = instances_ids[0]
-    instance_info = _wait_for_instance(api_client, instance_id)
-    thread = Thread(
-        target=_start_runner,
-        kwargs={
-            "hostname": instance_info["ip"],
-            "project_ssh_private_key": project_ssh_private_key,
-            "user_ssh_public_key": user_ssh_public_key,
-            "config": _ShimConfig(instance_id=instance_id, api_key=api_client.api_key),
-            "launch_command": launch_command,
-        },
-        daemon=True,
-    )
-    thread.start()
-    return LaunchedInstanceInfo(
-        instance_id=instance_id,
-        ip_address=instance_info["ip"],
-        region=region,
-        username="ubuntu",
-        ssh_port=22,
-        dockerized=True,
-        backend_data=None,
-    )
 
 
 def _add_ssh_keys(
@@ -182,20 +204,20 @@ _WAIT_FOR_INSTANCE_INTERVAL = 10
 def _wait_for_instance(
     api_client: LambdaAPIClient,
     instance_id: str,
-) -> Dict:
+) -> Optional[Dict]:
     for _ in range(_WAIT_FOR_INSTANCE_ATTEMPTS):
         instance_info = _get_instance_info(api_client, instance_id)
-        if instance_info is None or instance_info["status"] != "booting":
+        if instance_info is not None and instance_info["status"] != "booting":
             return instance_info
         time.sleep(_WAIT_FOR_INSTANCE_INTERVAL)
+    return None
 
 
 def _get_instance_info(api_client: LambdaAPIClient, instance_id: str) -> Optional[Dict]:
+    # TODO: use get instance https://cloud.lambdalabs.com/api/v1/docs#operation/getInstance
     instances = api_client.list_instances()
     instance_id_to_instance_map = {i["id"]: i for i in instances}
     instance = instance_id_to_instance_map.get(instance_id)
-    if instance is None:
-        return None
     return instance
 
 
@@ -277,6 +299,8 @@ def _run_ssh_command(hostname: str, ssh_private_key: str, command: str):
         subprocess.run(
             [
                 "ssh",
+                "-F",
+                "none",
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-i",
@@ -296,6 +320,8 @@ def _run_scp_command(hostname: str, ssh_private_key: str, source: str, target: s
         subprocess.run(
             [
                 "scp",
+                "-F",
+                "none",
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-i",
