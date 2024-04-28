@@ -121,7 +121,7 @@ class CudoCompute(Compute):
             instance_id=resp_data["id"],
             hostname=None,
             internal_ip=None,
-            region=resp_data["vm"]["regionId"],
+            region=instance_offer.region,
             price=instance_offer.price,
             ssh_port=22,
             username="root",
