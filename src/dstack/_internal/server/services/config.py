@@ -47,6 +47,12 @@ def seq_representer(dumper, sequence):
 yaml.add_representer(list, seq_representer)
 
 
+# Below we difine pydantic models for configs allowed in server/config.yml and YAML-based API.
+# There are some differences between the two, e.g. server/config.yml fills file-based
+# credentials by looking for a file, while YAML-based API doesn't do this.
+# So for some backends there are two sets of config models.
+
+
 class AWSConfig(CoreModel):
     type: Annotated[Literal["aws"], Field(description="The type of the backend")] = "aws"
     regions: Optional[List[str]] = None
@@ -93,11 +99,22 @@ class GCPServiceAccountCreds(CoreModel):
         return _fill_data(values)
 
 
+class GCPServiceAccountAPICreds(CoreModel):
+    type: Annotated[Literal["service_account"], Field(description="The type of credentials")] = (
+        "service_account"
+    )
+    filename: Annotated[
+        Optional[str], Field(description="The path to the service account file")
+    ] = ""
+    data: Annotated[str, Field(description="The contents of the service account file")]
+
+
 class GCPDefaultCreds(CoreModel):
     type: Annotated[Literal["default"], Field(description="The type of credentials")] = "default"
 
 
 AnyGCPCreds = Union[GCPServiceAccountCreds, GCPDefaultCreds]
+AnyGCPAPICreds = Union[GCPServiceAccountAPICreds, GCPDefaultCreds]
 
 
 class GCPConfig(CoreModel):
@@ -105,6 +122,13 @@ class GCPConfig(CoreModel):
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
     creds: AnyGCPCreds = Field(..., description="The credentials", discriminator="type")
+
+
+class GCPAPIConfig(CoreModel):
+    type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
+    project_id: Annotated[str, Field(description="The project ID")]
+    regions: Optional[List[str]] = None
+    creds: AnyGCPAPICreds = Field(..., description="The credentials", discriminator="type")
 
 
 class KubeconfigConfig(CoreModel):
@@ -116,9 +140,22 @@ class KubeconfigConfig(CoreModel):
         return _fill_data(values)
 
 
+class KubeconfigAPIConfig(CoreModel):
+    filename: Annotated[str, Field(description="The path to the kubeconfig file")] = ""
+    data: Annotated[str, Field(description="The contents of the kubeconfig file")]
+
+
 class KubernetesConfig(CoreModel):
     type: Annotated[Literal["kubernetes"], Field(description="The type of backend")] = "kubernetes"
     kubeconfig: Annotated[KubeconfigConfig, Field(description="The kubeconfig configuration")]
+    networking: Annotated[
+        Optional[KubernetesNetworkingConfig], Field(description="The networking configuration")
+    ]
+
+
+class KubernetesAPIConfig(CoreModel):
+    type: Annotated[Literal["kubernetes"], Field(description="The type of backend")] = "kubernetes"
+    kubeconfig: Annotated[KubeconfigAPIConfig, Field(description="The kubeconfig configuration")]
     networking: Annotated[
         Optional[KubernetesNetworkingConfig], Field(description="The networking configuration")
     ]
@@ -144,7 +181,16 @@ class NebiusServiceAccountCreds(CoreModel):
         return _fill_data(values)
 
 
-AnyNebiusCreds = Union[NebiusServiceAccountCreds]
+class NebiusServiceAccountAPICreds(CoreModel):
+    type: Annotated[Literal["service_account"], Field(description="The type of credentials")] = (
+        "service_account"
+    )
+    filename: Annotated[str, Field(description="The path to the service account file")]
+    data: Annotated[str, Field(description="The contents of the service account file")]
+
+
+AnyNebiusCreds = NebiusServiceAccountCreds
+AnyNebiusAPICreds = NebiusServiceAccountAPICreds
 
 
 class NebiusConfig(CoreModel):
@@ -154,6 +200,15 @@ class NebiusConfig(CoreModel):
     network_id: str
     regions: Optional[List[str]] = None
     creds: AnyNebiusCreds
+
+
+class NebiusAPIConfig(CoreModel):
+    type: Literal["nebius"] = "nebius"
+    cloud_id: str
+    folder_id: str
+    network_id: str
+    regions: Optional[List[str]] = None
+    creds: AnyNebiusAPICreds
 
 
 class RunpodConfig(CoreModel):
@@ -193,8 +248,34 @@ AnyBackendConfig = Union[
     DstackConfig,
 ]
 
-
 BackendConfig = Annotated[AnyBackendConfig, Field(..., discriminator="type")]
+
+
+class _BackendConfig(BaseModel):
+    __root__: BackendConfig
+
+
+AnyBackendAPIConfig = Union[
+    AWSConfig,
+    AzureConfig,
+    CudoConfig,
+    DataCrunchConfig,
+    GCPAPIConfig,
+    KubernetesAPIConfig,
+    LambdaConfig,
+    NebiusAPIConfig,
+    RunpodConfig,
+    TensorDockConfig,
+    VastAIConfig,
+    DstackConfig,
+]
+
+
+BackendAPIConfig = Annotated[AnyBackendAPIConfig, Field(..., discriminator="type")]
+
+
+class _BackendAPIConfig(BaseModel):
+    __root__: BackendAPIConfig
 
 
 class ProjectConfig(CoreModel):
@@ -325,10 +406,6 @@ class ServerConfigManager:
             f.write(_config_to_yaml(config))
 
 
-class _BackendConfig(BaseModel):
-    __root__: BackendConfig
-
-
 async def get_backend_config_yaml(
     project: ProjectModel, backend_type: BackendType
 ) -> BackendInfoYAML:
@@ -379,7 +456,9 @@ class _ConfigInfoWithCreds(CoreModel):
     __root__: Annotated[AnyConfigInfoWithCreds, Field(..., discriminator="type")]
 
 
-def _config_to_internal_config(backend_config: BackendConfig) -> AnyConfigInfoWithCreds:
+def _config_to_internal_config(
+    backend_config: Union[BackendConfig, BackendAPIConfig],
+) -> AnyConfigInfoWithCreds:
     backend_config_dict = backend_config.dict()
     # Allow to not specify networking
     if backend_config.type == "kubernetes":
@@ -392,15 +471,15 @@ def _config_to_internal_config(backend_config: BackendConfig) -> AnyConfigInfoWi
     return config_info.__root__
 
 
-def _config_yaml_to_backend_config(config_yaml) -> BackendConfig:
+def _config_yaml_to_backend_config(config_yaml: str) -> BackendAPIConfig:
     try:
         config_dict = yaml.load(config_yaml, yaml.FullLoader)
     except yaml.YAMLError:
         raise ServerClientError("Error parsing YAML")
     try:
-        backend_config = _BackendConfig.parse_obj(config_dict).__root__
-    except ValidationError:
-        raise ServerClientError("Bad backend config")
+        backend_config = _BackendAPIConfig.parse_obj(config_dict).__root__
+    except ValidationError as e:
+        raise ServerClientError(str(e))
     return backend_config
 
 
