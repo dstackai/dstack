@@ -19,12 +19,10 @@ commands:
   - pip install wandb
   - wandb login $WANDB_API_KEY
 
-  - | 
-    ACCELERATE_LOG_LEVEL=info 
-    accelerate launch 
+  - ACCELERATE_LOG_LEVEL=info accelerate launch
     --config_file recipes/accelerate_configs/multi_gpu.yaml 
     --num_processes=2
-    scripts/run_sft.py 
+    scripts/run_sft.py
     recipes/custom/config.yaml
 
 ports:
