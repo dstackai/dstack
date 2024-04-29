@@ -3,10 +3,7 @@ type: task
 python: "3.11"
 
 env:
-  - CONFIG_PATH=configs/sample_config.yaml
-  - NUM_ACCELERATORS=<Number of accelerators specified>
-
-  - HUGGING_FACE_HUB_TOKEN=<Your Hugging Face access token>
+  - HUGGING_FACE_HUB_TOKEN=<YOUR-HF-ACCESS-TOKEN>
 
 commands:
   - conda install cuda
@@ -21,12 +18,19 @@ commands:
   - pip install wandb
   - wandb login $WANDB_API_KEY
 
-  - ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/multi_gpu.yaml --num_processes=$NUM_ACCELERATORS scripts/run_sft.py recipes/custom/config.yaml
+  - | 
+    ACCELERATE_LOG_LEVEL=info 
+    accelerate launch 
+    --config_file recipes/accelerate_configs/multi_gpu.yaml 
+    --num_processes=$NUM_GPUS 
+    scripts/run_sft.py 
+    recipes/custom/config.yaml
 ports:
   - 6006
-  
+
 resources:
   gpu:
     memory: 40GB
     name: A6000
     count: 2
+
