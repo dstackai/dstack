@@ -214,12 +214,23 @@ func writeHostInfo() {
 		Memory:    getMemory(),
 	}
 
-	b, _ := json.Marshal(m)
-	fmt.Println(string(b))
-	err := os.WriteFile(consts.HostInfoFile, b, 0755) //nolint:gosec
+	b, err := json.Marshal(m)
 	if err != nil {
 		panic(err)
 	}
+
+	f, err := os.Create(consts.HostInfoFile)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	_, err = f.Write(b)
+	if err != nil {
+		panic(err)
+	}
+
+	f.Sync()
 }
 
 func getGpuInfo() [][]string {
