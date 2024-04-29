@@ -40,7 +40,10 @@ type: task
 python: "3.11"
 
 env:
-  - HUGGING_FACE_HUB_TOKEN=<YOUR-HF-ACCESS-TOKEN>
+  - HUGGING_FACE_HUB_TOKEN
+  - CONFIG_PATH
+  - NUM_GPUS
+  - WANDB_API_KEY
 
 commands:
   - conda install cuda
