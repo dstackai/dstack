@@ -8,9 +8,9 @@ env:
   - HF_HUB_ENABLE_HF_TRANSFER=1
 
 commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
+  - pip install -r examples/fine-tuning/qlora/requirements.txt
   - tensorboard --logdir results/runs &
-  - python fine-tuning/qlora/train.py --merge_and_push ${{ run.args }}
+  - python examples/fine-tuning/qlora/train.py --merge_and_push ${{ run.args }}
 ports:
   - 6006
 
