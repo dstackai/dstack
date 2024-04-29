@@ -2,11 +2,15 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Union
 
 import yaml
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, ValidationError, root_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing_extensions import Annotated
 
-from dstack._internal.core.models.backends import AnyConfigInfoWithCreds
+from dstack._internal.core.errors import (
+    ResourceNotExistsError,
+    ServerClientError,
+)
+from dstack._internal.core.models.backends import AnyConfigInfoWithCreds, BackendInfoYAML
 from dstack._internal.core.models.backends.aws import AnyAWSCreds
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.base import BackendType
@@ -26,6 +30,21 @@ from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+# By default, PyYAML chooses the style of a collection depending on whether it has nested collections.
+# If a collection has nested collections, it will be assigned the block style. Otherwise it will have the flow style.
+#
+# We want mapping to always be display in block-style but lists without nested objects in flow-style.
+# So we define a custom representeter
+
+
+def seq_representer(dumper, sequence):
+    flow_style = len(sequence) == 0 or isinstance(sequence[0], str) or isinstance(sequence[0], int)
+    return dumper.represent_sequence("tag:yaml.org,2002:seq", sequence, flow_style)
+
+
+yaml.add_representer(list, seq_representer)
 
 
 class AWSConfig(CoreModel):
@@ -302,23 +321,51 @@ class ServerConfigManager:
         return ServerConfig.parse_obj(config_dict)
 
     def _save_config(self, config: ServerConfig):
-        def seq_representer(dumper, sequence):
-            flow_style = (
-                len(sequence) == 0 or isinstance(sequence[0], str) or isinstance(sequence[0], int)
-            )
-            return dumper.represent_sequence("tag:yaml.org,2002:seq", sequence, flow_style)
-
-        yaml.add_representer(list, seq_representer)
-
         with open(settings.SERVER_CONFIG_FILE_PATH, "w+") as f:
-            yaml.dump(config.dict(exclude_none=True), f, sort_keys=False)
-
-
-server_config_manager = ServerConfigManager()
+            f.write(_config_to_yaml(config))
 
 
 class _BackendConfig(BaseModel):
     __root__: BackendConfig
+
+
+async def get_backend_config_yaml(
+    project: ProjectModel, backend_type: BackendType
+) -> BackendInfoYAML:
+    config_info = await backends_services.get_config_info(
+        project=project, backend_type=backend_type
+    )
+    if config_info is None:
+        raise ResourceNotExistsError()
+    config = _internal_config_to_config(config_info)
+    config_yaml = _config_to_yaml(config)
+    return BackendInfoYAML(
+        name=backend_type,
+        config_yaml=config_yaml,
+    )
+
+
+async def create_backend_config_yaml(
+    session: AsyncSession,
+    project: ProjectModel,
+    config_yaml: str,
+):
+    backend_config = _config_yaml_to_backend_config(config_yaml)
+    config_info = _config_to_internal_config(backend_config)
+    await backends_services.create_backend(session=session, project=project, config=config_info)
+
+
+async def update_backend_config_yaml(
+    session: AsyncSession,
+    project: ProjectModel,
+    config_yaml: str,
+):
+    backend_config = _config_yaml_to_backend_config(config_yaml)
+    config_info = _config_to_internal_config(backend_config)
+    await backends_services.update_backend(session=session, project=project, config=config_info)
+
+
+server_config_manager = ServerConfigManager()
 
 
 def _internal_config_to_config(config_info: AnyConfigInfoWithCreds) -> BackendConfig:
@@ -343,6 +390,22 @@ def _config_to_internal_config(backend_config: BackendConfig) -> AnyConfigInfoWi
         del backend_config_dict["regions"]
     config_info = _ConfigInfoWithCreds.parse_obj(backend_config_dict)
     return config_info.__root__
+
+
+def _config_yaml_to_backend_config(config_yaml) -> BackendConfig:
+    try:
+        config_dict = yaml.load(config_yaml, yaml.FullLoader)
+    except yaml.YAMLError:
+        raise ServerClientError("Error parsing YAML")
+    try:
+        backend_config = _BackendConfig.parse_obj(config_dict).__root__
+    except ValidationError:
+        raise ServerClientError("Bad backend config")
+    return backend_config
+
+
+def _config_to_yaml(config: CoreModel) -> str:
+    return yaml.dump(config.dict(exclude_none=True), sort_keys=False, default_flow_style=None)
 
 
 def _fill_data(values: dict):

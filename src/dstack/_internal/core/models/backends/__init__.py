@@ -150,3 +150,8 @@ AnyConfigValues = Union[
 class BackendInfo(CoreModel):
     name: str
     config: AnyConfigInfoWithoutCreds
+
+
+class BackendInfoYAML(CoreModel):
+    name: str
+    config_yaml: str
