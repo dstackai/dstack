@@ -405,7 +405,7 @@ def _config_yaml_to_backend_config(config_yaml) -> BackendConfig:
 
 
 def _config_to_yaml(config: CoreModel) -> str:
-    return yaml.dump(config.dict(exclude_none=True), sort_keys=False, default_flow_style=None)
+    return yaml.dump(config.dict(exclude_none=True), sort_keys=False)
 
 
 def _fill_data(values: dict):
