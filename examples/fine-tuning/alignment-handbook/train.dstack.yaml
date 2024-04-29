@@ -28,6 +28,7 @@ commands:
     --num_processes=$NUM_GPUS 
     scripts/run_sft.py 
     recipes/custom/config.yaml
+
 ports:
   - 6006
   
