@@ -81,7 +81,7 @@ resources:
 
 Now, simply run the `dstack run` command as below:
 
-```consnole
+```console
 $ CONFIG_PATH=config.yaml \
 NUM_GPUS=2 \
 WANDB_API_KEY=<YOUR-W&B-API-KEY> \
