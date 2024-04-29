@@ -125,51 +125,66 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
         raise ProvisioningError() from e
 
 
+def check_dstack_shim_service(client: paramiko.SSHClient):
+    _, stdout, _ = client.exec_command("sudo systemctl status dstack-shim.service")
+    status = stdout.read()
+    for raw_line in status.splitlines():
+        line = raw_line.decode()
+        if line.strip().startswith("Active: failed"):
+            raise ProvisioningError(f"The dstack-shim service doesn't start: {line.strip()}")
+
+
 def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any]:
-    host_info = None
     # wait host_info
     retries = 60
+    iter_delay = 3
     for _ in range(retries):
         try:
-            _, stdout, _ = client.exec_command(
+            _, stdout, stderr = client.exec_command(
                 f"sudo cat {working_dir}/host_info.json", timeout=10
             )
+            err = stderr.read().decode().strip()
+            if err:
+                logger.debug("Cannot read `host_info.json`: %s", err)
+                time.sleep(iter_delay)
+                continue
         except (paramiko.SSHException, OSError) as e:
-            logger.debug("Cannot run `cat hostinfo.json` in the remote instance: %s", e)
+            logger.debug("Cannot run `cat host_info.json` in the remote instance: %s", e)
         else:
             try:
                 host_info_json = stdout.read()
                 host_info = json.loads(host_info_json)
                 return host_info
             except ValueError:  # JSON parse error
-                _, stdout, _ = client.exec_command("sudo systemctl status dstack-shim.service")
-                status = stdout.read()
-                for raw_line in status.splitlines():
-                    line = raw_line.decode()
-                    if line.strip().startswith("Active: failed"):
-                        raise ProvisioningError(
-                            f"The dstack-shim service doesn't start: {line.strip()}"
-                        )
-
-        time.sleep(3)
+                check_dstack_shim_service(client)
+                raise ProvisioningError("Cannot parse host_info")
+        time.sleep(iter_delay)
     else:
+        check_dstack_shim_service(client)
         raise ProvisioningError("Cannot get host_info")
 
 
 def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
-    try:
-        _, stdout, stderr = client.exec_command(
-            "sleep 5 && curl -s http://localhost:10998/api/healthcheck", timeout=15
-        )
-        out = stdout.read().strip().decode()
-        err = stderr.read().strip().decode()
-        if err:
-            raise ProvisioningError(
-                f"The command 'get_shim_healthcheck' didn't work. stdout: {out}, stderr: {err}"
+    retries = 20
+    iter_delay = 3
+    for _ in range(retries):
+        try:
+            _, stdout, stderr = client.exec_command(
+                "curl -s http://localhost:10998/api/healthcheck", timeout=15
             )
-        return out
-    except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+            out = stdout.read().strip().decode()
+            err = stderr.read().strip().decode()
+            if err:
+                raise ProvisioningError(
+                    f"The command 'get_shim_healthcheck' didn't work. stdout: {out}, stderr: {err}"
+                )
+            if not out:
+                logger.debug("healthcheck is empty. retry")
+                time.sleep(iter_delay)
+                continue
+            return out
+        except (paramiko.SSHException, OSError) as e:
+            raise ProvisioningError() from e
 
 
 def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
