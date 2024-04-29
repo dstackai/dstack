@@ -202,7 +202,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
 		"DSTACK_NODES_NUM":      strconv.Itoa(nodes_num),
 		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(gpus_per_node_num),
-		"DSTACK_GPUS":           strconv.Itoa(gpus_num),
+		"DSTACK_GPUS_NUM":       strconv.Itoa(gpus_num),
 	}
 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
