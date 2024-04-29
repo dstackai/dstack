@@ -86,6 +86,7 @@ Now, simply run the `dstack run` command as below:
 
 ```console
 $ CONFIG_PATH=config.yaml \
+HUGGING_FACE_HUB_TOKEN=<YOUR-HF-ACCESS-TOKEN> \
 NUM_GPUS=2 \
 WANDB_API_KEY=<YOUR-W&B-API-KEY> \
 dstack run . -f train.dstack.yaml
