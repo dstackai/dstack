@@ -2,11 +2,13 @@ import json
 from unittest.mock import Mock, patch
 
 import pytest
+import yaml
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import BackendAuthError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import BackendModel
@@ -961,3 +963,163 @@ class TestGetConfigInfo:
             "vpc_ids": None,
             "creds": json.loads(backend.auth),
         }
+
+
+class TestCreateBackendYAML:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        response = client.post(
+            f"/api/project/{project.name}/backends/create_yaml",
+            headers=get_auth_headers(user.token),
+            json={},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_creates_aws_backend(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        config_dict = {
+            "type": "aws",
+            "creds": {
+                "type": "access_key",
+                "access_key": "1234",
+                "secret_key": "1234",
+            },
+            "regions": ["us-west-1"],
+        }
+        body = {"config_yaml": yaml.dump(config_dict)}
+        with patch(
+            "dstack._internal.core.backends.aws.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.aws.auth.authenticate"
+        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
+            default_creds_available_mock.return_value = False
+            response = client.post(
+                f"/api/project/{project.name}/backends/create_yaml",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+
+
+class TestUpdateBackendYAML:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        response = client.post(
+            f"/api/project/{project.name}/backends/update_yaml",
+            headers=get_auth_headers(user.token),
+            json={},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_updates_aws_backend(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        backend = await create_backend(
+            session=session,
+            project_id=project.id,
+            backend_type=BackendType.AWS,
+            config={"regions": ["us-west-1"]},
+        )
+        config_dict = {
+            "type": "aws",
+            "creds": {
+                "type": "access_key",
+                "access_key": "1234",
+                "secret_key": "1234",
+            },
+            "regions": ["us-east-1"],
+        }
+        body = {"config_yaml": yaml.dump(config_dict)}
+        with patch(
+            "dstack._internal.core.backends.aws.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.core.backends.aws.auth.authenticate"
+        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
+            default_creds_available_mock.return_value = False
+            response = client.post(
+                f"/api/project/{project.name}/backends/update_yaml",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        await session.refresh(backend)
+        assert json.loads(backend.config)["regions"] == ["us-east-1"]
+
+
+class TestGetConfigYAML:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        await create_backend(
+            session=session,
+            project_id=project.id,
+            backend_type=BackendType.AWS,
+            config={"regions": ["us-west-1"]},
+        )
+        response = client.post(
+            f"/api/project/{project.name}/backends/aws/get_yaml",
+            headers=get_auth_headers(user.token),
+            json={},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_returns_config_yaml(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        auth = {
+            "type": "access_key",
+            "access_key": "test_access_key",
+            "secret_key": "test_secret_key",
+        }
+        config = {"regions": ["us-west-1"]}
+        await create_backend(
+            session=session,
+            project_id=project.id,
+            backend_type=BackendType.AWS,
+            config=config,
+            auth=auth,
+        )
+        response = client.post(
+            f"/api/project/{project.name}/backends/aws/get_yaml",
+            headers=get_auth_headers(user.token),
+            json={},
+        )
+        expected_config_yaml = (
+            "type: aws\n"
+            "regions: [us-west-1]\n"
+            "creds:\n"
+            "  type: access_key\n"
+            "  access_key: test_access_key\n"
+            "  secret_key: test_secret_key\n"
+        )
+        assert response.status_code == 200
+        assert response.json() == {"name": "aws", "config_yaml": expected_config_yaml}

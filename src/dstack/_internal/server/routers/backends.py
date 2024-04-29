@@ -8,21 +8,28 @@ from dstack._internal.core.models.backends import (
     AnyConfigInfoWithCreds,
     AnyConfigInfoWithCredsPartial,
     AnyConfigValues,
+    BackendInfoYAML,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server import settings
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
-from dstack._internal.server.schemas.backends import DeleteBackendsRequest
+from dstack._internal.server.schemas.backends import (
+    CreateBackendYAMLRequest,
+    DeleteBackendsRequest,
+    UpdateBackendYAMLRequest,
+)
 from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin
 from dstack._internal.server.services import backends
-from dstack._internal.server.services.config import ServerConfigManager
+from dstack._internal.server.services.config import (
+    ServerConfigManager,
+    create_backend_config_yaml,
+    get_backend_config_yaml,
+    update_backend_config_yaml,
+)
 
 root_router = APIRouter(prefix="/api/backends", tags=["backends"])
 project_router = APIRouter(prefix="/api/project/{project_name}/backends", tags=["backends"])
-
-
-# These routes are not currently in use since backend UI configuration is disabled.
 
 
 @root_router.post("/list_types")
@@ -88,3 +95,40 @@ async def get_backend_config_info(
     if config_info is None:
         raise ResourceNotExistsError()
     return config_info
+
+
+@project_router.post("/create_yaml")
+async def create_backend_yaml(
+    body: CreateBackendYAMLRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+):
+    _, project = user_project
+    await create_backend_config_yaml(
+        session=session,
+        project=project,
+        config_yaml=body.config_yaml,
+    )
+
+
+@project_router.post("/update_yaml")
+async def update_backend_yaml(
+    body: UpdateBackendYAMLRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+):
+    _, project = user_project
+    await update_backend_config_yaml(
+        session=session,
+        project=project,
+        config_yaml=body.config_yaml,
+    )
+
+
+@project_router.post("/{backend_name}/get_yaml")
+async def get_backend_yaml(
+    backend_name: BackendType,
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+) -> BackendInfoYAML:
+    _, project = user_project
+    return await get_backend_config_yaml(project=project, backend_type=backend_name)
