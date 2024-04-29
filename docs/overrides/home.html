@@ -112,7 +112,8 @@
                 <h1>Orchestrate AI workloads in any cloud</h1>
 
                 <p>
-                    dstack is an open-source orchestration engine for running AI workloads at scale in any cloud or data center, leveraging the open-source ecosystem.
+                    dstack is an open-source container orchestration engine designed to run AI workloads in any cloud or data center.
+                    Say no to Kubernetes, Slurm, and vendor lock-in.
                 </p>
             </div>
 
@@ -148,7 +149,7 @@
                             <img class="logo-large" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
                             <img class="logo-large" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
                             <img class="logo-large" src="/assets/images/tensordock-logo.svg" title="TensorDock">
-                            <img class="logo-large" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <img class="l2go-large" src="/assets/images/vastai-logo.svg" title="Vast.ai">
                         </div>
                     </div>-->
 
@@ -163,7 +164,7 @@
                             <img class="logo-large" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
                             <img class="logo-large" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
                             <img class="logo-large" src="/assets/images/tensordock-logo.svg" title="TensorDock">
-                            <img class="logo-large" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <img class="l2go-large" src="/assets/images/vastai-logo.svg" title="Vast.ai">
                         </div>
 
                         <div class="tx-landing__integrations_text">
@@ -209,7 +210,7 @@
                 </div>
 
                 <div class="block large">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif" width="777" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif" width="800" style="border-radius: 10px">
                 </div>
             </div>
         </div>
@@ -217,7 +218,7 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="777" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="800" style="border-radius: 10px">
                 </div>
 
                 <div class="block">
@@ -226,7 +227,7 @@
                     <p>Tasks allow for convenient scheduling of various batch jobs, such as training, fine-tuning, or
                         data processing, as well as running web applications.</p>
 
-                    <p>You can run tasks on a single machine or on clusters.</p>
+                    <p>You can run tasks on a single machine or on a cluster of nodes.</p>
 
                     <p>
                         <a href="/docs/concepts/tasks" target="_blank"
@@ -253,7 +254,7 @@
                 </div>
 
                 <div class="block large">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="777" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="800" style="border-radius: 10px">
                 </div>
             </div>
         </div>
@@ -261,16 +262,14 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-pool.gif" width="777" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-pool.gif" width="800" style="border-radius: 10px">
                 </div>
 
                 <div class="block">
                     <h2>Pools</h2>
 
-                    <p>You can have instances provisioned in the cloud automatically, or add them manually, configuring
-                        the required resources, idle duration, etc.</p>
-
-                    <p>Pools simplify managing the lifecycle of cloud instances and enable their efficient reuse across runs.</p>
+                    <p>Pools enable the efficient reuse of cloud instances and on-premises servers across runs,
+                        simplifying their management.</p>
 
                     <p>
                         <a href="/docs/concepts/pools" target="_blank"
@@ -295,7 +294,7 @@
                     </h3>
 
                     <p>
-                        Deploy Llama 3 as a service using Ollama, an open-source serving tool.
+                        Deploy Llama 3 as an endpoint using Ollama.
                     </p>
 
                     <div class="feature-tags">
@@ -310,8 +309,7 @@
                     </h3>
 
                     <p>
-                        Fine-tune Llama 2 on a custom dataset using the PEFT and TRL,
-                        open-source training libraries.
+                        Fine-tune Llama 2 on a custom dataset using PEFT and TRL.
                     </p>
 
                     <div class="feature-tags">
@@ -326,7 +324,7 @@
                     </h3>
 
                     <p>
-                        Deploy LLMs with vLLM, an open-source serving library.
+                        Deploy LLMs as endpoints using vLLM.
 
                         <br><br>
                     </p>
@@ -339,11 +337,11 @@
 
                 <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md" target="_blank" class="feature-cell">
                     <h3>
-                        Text Generation Inference
+                        TGI
                     </h3>
 
                     <p>
-                        Deploy LLMs using TGI, an open-source serving library.
+                        Deploy LLMs as endpoints using TGI.
                     </p>
 
                     <div class="feature-tags">
@@ -358,7 +356,7 @@
                     </h3>
 
                     <p>
-                        Deploy LLMs using Ollama, an open-source serving tool.
+                        Deploy LLMs as endpoints using Ollama.
                     </p>
 
                     <div class="feature-tags">
@@ -370,11 +368,11 @@
 
                 <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/tei/README.md" target="_blank" class="feature-cell">
                     <h3>
-                        Text Embeddings Inference
+                        TEI
                     </h3>
 
                     <p>
-                        Deploy a text embeddings model using TEI, an open-source serving library.
+                        Deploy a text embeddings model as an endpoint using TEI.
                     </p>
 
                     <div class="feature-tags">
@@ -382,11 +380,42 @@
                         <div class="feature-tag">Embeddings</div>
                     </div>
                 </a>
+
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/llms/mixtral/README.md" target="_blank" class="feature-cell">
+                    <h3>
+                        Mixtral 7Bx8
+                    </h3>
+
+                    <p>
+                         Deploy Mixtral 7Bx8 as an endpoint using Ollama.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">LLMs</div>
+                    </div>
+                </a>
+
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/llms/chat-ui/README.md" target="_blank" class="feature-cell">
+                    <h3>
+                        Chat UI
+                    </h3>
+
+                    <p>
+                        Run a playground app to chat with an LLM using Chat UI.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">Embeddings</div>
+                    </div>
+                </a>
+
             </div>
 
             <p>
                 <a href="https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank"
-                class="md-button md-button-secondary small external">More examples
+                class="md-button md-button-secondary external">More examples
                 </a>
             </p>
         </div>
@@ -394,7 +423,7 @@
         <!--<div class="tx-landing__bottom_cta">
             <div class="tx-landing__highlights_text">
                 <h2><span class="gradient">Get started with dstack <br> in under a minute</span></h2>
-                <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-server.gif" width="777" style="border-radius: 10px">
+                <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-server.gif" width="800" style="border-radius: 10px">
                 <p class="tx-landing__bottom_cta_text">
                     <a href="/docs/installation/">Install</a> the open-source version (and configure your cloud accounts),
                     or <a href="#" data-tally-open="w7K17R">sign up</a> for the cloud version.
@@ -421,52 +450,63 @@
             <div class="tx-landing__plans_cards">
                 <div class="plans_card open_source">
                     <div class="plans_card__title">Open-source</div>
-                    <div class="plans_card__subtitle">Self-hosted. Use with your own cloud accounts or bare metals.</div>
+                    <div class="plans_card__subtitle">
+                        Use your own cloud accounts or data centers.
+                        <br>
+                        <br>
+                    </div>
 
                     <div class="plans_card__services">
                         <div class="plans_card__service-item">
-                            <img width="38" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                            <img width="32" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
                                  style="padding-top: 5px">
-                            <div class="plans_card__service-name">Amazon Web Services</div>
+                            <div class="plans_card__service-name">AWS</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="24" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <img width="20" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
                             <div class="plans_card__service-name">Azure</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="30" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
-                            <div class="plans_card__service-name">Google Cloud Platform</div>
+                            <img width="25" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">GCP</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="23" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
+                            <img width="20" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
                             <div class="plans_card__service-name">Lambda</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="23" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
+                            <img width="20" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
                             <div class="plans_card__service-name">TensorDock</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="24" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <img width="22" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
                             <div class="plans_card__service-name">Vast.ai</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="24" height="24" src="/assets/images/cudo-logo.svg" title="CUDO">
+                            <img width="22" height="24" src="/assets/images/cudo-logo.svg" title="CUDO">
                             <div class="plans_card__service-name">CUDO</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="24" height="24" src="/assets/images/kubernetes-logo.svg" title="Kubernetes">
-                            <div class="plans_card__service-name">Kubernetes</div>
+                            <img width="22" height="24" src="/assets/images/kubernetes-logo.svg" title="Kubernetes">
+                            <div class="plans_card__service-name">K8S</div>
                         </div>
                     </div>
 
                     <div class="plans_card__buttons">
+                        <div class="plans_card__panel">
+                            <div class="plans_card__items">
+                                <div class="item">CLI & API</div>
+                                <div class="item">Self-hosted</div>
+                            </div>
+                        </div>
+
                         <a href="/docs/installation"
                            class="md-button md-button--primary">Install open-source</a>
                             <div class="plans_card__buttons_subtitle">Always free.</div>
@@ -475,47 +515,58 @@
 
                 <div class="plans_card dstack_sky">
                     <div class="plans_card__title">dstack Sky</div>
-                    <div class="plans_card__subtitle">Fully-managed by dstack. No cloud account is required.</div>
+                    <div class="plans_card__subtitle">
+                        Access GPUs from our marketplace at the best rate.
+                        <!--No cloud accounts are requried.-->
+                    </div>
 
                     <div class="plans_card__services">
                         <div class="plans_card__service-item">
-                            <img width="38" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                            <img width="32" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
                                  style="padding-top: 5px">
-                            <div class="plans_card__service-name">Amazon Web Services</div>
+                            <div class="plans_card__service-name">AWS</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="24" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <img width="20" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
                             <div class="plans_card__service-name">Azure</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="30" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
-                            <div class="plans_card__service-name">Google Cloud Platform</div>
+                            <img width="25" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">GCP</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="23" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
+                            <img width="20" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
                             <div class="plans_card__service-name">Lambda</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="23" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
+                            <img width="20" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
                             <div class="plans_card__service-name">TensorDock</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="24" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <img width="22" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
                             <div class="plans_card__service-name">Vast.ai</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="24" height="24" src="/assets/images/cudo-logo.svg" title="CUDO">
+                            <img width="22" height="24" src="/assets/images/cudo-logo.svg" title="CUDO">
                             <div class="plans_card__service-name">CUDO</div>
                         </div>
                     </div>
 
                     <div class="plans_card__buttons">
+                        <div class="plans_card__panel">
+                            <div class="plans_card__items">
+                                <div class="item">CLI & API</div>
+                                <div class="item crown">Hosted by dstack</div>
+                                <div class="item crown">Web console</div>
+                            </div>
+                        </div>
+
                         <script>
                             function sign_in_on_click() {
                                 window.open("https://sky.dstack.ai", '_blank').focus();
@@ -526,38 +577,51 @@
                             <span>Sign up now</span>
                             <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
                         </a>
-                        <div class="plans_card__buttons_subtitle">Best GPU prices. No commision.</div>
+                        <div class="plans_card__buttons_subtitle">Pay per compute. No commision.</div>
                     </div>
                 </div>
 
                 <div class="plans_card enterprise">
                     <div class="plans_card__title">Enterprise</div>
-                    <div class="plans_card__subtitle">Self-hosted. The open-source features, plus security, compliance, and more.</div>
+                    <div class="plans_card__subtitle">
+                        Use your own cloud accounts or data centers.
+                        <br><br>
+                    </div>
 
                     <div class="plans_card__services">
                         <div class="plans_card__service-item">
-                            <img width="38" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                            <img width="32" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
                                 style="padding-top: 5px">
-                            <div class="plans_card__service-name">Amazon Web Services</div>
+                            <div class="plans_card__service-name">AWS</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="24" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <img width="20" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
                             <div class="plans_card__service-name">Azure</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="30" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
-                            <div class="plans_card__service-name">Google Cloud Platform</div>
+                            <img width="25" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">GCP</div>
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="24" height="24" src="/assets/images/kubernetes-logo.svg" title="Kubernetes">
-                            <div class="plans_card__service-name">Kubernetes</div>
+                            <img width="22" height="24" src="/assets/images/kubernetes-logo.svg" title="Kubernetes">
+                            <div class="plans_card__service-name">K8S</div>
                         </div>
                     </div>
 
                     <div class="plans_card__buttons">
+                        <div class="plans_card__panel">
+                            <div class="plans_card__items">
+                                <div class="item">CLI & API</div>
+                                <div class="item">Self-hosted</div>
+                                <div class="item crown">Web console</div>
+                                <div class="item crown">Single sign-on</div>
+                                <div class="item crown">Audit logs</div>
+                            </div>
+                        </div>
+
                         <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
                         class="md-button md-button-secondary external">Book a demo</a>
                             <div class="plans_card__buttons_subtitle">Contact us for pricing.</div>

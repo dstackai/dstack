@@ -1,4 +1,4 @@
-# VLLM
+# vLLM
 
 ## Service
 

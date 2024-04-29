@@ -47,25 +47,31 @@ are both acceptable).
 ```yaml
 type: service
 
+# Specify the Docker image
 image: ghcr.io/huggingface/text-generation-inference:latest
+
+# Specify environment variables
 env:
   - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+
+# The commands to run on start of the service
 commands:
   - text-generation-launcher --port 8000 --trust-remote-code
+
+# Specify the port of the service
 port: 8000
 
+# Specify GPU, disk, and other resource requirements
 resources:
   gpu: 80GB
 ```
 
 </div>
 
-The YAML file allows you to specify your own Docker image, environment variables, 
-resource requirements, etc.
-If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
+> See the [.dstack.yml reference](../reference/dstack.yml/service.md) for more details.
 
-!!! info ".dstack.yml"
-    For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/service.md).
+If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
+(pre-configured with Python, Conda, and essential CUDA drivers).
 
 ### Environment variables
 
@@ -75,11 +81,14 @@ Environment variables can be set either within the configuration file or passed 
 type: service
 
 image: ghcr.io/huggingface/text-generation-inference:latest
+
 env:
   - HUGGING_FACE_HUB_TOKEN
   - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+
 commands:
   - text-generation-launcher --port 8000 --trust-remote-code
+
 port: 8000
 
 resources:

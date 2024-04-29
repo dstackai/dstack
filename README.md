@@ -22,8 +22,10 @@ Orchestrate AI workloads in any cloud
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
 </div>
 
-`dstack` is an open-source orchestration engine for running AI workloads. It supports a wide range of cloud providers (such as AWS, GCP, Azure,
-Lambda, TensorDock, Vast.ai, CUDO, RunPod, etc.) as well as on-premises infrastructure.
+`dstack` is an open-source container orchestration engine designed for AI workloads across any cloud or data center.
+
+The supported cloud providers include AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, CUDO, and RunPod.
+You can also use `dstack` ro run workloads on on-prem servers.
 
 ## Latest news ✨
 

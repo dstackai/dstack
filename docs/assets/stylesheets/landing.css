@@ -295,7 +295,7 @@
 
 .tx-landing__highlights {
     margin-bottom: 5vw;
-    font-size: 18px;
+    font-size: 17px;
     line-height: 1.5;
 }
 
@@ -328,13 +328,32 @@
 }
 
 .tx-landing__highlights_grid .feature-cell {
-    padding: 40px 35px 40px 40px;
+    padding: 35px 50px;
     border-radius: 0;
     border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
     border-width: 0.75px;
     border-style: solid;
     display: flex;
     flex-direction: column;
+}
+
+@media screen and (min-width: 76.1875em) {
+    .tx-landing__highlights_grid {
+        grid-gap: 0 !important;
+
+        border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
+        border-width: 0.75px;
+        border-style: solid;
+        border-top: none;
+        border-left: none;
+
+        grid-template-columns: repeat(4, 1fr) !important;
+    }
+
+    .tx-landing__highlights_grid .feature-cell {
+        border-right: none;
+        border-bottom: none;
+    }
 }
 
 .tx-landing__highlights_grid .feature-cell:hover {
@@ -346,28 +365,30 @@
 }
 
 .tx-landing__highlights_grid .feature-cell .feature-tags {
-    display: flex;
-    flex-wrap: wrap;
+/*    display: flex;*/
+/*    flex-wrap: wrap;*/
     gap: 2px;
     margin: 0 -5px;
     margin-top: auto;
+    display: none;
 }
 
 .tx-landing__highlights_grid .feature-cell .feature-tags .feature-tag {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 11px 20px;
+    padding: 8px 20px;
     font-size: 0.85em;
     font-weight: 400;
     line-height: 1.44;
     color: black;
     margin-top: 20px;
-    margin-right: 10px;
-    border-radius: 0;
-    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
-    border-width: 0.75px;
+    margin-right: 5px;
+    border-radius: 30px;
+/*    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;*/
+    border-width: 0.5px;
     border-style: solid;
+    white-space: nowrap;
 }
 
 .tx-landing__highlights_grid > a, .tx-landing__highlights_grid > a:hover {
@@ -414,8 +435,8 @@
     grid-gap: 2rem;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-    padding-top: 40px;
-    padding-bottom: 20px;
+    margin-top: 40px;
+    margin-bottom: 30px;
 }
 
 .tx-landing__highlights_grid .feature-icon svg {
@@ -433,17 +454,27 @@
 }
 
 .tx-landing__highlights_grid h3 {
-    font-size: 1.2em;
-    font-weight: 800;
+    font-size: 1.1em;
+    font-weight: 700;
     border-bottom: none;
     padding-bottom: 0.2em;
     margin-top: 0;
+    line-height: 32px;
+}
+
+.tx-landing__highlights_grid h3:after {
+    content: url('data:image/svg+xml,<svg fill="black" xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
+    margin-left: 2px;
+    position: relative;
+    top: 3px;
+    margin-right: -7px;
 }
 
 .tx-landing__highlights_grid p {
-    font-size: 17px;
-    margin-top: 20px;
-    margin-bottom: 20px;
+    font-size: 18px;
+    margin-top: 15px;
+    margin-bottom: 10px;
+    color: rgba(0, 0, 0, 0.87);
 }
 
 .tx-landing__features {
@@ -525,7 +556,7 @@
 }
 
 .tx-landing__major_feature .block.large {
-    width: 750px;
+    width: 800px;
     max-width: 100%;
     flex: 0 0 auto;
 }
@@ -658,44 +689,91 @@
 }
 
 .plans_card.open_source {
+/*    border-color: #8587e2;*/
 }
 
 .plans_card.dstack_sky {
-    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.0125), rgba(0, 42, 255, 0.0125), rgba(225, 101, 254, 0.0225));
-    border-color: #0048ff;
-    border-image: none;
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.025), rgba(0, 42, 255, 0.025), rgba(225, 101, 254, 0.05));
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
 }
 
 .plans_card.enterprise {
     background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.0125), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.07));
-    border-color: #8587e2;
-    border-image: none;
+    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
 }
 
 .plans_card {
     display: flex;
     flex-direction: column;
     /*min-width: 445px;*/
-    width: 100%;
+    /*width: 100%;*/
     border-color: black;
     border-radius: 0;
     border-width: 0.5px;
     border-style: solid;
-    padding: 38px 28px 38px 46px
+    padding: 38px 46px;
+}
+
+@media screen and (min-width: 76.1875em) {
+    .plans_card.open_source {
+        padding: 38px 46px 38px 46px;
+        border-right: none;
+    }
+
+    .plans_card.dstack_sky {
+/*        border-top: 2px solid;*/
+    }
+
+    .plans_card.enterprise {
+        border-left: none;
+/*        border-top: 2px solid;*/
+    }
+
+    .tx-landing__plans_cards {
+        gap: 0;
+    }
 }
 
 .plans_card__title {
-    margin-bottom: 0.7rem;
+    margin-bottom: 1rem;
     font-size: 1.5em;
     font-weight: 800;
     line-height: 1.33;
 }
 
 .plans_card__subtitle {
-    margin-bottom: 1.2rem;
+    margin-bottom: 1rem;
     font-size: 0.9em;
     line-height: 1.44;
     color: black;
+}
+
+.plans_card__panel {
+    font-size: 0.9em;
+    line-height: 32px;
+    margin-bottom: 1.5em;
+}
+
+.plans_card__items .item::before {
+    -webkit-mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7Z"/></svg>') no-repeat 50% 50%;
+    mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 7 9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7Z"/></svg>') no-repeat 50% 50%;
+    -webkit-mask-size: cover;
+    mask-size: cover;
+    background: -webkit-linear-gradient(45deg, rgba(0, 0, 0, 0.87), rgba(0, 0, 0, 0.87));
+    content: '';
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin-right: 20px;
+    margin-left: 5px;
+    position: relative;
+    top: 5px;
+}
+
+.plans_card__items .item.crown::before {
+    -webkit-mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 16 3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5m14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1Z"/></svg>') no-repeat 50% 50%;
+    mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 16 3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5m14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1Z"/></svg>') no-repeat 50% 50%;
+    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
 }
 
 .plans_card__buttons_subtitle {
@@ -710,7 +788,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-bottom: 1.8rem;
+    margin-bottom: 1.3rem;
 }
 
 .plans_card__service-item {
@@ -736,7 +814,7 @@
 }
 
 .plans_card__items {
-    margin-bottom: .4rem;
+    margin-bottom: 1.25rem;
 }
 
 .plans_card__buttons {

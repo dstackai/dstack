@@ -1,14 +1,26 @@
 # What is dstack?
 
-`dstack` is an open-source orchestration engine for running AI workloads. It supports a wide range of cloud providers (such as AWS, GCP, Azure,
-Lambda, TensorDock, Vast.ai, CUDO, RunPod, etc.) as well as on-premises infrastructure.
+`dstack` is an open-source container orchestration engine designed for AI workloads across any cloud or data center.
+
+The supported cloud providers include AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, CUDO, and RunPod.
+You can also use `dstack` ro run workloads on on-prem servers.
+
+Think of `dstack` as a lightweight alternative to Kubernetes or Slurm that provides a
+straightforward interface for AI model development, training, and deployment.
+
+`dstack` supports dev environements, running tasks on clusters, and deployment with auto-scaling and built-in
+authorization, all right out of the box.
+
+`dstack` is vendor-agnostic, allowing you to utilize any open-source libraries, frameworks, or tools
+from your container.
 
 ## Why use dstack?
 
-1. Designed for development, training, and deployment of gen AI models.
-2. Efficiently utilizes compute across cloud providers and on-prem servers.
-3. Compatible with any training, fine-tuning, and serving frameworks, as well as other third-party tools.
-4. 100% open-source.
+1. Lightweight and easy-to-use compared to Kubernetes and Slurm
+2. Supports all major GPU cloud providers
+3. Scalable and reliable for production environments
+4. Enables management of AI infrastructure across multiple clouds without vendor lock-in
+5. Fully open-source
 
 ## How does it work?
 

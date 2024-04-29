@@ -2,10 +2,9 @@
 
 The `dev-environment` configuration type allows running [dev environments](../../concepts/dev-environments.md).
 
-!!! info "Filename"
-    Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `dev.dstack.yml` are both acceptable)
-    and can be located in the project's root directory or any nested folder.
-    Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
+> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `dev.dstack.yml` are both acceptable)
+> and can be located in the project's root directory or any nested folder.
+> Any configuration can be run via [`dstack run . -f PATH`](../cli/index.md#dstack-run).
 
 ### Examples
 
@@ -27,7 +26,7 @@ ide: vscode
 
 </div>
 
-??? info "nvcc"
+!!! info "nvcc"
     Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
     To install it, use `conda install cuda`.
 
@@ -73,10 +72,15 @@ type: dev-environment
 ide: vscode
 
 resources:
-  cpu: 16.. # 16 or more CPUs
-  memory: 200GB.. # 200GB or more RAM
-  gpu: 40GB..80GB:4 # 4 GPUs from 40GB to 80GB
-  shm_size: 16GB # 16GB of shared memory
+  # 200GB or more RAM
+  memory: 200GB..
+
+  # 4 GPUs from 40GB to 80GB
+  gpu: 40GB..80GB:4
+
+  # Shared memory
+  shm_size: 16GB
+
   disk: 500GB
 ```
 
@@ -127,6 +131,58 @@ For instance, you can define environment variables in a `.env` file and utilize 
 [//]: # (```)
 [//]: # ()
 [//]: # (</div>)
+
+#### Spot policy
+
+You can choose whether to use spot instances, on-demand instances, or any available type.
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+
+ide: vscode
+
+spot_policy: auto
+```
+
+</div>
+
+The `spot_policy` accepts `spot`, `on-demand`, and `auto`. The default for dev environments is `on-demand`.
+
+#### Backends
+
+By default, `dstack` provisions instances in all configured backends. However, you can specify the list of backends:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+
+ide: vscode
+
+backends: [aws, gcp]
+```
+
+</div>
+
+#### Regions
+
+By default, `dstack` uses all configured regions. However, you can specify the list of regions:
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: dev-environment
+
+ide: vscode
+
+regions: [eu-west-1, eu-west-2]
+```
+
+</div>
+
+The `dev-environment` configuration type supports many other options. See below.
 
 ### Root reference
 

@@ -30,7 +30,7 @@ port: 8000
 
 </div>
 
-??? info "nvcc"
+!!! info "nvcc"
     Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
     To install it, use `conda install cuda`.
 
@@ -164,7 +164,9 @@ commands:
 port: 8000
 
 resources:
-  gpu: 80GB:2 # 2 GPUs of 80GB
+  # 2 GPUs of 80GB
+  gpu: 80GB:2
+
   disk: 200GB
 
 # Enable the OpenAI-compatible endpoint
@@ -206,6 +208,67 @@ auth: false
 ```
 
 </div>
+
+#### Spot policy
+
+You can choose whether to use spot instances, on-demand instances, or any available type.
+
+<div editor-title="serve.dstack.yml">
+
+```yaml
+type: service
+
+commands:
+  - python3 -m http.server
+
+port: 8000
+
+spot_policy: auto
+```
+
+</div>
+
+The `spot_policy` accepts `spot`, `on-demand`, and `auto`. The default for services is `auto`.
+
+#### Backends
+
+By default, `dstack` provisions instances in all configured backends. However, you can specify the list of backends:
+
+<div editor-title="serve.dstack.yml">
+
+```yaml
+type: service
+
+commands:
+  - python3 -m http.server
+
+port: 8000
+
+backends: [aws, gcp]
+```
+
+</div>
+
+#### Regions
+
+By default, `dstack` uses all configured regions. However, you can specify the list of regions:
+
+<div editor-title="serve.dstack.yml">
+
+```yaml
+type: service
+
+commands:
+  - python3 -m http.server
+
+port: 8000
+
+regions: [eu-west-1, eu-west-2]
+```
+
+</div>
+
+The `service` configuration type supports many other options. See below.
 
 ### Root reference
 
