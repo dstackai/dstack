@@ -76,7 +76,8 @@ resources:
 
 ```
 
-- `HUGGING_FACE_HUB_TOKEN` should be set as environment variable so that the fine-tuned model and its checkpoints could be pushed to the Hugging Face Hub (for downloading gated models and private datasets as well).
+- `HUGGING_FACE_HUB_TOKEN` should be set as environment variable so that the fine-tuned model and its checkpoints could be pushed to the Hugging Face Hub (for downloading gated models and private datasets as well). Besides that, `CONFIG_PATH` is for pointing to training configuration file, `NUM_GPUS` is for assigning how many GPUs to be used, and `WANDB_API_KEY` is for logging into [Weights and Biases](https://wandb.ai/) to record training process.
+- the values of all environment variables could be set via system environment variables or command line arguments. See below. 
 - the first 4 lines clone `alignment-handbook` repo, copy local `config.yaml` into the repository.
 - the second 3 lines install dependencies required to use `alignment-handbook`.
 - the third 2 lines login to Weights and Biases. These line should be present if you have listed `wandb` under `report_to` field in `config.yaml`.
