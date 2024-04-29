@@ -142,10 +142,6 @@ All nodes are provisioned in the same region.
 ??? info "Backends"
     Running on multiple nodes is supported only with AWS, GCP, and Azure.
 
-`dstack` is easy to use with `accelerate`, `torchrun`, and other distributed frameworks. All you need to do
-is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, `DSTACK_NODES_NUM`,
-and `DSTACK_MASTER_NODE_IP`.
-
 ### Args
 
 You can parameterize tasks with user arguments using `${{ run.args }}` in the configuration.

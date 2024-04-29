@@ -9,7 +9,7 @@ commands:
   - python -m vllm.entrypoints.openai.api_server
     --model mistralai/Mixtral-8x7B-Instruct-v0.1
     --host 0.0.0.0
-    --tensor-parallel-size 2 # Should match the number of GPUs
+    --tensor-parallel-size $DSTACK_GPUS_NUM
 port: 8000
 
 resources:

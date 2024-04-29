@@ -7,9 +7,9 @@ The `service` configuration type allows running [services](../../concepts/servic
     and can be located in the project's root directory or any nested folder.
     Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
 
-### Examples
+## Examples
 
-#### Python version
+### Python version
 
 If you don't specify `image`, `dstack` uses the default Docker image pre-configured with 
 `python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
@@ -34,7 +34,7 @@ port: 8000
     Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
     To install it, use `conda install cuda`.
 
-#### Docker image
+### Docker image
 
 <div editor-title="serve.dstack.yml">
 
@@ -69,7 +69,7 @@ port: 8000
     port: 8000
     ```
 
-#### OpenAI-compatible interface
+### OpenAI-compatible interface
 
 By default, if you run a service, its endpoint is accessible at `https://<run name>.<gateway domain>`.
 
@@ -106,7 +106,7 @@ In this case, with such a configuration, once the service is up, you'll be able 
 `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
 See [services](../../concepts/services.md#configure-model-mapping) for more detail.
 
-#### Replicas and auto-scaling
+### Replicas and auto-scaling
 
 By default, `dstack` runs a single replica of the service.
 You can configure the number of replicas as well as the auto-scaling policy.
@@ -144,7 +144,7 @@ scaling:
 
 If you specify the minimum number of replicas as `0`, the service will scale down to zero when there are no requests.
 
-#### Resources { #_resources }
+### Resources { #_resources }
 
 If you specify memory size, you can either specify an explicit size (e.g. `24GB`) or a 
 range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
@@ -187,7 +187,7 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
     `shm_size`, e.g. set it to `16GB`.
 
-#### Authorization
+### Authorization
 
 By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`.
 Authorization can be disabled by setting `auth` to `false`.
@@ -209,7 +209,45 @@ auth: false
 
 </div>
 
-#### Spot policy
+### Environment variables
+
+<div editor-title=".dstack.yml">
+
+```yaml
+type: service
+
+python: "3.11"
+
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - MODEL=NousResearch/Llama-2-7b-chat-hf
+commands:
+  - pip install vllm
+  - python -m vllm.entrypoints.openai.api_server --model $MODEL --port 8000
+port: 8000
+
+resources:
+  gpu: 24GB
+```
+
+</div>
+
+If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above),
+`dstack` will require the value to be passed via the CLI or set in the current process.
+
+For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
+
+#### Default environment variables
+
+The following environment variables are available in any run and are passed by `dstack` by default:
+
+| Name                    | Description                             |
+|-------------------------|-----------------------------------------|
+| `DSTACK_RUN_NAME`       | The name of the run                     |
+| `DSTACK_REPO_ID`        | The ID of the repo                      |
+| `DSTACK_GPUS_NUM`       | The total number of GPUs in the run     |
+
+### Spot policy
 
 You can choose whether to use spot instances, on-demand instances, or any available type.
 
@@ -230,7 +268,7 @@ spot_policy: auto
 
 The `spot_policy` accepts `spot`, `on-demand`, and `auto`. The default for services is `auto`.
 
-#### Backends
+### Backends
 
 By default, `dstack` provisions instances in all configured backends. However, you can specify the list of backends:
 
@@ -249,7 +287,7 @@ backends: [aws, gcp]
 
 </div>
 
-#### Regions
+### Regions
 
 By default, `dstack` uses all configured regions. However, you can specify the list of regions:
 
@@ -270,7 +308,7 @@ regions: [eu-west-1, eu-west-2]
 
 The `service` configuration type supports many other options. See below.
 
-### Root reference
+## Root reference
 
 #SCHEMA# dstack._internal.core.models.configurations.ServiceConfiguration
     overrides:
@@ -278,7 +316,7 @@ The `service` configuration type supports many other options. See below.
       type:
         required: true
 
-### `model`
+## `model`
 
 #SCHEMA# dstack._internal.core.models.gateways.BaseChatModel
     overrides:
@@ -286,7 +324,7 @@ The `service` configuration type supports many other options. See below.
       type:
         required: true
 
-### `scaling`
+## `scaling`
 
 #SCHEMA# dstack._internal.core.models.configurations.ScalingSpec
     overrides:
@@ -294,7 +332,7 @@ The `service` configuration type supports many other options. See below.
       type:
         required: true
 
-### `resources`
+## `resources`
 
 #SCHEMA# dstack._internal.core.models.resources.ResourcesSpecSchema
     overrides:
@@ -303,7 +341,7 @@ The `service` configuration type supports many other options. See below.
         required: true
       item_id_prefix: resources-
 
-### `resouces.gpu` { #resources-gpu data-toc-label="resources.gpu" } 
+## `resouces.gpu` { #resources-gpu data-toc-label="resources.gpu" } 
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
     overrides:
@@ -311,7 +349,7 @@ The `service` configuration type supports many other options. See below.
       type:
         required: true
 
-### `resouces.disk` { #resources-disk data-toc-label="resources.disk" }
+## `resouces.disk` { #resources-disk data-toc-label="resources.disk" }
 
 #SCHEMA# dstack._internal.core.models.resources.DiskSpecSchema
     overrides:
@@ -319,7 +357,7 @@ The `service` configuration type supports many other options. See below.
       type:
         required: true
 
-### `registry_auth`
+## `registry_auth`
 
 #SCHEMA# dstack._internal.core.models.configurations.RegistryAuth
     overrides:

@@ -9,7 +9,7 @@ commands:
   - text-generation-launcher
     --port 80
     --trust-remote-code
-    --num-shard 2 # Should match the number of GPUs
+    --num-shard $DSTACK_GPUS_NUM
 port: 80
 
 resources:
