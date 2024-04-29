@@ -87,6 +87,7 @@ or `train.dstack.yml` are both acceptable).
 
     image: ghcr.io/huggingface/text-generation-inference:latest
     env:
+      - HUGGING_FACE_HUB_TOKEN # required to run gated models
       - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
     commands:
       - text-generation-launcher --port 8000 --trust-remote-code

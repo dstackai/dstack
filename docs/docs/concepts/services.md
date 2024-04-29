@@ -52,6 +52,7 @@ image: ghcr.io/huggingface/text-generation-inference:latest
 
 # Specify environment variables
 env:
+  - HUGGING_FACE_HUB_TOKEN # required to run gated models
   - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
 
 # The commands to run on start of the service
@@ -83,7 +84,7 @@ type: service
 image: ghcr.io/huggingface/text-generation-inference:latest
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HUGGING_FACE_HUB_TOKEN # required to run gated models
   - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
 
 commands:
@@ -114,6 +115,7 @@ type: service
 
 image: ghcr.io/huggingface/text-generation-inference:latest
 env:
+  - HUGGING_FACE_HUB_TOKEN # required to run gated models
   - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
 commands:
   - text-generation-launcher --port 8000 --trust-remote-code
