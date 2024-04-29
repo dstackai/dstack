@@ -1,10 +1,12 @@
+import asyncio
 import datetime
 import ipaddress
 from datetime import timedelta
-from typing import Dict, Optional, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from uuid import UUID
 
 import requests
+from paramiko.pkey import PKey
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -26,7 +28,7 @@ from dstack._internal.core.backends.remote.provisioning import (
     run_shim_as_systemd_service,
     upload_envs,
 )
-from dstack._internal.core.errors import BackendError, ConfigurationError, ProvisioningError
+from dstack._internal.core.errors import BackendError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
@@ -114,6 +116,53 @@ async def process_instances() -> None:
         PROCESSING_POOL_IDS.difference_update(i.id for i in instances)
 
 
+def deploy_instance(
+    remote_details: RemoteConnectionInfo, pkeys: List[PKey]
+) -> Tuple[HealthStatus, Dict[str, Any]]:
+    with get_paramiko_connection(
+        remote_details.ssh_user, remote_details.host, remote_details.port, pkeys
+    ) as client:
+        logger.info(f"Connected to {remote_details.ssh_user} {remote_details.host}")
+
+        runner_build = get_dstack_runner_version()
+
+        # Execute pre start commands
+        shim_pre_start_commands = get_shim_pre_start_commands(runner_build)
+        run_pre_start_commands(
+            client,
+            shim_pre_start_commands,
+            authorized_keys=[pk.public.strip() for pk in remote_details.ssh_keys],
+        )
+        logger.debug("The script for installing dstack has been executed")
+
+        # Upload envs
+        shim_envs = get_shim_env(
+            runner_build, authorized_keys=[sk.public for sk in remote_details.ssh_keys]
+        )
+        upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
+        logger.debug("The dstack-shim environemnt variables has been installed")
+
+        # Run dstack-shim as a systemd service
+        run_shim_as_systemd_service(
+            client=client,
+            working_dir=DSTACK_WORKING_DIR,
+            dev=settings.DSTACK_VERSION is None,
+        )
+
+        # Get host info
+        host_info = get_host_info(client, DSTACK_WORKING_DIR)
+        logger.debug("Received a host_info %s", host_info)
+
+        raw_health = get_shim_healthcheck(client)
+        try:
+            health_response = HealthcheckResponse.__response__.parse_raw(raw_health)
+        except ValueError as e:
+            raise ProvisioningError("Cannot read HealthcheckResponse") from e
+        health = runner_client.health_response_to_health_status(health_response)
+
+        return health, host_info
+
+
 async def add_remote(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
@@ -161,45 +210,26 @@ async def add_remote(instance_id: UUID) -> None:
             ]
             if not pkeys:
                 logger.error("There are no ssh private key")
-                raise ConfigurationError("The SSH private key is not provided")
+                raise ProvisioningError("The SSH private key is not provided")
 
-            with get_paramiko_connection(
-                remote_details.ssh_user, remote_details.host, remote_details.port, pkeys
-            ) as client:
-                logger.info(f"connected to {remote_details.ssh_user} {remote_details.host}")
-
-                runner_build = get_dstack_runner_version()
-
-                # Execute pre start commands
-                shim_pre_start_commands = get_shim_pre_start_commands(runner_build)
-                run_pre_start_commands(
-                    client,
-                    shim_pre_start_commands,
-                    authorized_keys=[pk.public.strip() for pk in remote_details.ssh_keys],
+            try:
+                future = asyncio.get_running_loop().run_in_executor(
+                    None, deploy_instance, remote_details, pkeys
                 )
-                logger.debug("The script for installing dstack has been executed")
-
-                # Upload envs
-                shim_envs = get_shim_env(
-                    runner_build, authorized_keys=[sk.public for sk in remote_details.ssh_keys]
+                deploy_timeout = 20 * 60  # 20 minutes
+                result = await asyncio.wait_for(future, timeout=deploy_timeout)
+                health, host_info = result
+            except (asyncio.TimeoutError, TimeoutError) as e:
+                raise ProvisioningError() from e
+            except Exception as e:
+                logger.debug("deploy_instance raise an error: %s", e)
+                raise ProvisioningError() from e
+            else:
+                logger.info(
+                    "The instance %s (%s) was successfully added",
+                    instance.name,
+                    remote_details.host,
                 )
-                upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
-                logger.debug("The dstack-shim environemnt variables has been installed")
-
-                # Run dstack-shim as a systemd service
-                run_shim_as_systemd_service(
-                    client=client,
-                    working_dir=DSTACK_WORKING_DIR,
-                    dev=settings.DSTACK_VERSION is None,
-                )
-
-                # Get host info
-                host_info = get_host_info(client, DSTACK_WORKING_DIR)
-                logger.debug("Received a host_info %s", host_info)
-
-                raw_health = get_shim_healthcheck(client)
-                health_response = HealthcheckResponse.__response__.parse_raw(raw_health)
-                health = runner_client.health_response_to_health_status(health_response)
 
         except ProvisioningError as e:
             logger.warning("Provisioning could not be completed because of the error: %s", e)
@@ -622,7 +652,7 @@ async def terminate(instance_id: UUID) -> None:
         instance.status = InstanceStatus.TERMINATED
 
         logger.info(
-            "instance %s terminated",
+            "Instance %s terminated",
             instance.name,
             extra={
                 "instance_name": instance.name,
