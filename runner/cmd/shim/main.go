@@ -97,7 +97,7 @@ func main() {
 						Usage:       "Do not delete container on exit",
 						Destination: &args.Docker.KeepContainer,
 					},
-					&cli.PathFlag{
+					&cli.StringFlag{
 						Name:        "ssh-key",
 						Usage:       "Public SSH key",
 						Required:    true,
