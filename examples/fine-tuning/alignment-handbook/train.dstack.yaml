@@ -4,15 +4,13 @@ python: "3.11"
 
 env:
   - HUGGING_FACE_HUB_TOKEN
-  - CONFIG_PATH
-  - NUM_GPUS
   - WANDB_API_KEY
 
 commands:
   - conda install cuda
   - git clone https://github.com/huggingface/alignment-handbook.git
   - mkdir -p alignment-handbook/recipes/custom/
-  - cp "$CONFIG_PATH" alignment-handbook/recipes/custom/config.yaml
+  - cp config.yaml alignment-handbook/recipes/custom/config.yaml
 
   - cd alignment-handbook
   - python -m pip install .
@@ -25,7 +23,7 @@ commands:
     ACCELERATE_LOG_LEVEL=info 
     accelerate launch 
     --config_file recipes/accelerate_configs/multi_gpu.yaml 
-    --num_processes=$NUM_GPUS 
+    --num_processes=2
     scripts/run_sft.py 
     recipes/custom/config.yaml
 

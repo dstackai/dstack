@@ -41,15 +41,13 @@ python: "3.11"
 
 env:
   - HUGGING_FACE_HUB_TOKEN
-  - CONFIG_PATH
-  - NUM_GPUS
   - WANDB_API_KEY
 
 commands:
   - conda install cuda
   - git clone https://github.com/huggingface/alignment-handbook.git
   - mkdir -p alignment-handbook/recipes/custom/
-  - cp "$CONFIG_PATH" alignment-handbook/recipes/custom/config.yaml
+  - cp config.yaml alignment-handbook/recipes/custom/config.yaml
 
   - cd alignment-handbook
   - python -m pip install .
@@ -62,9 +60,10 @@ commands:
     ACCELERATE_LOG_LEVEL=info 
     accelerate launch 
     --config_file recipes/accelerate_configs/multi_gpu.yaml 
-    --num_processes=$NUM_GPUS 
+    --num_processes=2 
     scripts/run_sft.py 
     recipes/custom/config.yaml
+    
 ports:
   - 6006
   
@@ -76,7 +75,7 @@ resources:
 
 ```
 
-- `HUGGING_FACE_HUB_TOKEN` should be set as environment variable so that the fine-tuned model and its checkpoints could be pushed to the Hugging Face Hub (for downloading gated models and private datasets as well). Besides that, `CONFIG_PATH` is for pointing to training configuration file, `NUM_GPUS` is for assigning how many GPUs to be used, and `WANDB_API_KEY` is for logging into [Weights and Biases](https://wandb.ai/) to record training process.
+- `HUGGING_FACE_HUB_TOKEN` should be set as environment variable so that the fine-tuned model and its checkpoints could be pushed to the Hugging Face Hub (for downloading gated models and private datasets as well). Besides that, `WANDB_API_KEY` is for logging into [Weights and Biases](https://wandb.ai/) to record training process.
 - the values of all environment variables could be set via system environment variables or command line arguments. See below. 
 - the first 4 lines clone `alignment-handbook` repo, copy local `config.yaml` into the repository.
 - the second 3 lines install dependencies required to use `alignment-handbook`.
@@ -86,9 +85,7 @@ resources:
 Now, simply run the `dstack run` command as below:
 
 ```console
-$ CONFIG_PATH=config.yaml \
-HUGGING_FACE_HUB_TOKEN=<YOUR-HF-ACCESS-TOKEN> \
-NUM_GPUS=2 \
+$ HUGGING_FACE_HUB_TOKEN=<YOUR-HF-ACCESS-TOKEN> \
 WANDB_API_KEY=<YOUR-W&B-API-KEY> \
 dstack run . -f train.dstack.yaml
 ```
