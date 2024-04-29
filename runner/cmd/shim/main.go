@@ -112,9 +112,6 @@ func main() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					if serviceMode {
-						writeHostInfo()
-					}
 
 					if args.Runner.BinaryPath == "" {
 						if err := args.DownloadRunner(); err != nil {
@@ -150,6 +147,10 @@ func main() {
 						defer cancelShutdown()
 						_ = shimServer.HttpServer.Shutdown(shutdownCtx)
 					}()
+
+					if serviceMode {
+						writeHostInfo()
+					}
 
 					if err := shimServer.HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 						return cli.Exit(err, 1)
