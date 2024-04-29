@@ -188,13 +188,21 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 }
 
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
+	node_rank := ex.clusterInfo.GPUSPerJob
+	nodes_num := ex.jobSpec.JobsPerReplica
+	gpus_per_node_num := ex.clusterInfo.GPUSPerJob
+	gpus_num := nodes_num * gpus_per_node_num
+
 	jobEnvs := map[string]string{
-		"RUN_NAME":              ex.run.RunName,
-		"REPO_ID":               ex.run.RepoId,
+		"RUN_NAME":              ex.run.RunName, // deprecated, remove in 0.19
+		"REPO_ID":               ex.run.RepoId,  // deprecated, remove in 0.19
+		"DSTACK_RUN_NAME":       ex.run.RunName,
+		"DSTACK_REPO_ID":        ex.run.RepoId,
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
-		"DSTACK_NODE_RANK":      strconv.Itoa(ex.jobSpec.JobNum),
-		"DSTACK_NODES_NUM":      strconv.Itoa(ex.jobSpec.JobsPerReplica),
-		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(ex.clusterInfo.GPUSPerJob),
+		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
+		"DSTACK_NODES_NUM":      strconv.Itoa(nodes_num),
+		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(gpus_per_node_num),
+		"DSTACK_GPUS_NUM":       strconv.Itoa(gpus_num),
 	}
 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)

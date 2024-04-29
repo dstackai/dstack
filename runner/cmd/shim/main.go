@@ -97,7 +97,7 @@ func main() {
 						Usage:       "Do not delete container on exit",
 						Destination: &args.Docker.KeepContainer,
 					},
-					&cli.PathFlag{
+					&cli.StringFlag{
 						Name:        "ssh-key",
 						Usage:       "Public SSH key",
 						Required:    true,
@@ -112,9 +112,6 @@ func main() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					if serviceMode {
-						writeHostInfo()
-					}
 
 					if args.Runner.BinaryPath == "" {
 						if err := args.DownloadRunner(); err != nil {
@@ -150,6 +147,10 @@ func main() {
 						defer cancelShutdown()
 						_ = shimServer.HttpServer.Shutdown(shutdownCtx)
 					}()
+
+					if serviceMode {
+						writeHostInfo()
+					}
 
 					if err := shimServer.HttpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 						return cli.Exit(err, 1)
@@ -213,12 +214,23 @@ func writeHostInfo() {
 		Memory:    getMemory(),
 	}
 
-	b, _ := json.Marshal(m)
-	fmt.Println(string(b))
-	err := os.WriteFile(consts.HostInfoFile, b, 0755) //nolint:gosec
+	b, err := json.Marshal(m)
 	if err != nil {
 		panic(err)
 	}
+
+	f, err := os.Create(consts.HostInfoFile)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+
+	_, err = f.Write(b)
+	if err != nil {
+		panic(err)
+	}
+
+	f.Sync()
 }
 
 func getGpuInfo() [][]string {

@@ -132,7 +132,7 @@
     margin-left: 32px;
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.highlight,.termy,.md-typeset__table,p,h4,h3):not(.admonition-title) {
+[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.highlight,.termy,.md-typeset__table,p,h4,h3,.tabbed-set):not(.admonition-title) {
     padding-left: 32px;
 }
 
@@ -1412,6 +1412,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 [dir=ltr] .md-typeset blockquote {
     border-left: 0.1rem solid var(--md-accent-fg-color);
     color: var(--md-default-fg-color);
+    background: -webkit-linear-gradient(45deg, rgba(225, 101, 254, 0.1), rgba(0, 42, 255, 0.015), rgba(0, 42, 255, 0.015));
+    padding: 1px 20px;
 }
 
 a.md-go-to-action.secondary {

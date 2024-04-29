@@ -1,11 +1,9 @@
 # Tasks
 
-Tasks allow for convenient scheduling of various batch jobs, such as training, fine-tuning, or data processing, as well as running web applications. You can run tasks on a single machine or on clusters.
+Tasks allow for convenient scheduling of various batch jobs, such as training, fine-tuning, or
+data processing, as well as running web applications.
 
-[//]: # (TODO: Support multi-node)
-
-You simply specify the commands, required environment, and resources, and then submit it. `dstack` provisions the required
-resources in a configured backend and runs the task.
+You can run tasks on a single machine or on a cluster of nodes.
 
 ## Configuration
 
@@ -17,25 +15,29 @@ are both acceptable).
 ```yaml
 type: task
 
+# Specify the Python version, or your Docker image
 python: "3.11"
+
+# Specify environment variables
 env:
   - HF_HUB_ENABLE_HF_TRANSFER=1
+
+# The commands to run on start of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
+# Specify GPU, disk, and other resource requirements
 resources:
   gpu: 80GB
 ```
 
 </div>
 
-The YAML file allows you to specify your own Docker image, environment variables, 
-resource requirements, etc.
-If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
+> See the [.dstack.yml reference](../reference/dstack.yml/task.md) for more details.
 
-!!! info ".dstack.yml"
-    For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/task.md).
+If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
+(pre-configured with Python, Conda, and essential CUDA drivers).
 
 ### Environment variables
 
@@ -134,15 +136,11 @@ resources:
 
 </div>
 
-If you run the task, `dstack` first provisions the master node and then runs the other nodes.
+If you run the task, `dstack` first provisions the master node and then runs the other nodes of the cluster.
 All nodes are provisioned in the same region.
 
-!!! info "Backends"
+??? info "Backends"
     Running on multiple nodes is supported only with AWS, GCP, and Azure.
-
-`dstack` is easy to use with `accelerate`, `torchrun`, and other distributed frameworks. All you need to do
-is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, `DSTACK_NODES_NUM`,
-and `DSTACK_MASTER_NODE_IP`.
 
 ### Args
 

@@ -1,43 +1,42 @@
 # profiles.yml
 
-Instead of configuring run options as [`dstack run`](cli/index.md#dstack-run) arguments 
-or `.dstack.yml` parameters, you can defines those options in `profiles.yml`
-and reuse them across different run configurations.
-`dstack` supports repository-level profiles defined in `$REPO_ROOT/.dstack/profiles.yml`
-and global profiles defined in `~/.dstack/profiles.yml`.
+Sometimes, you may want to reuse the same parameters across different [`.dstack.yml`](dstack.yml.md) configurations.
 
-Profiles parameters are resolved with the following priority:
+This can be achieved by defining those parameters in a profile.
 
-1. `dstack run` arguments
-2. `.dstack.yml` parameters
-3. Repository-level profiles from `$REPO_ROOT/.dstack/profiles.yml`
-4. Global profiles from `~/.dstack/profiles.yml`
+Profiles can be defined on the repository level (via the `.dstack/profiles.yml` file in the root directory of the
+repository) or on the global level (via the `~/.dstack/profiles.yml` file).
 
-## Example
+Any profile can be marked as default so that it will be applied automatically for any run. Otherwise, you can refer to a specific profile
+via `--profile NAME` in `dstack run`.
+
+### Example
 
 <div editor-title=".dstack/profiles.yml"> 
 
 ```yaml
 profiles:
-  - name: large
+  - name: my-profile
 
-    spot_policy: auto # (Optional) The spot policy. Supports `spot`, `on-demand, and `auto`.
+    # The spot pololicy can be "spot", "on-demand", or "auto"
+    spot_policy: auto
 
-    max_price: 1.5 # (Optional) The maximum price per instance per hour
-    
-    max_duration: 1d # (Optional) The maximum duration of the run.
+    # Limit the maximum price of the instance per hour
+    max_price: 1.5
 
-    retry:
-      retry-duration: 3h # (Optional) To wait for capacity
-    
-    backends: [azure, lambda]  # (Optional) Use only listed backends 
+    # Stop any run if it runs longer that this duration
+    max_duration: 1d
 
-    default: true # (Optional) Activate the profile by default
+    # Use only these backends
+    backends: [azure, lambda]
+
+    # If set to true, this profile will be applied automatically
+    default: true
 ```
 
 </div>
 
-You can mark any profile as default or pass its name via `--profile` to `dstack run`.
+The profile configuration supports many properties. See below.
 
 ### Root reference
 

@@ -13,22 +13,23 @@ both acceptable).
 ```yaml
 type: dev-environment
 
+# Specify the Python version, or your Docker image
 python: "3.11"
 
+# This pre-configures the IDE with required extensions
 ide: vscode
 
+# Specify GPU, disk, and other resource requirements
 resources:
   gpu: 80GB
 ```
 
 </div>
 
-The YAML file allows you to specify your own Docker image, environment variables, 
-resource requirements, etc.
-If image is not specified, `dstack` uses its own (pre-configured with Python, Conda, and essential CUDA drivers).
+> See the [.dstack.yml reference](../reference/dstack.yml/dev-environment.md) for more details.
 
-!!! info ".dstack.yml"
-    For more details on the file syntax, refer to the [`.dstack.yml` reference](../reference/dstack.yml/dev-environment.md).
+If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
+(pre-configured with Python, Conda, and essential CUDA drivers).
 
 ### Environment variables
 
@@ -53,7 +54,7 @@ If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TO
 
 For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
 
-??? info "Profiles"
+!!! info "Profiles"
     In case you'd like to reuse certain parameters (such as spot policy, retry and max duration,
     max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
 
@@ -92,7 +93,7 @@ When `dstack` provisions the dev environment, it uses the current folder content
 The `dstack run` command allows specifying many things, including spot policy, retry and max duration, 
 max price, regions, instance types, and [much more](../reference/cli/index.md#dstack-run).
 
-### IDE
+### VS Code
 
 To open the dev environment in your desktop IDE, use the link from the output 
 (such as `vscode://vscode-remote/ssh-remote+fast-moth-1/workflow`).
@@ -101,7 +102,7 @@ To open the dev environment in your desktop IDE, use the link from the output
 
 ### SSH
 
-Alternatively, you can connect to the dev environment via SSH:
+Alternatively, while the CLI is attached to the run, you can connect to the dev environment via SSH:
 
 <div class="termy">
 
