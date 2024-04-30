@@ -365,7 +365,7 @@ async def register_service(session: AsyncSession, run_model: RunModel):
     except SSHError:
         raise ServerClientError("Gateway tunnel is not working")
     except httpx.RequestError as e:
-        raise GatewayError(f"Gateway is not working: {e}")
+        raise GatewayError(f"Gateway is not working: {e!r}")
 
 
 async def register_replica(
@@ -382,7 +382,7 @@ async def register_replica(
             )
         logger.info("%s: replica is registered for service %s", fmt(job_model), run.id.hex)
     except (httpx.RequestError, SSHError) as e:
-        raise GatewayError(str(e))
+        raise GatewayError(repr(e))
 
 
 async def unregister_service(session: AsyncSession, run_model: RunModel):
@@ -400,7 +400,7 @@ async def unregister_service(session: AsyncSession, run_model: RunModel):
         # ignore if service is not registered
         logger.warning("%s: unregistering service: %s", fmt(run_model), e)
     except (httpx.RequestError, SSHError) as e:
-        raise GatewayError(str(e))
+        raise GatewayError(repr(e))
 
 
 async def unregister_replica(session: AsyncSession, job_model: JobModel):
@@ -431,7 +431,7 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
         # ignore if replica is not registered
         logger.warning("%s: unregistering replica from service: %s", fmt(job_model), e)
     except (httpx.RequestError, SSHError) as e:
-        raise GatewayError(str(e))
+        raise GatewayError(repr(e))
 
 
 async def get_gateway_connection(

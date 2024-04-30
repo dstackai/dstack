@@ -24,7 +24,7 @@ class AuthProvider:
             if resp.status_code == 200:
                 return True
         except httpx.RequestError as e:
-            logger.debug("Failed to check access: %s", e)
+            logger.debug("Failed to check access: %r", e)
         return False
 
 
