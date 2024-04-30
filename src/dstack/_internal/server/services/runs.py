@@ -169,7 +169,7 @@ async def list_user_runs(
     runs = []
     for r in run_models:
         try:
-            runs.append(run_model_to_run(r))
+            runs.append(run_model_to_run(r, return_in_api=True))
         except pydantic.ValidationError:
             pass
     if len(run_models) > len(runs):
@@ -252,7 +252,7 @@ async def get_run(
     run_model = res.scalar()
     if run_model is None:
         return None
-    return run_model_to_run(run_model)
+    return run_model_to_run(run_model, return_in_api=True)
 
 
 async def get_run_plan(
@@ -428,7 +428,7 @@ async def submit_run(
     await session.commit()
     await session.refresh(run_model)
 
-    run = run_model_to_run(run_model)
+    run = run_model_to_run(run_model, return_in_api=True)
     return run
 
 
@@ -639,7 +639,9 @@ async def create_instance(
     return instance_model_to_instance(instance)
 
 
-def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:
+def run_model_to_run(
+    run_model: RunModel, include_job_submissions: bool = True, return_in_api: bool = False
+) -> Run:
     jobs: List[Job] = []
     run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
     for replica_num, replica_submissions in itertools.groupby(
@@ -654,7 +656,16 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
                 if job_spec is None:
                     job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
                 if include_job_submissions:
-                    submissions.append(job_model_to_job_submission(job_model))
+                    job_submission = job_model_to_job_submission(job_model)
+                    if return_in_api:
+                        # Set default non-None values for 0.18 backward-compatibility
+                        # Remove in 0.19
+                        if job_submission.job_provisioning_data is not None:
+                            if job_submission.job_provisioning_data.hostname is None:
+                                job_submission.job_provisioning_data.hostname = ""
+                            if job_submission.job_provisioning_data.ssh_port is None:
+                                job_submission.job_provisioning_data.ssh_port = 22
+                    submissions.append(job_submission)
             if job_spec is not None:
                 jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
 
