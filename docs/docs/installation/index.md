@@ -94,18 +94,18 @@ There are two ways to configure AWS: using an access key or using the default cr
         projects:
         - name: main
           backends:
-          - type: aws
-            creds:
-              type: default
+            - type: aws
+              creds:
+                type: default
 
-            vpc_name: my-vpc
+              vpc_name: my-vpc
         ```
 
     === "vpc_ids"
         ```yaml
         projects:
         - name: main
-            backends:
+          backends:
             - type: aws
               creds:
                 type: default
