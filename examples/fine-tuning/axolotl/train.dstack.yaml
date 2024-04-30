@@ -1,0 +1,18 @@
+type: task
+
+image: winglian/axolotl-cloud:main-20240429-py3.11-cu121-2.2.1
+
+env:
+    - HUGGING_FACE_HUB_TOKEN
+    - WANDB_API_KEY
+
+commands:
+    - accelerate launch -m axolotl.cli.train config.yaml
+
+ports:
+    - 6006
+
+resources:
+    gpu:
+        memory: 24GB..
+        count: 2
