@@ -613,7 +613,9 @@ Once the `~/.dstack/server/config.yml` file is configured, proceed to start the 
     <div class="termy">
     
     ```shell
-    $ docker run -p 3000:3000 -v $HOME/.dstack/server/:/root/.dstack/server dstackai/dstack
+    $ docker run -p 3000:3000 \
+        -v $HOME/.dstack/server/:/root/.dstack/server \
+        dstackai/dstack
 
     Applying ~/.dstack/server/config.yml...
 
@@ -622,6 +624,8 @@ Once the `~/.dstack/server/config.yml` file is configured, proceed to start the 
     ```
         
     </div>
+
+    > For more details on how to deploy `dstack` using Docker, check its [Docker repo](https://hub.docker.com/r/dstackai/dstack).
 
 [//]: # (After you update `~/.dstack/server/config.yml`, make sure to restart the server.)
 

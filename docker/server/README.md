@@ -69,21 +69,21 @@ environment variables.
 
 To persist state into an AWS S3 bucket, provide the following environment variables:
 
-    - `AWS_ACCESS_KEY_ID` - The AWS access key ID
-    - `AWS_SECRET_ACCESS_KEY` -  The AWS secret access key
+- `AWS_ACCESS_KEY_ID` - The AWS access key ID
+- `AWS_SECRET_ACCESS_KEY` -  The AWS secret access key
 
 #### GCP Storage
 
 To persist state into an AWS S3 bucket, provide one of the following environment variables:
 
-    - `GOOGLE_APPLICATION_CREDENTIALS` - The path to the GCP service account key JSON file
-    - `GOOGLE_APPLICATION_CREDENTIALS_JSON` - The GCP service account key JSON
+- `GOOGLE_APPLICATION_CREDENTIALS` - The path to the GCP service account key JSON file
+- `GOOGLE_APPLICATION_CREDENTIALS_JSON` - The GCP service account key JSON
 
 #### Azure Blob Storage
 
 To persist state into an Azure blog storage, provide the following environment variable.
 
- - `LITESTREAM_AZURE_ACCOUNT_KEY` - The Azure storage account key
+- `LITESTREAM_AZURE_ACCOUNT_KEY` - The Azure storage account key
 
 More [details](https://litestream.io/guides/) on options for configuring replication.
 

@@ -204,7 +204,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: dstackai/dstack
-          readme-filepath: ./README.md
+          readme-filepath: ./docker/server/README.md
 
   generate-json-schema:
     needs: [ pypi-upload ]
