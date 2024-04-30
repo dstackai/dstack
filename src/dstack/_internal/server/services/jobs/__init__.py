@@ -113,6 +113,12 @@ async def terminate_job_provisioning_data_instance(
         project=project,
         backend_type=job_provisioning_data.backend,
     )
+    if backend is None:
+        logger.error(
+            "Failed to terminate the instance. "
+            f"Backend {job_provisioning_data.backend} is not configured in project {project.name}."
+        )
+        return
     logger.debug("Terminating runner instance %s", job_provisioning_data.hostname)
     await run_async(
         backend.compute().terminate_instance,
