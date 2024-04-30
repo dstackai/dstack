@@ -1,4 +1,3 @@
-%%writefile config_fsdp+qlora.yaml
 base_model: meta-llama/Meta-Llama-3-8B
 model_type: LlamaForCausalLM
 tokenizer_type: AutoTokenizer  # PreTrainedTokenizerFast
