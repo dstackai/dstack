@@ -33,8 +33,10 @@ class GatewayClient:
         self.is_server_ready = False
 
         self.base_url = "http://gateway" if uds else f"http://localhost:{port}"
+        # We set large timeout because service registration can take time.
+        # Consider making gateway API async to avoid long-running requests.
         self._client = AsyncClientWrapper(
-            transport=httpx.AsyncHTTPTransport(uds=uds) if uds else None, timeout=30
+            transport=httpx.AsyncHTTPTransport(uds=uds) if uds else None, timeout=120
         )
 
     async def register_service(
