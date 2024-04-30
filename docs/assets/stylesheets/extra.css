@@ -979,6 +979,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     z-index: 1;
     padding: 5px;
     border-radius: 6px;
+    border: 1px solid black;
 }
 
 .md-typeset .tabbed-labels {

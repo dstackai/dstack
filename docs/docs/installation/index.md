@@ -107,13 +107,13 @@ There are two ways to configure AWS: using an access key or using the default cr
         - name: main
             backends:
             - type: aws
-                creds:
-                  type: default
+              creds:
+                type: default
 
-                vpc_ids:
-                  us-east-1: vpc-0a2b3c4d5e6f7g8h
-                  us-east-2: vpc-9i8h7g6f5e4d3c2b
-                  us-west-1: vpc-4d3c2b1a0f9e8d7
+              vpc_ids:
+                us-east-1: vpc-0a2b3c4d5e6f7g8h
+                us-east-2: vpc-9i8h7g6f5e4d3c2b
+                us-west-1: vpc-4d3c2b1a0f9e8d7
         ```
 
     Note, the VPCs are required to have a public subnet.
