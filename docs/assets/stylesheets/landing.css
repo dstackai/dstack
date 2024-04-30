@@ -156,7 +156,7 @@
     -webkit-mask-size: cover;
     mask-size: cover;
     margin-right: 5px;
-    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
+    background: -webkit-linear-gradient(45deg, rgba(0, 0, 0, 0.87), rgba(0, 0, 0, 0.87));
 }
 
 .md-header__buttons .md-button.github:before,
@@ -172,7 +172,7 @@
     -webkit-mask-size: cover;
     mask-size: cover;
     margin-right: 5px;
-    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
+    background: black;
 }
 
 .md-header__buttons {
@@ -192,13 +192,12 @@
 }
 
 .md-header__buttons .md-button {
-    font-size: 19px;
+    font-size: 0.95rem;
 }
 
 .md-typeset .md-button {
     min-width: 225px;
     padding: 0.55em 2em;
-    font-size: 20px;
 }
 
 .md-typeset .md-button.small {
@@ -237,18 +236,20 @@
 [data-md-color-primary=white] .md-header__buttons .md-button--primary, [data-md-color-primary=white].md-header__buttons .md-button--primary:hover,
 [data-md-color-primary=white] .md-typeset .md-button--primary, [data-md-color-primary=white] .md-typeset .md-button--primary:hover {
     background: rgba(0, 0, 0, 0.87);
-    border: 1.5px solid black;
-    border-radius: 1px;
+    border: 1.5px solid rgba(0, 0, 0, 0.87);
+    border-radius: 8px;
+    font-weight: 400 !important;
 }
 
 .md-header__buttons .md-button--primary,
 .md-header__buttons .md-button-secondary {
-    font-weight: 400 !important;
+    font-weight: 500 !important;
     white-space: nowrap;
+    padding: 0.45rem 1rem;
 }
 
 .md-button-secondary.external:after {
-    content: url('data:image/svg+xml,<svg fill="rgba(138, 5, 220, 1)" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
+    content: url('data:image/svg+xml,<svg fill="rgba(0, 0, 0, 0.87)" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
     line-height: 14px;
     margin-left: 5px;
     position: relative;
@@ -269,28 +270,18 @@
 .md-typeset .md-button-secondary,
 .md-header__buttons .md-button-secondary:hover,
 .md-typeset .md-button-secondary:hover {
-    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
-    border-width: 1.5px;
-    border-style: solid;
-    background: -webkit-linear-gradient(45deg, #0048ff, #ce00ff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    background: transparent;
+    color: black;
+    border: 1.5px solid rgba(0, 0, 0, 0.87);
+    border-radius: 8px;
 }
 
 .md-header__buttons {
-    padding-top: 11px;
+    padding-top: 9px;
 }
 
 .md-header__buttons .md-button-secondary {
-    border-width: 1.5px;
-    font-weight: 400 !important;
-    font-size: 0.85rem;
-}
 
-@media screen and (max-width: 76.1875em) {
-    /*.md-header .md-header__buttons {
-        display: none;
-    }*/
 }
 
 .tx-landing__highlights {
@@ -318,7 +309,6 @@
     margin-top: 30px;
     border: 1px solid;
     padding: 10px 30px;
-    /*border-radius: 30px;*/
 }
 
 .tx-landing__highlights_text h2 .gradient {
@@ -330,8 +320,8 @@
 .tx-landing__highlights_grid .feature-cell {
     padding: 35px 50px;
     border-radius: 0;
-    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
-    border-width: 0.75px;
+    border-color: black;
+    border-width: 1px;
     border-style: solid;
     display: flex;
     flex-direction: column;
@@ -340,10 +330,9 @@
 @media screen and (min-width: 76.1875em) {
     .tx-landing__highlights_grid {
         grid-gap: 0 !important;
-
-        border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
-        border-width: 0.75px;
+        border-width: 1px;
         border-style: solid;
+        border-color: black;
         border-top: none;
         border-left: none;
 
@@ -365,8 +354,6 @@
 }
 
 .tx-landing__highlights_grid .feature-cell .feature-tags {
-/*    display: flex;*/
-/*    flex-wrap: wrap;*/
     gap: 2px;
     margin: 0 -5px;
     margin-top: auto;
@@ -385,7 +372,6 @@
     margin-top: 20px;
     margin-right: 5px;
     border-radius: 30px;
-/*    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;*/
     border-width: 0.5px;
     border-style: solid;
     white-space: nowrap;
@@ -394,12 +380,6 @@
 .tx-landing__highlights_grid > a, .tx-landing__highlights_grid > a:hover {
     text-decoration: none;
     color: inherit;
-}
-
-@media screen and (min-width: 76.1875em) {
-    /*.tx-landing__integrations {
-        margin-top: -5rem;
-    }*/
 }
 
 .tx-landing__integrations_text {
@@ -530,7 +510,7 @@
     max-width: 500px;
     margin-top: 0.75em;
     margin-bottom: 0.75em;
-    background: var(--md-typeset-a-color);
+    background: black;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -1.5px;
@@ -684,32 +664,26 @@
 .md-header__buttons .md-button--primary.sky, .md-header__buttons .md-button--primary.sky:hover,
 .md-typeset .md-button--primary.sky, .md-typeset .md-button--primary.sky:hover {
     background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
-    border-radius: 3px;
+    border-radius: 8px;
     border: 1px solid transparent;
 }
 
 .plans_card.open_source {
-/*    border-color: #8587e2;*/
 }
 
 .plans_card.dstack_sky {
-    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.025), rgba(0, 42, 255, 0.025), rgba(225, 101, 254, 0.05));
-    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
 }
 
 .plans_card.enterprise {
     background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.0125), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.07));
-    border-image: linear-gradient(45deg, #0048ff, #ce00ff) 10;
 }
 
 .plans_card {
     display: flex;
     flex-direction: column;
-    /*min-width: 445px;*/
-    /*width: 100%;*/
     border-color: black;
     border-radius: 0;
-    border-width: 0.5px;
+    border-width: 1px;
     border-style: solid;
     padding: 38px 46px;
 }
@@ -718,15 +692,17 @@
     .plans_card.open_source {
         padding: 38px 46px 38px 46px;
         border-right: none;
+        border-top-left-radius: 12px;
+        border-bottom-left-radius: 12px;
     }
 
     .plans_card.dstack_sky {
-/*        border-top: 2px solid;*/
     }
 
     .plans_card.enterprise {
         border-left: none;
-/*        border-top: 2px solid;*/
+        border-top-right-radius: 12px;
+        border-bottom-right-radius: 12px;
     }
 
     .tx-landing__plans_cards {
@@ -762,8 +738,8 @@
     background: -webkit-linear-gradient(45deg, rgba(0, 0, 0, 0.87), rgba(0, 0, 0, 0.87));
     content: '';
     display: inline-block;
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     margin-right: 20px;
     margin-left: 5px;
     position: relative;
