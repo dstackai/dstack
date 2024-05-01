@@ -288,11 +288,9 @@ async def add_remote(
         availability=InstanceAvailability.AVAILABLE,
     )
 
-    ssh_connection_info = None
-    if ssh_user and ssh_keys:
-        ssh_connection_info = RemoteConnectionInfo(
-            host=host, port=port, ssh_user=ssh_user, ssh_keys=ssh_keys
-        ).json()
+    ssh_connection_info = RemoteConnectionInfo(
+        host=host, port=port, ssh_user=ssh_user, ssh_keys=ssh_keys
+    ).json()
 
     im = InstanceModel(
         name=instance_name,

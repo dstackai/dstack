@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import dstack._internal.core.models.pools as models
 import dstack._internal.server.schemas.pools as schemas
 import dstack._internal.server.services.pools as pools
+from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -82,6 +83,9 @@ async def add_instance(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Instance:
+    if not body.host.strip() or not body.ssh_user.strip() or not body.ssh_keys:
+        raise ConfigurationError("Host, user or ssh keys are empty")
+
     _, project = user_project
     result = await pools.add_remote(
         session,
@@ -90,7 +94,7 @@ async def add_instance(
         instance_name=body.instance_name,
         region=body.region,
         host=body.host,
-        port=body.port,
+        port=body.port or 22,
         ssh_user=body.ssh_user,
         ssh_keys=body.ssh_keys,
     )

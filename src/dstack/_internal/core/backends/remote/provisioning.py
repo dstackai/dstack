@@ -32,7 +32,7 @@ def sftp_upload(client: paramiko.SSHClient, path: str, body: str) -> None:
         sftp.putfo(io.BytesIO(body.encode()), path)
         sftp.close()
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"sft_upload failed: {e}") from e
 
 
 def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, str]) -> None:
@@ -50,7 +50,7 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
                 f"The command 'upload_envs' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"upload_envs failed: {e}") from e
 
 
 def run_pre_start_commands(
@@ -68,7 +68,7 @@ def run_pre_start_commands(
                 f"The command 'authorized_keys' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"upload authorized_keys failed: {e}") from e
 
     script = " && ".join(shim_pre_start_commands)
     try:
@@ -80,7 +80,7 @@ def run_pre_start_commands(
                 f"The command 'run_pre_start_commands' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"run_pre-start_commands failed: {e}") from e
 
 
 def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, dev: bool) -> None:
@@ -122,7 +122,7 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
                 f"The command 'run_shim_as_systemd_service' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"run_shim_as_systemd failed: {e}") from e
 
 
 def check_dstack_shim_service(client: paramiko.SSHClient):
@@ -145,7 +145,7 @@ def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any
             )
             err = stderr.read().decode().strip()
             if err:
-                logger.debug("Cannot read `host_info.json`: %s", err)
+                logger.debug("Retry after error: %s", err)
                 time.sleep(iter_delay)
                 continue
         except (paramiko.SSHException, OSError) as e:
@@ -184,7 +184,7 @@ def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
                 continue
             return out
         except (paramiko.SSHException, OSError) as e:
-            raise ProvisioningError() from e
+            raise ProvisioningError(f"get_shim_healthcheck failed: {e}") from e
 
 
 def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
@@ -226,9 +226,12 @@ def get_paramiko_connection(
                     timeout=SSH_CONNECT_TIMEOUT,
                 )
             except paramiko.AuthenticationException:
+                logger.debug(
+                    f'Authentication faild to connect to "{conn_url}" and {pkey.fingerprint}'
+                )
                 continue  # try next key
             except (paramiko.SSHException, OSError) as e:
-                raise ProvisioningError() from e
+                raise ProvisioningError(f"Connect failed: {e}") from e
             else:
                 yield client
                 return
