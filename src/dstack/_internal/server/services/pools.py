@@ -258,6 +258,8 @@ async def add_remote(
     pools = await list_project_pool_models(session, project)
     for pool in pools:
         for instance in pool.instances:
+            if instance.deleted:
+                continue
             if instance.remote_connection_info is not None:
                 rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
                 if rci.host == host and rci.port == port and rci.ssh_user == ssh_user:
