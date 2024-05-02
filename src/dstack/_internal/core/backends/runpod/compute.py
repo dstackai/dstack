@@ -123,7 +123,7 @@ class RunpodCompute(Compute):
                 provisioning_data.ssh_port = port["publicPort"]
 
 
-def get_docker_args(authorized_keys):
+def get_docker_args(authorized_keys: List[str]) -> str:
     commands = get_docker_commands(authorized_keys, False)
     command = " && ".join(commands)
     command_escaped = command.replace('"', '\\"')

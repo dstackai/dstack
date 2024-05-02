@@ -44,10 +44,10 @@ class RunpodApiClient:
         docker_args: str = "",
         ports: Optional[str] = None,
         volume_mount_path: str = "/runpod-volume",
-        env: Optional[dict] = None,
+        env: Optional[Dict[str, Any]] = None,
         template_id: Optional[str] = None,
         network_volume_id: Optional[str] = None,
-        allowed_cuda_versions: Optional[list] = None,
+        allowed_cuda_versions: Optional[List[str]] = None,
         bid_per_gpu: Optional[float] = None,
     ) -> Dict:
         resp = self._make_request(
@@ -159,7 +159,7 @@ query myself {
 """
 
 
-def generate_pod_query(pod_id) -> str:
+def generate_pod_query(pod_id: str) -> str:
     """
     Generate a query for a specific GPU type
     """
@@ -221,7 +221,7 @@ def generate_pod_deployment_mutation(
     docker_args=None,
     ports=None,
     volume_mount_path=None,
-    env: dict = None,
+    env: Optional[Dict[str, Any]] = None,
     template_id=None,
     network_volume_id=None,
     allowed_cuda_versions: Optional[List[str]] = None,
@@ -327,7 +327,7 @@ def generate_pod_rent_interruptable_mutation(
     docker_args=None,
     ports=None,
     volume_mount_path=None,
-    env: dict = None,
+    env: Optional[Dict[str, Any]] = None,
     template_id=None,
     network_volume_id=None,
     allowed_cuda_versions: Optional[List[str]] = None,
