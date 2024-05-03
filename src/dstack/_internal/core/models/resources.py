@@ -214,7 +214,7 @@ class ResourcesSpec(CoreModel):
         def schema_extra(schema: Dict[str, Any]):
             schema.clear()
             # replace strict schema with a more permissive one
-            ref_template = "#/definitions/ResourcesSpec/definitions/{model}"
+            ref_template = "#/definitions/ResourcesSpecRequest/definitions/{model}"
             for field, value in ResourcesSpecSchema.schema(ref_template=ref_template).items():
                 schema[field] = value
 
