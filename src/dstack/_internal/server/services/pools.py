@@ -257,6 +257,15 @@ async def add_remote(
     ssh_user: str,
     ssh_keys: List[SSHKey],
 ) -> Instance:
+    # Check instance in all instances
+    pools = await list_project_pool_models(session, project)
+    for pool in pools:
+        for instance in pool.instances:
+            if instance.remote_connection_info is not None:
+                rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
+                if rci.host == host and rci.port == port and rci.ssh_user == ssh_user:
+                    return instance_model_to_instance(instance)
+
     pool_model = await get_or_create_pool_by_name(session, project, pool_name)
     pool_model_name = pool_model.name
     if instance_name is None:
@@ -288,11 +297,9 @@ async def add_remote(
         availability=InstanceAvailability.AVAILABLE,
     )
 
-    ssh_connection_info = None
-    if ssh_user and ssh_keys:
-        ssh_connection_info = RemoteConnectionInfo(
-            host=host, port=port, ssh_user=ssh_user, ssh_keys=ssh_keys
-        ).json()
+    ssh_connection_info = RemoteConnectionInfo(
+        host=host, port=port, ssh_user=ssh_user, ssh_keys=ssh_keys
+    ).json()
 
     im = InstanceModel(
         name=instance_name,

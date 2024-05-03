@@ -220,10 +220,10 @@ async def add_remote(instance_id: UUID) -> None:
                 result = await asyncio.wait_for(future, timeout=deploy_timeout)
                 health, host_info = result
             except (asyncio.TimeoutError, TimeoutError) as e:
-                raise ProvisioningError() from e
+                raise ProvisioningError(f"Deploy timeout {e}") from e
             except Exception as e:
                 logger.debug("deploy_instance raise an error: %s", e)
-                raise ProvisioningError() from e
+                raise ProvisioningError(f"Deploy instance raise an error {e}") from e
             else:
                 logger.info(
                     "The instance %s (%s) was successfully added",
@@ -232,7 +232,11 @@ async def add_remote(instance_id: UUID) -> None:
                 )
 
         except ProvisioningError as e:
-            logger.warning("Provisioning could not be completed because of the error: %s", e)
+            logger.warning(
+                "Provisioning the instance '%s' could not be completed because of the error: %s",
+                instance.name,
+                e,
+            )
             instance.status = InstanceStatus.PENDING
             instance.last_retry_at = get_current_datetime()
             await session.commit()

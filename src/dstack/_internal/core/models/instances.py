@@ -28,15 +28,15 @@ class Resources(CoreModel):
     def pretty_format(self) -> str:
         resources = {
             "cpus": self.cpus,
-            "memory": f"{self.memory_mib / 1024:g}GB",
-            "disk_size": f"{self.disk.size_mib / 1024:g}GB",
+            "memory": f"{self.memory_mib / 1024:.0f}GB",
+            "disk_size": f"{self.disk.size_mib / 1024:.1f}GB",
         }
         if self.gpus:
             gpu = self.gpus[0]
             resources.update(
                 gpu_name=gpu.name,
                 gpu_count=len(self.gpus),
-                gpu_memory=f"{gpu.memory_mib / 1024:g}GB",
+                gpu_memory=f"{gpu.memory_mib / 1024:.0f}GB",
             )
         return pretty_resources(**resources)
 
