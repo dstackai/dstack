@@ -272,12 +272,14 @@ async def add_remote(
     instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
     instance_type = InstanceType(name="ssh", resources=instance_resource)
 
-    local = JobProvisioningData(
+    host_region = region if region is not None else "remote"
+
+    remote = JobProvisioningData(
         backend=BackendType.REMOTE,
         instance_type=instance_type,
         instance_id=instance_name,
         hostname=host,
-        region=region or "remote",
+        region=host_region,
         internal_ip=None,
         price=0,
         username=ssh_user,
@@ -289,7 +291,7 @@ async def add_remote(
     offer = InstanceOfferWithAvailability(
         backend=BackendType.REMOTE,
         instance=instance_type,
-        region=region or "remote",
+        region=host_region,
         price=0.0,
         availability=InstanceAvailability.AVAILABLE,
     )
@@ -306,7 +308,7 @@ async def add_remote(
         created_at=common_utils.get_current_datetime(),
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PENDING,
-        job_provisioning_data=local.json(),
+        job_provisioning_data=remote.json(),
         remote_connection_info=ssh_connection_info,
         offer=offer.json(),
         region=offer.region,
