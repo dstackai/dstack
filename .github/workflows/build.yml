@@ -156,7 +156,7 @@ jobs:
       - name: Install AWS
         run: pip install awscli
       - name: Install dstack
-        run: pip install .
+        run: pip install .[all]
       - name: Generate json schema
         run: |
           python -c "from dstack._internal.core.models.configurations import RunConfiguration; print(RunConfiguration.schema_json(indent=2))" > configuration.json
