@@ -13,6 +13,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.utils.gpu import convert_gpu_name
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -188,9 +189,10 @@ def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
 
 
 def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
+    gpu_name = convert_gpu_name(host_info["gpu_name"])
     if host_info.get("gpu_count", 0):
         gpu_memory = int(host_info["gpu_memory"].lower().replace("mib", "").strip())
-        gpus = [Gpu(name=host_info["gpu_name"], memory_mib=gpu_memory)] * host_info["gpu_count"]
+        gpus = [Gpu(name=gpu_name, memory_mib=gpu_memory)] * host_info["gpu_count"]
     else:
         gpus = []
     instance_type = InstanceType(
