@@ -53,6 +53,12 @@ from dstack._internal.core.models.backends.nebius import (
     NebiusConfigInfoWithCredsPartial,
     NebiusConfigValues,
 )
+from dstack._internal.core.models.backends.oci import (
+    OCIConfigInfo,
+    OCIConfigInfoWithCreds,
+    OCIConfigInfoWithCredsPartial,
+    OCIConfigValues,
+)
 from dstack._internal.core.models.backends.runpod import (
     RunpodConfigInfo,
     RunpodConfigInfoWithCreds,
@@ -72,6 +78,7 @@ from dstack._internal.core.models.backends.vastai import (
     VastAIConfigValues,
 )
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.settings import FeatureFlags
 
 # Backend config returned by the API
 AnyConfigInfoWithoutCreds = Union[
@@ -89,6 +96,8 @@ AnyConfigInfoWithoutCreds = Union[
     DstackConfigInfo,
     DstackBaseBackendConfigInfo,
 ]
+if FeatureFlags.OCI_BACKEND:
+    AnyConfigInfoWithoutCreds = Union[AnyConfigInfoWithoutCreds, OCIConfigInfo]
 
 # Same as AnyConfigInfoWithoutCreds but also includes creds.
 # Used to create/update backend.
@@ -107,6 +116,8 @@ AnyConfigInfoWithCreds = Union[
     VastAIConfigInfoWithCreds,
     DstackConfigInfo,
 ]
+if FeatureFlags.OCI_BACKEND:
+    AnyConfigInfoWithCreds = Union[AnyConfigInfoWithCreds, OCIConfigInfoWithCreds]
 
 AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 
@@ -127,6 +138,10 @@ AnyConfigInfoWithCredsPartial = Union[
     VastAIConfigInfoWithCredsPartial,
     DstackConfigInfo,
 ]
+if FeatureFlags.OCI_BACKEND:
+    AnyConfigInfoWithCredsPartial = Union[
+        AnyConfigInfoWithCredsPartial, OCIConfigInfoWithCredsPartial
+    ]
 
 # Suggestions for unfilled fields used in interactive setup.
 AnyConfigValues = Union[
@@ -143,6 +158,8 @@ AnyConfigValues = Union[
     VastAIConfigValues,
     DstackConfigValues,
 ]
+if FeatureFlags.OCI_BACKEND:
+    AnyConfigValues = Union[AnyConfigValues, OCIConfigValues]
 
 
 # In case we'll support multiple backends of the same type,
