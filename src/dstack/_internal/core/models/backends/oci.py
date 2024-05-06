@@ -1,8 +1,7 @@
 from pathlib import Path
 
-import oci
 from pydantic import Field
-from typing_extensions import Annotated, Any, List, Literal, Mapping, Optional, Union
+from typing_extensions import Annotated, List, Literal, Optional, Union
 
 from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
@@ -23,15 +22,9 @@ class OCIClientCreds(CoreModel):
         str, Field(description="Name or key of any region the tenancy is subscribed to")
     ]
 
-    def to_client_config(self) -> Mapping[str, Any]:
-        return self.dict(exclude={"type"})
-
 
 class OCIDefaultCreds(CoreModel):
     type: Annotated[Literal["default"], Field(description="The type of credentials")] = "default"
-
-    def to_client_config(self) -> Mapping[str, Any]:
-        return oci.config.from_file()
 
 
 AnyOCICreds = Union[OCIClientCreds, OCIDefaultCreds]
