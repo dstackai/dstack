@@ -342,7 +342,7 @@ def filter_pool_instances(
             continue
 
         if instance.backend == BackendType.REMOTE:
-            instances.append(instance)
+            candidates.append(instance)
             continue
 
         # TODO: remove on prod
