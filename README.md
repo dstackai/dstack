@@ -29,11 +29,11 @@ You can also use `dstack` ro run workloads on on-prem servers.
 
 ## Latest news ✨
 
-- [2024/04] [dstack 0.18.0: RunPod integration, multi-node tasks, and more](https://dstack.ai/changelog/0.18.0/) (Release)
-- [2024/03] [dstack 0.17.0: Service auto-scaling, and other improvements](https://dstack.ai/changelog/0.17.0/) (Release)
-- [2024/02] [dstack 0.16.0: Pools](https://dstack.ai/changelog/0.16.0/) (Release)
-- [2024/02] [dstack 0.15.1: Kubernetes integration](https://dstack.ai/changelog/0.15.1/) (Release)
-- [2024/01] [dstack 0.15.0: Resources, authorization, and more](https://dstack.ai/changelog/0.15.0/) (Release)
+- [2024/04] [dstack 0.18.1: On-prem servers, and new example](https://github.com/dstackai/dstack/releases/tag/0.18.1) (Release)
+- [2024/04] [dstack 0.18.0: RunPod, mult-node tasks, and more](https://github.com/dstackai/dstack/releases/tag/0.18.0) (Release)
+- [2024/03] [dstack 0.17.0: Auto-scaling, and other improvements](https://github.com/dstackai/dstack/releases/tag/0.17.0) (Release)
+- [2024/02] [dstack 0.16.0: Pools](https://github.com/dstackai/dstack/releases/tag/0.16.0) (Release)
+- [2024/02] [dstack 0.15.1: Kubernetes](https://github.com/dstackai/dstack/releases/tag/0.15.1) (Release)
 
 ## Installation
 

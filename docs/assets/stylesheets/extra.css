@@ -225,6 +225,10 @@
     }
 }
 
+.md-nav--secondary:not(:has(ul)) {
+    display: none;
+}
+
 .md-nav--secondary {
     border: 1px solid black;
     padding: 20px 5px;
