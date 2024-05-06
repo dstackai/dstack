@@ -62,20 +62,12 @@ async def get_pool(
     return res.one_or_none()
 
 
-async def get_named_or_default_pool(
-    session: AsyncSession, project: ProjectModel, pool_name: Optional[str]
-) -> Optional[PoolModel]:
-    if pool_name is not None:
-        return await get_pool(session, project, pool_name)
-    return project.default_pool
-
-
 async def get_or_create_pool_by_name(
     session: AsyncSession, project: ProjectModel, pool_name: Optional[str]
 ) -> PoolModel:
     if pool_name is None:
-        if project.default_pool is not None:
-            return project.default_pool
+        if project.default_pool_id is not None:
+            return await get_default_pool_or_error(session, project)
         default_pool = await get_pool(session, project, DEFAULT_POOL_NAME)
         if default_pool is not None:
             await set_default_pool(session, project, DEFAULT_POOL_NAME)
@@ -85,6 +77,11 @@ async def get_or_create_pool_by_name(
     if pool is not None:
         return pool
     return await create_pool(session, project, pool_name)
+
+
+async def get_default_pool_or_error(session: AsyncSession, project: ProjectModel) -> PoolModel:
+    res = await session.execute(select(PoolModel).where(PoolModel.id == project.default_pool_id))
+    return res.scalar_one()
 
 
 async def create_pool(session: AsyncSession, project: ProjectModel, name: str) -> PoolModel:
@@ -98,7 +95,7 @@ async def create_pool(session: AsyncSession, project: ProjectModel, name: str) -
     session.add(pool)
     await session.commit()
     await session.refresh(pool)
-    if project.default_pool is None:
+    if project.default_pool_id is None:
         await set_default_pool(session, project, pool.name)
     return pool
 
