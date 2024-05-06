@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 from typing import List
 
@@ -138,13 +139,20 @@ class AWSConfigurator(Configurator):
         regions = config.regions
         if regions is None:
             regions = DEFAULT_REGIONS
-        for region in regions:
-            ec2_client = session.client("ec2", region_name=region)
-            try:
-                compute.get_vpc_id_subnet_id_or_error(
+        # The number of workers should be >= the number of regions
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+            futures = []
+            for region in regions:
+                ec2_client = session.client("ec2", region_name=region)
+                future = executor.submit(
+                    compute.get_vpc_id_subnet_id_or_error,
                     ec2_client=ec2_client,
                     config=AWSConfig.parse_obj(config),
                     region=region,
                 )
-            except ComputeError as e:
-                raise ServerClientError(e.args[0])
+                futures.append(future)
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()
+                except ComputeError as e:
+                    raise ServerClientError(e.args[0])
