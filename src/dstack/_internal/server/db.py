@@ -14,7 +14,7 @@ from dstack._internal.server.settings import DATABASE_URL
 class Database:
     def __init__(self, url: str):
         self.url = url
-        self.engine = create_async_engine(self.url, echo=False)
+        self.engine = create_async_engine(self.url, echo=settings.SQL_ECHO_ENABLED)
         self.session_maker = sessionmaker(
             bind=self.engine, expire_on_commit=False, class_=AsyncSession
         )

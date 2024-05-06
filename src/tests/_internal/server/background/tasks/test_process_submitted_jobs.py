@@ -21,7 +21,7 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
 )
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
-from dstack._internal.server.models import JobModel
+from dstack._internal.server.models import JobModel, ProjectModel
 from dstack._internal.server.services.pools import (
     get_or_create_pool_by_name,
 )
@@ -117,7 +117,12 @@ class TestProcessSubmittedJobs:
         assert job is not None
         assert job.status == JobStatus.PROVISIONING
 
-        await session.refresh(project)
+        res = await session.execute(
+            select(ProjectModel)
+            .where(ProjectModel.id == project.id)
+            .options(joinedload(ProjectModel.default_pool))
+        )
+        project = res.scalar_one()
         assert project.default_pool.name == DEFAULT_POOL_NAME
 
         instance_offer = InstanceOfferWithAvailability.parse_raw(
@@ -165,7 +170,12 @@ class TestProcessSubmittedJobs:
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
-        await session.refresh(project)
+        res = await session.execute(
+            select(ProjectModel)
+            .where(ProjectModel.id == project.id)
+            .options(joinedload(ProjectModel.default_pool))
+        )
+        project = res.scalar_one()
         assert not project.default_pool.instances
 
     @pytest.mark.asyncio

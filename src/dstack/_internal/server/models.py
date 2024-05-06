@@ -97,9 +97,7 @@ class ProjectModel(BaseModel):
     default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
         ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )
-    default_pool: Mapped[Optional["PoolModel"]] = relationship(
-        foreign_keys=[default_pool_id], lazy="selectin"
-    )
+    default_pool: Mapped[Optional["PoolModel"]] = relationship(foreign_keys=[default_pool_id])
 
 
 class MemberModel(BaseModel):
@@ -350,5 +348,5 @@ class InstanceModel(BaseModel):
 
     # current job
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
-    job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="immediate")
+    job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="joined")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)

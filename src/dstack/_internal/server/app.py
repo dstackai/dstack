@@ -31,10 +31,10 @@ from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import (
     DEFAULT_PROJECT_NAME,
-    DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT,
-    DSTACK_UPDATE_DEFAULT_PROJECT,
+    DO_NOT_UPDATE_DEFAULT_PROJECT,
     SERVER_CONFIG_FILE_PATH,
     SERVER_URL,
+    UPDATE_DEFAULT_PROJECT,
 )
 from dstack._internal.server.utils.logging import configure_logging
 from dstack._internal.server.utils.routers import (
@@ -109,8 +109,8 @@ async def lifespan(app: FastAPI):
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
         token=admin.token,
-        default=DSTACK_UPDATE_DEFAULT_PROJECT,
-        no_default=DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT,
+        default=UPDATE_DEFAULT_PROJECT,
+        no_default=DO_NOT_UPDATE_DEFAULT_PROJECT,
     )
     if settings.SERVER_BUCKET is not None:
         init_default_storage()
