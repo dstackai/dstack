@@ -44,10 +44,11 @@ class RunpodApiClient:
         docker_args: str = "",
         ports: Optional[str] = None,
         volume_mount_path: str = "/runpod-volume",
-        env: Optional[dict] = None,
+        env: Optional[Dict[str, Any]] = None,
         template_id: Optional[str] = None,
         network_volume_id: Optional[str] = None,
-        allowed_cuda_versions: Optional[list] = None,
+        allowed_cuda_versions: Optional[List[str]] = None,
+        bid_per_gpu: Optional[float] = None,
     ) -> Dict:
         resp = self._make_request(
             {
@@ -72,11 +73,12 @@ class RunpodApiClient:
                     template_id,
                     network_volume_id,
                     allowed_cuda_versions,
+                    bid_per_gpu,
                 )
             }
         )
-        data = resp.json()
-        return data["data"]["podFindAndDeployOnDemand"]
+        data = resp.json()["data"]
+        return data["podRentInterruptable"] if bid_per_gpu else data["podFindAndDeployOnDemand"]
 
     def get_pod(self, pod_id: str) -> Dict:
         resp = self._make_request({"query": generate_pod_query(pod_id)})
@@ -134,7 +136,7 @@ query myself {
 """
 
 
-def generate_pod_query(pod_id) -> str:
+def generate_pod_query(pod_id: str) -> str:
     """
     Generate a query for a specific GPU type
     """
@@ -196,13 +198,14 @@ def generate_pod_deployment_mutation(
     docker_args=None,
     ports=None,
     volume_mount_path=None,
-    env: dict = None,
+    env: Optional[Dict[str, Any]] = None,
     template_id=None,
     network_volume_id=None,
     allowed_cuda_versions: Optional[List[str]] = None,
+    bid_per_gpu: Optional[float] = None,
 ) -> str:
     """
-    Generates a mutation to deploy a pod on demand.
+    Generates a mutation to deploy pod.
     """
     input_fields = []
 
@@ -223,6 +226,8 @@ def generate_pod_deployment_mutation(
         input_fields.append("supportPublicIp: false")
 
     # ------------------------------ Optional Fields ----------------------------- #
+    if bid_per_gpu is not None:
+        input_fields.append(f"bidPerGpu: {bid_per_gpu}")
     if data_center_id is not None:
         input_fields.append(f'dataCenterId: "{data_center_id}"')
     if country_code is not None:
@@ -261,27 +266,25 @@ def generate_pod_deployment_mutation(
         )
         input_fields.append(f"allowedCudaVersions: [{allowed_cuda_versions_string}]")
 
+    pod_deploy = "podFindAndDeployOnDemand" if bid_per_gpu is None else "podRentInterruptable"
     # Format input fields
     input_string = ", ".join(input_fields)
-
     return f"""
-    mutation {{
-      podFindAndDeployOnDemand(
-        input: {{
-          {input_string}
+        mutation {{
+          {pod_deploy}(
+            input: {{
+              {input_string}
+            }}
+          ) {{
+            id
+            lastStatusChange
+            imageName
+            machine {{
+              podHostId
+            }}
+          }}
         }}
-      ) {{
-        id
-        desiredStatus
-        imageName
-        env
-        machineId
-        machine {{
-          podHostId
-        }}
-      }}
-    }}
-    """
+        """
 
 
 def generate_pod_terminate_mutation(pod_id: str) -> str:
