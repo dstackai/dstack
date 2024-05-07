@@ -7,7 +7,7 @@ from dstack._internal.core.backends.oci.auth import get_client_config
 from dstack._internal.core.models.backends.oci import AnyOCICreds
 
 
-class OCIRegion:
+class OCIRegionClient:
     """
     A structure for region-specific objects, including region-bound API clients
     """
@@ -30,7 +30,7 @@ class OCIRegion:
 
 def get_subscribed_region_names(creds: AnyOCICreds) -> List[str]:
     config = get_client_config(creds)
-    region = OCIRegion(config)
+    region = OCIRegionClient(config)
 
     subscriptions: List[oci.identity.models.RegionSubscription] = (
         region.identity_client.list_region_subscriptions(config["tenancy"]).data
