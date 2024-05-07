@@ -99,7 +99,9 @@ KUBERNETES_DEPS = ["kubernetes"]
 
 LAMBDA_DEPS = AWS_DEPS
 
-ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS
+OCI_DEPS = ["oci"]
+
+ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS + OCI_DEPS
 
 
 setup(
@@ -134,6 +136,7 @@ setup(
         "gcp": GCP_DEPS,
         "kubernetes": KUBERNETES_DEPS,
         "lambda": LAMBDA_DEPS,
+        "oci": OCI_DEPS,
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

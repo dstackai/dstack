@@ -28,6 +28,7 @@ from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import Configurator
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.server.utils.common import run_async
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -95,6 +96,14 @@ try:
     from dstack._internal.server.services.backends.configurators.nebius import NebiusConfigurator
 
     _CONFIGURATOR_CLASSES.append(NebiusConfigurator)
+except ImportError:
+    pass
+
+try:
+    from dstack._internal.server.services.backends.configurators.oci import OCIConfigurator
+
+    if FeatureFlags.OCI_BACKEND:
+        _CONFIGURATOR_CLASSES.append(OCIConfigurator)
 except ImportError:
     pass
 

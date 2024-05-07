@@ -18,6 +18,7 @@ from dstack._internal.core.models.backends.cudo import AnyCudoCreds
 from dstack._internal.core.models.backends.datacrunch import AnyDataCrunchCreds
 from dstack._internal.core.models.backends.kubernetes import KubernetesNetworkingConfig
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
+from dstack._internal.core.models.backends.oci import AnyOCICreds
 from dstack._internal.core.models.backends.runpod import AnyRunpodCreds
 from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.backends.vastai import AnyVastAICreds
@@ -27,6 +28,7 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.utils.common import run_async
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -211,6 +213,12 @@ class NebiusAPIConfig(CoreModel):
     creds: AnyNebiusAPICreds
 
 
+class OCIConfig(CoreModel):
+    type: Literal["oci"] = "oci"
+    creds: Optional[AnyOCICreds]
+    regions: Optional[List[str]] = None
+
+
 class RunpodConfig(CoreModel):
     type: Literal["runpod"] = "runpod"
     regions: Optional[List[str]] = None
@@ -247,6 +255,8 @@ AnyBackendConfig = Union[
     VastAIConfig,
     DstackConfig,
 ]
+if FeatureFlags.OCI_BACKEND:
+    AnyBackendConfig = Union[AnyBackendConfig, OCIConfig]
 
 BackendConfig = Annotated[AnyBackendConfig, Field(..., discriminator="type")]
 
@@ -269,6 +279,8 @@ AnyBackendAPIConfig = Union[
     VastAIConfig,
     DstackConfig,
 ]
+if FeatureFlags.OCI_BACKEND:
+    AnyBackendAPIConfig = Union[AnyBackendAPIConfig, OCIConfig]
 
 
 BackendAPIConfig = Annotated[AnyBackendAPIConfig, Field(..., discriminator="type")]

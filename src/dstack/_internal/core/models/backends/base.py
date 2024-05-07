@@ -2,6 +2,7 @@ import enum
 from typing import List, Optional
 
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.settings import FeatureFlags
 
 
 class BackendType(str, enum.Enum):
@@ -31,6 +32,8 @@ class BackendType(str, enum.Enum):
     LOCAL = "local"
     REMOTE = "remote"  # TODO: replace for LOCAL
     NEBIUS = "nebius"
+    if FeatureFlags.OCI_BACKEND:
+        OCI = "oci"
     RUNPOD = "runpod"
     TENSORDOCK = "tensordock"
     VASTAI = "vastai"

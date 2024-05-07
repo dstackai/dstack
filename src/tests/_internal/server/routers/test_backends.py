@@ -19,8 +19,19 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
 )
+from dstack._internal.settings import FeatureFlags
 
 client = TestClient(app)
+
+
+FAKE_OCI_CLIENT_CREDS = {
+    "type": "client",
+    "user": "ocid1.user.oc1..aaaaaaaa",
+    "tenancy": "ocid1.tenancy.oc1..aaaaaaaa",
+    "key_file": "/dev/null",
+    "fingerprint": "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",
+    "region": "me-dubai-1",
+}
 
 
 class TestListBackendTypes:
@@ -36,6 +47,7 @@ class TestListBackendTypes:
             "kubernetes",
             "lambda",
             "nebius",
+            *(["oci"] if FeatureFlags.OCI_BACKEND else []),
             "runpod",
             "tensordock",
             "vastai",
@@ -614,6 +626,91 @@ class TestGetBackendConfigValuesLambda:
         }
 
 
+@pytest.mark.skipif(not FeatureFlags.OCI_BACKEND, reason="behind a feature flag")
+class TestGetBackendConfigValuesOCI:
+    @pytest.mark.asyncio
+    async def test_returns_initial_config(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {"type": "oci"}
+        with patch(
+            "dstack._internal.core.backends.oci.auth.default_creds_available"
+        ) as default_creds_available_mock:
+            default_creds_available_mock.return_value = False
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            default_creds_available_mock.assert_called()
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "type": "oci",
+            "default_creds": False,
+            "regions": None,
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {
+            "type": "oci",
+            "creds": FAKE_OCI_CLIENT_CREDS,
+        }
+        with patch(
+            "dstack._internal.core.backends.oci.auth.default_creds_available"
+        ) as default_creds_available_mock:
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            default_creds_available_mock.assert_called()
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [
+                {
+                    "code": "invalid_credentials",
+                    "msg": "Invalid credentials",
+                    "fields": ["creds"],
+                },
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        body = {
+            "type": "oci",
+            "creds": FAKE_OCI_CLIENT_CREDS,
+        }
+        with patch(
+            "dstack._internal.core.backends.oci.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_region_names"
+        ) as get_regions_mock:
+            default_creds_available_mock.return_value = True
+            get_regions_mock.return_value = ["me-dubai-1", "eu-frankfurt-1"]
+            response = client.post(
+                "/api/backends/config_values",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+            default_creds_available_mock.assert_called()
+            get_regions_mock.assert_called()
+        assert response.status_code == 200, response.json()
+        assert response.json() == {
+            "type": "oci",
+            "default_creds": True,
+            "regions": {
+                "selected": ["me-dubai-1", "eu-frankfurt-1"],
+                "values": [
+                    {"label": "me-dubai-1", "value": "me-dubai-1"},
+                    {"label": "eu-frankfurt-1", "value": "eu-frankfurt-1"},
+                ],
+            },
+        }
+
+
 class TestCreateBackend:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
@@ -720,6 +817,66 @@ class TestCreateBackend:
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
+
+    @pytest.mark.skipif(not FeatureFlags.OCI_BACKEND, reason="behind a feature flag")
+    @pytest.mark.asyncio
+    async def test_creates_oci_backend(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        body = {
+            "type": "oci",
+            "creds": FAKE_OCI_CLIENT_CREDS,
+        }
+        with patch(
+            "dstack._internal.core.backends.oci.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_region_names"
+        ) as get_regions_mock:
+            default_creds_available_mock.return_value = False
+            get_regions_mock.return_value = ["me-dubai-1", "eu-frankfurt-1"]
+            response = client.post(
+                f"/api/project/{project.name}/backends/create",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.skipif(not FeatureFlags.OCI_BACKEND, reason="behind a feature flag")
+    @pytest.mark.asyncio
+    async def test_not_creates_oci_backend_if_regions_not_subscribed(
+        self, test_db, session: AsyncSession
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        body = {
+            "type": "oci",
+            "creds": FAKE_OCI_CLIENT_CREDS,
+            "regions": ["me-dubai-1", "eu-frankfurt-1", "us-ashburn-1"],
+        }
+        with patch(
+            "dstack._internal.core.backends.oci.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_region_names"
+        ) as get_regions_mock:
+            default_creds_available_mock.return_value = False
+            # us-ashburn-1 not subscribed
+            get_regions_mock.return_value = ["me-dubai-1", "eu-frankfurt-1"]
+            response = client.post(
+                f"/api/project/{project.name}/backends/create",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 400, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 0
 
     @pytest.mark.asyncio
     async def test_create_azure_backend(self, test_db, session: AsyncSession):
@@ -1003,6 +1160,35 @@ class TestCreateBackendYAML:
             "dstack._internal.core.backends.aws.auth.authenticate"
         ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
+            response = client.post(
+                f"/api/project/{project.name}/backends/create_yaml",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        res = await session.execute(select(BackendModel))
+        assert len(res.scalars().all()) == 1
+
+    @pytest.mark.skipif(not FeatureFlags.OCI_BACKEND, reason="behind a feature flag")
+    @pytest.mark.asyncio
+    async def test_creates_oci_backend(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        config_dict = {
+            "type": "oci",
+            "creds": FAKE_OCI_CLIENT_CREDS,
+        }
+        body = {"config_yaml": yaml.dump(config_dict)}
+        with patch(
+            "dstack._internal.core.backends.oci.auth.default_creds_available"
+        ) as default_creds_available_mock, patch(
+            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_region_names"
+        ) as get_regions_mock:
+            default_creds_available_mock.return_value = False
+            get_regions_mock.return_value = ["me-dubai-1", "eu-frankfurt-1"]
             response = client.post(
                 f"/api/project/{project.name}/backends/create_yaml",
                 headers=get_auth_headers(user.token),
