@@ -89,7 +89,7 @@ class OCIConfigurator(Configurator):
             config.regions = available_regions
         elif unsubscribed_regions := set(config.regions) - set(available_regions):
             msg = f"Regions {unsubscribed_regions} are configured but not subscribed to in OCI"
-            raise ServerClientError(msg, fields=["regions"])
+            raise ServerClientError(msg, fields=[["regions"]])
 
         return BackendModel(
             project_id=project.id,
