@@ -258,6 +258,8 @@ async def add_remote(
     pools = await list_project_pool_models(session, project)
     for pool in pools:
         for instance in pool.instances:
+            if instance.deleted:
+                continue
             if instance.remote_connection_info is not None:
                 rci = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
                 if rci.host == host and rci.port == port and rci.ssh_user == ssh_user:
@@ -272,12 +274,14 @@ async def add_remote(
     instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
     instance_type = InstanceType(name="ssh", resources=instance_resource)
 
-    local = JobProvisioningData(
+    host_region = region if region is not None else "remote"
+
+    remote = JobProvisioningData(
         backend=BackendType.REMOTE,
         instance_type=instance_type,
         instance_id=instance_name,
         hostname=host,
-        region=region or "remote",
+        region=host_region,
         internal_ip=None,
         price=0,
         username=ssh_user,
@@ -289,7 +293,7 @@ async def add_remote(
     offer = InstanceOfferWithAvailability(
         backend=BackendType.REMOTE,
         instance=instance_type,
-        region=region or "remote",
+        region=host_region,
         price=0.0,
         availability=InstanceAvailability.AVAILABLE,
     )
@@ -306,7 +310,7 @@ async def add_remote(
         created_at=common_utils.get_current_datetime(),
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PENDING,
-        job_provisioning_data=local.json(),
+        job_provisioning_data=remote.json(),
         remote_connection_info=ssh_connection_info,
         offer=offer.json(),
         region=offer.region,
@@ -342,7 +346,7 @@ def filter_pool_instances(
             continue
 
         if instance.backend == BackendType.REMOTE:
-            instances.append(instance)
+            candidates.append(instance)
             continue
 
         # TODO: remove on prod

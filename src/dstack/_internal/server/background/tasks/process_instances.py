@@ -252,12 +252,14 @@ async def add_remote(instance_id: UUID) -> None:
                 continue
         internal_ip = addresses[0] if addresses else None
 
+        region = instance.region
+
         jpd = JobProvisioningData(
             backend=BackendType.REMOTE,
             instance_type=instance_type,
             instance_id="instance_id",
             hostname=remote_details.host,
-            region="remote",
+            region=region,
             price=0,
             internal_ip=internal_ip,
             username=remote_details.ssh_user,
@@ -270,12 +272,10 @@ async def add_remote(instance_id: UUID) -> None:
         instance.status = InstanceStatus.IDLE if health else InstanceStatus.PROVISIONING
         instance.backend = BackendType.REMOTE
 
-        instance.region = "remote"
-
         instance_offer = InstanceOfferWithAvailability(
             backend=BackendType.REMOTE,
             instance=instance_type,
-            region="remote",
+            region=region,
             price=0,
             availability=InstanceAvailability.AVAILABLE,
             instance_runtime=InstanceRuntime.SHIM,
