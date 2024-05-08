@@ -168,7 +168,7 @@ def get_run_spec(
         configuration_path="dstack.yaml",
         configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
-        ssh_key_pub="",
+        ssh_key_pub="user_ssh_key",
     )
 
 

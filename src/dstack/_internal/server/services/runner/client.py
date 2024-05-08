@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import BinaryIO, Dict, Optional, Union
+from typing import BinaryIO, Dict, List, Optional, Union
 
 import requests
 import requests.exceptions
@@ -125,7 +125,7 @@ class ShimClient:
         image_name: str,
         container_name: str,
         shm_size: Optional[Memory],
-        public_key: Optional[str],
+        public_keys: List[str],
     ):
         _shm_size = int(shm_size * 1024 * 1024 * 1014) if shm_size else 0
         post_body = DockerImageBody(
@@ -134,7 +134,7 @@ class ShimClient:
             image_name=image_name,
             container_name=container_name,
             shm_size=_shm_size,
-            public_key=public_key or "",
+            public_keys=public_keys,
         ).dict()
         resp = requests.post(
             self._url("/api/submit"),

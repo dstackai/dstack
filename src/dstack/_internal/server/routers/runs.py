@@ -166,7 +166,6 @@ async def create_instance(
             session=session,
             project=project,
             user=user,
-            ssh_key=body.ssh_key,
             profile=body.profile,
             requirements=body.requirements,
         )

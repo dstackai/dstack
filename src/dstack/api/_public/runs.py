@@ -17,7 +17,6 @@ from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
-from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
@@ -391,10 +390,8 @@ class RunCollection:
     def get_offers(self, profile: Profile, requirements: Requirements) -> PoolInstanceOffers:
         return self._api_client.runs.get_offers(self._project, profile, requirements)
 
-    def create_instance(
-        self, profile: Profile, requirements: Requirements, ssh_key: SSHKey
-    ) -> Instance:
-        return self._api_client.runs.create_instance(self._project, profile, requirements, ssh_key)
+    def create_instance(self, profile: Profile, requirements: Requirements) -> Instance:
+        return self._api_client.runs.create_instance(self._project, profile, requirements)
 
     def get_plan(
         self,
