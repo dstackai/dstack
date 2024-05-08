@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -97,9 +98,13 @@ func (c *dockerParametersMock) DockerKeepContainer() bool {
 	return false
 }
 
-func (c *dockerParametersMock) DockerShellCommands() []string {
+func (c *dockerParametersMock) DockerShellCommands(publicKeys []string) []string {
+	userPublicKey := c.publicSSHKey
+	if len(publicKeys) > 0 {
+		userPublicKey = strings.Join(publicKeys, "\n")
+	}
 	commands := make([]string, 0)
-	commands = append(commands, getSSHShellCommands(c.sshPort, c.publicSSHKey)...)
+	commands = append(commands, getSSHShellCommands(c.sshPort, userPublicKey)...)
 	commands = append(commands, c.commands...)
 	return commands
 }

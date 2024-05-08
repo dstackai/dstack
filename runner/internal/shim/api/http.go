@@ -39,7 +39,7 @@ func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (
 		if err != nil {
 			fmt.Printf("failed Run %v\n", err)
 		}
-	}(body.TaskParams())
+	}(body.GetDockerImageConfig())
 
 	return nil, nil
 }

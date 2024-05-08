@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from sqlalchemy import select
@@ -152,6 +152,10 @@ async def _process_job(job_id: UUID):
                         fmt(job_model),
                         job_submission.age,
                     )
+                    public_keys = [
+                        project.ssh_public_key.strip(),
+                        run.run_spec.ssh_key_pub.strip(),
+                    ]
                     success = await run_async(
                         _process_provisioning_with_shim,
                         server_ssh_private_key,
@@ -159,6 +163,7 @@ async def _process_job(job_id: UUID):
                         job_model,
                         secrets,
                         job.job_spec.registry_auth,
+                        public_keys,
                     )
                 else:
                     logger.debug(
@@ -339,6 +344,7 @@ def _process_provisioning_with_shim(
     job_model: JobModel,
     secrets: Dict[str, str],
     registry_auth: Optional[RegistryAuth],
+    public_keys: List[str],
     *,
     ports: Dict[int, int],
 ) -> bool:
@@ -359,24 +365,22 @@ def _process_provisioning_with_shim(
         logger.debug("%s: shim is not available yet", fmt(job_model))
         return False  # shim is not available yet
 
+    username = ""
+    password = ""
     if registry_auth is not None:
         logger.debug("%s: authenticating to the registry...", fmt(job_model))
         interpolate = VariablesInterpolator({"secrets": secrets}).interpolate
-        shim_client.submit(
-            username=interpolate(registry_auth.username),
-            password=interpolate(registry_auth.password),
-            image_name=job_spec.image_name,
-            container_name=job_model.job_name,
-            shm_size=job_spec.requirements.resources.shm_size,
-        )
-    else:
-        shim_client.submit(
-            username="",
-            password="",
-            image_name=job_spec.image_name,
-            container_name=job_model.job_name,
-            shm_size=job_spec.requirements.resources.shm_size,
-        )
+        username = interpolate(registry_auth.username)
+        password = interpolate(registry_auth.password)
+
+    shim_client.submit(
+        username=username,
+        password=password,
+        image_name=job_spec.image_name,
+        container_name=job_model.job_name,
+        shm_size=job_spec.requirements.resources.shm_size,
+        public_keys=public_keys,
+    )
 
     job_model.status = JobStatus.PULLING
     logger.info("%s: now is %s", fmt(job_model), job_model.status.name)

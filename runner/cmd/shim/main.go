@@ -101,7 +101,7 @@ func main() {
 						Name:        "ssh-key",
 						Usage:       "Public SSH key",
 						Required:    true,
-						Destination: &args.Docker.PublicSSHKey,
+						Destination: &args.Docker.ConcatinatedPublicSSHKeys,
 						EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
 					},
 					&cli.BoolFlag{

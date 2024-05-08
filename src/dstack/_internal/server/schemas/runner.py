@@ -77,6 +77,7 @@ class DockerImageBody(CoreModel):
     image_name: str
     container_name: str
     shm_size: int
+    public_keys: List[str]
 
 
 class StopBody(CoreModel):

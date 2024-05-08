@@ -3,11 +3,12 @@ package api
 import "github.com/dstackai/dstack/runner/internal/shim"
 
 type DockerTaskBody struct {
-	Username      string `json:"username"`
-	Password      string `json:"password"`
-	ImageName     string `json:"image_name"`
-	ContainerName string `json:"container_name"`
-	ShmSize       int64  `json:"shm_size"`
+	Username      string   `json:"username"`
+	Password      string   `json:"password"`
+	ImageName     string   `json:"image_name"`
+	ContainerName string   `json:"container_name"`
+	ShmSize       int64    `json:"shm_size"`
+	PublicKeys    []string `json:"public_keys"`
 }
 
 type StopBody struct {
@@ -36,13 +37,14 @@ type StopResponse struct {
 	State string `json:"state"`
 }
 
-func (ra DockerTaskBody) TaskParams() shim.DockerImageConfig {
+func (ra DockerTaskBody) GetDockerImageConfig() shim.DockerImageConfig {
 	res := shim.DockerImageConfig{
 		ImageName:     ra.ImageName,
 		Username:      ra.Username,
 		Password:      ra.Password,
 		ContainerName: ra.ContainerName,
 		ShmSize:       ra.ShmSize,
+		PublicKeys:    ra.PublicKeys,
 	}
 	return res
 }

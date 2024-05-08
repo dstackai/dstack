@@ -275,16 +275,16 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 	return nil
 }
 
-func createContainer(ctx context.Context, client docker.APIClient, runnerDir string, dockerParams DockerParameters, taskParams DockerImageConfig) (string, error) {
+func createContainer(ctx context.Context, client docker.APIClient, runnerDir string, dockerParams DockerParameters, dockerImageConfig DockerImageConfig) (string, error) {
 	timeout := int(0)
 	stopOptions := container.StopOptions{Timeout: &timeout}
-	err := client.ContainerStop(ctx, taskParams.ContainerName, stopOptions)
+	err := client.ContainerStop(ctx, dockerImageConfig.ContainerName, stopOptions)
 	if err != nil {
 		log.Printf("Cleanup routine: Cannot stop container: %s", err)
 	}
 
 	removeOptions := container.RemoveOptions{Force: true}
-	err = client.ContainerRemove(ctx, taskParams.ContainerName, removeOptions)
+	err = client.ContainerRemove(ctx, dockerImageConfig.ContainerName, removeOptions)
 	if err != nil {
 		log.Printf("Cleanup routine: Cannot remove container: %s", err)
 	}
@@ -299,8 +299,8 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 	}
 
 	containerConfig := &container.Config{
-		Image:        taskParams.ImageName,
-		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(), " && ")},
+		Image:        dockerImageConfig.ImageName,
+		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(dockerImageConfig.PublicKeys), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
 	}
@@ -313,9 +313,9 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 			DeviceRequests: gpuRequest,
 		},
 		Mounts:  mounts,
-		ShmSize: taskParams.ShmSize,
+		ShmSize: dockerImageConfig.ShmSize,
 	}
-	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskParams.ContainerName)
+	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, dockerImageConfig.ContainerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -412,8 +412,12 @@ func (c CLIArgs) DockerKeepContainer() bool {
 	return c.Docker.KeepContainer
 }
 
-func (c CLIArgs) DockerShellCommands() []string {
-	commands := getSSHShellCommands(c.Docker.SSHPort, c.Docker.PublicSSHKey)
+func (c CLIArgs) DockerShellCommands(publicKeys []string) []string {
+	concatinatedPublicKeys := c.Docker.ConcatinatedPublicSSHKeys
+	if len(publicKeys) > 0 {
+		concatinatedPublicKeys = strings.Join(publicKeys, "\n")
+	}
+	commands := getSSHShellCommands(c.Docker.SSHPort, concatinatedPublicKeys)
 	commands = append(commands, fmt.Sprintf("%s %s", DstackRunnerBinaryName, strings.Join(c.getRunnerArgs(), " ")))
 	return commands
 }
