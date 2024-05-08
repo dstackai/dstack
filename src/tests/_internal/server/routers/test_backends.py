@@ -1118,6 +1118,7 @@ class TestGetConfigInfo:
             "regions": json.loads(backend.config)["regions"],
             "vpc_name": None,
             "vpc_ids": None,
+            "public_ips": None,
             "creds": json.loads(backend.auth),
         }
 

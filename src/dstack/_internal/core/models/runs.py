@@ -195,9 +195,13 @@ class JobProvisioningData(CoreModel):
     backend: BackendType
     instance_type: InstanceType
     instance_id: str
-    # hostname may not be set immediately after instance provisioning
+    # hostname may not be set immediately after instance provisioning.
+    # It is set to a public IP or, if public IPs are disabled, to a private IP.
     hostname: Optional[str]
     internal_ip: Optional[str]
+    # public_ip_enabled can used to distinguished instances with and without public IPs.
+    # hostname being None is not enough since it can be filled after provisioning.
+    public_ip_enabled: bool = True
     region: str
     price: float
     username: str
