@@ -62,6 +62,12 @@ class AWSConfig(CoreModel):
     vpc_ids: Annotated[
         Optional[Dict[str, str]], Field(description="The mapping from AWS regions to VPC IDs")
     ] = None
+    public_ips: Annotated[
+        Optional[bool],
+        Field(
+            description="A flag to enable/disable public IP assigning on instances. Defaults to `true`."
+        ),
+    ] = None
     creds: AnyAWSCreds = Field(..., description="The credentials", discriminator="type")
 
 
@@ -76,8 +82,8 @@ class AzureConfig(CoreModel):
 class CudoConfig(CoreModel):
     type: Annotated[Literal["cudo"], Field(description="The type of backend")] = "cudo"
     regions: Optional[List[str]] = None
-    creds: Annotated[AnyCudoCreds, Field(description="The credentials")]
     project_id: Annotated[str, Field(description="The project ID")]
+    creds: Annotated[AnyCudoCreds, Field(description="The credentials")]
 
 
 class DataCrunchConfig(CoreModel):

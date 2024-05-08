@@ -105,6 +105,7 @@ class AWSCompute(Compute):
         ec2 = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         iam_client = self.session.client("iam", region_name=instance_offer.region)
+        allocate_public_ip = self.config.allocate_public_ips
 
         tags = [
             {"Key": "Name", "Value": instance_config.instance_name},
@@ -117,6 +118,7 @@ class AWSCompute(Compute):
                 ec2_client=ec2_client,
                 config=self.config,
                 region=instance_offer.region,
+                allocate_public_ip=allocate_public_ip,
             )
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             response = ec2.create_instances(
@@ -140,6 +142,7 @@ class AWSCompute(Compute):
                     ),
                     spot=instance_offer.instance.resources.spot,
                     subnet_id=subnet_id,
+                    allocate_public_ip=allocate_public_ip,
                 )
             )
             instance = response[0]
@@ -149,11 +152,16 @@ class AWSCompute(Compute):
                 ec2_client.cancel_spot_instance_requests(
                     SpotInstanceRequestIds=[instance.spot_instance_request_id]
                 )
+            if allocate_public_ip:
+                hostname = instance.public_ip_address
+            else:
+                hostname = instance.private_ip_address
             return JobProvisioningData(
                 backend=instance_offer.backend,
                 instance_type=instance_offer.instance,
                 instance_id=instance.instance_id,
-                hostname=instance.public_ip_address,
+                public_ip_enabled=allocate_public_ip,
+                hostname=hostname,
                 internal_ip=instance.private_ip_address,
                 region=instance_offer.region,
                 price=instance_offer.price,
@@ -247,6 +255,7 @@ def get_vpc_id_subnet_id_or_error(
     ec2_client: botocore.client.BaseClient,
     config: AWSConfig,
     region: str,
+    allocate_public_ip: bool,
 ) -> Tuple[str, str]:
     if config.vpc_ids is not None:
         vpc_id = config.vpc_ids.get(region)
@@ -259,6 +268,7 @@ def get_vpc_id_subnet_id_or_error(
         subnet_id = aws_resources.get_subnet_id_for_vpc(
             ec2_client=ec2_client,
             vpc_id=vpc_id,
+            allocate_public_ip=allocate_public_ip,
         )
         if subnet_id is not None:
             return vpc_id, subnet_id
@@ -268,6 +278,7 @@ def get_vpc_id_subnet_id_or_error(
         ec2_client=ec2_client,
         vpc_name=config.vpc_name,
         region=region,
+        allocate_public_ip=allocate_public_ip,
     )
 
 
@@ -275,6 +286,7 @@ def _get_vpc_id_subnet_id_by_vpc_name_or_error(
     ec2_client: botocore.client.BaseClient,
     vpc_name: Optional[str],
     region: str,
+    allocate_public_ip: bool,
 ) -> Tuple[str, str]:
     if vpc_name is not None:
         vpc_id = aws_resources.get_vpc_id_by_name(
@@ -290,9 +302,20 @@ def _get_vpc_id_subnet_id_by_vpc_name_or_error(
     subnet_id = aws_resources.get_subnet_id_for_vpc(
         ec2_client=ec2_client,
         vpc_id=vpc_id,
+        allocate_public_ip=allocate_public_ip,
     )
     if subnet_id is not None:
         return vpc_id, subnet_id
     if vpc_name is not None:
-        raise ComputeError(f"Failed to find public subnet for VPC {vpc_name} in region {region}")
-    raise ComputeError(f"Failed to find public subnet for default VPC in region {region}")
+        if allocate_public_ip:
+            raise ComputeError(
+                f"Failed to find public subnet for VPC {vpc_name} in region {region}"
+            )
+        raise ComputeError(
+            f"Failed to find private subnet with NAT for VPC {vpc_name} in region {region}"
+        )
+    if allocate_public_ip:
+        raise ComputeError(f"Failed to find public subnet for default VPC in region {region}")
+    raise ComputeError(
+        f"Failed to find private subnet with NAT for default VPC in region {region}"
+    )

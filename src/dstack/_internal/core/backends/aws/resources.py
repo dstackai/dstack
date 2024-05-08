@@ -192,6 +192,7 @@ def create_instances_struct(
     security_group_id: str,
     spot: bool,
     subnet_id: Optional[str] = None,
+    allocate_public_ip: bool = True,
 ) -> Dict[str, Any]:
     struct = dict(
         BlockDeviceMappings=[
@@ -230,7 +231,7 @@ def create_instances_struct(
     if subnet_id is not None:
         struct["NetworkInterfaces"] = [
             {
-                "AssociatePublicIpAddress": True,
+                "AssociatePublicIpAddress": allocate_public_ip,
                 "DeviceIndex": 0,
                 "SubnetId": subnet_id,
                 "Groups": [security_group_id],
@@ -334,18 +335,31 @@ def get_vpc_by_vpc_id(ec2_client: botocore.client.BaseClient, vpc_id: str) -> Op
 def get_subnet_id_for_vpc(
     ec2_client: botocore.client.BaseClient,
     vpc_id: str,
+    allocate_public_ip: bool,
 ) -> Optional[str]:
+    """
+    If `allocate_public_ip` is True, returns a first public subnet found in the VPC.
+    If `allocate_public_ip` is False, returns a first subnet with NAT found in the VPC.
+    """
     subnets = _get_subnets_by_vpc_id(ec2_client=ec2_client, vpc_id=vpc_id)
     if len(subnets) == 0:
         return None
-    # Return first public subnet
     for subnet in subnets:
         subnet_id = subnet["SubnetId"]
-        is_public_subnet = _is_public_subnet(
-            ec2_client=ec2_client, vpc_id=vpc_id, subnet_id=subnet_id
-        )
-        if is_public_subnet:
-            return subnet_id
+        if allocate_public_ip:
+            is_public_subnet = _is_public_subnet(
+                ec2_client=ec2_client, vpc_id=vpc_id, subnet_id=subnet_id
+            )
+            if is_public_subnet:
+                return subnet_id
+        else:
+            subnet_behind_nat = _is_subnet_behind_nat(
+                ec2_client=ec2_client,
+                vpc_id=vpc_id,
+                subnet_id=subnet_id,
+            )
+            if subnet_behind_nat:
+                return subnet_id
     return None
 
 
@@ -437,6 +451,40 @@ def _is_public_subnet(
     for route_table in response["RouteTables"]:
         for route in route_table["Routes"]:
             if "GatewayId" in route and route["GatewayId"].startswith("igw-"):
+                return True
+
+    return False
+
+
+def _is_subnet_behind_nat(
+    ec2_client: botocore.client.BaseClient,
+    vpc_id: str,
+    subnet_id: str,
+) -> bool:
+    # Check explicitly associated route tables
+    response = ec2_client.describe_route_tables(
+        Filters=[{"Name": "association.subnet-id", "Values": [subnet_id]}]
+    )
+    for route_table in response["RouteTables"]:
+        for route in route_table["Routes"]:
+            if "NatGatewayId" in route and route["NatGatewayId"].startswith("nat-"):
+                return True
+
+    # Main route table controls the routing of all subnetes
+    # that are not explicitly associated with any other route table.
+    if len(response["RouteTables"]) > 0:
+        return False
+
+    # Check implicitly associated main route table
+    response = ec2_client.describe_route_tables(
+        Filters=[
+            {"Name": "association.main", "Values": ["true"]},
+            {"Name": "vpc-id", "Values": [vpc_id]},
+        ]
+    )
+    for route_table in response["RouteTables"]:
+        for route in route_table["Routes"]:
+            if "NatGatewayId" in route and route["NatGatewayId"].startswith("nat-"):
                 return True
 
     return False

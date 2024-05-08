@@ -139,6 +139,7 @@ class AWSConfigurator(Configurator):
         regions = config.regions
         if regions is None:
             regions = DEFAULT_REGIONS
+        allocate_public_ip = config.public_ips if config.public_ips is not None else True
         # The number of workers should be >= the number of regions
         with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
             futures = []
@@ -149,6 +150,7 @@ class AWSConfigurator(Configurator):
                     ec2_client=ec2_client,
                     config=AWSConfig.parse_obj(config),
                     region=region,
+                    allocate_public_ip=allocate_public_ip,
                 )
                 futures.append(future)
             for future in concurrent.futures.as_completed(futures):
