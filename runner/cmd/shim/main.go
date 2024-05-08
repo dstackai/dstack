@@ -230,7 +230,10 @@ func writeHostInfo() {
 		panic(err)
 	}
 
-	f.Sync()
+	err = f.Sync()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func getGpuInfo() [][]string {
@@ -272,7 +275,7 @@ func getGpuInfo() [][]string {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("gpu record %v\n", record)
+
 		gpus = append(gpus, record)
 	}
 	return gpus
@@ -284,6 +287,7 @@ func getInterfaces() []string {
 	if err != nil {
 		panic("cannot get interfaces")
 	}
+
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
 		if err != nil {
@@ -293,10 +297,10 @@ func getInterfaces() []string {
 		for _, addr := range addrs {
 			switch v := addr.(type) {
 			case *net.IPNet:
-				fmt.Println(v.IP)
 				if v.IP.IsLoopback() {
 					continue
 				}
+
 				addresses = append(addresses, addr.String())
 			}
 		}
@@ -308,9 +312,12 @@ func getDiskSize() uint64 {
 	var stat unix.Statfs_t
 	wd, err := os.Getwd()
 	if err != nil {
+		panic("cannot get current disk")
+	}
+	err = unix.Statfs(wd, &stat)
+	if err != nil {
 		panic("cannot get disk size")
 	}
-	unix.Statfs(wd, &stat)
 	size := stat.Bavail * uint64(stat.Bsize)
 	return size
 }
