@@ -112,7 +112,6 @@ func main() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-
 					if args.Runner.BinaryPath == "" {
 						if err := args.DownloadRunner(); err != nil {
 							return cli.Exit(err, 1)

@@ -152,10 +152,9 @@ async def _process_job(job_id: UUID):
                         fmt(job_model),
                         job_submission.age,
                     )
-                    public_keys = [
-                        project.ssh_public_key.strip(),
-                        run.run_spec.ssh_key_pub.strip(),
-                    ]
+                    ssh_user = job_provisioning_data.username
+                    user_ssh_key = run.run_spec.ssh_key_pub.strip()
+                    public_keys = [project.ssh_public_key.strip(), user_ssh_key]
                     success = await run_async(
                         _process_provisioning_with_shim,
                         server_ssh_private_key,
@@ -164,6 +163,8 @@ async def _process_job(job_id: UUID):
                         secrets,
                         job.job_spec.registry_auth,
                         public_keys,
+                        ssh_user,
+                        user_ssh_key,
                     )
                 else:
                     logger.debug(
@@ -345,6 +346,8 @@ def _process_provisioning_with_shim(
     secrets: Dict[str, str],
     registry_auth: Optional[RegistryAuth],
     public_keys: List[str],
+    ssh_user: str,
+    ssh_key: str,
     *,
     ports: Dict[int, int],
 ) -> bool:
@@ -380,6 +383,8 @@ def _process_provisioning_with_shim(
         container_name=job_model.job_name,
         shm_size=job_spec.requirements.resources.shm_size,
         public_keys=public_keys,
+        ssh_user=ssh_user,
+        ssh_key=ssh_key,
     )
 
     job_model.status = JobStatus.PULLING

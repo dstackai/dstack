@@ -20,7 +20,7 @@ func main() {
 }
 
 func start(tempDir string, homeDir string, workingDir string, httpPort int, logLevel int, version string) error {
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
 		return tracerr.Errorf("Failed to create temp directory: %w", err)
 	}
 

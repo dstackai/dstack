@@ -41,16 +41,18 @@ type CLIArgs struct {
 	}
 }
 
-type DockerImageConfig struct {
+type TaskConfig struct {
 	Username      string
 	Password      string
 	ImageName     string
 	ContainerName string
 	ShmSize       int64
 	PublicKeys    []string
+	SshUser       string
+	SshKey        string
 }
 
-func (ra DockerImageConfig) EncodeRegistryAuth() (string, error) {
+func (ra TaskConfig) EncodeRegistryAuth() (string, error) {
 	if ra.Username == "" && ra.Password == "" {
 		return "", nil
 	}

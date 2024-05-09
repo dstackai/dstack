@@ -257,7 +257,6 @@ class Run(ABC):
             if control_sock_path_and_port_locks is None:
                 if self._ports_lock is None:
                     self._ports_lock = _reserve_ports(job.job_spec)
-
                 logger.debug(
                     "Attaching to %s (%s: %s)",
                     self.name,
@@ -266,7 +265,6 @@ class Run(ABC):
                 )
             else:
                 self._ports_lock = control_sock_path_and_port_locks[1]
-
                 logger.debug(
                     "Reusing the existing tunnel to %s (%s: %s)",
                     self.name,
