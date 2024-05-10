@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import Dict, Iterable
 
 import oci
 from typing_extensions import Any, List, Mapping
@@ -26,6 +27,18 @@ class OCIRegionClient:
     @cached_property
     def availability_domains(self) -> List[oci.identity.models.AvailabilityDomain]:
         return self.identity_client.list_availability_domains(self.client_config["tenancy"]).data
+
+
+def make_region_clients_map(
+    region_names: Iterable[str], creds: AnyOCICreds
+) -> Dict[str, OCIRegionClient]:
+    config = get_client_config(creds)
+    result = {}
+    for region_name in region_names:
+        region_config = dict(config)
+        region_config["region"] = region_name
+        result[region_name] = OCIRegionClient(region_config)
+    return result
 
 
 def get_subscribed_region_names(creds: AnyOCICreds) -> List[str]:
