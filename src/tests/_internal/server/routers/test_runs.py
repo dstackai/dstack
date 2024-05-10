@@ -15,7 +15,6 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceType,
     Resources,
-    SSHKey,
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
 from dstack._internal.core.models.resources import ResourcesSpec
@@ -900,7 +899,6 @@ class TestCreateInstance:
         request = CreateInstanceRequest(
             profile=Profile(name="test_profile"),
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
-            ssh_key=SSHKey(public="test_public_key"),
         )
         with patch(
             "dstack._internal.server.services.runs.get_offers_by_requirements"
@@ -966,7 +964,6 @@ class TestCreateInstance:
         request = CreateInstanceRequest(
             profile=Profile(name="test_profile"),
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
-            ssh_key=SSHKey(public="test_public_key"),
         )
         with patch(
             "dstack._internal.server.services.runs.get_offers_by_requirements"
@@ -1004,7 +1001,6 @@ class TestCreateInstance:
         request = CreateInstanceRequest(
             profile=Profile(name="test_profile"),
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
-            ssh_key=SSHKey(public="test_public_key"),
         )
 
         with patch(

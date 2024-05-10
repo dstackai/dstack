@@ -273,19 +273,11 @@ class PoolCommand(APIBaseCommand):
             console.print("\nExiting...")
             return
 
-        # TODO(egor-s): user key must be added during the `run`, not `pool add`
-        user_priv_key = Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
-        try:
-            user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
-        except FileNotFoundError:
-            user_pub_key = generate_public_key(rsa_pkey_from_str(user_priv_key))
-        user_ssh_key = SSHKey(public=user_pub_key, private=user_priv_key)
-
         try:
             with console.status("Creating instance..."):
                 # TODO: Instance name is not passed, so --instance does not work.
                 # There is profile.instance_name but it makes sense for `dstack run` only.
-                instance = self.api.runs.create_instance(profile, requirements, user_ssh_key)
+                instance = self.api.runs.create_instance(profile, requirements)
         except ServerClientError as e:
             raise CLIError(e.msg)
         console.print()
@@ -295,21 +287,6 @@ class PoolCommand(APIBaseCommand):
         super()._command(args)
 
         ssh_keys = []
-
-        try:
-            # TODO: user key must be added during the `run`, not `pool add`
-            user_priv_key = convert_pkcs8_to_pem(
-                Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
-            )
-            try:
-                user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
-            except FileNotFoundError:
-                user_pub_key = generate_public_key(rsa_pkey_from_str(user_priv_key))
-            user_ssh_key = SSHKey(public=user_pub_key, private=user_priv_key)
-            ssh_keys.append(user_ssh_key)
-        except OSError:
-            pass
-
         if args.ssh_identity_file:
             try:
                 private_key = convert_pkcs8_to_pem(args.ssh_identity_file.read_text())

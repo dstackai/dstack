@@ -74,8 +74,21 @@ func NewDockerRunner(dockerParams DockerParameters) (*DockerRunner, error) {
 	return runner, nil
 }
 
-func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
+func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	var err error
+
+	if cfg.SshKey != "" {
+		ak := AuthorizedKeys{user: cfg.SshUser}
+		if err := ak.AppendPublicKeys([]string{cfg.SshKey}); err != nil {
+			return tracerr.Wrap(err)
+		}
+		defer func(cfg TaskConfig) {
+			err := ak.RemovePublicKeys([]string{cfg.SshKey})
+			if err != nil {
+				log.Printf("Error RemovePublicKeys: %s\n", err.Error())
+			}
+		}(cfg)
+	}
 
 	d.containerStatus = ContainerStatus{
 		ContainerName: cfg.ContainerName,
@@ -155,7 +168,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg DockerImageConfig) error {
 	d.state = Pending
 	d.currentContainer = ""
 
-	var jobResult = JobResult{Reason: "DONE_BY_RUNNER"}
+	jobResult := JobResult{Reason: "DONE_BY_RUNNER"}
 	if d.containerStatus.ExitCode != 0 {
 		jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: d.containerStatus.Error}
 	}
@@ -186,30 +199,30 @@ func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus, string, JobResu
 	return d.state, d.containerStatus, d.executorError, d.jobResult
 }
 
-func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerImageConfig) error {
-	if !strings.Contains(taskParams.ImageName, ":") {
-		taskParams.ImageName += ":latest"
+func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConfig) error {
+	if !strings.Contains(taskConfig.ImageName, ":") {
+		taskConfig.ImageName += ":latest"
 	}
 	images, err := client.ImageList(ctx, image.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("reference", taskParams.ImageName)),
+		Filters: filters.NewArgs(filters.Arg("reference", taskConfig.ImageName)),
 	})
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 
 	// TODO: force pull latset
-	if len(images) > 0 && !strings.Contains(taskParams.ImageName, ":latest") {
+	if len(images) > 0 && !strings.Contains(taskConfig.ImageName, ":latest") {
 		return nil
 	}
 
 	opts := image.PullOptions{}
-	regAuth, _ := taskParams.EncodeRegistryAuth()
+	regAuth, _ := taskConfig.EncodeRegistryAuth()
 	if regAuth != "" {
 		opts.RegistryAuth = regAuth
 	}
 
 	startTime := time.Now()
-	reader, err := client.ImagePull(ctx, taskParams.ImageName, opts)
+	reader, err := client.ImagePull(ctx, taskConfig.ImageName, opts)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -275,16 +288,16 @@ func pullImage(ctx context.Context, client docker.APIClient, taskParams DockerIm
 	return nil
 }
 
-func createContainer(ctx context.Context, client docker.APIClient, runnerDir string, dockerParams DockerParameters, taskParams DockerImageConfig) (string, error) {
+func createContainer(ctx context.Context, client docker.APIClient, runnerDir string, dockerParams DockerParameters, taskConfig TaskConfig) (string, error) {
 	timeout := int(0)
 	stopOptions := container.StopOptions{Timeout: &timeout}
-	err := client.ContainerStop(ctx, taskParams.ContainerName, stopOptions)
+	err := client.ContainerStop(ctx, taskConfig.ContainerName, stopOptions)
 	if err != nil {
 		log.Printf("Cleanup routine: Cannot stop container: %s", err)
 	}
 
 	removeOptions := container.RemoveOptions{Force: true}
-	err = client.ContainerRemove(ctx, taskParams.ContainerName, removeOptions)
+	err = client.ContainerRemove(ctx, taskConfig.ContainerName, removeOptions)
 	if err != nil {
 		log.Printf("Cleanup routine: Cannot remove container: %s", err)
 	}
@@ -299,8 +312,8 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 	}
 
 	containerConfig := &container.Config{
-		Image:        taskParams.ImageName,
-		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(), " && ")},
+		Image:        taskConfig.ImageName,
+		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(taskConfig.PublicKeys), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
 	}
@@ -313,9 +326,9 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 			DeviceRequests: gpuRequest,
 		},
 		Mounts:  mounts,
-		ShmSize: taskParams.ShmSize,
+		ShmSize: taskConfig.ShmSize,
 	}
-	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskParams.ContainerName)
+	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskConfig.ContainerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
@@ -412,8 +425,12 @@ func (c CLIArgs) DockerKeepContainer() bool {
 	return c.Docker.KeepContainer
 }
 
-func (c CLIArgs) DockerShellCommands() []string {
-	commands := getSSHShellCommands(c.Docker.SSHPort, c.Docker.PublicSSHKey)
+func (c CLIArgs) DockerShellCommands(publicKeys []string) []string {
+	concatinatedPublicKeys := c.Docker.ConcatinatedPublicSSHKeys
+	if len(publicKeys) > 0 {
+		concatinatedPublicKeys = strings.Join(publicKeys, "\n")
+	}
+	commands := getSSHShellCommands(c.Docker.SSHPort, concatinatedPublicKeys)
 	commands = append(commands, fmt.Sprintf("%s %s", DstackRunnerBinaryName, strings.Join(c.getRunnerArgs(), " ")))
 	return commands
 }
@@ -439,7 +456,7 @@ func (c CLIArgs) DockerPorts() []int {
 
 func (c CLIArgs) MakeRunnerDir() (string, error) {
 	runnerTemp := filepath.Join(c.Shim.HomeDir, "runners", time.Now().Format("20060102-150405"))
-	if err := os.MkdirAll(runnerTemp, 0755); err != nil {
+	if err := os.MkdirAll(runnerTemp, 0o755); err != nil {
 		return "", tracerr.Wrap(err)
 	}
 	return runnerTemp, nil

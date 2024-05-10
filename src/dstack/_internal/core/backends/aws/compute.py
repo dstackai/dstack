@@ -187,7 +187,6 @@ class AWSCompute(Compute):
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
             ssh_keys=[
-                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
             job_docker_config=None,

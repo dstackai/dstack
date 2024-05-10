@@ -553,7 +553,6 @@ async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
-    ssh_key: SSHKey,
     profile: Profile,
     requirements: Requirements,
 ) -> Instance:
@@ -584,7 +583,6 @@ async def create_instance(
     instance_name = await generate_instance_name(
         session=session, project=project, pool_name=pool.name
     )
-    user_ssh_key = ssh_key
     project_ssh_key = SSHKey(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
@@ -593,7 +591,7 @@ async def create_instance(
     instance_config = InstanceConfiguration(
         project_name=project.name,
         instance_name=instance_name,
-        ssh_keys=[user_ssh_key, project_ssh_key],
+        ssh_keys=[project_ssh_key],
         job_docker_config=DockerConfig(
             image=dstack_default_image,
             registry_auth=None,

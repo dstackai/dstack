@@ -21,7 +21,7 @@ func (ds DummyRunner) GetState() (shim.RunnerStatus, shim.ContainerStatus, strin
 	return ds.State, ds.ContainerStatus, "", ds.JobResult
 }
 
-func (ds DummyRunner) Run(context.Context, shim.DockerImageConfig) error {
+func (ds DummyRunner) Run(context.Context, shim.TaskConfig) error {
 	return nil
 }
 

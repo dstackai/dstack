@@ -68,7 +68,7 @@ jobs:
           go test -race $(go list ./... | grep -v /vendor/)
 
   runner-compile:
-    needs: [ runner-test ]
+    needs: [runner-test]
     defaults:
       run:
         working-directory: runner
@@ -77,14 +77,14 @@ jobs:
     strategy:
       matrix:
         include:
-          - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
+          - { goos: "linux", goarch: "amd64", runson: "ubuntu-latest" }
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.21.1
+          go-version: "1.22"
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install AWS
-        run:  pip install awscli
+        run: pip install awscli
       - name: Download Runner
         uses: actions/download-artifact@v3
         with:

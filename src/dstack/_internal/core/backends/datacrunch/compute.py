@@ -147,7 +147,6 @@ class DataCrunchCompute(Compute):
             project_name=run.project_name,
             instance_name=job.job_spec.job_name,  # TODO: generate name
             ssh_keys=[
-                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
             job_docker_config=None,

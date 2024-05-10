@@ -17,7 +17,6 @@ from dstack._internal.core.backends.local import LocalBackend
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
-from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
     DEFAULT_RUN_TERMINATION_IDLE_TIME,
@@ -258,7 +257,6 @@ class Run(ABC):
             if control_sock_path_and_port_locks is None:
                 if self._ports_lock is None:
                     self._ports_lock = _reserve_ports(job.job_spec)
-
                 logger.debug(
                     "Attaching to %s (%s: %s)",
                     self.name,
@@ -267,7 +265,6 @@ class Run(ABC):
                 )
             else:
                 self._ports_lock = control_sock_path_and_port_locks[1]
-
                 logger.debug(
                     "Reusing the existing tunnel to %s (%s: %s)",
                     self.name,
@@ -391,10 +388,8 @@ class RunCollection:
     def get_offers(self, profile: Profile, requirements: Requirements) -> PoolInstanceOffers:
         return self._api_client.runs.get_offers(self._project, profile, requirements)
 
-    def create_instance(
-        self, profile: Profile, requirements: Requirements, ssh_key: SSHKey
-    ) -> Instance:
-        return self._api_client.runs.create_instance(self._project, profile, requirements, ssh_key)
+    def create_instance(self, profile: Profile, requirements: Requirements) -> Instance:
+        return self._api_client.runs.create_instance(self._project, profile, requirements)
 
     def get_plan(
         self,

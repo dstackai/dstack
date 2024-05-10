@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -32,7 +33,7 @@ func TestDocker_SSHServer(t *testing.T) {
 	defer cancel()
 
 	dockerRunner, _ := NewDockerRunner(params)
-	assert.NoError(t, dockerRunner.Run(ctx, DockerImageConfig{ImageName: "ubuntu"}))
+	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu"}))
 }
 
 // TestDocker_SSHServerConnect pulls ubuntu image (without sshd), installs openssh-server and tries to connect via SSH
@@ -63,7 +64,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		assert.NoError(t, dockerRunner.Run(ctx, DockerImageConfig{ImageName: "ubuntu"}))
+		assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu"}))
 	}()
 
 	for i := 0; i < timeout; i++ {
@@ -97,9 +98,13 @@ func (c *dockerParametersMock) DockerKeepContainer() bool {
 	return false
 }
 
-func (c *dockerParametersMock) DockerShellCommands() []string {
+func (c *dockerParametersMock) DockerShellCommands(publicKeys []string) []string {
+	userPublicKey := c.publicSSHKey
+	if len(publicKeys) > 0 {
+		userPublicKey = strings.Join(publicKeys, "\n")
+	}
 	commands := make([]string, 0)
-	commands = append(commands, getSSHShellCommands(c.sshPort, c.publicSSHKey)...)
+	commands = append(commands, getSSHShellCommands(c.sshPort, userPublicKey)...)
 	commands = append(commands, c.commands...)
 	return commands
 }
