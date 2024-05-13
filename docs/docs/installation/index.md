@@ -138,35 +138,6 @@ There are two ways to configure AWS: using an access key or using the default cr
                     "servicequotas:*"
                 ],
                 "Resource": "*"
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "iam:GetRole",
-                    "iam:CreateRole",
-                    "iam:AttachRolePolicy",
-                    "iam:TagRole"
-                ],
-                "Resource": "*"
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "iam:CreatePolicy",
-                    "iam:TagPolicy"
-                ],
-                "Resource": "*"
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "iam:GetInstanceProfile",
-                    "iam:CreateInstanceProfile",
-                    "iam:AddRoleToInstanceProfile",
-                    "iam:TagInstanceProfile",
-                    "iam:PassRole"
-                ],
-                "Resource": "*"
             }
         ]
     }
