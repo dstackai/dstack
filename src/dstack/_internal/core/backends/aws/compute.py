@@ -104,7 +104,6 @@ class AWSCompute(Compute):
         project_name = instance_config.project_name
         ec2 = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
-        iam_client = self.session.client("iam", region_name=instance_offer.region)
         allocate_public_ip = self.config.allocate_public_ips
 
         tags = [
@@ -129,10 +128,7 @@ class AWSCompute(Compute):
                         cuda=len(instance_offer.instance.resources.gpus) > 0,
                     ),
                     instance_type=instance_offer.instance.name,
-                    iam_instance_profile_arn=aws_resources.create_iam_instance_profile(
-                        iam_client=iam_client,
-                        project_id=project_name,
-                    ),
+                    iam_instance_profile_arn=None,
                     user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
                     tags=tags,
                     security_group_id=aws_resources.create_security_group(
