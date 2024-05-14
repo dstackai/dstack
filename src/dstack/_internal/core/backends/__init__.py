@@ -8,6 +8,7 @@ BACKENDS_WITH_MULTINODE_SUPPORT = [
 ]
 BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
     BackendType.AWS,
+    BackendType.DSTACK,
     BackendType.AZURE,
     BackendType.CUDO,
     BackendType.DATACRUNCH,
