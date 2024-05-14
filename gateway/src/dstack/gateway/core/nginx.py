@@ -113,7 +113,8 @@ class Nginx(BaseModel):
 
             logger.debug("Registering entrypoint domain %s", domain)
 
-            await run_async(self.run_certbot, domain)
+            if https:
+                await run_async(self.run_certbot, domain)
             await run_async(self.write_conf, conf.render(), config_name)
             self.configs[config_name] = conf
 
