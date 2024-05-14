@@ -240,6 +240,7 @@ class ServiceConfigurationParams(CoreModel):
         Optional[AnyModel],
         Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
     ] = None
+    https: Annotated[bool, Field(description="Enable HTTPS")] = True
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
     replicas: Annotated[
         Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],
@@ -300,6 +301,7 @@ class ServiceConfiguration(
         home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
         resources (Optional[ResourcesSpec]): The requirements to run the configuration.
         model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
+        https (bool): Enable HTTPS. Defaults to `True`.
         auth (bool): Enable the authorization. Defaults to `True`.
         replicas Range[int]: The range of the number of replicas. Defaults to `1`.
         scaling: Optional[ScalingSpec]: The auto-scaling configuration.

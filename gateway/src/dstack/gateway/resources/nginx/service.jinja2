@@ -57,6 +57,7 @@ server {
     {% endif %}
 
     listen 80;
+    {% if https %}
     listen 443 ssl;
     ssl_certificate /etc/letsencrypt/live/{{ domain }}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{ domain }}/privkey.pem;
@@ -72,4 +73,5 @@ server {
     if ($force_https) {
         return 301 https://$host$request_uri;
     }
+    {% endif %}
 }

@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class RegisterServiceRequest(BaseModel):
     run_id: str
     domain: str
+    https: bool = True
     auth: bool = True
     options: dict = {}
     ssh_private_key: str
@@ -23,3 +24,4 @@ class RegisterReplicaRequest(BaseModel):
 class RegisterEntrypointRequest(BaseModel):
     module: Literal["openai"]
     domain: str
+    https: bool = True
