@@ -126,7 +126,7 @@ jobs:
         run: |
           IMAGE_DEFINITION=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
           IMAGE_NAME=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
-          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
+          ../publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
 
   build-gcp-images:
     needs: build-docker
