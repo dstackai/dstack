@@ -315,6 +315,13 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 async def register_service(session: AsyncSession, run_model: RunModel):
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
+    service_https = run_spec.configuration.https
+    service_protocol = "https" if service_https else "http"
+
+    # Currently, gateway endpoint is always https
+    gateway_https = True
+    gateway_protocol = "https" if gateway_https else "http"
+
     # TODO(egor-s): allow to configure gateway name
     gateway_name: Optional[str] = None
     if gateway_name is None:
@@ -333,12 +340,11 @@ async def register_service(session: AsyncSession, run_model: RunModel):
     wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     if wildcard_domain is None:
         raise ServerClientError("Domain is required for gateway")
-    # we force port 443 for now
-    service_spec = ServiceSpec(url=f"https://{run_model.run_name}.{wildcard_domain}")
+    service_spec = ServiceSpec(url=f"{service_protocol}://{run_model.run_name}.{wildcard_domain}")
     if run_spec.configuration.model is not None:
         service_spec.model = ServiceModelSpec(
             name=run_spec.configuration.model.name,
-            base_url=f"https://gateway.{wildcard_domain}",
+            base_url=f"{gateway_protocol}://gateway.{wildcard_domain}",
             type=run_spec.configuration.model.type,
         )
         service_spec.options = get_service_options(run_spec.configuration)
@@ -357,6 +363,8 @@ async def register_service(session: AsyncSession, run_model: RunModel):
                 project=run_model.project.name,
                 run_id=run_model.id,
                 domain=urlparse(service_spec.url).hostname,
+                service_https=service_https,
+                gateway_https=gateway_https,
                 auth=run_spec.configuration.auth,
                 options=service_spec.options,
                 ssh_private_key=run_model.project.ssh_private_key,

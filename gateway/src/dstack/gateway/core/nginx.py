@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class SiteConfig(BaseModel):
     type: str
     domain: str
+    https: bool = True
 
     def render(self) -> str:
         template = importlib.resources.read_text(
@@ -73,12 +74,15 @@ class Nginx(BaseModel):
                 server=server, eab_kid=eab_kid, eab_hmac_key=eab_hmac_key
             )
 
-    async def register_service(self, project: str, service_id: str, domain: str, auth: bool):
+    async def register_service(
+        self, project: str, service_id: str, domain: str, https: bool, auth: bool
+    ):
         config_name = self.get_config_name(domain)
         conf = ServiceConfig(
             project=project,
             service_id=service_id,
             domain=domain,
+            https=https,
             auth=auth,
         )
 
@@ -88,16 +92,18 @@ class Nginx(BaseModel):
 
             logger.debug("Registering service domain %s", domain)
 
-            await run_async(self.run_certbot, domain)
+            if https:
+                await run_async(self.run_certbot, domain)
             await run_async(self.write_conf, conf.render(), config_name)
             self.configs[config_name] = conf
 
         logger.info("Service domain %s is registered now", domain)
 
-    async def register_entrypoint(self, domain: str, prefix: str):
+    async def register_entrypoint(self, domain: str, prefix: str, https: bool):
         config_name = self.get_config_name(domain)
         conf = EntrypointConfig(
             domain=domain,
+            https=https,
             proxy_path=prefix,
         )
 
