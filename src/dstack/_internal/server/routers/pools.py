@@ -92,6 +92,7 @@ async def add_instance(
         project=project,
         pool_name=body.pool_name,
         instance_name=body.instance_name,
+        instance_network=body.instance_network,
         region=body.region,
         host=body.host,
         port=body.port or 22,

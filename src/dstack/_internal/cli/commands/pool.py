@@ -170,6 +170,11 @@ class PoolCommand(APIBaseCommand):
         add_ssh.add_argument("--region", help="Host region", dest="region")
         add_ssh.add_argument("--pool", help="Pool name", dest="pool_name")
         add_ssh.add_argument("--name", dest="instance_name", help="Set the name of the instance")
+        add_ssh.add_argument(
+            "--network",
+            dest="network",
+            help="Network address for multinode setup. Format <ip address>/<netmask>",
+        )
         add_ssh.set_defaults(subfunc=self._add_ssh)
 
     def _list(self, args: argparse.Namespace) -> None:
@@ -322,6 +327,7 @@ class PoolCommand(APIBaseCommand):
             project_name=self.api.project,
             pool_name=args.pool_name,
             instance_name=args.instance_name,
+            instance_network=args.network,
             region=args.region,
             host=ssh_host,
             port=ssh_port,

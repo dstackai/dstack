@@ -40,6 +40,7 @@ class CreateInstanceRequest(CoreModel):
 class AddRemoteInstanceRequest(CoreModel):
     pool_name: Optional[str]
     instance_name: Optional[str]
+    instance_network: Optional[str]
     region: Optional[str]
     host: str
     port: int

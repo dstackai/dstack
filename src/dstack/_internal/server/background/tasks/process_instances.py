@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import ipaddress
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from uuid import UUID
@@ -55,6 +54,7 @@ from dstack._internal.server.services.runs import get_create_instance_offers
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.network import get_ip_from_network
 from dstack._internal.utils.ssh import (
     rsa_pkey_from_str,
 )
@@ -244,13 +244,19 @@ async def add_remote(instance_id: UUID) -> None:
 
         instance_type = host_info_to_instance_type(host_info)
 
-        addresses = []
-        for address in host_info.get("addresses", []):
-            try:
-                addresses.append(str(ipaddress.IPv4Address(address.rstrip("/32"))))
-            except ipaddress.AddressValueError:
-                continue
-        internal_ip = addresses[0] if addresses else None
+        instance_network = None
+        try:
+            default_jpd = JobProvisioningData.__response__.parse_raw(
+                instance.job_provisioning_data
+            )
+            instance_network = default_jpd.instance_network
+        except ValidationError:
+            pass
+
+        internal_ip = get_ip_from_network(
+            network=instance_network,
+            addresses=host_info.get("addresses", []),
+        )
 
         region = instance.region
 
@@ -262,6 +268,7 @@ async def add_remote(instance_id: UUID) -> None:
             region=region,
             price=0,
             internal_ip=internal_ip,
+            instance_network=instance_network,
             username=remote_details.ssh_user,
             ssh_port=22,
             dockerized=True,
