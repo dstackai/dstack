@@ -666,10 +666,10 @@
 }
 
 .plans_card.dstack_sky {
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.2), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.07));
 }
 
 .plans_card.enterprise {
-    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.0125), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.07));
 }
 
 .plans_card {
@@ -688,15 +688,18 @@
         border-right: none;
         border-top-left-radius: 12px;
         border-bottom-left-radius: 12px;
+        margin-right: 5px;
     }
 
     .plans_card.dstack_sky {
-    }
-
-    .plans_card.enterprise {
         border-left: none;
         border-top-right-radius: 12px;
         border-bottom-right-radius: 12px;
+        margin-left: 5px;
+    }
+
+    .plans_card.enterprise {
+        margin: 0 -5px;
     }
 
     .tx-landing__plans_cards {

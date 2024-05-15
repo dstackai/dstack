@@ -4,7 +4,7 @@ Pools enable the efficient reuse of cloud instances and on-premises servers acro
 
 ## Adding instances
 
-### `dstack run`
+### Automatic provisioning
 
 By default, when using the `dstack run` command, it tries to reuse an instance from a pool. If no idle instance meets the
 requirements, `dstack` automatically provisions a new cloud instance and adds it to the pool.
@@ -18,7 +18,7 @@ requirements, `dstack` automatically provisions a new cloud instance and adds it
     This means that if the run is finished and the instance remains idle for longer than five minutes, it is automatically
     removed from the pool. To override the default idle duration, use  `--idle-duration DURATION` with `dstack run`.
 
-### `dstack pool add`
+### Manual provisioning
 
 To manually provision a cloud instance and add it to a pool, use [`dstack pool add`](../reference/cli/index.md#dstack-pool-add):
 
@@ -51,7 +51,7 @@ For more details on policies and their defaults, refer to [`.dstack/profiles.yml
 ??? info "Limitations"
     The `dstack pool add` command is not supported for Kubernetes, VastAI, and RunPod backends yet.
 
-### `dstack pool add-ssh`
+### Adding on-prem servers
 
 Any on-prem server that can be accessed via SSH can be added to a pool and used to run workloads.
 
@@ -61,7 +61,7 @@ the SSH key.
 <div class="termy">
 
 ```shell
-$ dstack pool add-ssh ubuntu@54.73.155.119 -i ~/.ssh/id_rsa
+$ dstack pool add-ssh -i ~/.ssh/id_rsa ubuntu@54.73.155.119
 ```
 
 </div>
@@ -77,8 +77,6 @@ Once the instance is provisioned, you'll see it in the pool and will be able to 
 
 If the instance remains idle for the configured idle duration, `dstack` removes it and deletes all cloud resources.
 
-### `dstack pool remove`
-
 To remove an instance from the pool manually, use the `dstack pool remove` command. 
 
 <div class="termy">
@@ -90,8 +88,6 @@ $ dstack pool remove &lt;instance name&gt;
 </div>
 
 ## List instances
-
-### `dstack pool ps`
 
 The [`dstack pool ps`](../reference/cli/index.md#dstack-pool-ps) command lists active instances and their status (`busy`
 or `idle`).

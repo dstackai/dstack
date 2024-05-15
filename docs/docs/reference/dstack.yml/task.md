@@ -167,7 +167,7 @@ The following environment variables are available in any run and are passed by `
 | `DSTACK_NODE_RANK`      | The rank of the node                    |
 | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node |
 
-### Nodes
+### Nodes { #_nodes }
 
 By default, the task runs on a single node. However, you can run it on a cluster of nodes.
 
@@ -226,8 +226,15 @@ commands:
 
 </div>
 
-Now, you can pass your arguments to the `dstack run` command. 
-See [tasks](../../concepts/tasks.md#parametrize-tasks) for more detail.
+Now, you can pass your arguments to the `dstack run` command:
+
+<div class="termy">
+
+```shell
+$ dstack run . -f train.dstack.yml --train_batch_size=1 --num_train_epochs=100
+```
+
+</div>
 
 ### Web applications
 

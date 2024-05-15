@@ -195,18 +195,19 @@ nav:
           - Services: docs/concepts/services.md
           - Pools: docs/concepts/pools.md
       - Reference:
+          - server/config.yml: docs/reference/server/config.yml.md
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
               - task: docs/reference/dstack.yml/task.md
               - service: docs/reference/dstack.yml/service.md
-              - gateway: docs/reference/dstack.yml/gateway.md
+#              - gateway: docs/reference/dstack.yml/gateway.md
           - profiles.yml: docs/reference/profiles.yml.md
           - CLI: docs/reference/cli/index.md
-          - server/config.yml: docs/reference/server/config.yml.md
+          - profiles.yml: docs/reference/profiles.yml.md
           - API:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
-  - Examples: https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank
+  - Examples: https://github.com/dstackai/dstack/tree/master/examples" target="_blank
   - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
   - Blog:
       - blog/index.md

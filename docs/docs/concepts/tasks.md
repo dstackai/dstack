@@ -15,64 +15,6 @@ are both acceptable).
 ```yaml
 type: task
 
-# Specify the Python version, or your Docker image
-python: "3.11"
-
-# Specify environment variables
-env:
-  - HF_HUB_ENABLE_HF_TRANSFER=1
-
-# The commands to run on start of the task
-commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
-
-# Specify GPU, disk, and other resource requirements
-resources:
-  gpu: 80GB
-```
-
-</div>
-
-> See the [.dstack.yml reference](../reference/dstack.yml/task.md) for more details.
-
-If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
-(pre-configured with Python, Conda, and essential CUDA drivers).
-
-### Environment variables
-
-Environment variables can be set either within the configuration file or passed via the CLI.
-
-```yaml
-type: task
-
-python: "3.11"
-env:
-  - HUGGING_FACE_HUB_TOKEN
-  - HF_HUB_ENABLE_HF_TRANSFER=1
-commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py
-
-resources:
-  gpu: 80GB
-```
-
-If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
-`dstack` will require the value to be passed via the CLI or set in the current process.
-
-For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
-
-### Ports
-
-A task can configure ports. In this case, if the task is running an application on a port, `dstack run` 
-will securely allow you to access this port from your local machine through port forwarding.
-
-<div editor-title="train.dstack.yml"> 
-
-```yaml
-type: task
-
 python: "3.11"
 env:
   - HF_HUB_ENABLE_HF_TRANSFER=1
@@ -90,95 +32,15 @@ resources:
 
 </div>
 
-When running it, `dstack run` forwards `6000` port to `localhost:6000`, enabling secure access. 
+If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
+(pre-configured with Python, Conda, and essential CUDA drivers).
 
-??? info "Port mapping"
-    By default, `dstack` uses the same ports on your local machine for port forwarding. However, you can override local ports using `--port`:
-    
-    <div class="termy">
-    
-    ```shell
-    $ dstack run . -f train.dstack.yml --port 6000:6001
-    ```
-    
-    </div>
-    
-    This will forward the task's port `6000` to `localhost:6001`.
+By default, the task runs on a single instance. However, you can specify the
+[number of nodes](../reference/dstack.yml/task.md#_nodes) so `dstack`
+provisions a cluster of instances.
 
-### Nodes
-
-By default, the task runs on a single node. However, you can run it on a cluster of nodes.
-
-<div editor-title="train.dstack.yml">
-
-```yaml
-type: task
-
-# The size of the cluster
-nodes: 2
-
-python: "3.11"
-env:
-  - HF_HUB_ENABLE_HF_TRANSFER=1
-commands:
-  - pip install -r requirements.txt
-  - torchrun
-    --nproc_per_node=$DSTACK_GPUS_PER_NODE
-    --node_rank=$DSTACK_NODE_RANK
-    --nnodes=$DSTACK_NODES_NUM
-    --master_addr=$DSTACK_MASTER_NODE_IP
-    --master_port=8008 resnet_ddp.py
-    --num_epochs 20
-
-resources:
-  gpu: 24GB
-```
-
-</div>
-
-If you run the task, `dstack` first provisions the master node and then runs the other nodes of the cluster.
-All nodes are provisioned in the same region.
-
-??? info "Backends"
-    Running on multiple nodes is supported only with AWS, GCP, and Azure.
-
-### Args
-
-You can parameterize tasks with user arguments using `${{ run.args }}` in the configuration.
-
-<div editor-title="train.dstack.yml"> 
-
-```yaml
-type: task
-
-python: "3.11"
-env:
-  - HF_HUB_ENABLE_HF_TRANSFER=1
-commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py ${{ run.args }}
-
-resources:
-  gpu: 80GB
-```
-
-</div>
-
-Now, you can pass your arguments to the `dstack run` command:
-
-<div class="termy">
-
-```shell
-$ dstack run . -f train.dstack.yml --train_batch_size=1 --num_train_epochs=100
-```
-
-</div>
-
-The `dstack run` command will pass `--train_batch_size=1` and `--num_train_epochs=100` as arguments to `train.py`.
-
-??? info "Profiles"
-    In case you'd like to reuse certain parameters (such as spot policy, retry and max duration,
-    max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+> See the [.dstack.yml reference](../reference/dstack.yml/task.md)
+> for many examples on task configuration.
 
 ## Running
 
@@ -200,6 +62,8 @@ Continue? [y/n]: y
 Provisioning...
 ---> 100%
 
+TensorBoard 2.13.0 at http://localhost:6006/ (Press CTRL+C to quit)
+
 Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
@@ -207,22 +71,24 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 
 </div>
 
-When `dstack` submits the task, it uses the current folder contents.
+If the task specifies `ports`, `dstack run` automatically forwards them to your local machine for
+convenient and secure access.
+
+When running the task, `dstack run` mounts the current folder's contents.
 
 !!! info ".gitignore"
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
-The `dstack run` command allows specifying many things, including spot policy, retry and max duration, 
-max price, regions, instance types, and [much more](../reference/cli/index.md#dstack-run).
+> See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+> on how `dstack run` works.
 
 ## Managing runs
 
 **Stoping runs**
 
-Once the run exceeds the max duration,
-or when you use [`dstack stop`](../reference/cli/index.md#dstack-stop), 
-the task and its cloud resources are deleted.
+Once you use [`dstack stop`](../reference/cli/index.md#dstack-stop) (or when the run exceeds the
+`max_duration`), the instances return to the [pool](pools.md).
 
 **Listing runs**
 
@@ -234,4 +100,4 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 
 1. Check the [QLoRA :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/qlora/README.md){:target="_blank"} example
 2. Check the [`.dstack.yml` reference](../reference/dstack.yml/task.md) for more details and examples
-3. Browse [all examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md){:target="_blank"}
+3. Browse [all examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}

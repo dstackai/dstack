@@ -14,7 +14,7 @@ Orchestrate AI workloads in any cloud
 
 <p align="center">
 <a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> •
-<a href="https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank"><b>Examples</b></a> •
+<a href="https://github.com/dstackai/dstack/tree/master/examples" target="_blank"><b>Examples</b></a> •
 <a href="https://discord.gg/u8SmfwPpMd" target="_blank"><b>Discord</b></a>
 </p>
 

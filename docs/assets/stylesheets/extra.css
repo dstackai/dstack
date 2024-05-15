@@ -1402,7 +1402,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 [dir=ltr] .md-typeset blockquote {
     border: 1px solid black;
     color: var(--md-default-fg-color);
-    padding: 0 20px;
+    padding: 8px 25px;
     border-radius: 12px;
 }
 

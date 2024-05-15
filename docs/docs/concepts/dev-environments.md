@@ -26,37 +26,11 @@ resources:
 
 </div>
 
-> See the [.dstack.yml reference](../reference/dstack.yml/dev-environment.md) for more details.
-
 If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
 (pre-configured with Python, Conda, and essential CUDA drivers).
 
-### Environment variables
-
-Environment variables can be set either within the configuration file or passed via the CLI.
-
-```yaml
-type: dev-environment
-
-env:
-  - HUGGING_FACE_HUB_TOKEN
-  - HF_HUB_ENABLE_HF_TRANSFER=1
-
-python: "3.11"
-ide: vscode
-
-resources:
-  gpu: 80GB
-```
-
-If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
-`dstack` will require the value to be passed via the CLI or set in the current process.
-
-For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
-
-!!! info "Profiles"
-    In case you'd like to reuse certain parameters (such as spot policy, retry and max duration,
-    max price, regions, instance types, etc.) across runs, you can define them via [`.dstack/profiles.yml`](../reference/profiles.yml.md).
+> See the [.dstack.yml reference](../reference/dstack.yml/dev-environment.md)
+> for many examples on dev envioronment configuration.
 
 ## Running
 
@@ -84,14 +58,14 @@ To open in VS Code Desktop, use this link:
 
 </div>
 
-When `dstack` provisions the dev environment, it uses the current folder contents.
+When `dstack` provisions the dev environment, it mounts the project folder contents.
 
 !!! info ".gitignore"
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
-The `dstack run` command allows specifying many things, including spot policy, retry and max duration, 
-max price, regions, instance types, and [much more](../reference/cli/index.md#dstack-run).
+> See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+> on how `dstack run` works.
 
 ### VS Code
 
