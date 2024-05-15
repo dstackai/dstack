@@ -157,20 +157,20 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
     Then proceed to configure the backend:
 
-        <div editor-title="~/.dstack/server/config.yml">
+    <div editor-title="~/.dstack/server/config.yml">
 
-        ```yaml
-        projects:
-        - name: main
-        backends:
-        - type: azure
-            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
-            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
-            creds:
-            type: default
-        ```
+    ```yaml
+    projects:
+    - name: main
+    backends:
+    - type: azure
+        subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+        tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
+        creds:
+        type: default
+    ```
 
-        </div>
+    </div>
 
     !!! info "NOTE:"
         If you don't know your `subscription_id`, run
@@ -219,94 +219,29 @@ There are two ways to configure Azure: using a client secret or using the defaul
         }
         ```
 
-    ### GCP
+### GCP
 
-    ??? info "Enable APIs"
-        First, ensure the required APIs are enabled in your GCP `project_id`.
+??? info "Enable APIs"
+    First, ensure the required APIs are enabled in your GCP `project_id`.
 
-        ```shell
-        PROJECT_ID=...
-        gcloud config set project $PROJECT_ID
-        gcloud services enable cloudapis.googleapis.com
-        gcloud services enable compute.googleapis.com
-        ```
+    ```shell
+    PROJECT_ID=...
+    gcloud config set project $PROJECT_ID
+    gcloud services enable cloudapis.googleapis.com
+    gcloud services enable compute.googleapis.com
+    ```
 
-    There are two ways to configure GCP: using a service account or using the default credentials.
+There are two ways to configure GCP: using a service account or using the default credentials.
 
-    === "Service account"
+=== "Service account"
 
-        To create a service account, follow [this guide :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/service-accounts-create).
-        Make sure to grant it the `Service Account User` and `Compute Admin` roles.
+    To create a service account, follow [this guide :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/service-accounts-create).
+    Make sure to grant it the `Service Account User` and `Compute Admin` roles.
 
-        After setting up the service account [create a key :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/keys-create-delete) for it
-        and download the corresponding JSON file.
+    After setting up the service account [create a key :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/keys-create-delete) for it
+    and download the corresponding JSON file.
 
-        Then go ahead and configure the backend by specifying the downloaded file path.
-
-        <div editor-title="~/.dstack/server/config.yml">
-
-        ```yaml
-        projects:
-        - name: main
-        backends:
-        - type: gcp
-            project_id: gcp-project-id
-            creds:
-            type: service_account
-            filename: ~/.dstack/server/gcp-024ed630eab5.json
-        ```
-
-        </div>
-
-    === "Default credentials"
-
-        <div editor-title="~/.dstack/server/config.yml">
-
-        ```yaml
-        projects:
-        - name: main
-        backends:
-        - type: gcp
-            project_id: gcp-project-id
-            creds:
-            type: default
-        ```
-
-        </div>
-
-    !!! info "NOTE:"
-        If you don't know your GCP project ID, run
-
-        ```shell
-        gcloud projects list --format="json(projectId)"
-        ```
-
-    ??? info "Required GCP permissions"
-        The following GCP permissions are sufficient for `dstack` to work:
-
-        ```
-        compute.disks.create
-        compute.firewalls.create
-        compute.images.useReadOnly
-        compute.instances.create
-        compute.instances.delete
-        compute.instances.get
-        compute.instances.setLabels
-        compute.instances.setMetadata
-        compute.instances.setTags
-        compute.networks.updatePolicy
-        compute.regions.list
-        compute.subnetworks.use
-        compute.subnetworks.useExternalIp
-        compute.zoneOperations.get
-        ```
-
-    ### Lambda
-
-    Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
-    button to create a new API key.
-
-    Then, go ahead and configure the backend:
+    Then go ahead and configure the backend by specifying the downloaded file path.
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -314,20 +249,16 @@ There are two ways to configure Azure: using a client secret or using the defaul
     projects:
     - name: main
     backends:
-    - type: lambda
+    - type: gcp
+        project_id: gcp-project-id
         creds:
-        type: api_key
-        api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
+        type: service_account
+        filename: ~/.dstack/server/gcp-024ed630eab5.json
     ```
 
     </div>
 
-    ### TensorDock
-
-    Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
-    section to create a new authorization key.
-
-    Then, go ahead and configure the backend:
+=== "Default credentials"
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -335,24 +266,200 @@ There are two ways to configure Azure: using a client secret or using the defaul
     projects:
     - name: main
     backends:
-    - type: tensordock
+    - type: gcp
+        project_id: gcp-project-id
         creds:
-        type: api_key
-        api_key: 248e621d-9317-7494-dc1557fa5825b-98b
-        api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
+        type: default
     ```
 
     </div>
 
-    !!! info "NOTE:"
-        The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
+!!! info "NOTE:"
+    If you don't know your GCP project ID, run
 
-    ### Vast.ai
+    ```shell
+    gcloud projects list --format="json(projectId)"
+    ```
 
-    Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
-    API Key.
+??? info "Required GCP permissions"
+    The following GCP permissions are sufficient for `dstack` to work:
 
-    Then, go ahead and configure the backend:
+    ```
+    compute.disks.create
+    compute.firewalls.create
+    compute.images.useReadOnly
+    compute.instances.create
+    compute.instances.delete
+    compute.instances.get
+    compute.instances.setLabels
+    compute.instances.setMetadata
+    compute.instances.setTags
+    compute.networks.updatePolicy
+    compute.regions.list
+    compute.subnetworks.use
+    compute.subnetworks.useExternalIp
+    compute.zoneOperations.get
+    ```
+
+### Lambda
+
+Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
+button to create a new API key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+backends:
+- type: lambda
+    creds:
+    type: api_key
+    api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
+```
+
+</div>
+
+### TensorDock
+
+Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
+section to create a new authorization key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+backends:
+- type: tensordock
+    creds:
+    type: api_key
+    api_key: 248e621d-9317-7494-dc1557fa5825b-98b
+    api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
+```
+
+</div>
+
+!!! info "NOTE:"
+    The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
+
+### Vast.ai
+
+Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
+API Key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+backends:
+- type: vastai
+    creds:
+    type: api_key
+    api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
+```
+
+</div>
+
+!!! info "NOTE:"
+    Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
+
+### CUDO
+
+Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
+
+Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+backends:
+- type: cudo
+    project_id: my-cudo-project
+    creds:
+    type: api_key
+    api_key: 7487240a466624b48de22865589
+```
+
+</div>
+
+### RunPod
+
+Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
+the button to create a key.
+
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+backends:
+- type: runpod
+    creds:
+    type: api_key
+    api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+```
+
+</div>
+
+!!! warning "NOTE:"
+    If you're using a custom Docker image, its entrypoint cannot be anything other than `/bin/bash` or `/bin/sh`.
+    See the [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1137) for more details.
+
+!!! info "NOTE:"
+    The `runpod` backend supports on-demand instances only. Spot instance support coming soon.
+
+### DataCrunch
+
+Log into your [DataCrunch :material-arrow-top-right-thin:{ .external }](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+backends:
+- type: datacrunch
+    creds:
+    type: api_key
+    client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
+    client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8
+```
+
+</div>
+
+### Kubernetes
+
+`dstack` supports both self-managed, and managed Kubernetes clusters.
+
+??? info "Prerequisite"
+    To use GPUs with Kubernetes, the cluster must be installed with the
+    [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html).
+
+    [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
+
+To configure a Kubernetes backend, specify the path to the kubeconfig file,
+and the port that `dstack` can use for proxying SSH traffic.
+In case of a self-managed cluster, also specify the IP address of any node in the cluster.
+
+[//]: # (TODO: Mention that the Kind context has to be selected via `current-context` )
+
+=== "Self-managed"
+
+    Here's how to configure the backend to use a self-managed cluster.
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -360,22 +467,38 @@ There are two ways to configure Azure: using a client secret or using the defaul
     projects:
     - name: main
     backends:
-    - type: vastai
-        creds:
-        type: api_key
-        api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
+    - type: kubernetes
+        kubeconfig:
+        filename: ~/.kube/config
+        networking:
+        ssh_host: localhost # The external IP address of any node
+        ssh_port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>
 
-    !!! info "NOTE:"
-        Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
+    The port specified to `ssh_port` must be accessible outside of the cluster.
 
-    ### CUDO
+    For example, if you are using Kind, make sure to add it via `extraPortMappings`:
 
-    Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
+    <div editor-title="installation/kind-config.yml">
 
-    Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
+    ```yaml
+    kind: Cluster
+    apiVersion: kind.x-k8s.io/v1alpha4
+    nodes:
+    - role: control-plane
+    extraPortMappings:
+    - containerPort: 32000 # Must be same as `ssh_port`
+        hostPort: 32000 # Must be same as `ssh_port`
+    ```
+
+    </div>
+
+[//]: # (TODO: Elaborate on the Kind's IP address on Linux)
+
+=== "Managed"
+    Here's how to configure the backend to use a managed cluster (AWS, GCP, Azure).
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -383,150 +506,27 @@ There are two ways to configure Azure: using a client secret or using the defaul
     projects:
     - name: main
     backends:
-    - type: cudo
-        project_id: my-cudo-project
-        creds:
-        type: api_key
-        api_key: 7487240a466624b48de22865589
+    - type: kubernetes
+        kubeconfig:
+        filename: ~/.kube/config
+        networking:
+        ssh_port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>
 
-    ### RunPod
+    The port specified to `ssh_port` must be accessible outside of the cluster.
 
-    Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
-    the button to create a key.
+    For example, if you are using EKS, make sure to add it via an ingress rule
+    of the corresponding security group:
 
-    Then proceed to configuring the backend.
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-    backends:
-    - type: runpod
-        creds:
-        type: api_key
-        api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+    ```shell
+    aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
     ```
 
-    </div>
+[//]: # (TODO: Elaborate on gateways, and what backends allow configuring them)
 
-    !!! warning "NOTE:"
-        If you're using a custom Docker image, its entrypoint cannot be anything other than `/bin/bash` or `/bin/sh`.
-        See the [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1137) for more details.
-
-    !!! info "NOTE:"
-        The `runpod` backend supports on-demand instances only. Spot instance support coming soon.
-
-    ### DataCrunch
-
-    Log into your [DataCrunch :material-arrow-top-right-thin:{ .external }](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
-
-    Then, go ahead and configure the backend:
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-    backends:
-    - type: datacrunch
-        creds:
-        type: api_key
-        client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
-        client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8
-    ```
-
-    </div>
-
-    ### Kubernetes
-
-    `dstack` supports both self-managed, and managed Kubernetes clusters.
-
-    ??? info "Prerequisite"
-        To use GPUs with Kubernetes, the cluster must be installed with the
-        [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html).
-
-        [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
-
-    To configure a Kubernetes backend, specify the path to the kubeconfig file,
-    and the port that `dstack` can use for proxying SSH traffic.
-    In case of a self-managed cluster, also specify the IP address of any node in the cluster.
-
-    [//]: # (TODO: Mention that the Kind context has to be selected via `current-context` )
-
-    === "Self-managed"
-
-        Here's how to configure the backend to use a self-managed cluster.
-
-        <div editor-title="~/.dstack/server/config.yml">
-
-        ```yaml
-        projects:
-        - name: main
-        backends:
-        - type: kubernetes
-            kubeconfig:
-            filename: ~/.kube/config
-            networking:
-            ssh_host: localhost # The external IP address of any node
-            ssh_port: 32000 # Any port accessible outside of the cluster
-        ```
-
-        </div>
-
-        The port specified to `ssh_port` must be accessible outside of the cluster.
-
-        For example, if you are using Kind, make sure to add it via `extraPortMappings`:
-
-        <div editor-title="installation/kind-config.yml">
-
-        ```yaml
-        kind: Cluster
-        apiVersion: kind.x-k8s.io/v1alpha4
-        nodes:
-        - role: control-plane
-        extraPortMappings:
-        - containerPort: 32000 # Must be same as `ssh_port`
-            hostPort: 32000 # Must be same as `ssh_port`
-        ```
-
-        </div>
-
-    [//]: # (TODO: Elaborate on the Kind's IP address on Linux)
-
-    === "Managed"
-        Here's how to configure the backend to use a managed cluster (AWS, GCP, Azure).
-
-        <div editor-title="~/.dstack/server/config.yml">
-
-        ```yaml
-        projects:
-        - name: main
-        backends:
-        - type: kubernetes
-            kubeconfig:
-            filename: ~/.kube/config
-            networking:
-            ssh_port: 32000 # Any port accessible outside of the cluster
-        ```
-
-        </div>
-
-        The port specified to `ssh_port` must be accessible outside of the cluster.
-
-        For example, if you are using EKS, make sure to add it via an ingress rule
-        of the corresponding security group:
-
-        ```shell
-        aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
-        ```
-
-    [//]: # (TODO: Elaborate on gateways, and what backends allow configuring them)
-
-    [//]: # (TODO: Should we automatically detect ~/.kube/config)
+[//]: # (TODO: Should we automatically detect ~/.kube/config)
 
 ## Root reference
 
