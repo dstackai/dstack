@@ -1,13 +1,13 @@
 from typing import List, Optional
 
-from dstack._internal.core.models.configurations import ConfigurationType, PortMapping
+from dstack._internal.core.models.configurations import PortMapping, RunConfigurationType
 from dstack._internal.core.models.profiles import ProfileRetryPolicy, SpotPolicy
 from dstack._internal.core.models.runs import RetryPolicy
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 
 
 class ServiceJobConfigurator(JobConfigurator):
-    TYPE: ConfigurationType = ConfigurationType.SERVICE
+    TYPE: RunConfigurationType = RunConfigurationType.SERVICE
 
     def _shell_commands(self) -> List[str]:
         return self.run_spec.configuration.commands

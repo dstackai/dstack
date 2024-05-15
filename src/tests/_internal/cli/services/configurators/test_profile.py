@@ -1,7 +1,7 @@
 import argparse
 from typing import List, Tuple
 
-from dstack._internal.cli.services.configurators.profile import (
+from dstack._internal.cli.services.profile import (
     apply_profile_args,
     register_profile_args,
 )

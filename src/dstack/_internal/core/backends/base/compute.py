@@ -9,6 +9,7 @@ import requests
 import yaml
 
 from dstack._internal import settings
+from dstack._internal.core.models.gateways import GatewayComputeConfiguration
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
@@ -84,10 +85,7 @@ class Compute(ABC):
 
     def create_gateway(
         self,
-        instance_name: str,
-        ssh_key_pub: str,
-        region: str,
-        project_id: str,
+        configuration: GatewayComputeConfiguration,
     ) -> LaunchedGatewayInfo:
         raise NotImplementedError()
 

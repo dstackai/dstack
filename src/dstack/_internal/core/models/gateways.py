@@ -8,6 +8,27 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 
 
+class GatewayConfiguration(CoreModel):
+    type: Literal["gateway"] = "gateway"
+    name: Annotated[Optional[str], Field(description="The gateway name")] = None
+    default: Annotated[bool, Field(description="Make the gateway default")] = False
+    backend: Annotated[BackendType, Field(description="The gateway backend")]
+    region: Annotated[str, Field(description="The gateway region")]
+    domain: Annotated[
+        Optional[str], Field(description="The gateway domain, e.g. `*.example.com`")
+    ] = None
+    public_ip: Annotated[bool, Field(description="Allocate public IP for the gateway")] = True
+
+
+class GatewayComputeConfiguration(CoreModel):
+    project_name: str
+    instance_name: str
+    backend: BackendType
+    region: str
+    public_ip: bool
+    ssh_key_pub: str
+
+
 class Gateway(CoreModel):
     name: str
     ip_address: Optional[str]

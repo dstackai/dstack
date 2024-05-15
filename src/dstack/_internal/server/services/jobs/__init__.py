@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import ComputeResourceNotFoundError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.models.configurations import RunConfigurationType
 from dstack._internal.core.models.instances import RemoteConnectionInfo
 from dstack._internal.core.models.runs import (
     InstanceStatus,
@@ -133,7 +133,7 @@ def delay_job_instance_termination(job_model: JobModel):
 
 
 def _get_job_configurator(run_spec: RunSpec) -> JobConfigurator:
-    configuration_type = ConfigurationType(run_spec.configuration.type)
+    configuration_type = RunConfigurationType(run_spec.configuration.type)
     configurator_class = _configuration_type_to_configurator_class_map[configuration_type]
     return configurator_class(run_spec)
 

@@ -19,6 +19,7 @@ from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import is_core_model_instance
+from dstack._internal.core.models.gateways import GatewayComputeConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -192,17 +193,14 @@ class AWSCompute(Compute):
 
     def create_gateway(
         self,
-        instance_name: str,
-        ssh_key_pub: str,
-        region: str,
-        project_id: str,
-    ) -> JobProvisioningData:
-        ec2 = self.session.resource("ec2", region_name=region)
-        ec2_client = self.session.client("ec2", region_name=region)
+        configuration: GatewayComputeConfiguration,
+    ) -> LaunchedGatewayInfo:
+        ec2 = self.session.resource("ec2", region_name=configuration.region)
+        ec2_client = self.session.client("ec2", region_name=configuration.region)
         tags = [
-            {"Key": "Name", "Value": instance_name},
+            {"Key": "Name", "Value": configuration.instance_name},
             {"Key": "owner", "Value": "dstack"},
-            {"Key": "dstack_project", "Value": project_id},
+            {"Key": "dstack_project", "Value": configuration.project_name},
         ]
         if settings.DSTACK_VERSION is not None:
             tags.append({"Key": "dstack_version", "Value": settings.DSTACK_VERSION})
@@ -212,11 +210,11 @@ class AWSCompute(Compute):
                 image_id=aws_resources.get_gateway_image_id(ec2_client),
                 instance_type="t2.micro",
                 iam_instance_profile_arn=None,
-                user_data=get_gateway_user_data(ssh_key_pub),
+                user_data=get_gateway_user_data(configuration.ssh_key_pub),
                 tags=tags,
                 security_group_id=aws_resources.create_gateway_security_group(
                     ec2_client=ec2_client,
-                    project_id=project_id,
+                    project_id=configuration.project_name,
                 ),
                 spot=False,
             )
@@ -226,7 +224,7 @@ class AWSCompute(Compute):
         instance.reload()  # populate instance.public_ip_address
         return LaunchedGatewayInfo(
             instance_id=instance.instance_id,
-            region=region,
+            region=configuration.region,
             ip_address=instance.public_ip_address,
         )
 

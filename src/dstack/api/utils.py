@@ -5,7 +5,9 @@ import yaml
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import AnyRunConfiguration
-from dstack._internal.core.models.configurations import parse as parse_configuration
+from dstack._internal.core.models.configurations import (
+    parse_run_configuration as parse_configuration,
+)
 from dstack._internal.core.models.profiles import Profile, ProfilesConfig
 from dstack._internal.utils.common import get_dstack_dir
 from dstack._internal.utils.path import PathLike, path_in_dir

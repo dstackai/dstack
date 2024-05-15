@@ -4,8 +4,7 @@ import threading
 import time
 from typing import Dict, List, Optional
 
-# TODO: update import as KNOWN_GPUS becomes public
-from gpuhunt._internal.constraints import KNOWN_GPUS
+from gpuhunt import KNOWN_GPUS
 from kubernetes import client
 
 from dstack._internal.core.backends.base.compute import (
@@ -22,6 +21,9 @@ from dstack._internal.core.backends.kubernetes.utils import (
 )
 from dstack._internal.core.errors import ComputeError, GatewayError
 from dstack._internal.core.models.backends.base import BackendType
+
+# TODO: update import as KNOWN_GPUS becomes public
+from dstack._internal.core.models.gateways import GatewayComputeConfiguration
 from dstack._internal.core.models.instances import (
     Disk,
     Gpu,
@@ -205,7 +207,10 @@ class KubernetesCompute(Compute):
             if e.status != 404:
                 raise
 
-    def create_gateway(self, instance_name: str, ssh_key_pub: str, region: str, project_id: str):
+    def create_gateway(
+        self,
+        configuration: GatewayComputeConfiguration,
+    ) -> LaunchedGatewayInfo:
         # Gateway creation is currently limited to Kubernetes with Load Balancer support.
         # If the cluster does not support Load Balancer, the service will be provisioned but
         # the external IP/hostname will never be allocated.
@@ -215,7 +220,8 @@ class KubernetesCompute(Compute):
         # TODO: By default EKS creates a Classic Load Balancer for Load Balancer services.
         # Consider deploying an NLB. It seems it requires some extra configuration on the cluster:
         # https://docs.aws.amazon.com/eks/latest/userguide/network-load-balancing.html
-        commands = _get_gateway_commands(authorized_keys=[ssh_key_pub])
+        instance_name = configuration.instance_name
+        commands = _get_gateway_commands(authorized_keys=[configuration.ssh_key_pub])
         self.api.create_namespaced_pod(
             namespace=DEFAULT_NAMESPACE,
             body=client.V1Pod(

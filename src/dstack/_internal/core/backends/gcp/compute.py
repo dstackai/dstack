@@ -17,6 +17,7 @@ from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.gcp.config import GCPConfig
 from dstack._internal.core.errors import ComputeResourceNotFoundError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.gateways import GatewayComputeConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -176,10 +177,7 @@ class GCPCompute(Compute):
 
     def create_gateway(
         self,
-        instance_name: str,
-        ssh_key_pub: str,
-        region: str,
-        project_id: str,
+        configuration: GatewayComputeConfiguration,
     ) -> LaunchedGatewayInfo:
         gcp_resources.create_gateway_firewall_rules(
             firewalls_client=self.firewalls_client,
@@ -187,7 +185,7 @@ class GCPCompute(Compute):
         )
         # e2-micro is available in every zone
         for i in self.regions_client.list(project=self.config.project_id):
-            if i.name == region:
+            if i.name == configuration.region:
                 zone = i.zones[0].split("/")[-1]
                 break
         else:
@@ -202,24 +200,24 @@ class GCPCompute(Compute):
             machine_type="e2-micro",
             accelerators=[],
             spot=False,
-            user_data=get_gateway_user_data(ssh_key_pub),
-            authorized_keys=[ssh_key_pub],
+            user_data=get_gateway_user_data(configuration.ssh_key_pub),
+            authorized_keys=[configuration.ssh_key_pub],
             labels={
                 "owner": "dstack",
-                "dstack_project": project_id,
+                "dstack_project": configuration.project_name,
             },
             tags=[gcp_resources.DSTACK_GATEWAY_TAG],
-            instance_name=instance_name,
+            instance_name=configuration.instance_name,
             zone=zone,
             service_account=None,
         )
         operation = self.instances_client.insert(request=request)
         gcp_resources.wait_for_extended_operation(operation, "instance creation")
         instance = self.instances_client.get(
-            project=self.config.project_id, zone=zone, instance=instance_name
+            project=self.config.project_id, zone=zone, instance=configuration.instance_name
         )
         return LaunchedGatewayInfo(
-            instance_id=instance_name,
+            instance_id=configuration.instance_name,
             region=zone,  # used for instance termination
             ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
         )

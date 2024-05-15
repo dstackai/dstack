@@ -11,7 +11,7 @@ from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec, memory_spec
-from dstack._internal.cli.services.configurators.profile import (
+from dstack._internal.cli.services.profile import (
     apply_profile_args,
     register_profile_args,
 )
