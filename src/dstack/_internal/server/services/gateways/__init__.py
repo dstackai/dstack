@@ -144,7 +144,7 @@ async def create_gateway(
         instance_name=gateway.name,
         backend=configuration.backend,
         region=configuration.region,
-        public_ip=configuration.public_ip,
+        public_ip=True,
         ssh_key_pub=project.name,
     )
 

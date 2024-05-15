@@ -17,7 +17,7 @@ class GatewayConfiguration(CoreModel):
     domain: Annotated[
         Optional[str], Field(description="The gateway domain, e.g. `*.example.com`")
     ] = None
-    public_ip: Annotated[bool, Field(description="Allocate public IP for the gateway")] = True
+    # public_ip: Annotated[bool, Field(description="Allocate public IP for the gateway")] = True
 
 
 class GatewayComputeConfiguration(CoreModel):

@@ -73,6 +73,14 @@ class TestListAndGetGateways:
                 "name": gateway.name,
                 "region": gateway.region,
                 "wildcard_domain": gateway.wildcard_domain,
+                "configuration": {
+                    "type": "gateway",
+                    "name": gateway.name,
+                    "backend": backend.type.value,
+                    "region": gateway.region,
+                    "domain": gateway.wildcard_domain,
+                    "default": False,
+                },
             }
         ]
 
@@ -109,6 +117,14 @@ class TestListAndGetGateways:
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
+            "configuration": {
+                "type": "gateway",
+                "name": gateway.name,
+                "backend": backend.type.value,
+                "region": gateway.region,
+                "domain": gateway.wildcard_domain,
+                "default": False,
+            },
         }
 
     @pytest.mark.asyncio
@@ -180,6 +196,14 @@ class TestCreateGateway:
             "wildcard_domain": None,
             "default": True,
             "created_at": response.json()["created_at"],
+            "configuration": {
+                "type": "gateway",
+                "name": "test",
+                "backend": backend.type.value,
+                "region": "us",
+                "domain": None,
+                "default": True,
+            },
         }
 
     @pytest.mark.asyncio
@@ -226,6 +250,14 @@ class TestCreateGateway:
             "wildcard_domain": None,
             "default": True,
             "created_at": response.json()["created_at"],
+            "configuration": {
+                "type": "gateway",
+                "name": "random-name",
+                "backend": backend.type.value,
+                "region": "us",
+                "domain": None,
+                "default": True,
+            },
         }
 
     @pytest.mark.asyncio
@@ -352,6 +384,14 @@ class TestDefaultGateway:
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
+            "configuration": {
+                "type": "gateway",
+                "name": gateway.name,
+                "backend": backend.type.value,
+                "region": gateway.region,
+                "domain": gateway.wildcard_domain,
+                "default": True,
+            },
         }
 
     @pytest.mark.asyncio
@@ -451,6 +491,14 @@ class TestDeleteGateway:
                 "name": gateway_gcp.name,
                 "region": gateway_gcp.region,
                 "wildcard_domain": gateway_gcp.wildcard_domain,
+                "configuration": {
+                    "type": "gateway",
+                    "name": gateway_gcp.name,
+                    "backend": backend_gcp.type.value,
+                    "region": gateway_gcp.region,
+                    "domain": gateway_gcp.wildcard_domain,
+                    "default": False,
+                },
             }
         ]
 
@@ -502,6 +550,14 @@ class TestUpdateGateway:
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": "test.com",
+            "configuration": {
+                "type": "gateway",
+                "name": gateway.name,
+                "backend": backend.type.value,
+                "region": gateway.region,
+                "domain": "test.com",
+                "default": False,
+            },
         }
 
     @pytest.mark.asyncio
