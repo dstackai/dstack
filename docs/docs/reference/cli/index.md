@@ -59,6 +59,24 @@ $ dstack run . --help
 
     If there are large files, consider creating a `.gitignore` file to exclude them for better performance.
 
+### dstack apply
+
+This command applies a given configuration. If a resources does not exist, `dstack apply` creates the resource.
+If a resource exists, `dstack apply` updates the resource in-place or re-creates the resource if the update is not possible.
+
+<div class="termy">
+
+```shell
+$ dstack apply --help
+#GENERATE#
+```
+
+</div>
+
+!!! info "NOTE:"
+    The `dstack apply` command currently supports only `gateway` configurations.
+    Support for other configuration types is coming soon.
+
 ### dstack ps
 
 This command shows the status of runs.
