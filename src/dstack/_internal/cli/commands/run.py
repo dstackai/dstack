@@ -5,18 +5,18 @@ from pathlib import Path
 from typing import Optional
 
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.services.configurators.profile import (
-    apply_profile_args,
-    register_profile_args,
-)
 from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
     run_configurators_mapping,
 )
+from dstack._internal.cli.services.profile import (
+    apply_profile_args,
+    register_profile_args,
+)
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
-from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.models.configurations import RunConfigurationType
 from dstack._internal.core.models.runs import JobTerminationReason
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
@@ -39,7 +39,7 @@ class RunCommand(APIBaseCommand):
             "-h",
             "--help",
             nargs="?",
-            type=ConfigurationType,
+            type=RunConfigurationType,
             default=NOTSET,
             help="Show this help message and exit. TYPE is one of [code]task[/], [code]dev-environment[/], [code]service[/]",
             dest="help",
@@ -83,7 +83,7 @@ class RunCommand(APIBaseCommand):
     def _command(self, args: argparse.Namespace):
         if args.help is not NOTSET:
             if args.help is not None:
-                run_configurators_mapping[ConfigurationType(args.help)].register(self._parser)
+                run_configurators_mapping[RunConfigurationType(args.help)].register(self._parser)
             else:
                 BaseRunConfigurator.register(self._parser)
             self._parser.print_help()
@@ -102,7 +102,7 @@ class RunCommand(APIBaseCommand):
             apply_profile_args(args, conf)
             logger.debug("Configuration loaded: %s", configuration_path)
             parser = argparse.ArgumentParser()
-            configurator = run_configurators_mapping[ConfigurationType(conf.type)]
+            configurator = run_configurators_mapping[RunConfigurationType(conf.type)]
             configurator.register(parser)
             known, unknown = parser.parse_known_args(args.unknown)
             configurator.apply(known, unknown, conf)
@@ -176,7 +176,7 @@ class RunCommand(APIBaseCommand):
             )
 
             if run.status in (RunStatus.RUNNING, RunStatus.DONE):
-                if run._run.run_spec.configuration.type == ConfigurationType.SERVICE.value:
+                if run._run.run_spec.configuration.type == RunConfigurationType.SERVICE.value:
                     console.print(
                         f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
                     )

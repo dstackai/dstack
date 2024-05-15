@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from dstack._internal.core.models.configurations import ConfigurationType, PortMapping
+from dstack._internal.core.models.configurations import PortMapping, RunConfigurationType
 from dstack._internal.core.models.profiles import ProfileRetryPolicy, SpotPolicy
 from dstack._internal.core.models.runs import RetryPolicy, RunSpec
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
@@ -15,7 +15,7 @@ INSTALL_IPYKERNEL = (
 
 
 class DevEnvironmentJobConfigurator(JobConfigurator):
-    TYPE: ConfigurationType = ConfigurationType.DEV_ENVIRONMENT
+    TYPE: RunConfigurationType = RunConfigurationType.DEV_ENVIRONMENT
 
     def __init__(self, run_spec: RunSpec):
         self.ide = VSCodeDesktop(

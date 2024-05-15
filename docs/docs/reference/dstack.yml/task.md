@@ -2,9 +2,10 @@
 
 The `task` configuration type allows running [tasks](../../concepts/tasks.md).
 
-> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `train.dstack.yml` are both acceptable)
-> and can be located in the project's root directory or any nested folder.
-> Any configuration can be run via [`dstack run . -f PATH`](../cli/index.md#dstack-run).
+!!! info "Filename"
+    Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
+    and can be located in the project's root directory or any nested folder.
+    Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
 
 ## Examples
 

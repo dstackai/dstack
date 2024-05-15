@@ -3,7 +3,7 @@ from typing import Any, Optional
 import pytest
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.configurations import RegistryAuth, parse
+from dstack._internal.core.models.configurations import RegistryAuth, parse_run_configuration
 from dstack._internal.core.models.resources import Range
 
 
@@ -20,15 +20,15 @@ class TestParseConfiguration:
                 conf["scaling"] = scaling
             return conf
 
-        assert parse(test_conf(1)).replicas == Range(min=1, max=1)
-        assert parse(test_conf("2")).replicas == Range(min=2, max=2)
-        assert parse(test_conf("3..3")).replicas == Range(min=3, max=3)
+        assert parse_run_configuration(test_conf(1)).replicas == Range(min=1, max=1)
+        assert parse_run_configuration(test_conf("2")).replicas == Range(min=2, max=2)
+        assert parse_run_configuration(test_conf("3..3")).replicas == Range(min=3, max=3)
         with pytest.raises(
             ConfigurationError,
             match="When you set `replicas` to a range, ensure to specify `scaling`",
         ):
-            parse(test_conf("0..10"))
-        assert parse(
+            parse_run_configuration(test_conf("0..10"))
+        assert parse_run_configuration(
             test_conf(
                 "0..10",
                 {
@@ -41,7 +41,7 @@ class TestParseConfiguration:
             ConfigurationError,
             match="When you set `replicas` to a range, ensure to specify `scaling`",
         ):
-            parse(
+            parse_run_configuration(
                 test_conf(
                     "0..10",
                     {

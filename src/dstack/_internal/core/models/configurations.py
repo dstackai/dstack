@@ -7,7 +7,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration
-from dstack._internal.core.models.gateways import AnyModel
+from dstack._internal.core.models.gateways import AnyModel, GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
@@ -17,7 +17,7 @@ CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
 
 
-class ConfigurationType(str, Enum):
+class RunConfigurationType(str, Enum):
     DEV_ENVIRONMENT = "dev-environment"
     TASK = "task"
     SERVICE = "service"
@@ -319,13 +319,38 @@ class RunConfiguration(CoreModel):
         Field(discriminator="type"),
     ]
 
-    class Config:
-        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
-
-def parse(data: dict) -> AnyRunConfiguration:
+def parse_run_configuration(data: dict) -> AnyRunConfiguration:
     try:
         conf = RunConfiguration.parse_obj(data).__root__
     except ValidationError as e:
         raise ConfigurationError(e)
     return conf
+
+
+class ApplyConfigurationType(str, Enum):
+    GATEWAY = "gateway"
+
+
+AnyApplyConfiguration = GatewayConfiguration
+
+
+def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
+    try:
+        conf = GatewayConfiguration.parse_obj(data)
+    except ValidationError as e:
+        raise ConfigurationError(e)
+    return conf
+
+
+AnyDstackConfiguration = Union[AnyRunConfiguration, GatewayConfiguration]
+
+
+class DstackConfiguration(CoreModel):
+    __root__: Annotated[
+        AnyDstackConfiguration,
+        Field(discriminator="type"),
+    ]
+
+    class Config:
+        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}

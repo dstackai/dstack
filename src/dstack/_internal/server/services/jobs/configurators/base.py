@@ -8,10 +8,10 @@ from cachetools import TTLCache, cached
 import dstack.version as version
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.configurations import (
-    ConfigurationType,
     PortMapping,
     PythonVersion,
     RegistryAuth,
+    RunConfigurationType,
 )
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import (
@@ -44,7 +44,7 @@ def get_default_image(python_version: str) -> str:
 
 
 class JobConfigurator(ABC):
-    TYPE: ConfigurationType
+    TYPE: RunConfigurationType
 
     def __init__(self, run_spec: RunSpec):
         self.run_spec = run_spec

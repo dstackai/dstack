@@ -46,9 +46,7 @@ async def create_gateway(
     return await gateways.create_gateway(
         session=session,
         project=project,
-        name=body.name,
-        backend_type=body.backend_type,
-        region=body.region,
+        configuration=body.configuration,
     )
 
 
