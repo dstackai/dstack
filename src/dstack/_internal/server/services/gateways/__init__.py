@@ -122,21 +122,22 @@ async def create_gateway(
     else:
         raise ResourceNotExistsError()
 
-    name = configuration.name
-    if name is None:
-        name = await generate_gateway_name(session=session, project=project)
+    if configuration.name is None:
+        configuration.name = await generate_gateway_name(session=session, project=project)
 
     gateway = GatewayModel(  # reserve name
-        name=name,
+        name=configuration.name,
         region=configuration.region,
         project_id=project.id,
         backend_id=backend_model.id,
+        wildcard_domain=configuration.domain,
+        configuration=configuration.json(),
     )
     session.add(gateway)
     await session.commit()
 
-    if project.default_gateway is None:
-        await set_default_gateway(session=session, project=project, name=name)
+    if project.default_gateway is None or configuration.default:
+        await set_default_gateway(session=session, project=project, name=configuration.name)
 
     compute_configuration = GatewayComputeConfiguration(
         project_name=project.name,
@@ -160,7 +161,7 @@ async def create_gateway(
         await session.execute(
             delete(GatewayModel).where(
                 GatewayModel.project_id == project.id,
-                GatewayModel.name == name,
+                GatewayModel.name == configuration.name,
             )
         )
         await session.commit()
@@ -550,6 +551,18 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
     backend_type = gateway_model.backend.type
     if gateway_model.backend.type == BackendType.DSTACK:
         backend_type = BackendType.AWS
+    if gateway_model.configuration is not None:
+        configuration = GatewayConfiguration.__response__.parse_raw(gateway_model.configuration)
+    else:
+        # Handle gateways created before GatewayConfiguration was introduced
+        configuration = GatewayConfiguration(
+            name=gateway_model.name,
+            default=False,
+            backend=gateway_model.backend.type,
+            region=gateway_model.region,
+            domain=gateway_model.wildcard_domain,
+        )
+    configuration.default = gateway_model.project.default_gateway_id == gateway_model.id
     return Gateway(
         name=gateway_model.name,
         ip_address=ip_address,
@@ -559,4 +572,5 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         default=gateway_model.project.default_gateway_id == gateway_model.id,
         created_at=gateway_model.created_at.replace(tzinfo=timezone.utc),
         backend=backend_type,
+        configuration=configuration,
     )

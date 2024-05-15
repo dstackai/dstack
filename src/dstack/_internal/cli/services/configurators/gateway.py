@@ -12,16 +12,29 @@ class GatewayConfigurator(BaseApplyConfigurator):
     TYPE: ApplyConfigurationType = ApplyConfigurationType.GATEWAY
 
     def apply_configuration(self, conf: GatewayConfiguration, args: argparse.Namespace):
+        # TODO: Show apply plan
+        # TODO: Update gateway in-place when domain/default change
         confirmed = False
         if conf.name is not None:
             try:
-                self.api_client.client.gateways.get(
+                gateway = self.api_client.client.gateways.get(
                     project_name=self.api_client.project, gateway_name=conf.name
                 )
             except ResourceNotExistsError:
                 pass
             else:
-                if not args.yes and not confirm_ask(
+                if gateway.configuration == conf:
+                    if not args.force:
+                        console.print(
+                            "Gateway configuration has not changed. Use --force to recreate the gateway."
+                        )
+                        return
+                    if not args.yes and not confirm_ask(
+                        "Gateway configuration has not changed. Re-create the gateway?"
+                    ):
+                        console.print("\nExiting...")
+                        return
+                elif not args.yes and not confirm_ask(
                     f"Gateway [code]{conf.name}[/] already exist. Re-create the gateway?"
                 ):
                     console.print("\nExiting...")

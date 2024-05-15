@@ -230,6 +230,7 @@ class GatewayModel(BaseModel):
     name: Mapped[str] = mapped_column(String(100))
     region: Mapped[str] = mapped_column(String(100))
     wildcard_domain: Mapped[str] = mapped_column(String(100), nullable=True)
+    configuration: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))

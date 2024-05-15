@@ -30,6 +30,8 @@ class GatewayComputeConfiguration(CoreModel):
 
 
 class Gateway(CoreModel):
+    # TODO: configuration fields are duplicated on top-level for backward compatibility with 0.18.x
+    # Remove in 0.19
     name: str
     ip_address: Optional[str]
     instance_id: Optional[str]
@@ -38,6 +40,7 @@ class Gateway(CoreModel):
     default: bool
     created_at: datetime.datetime
     backend: BackendType
+    configuration: GatewayConfiguration
 
 
 class BaseChatModel(CoreModel):
