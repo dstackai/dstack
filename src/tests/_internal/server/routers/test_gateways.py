@@ -80,6 +80,7 @@ class TestListAndGetGateways:
                     "region": gateway.region,
                     "domain": gateway.wildcard_domain,
                     "default": False,
+                    "public_ip": True,
                 },
             }
         ]
@@ -124,6 +125,7 @@ class TestListAndGetGateways:
                 "region": gateway.region,
                 "domain": gateway.wildcard_domain,
                 "default": False,
+                "public_ip": True,
             },
         }
 
@@ -203,6 +205,7 @@ class TestCreateGateway:
                 "region": "us",
                 "domain": None,
                 "default": True,
+                "public_ip": True,
             },
         }
 
@@ -257,6 +260,7 @@ class TestCreateGateway:
                 "region": "us",
                 "domain": None,
                 "default": True,
+                "public_ip": True,
             },
         }
 
@@ -391,6 +395,7 @@ class TestDefaultGateway:
                 "region": gateway.region,
                 "domain": gateway.wildcard_domain,
                 "default": True,
+                "public_ip": True,
             },
         }
 
@@ -498,6 +503,7 @@ class TestDeleteGateway:
                     "region": gateway_gcp.region,
                     "domain": gateway_gcp.wildcard_domain,
                     "default": False,
+                    "public_ip": True,
                 },
             }
         ]
@@ -557,6 +563,7 @@ class TestUpdateGateway:
                 "region": gateway.region,
                 "domain": "test.com",
                 "default": False,
+                "public_ip": True,
             },
         }
 
