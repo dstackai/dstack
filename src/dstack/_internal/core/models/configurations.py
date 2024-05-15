@@ -319,9 +319,6 @@ class RunConfiguration(CoreModel):
         Field(discriminator="type"),
     ]
 
-    class Config:
-        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
-
 
 def parse_run_configuration(data: dict) -> AnyRunConfiguration:
     try:
@@ -344,3 +341,16 @@ def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
     except ValidationError as e:
         raise ConfigurationError(e)
     return conf
+
+
+AnyDstackConfiguration = Union[AnyRunConfiguration, GatewayConfiguration]
+
+
+class DstackConfiguration(CoreModel):
+    __root__: Annotated[
+        AnyDstackConfiguration,
+        Field(discriminator="type"),
+    ]
+
+    class Config:
+        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}

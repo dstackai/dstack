@@ -159,7 +159,7 @@ jobs:
         run: pip install .
       - name: Generate json schema
         run: |
-          python -c "from dstack._internal.core.models.configurations import RunConfiguration; print(RunConfiguration.schema_json(indent=2))" > configuration.json
+          python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
           python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
       - name: Upload json schema to S3
         run: |
