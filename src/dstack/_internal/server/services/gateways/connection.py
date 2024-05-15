@@ -5,6 +5,7 @@ from typing import AsyncIterator, Dict, Optional
 
 import aiorwlock
 
+from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.services.gateways.client import (
     GATEWAY_MANAGEMENT_PORT,
     GatewayClient,
@@ -29,9 +30,10 @@ class GatewayConnection:
         self._lock = aiorwlock.RWLock()
         self.stats: Dict[str, Dict[int, Stat]] = {}
         self.ip_address = ip_address
-
+        self.ports_lock = PortsLock(restrictions={server_port: 0}).acquire()
+        local_port = self.ports_lock.dict()[server_port]
         args = ["-L", "{temp_dir}/gateway:localhost:%d" % GATEWAY_MANAGEMENT_PORT]
-        args += ["-R", f"localhost:8001:localhost:{server_port}"]
+        args += ["-R", f"localhost:{local_port}:localhost:{server_port}"]
         self.tunnel = AsyncSSHTunnel(
             f"ubuntu@{ip_address}",
             id_rsa,

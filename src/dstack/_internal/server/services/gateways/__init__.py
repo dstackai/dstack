@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.jobs as jobs_services
 import dstack._internal.utils.random_names as random_names
+from dstack._internal.core.backends import BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT
 from dstack._internal.core.backends.base.compute import (
     Compute,
     get_dstack_gateway_wheel,
@@ -87,17 +88,27 @@ async def get_project_default_gateway(
 
 
 async def create_gateway_compute(
+    project_name: str,
     backend_compute: Compute,
-    configuration: GatewayComputeConfiguration,
+    configuration: GatewayConfiguration,
     backend_id: Optional[uuid.UUID] = None,
 ) -> GatewayComputeModel:
     private_bytes, public_bytes = generate_rsa_key_pair_bytes()
     gateway_ssh_private_key = private_bytes.decode()
     gateway_ssh_public_key = public_bytes.decode()
 
+    compute_configuration = GatewayComputeConfiguration(
+        project_name=project_name,
+        instance_name=configuration.name,
+        backend=configuration.backend,
+        region=configuration.region,
+        public_ip=configuration.public_ip,
+        ssh_key_pub=gateway_ssh_public_key,
+    )
+
     info = await run_async(
         backend_compute.create_gateway,
-        configuration,
+        compute_configuration,
     )
 
     return GatewayComputeModel(
@@ -122,6 +133,15 @@ async def create_gateway(
     else:
         raise ResourceNotExistsError()
 
+    if (
+        not configuration.public_ip
+        and configuration.backend not in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT
+    ):
+        raise GatewayError(
+            f"Private gateways are not supported for {configuration.backend.value} backend. "
+            f"Supported backends: {[b.value for b in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT]}."
+        )
+
     if configuration.name is None:
         configuration.name = await generate_gateway_name(session=session, project=project)
 
@@ -139,19 +159,11 @@ async def create_gateway(
     if project.default_gateway is None or configuration.default:
         await set_default_gateway(session=session, project=project, name=configuration.name)
 
-    compute_configuration = GatewayComputeConfiguration(
-        project_name=project.name,
-        instance_name=gateway.name,
-        backend=configuration.backend,
-        region=configuration.region,
-        public_ip=True,
-        ssh_key_pub=project.name,
-    )
-
     try:
         gateway.gateway_compute = await create_gateway_compute(
             backend_compute=backend.compute(),
-            configuration=compute_configuration,
+            project_name=project.name,
+            configuration=configuration,
             backend_id=backend_model.id,
         )
         session.add(gateway)
@@ -321,13 +333,6 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 async def register_service(session: AsyncSession, run_model: RunModel):
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
 
-    service_https = run_spec.configuration.https
-    service_protocol = "https" if service_https else "http"
-
-    # Currently, gateway endpoint is always https
-    gateway_https = True
-    gateway_protocol = "https" if gateway_https else "http"
-
     # TODO(egor-s): allow to configure gateway name
     gateway_name: Optional[str] = None
     if gateway_name is None:
@@ -342,6 +347,21 @@ async def register_service(session: AsyncSession, run_model: RunModel):
             raise ResourceNotExistsError("Gateway does not exist")
     if gateway.gateway_compute is None:
         raise ServerClientError("Gateway has no instance associated with it")
+
+    service_https = run_spec.configuration.https
+    service_protocol = "https" if service_https else "http"
+
+    gateway_configuration = None
+    if gateway.configuration is not None:
+        gateway_configuration = GatewayConfiguration.__response__.parse_raw(gateway.configuration)
+        if service_https and not gateway_configuration.public_ip:
+            raise ServerClientError("Cannot run HTTPS service on gateway without public IP")
+
+    gateway_https = True
+    if gateway_configuration is not None:
+        # Currently, https is always False for private gateways
+        gateway_https = gateway_configuration.public_ip
+    gateway_protocol = "https" if gateway_https else "http"
 
     wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     if wildcard_domain is None:

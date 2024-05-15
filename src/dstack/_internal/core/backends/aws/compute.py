@@ -204,6 +204,12 @@ class AWSCompute(Compute):
         ]
         if settings.DSTACK_VERSION is not None:
             tags.append({"Key": "dstack_version", "Value": settings.DSTACK_VERSION})
+        vpc_id, subnet_id = get_vpc_id_subnet_id_or_error(
+            ec2_client=ec2_client,
+            config=self.config,
+            region=configuration.region,
+            allocate_public_ip=configuration.public_ip,
+        )
         response = ec2.create_instances(
             **aws_resources.create_instances_struct(
                 disk_size=10,
@@ -215,17 +221,24 @@ class AWSCompute(Compute):
                 security_group_id=aws_resources.create_gateway_security_group(
                     ec2_client=ec2_client,
                     project_id=configuration.project_name,
+                    vpc_id=vpc_id,
                 ),
                 spot=False,
+                subnet_id=subnet_id,
+                allocate_public_ip=configuration.public_ip,
             )
         )
         instance = response[0]
         instance.wait_until_running()
         instance.reload()  # populate instance.public_ip_address
+        if configuration.public_ip:
+            ip_address = instance.public_ip_address
+        else:
+            ip_address = instance.private_ip_address
         return LaunchedGatewayInfo(
             instance_id=instance.instance_id,
             region=configuration.region,
-            ip_address=instance.public_ip_address,
+            ip_address=ip_address,
         )
 
 
