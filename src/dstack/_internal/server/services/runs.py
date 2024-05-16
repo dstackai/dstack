@@ -583,21 +583,6 @@ async def create_instance(
     instance_name = await generate_instance_name(
         session=session, project=project, pool_name=pool.name
     )
-    project_ssh_key = SSHKey(
-        public=project.ssh_public_key.strip(),
-        private=project.ssh_private_key.strip(),
-    )
-    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
-    instance_config = InstanceConfiguration(
-        project_name=project.name,
-        instance_name=instance_name,
-        ssh_keys=[project_ssh_key],
-        job_docker_config=DockerConfig(
-            image=dstack_default_image,
-            registry_auth=None,
-        ),
-        user=user.name,
-    )
 
     termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
     termination_idle_time = profile.termination_idle_time
@@ -617,7 +602,7 @@ async def create_instance(
         status=InstanceStatus.PENDING,
         profile=profile.json(),
         requirements=requirements.json(),
-        instance_configuration=instance_config.json(),
+        instance_configuration=None,
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
         retry_policy=retry_policy.retry,
@@ -632,6 +617,25 @@ async def create_instance(
         },
     )
     session.add(instance)
+    await session.commit()
+
+    project_ssh_key = SSHKey(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
+    instance_config = InstanceConfiguration(
+        project_name=project.name,
+        instance_name=instance_name,
+        instance_id=str(instance.id),
+        ssh_keys=[project_ssh_key],
+        job_docker_config=DockerConfig(
+            image=dstack_default_image,
+            registry_auth=None,
+        ),
+        user=user.name,
+    )
+    instance.instance_configuration = instance_config.json()
     await session.commit()
 
     return instance_model_to_instance(instance)
