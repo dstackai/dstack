@@ -202,6 +202,9 @@ class JobProvisioningData(CoreModel):
     # public_ip_enabled can used to distinguished instances with and without public IPs.
     # hostname being None is not enough since it can be filled after provisioning.
     public_ip_enabled: bool = True
+    # instance_network a network address for multimode installation. Specified as `<ip address>/<netmask>`
+    # internal_ip will be selected from the specified network
+    instance_network: Optional[str]
     region: str
     price: float
     username: str
