@@ -72,7 +72,7 @@ class DockerConfig(CoreModel):
 class InstanceConfiguration(CoreModel):
     project_name: str
     instance_name: str  # unique in pool
-    instance_id: str
+    instance_id: Optional[str]
     ssh_keys: List[SSHKey]
     job_docker_config: Optional[DockerConfig]
     user: str  # dstack user name
