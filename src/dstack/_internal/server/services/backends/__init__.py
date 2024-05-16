@@ -275,6 +275,16 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
     return _BACKENDS_CACHE[key]
 
 
+async def get_project_backend_with_model_by_type_or_error(
+    project: ProjectModel, backend_type: BackendType
+) -> BackendTuple:
+    backends_with_models = await get_project_backends_with_models(project=project)
+    for backend_model, backend in backends_with_models:
+        if backend.TYPE == backend_type:
+            return backend_model, backend
+    raise BackendNotAvailable()
+
+
 async def get_project_backends(project: ProjectModel) -> List[Backend]:
     backends_with_models = await get_project_backends_with_models(project)
     backends = [b for _, b in backends_with_models]

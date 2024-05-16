@@ -16,6 +16,7 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
     table.add_column("ADDRESS")
     table.add_column("DOMAIN")
     table.add_column("DEFAULT")
+    table.add_column("STATUS")
     if verbose:
         table.add_column("INSTANCE ID")
         table.add_column("CREATED")
@@ -30,6 +31,7 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
                 gateway.ip_address,
                 gateway.wildcard_domain,
                 "✓" if gateway.default else "",
+                gateway.status,
             ]
             if verbose:
                 renderables.append(gateway.instance_id)
