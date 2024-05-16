@@ -2,6 +2,7 @@ import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Dict, List, Optional, Set
 
 from dstack._internal.core.backends.base.compute import Compute, get_instance_name, get_user_data
@@ -63,7 +64,10 @@ class OCICompute(Compute):
         self.config = config
         self.pre_conf = PreConfiguredResources.load(set(config.regions or []))
         self.regions = make_region_clients_map(config.regions or [], config.creds)
-        self.shapes_quota = resources.ShapesQuota.load(self.regions, self.pre_conf.compartment_id)
+
+    @cached_property
+    def shapes_quota(self) -> resources.ShapesQuota:
+        return resources.ShapesQuota.load(self.regions, self.pre_conf.compartment_id)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
