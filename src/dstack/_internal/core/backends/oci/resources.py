@@ -255,3 +255,15 @@ def launch_instance(
             source_details=oci.core.models.InstanceSourceViaImageDetails(image_id=image_id),
         )
     ).data
+
+
+def terminate_instance_if_exists(client: oci.core.ComputeClient, instance_id: str) -> None:
+    try:
+        client.terminate_instance(
+            instance_id=instance_id,
+            preserve_boot_volume=False,
+            preserve_data_volumes_created_at_launch=False,
+        )
+    except oci.exceptions.ServiceError as e:
+        if e.status != 404:
+            raise

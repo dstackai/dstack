@@ -119,11 +119,7 @@ class OCICompute(Compute):
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
         region_client = self.regions[region]
-        region_client.compute_client.terminate_instance(
-            instance_id=instance_id,
-            preserve_boot_volume=False,
-            preserve_data_volumes_created_at_launch=False,
-        )
+        resources.terminate_instance_if_exists(region_client.compute_client, instance_id)
 
     def create_instance(
         self,
