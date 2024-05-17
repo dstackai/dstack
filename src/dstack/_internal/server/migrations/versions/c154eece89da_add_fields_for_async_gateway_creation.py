@@ -59,6 +59,6 @@ def downgrade() -> None:
         batch_op.drop_column("status")
 
     with op.batch_alter_table("gateway_computes", schema=None) as batch_op:
-        batch_op.drop_column("active", nullable=False)
+        batch_op.drop_column("active")
 
     # ### end Alembic commands ###
