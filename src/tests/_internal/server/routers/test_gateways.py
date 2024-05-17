@@ -25,14 +25,6 @@ from dstack._internal.server.testing.common import (
 client = TestClient(app)
 
 
-class AsyncContextManager:
-    async def __aenter__(self):
-        pass
-
-    async def __aexit__(self, exc_type, exc, traceback):
-        pass
-
-
 class TestListAndGetGateways:
     @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):

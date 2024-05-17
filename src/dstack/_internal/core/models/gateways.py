@@ -49,6 +49,7 @@ class Gateway(CoreModel):
     created_at: datetime.datetime
     backend: BackendType
     status: GatewayStatus
+    status_message: Optional[str]
     configuration: GatewayConfiguration
 
 

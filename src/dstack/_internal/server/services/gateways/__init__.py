@@ -218,6 +218,7 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
             continue  # ignore error, but keep gateway
         if gateway.gateway_compute is not None:
             await gateway_connections_pool.remove(gateway.gateway_compute.ip_address)
+            gateway.gateway_compute.active = False
             gateway.gateway_compute.deleted = True
             session.add(gateway.gateway_compute)
         await session.delete(gateway)
@@ -474,7 +475,10 @@ async def get_gateway_connection(
 
 async def init_gateways(session: AsyncSession):
     res = await session.execute(
-        select(GatewayComputeModel).where(GatewayComputeModel.deleted == False)
+        select(GatewayComputeModel).where(
+            GatewayComputeModel.active == True,
+            GatewayComputeModel.deleted == False,
+        )
     )
     gateway_computes = res.scalars().all()
 
@@ -582,5 +586,6 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         created_at=gateway_model.created_at.replace(tzinfo=timezone.utc),
         backend=backend_type,
         status=gateway_model.status,
+        status_message=gateway_model.status_message,
         configuration=configuration,
     )

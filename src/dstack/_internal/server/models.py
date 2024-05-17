@@ -272,6 +272,8 @@ class GatewayComputeModel(BaseModel):
     ssh_private_key: Mapped[str] = mapped_column(Text)
     ssh_public_key: Mapped[str] = mapped_column(Text)
 
+    # active means the server should maintain connection to gateway.
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
 

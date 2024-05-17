@@ -9,18 +9,14 @@ from dstack._internal.core.errors import BackendError, BackendNotAvailable, SSHE
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import GatewayModel
-from dstack._internal.server.services.backends import (
-    get_project_backend_with_model_by_type_or_error,
-)
+from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
     PROCESSING_GATEWAYS_IDS,
     PROCESSING_GATEWAYS_LOCK,
     GatewayConnection,
-    configure_gateway,
-    connect_to_gateway_with_retry,
     create_gateway_compute,
     gateway_connections_pool,
-    get_gateway_configuration,
 )
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -81,9 +77,13 @@ async def _process_gateway(gateway_id: UUID):
 
 
 async def _process_submitted_gateway(session: AsyncSession, gateway_model: GatewayModel):
-    configuration = get_gateway_configuration(gateway_model)
+    logger.info("Started gateway %s provisioning", gateway_model.name)
+    configuration = gateways_services.get_gateway_configuration(gateway_model)
     try:
-        backend_model, backend = await get_project_backend_with_model_by_type_or_error(
+        (
+            backend_model,
+            backend,
+        ) = await backends_services.get_project_backend_with_model_by_type_or_error(
             project=gateway_model.project, backend_type=configuration.backend
         )
     except BackendNotAvailable:
@@ -101,6 +101,7 @@ async def _process_submitted_gateway(session: AsyncSession, gateway_model: Gatew
             backend_id=backend_model.id,
         )
         session.add(gateway_model)
+        gateway_model.status = GatewayStatus.PROVISIONING
         await session.commit()
         await session.refresh(gateway_model)
     except BackendError as e:
@@ -125,21 +126,26 @@ async def _process_submitted_gateway(session: AsyncSession, gateway_model: Gatew
         await session.commit()
         return
 
-    connection = await connect_to_gateway_with_retry(gateway_model.gateway_compute)
+    connection = await gateways_services.connect_to_gateway_with_retry(
+        gateway_model.gateway_compute
+    )
     if connection is None:
         gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = "Failed to connect to gateway"
         gateway_model.last_processed_at = get_current_datetime()
+        gateway_model.gateway_compute.deleted = True
         await session.commit()
         return
 
     try:
-        await configure_gateway(connection)
+        await gateways_services.configure_gateway(connection)
     except Exception:
         logger.exception("Failed to configure gateway %s", gateway_model.name)
         gateway_model.status = GatewayStatus.FAILED
         gateway_model.status_message = "Failed to configure gateway"
         gateway_model.last_processed_at = get_current_datetime()
+        await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
+        gateway_model.gateway_compute.active = False
         await session.commit()
         return
 

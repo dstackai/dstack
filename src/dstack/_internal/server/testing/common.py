@@ -421,3 +421,11 @@ async def create_instance(
     session.add(im)
     await session.commit()
     return im
+
+
+class AsyncContextManager:
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        pass
