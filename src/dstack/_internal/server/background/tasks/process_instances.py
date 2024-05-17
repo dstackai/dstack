@@ -100,7 +100,10 @@ async def process_instances() -> None:
             ):
                 await add_remote(instance.id)
 
-            if instance.status == InstanceStatus.PENDING:
+            if (
+                instance.status == InstanceStatus.PENDING
+                and instance.remote_connection_info is None
+            ):
                 await create_instance(instance.id)
 
             if instance.status in (
@@ -257,6 +260,23 @@ async def add_remote(instance_id: UUID) -> None:
             network=instance_network,
             addresses=host_info.get("addresses", []),
         )
+        if instance_network is not None and internal_ip is None:
+            instance.status = InstanceStatus.TERMINATED
+            instance.deleted = True
+            instance.deleted_at = get_current_datetime()
+            instance.termination_reason = (
+                "Unable to locate the internal ip-address for the given network"
+            )
+            await session.commit()
+            logger.warning(
+                "Failed to configure internal ip-address on instance %s. Terminate it",
+                instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
+            )
+            return
 
         region = instance.region
 
