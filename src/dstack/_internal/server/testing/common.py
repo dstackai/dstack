@@ -11,6 +11,7 @@ from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
 )
+from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceConfiguration, InstanceType, Resources
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
@@ -270,6 +271,8 @@ async def create_gateway(
     region: str = "us",
     wildcard_domain: Optional[str] = None,
     gateway_compute_id: Optional[UUID] = None,
+    status: Optional[GatewayStatus] = GatewayStatus.SUBMITTED,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
 ) -> GatewayModel:
     gateway = GatewayModel(
         project_id=project_id,
@@ -278,6 +281,8 @@ async def create_gateway(
         region=region,
         wildcard_domain=wildcard_domain,
         gateway_compute_id=gateway_compute_id,
+        status=status,
+        last_processed_at=last_processed_at,
     )
     session.add(gateway)
     await session.commit()
@@ -416,3 +421,11 @@ async def create_instance(
     session.add(im)
     await session.commit()
     return im
+
+
+class AsyncContextManager:
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        pass

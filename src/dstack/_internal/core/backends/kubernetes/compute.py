@@ -19,7 +19,7 @@ from dstack._internal.core.backends.kubernetes.utils import (
     get_api_from_config_data,
     get_cluster_public_ip,
 )
-from dstack._internal.core.errors import ComputeError, GatewayError
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 
 # TODO: update import as KNOWN_GPUS becomes public
@@ -286,7 +286,7 @@ class KubernetesCompute(Compute):
         )
         if hostname is None:
             self.terminate_instance(instance_name, region="-")
-            raise GatewayError(
+            raise ComputeError(
                 "Failed to get gateway hostname. "
                 "Ensure the Kubernetes cluster supports Load Balancer services."
             )

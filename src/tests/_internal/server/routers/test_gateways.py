@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import LaunchedGatewayInfo
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.services.gateways import (
@@ -24,14 +23,6 @@ from dstack._internal.server.testing.common import (
 )
 
 client = TestClient(app)
-
-
-class AsyncContextManager:
-    async def __aenter__(self):
-        pass
-
-    async def __aexit__(self, exc_type, exc, traceback):
-        pass
 
 
 class TestListAndGetGateways:
@@ -68,6 +59,8 @@ class TestListAndGetGateways:
                 "backend": backend.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
+                "status": "submitted",
+                "status_message": None,
                 "instance_id": gateway_compute.instance_id,
                 "ip_address": gateway_compute.ip_address,
                 "name": gateway.name,
@@ -113,6 +106,8 @@ class TestListAndGetGateways:
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": False,
+            "status": "submitted",
+            "status_message": None,
             "instance_id": gateway_compute.instance_id,
             "ip_address": gateway_compute.ip_address,
             "name": gateway.name,
@@ -165,36 +160,21 @@ class TestCreateGateway:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        backend = await create_backend(session, project.id)
-        with patch(
-            "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m, patch(
-            "dstack._internal.server.services.gateways.gateway_connections_pool.add"
-        ) as pool_add:
-            aws = Mock()
-            m.return_value = [(backend, aws)]
-            aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
-                instance_id="i-1234567890",
-                ip_address="2.2.2.2",
-                region="us",
-            )
-            pool_add.return_value = MagicMock()
-            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
-            response = client.post(
-                f"/api/project/{project.name}/gateways/create",
-                json={"name": "test", "backend_type": "aws", "region": "us"},
-                headers=get_auth_headers(user.token),
-            )
-            m.assert_called_once()
-            aws.compute.return_value.create_gateway.assert_called_once()
-            pool_add.assert_called_once()
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        response = client.post(
+            f"/api/project/{project.name}/gateways/create",
+            json={"name": "test", "backend_type": "aws", "region": "us"},
+            headers=get_auth_headers(user.token),
+        )
         assert response.status_code == 200
         assert response.json() == {
             "name": "test",
             "backend": "aws",
             "region": "us",
-            "instance_id": "i-1234567890",
-            "ip_address": "2.2.2.2",
+            "status": "submitted",
+            "status_message": None,
+            "instance_id": "",
+            "ip_address": "",
             "wildcard_domain": None,
             "default": True,
             "created_at": response.json()["created_at"],
@@ -216,40 +196,24 @@ class TestCreateGateway:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        backend = await create_backend(session, project.id)
-        with patch(
-            "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m, patch(
-            "dstack._internal.server.services.gateways.random_names.generate_name"
-        ) as g, patch(
-            "dstack._internal.server.services.gateways.gateway_connections_pool.add"
-        ) as pool_add:
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        with patch("dstack._internal.server.services.gateways.random_names.generate_name") as g:
             g.return_value = "random-name"
-            aws = Mock()
-            m.return_value = [(backend, aws)]
-            aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
-                instance_id="i-1234567890",
-                ip_address="2.2.2.2",
-                region="us",
-            )
-            pool_add.return_value = MagicMock()
-            pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
             response = client.post(
                 f"/api/project/{project.name}/gateways/create",
                 json={"name": None, "backend_type": "aws", "region": "us"},
                 headers=get_auth_headers(user.token),
             )
             g.assert_called_once()
-            m.assert_called_once()
-            aws.compute.return_value.create_gateway.assert_called_once()
-            pool_add.assert_called_once()
         assert response.status_code == 200
         assert response.json() == {
             "name": "random-name",
             "backend": "aws",
             "region": "us",
-            "instance_id": "i-1234567890",
-            "ip_address": "2.2.2.2",
+            "status": "submitted",
+            "status_message": None,
+            "instance_id": "",
+            "ip_address": "",
             "wildcard_domain": None,
             "default": True,
             "created_at": response.json()["created_at"],
@@ -263,36 +227,6 @@ class TestCreateGateway:
                 "public_ip": True,
             },
         }
-
-    @pytest.mark.asyncio
-    async def test_rollback_gateway_on_fail(self, test_db, session: AsyncSession):
-        user = await create_user(session, global_role=GlobalRole.USER)
-        project = await create_project(session)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
-        )
-        backend = await create_backend(session, project.id)
-        with patch(
-            "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m:
-            aws = Mock()
-            m.return_value = [(backend, aws)]
-            aws.compute.return_value.create_gateway.side_effect = DstackError()
-
-            with pytest.raises(DstackError):
-                client.post(
-                    f"/api/project/{project.name}/gateways/create",
-                    json={"name": "test", "backend_type": "aws", "region": "us"},
-                    headers=get_auth_headers(user.token),
-                )
-            m.assert_called_once()
-            aws.compute.return_value.create_gateway.assert_called_once()
-        response = client.post(
-            f"/api/project/{project.name}/gateways/list",
-            headers=get_auth_headers(user.token),
-        )
-        assert response.status_code == 200
-        assert response.json() == []
 
     @pytest.mark.asyncio
     async def test_create_gateway_missing_backend(self, test_db, session: AsyncSession):
@@ -383,6 +317,8 @@ class TestDefaultGateway:
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": True,
+            "status": "submitted",
+            "status_message": None,
             "instance_id": gateway_compute.instance_id,
             "ip_address": gateway_compute.ip_address,
             "name": gateway.name,
@@ -491,6 +427,8 @@ class TestDeleteGateway:
                 "backend": backend_gcp.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
+                "status": "submitted",
+                "status_message": None,
                 "instance_id": gateway_compute_gcp.instance_id,
                 "ip_address": gateway_compute_gcp.ip_address,
                 "name": gateway_gcp.name,
@@ -550,6 +488,8 @@ class TestUpdateGateway:
         assert response.json() == {
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
+            "status": "submitted",
+            "status_message": None,
             "default": False,
             "instance_id": gateway_compute.instance_id,
             "ip_address": gateway_compute.ip_address,

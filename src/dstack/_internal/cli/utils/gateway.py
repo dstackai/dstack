@@ -16,9 +16,11 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
     table.add_column("ADDRESS")
     table.add_column("DOMAIN")
     table.add_column("DEFAULT")
+    table.add_column("STATUS")
     if verbose:
-        table.add_column("INSTANCE ID")
+        table.add_column("ERROR")
         table.add_column("CREATED")
+        table.add_column("INSTANCE_ID")
 
     gateways = sorted(gateways, key=lambda g: g.backend)
     for backend, backend_gateways in itertools.groupby(gateways, key=lambda g: g.backend):
@@ -30,10 +32,12 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
                 gateway.ip_address,
                 gateway.wildcard_domain,
                 "✓" if gateway.default else "",
+                gateway.status,
             ]
             if verbose:
-                renderables.append(gateway.instance_id)
+                renderables.append(gateway.status_message)
                 renderables.append(pretty_date(gateway.created_at))
+                renderables.append(gateway.instance_id)
             table.add_row(*renderables)
     console.print(table)
     console.print()

@@ -1,4 +1,5 @@
 import datetime
+from enum import Enum
 from typing import Optional, Union
 
 from pydantic import Field
@@ -6,6 +7,13 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
+
+
+class GatewayStatus(str, Enum):
+    SUBMITTED = "submitted"
+    PROVISIONING = "provisioning"
+    RUNNING = "running"
+    FAILED = "failed"
 
 
 class GatewayConfiguration(CoreModel):
@@ -40,6 +48,8 @@ class Gateway(CoreModel):
     default: bool
     created_at: datetime.datetime
     backend: BackendType
+    status: GatewayStatus
+    status_message: Optional[str]
     configuration: GatewayConfiguration
 
 

@@ -21,6 +21,7 @@ from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     TerminationPolicy,
@@ -232,6 +233,9 @@ class GatewayModel(BaseModel):
     wildcard_domain: Mapped[str] = mapped_column(String(100), nullable=True)
     configuration: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    status: Mapped[GatewayStatus] = mapped_column(Enum(GatewayStatus))
+    status_message: Mapped[Optional[str]] = mapped_column(Text)
+    last_processed_at: Mapped[datetime] = mapped_column(DateTime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
@@ -268,6 +272,8 @@ class GatewayComputeModel(BaseModel):
     ssh_private_key: Mapped[str] = mapped_column(Text)
     ssh_public_key: Mapped[str] = mapped_column(Text)
 
+    # active means the server should maintain connection to gateway.
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
 
