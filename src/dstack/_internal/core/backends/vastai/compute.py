@@ -99,10 +99,7 @@ class VastAICompute(Compute):
     ):
         self.api_client.destroy_instance(instance_id)
 
-    def update_provisioning_data(
-        self,
-        provisioning_data: JobProvisioningData,
-    ):
+    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
         resp = self.api_client.get_instance(provisioning_data.instance_id)
         if resp is not None:
             if resp["actual_status"] == "running":

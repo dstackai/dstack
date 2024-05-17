@@ -25,6 +25,10 @@ class OCIRegionClient:
         return oci.identity.IdentityClient(self.client_config)
 
     @cached_property
+    def virtual_network_client(self) -> oci.core.VirtualNetworkClient:
+        return oci.core.VirtualNetworkClient(self.client_config)
+
+    @cached_property
     def availability_domains(self) -> List[oci.identity.models.AvailabilityDomain]:
         return self.identity_client.list_availability_domains(self.client_config["tenancy"]).data
 

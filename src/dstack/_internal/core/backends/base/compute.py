@@ -69,10 +69,7 @@ class Compute(ABC):
         """
         raise NotImplementedError()
 
-    def update_provisioning_data(
-        self,
-        provisioning_data: JobProvisioningData,
-    ):
+    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
         """
         This method is called if `JobProvisioningData` returned from `run_job()`/`create_instance()`
         is not complete, e.g. missing `hostname` or `ssh_port`.

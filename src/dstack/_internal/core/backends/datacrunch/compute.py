@@ -159,10 +159,7 @@ class DataCrunchCompute(Compute):
     ) -> None:
         self.api_client.delete_instance(instance_id)
 
-    def update_provisioning_data(
-        self,
-        provisioning_data: JobProvisioningData,
-    ):
+    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
         instance = self.api_client.get_instance_by_id(provisioning_data.instance_id)
         if instance is not None and instance.status == "running":
             provisioning_data.hostname = instance.ip
