@@ -1,5 +1,6 @@
 import argparse
 import getpass
+import ipaddress
 import time
 import urllib.parse
 from pathlib import Path
@@ -290,6 +291,21 @@ class PoolCommand(APIBaseCommand):
 
     def _add_ssh(self, args: argparse.Namespace) -> None:
         super()._command(args)
+
+        # validate network
+        if args.network is not None:
+            try:
+                network = ipaddress.ip_network(args.network)
+            except ValueError as e:
+                console.print(
+                    f"[error]Can't parse network. The address must be in the format <ip>/<netmask>. Error: {e}[/]"
+                )
+                return
+            if not network.is_private:
+                console.print(
+                    f"[error]The network must be private network. The {network} is not private[/]"
+                )
+                return
 
         ssh_keys = []
         if args.ssh_identity_file:

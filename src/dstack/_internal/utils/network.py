@@ -13,12 +13,16 @@ def get_ip_from_network(network: Optional[str], addresses: Sequence[str]) -> Opt
 
     internal_network = None
     if network is not None:
+        if not ip_addresses:
+            return None
         try:
             internal_network = ipaddress.ip_network(network)
         except ValueError:
-            pass
+            return None
 
-    if internal_network is not None:
+        if not internal_network.is_private:
+            return None
+
         for internal_ip in ip_addresses:
             if internal_ip in internal_network:
                 return str(internal_ip)
