@@ -1,3 +1,6 @@
+import random
+import re
+import string
 from typing import Dict, List, Optional
 
 import google.api_core.exceptions
@@ -200,3 +203,26 @@ def wait_for_extended_operation(
         raise operation.exception() or RuntimeError(operation.error_message)
 
     return result
+
+
+NAME_PATTERN = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
+
+LABEL_VALUE_PATTERN = re.compile(r"^[-a-z0-9]{0,63}$")
+
+
+def is_valid_resource_name(name: str) -> bool:
+    if len(name) < 1 or len(name) > 63:
+        return False
+    match = re.match(NAME_PATTERN, name)
+    return match is not None
+
+
+def is_valid_label_value(value: str) -> bool:
+    match = re.match(LABEL_VALUE_PATTERN, value)
+    return match is not None
+
+
+def generate_random_resource_name() -> str:
+    return random.choice(string.ascii_lowercase) + "".join(
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(40)
+    )
