@@ -146,6 +146,7 @@ def register_routes(app: FastAPI):
     app.include_router(users.router)
     app.include_router(projects.router)
     app.include_router(pools.router)
+    app.include_router(pools.root_router)
     app.include_router(backends.root_router)
     app.include_router(backends.project_router)
     app.include_router(repos.router)
