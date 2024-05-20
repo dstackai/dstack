@@ -213,8 +213,8 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
 
     if instance is not None:
         await wait_to_lock(PROCESSING_POOL_LOCK, PROCESSING_POOL_IDS, instance.id)
-        await session.refresh(instance)
         try:
+            await session.refresh(instance)
             # there is an associated instance to empty
             jpd: Optional[JobProvisioningData] = None
             if job_model.job_provisioning_data is not None:

@@ -93,30 +93,32 @@ async def process_instances() -> None:
             PROCESSING_POOL_IDS.update(i.id for i in instances)
 
     try:
-        for instance in instances:
-            if (
-                instance.status == InstanceStatus.PENDING
-                and instance.remote_connection_info is not None
-            ):
-                await add_remote(instance.id)
-
-            if (
-                instance.status == InstanceStatus.PENDING
-                and instance.remote_connection_info is None
-            ):
-                await create_instance(instance.id)
-
-            if instance.status in (
-                InstanceStatus.PROVISIONING,
-                InstanceStatus.IDLE,
-                InstanceStatus.BUSY,
-            ):
-                await check_instance(instance.id)
-
-            if instance.status == InstanceStatus.TERMINATING:
-                await terminate(instance.id)
+        futures = [process_instance(i) for i in instances]
+        for future in asyncio.as_completed(futures):
+            instance_id = await future
+            PROCESSING_POOL_IDS.remove(instance_id)
     finally:
         PROCESSING_POOL_IDS.difference_update(i.id for i in instances)
+
+
+async def process_instance(instance: InstanceModel) -> UUID:
+    if instance.status == InstanceStatus.PENDING and instance.remote_connection_info is not None:
+        await add_remote(instance.id)
+
+    if instance.status == InstanceStatus.PENDING and instance.remote_connection_info is None:
+        await create_instance(instance.id)
+
+    if instance.status in (
+        InstanceStatus.PROVISIONING,
+        InstanceStatus.IDLE,
+        InstanceStatus.BUSY,
+    ):
+        await check_instance(instance.id)
+
+    if instance.status == InstanceStatus.TERMINATING:
+        await terminate(instance.id)
+
+    return instance.id
 
 
 def deploy_instance(
@@ -704,45 +706,64 @@ async def terminate_idle_instances() -> None:
                     InstanceModel.deleted == False,
                     InstanceModel.job == None,  # noqa: E711
                     InstanceModel.status == InstanceStatus.IDLE,
+                    InstanceModel.id.not_in(PROCESSING_POOL_IDS),
                 )
                 .options(joinedload(InstanceModel.project))
             )
             instances = res.scalars().all()
+            if not instances:
+                return
 
-            for instance in instances:
-                last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
-                if instance.last_job_processed_at is not None:
-                    last_time = instance.last_job_processed_at.replace(
-                        tzinfo=datetime.timezone.utc
-                    )
+            PROCESSING_POOL_IDS.update(i.id for i in instances)
 
-                idle_seconds = instance.termination_idle_time
-                delta = datetime.timedelta(seconds=idle_seconds)
+    futures = [_terminate_idle_instance(i.id) for i in instances]
+    try:
+        for future in asyncio.as_completed(futures):
+            instance_id = await future
+            PROCESSING_POOL_IDS.remove(instance_id)
+    finally:
+        PROCESSING_POOL_IDS.difference_update(i.id for i in instances)
 
-                current_time = get_current_datetime()
-                if last_time + delta < current_time:
-                    jpd = JobProvisioningData.__response__.parse_raw(
-                        instance.job_provisioning_data
-                    )
-                    await terminate_job_provisioning_data_instance(
-                        project=instance.project, job_provisioning_data=jpd
-                    )
-                    instance.deleted = True
-                    instance.deleted_at = get_current_datetime()
-                    instance.finished_at = get_current_datetime()
-                    instance.status = InstanceStatus.TERMINATED
-                    instance.termination_reason = "Idle timeout"
-                    idle_time = current_time - last_time
-                    logger.info(
-                        "Instance %s terminated by termination policy: idle time %ss",
-                        instance.name,
-                        str(idle_time.seconds),
-                        extra={
-                            "instance_name": instance.name,
-                            "instance_status": InstanceStatus.TERMINATED.value,
-                        },
-                    )
-            await session.commit()
+
+async def _terminate_idle_instance(instance_id: UUID) -> UUID:
+    async with get_session_ctx() as session:
+        instance = (
+            await session.scalars(
+                select(InstanceModel)
+                .where(InstanceModel.id == instance_id)
+                .options(joinedload(InstanceModel.project))
+            )
+        ).one()
+        last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
+        if instance.last_job_processed_at is not None:
+            last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+
+        idle_seconds = instance.termination_idle_time
+        delta = datetime.timedelta(seconds=idle_seconds)
+
+        current_time = get_current_datetime()
+        if last_time + delta < current_time:
+            jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
+            await terminate_job_provisioning_data_instance(
+                project=instance.project, job_provisioning_data=jpd
+            )
+            instance.deleted = True
+            instance.deleted_at = get_current_datetime()
+            instance.finished_at = get_current_datetime()
+            instance.status = InstanceStatus.TERMINATED
+            instance.termination_reason = "Idle timeout"
+            idle_time = current_time - last_time
+            logger.info(
+                "Instance %s terminated by termination policy: idle time %ss",
+                instance.name,
+                str(idle_time.seconds),
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
+            )
+        await session.commit()
+    return instance_id
 
 
 def _get_retry_duration_deadline(instance: InstanceModel) -> datetime.datetime:
