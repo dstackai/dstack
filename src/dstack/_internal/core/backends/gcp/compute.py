@@ -29,6 +29,9 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class GCPCompute(Compute):
@@ -94,6 +97,16 @@ class GCPCompute(Compute):
     ) -> JobProvisioningData:
         instance_name = instance_config.instance_name
 
+        if not gcp_resources.is_valid_resource_name(instance_name):
+            # In a rare case the instance name is invalid in GCP,
+            # we better use a random instance name than fail provisioning.
+            instance_name = gcp_resources.generate_random_resource_name()
+            logger.warning(
+                "Invalid GCP instance name: %s. A new valid name is generated: %s",
+                instance_config.instance_name,
+                instance_name,
+            )
+
         authorized_keys = instance_config.get_public_keys()
 
         gcp_resources.create_runner_firewall_rules(
@@ -101,6 +114,13 @@ class GCPCompute(Compute):
             project_id=self.config.project_id,
         )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+
+        labels = {
+            "owner": "dstack",
+            "dstack_project": instance_config.project_name.lower(),
+            "dstack_user": instance_config.user.lower(),
+        }
+        labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
 
         for zone in _get_instance_zones(instance_offer):
             request = compute_v1.InsertInstanceRequest()
@@ -120,11 +140,7 @@ class GCPCompute(Compute):
                 spot=instance_offer.instance.resources.spot,
                 user_data=get_user_data(authorized_keys),
                 authorized_keys=authorized_keys,
-                labels={
-                    "owner": "dstack",
-                    "dstack_project": instance_config.project_name.lower(),
-                    "dstack_user": instance_config.user.lower(),
-                },
+                labels=labels,
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,
                 zone=zone,

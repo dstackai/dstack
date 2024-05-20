@@ -88,7 +88,7 @@ class Compute(ABC):
 
 
 def get_instance_name(run: Run, job: Job) -> str:
-    return f"{run.project_name}-{job.job_spec.job_name}"
+    return f"{run.project_name.lower()}-{job.job_spec.job_name}"
 
 
 def get_user_data(authorized_keys: List[str]) -> str:
