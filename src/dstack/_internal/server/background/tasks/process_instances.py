@@ -102,6 +102,13 @@ async def process_instances() -> None:
 
 
 async def process_instance(instance: InstanceModel) -> UUID:
+    if (
+        instance.status == InstanceStatus.IDLE
+        and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
+        and instance.job_id is None
+    ):
+        await terminate_idle_instance(instance.id)
+
     if instance.status == InstanceStatus.PENDING and instance.remote_connection_info is not None:
         await add_remote(instance.id)
 
@@ -696,36 +703,7 @@ async def terminate(instance_id: UUID) -> None:
         await session.commit()
 
 
-async def terminate_idle_instances() -> None:
-    async with get_session_ctx() as session:
-        async with PROCESSING_POOL_LOCK:
-            res = await session.execute(
-                select(InstanceModel)
-                .where(
-                    InstanceModel.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE,
-                    InstanceModel.deleted == False,
-                    InstanceModel.job == None,  # noqa: E711
-                    InstanceModel.status == InstanceStatus.IDLE,
-                    InstanceModel.id.not_in(PROCESSING_POOL_IDS),
-                )
-                .options(joinedload(InstanceModel.project))
-            )
-            instances = res.scalars().all()
-            if not instances:
-                return
-
-            PROCESSING_POOL_IDS.update(i.id for i in instances)
-
-    futures = [_terminate_idle_instance(i.id) for i in instances]
-    try:
-        for future in asyncio.as_completed(futures):
-            instance_id = await future
-            PROCESSING_POOL_IDS.remove(instance_id)
-    finally:
-        PROCESSING_POOL_IDS.difference_update(i.id for i in instances)
-
-
-async def _terminate_idle_instance(instance_id: UUID) -> UUID:
+async def terminate_idle_instance(instance_id: UUID):
     async with get_session_ctx() as session:
         instance = (
             await session.scalars(
@@ -763,7 +741,6 @@ async def _terminate_idle_instance(instance_id: UUID) -> UUID:
                 },
             )
         await session.commit()
-    return instance_id
 
 
 def _get_retry_duration_deadline(instance: InstanceModel) -> datetime.datetime:
