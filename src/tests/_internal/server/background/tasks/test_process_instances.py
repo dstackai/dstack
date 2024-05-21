@@ -21,7 +21,6 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.server.background.tasks.process_instances import (
     HealthStatus,
     process_instances,
-    terminate_idle_instances,
 )
 from dstack._internal.server.background.tasks.process_instances import (
     create_instance as task_create_instance,
@@ -220,25 +219,21 @@ class TestCheckShim:
         assert instance.health_status == health_status
 
 
-class TestIdleTime:
+class TestTerminateIdleTime:
     @pytest.mark.asyncio
     async def test_terminate_by_idle_timeout(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         pool = await create_pool(session, project)
-
         instance = await create_instance(session, project, pool, status=InstanceStatus.IDLE)
         instance.termination_idle_time = 300
         instance.termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
         instance.last_job_processed_at = get_current_datetime() + dt.timedelta(minutes=-19)
         await session.commit()
-
         with patch(
             "dstack._internal.server.background.tasks.process_instances.terminate_job_provisioning_data_instance"
         ):
-            await terminate_idle_instances()
-
+            await process_instances()
         await session.refresh(instance)
-
         assert instance is not None
         assert instance.status == InstanceStatus.TERMINATED
         assert instance.termination_reason == "Idle timeout"
