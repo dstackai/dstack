@@ -712,35 +712,37 @@ async def terminate_idle_instance(instance_id: UUID):
                 .options(joinedload(InstanceModel.project))
             )
         ).one()
-        last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
-        if instance.last_job_processed_at is not None:
-            last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
-
+        current_time = get_current_datetime()
+        idle_duration = _get_instance_idle_duration(instance)
         idle_seconds = instance.termination_idle_time
         delta = datetime.timedelta(seconds=idle_seconds)
-
-        current_time = get_current_datetime()
-        if last_time + delta < current_time:
+        if idle_duration > delta:
             jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
             await terminate_job_provisioning_data_instance(
                 project=instance.project, job_provisioning_data=jpd
             )
             instance.deleted = True
-            instance.deleted_at = get_current_datetime()
-            instance.finished_at = get_current_datetime()
+            instance.deleted_at = current_time
+            instance.finished_at = current_time
             instance.status = InstanceStatus.TERMINATED
             instance.termination_reason = "Idle timeout"
-            idle_time = current_time - last_time
             logger.info(
                 "Instance %s terminated by termination policy: idle time %ss",
                 instance.name,
-                str(idle_time.seconds),
+                str(idle_duration.seconds),
                 extra={
                     "instance_name": instance.name,
                     "instance_status": InstanceStatus.TERMINATED.value,
                 },
             )
         await session.commit()
+
+
+def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:
+    last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
+    if instance.last_job_processed_at is not None:
+        last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+    return get_current_datetime() - last_time
 
 
 def _get_retry_duration_deadline(instance: InstanceModel) -> datetime.datetime:
