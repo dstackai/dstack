@@ -11,7 +11,12 @@ from rich.live import Live
 from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec, memory_spec
+from dstack._internal.cli.services.args import (
+    cpu_spec,
+    disk_spec,
+    gpu_spec,
+    memory_spec,
+)
 from dstack._internal.cli.services.profile import (
     apply_profile_args,
     register_profile_args,
@@ -25,11 +30,22 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import Profile, SpotPolicy, parse_duration
-from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
-from dstack._internal.core.models.runs import InstanceStatus, Requirements, get_policy_map
+from dstack._internal.core.models.resources import (
+    DEFAULT_CPU_COUNT,
+    DEFAULT_MEMORY_SIZE,
+)
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    Requirements,
+    get_policy_map,
+)
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.ssh import convert_pkcs8_to_pem, generate_public_key, rsa_pkey_from_str
+from dstack._internal.utils.ssh import (
+    convert_pkcs8_to_pem,
+    generate_public_key,
+    rsa_pkey_from_str,
+)
 from dstack.api._public.resources import Resources
 from dstack.api.utils import load_profile
 
@@ -100,7 +116,9 @@ class PoolCommand(APIBaseCommand):
 
         # add instance
         add_parser = subparsers.add_parser(
-            "add", help="Add instance to pool", formatter_class=self._parser.formatter_class
+            "add",
+            help="Add instance to pool",
+            formatter_class=self._parser.formatter_class,
         )
         self._parser.add_argument(
             "--max-offers",
@@ -120,6 +138,7 @@ class PoolCommand(APIBaseCommand):
             "rm",
             help="Remove instance from the pool",
             formatter_class=self._parser.formatter_class,
+            aliases=["remove"],
         )
         remove_parser.add_argument(
             "instance_name",
@@ -231,7 +250,8 @@ class PoolCommand(APIBaseCommand):
                 while True:
                     resp = self.api.client.pool.show(self.api.project, args.pool_name)
                     group = Group(
-                        pool_name_template.format(resp.name), get_instance_table(resp.instances)
+                        pool_name_template.format(resp.name),
+                        get_instance_table(resp.instances),
                     )
                     live.update(group)
                     time.sleep(LIVE_PROVISION_INTERVAL_SECS)
