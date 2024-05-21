@@ -236,9 +236,9 @@ def launch_instance(
     display_name: str,
     cloud_init_user_data: str,
     shape: str,
+    disk_size_gb: int,
     image_id: str,
 ) -> oci.core.models.Instance:
-    # TODO(#1194): allow setting disk size
     return region.compute_client.launch_instance(
         oci.core.models.LaunchInstanceDetails(
             availability_domain=availability_domain,
@@ -252,7 +252,10 @@ def launch_instance(
                 user_data=base64.b64encode(cloud_init_user_data.encode()).decode(),
             ),
             shape=shape,
-            source_details=oci.core.models.InstanceSourceViaImageDetails(image_id=image_id),
+            source_details=oci.core.models.InstanceSourceViaImageDetails(
+                image_id=image_id,
+                boot_volume_size_in_gbs=disk_size_gb,
+            ),
         )
     ).data
 
