@@ -113,7 +113,7 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
             sudo mv /tmp/dstack-shim.service /etc/systemd/system/dstack-shim.service && \
             sudo systemctl daemon-reload && \
             sudo systemctl --quiet enable dstack-shim && \
-            sudo systemctl start dstack-shim
+            sudo systemctl restart dstack-shim
         """
         _, stdout, stderr = client.exec_command(cmd, timeout=100)
         out = stdout.read().strip().decode()
