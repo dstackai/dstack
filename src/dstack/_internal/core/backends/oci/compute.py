@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict, List, Optional, Set
 
+import oci
+
 from dstack._internal.core.backends.base.compute import Compute, get_instance_name, get_user_data
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.oci import resources
@@ -132,23 +134,28 @@ class OCICompute(Compute):
             instance_offer.instance.name, self.shapes_quota, region, self.pre_conf.compartment_id
         )
         if availability_domain is None:
-            raise NoCapacityError()
+            raise NoCapacityError("Shape unavailable in all availability domains")
 
         if len(instance_offer.instance.resources.gpus) > 0:
             image_id = self.pre_conf.cuda_image_ids[instance_offer.region]
         else:
             image_id = self.pre_conf.standard_image_ids[instance_offer.region]
 
-        instance = resources.launch_instance(
-            region=region,
-            availability_domain=availability_domain,
-            compartment_id=self.pre_conf.compartment_id,
-            subnet_id=self.pre_conf.subnet_ids[instance_offer.region],
-            display_name=instance_config.instance_name,
-            cloud_init_user_data=get_user_data(instance_config.get_public_keys()),
-            shape=instance_offer.instance.name,
-            image_id=image_id,
-        )
+        try:
+            instance = resources.launch_instance(
+                region=region,
+                availability_domain=availability_domain,
+                compartment_id=self.pre_conf.compartment_id,
+                subnet_id=self.pre_conf.subnet_ids[instance_offer.region],
+                display_name=instance_config.instance_name,
+                cloud_init_user_data=get_user_data(instance_config.get_public_keys()),
+                shape=instance_offer.instance.name,
+                image_id=image_id,
+            )
+        except oci.exceptions.ServiceError as e:
+            if e.code in ("LimitExceeded", "QuotaExceeded"):
+                raise NoCapacityError(e.message)
+            raise
 
         return JobProvisioningData(
             backend=instance_offer.backend,
