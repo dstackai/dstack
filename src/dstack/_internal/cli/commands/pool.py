@@ -117,7 +117,7 @@ class PoolCommand(APIBaseCommand):
 
         # remove instance
         remove_parser = subparsers.add_parser(
-            "remove",
+            "rm",
             help="Remove instance from the pool",
             formatter_class=self._parser.formatter_class,
         )
