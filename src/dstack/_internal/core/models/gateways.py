@@ -17,12 +17,18 @@ class GatewayStatus(str, Enum):
 
 
 class LetsEncryptGatewayCertificate(CoreModel):
-    type: Literal["lets-encrypt"] = "lets-encrypt"
+    type: Annotated[
+        Literal["lets-encrypt"], Field(description="Automatic certificates by Let's Encrypt")
+    ] = "lets-encrypt"
 
 
 class ACMGatewayCertificate(CoreModel):
-    type: Literal["acm"] = "acm"
-    arn: Annotated[str, Field(description="The gateway region")]
+    type: Annotated[
+        Literal["acm"], Field(description="Certificates by AWS Certificate Manager (ACM)")
+    ] = "acm"
+    arn: Annotated[
+        str, Field(description="The ARN of the wildcard ACM certificate for the domain")
+    ]
 
 
 # TODO: Allow setting up custom ACME certificate (e.g. ZeroSSL) via GatewayConfiguration
@@ -48,7 +54,8 @@ class GatewayConfiguration(CoreModel):
     ] = None
     public_ip: Annotated[bool, Field(description="Allocate public IP for the gateway")] = True
     certificate: Annotated[
-        Optional[AnyGatewayCertificate], Field(description="The SSL certificate configuration")
+        Optional[AnyGatewayCertificate],
+        Field(description="The SSL certificate configuration. Defaults to `type: lets-encrypt`"),
     ] = LetsEncryptGatewayCertificate()
 
 

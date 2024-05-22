@@ -12,7 +12,7 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
     table = Table(box=None)
     table.add_column("BACKEND")
     table.add_column("REGION")
-    table.add_column("NAME")
+    table.add_column("NAME", no_wrap=True)
     table.add_column("HOSTNAME", no_wrap=True)
     table.add_column("DOMAIN")
     table.add_column("DEFAULT")

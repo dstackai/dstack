@@ -142,18 +142,11 @@ async def create_gateway(
     project: ProjectModel,
     configuration: GatewayConfiguration,
 ) -> Gateway:
+    _validate_gateway_configuration(configuration)
+
     backend_model, _ = await get_project_backend_with_model_by_type_or_error(
         project=project, backend_type=configuration.backend
     )
-
-    if (
-        not configuration.public_ip
-        and configuration.backend not in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT
-    ):
-        raise ServerClientError(
-            f"Private gateways are not supported for {configuration.backend.value} backend. "
-            f"Supported backends: {[b.value for b in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT]}."
-        )
 
     if configuration.name is None:
         configuration.name = await generate_gateway_name(session=session, project=project)
@@ -635,29 +628,40 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
     )
 
 
-def _get_service_https(
-    run_spec: RunSpec, gateway_configuration: Optional[GatewayConfiguration]
-) -> bool:
+def _validate_gateway_configuration(configuration: GatewayConfiguration):
+    if (
+        not configuration.public_ip
+        and configuration.backend not in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT
+    ):
+        raise ServerClientError(
+            f"Private gateways are not supported for {configuration.backend.value} backend. "
+            f"Supported backends: {[b.value for b in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT]}."
+        )
+
+    if configuration.certificate is not None:
+        if configuration.certificate.type == "lets-encrypt" and not configuration.public_ip:
+            raise ServerClientError(
+                "lets-encrypt certificate type is not supported for private gateways"
+            )
+        if configuration.certificate.type == "acm" and configuration.backend != BackendType.AWS:
+            raise ServerClientError("acm certificate type is supported for aws backend only")
+
+
+def _get_service_https(run_spec: RunSpec, configuration: Optional[GatewayConfiguration]) -> bool:
     if not run_spec.configuration.https:
         return False
-    if gateway_configuration is None:
+    if configuration is None:
         return True
-    if (
-        gateway_configuration.certificate is not None
-        and gateway_configuration.certificate.type == "acm"
-    ):
+    if configuration.certificate is not None and configuration.certificate.type == "acm":
         return False
     return True
 
 
-def _get_gateway_https(
-    run_spec: RunSpec, gateway_configuration: Optional[GatewayConfiguration]
-) -> bool:
-    if gateway_configuration is None:
+def _get_gateway_https(run_spec: RunSpec, configuration: Optional[GatewayConfiguration]) -> bool:
+    if configuration is None:
         return True
-    if (
-        gateway_configuration.certificate is not None
-        and gateway_configuration.certificate.type == "acm"
-    ):
+    if configuration.certificate is not None and configuration.certificate.type == "acm":
         return False
-    return True
+    if configuration.certificate is not None and configuration.certificate.type == "lets-encrypt":
+        return True
+    return False
