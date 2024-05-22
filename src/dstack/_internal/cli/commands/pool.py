@@ -296,10 +296,10 @@ class PoolCommand(APIBaseCommand):
         # validate network
         if args.network is not None:
             try:
-                network = ipaddress.ip_network(args.network)
+                network = ipaddress.IPv4Interface(args.network).network
             except ValueError as e:
                 console.print(
-                    f"[error]Can't parse network. The address must be in the format <ip>/<netmask>. Error: {e}[/]"
+                    f"[error]Can't parse network. The address must be in the format <network address>/<netmask>, example `10.0.0.0/24`. Error: {e}[/]"
                 )
                 return
             if not network.is_private:
