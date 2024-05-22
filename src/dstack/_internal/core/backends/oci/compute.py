@@ -150,6 +150,7 @@ class OCICompute(Compute):
                 display_name=instance_config.instance_name,
                 cloud_init_user_data=get_user_data(instance_config.get_public_keys()),
                 shape=instance_offer.instance.name,
+                disk_size_gb=round(instance_offer.instance.resources.disk.size_mib / 1024),
                 image_id=image_id,
             )
         except oci.exceptions.ServiceError as e:
