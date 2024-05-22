@@ -27,11 +27,11 @@ There are two ways to configure AWS: using an access key or using the default cr
     projects:
     - name: main
       backends:
-      - type: aws
-        creds:
-          type: access_key
-          access_key: KKAAUKLIZ5EHKICAOASV
-          secret_key: pn158lMqSBJiySwpQ9ubwmI6VUU3/W2fdJdFwfgO
+        - type: aws
+          creds:
+            type: access_key
+            access_key: KKAAUKLIZ5EHKICAOASV
+            secret_key: pn158lMqSBJiySwpQ9ubwmI6VUU3/W2fdJdFwfgO
     ```
     
     </div>
@@ -44,11 +44,11 @@ There are two ways to configure AWS: using an access key or using the default cr
     
     ```yaml
     projects:
-    - name: main
-      backends:
-      - type: aws
-        creds:
-          type: default
+      - name: main
+        backends:
+          - type: aws
+            creds:
+              type: default
     ```
     
     </div>
@@ -60,28 +60,28 @@ There are two ways to configure AWS: using an access key or using the default cr
 
         ```yaml
         projects:
-        - name: main
-          backends:
-            - type: aws
-              creds:
-                type: default
+          - name: main
+            backends:
+              - type: aws
+                creds:
+                  type: default
 
-              vpc_name: my-vpc
+                vpc_name: my-vpc
         ```
 
     === "vpc_ids"
         ```yaml
         projects:
-        - name: main
-          backends:
-            - type: aws
-              creds:
-                type: default
+          - name: main
+            backends:
+              - type: aws
+                creds:
+                  type: default
 
-              vpc_ids:
-                us-east-1: vpc-0a2b3c4d5e6f7g8h
-                us-east-2: vpc-9i8h7g6f5e4d3c2b
-                us-west-1: vpc-4d3c2b1a0f9e8d7
+                vpc_ids:
+                  us-east-1: vpc-0a2b3c4d5e6f7g8h
+                  us-east-2: vpc-9i8h7g6f5e4d3c2b
+                  us-west-1: vpc-4d3c2b1a0f9e8d7
         ```
 
     Note, the VPCs are required to have a public subnet.
@@ -161,13 +161,13 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
     ```yaml
     projects:
-    - name: main
-    backends:
-    - type: azure
-        subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
-        tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
-        creds:
-        type: default
+      - name: main
+        backends:
+          - type: azure
+            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
+            creds:
+              type: default
     ```
 
     </div>
@@ -248,12 +248,12 @@ There are two ways to configure GCP: using a service account or using the defaul
     ```yaml
     projects:
     - name: main
-    backends:
-    - type: gcp
-        project_id: gcp-project-id
-        creds:
-        type: service_account
-        filename: ~/.dstack/server/gcp-024ed630eab5.json
+      backends:
+        - type: gcp
+          project_id: gcp-project-id
+          creds:
+            type: service_account
+            filename: ~/.dstack/server/gcp-024ed630eab5.json
     ```
 
     </div>
@@ -265,11 +265,11 @@ There are two ways to configure GCP: using a service account or using the defaul
     ```yaml
     projects:
     - name: main
-    backends:
-    - type: gcp
-        project_id: gcp-project-id
-        creds:
-        type: default
+      backends:
+        - type: gcp
+          project_id: gcp-project-id
+          creds:
+            type: default
     ```
 
     </div>
@@ -313,11 +313,11 @@ Then, go ahead and configure the backend:
 ```yaml
 projects:
 - name: main
-backends:
-- type: lambda
-    creds:
-    type: api_key
-    api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
+  backends:
+    - type: lambda
+      creds:
+        type: api_key
+        api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
 ```
 
 </div>
@@ -333,13 +333,13 @@ Then, go ahead and configure the backend:
 
 ```yaml
 projects:
-- name: main
-backends:
-- type: tensordock
-    creds:
-    type: api_key
-    api_key: 248e621d-9317-7494-dc1557fa5825b-98b
-    api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
+  - name: main
+    backends:
+      - type: tensordock
+        creds:
+          type: api_key
+          api_key: 248e621d-9317-7494-dc1557fa5825b-98b
+          api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
 ```
 
 </div>
@@ -359,11 +359,11 @@ Then, go ahead and configure the backend:
 ```yaml
 projects:
 - name: main
-backends:
-- type: vastai
-    creds:
-    type: api_key
-    api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
+  backends:
+    - type: vastai
+      creds:
+        type: api_key
+        api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
 ```
 
 </div>
@@ -381,13 +381,13 @@ Ensure you've created a project with CUDO Compute, then proceed to configuring t
 
 ```yaml
 projects:
-- name: main
-backends:
-- type: cudo
-    project_id: my-cudo-project
-    creds:
-    type: api_key
-    api_key: 7487240a466624b48de22865589
+  - name: main
+    backends:
+      - type: cudo
+        project_id: my-cudo-project
+        creds:
+          type: api_key
+          api_key: 7487240a466624b48de22865589
 ```
 
 </div>
@@ -403,12 +403,12 @@ Then proceed to configuring the backend.
 
 ```yaml
 projects:
-- name: main
-backends:
-- type: runpod
-    creds:
-    type: api_key
-    api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+  - name: main
+    backends:
+      - type: runpod
+        creds:
+          type: api_key
+          api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
 ```
 
 </div>
@@ -430,13 +430,13 @@ Then, go ahead and configure the backend:
 
 ```yaml
 projects:
-- name: main
-backends:
-- type: datacrunch
-    creds:
-    type: api_key
-    client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
-    client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8
+  - name: main
+    backends:
+      - type: datacrunch
+        creds:
+          type: api_key
+          client_id: xfaHBqYEsArqhKWX-e52x3HH7w8T
+          client_secret: B5ZU5Qx9Nt8oGMlmMhNI3iglK8bjMhagTbylZy4WzncZe39995f7Vxh8
 ```
 
 </div>
@@ -466,13 +466,13 @@ In case of a self-managed cluster, also specify the IP address of any node in th
     ```yaml
     projects:
     - name: main
-    backends:
-    - type: kubernetes
-        kubeconfig:
-        filename: ~/.kube/config
-        networking:
-        ssh_host: localhost # The external IP address of any node
-        ssh_port: 32000 # Any port accessible outside of the cluster
+      backends:
+        - type: kubernetes
+          kubeconfig:
+          filename: ~/.kube/config
+          networking:
+          ssh_host: localhost # The external IP address of any node
+          ssh_port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>
@@ -487,9 +487,9 @@ In case of a self-managed cluster, also specify the IP address of any node in th
     kind: Cluster
     apiVersion: kind.x-k8s.io/v1alpha4
     nodes:
-    - role: control-plane
-    extraPortMappings:
-    - containerPort: 32000 # Must be same as `ssh_port`
+      - role: control-plane
+        extraPortMappings:
+      - containerPort: 32000 # Must be same as `ssh_port`
         hostPort: 32000 # Must be same as `ssh_port`
     ```
 
@@ -504,13 +504,13 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 
     ```yaml
     projects:
-    - name: main
-    backends:
-    - type: kubernetes
-        kubeconfig:
-        filename: ~/.kube/config
-        networking:
-        ssh_port: 32000 # Any port accessible outside of the cluster
+      - name: main
+        backends:
+          - type: kubernetes
+            kubeconfig:
+            filename: ~/.kube/config
+            networking:
+            ssh_port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>

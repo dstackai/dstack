@@ -15,13 +15,13 @@ configure a backend for each cloud account that you'd like to use.
 
 ```yaml
 projects:
-- name: main
-  backends:
-  - type: aws
-    creds:
-      type: access_key
-      access_key: AIZKISCVKUKO5AAKLAEH
-      secret_key: QSbmpqJIUBn1V5U3pyM9S6lwwiu8/fOJ2dgfwFdW
+  - name: main
+    backends:
+      - type: aws
+        creds:
+          type: access_key
+          access_key: AIZKISCVKUKO5AAKLAEH
+          secret_key: QSbmpqJIUBn1V5U3pyM9S6lwwiu8/fOJ2dgfwFdW
 ```
 
 </div>
