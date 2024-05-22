@@ -30,6 +30,7 @@ from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayConfiguration,
     GatewayStatus,
+    LetsEncryptGatewayCertificate,
 )
 from dstack._internal.core.models.runs import (
     Run,
@@ -115,6 +116,7 @@ async def create_gateway_compute(
         region=configuration.region,
         public_ip=configuration.public_ip,
         ssh_key_pub=gateway_ssh_public_key,
+        certificate=configuration.certificate,
     )
 
     info = await run_async(
@@ -124,9 +126,12 @@ async def create_gateway_compute(
 
     return GatewayComputeModel(
         backend_id=backend_id,
-        ip_address=info.ip_address,
         region=info.region,
+        ip_address=info.ip_address,
         instance_id=info.instance_id,
+        hostname=info.hostname,
+        configuration=compute_configuration.json(),
+        backend_data=info.backend_data,
         ssh_private_key=gateway_ssh_private_key,
         ssh_public_key=gateway_ssh_public_key,
     )
@@ -211,11 +216,17 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
         backend = await get_project_backend_by_type_or_error(project, gateway.backend.type)
         tasks.append(_terminate_gateway(gateway=gateway, backend=backend))
         gateways.append(gateway)
+    logger.info("Deleting gateways: %s", [g.name for g in gateways])
     # terminate in parallel
     terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
     for gateway, error in zip(gateways, terminate_results):
         if isinstance(error, Exception):
-            continue  # ignore error, but keep gateway
+            logger.exception(
+                "Error when deleting gateway compute for %s",
+                gateway.name,
+                exc_info=(type(error), error, error.__traceback__),
+            )
+            continue  # keep gateway
         if gateway.gateway_compute is not None:
             await gateway_connections_pool.remove(gateway.gateway_compute.ip_address)
             gateway.gateway_compute.active = False
@@ -229,13 +240,16 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
 
 async def _terminate_gateway(gateway: GatewayModel, backend: Backend):
     await wait_to_lock(PROCESSING_GATEWAYS_LOCK, PROCESSING_GATEWAYS_IDS, gateway.id)
-    if gateway.gateway_compute is not None:
+    gateway_compute_configuration = get_gateway_compute_configuration(gateway)
+    if gateway.gateway_compute is not None and gateway_compute_configuration is not None:
+        logger.info("Deleting gateway compute for %s...", gateway.name)
         await run_async(
-            backend.compute().terminate_instance,
+            backend.compute().terminate_gateway,
             gateway.gateway_compute.instance_id,
-            gateway.gateway_compute.region,
-            None,
+            gateway_compute_configuration,
+            gateway.gateway_compute.backend_data,
         )
+        logger.info("Deleted gateway compute for %s", gateway.name)
 
 
 async def set_gateway_wildcard_domain(
@@ -335,19 +349,23 @@ async def register_service(session: AsyncSession, run_model: RunModel):
     if gateway.status != GatewayStatus.RUNNING:
         raise ServerClientError("Gateway status is not running")
 
-    service_https = run_spec.configuration.https
-    service_protocol = "https" if service_https else "http"
-
     gateway_configuration = None
     if gateway.configuration is not None:
         gateway_configuration = GatewayConfiguration.__response__.parse_raw(gateway.configuration)
-        if service_https and not gateway_configuration.public_ip:
-            raise ServerClientError("Cannot run HTTPS service on gateway without public IP")
 
-    gateway_https = True
-    if gateway_configuration is not None:
-        # Currently, https is always False for private gateways
-        gateway_https = gateway_configuration.public_ip
+    service_https = _get_service_https(run_spec, gateway_configuration)
+    service_protocol = "https" if service_https else "http"
+
+    if (
+        service_https
+        and gateway_configuration is not None
+        and gateway_configuration.certificate is None
+    ):
+        raise ServerClientError(
+            "Cannot run HTTPS service on gateway with no SSL cerfificates configured"
+        )
+
+    gateway_https = _get_gateway_https(run_spec, gateway_configuration)
     gateway_protocol = "https" if gateway_https else "http"
 
     wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
@@ -565,12 +583,37 @@ def get_gateway_configuration(gateway_model: GatewayModel) -> GatewayConfigurati
     )
 
 
+def get_gateway_compute_configuration(
+    gateway_model: GatewayModel,
+) -> Optional[GatewayComputeConfiguration]:
+    if gateway_model.gateway_compute is None:
+        return None
+    if gateway_model.gateway_compute.configuration is not None:
+        return GatewayComputeConfiguration.__response__.parse_raw(
+            gateway_model.gateway_compute.configuration
+        )
+    # Handle gateways created before GatewayComputeConfiguration was introduced
+    return GatewayComputeConfiguration(
+        project_name=gateway_model.project.name,
+        instance_name=gateway_model.gateway_compute.instance_id,
+        backend=gateway_model.backend.type,
+        region=gateway_model.gateway_compute.region,
+        public_ip=True,
+        ssh_key_pub=gateway_model.gateway_compute.ssh_public_key,
+        certificate=LetsEncryptGatewayCertificate(),
+    )
+
+
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
     ip_address = ""
     instance_id = ""
+    hostname = ""
     if gateway_model.gateway_compute is not None:
         ip_address = gateway_model.gateway_compute.ip_address
         instance_id = gateway_model.gateway_compute.instance_id
+        hostname = gateway_model.gateway_compute.hostname
+        if hostname is None:
+            hostname = ip_address
     backend_type = gateway_model.backend.type
     if gateway_model.backend.type == BackendType.DSTACK:
         backend_type = BackendType.AWS
@@ -580,12 +623,41 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
         name=gateway_model.name,
         ip_address=ip_address,
         instance_id=instance_id,
+        hostname=hostname,
+        backend=backend_type,
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=gateway_model.project.default_gateway_id == gateway_model.id,
         created_at=gateway_model.created_at.replace(tzinfo=timezone.utc),
-        backend=backend_type,
         status=gateway_model.status,
         status_message=gateway_model.status_message,
         configuration=configuration,
     )
+
+
+def _get_service_https(
+    run_spec: RunSpec, gateway_configuration: Optional[GatewayConfiguration]
+) -> bool:
+    if not run_spec.configuration.https:
+        return False
+    if gateway_configuration is None:
+        return True
+    if (
+        gateway_configuration.certificate is not None
+        and gateway_configuration.certificate.type == "acm"
+    ):
+        return False
+    return True
+
+
+def _get_gateway_https(
+    run_spec: RunSpec, gateway_configuration: Optional[GatewayConfiguration]
+) -> bool:
+    if gateway_configuration is None:
+        return True
+    if (
+        gateway_configuration.certificate is not None
+        and gateway_configuration.certificate.type == "acm"
+    ):
+        return False
+    return True

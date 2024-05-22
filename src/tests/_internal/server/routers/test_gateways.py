@@ -63,6 +63,7 @@ class TestListAndGetGateways:
                 "status_message": None,
                 "instance_id": gateway_compute.instance_id,
                 "ip_address": gateway_compute.ip_address,
+                "hostname": gateway_compute.ip_address,
                 "name": gateway.name,
                 "region": gateway.region,
                 "wildcard_domain": gateway.wildcard_domain,
@@ -74,6 +75,7 @@ class TestListAndGetGateways:
                     "domain": gateway.wildcard_domain,
                     "default": False,
                     "public_ip": True,
+                    "certificate": {"type": "lets-encrypt"},
                 },
             }
         ]
@@ -110,6 +112,7 @@ class TestListAndGetGateways:
             "status_message": None,
             "instance_id": gateway_compute.instance_id,
             "ip_address": gateway_compute.ip_address,
+            "hostname": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
@@ -121,6 +124,7 @@ class TestListAndGetGateways:
                 "domain": gateway.wildcard_domain,
                 "default": False,
                 "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
             },
         }
 
@@ -175,6 +179,7 @@ class TestCreateGateway:
             "status_message": None,
             "instance_id": "",
             "ip_address": "",
+            "hostname": "",
             "wildcard_domain": None,
             "default": True,
             "created_at": response.json()["created_at"],
@@ -186,6 +191,7 @@ class TestCreateGateway:
                 "domain": None,
                 "default": True,
                 "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
             },
         }
 
@@ -214,6 +220,7 @@ class TestCreateGateway:
             "status_message": None,
             "instance_id": "",
             "ip_address": "",
+            "hostname": "",
             "wildcard_domain": None,
             "default": True,
             "created_at": response.json()["created_at"],
@@ -225,6 +232,7 @@ class TestCreateGateway:
                 "domain": None,
                 "default": True,
                 "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
             },
         }
 
@@ -321,6 +329,7 @@ class TestDefaultGateway:
             "status_message": None,
             "instance_id": gateway_compute.instance_id,
             "ip_address": gateway_compute.ip_address,
+            "hostname": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
@@ -332,6 +341,7 @@ class TestDefaultGateway:
                 "domain": gateway.wildcard_domain,
                 "default": True,
                 "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
             },
         }
 
@@ -399,9 +409,9 @@ class TestDeleteGateway:
             "dstack._internal.server.services.gateways.get_project_backend_by_type_or_error"
         ) as m:
             aws = Mock()
-            aws.compute.return_value.terminate_instance.return_value = None  # success
+            aws.compute.return_value.terminate_gateway.return_value = None  # success
             gcp = Mock()
-            gcp.compute.return_value.terminate_instance.side_effect = DstackError()  # fail
+            gcp.compute.return_value.terminate_gateway.side_effect = DstackError()  # fail
 
             def get_backend(_, backend_type):
                 return {BackendType.AWS: aws, BackendType.GCP: gcp}[backend_type]
@@ -413,8 +423,8 @@ class TestDeleteGateway:
                 json={"names": [gateway_aws.name, gateway_gcp.name]},
                 headers=get_auth_headers(user.token),
             )
-            aws.compute.return_value.terminate_instance.assert_called_once()
-            gcp.compute.return_value.terminate_instance.assert_called_once()
+            aws.compute.return_value.terminate_gateway.assert_called_once()
+            gcp.compute.return_value.terminate_gateway.assert_called_once()
             assert response.status_code == 200
 
         response = client.post(
@@ -431,6 +441,7 @@ class TestDeleteGateway:
                 "status_message": None,
                 "instance_id": gateway_compute_gcp.instance_id,
                 "ip_address": gateway_compute_gcp.ip_address,
+                "hostname": gateway_compute_gcp.ip_address,
                 "name": gateway_gcp.name,
                 "region": gateway_gcp.region,
                 "wildcard_domain": gateway_gcp.wildcard_domain,
@@ -442,6 +453,7 @@ class TestDeleteGateway:
                     "domain": gateway_gcp.wildcard_domain,
                     "default": False,
                     "public_ip": True,
+                    "certificate": {"type": "lets-encrypt"},
                 },
             }
         ]
@@ -493,6 +505,7 @@ class TestUpdateGateway:
             "default": False,
             "instance_id": gateway_compute.instance_id,
             "ip_address": gateway_compute.ip_address,
+            "hostname": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": "test.com",
@@ -504,6 +517,7 @@ class TestUpdateGateway:
                 "domain": "test.com",
                 "default": False,
                 "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
             },
         }
 

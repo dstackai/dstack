@@ -261,6 +261,9 @@ class GatewayComputeModel(BaseModel):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
     instance_id: Mapped[str] = mapped_column(String(100))
     ip_address: Mapped[str] = mapped_column(String(100))
+    hostname: Mapped[Optional[str]] = mapped_column(String(100))
+    configuration: Mapped[Optional[str]] = mapped_column(Text)
+    backend_data: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[str] = mapped_column(String(100))
 
     backend_id: Mapped[Optional[uuid.UUID]] = mapped_column(

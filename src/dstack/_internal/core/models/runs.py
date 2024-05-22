@@ -204,7 +204,7 @@ class JobProvisioningData(CoreModel):
     public_ip_enabled: bool = True
     # instance_network a network address for multimode installation. Specified as `<ip address>/<netmask>`
     # internal_ip will be selected from the specified network
-    instance_network: Optional[str]
+    instance_network: Optional[str] = None
     region: str
     price: float
     username: str

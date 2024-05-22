@@ -72,7 +72,7 @@ class DockerConfig(CoreModel):
 class InstanceConfiguration(CoreModel):
     project_name: str
     instance_name: str  # unique in pool
-    instance_id: Optional[str]
+    instance_id: Optional[str] = None
     ssh_keys: List[SSHKey]
     job_docker_config: Optional[DockerConfig]
     user: str  # dstack user name
@@ -118,3 +118,5 @@ class LaunchedGatewayInfo(CoreModel):
     instance_id: str
     ip_address: str
     region: str
+    hostname: Optional[str] = None
+    backend_data: Optional[str] = None  # backend-specific data in json

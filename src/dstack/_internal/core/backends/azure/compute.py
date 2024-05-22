@@ -230,6 +230,18 @@ class AzureCompute(Compute):
             region=configuration.region,
         )
 
+    def terminate_gateway(
+        self,
+        instance_id: str,
+        configuration: GatewayComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
+        self.terminate_instance(
+            instance_id=instance_id,
+            region=configuration.region,
+            backend_data=backend_data,
+        )
+
 
 class VMImageVariant(enum.Enum):
     GRID = enum.auto()

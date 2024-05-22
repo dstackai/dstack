@@ -256,18 +256,19 @@ def get_vpc_by_vpc_id(ec2_client: botocore.client.BaseClient, vpc_id: str) -> Op
     return None
 
 
-def get_subnet_id_for_vpc(
+def get_subnets_ids_for_vpc(
     ec2_client: botocore.client.BaseClient,
     vpc_id: str,
     allocate_public_ip: bool,
-) -> Optional[str]:
+) -> List[str]:
     """
-    If `allocate_public_ip` is True, returns a first public subnet found in the VPC.
-    If `allocate_public_ip` is False, returns a first subnet with NAT found in the VPC.
+    If `allocate_public_ip` is True, returns public subnets found in the VPC.
+    If `allocate_public_ip` is False, returns subnets with NAT found in the VPC.
     """
     subnets = _get_subnets_by_vpc_id(ec2_client=ec2_client, vpc_id=vpc_id)
     if len(subnets) == 0:
-        return None
+        return []
+    subnets_ids = []
     for subnet in subnets:
         subnet_id = subnet["SubnetId"]
         if allocate_public_ip:
@@ -275,7 +276,7 @@ def get_subnet_id_for_vpc(
                 ec2_client=ec2_client, vpc_id=vpc_id, subnet_id=subnet_id
             )
             if is_public_subnet:
-                return subnet_id
+                subnets_ids.append(subnet_id)
         else:
             subnet_behind_nat = _is_subnet_behind_nat(
                 ec2_client=ec2_client,
@@ -283,8 +284,8 @@ def get_subnet_id_for_vpc(
                 subnet_id=subnet_id,
             )
             if subnet_behind_nat:
-                return subnet_id
-    return None
+                subnets_ids.append(subnet_id)
+    return subnets_ids
 
 
 def _add_ingress_security_group_rule_if_missing(

@@ -86,6 +86,14 @@ class Compute(ABC):
     ) -> LaunchedGatewayInfo:
         raise NotImplementedError()
 
+    def terminate_gateway(
+        self,
+        instance_id: str,
+        configuration: GatewayComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
+        raise NotImplementedError()
+
 
 def get_instance_name(run: Run, job: Job) -> str:
     return f"{run.project_name.lower()}-{job.job_spec.job_name}"
