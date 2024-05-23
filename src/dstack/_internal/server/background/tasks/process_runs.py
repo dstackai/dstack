@@ -62,17 +62,20 @@ async def process_runs():
                 )
             )
             runs = res.scalars().all()
-            PROCESSING_RUNS_IDS.update(run.id for run in runs)
+            unprocessed_runs_ids = set(run.id for run in runs)
+            PROCESSING_RUNS_IDS.update(unprocessed_runs_ids)
 
     futures = [process_single_run(run.id, [job.id for job in run.jobs]) for run in runs]
     try:
         for future in asyncio.as_completed(futures):
             run_id = await future
-            PROCESSING_RUNS_IDS.remove(run_id)  # unlock job processing as soon as possible
+            # Unlock job processing as soon as possible.
+            PROCESSING_RUNS_IDS.remove(run_id)
+            unprocessed_runs_ids.remove(run_id)
     finally:
-        PROCESSING_RUNS_IDS.difference_update(
-            run.id for run in runs
-        )  # ensure that all runs are unlocked
+        # Ensure that all runs are unlocked.
+        # Note that runs should not be unlocked twice!
+        PROCESSING_RUNS_IDS.difference_update(unprocessed_runs_ids)
 
 
 async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uuid.UUID:
