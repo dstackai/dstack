@@ -6,8 +6,8 @@ def get_ip_from_network(network: Optional[str], addresses: Sequence[str]) -> Opt
     ip_addresses = []
     for address in addresses:
         try:
-            ip, _, _ = address.partition("/")
-            ip_addresses.append(ipaddress.IPv4Address(ip))
+            interface = ipaddress.IPv4Interface(address)
+            ip_addresses.append(interface.ip)
         except ipaddress.AddressValueError:
             continue
 

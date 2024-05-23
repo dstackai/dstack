@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 from datetime import timezone
 from typing import Dict, List, Optional
 
@@ -13,6 +14,7 @@ from dstack._internal.core.backends.base.offers import (
     requirements_to_query_filter,
 )
 from dstack._internal.core.errors import (
+    ClientError,
     ResourceExistsError,
     ResourceNotExistsError,
     ServerClientError,
@@ -255,6 +257,13 @@ async def add_remote(
     ssh_user: str,
     ssh_keys: List[SSHKey],
 ) -> Instance:
+    if instance_network is not None:
+        try:
+            interface = ipaddress.IPv4Interface(instance_network)
+            instance_network = str(interface.network)
+        except ipaddress.AddressValueError as e:
+            raise ClientError(e)
+
     # Check instance in all instances
     pools = await list_project_pool_models(session, project)
     for pool in pools:
