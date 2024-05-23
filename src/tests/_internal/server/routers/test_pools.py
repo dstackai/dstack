@@ -290,6 +290,7 @@ class TestShowPool:
                     "hostname": "running_instance.ip",
                     "status": "idle",
                     "created": "2023-01-02T03:04:00+00:00",
+                    "pool_name": "test_router_pool_name",
                     "region": "en",
                     "price": 1,
                 }
@@ -433,6 +434,7 @@ class TestRemoveInstance:
                     "hostname": "running_instance.ip",
                     "status": "terminating",
                     "created": "2023-01-02T03:04:00+00:00",
+                    "pool_name": "test_router_pool_name",
                     "region": "en",
                     "price": 1,
                 }

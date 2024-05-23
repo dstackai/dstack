@@ -1,10 +1,11 @@
 import asyncio
 import ipaddress
-from datetime import timezone
+import uuid
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 import gpuhunt
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -32,9 +33,11 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
+from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.server import settings
-from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel
+from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel, UserModel
 from dstack._internal.server.services.jobs import PROCESSING_POOL_LOCK
+from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
 from dstack._internal.utils.common import get_current_datetime
@@ -103,12 +106,13 @@ async def create_pool(session: AsyncSession, project: ProjectModel, name: str) -
 
 
 async def list_project_pool_models(
-    session: AsyncSession, project: ProjectModel
+    session: AsyncSession, project: ProjectModel, select_deleted: bool = False
 ) -> List[PoolModel]:
+    filters = [PoolModel.project_id == project.id]
+    if not select_deleted:
+        filters.append(PoolModel.deleted == select_deleted)
     pools = await session.execute(
-        select(PoolModel)
-        .where(PoolModel.project_id == project.id, PoolModel.deleted == False)
-        .options(joinedload(PoolModel.instances))
+        select(PoolModel).where(*filters).options(joinedload(PoolModel.instances))
     )
     return list(pools.scalars().unique().all())
 
@@ -220,6 +224,9 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     if instance_model.job is not None:
         instance.job_name = instance_model.job.job_name
         instance.job_status = instance_model.job.status
+
+    if instance_model.pool is not None:
+        instance.pool_name = instance_model.pool.name
 
     return instance
 
@@ -387,4 +394,118 @@ def filter_pool_instances(
         catalog_item = offer_to_catalog_item(offer)
         if gpuhunt.matches(catalog_item, query_filter):
             instances.append(instance)
+    return instances
+
+
+async def list_pools_instance_models(
+    session: AsyncSession,
+    projects: List[ProjectModel],
+    pools: List[PoolModel],
+    only_active: bool,
+    prev_created_at: Optional[datetime],
+    prev_name: Optional[uuid.UUID],
+    limit: int,
+    ascending: bool,
+) -> List[InstanceModel]:
+    filters = [
+        InstanceModel.project_id.in_(p.id for p in projects),
+        InstanceModel.pool_id.in_(p.id for p in pools),
+    ]
+
+    if only_active:
+        filters.extend(
+            [
+                InstanceModel.deleted == False,
+                InstanceModel.status.in_([InstanceStatus.IDLE, InstanceStatus.BUSY]),
+            ]
+        )
+
+    if prev_created_at is not None:
+        if ascending:
+            if prev_name is None:
+                filters.append(InstanceModel.created_at > prev_created_at)
+            else:
+                filters.append(
+                    or_(
+                        InstanceModel.created_at > prev_created_at,
+                        and_(
+                            InstanceModel.created_at == prev_created_at,
+                            InstanceModel.name < prev_name,
+                        ),
+                    )
+                )
+        else:
+            if prev_name is None:
+                filters.append(InstanceModel.created_at < prev_created_at)
+            else:
+                filters.append(
+                    or_(
+                        InstanceModel.created_at < prev_created_at,
+                        and_(
+                            InstanceModel.created_at == prev_created_at,
+                            InstanceModel.name > prev_name,
+                        ),
+                    )
+                )
+    order_by = (InstanceModel.created_at.desc(), InstanceModel.name)
+    if ascending:
+        order_by = (InstanceModel.created_at.asc(), InstanceModel.name.desc())
+
+    res = await session.execute(
+        select(InstanceModel)
+        .where(*filters)
+        .order_by(*order_by)
+        .limit(limit)
+        .options(joinedload(InstanceModel.pool))
+    )
+    instance_models = list(res.scalars().all())
+    return instance_models
+
+
+async def list_user_pool(
+    session: AsyncSession,
+    user: UserModel,
+    project_name: Optional[str],
+    pool_name: Optional[str],
+    only_active: bool,
+    prev_created_at: Optional[datetime],
+    prev_name: Optional[uuid.UUID],
+    limit: int,
+    ascending: bool,
+) -> List[Instance]:
+    if user.global_role == GlobalRole.ADMIN:
+        projects = await list_project_models(session=session)
+    else:
+        projects = await list_user_project_models(session=session, user=user)
+    if not projects:
+        return []
+
+    if project_name is not None:
+        projects = [proj for proj in projects if proj.name == project_name]
+
+    pools = []
+    for proj in projects:
+        project_pools = await list_project_pool_models(
+            session=session, project=proj, select_deleted=(not only_active)
+        )
+        available_pools = project_pools
+        if pool_name is not None:
+            available_pools = (pool for pool in project_pools if pool.name == pool_name)
+        pools.extend(available_pools)
+    if not pools:
+        return []
+
+    instance_models = await list_pools_instance_models(
+        session=session,
+        projects=projects,
+        pools=pools,
+        only_active=only_active,
+        prev_created_at=prev_created_at,
+        prev_name=prev_name,
+        limit=limit,
+        ascending=ascending,
+    )
+    instances = []
+    for instance in instance_models:
+        instances.append(instance_model_to_instance(instance))
     return instances

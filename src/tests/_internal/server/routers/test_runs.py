@@ -947,6 +947,7 @@ class TestCreateInstance:
                 "hostname": None,
                 "status": "pending",
                 "created": result["created"],
+                "pool_name": "default-pool",
                 "region": None,
                 "price": None,
             }

@@ -10,10 +10,38 @@ from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
+from dstack._internal.server.schemas.pools import ListPoolsRequest
 from dstack._internal.server.schemas.runs import AddRemoteInstanceRequest
-from dstack._internal.server.security.permissions import ProjectMember
+from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 
+root_router = APIRouter(prefix="/api/pools", tags=["pool"])
 router = APIRouter(prefix="/api/project/{project_name}/pool", tags=["pool"])
+
+
+@root_router.post("/list")
+async def list_pools(
+    body: ListPoolsRequest,
+    session: AsyncSession = Depends(get_session),
+    user: UserModel = Depends(Authenticated()),
+) -> List[Instance]:
+    """
+    Returns all instances visible to user sorted by descending created_at.
+    A **project_name** and **pool_name** can be specified as filters.
+
+    The results are paginated. To get the next page, pass created_at and id of
+    the last run from the previous page as **prev_created_at** and **prev_name**.
+    """
+    return await pools.list_user_pool(
+        session=session,
+        user=user,
+        project_name=body.project_name,
+        pool_name=body.pool_name,
+        only_active=body.only_active,
+        prev_created_at=body.prev_created_at,
+        prev_name=body.prev_name,
+        limit=body.limit,
+        ascending=body.ascending,
+    )
 
 
 @router.post("/list")
