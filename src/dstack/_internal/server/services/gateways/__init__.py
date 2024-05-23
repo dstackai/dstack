@@ -207,7 +207,7 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
         if gateway.name not in gateways_names:
             continue
         backend = await get_project_backend_by_type_or_error(project, gateway.backend.type)
-        tasks.append(_terminate_gateway(gateway=gateway, backend=backend))
+        tasks.append(_terminate_gateway(session=session, gateway=gateway, backend=backend))
         gateways.append(gateway)
     logger.info("Deleting gateways: %s", [g.name for g in gateways])
     # terminate in parallel
@@ -231,8 +231,9 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
     await session.commit()
 
 
-async def _terminate_gateway(gateway: GatewayModel, backend: Backend):
+async def _terminate_gateway(session: AsyncSession, gateway: GatewayModel, backend: Backend):
     await wait_to_lock(PROCESSING_GATEWAYS_LOCK, PROCESSING_GATEWAYS_IDS, gateway.id)
+    await session.refresh(gateway)
     gateway_compute_configuration = get_gateway_compute_configuration(gateway)
     if gateway.gateway_compute is not None and gateway_compute_configuration is not None:
         logger.info("Deleting gateway compute for %s...", gateway.name)
