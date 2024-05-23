@@ -29,3 +29,19 @@ domain: '*.example.com'
       show_root_heading: false
       type:
         required: true
+
+## `certificate[type=lets-encrypt]`
+
+#SCHEMA# dstack._internal.core.models.gateways.LetsEncryptGatewayCertificate
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+## `certificate[type=acm]`
+
+#SCHEMA# dstack._internal.core.models.gateways.ACMGatewayCertificate
+    overrides:
+      show_root_heading: false
+      type:
+        required: true

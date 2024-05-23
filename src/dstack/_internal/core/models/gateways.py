@@ -16,6 +16,33 @@ class GatewayStatus(str, Enum):
     FAILED = "failed"
 
 
+class LetsEncryptGatewayCertificate(CoreModel):
+    type: Annotated[
+        Literal["lets-encrypt"], Field(description="Automatic certificates by Let's Encrypt")
+    ] = "lets-encrypt"
+
+
+class ACMGatewayCertificate(CoreModel):
+    type: Annotated[
+        Literal["acm"], Field(description="Certificates by AWS Certificate Manager (ACM)")
+    ] = "acm"
+    arn: Annotated[
+        str, Field(description="The ARN of the wildcard ACM certificate for the domain")
+    ]
+
+
+# TODO: Allow setting up custom ACME certificate (e.g. ZeroSSL) via GatewayConfiguration
+
+AnyGatewayCertificate = Union[LetsEncryptGatewayCertificate, ACMGatewayCertificate]
+
+
+class GatewayCertificate(CoreModel):
+    __root__: Annotated[
+        AnyGatewayCertificate,
+        Field(discriminator="type"),
+    ]
+
+
 class GatewayConfiguration(CoreModel):
     type: Literal["gateway"] = "gateway"
     name: Annotated[Optional[str], Field(description="The gateway name")] = None
@@ -26,6 +53,10 @@ class GatewayConfiguration(CoreModel):
         Optional[str], Field(description="The gateway domain, e.g. `*.example.com`")
     ] = None
     public_ip: Annotated[bool, Field(description="Allocate public IP for the gateway")] = True
+    certificate: Annotated[
+        Optional[AnyGatewayCertificate],
+        Field(description="The SSL certificate configuration. Defaults to `type: lets-encrypt`"),
+    ] = LetsEncryptGatewayCertificate()
 
 
 class GatewayComputeConfiguration(CoreModel):
@@ -35,22 +66,27 @@ class GatewayComputeConfiguration(CoreModel):
     region: str
     public_ip: bool
     ssh_key_pub: str
+    certificate: Optional[AnyGatewayCertificate]
 
 
 class Gateway(CoreModel):
-    # TODO: configuration fields are duplicated on top-level for backward compatibility with 0.18.x
-    # Remove in 0.19
     name: str
-    ip_address: Optional[str]
-    instance_id: Optional[str]
-    region: str
-    wildcard_domain: Optional[str]
-    default: bool
+    configuration: GatewayConfiguration
     created_at: datetime.datetime
-    backend: BackendType
     status: GatewayStatus
     status_message: Optional[str]
-    configuration: GatewayConfiguration
+    # The ip address / hostname the user should set up the domain for.
+    # Could be the same as ip_address but also different, e.g. gateway behind ALB.
+    hostname: Optional[str]
+    # The ip address of the gateway instance
+    ip_address: Optional[str]
+    instance_id: Optional[str]
+    # TODO: configuration fields are duplicated on top-level for backward compatibility with 0.18.x
+    # Remove in 0.19
+    backend: BackendType
+    region: str
+    default: bool
+    wildcard_domain: Optional[str]
 
 
 class BaseChatModel(CoreModel):

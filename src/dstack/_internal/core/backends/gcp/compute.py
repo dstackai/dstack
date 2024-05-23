@@ -78,7 +78,7 @@ class GCPCompute(Compute):
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
         # Old instances have region set to zone, e.g. us-central1-a.
-        # New instance have region set to region, e.g. us-central1. Zone in stored in backend_data.
+        # New instance have region set to region, e.g. us-central1. Zone is stored in backend_data.
         zone = region
         if backend_data is not None:
             backend_data_dict = json.loads(backend_data)
@@ -234,8 +234,21 @@ class GCPCompute(Compute):
         )
         return LaunchedGatewayInfo(
             instance_id=configuration.instance_name,
-            region=zone,  # used for instance termination
+            region=configuration.region,  # used for instance termination
             ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
+            backend_data=json.dumps({"zone": zone}),
+        )
+
+    def terminate_gateway(
+        self,
+        instance_id: str,
+        configuration: GatewayComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
+        self.terminate_instance(
+            instance_id=instance_id,
+            region=configuration.region,
+            backend_data=backend_data,
         )
 
 

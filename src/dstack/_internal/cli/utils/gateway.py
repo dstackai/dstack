@@ -12,8 +12,8 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
     table = Table(box=None)
     table.add_column("BACKEND")
     table.add_column("REGION")
-    table.add_column("NAME")
-    table.add_column("ADDRESS")
+    table.add_column("NAME", no_wrap=True)
+    table.add_column("HOSTNAME", no_wrap=True)
     table.add_column("DOMAIN")
     table.add_column("DEFAULT")
     table.add_column("STATUS")
@@ -29,7 +29,7 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
                 backend.value if i == 0 else "",
                 gateway.region,
                 gateway.name,
-                gateway.ip_address,
+                gateway.hostname,
                 gateway.wildcard_domain,
                 "✓" if gateway.default else "",
                 gateway.status,
