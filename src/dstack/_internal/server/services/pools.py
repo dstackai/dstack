@@ -375,6 +375,9 @@ def filter_pool_instances(
         if profile.backends is not None and instance.backend not in profile.backends:
             continue
 
+        if profile.regions is not None and instance.region not in profile.regions:
+            continue
+
         if multinode and instance.backend not in BACKENDS_WITH_MULTINODE_SUPPORT:
             continue
 
