@@ -61,7 +61,7 @@ $ dstack run . --help
 
 ### dstack apply
 
-This command applies a given configuration. If a resources does not exist, `dstack apply` creates the resource.
+This command applies a given configuration. If a resource does not exist, `dstack apply` creates the resource.
 If a resource exists, `dstack apply` updates the resource in-place or re-creates the resource if the update is not possible.
 
 <div class="termy">
@@ -75,6 +75,23 @@ $ dstack apply --help
 
 !!! info "NOTE:"
     The `dstack apply` command currently supports only `gateway` configurations.
+    Support for other configuration types is coming soon.
+
+### dstack destroy
+
+This command destroys the resources defined by a given configuration.
+
+<div class="termy">
+
+```shell
+$ dstack destroy --help
+#GENERATE#
+```
+
+</div>
+
+!!! info "NOTE:"
+    The `dstack destroy` command currently supports only `gateway` configurations.
     Support for other configuration types is coming soon.
 
 ### dstack ps
