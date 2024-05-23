@@ -90,15 +90,17 @@ async def process_instances() -> None:
             if not instances:
                 return
 
-            PROCESSING_POOL_IDS.update(i.id for i in instances)
+            unprocessed_instances_ids = set(i.id for i in instances)
+            PROCESSING_POOL_IDS.update(unprocessed_instances_ids)
 
     try:
         futures = [process_instance(i) for i in instances]
         for future in asyncio.as_completed(futures):
             instance_id = await future
             PROCESSING_POOL_IDS.remove(instance_id)
+            unprocessed_instances_ids.remove(instance_id)
     finally:
-        PROCESSING_POOL_IDS.difference_update(i.id for i in instances)
+        PROCESSING_POOL_IDS.difference_update(unprocessed_instances_ids)
 
 
 async def process_instance(instance: InstanceModel) -> UUID:
