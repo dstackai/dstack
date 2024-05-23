@@ -106,10 +106,35 @@ There are two ways to configure AWS: using an access key or using the default cr
                     "servicequotas:*"
                 ],
                 "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "elasticloadbalancing:CreateLoadBalancer",
+                    "elasticloadbalancing:CreateTargetGroup",
+                    "elasticloadbalancing:CreateListener",
+                    "elasticloadbalancing:RegisterTargets",
+                    "elasticloadbalancing:AddTags",
+                    "elasticloadbalancing:DeleteLoadBalancer",
+                    "elasticloadbalancing:DeleteTargetGroup",
+                    "elasticloadbalancing:DeleteListener",
+                    "elasticloadbalancing:DeregisterTargets"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "acm:DescribeCertificate",
+                    "acm:ListCertificates"
+                ],
+                "Resource": "*"
             }
         ]
     }
     ```
+
+    The `elasticloadbalancing:*` and `acm:*` permissions are only needed for provisioning gateways with ACM (AWS Certificate Manager) certificates.
 
 ### Azure
 
