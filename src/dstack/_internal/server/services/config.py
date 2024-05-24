@@ -223,6 +223,7 @@ class OCIConfig(CoreModel):
     type: Literal["oci"] = "oci"
     creds: Optional[AnyOCICreds]
     regions: Optional[List[str]] = None
+    compartment_id: Optional[str] = None
 
 
 class RunpodConfig(CoreModel):

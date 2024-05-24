@@ -1,4 +1,5 @@
 import base64
+import time
 from concurrent.futures import Executor, ThreadPoolExecutor, as_completed
 from functools import reduce
 from itertools import islice
@@ -7,10 +8,16 @@ from typing import Dict, Iterable, List, Mapping, Optional, Set
 import oci
 
 from dstack._internal.core.backends.oci.region import OCIRegionClient
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceOffer
+from dstack._internal.utils.logging import get_logger
 
+logger = get_logger(__name__)
 LIST_SHAPES_MAX_LIMIT = 100
 CAPACITY_REPORT_MAX_SHAPES = 10  # undocumented, found by experiment
+VCN_CIDR = "10.0.0.0/16"
+WAIT_FOR_COMPARTMENT_ATTEMPS = 36
+WAIT_FOR_COMPARTMENT_DELAY = 5
 
 
 class ShapesQuota:
@@ -270,3 +277,167 @@ def terminate_instance_if_exists(client: oci.core.ComputeClient, instance_id: st
     except oci.exceptions.ServiceError as e:
         if e.status != 404:
             raise
+
+
+def get_or_create_compartment(
+    name: str, parent_compartment_id: str, client: oci.identity.IdentityClient
+) -> oci.identity.models.Compartment:
+    if compartments := client.list_compartments(
+        compartment_id=parent_compartment_id, name=name
+    ).data:
+        return compartments[0]
+
+    return client.create_compartment(
+        oci.identity.models.CreateCompartmentDetails(
+            compartment_id=parent_compartment_id,
+            name=name,
+            description="Resources created and managed by dstack",
+        )
+    ).data
+
+
+def get_compartment_lifecycle_state(id: str, client: oci.identity.IdentityClient) -> Optional[str]:
+    try:
+        return client.get_compartment(id).data.lifecycle_state
+    except oci.exceptions.ServiceError as e:
+        if e.status == 404:
+            return None
+        raise
+
+
+def wait_until_compartment_active(id: str, regions: Mapping[str, OCIRegionClient]) -> None:
+    start_time = int(time.time())
+    state_active = oci.identity.models.Compartment.LIFECYCLE_STATE_ACTIVE
+    state_creating = oci.identity.models.Compartment.LIFECYCLE_STATE_CREATING
+    pending_regions = set(regions)
+
+    for attempt in range(1, WAIT_FOR_COMPARTMENT_ATTEMPS + 1):
+        while region := next(iter(pending_regions), None):
+            state = get_compartment_lifecycle_state(id, regions[region].identity_client)
+            if state == state_active:
+                pending_regions.remove(region)
+            elif state == state_creating or state is None:
+                break
+            else:
+                msg = f"Unexpected state {state} for compartment {id}"
+                raise BackendError(msg)
+
+        if not pending_regions:
+            return
+
+        logger.debug(
+            f"Waiting for OCI compartment {id} to become active. "
+            f"Tried {attempt}/{WAIT_FOR_COMPARTMENT_ATTEMPS} times"
+        )
+        if attempt != WAIT_FOR_COMPARTMENT_ATTEMPS:
+            time.sleep(WAIT_FOR_COMPARTMENT_DELAY)
+
+    time_spent = int(time.time() - start_time)
+    msg = f"Compartment {id} did not become active in {time_spent}s. Giving up"
+    raise BackendError(msg)
+
+
+def set_up_network_resources(
+    compartment_id: str, project_name: str, regions: Mapping[str, OCIRegionClient]
+) -> Dict[str, str]:
+    """
+    Create or update a VCN and a subnet with Internet access in each region.
+    Returns a mapping of region names to subnet IDs.
+    """
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_region_name = {}
+        for region_name, region_client in regions.items():
+            future = executor.submit(
+                set_up_network_resources_in_region,
+                compartment_id,
+                project_name,
+                region_client.virtual_network_client,
+            )
+            future_to_region_name[future] = region_name
+
+        result = {}
+        for future in as_completed(future_to_region_name):
+            region_name = future_to_region_name[future]
+            result[region_name] = future.result()
+
+    return result
+
+
+def set_up_network_resources_in_region(
+    compartment_id: str, project_name: str, client: oci.core.VirtualNetworkClient
+) -> str:
+    """
+    Create or update a VCN and a subnet with Internet access. Returns subnet ID.
+    """
+
+    vcn = get_or_create_vcn(f"dstack-{project_name}-default-vcn", compartment_id, client)
+    internet_gateway = get_or_create_internet_gateway(
+        f"dstack-{project_name}-default-internet-gateway", vcn.id, compartment_id, client
+    )
+    update_route_table(vcn.default_route_table_id, internet_gateway.id, client)
+    subnet = get_or_create_subnet(
+        f"dstack-{project_name}-default-subnet", vcn.id, compartment_id, client
+    )
+    return subnet.id
+
+
+def get_or_create_vcn(
+    name: str, compartment_id: str, client: oci.core.VirtualNetworkClient
+) -> oci.core.models.Vcn:
+    if vcns := client.list_vcns(compartment_id=compartment_id, display_name=name).data:
+        return vcns[0]
+
+    return client.create_vcn(
+        oci.core.models.CreateVcnDetails(
+            cidr_blocks=[VCN_CIDR],
+            compartment_id=compartment_id,
+            display_name=name,
+        )
+    ).data
+
+
+def get_or_create_subnet(
+    name: str, vcn_id: str, compartment_id: str, client: oci.core.VirtualNetworkClient
+) -> oci.core.models.Subnet:
+    if subnets := client.list_subnets(compartment_id=compartment_id, display_name=name).data:
+        return subnets[0]
+
+    return client.create_subnet(
+        oci.core.models.CreateSubnetDetails(
+            cidr_block=VCN_CIDR,
+            compartment_id=compartment_id,
+            display_name=name,
+            vcn_id=vcn_id,
+        )
+    ).data
+
+
+def get_or_create_internet_gateway(
+    name: str, vcn_id: str, compartment_id: str, client: oci.core.VirtualNetworkClient
+) -> oci.core.models.InternetGateway:
+    if gateways := client.list_internet_gateways(
+        compartment_id=compartment_id, vcn_id=vcn_id, display_name=name
+    ).data:
+        return gateways[0]
+
+    return client.create_internet_gateway(
+        oci.core.models.CreateInternetGatewayDetails(
+            compartment_id=compartment_id, display_name=name, vcn_id=vcn_id, is_enabled=True
+        )
+    ).data
+
+
+def update_route_table(
+    route_table_id: str, internet_gateway_id: str, client: oci.core.VirtualNetworkClient
+) -> oci.core.models.RouteTable:
+    return client.update_route_table(
+        route_table_id,
+        oci.core.models.UpdateRouteTableDetails(
+            route_rules=[
+                oci.core.models.RouteRule(
+                    destination="0.0.0.0/0", network_entity_id=internet_gateway_id
+                )
+            ]
+        ),
+    ).data

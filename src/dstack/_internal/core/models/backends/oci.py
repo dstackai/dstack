@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Dict
 
 from pydantic import Field
 from typing_extensions import Annotated, List, Literal, Optional, Union
@@ -10,6 +11,7 @@ from dstack._internal.core.models.common import CoreModel
 class OCIConfigInfo(CoreModel):
     type: Literal["oci"] = "oci"
     regions: Optional[List[str]] = None
+    compartment_id: Optional[str] = None
 
 
 class OCIClientCreds(CoreModel):
@@ -45,13 +47,16 @@ class OCIConfigInfoWithCredsPartial(CoreModel):
     type: Literal["oci"] = "oci"
     creds: Optional[AnyOCICreds]
     regions: Optional[List[str]]
+    compartment_id: Optional[str]
 
 
 class OCIConfigValues(CoreModel):
     type: Literal["oci"] = "oci"
     default_creds: bool = False
     regions: Optional[ConfigMultiElement]
+    compartment_id: Optional[str] = None
 
 
 class OCIStoredConfig(OCIConfigInfo):
-    pass
+    compartment_id: str
+    subnet_ids_per_region: Dict[str, str]

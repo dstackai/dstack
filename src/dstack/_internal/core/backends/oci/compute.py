@@ -38,21 +38,17 @@ class PreConfiguredResources:
     # TODO(#1194): remove this class and teach dstack to create or discover all
     # necessary resources automatically
 
-    compartment_id: str
-    subnet_ids: Dict[str, str]
     standard_image_ids: Dict[str, str]
     cuda_image_ids: Dict[str, str]
 
     @staticmethod
     def load(required_regions: Set[str]) -> "PreConfiguredResources":
         params = dict(
-            compartment_id=os.getenv("DSTACK_OCI_COMPARTMENT_ID"),
-            subnet_ids=json.loads(os.getenv("DSTACK_OCI_SUBNET_IDS", "null")),
             standard_image_ids=json.loads(os.getenv("DSTACK_OCI_STANDARD_IMAGE_IDS", "null")),
             cuda_image_ids=json.loads(os.getenv("DSTACK_OCI_CUDA_IMAGE_IDS", "null")),
         )
         for param, value in params.items():
-            if not value or param.endswith("ids") and set(value) != required_regions:
+            if not value or required_regions - set(value):
                 msg = (
                     f"Invalid OCI parameter {param!r}. Make sure you set the corresponding"
                     " environment variable when running dstack server"
@@ -69,7 +65,7 @@ class OCICompute(Compute):
 
     @cached_property
     def shapes_quota(self) -> resources.ShapesQuota:
-        return resources.ShapesQuota.load(self.regions, self.pre_conf.compartment_id)
+        return resources.ShapesQuota.load(self.regions, self.config.compartment_id)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -83,7 +79,7 @@ class OCICompute(Compute):
 
         with ThreadPoolExecutor(max_workers=8) as executor:
             shapes_availability = resources.get_shapes_availability(
-                offers, self.shapes_quota, self.regions, self.pre_conf.compartment_id, executor
+                offers, self.shapes_quota, self.regions, self.config.compartment_id, executor
             )
 
         offers_with_availability = []
@@ -131,7 +127,7 @@ class OCICompute(Compute):
         region = self.regions[instance_offer.region]
 
         availability_domain = resources.choose_available_domain(
-            instance_offer.instance.name, self.shapes_quota, region, self.pre_conf.compartment_id
+            instance_offer.instance.name, self.shapes_quota, region, self.config.compartment_id
         )
         if availability_domain is None:
             raise NoCapacityError("Shape unavailable in all availability domains")
@@ -145,8 +141,8 @@ class OCICompute(Compute):
             instance = resources.launch_instance(
                 region=region,
                 availability_domain=availability_domain,
-                compartment_id=self.pre_conf.compartment_id,
-                subnet_id=self.pre_conf.subnet_ids[instance_offer.region],
+                compartment_id=self.config.compartment_id,
+                subnet_id=self.config.subnet_ids_per_region[instance_offer.region],
                 display_name=instance_config.instance_name,
                 cloud_init_user_data=get_user_data(instance_config.get_public_keys()),
                 shape=instance_offer.instance.name,
@@ -177,7 +173,7 @@ class OCICompute(Compute):
         if vnic := resources.get_instance_vnic(
             provisioning_data.instance_id,
             self.regions[provisioning_data.region],
-            self.pre_conf.compartment_id,
+            self.config.compartment_id,
         ):
             provisioning_data.hostname = vnic.public_ip
             provisioning_data.internal_ip = vnic.private_ip

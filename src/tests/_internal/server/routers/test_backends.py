@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.backends.oci import region as oci_region
 from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -31,6 +32,14 @@ FAKE_OCI_CLIENT_CREDS = {
     "key_file": "/dev/null",
     "fingerprint": "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",
     "region": "me-dubai-1",
+}
+SAMPLE_OCI_COMPARTMENT_ID = "ocid1.compartment.oc1..aaaaaaaa"
+SAMPLE_OCI_SUBSCRIBED_REGIONS = oci_region.SubscribedRegions(
+    names=["me-dubai-1", "eu-frankfurt-1"], home_region_name="eu-frankfurt-1"
+)
+SAMPLE_OCI_SUBNETS = {
+    "me-dubai-1": "ocid1.subnet.oc1.me-dubai-1.aaaaaaaa",
+    "eu-frankfurt-1": "ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaa",
 }
 
 
@@ -647,6 +656,7 @@ class TestGetBackendConfigValuesOCI:
             "type": "oci",
             "default_creds": False,
             "regions": None,
+            "compartment_id": None,
         }
 
     @pytest.mark.asyncio
@@ -686,10 +696,10 @@ class TestGetBackendConfigValuesOCI:
         with patch(
             "dstack._internal.core.backends.oci.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_region_names"
+            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
         ) as get_regions_mock:
             default_creds_available_mock.return_value = True
-            get_regions_mock.return_value = ["me-dubai-1", "eu-frankfurt-1"]
+            get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
             response = client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
@@ -708,6 +718,7 @@ class TestGetBackendConfigValuesOCI:
                     {"label": "eu-frankfurt-1", "value": "eu-frankfurt-1"},
                 ],
             },
+            "compartment_id": None,
         }
 
 
@@ -833,10 +844,13 @@ class TestCreateBackend:
         with patch(
             "dstack._internal.core.backends.oci.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_region_names"
-        ) as get_regions_mock:
+            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
+        ) as get_regions_mock, patch(
+            "dstack._internal.server.services.backends.configurators.oci._create_resources"
+        ) as create_resources_mock:
             default_creds_available_mock.return_value = False
-            get_regions_mock.return_value = ["me-dubai-1", "eu-frankfurt-1"]
+            get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
+            create_resources_mock.return_value = SAMPLE_OCI_COMPARTMENT_ID, SAMPLE_OCI_SUBNETS
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
@@ -864,11 +878,11 @@ class TestCreateBackend:
         with patch(
             "dstack._internal.core.backends.oci.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_region_names"
+            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
         ) as get_regions_mock:
             default_creds_available_mock.return_value = False
             # us-ashburn-1 not subscribed
-            get_regions_mock.return_value = ["me-dubai-1", "eu-frankfurt-1"]
+            get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
             response = client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
@@ -1186,10 +1200,13 @@ class TestCreateBackendYAML:
         with patch(
             "dstack._internal.core.backends.oci.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_region_names"
-        ) as get_regions_mock:
+            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
+        ) as get_regions_mock, patch(
+            "dstack._internal.server.services.backends.configurators.oci._create_resources"
+        ) as create_resources_mock:
             default_creds_available_mock.return_value = False
-            get_regions_mock.return_value = ["me-dubai-1", "eu-frankfurt-1"]
+            get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
+            create_resources_mock.return_value = SAMPLE_OCI_COMPARTMENT_ID, SAMPLE_OCI_SUBNETS
             response = client.post(
                 f"/api/project/{project.name}/backends/create_yaml",
                 headers=get_auth_headers(user.token),
