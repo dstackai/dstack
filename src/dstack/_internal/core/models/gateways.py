@@ -50,7 +50,7 @@ class GatewayConfiguration(CoreModel):
     backend: Annotated[BackendType, Field(description="The gateway backend")]
     region: Annotated[str, Field(description="The gateway region")]
     domain: Annotated[
-        Optional[str], Field(description="The gateway domain, e.g. `*.example.com`")
+        Optional[str], Field(description="The gateway domain, e.g. `example.com`")
     ] = None
     public_ip: Annotated[bool, Field(description="Allocate public IP for the gateway")] = True
     certificate: Annotated[

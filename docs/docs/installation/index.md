@@ -90,8 +90,12 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-> If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+### dstack Sky
+
+If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
 find the server address, your project name, and user token in the settings of your project.
+
+![](../../assets/images/dstack-cloud-config.png){ width=800 }
 
 [//]: # (The `dstack server` command automatically updates `~/.dstack/config.yml`)
 [//]: # (with the `main` project.)

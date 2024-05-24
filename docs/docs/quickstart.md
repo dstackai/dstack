@@ -1,14 +1,11 @@
 # Quickstart
 
 ??? info "Installation"
-    To use the open-source version, make sure to [install the server](installation/index.md) and configure backends.
+    To use the open-source version, make sure to [set up the server](installation/index.md) and configure backends.
 
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, install the CLI and run the `dstack config` command:
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+    you only need to [set up the CLI](installation/index.md#set-up-the-cli).
     
-    ![](../assets/images/dstack-cloud-config.png){ width=800 }
-
-    Once the CLI is set up, follow the quickstart.
-
 ## Initialize a repo
 
 To use `dstack`'s CLI in a folder, first run [`dstack init`](reference/cli/index.md#dstack-init) within that folder.

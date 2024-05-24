@@ -29,11 +29,11 @@ You can also use `dstack` ro run workloads on on-prem servers.
 
 ## Latest news ✨
 
+- [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
 - [2024/04] [dstack 0.18.1: On-prem servers, and new example](https://github.com/dstackai/dstack/releases/tag/0.18.1) (Release)
 - [2024/04] [dstack 0.18.0: RunPod, mult-node tasks, and more](https://github.com/dstackai/dstack/releases/tag/0.18.0) (Release)
 - [2024/03] [dstack 0.17.0: Auto-scaling, and other improvements](https://github.com/dstackai/dstack/releases/tag/0.17.0) (Release)
 - [2024/02] [dstack 0.16.0: Pools](https://github.com/dstackai/dstack/releases/tag/0.16.0) (Release)
-- [2024/02] [dstack 0.15.1: Kubernetes](https://github.com/dstackai/dstack/releases/tag/0.15.1) (Release)
 
 ## Installation
 
@@ -53,7 +53,8 @@ If you have default AWS, GCP, or Azure credentials on your machine, the `dstack`
 
 Otherwise, you need to manually specify the cloud credentials in `~/.dstack/server/config.yml`.
 
-For further details on setting up the server, refer to [installation](https://dstack.ai/docs/installation/).
+See the [server/config.yml reference](https://dstack.ai/docs/reference/server/config.yml.md#examples)
+for details on how to configure backends for all supported cloud providers.
 
 ### Start the server
 

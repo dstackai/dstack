@@ -3,39 +3,11 @@
 Services make it very easy to deploy any kind of model or application as public,
 secure, and scalable endpoints.
 
-??? info "Gateway"
+??? info "Gateways"
+    If you're using the open-source server, you must set up a [gateway](gateways.md) before you can run a service.
 
-    If you're using the open-source server, you first have to set up a gateway.
-
-    ### Gateway { style="display:none" }
-
-    For example, if your domain is `example.com`, go ahead and run the 
-    `dstack gateway create` command:
-    
-    <div class="termy">
-       
-    ```shell
-    $ dstack gateway create --domain example.com --region eu-west-1 --backend aws
-    
-    Creating gateway...
-    ---> 100%
-    
-     BACKEND  REGION     NAME          ADDRESS        DOMAIN       DEFAULT
-     aws      eu-west-1  sour-fireant  52.148.254.14  example.com  ✓
-    ```
-    
-    </div>
-    
-    Afterward, in your domain's DNS settings, add an `A` DNS record for `*.example.com` 
-    pointing to the IP address of the gateway.
-    
-    Now, if you run a service, `dstack` will make its endpoint available at 
-    `https://<run name>.<gateway domain>`.
-
-    In case your service has the [model mapping](#configure-model-mapping) configured, `dstack` will 
-    automatically make your model available at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
-
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, the gateway is set up for you.
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+    the gateway is already set up for you.
 
 ## Configuration
 
@@ -70,9 +42,10 @@ model:
 If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
 (pre-configured with Python, Conda, and essential CUDA drivers).
 
-By default, the service is deployed to a single instance. However, you can specify the
-[number of replicas and scaling policy](../reference/dstack.yml/service.md#replicas-and-auto-scaling), so `dstack`
-auto-scales it based on the load.
+!!! info "Replicas and scaling"
+    By default, the service is deployed to a single instance. However, you can specify the
+    [number of replicas and scaling policy](../reference/dstack.yml/service.md#replicas-and-auto-scaling).
+    In this case, `dstack` auto-scales it based on the load.
 
 > See the [.dstack.yml reference](../reference/dstack.yml/service.md)
 > for many examples on service configuration.
@@ -157,4 +130,5 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 
 1. Check the [Text Generation Inference :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md){:target="_blank"} examples
 2. Check the [`.dstack.yml` reference](../reference/dstack.yml/service.md) for more details and examples
-3. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
+3. See [gateways](gateways.md) on how to set up a gateway
+4. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}

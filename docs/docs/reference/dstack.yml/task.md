@@ -206,7 +206,8 @@ is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, 
 `DSTACK_MASTER_NODE_IP`, and `DSTACK_GPUS_NUM` (see [System environment variables](#default-environment-variables)).
 
 ??? info "Backends"
-    Running on multiple nodes is supported only with AWS, GCP, and Azure.
+    Running on multiple nodes is supported only with the `aws`, `gcp`, `azure`, and instances added via
+    [`dstack pool add-ssh`](../../concepts/pools.md#adding-on-prem-servers).
 
 ### Arguments
 

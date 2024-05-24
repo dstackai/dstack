@@ -193,6 +193,7 @@ nav:
           - Dev environments: docs/concepts/dev-environments.md
           - Tasks: docs/concepts/tasks.md
           - Services: docs/concepts/services.md
+          - Gateways: docs/concepts/gateways.md
           - Pools: docs/concepts/pools.md
       - Reference:
           - server/config.yml: docs/reference/server/config.yml.md
@@ -200,7 +201,7 @@ nav:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
               - task: docs/reference/dstack.yml/task.md
               - service: docs/reference/dstack.yml/service.md
-#              - gateway: docs/reference/dstack.yml/gateway.md
+              - gateway: docs/reference/dstack.yml/gateway.md
           - profiles.yml: docs/reference/profiles.yml.md
           - CLI: docs/reference/cli/index.md
           - profiles.yml: docs/reference/profiles.yml.md

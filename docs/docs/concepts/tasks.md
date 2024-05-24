@@ -35,9 +35,11 @@ resources:
 If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
 (pre-configured with Python, Conda, and essential CUDA drivers).
 
-By default, the task runs on a single instance. However, you can specify the
-[number of nodes](../reference/dstack.yml/task.md#_nodes) so `dstack`
-provisions a cluster of instances.
+
+!!! info "Nodes"
+    By default, tasks run on a single instance. However, you can specify
+    the [number of nodes](../reference/dstack.yml/task.md#_nodes).
+    In this case, `dstack` provisions a cluster of instances.
 
 > See the [.dstack.yml reference](../reference/dstack.yml/task.md)
 > for many examples on task configuration.

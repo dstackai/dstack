@@ -73,6 +73,25 @@ The command accepts the same arguments as the standard `ssh` command.
 
 Once the instance is provisioned, you'll see it in the pool and will be able to run workloads on it.
 
+#### Network
+
+If you want on-prem instances to run multi-node tasks, ensure these on-prem servers share the same private network.
+Additionally, you need to pass the `--network` option to `dstack pool add-ssh`:
+
+<div class="termy">
+
+```shell
+$ dstack pool add-ssh -i ~/.ssh/id_rsa ubuntu@54.73.155.119 \
+    --network 10.0.0.0/24
+```
+
+</div>
+
+The `--network` argument accepts the IP address range (CIDR) of the private network of the instance.
+
+Once you've added multiple instances with the same network value, you can use them as a cluster to run
+[multi-node tasks](../reference/dstack.yml/task.md#_nodes).
+
 ## Removing instances
 
 If the instance remains idle for the configured idle duration, `dstack` removes it and deletes all cloud resources.
