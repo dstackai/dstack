@@ -20,7 +20,7 @@ class BaseApplyConfigurator(ABC):
         pass
 
     @abstractmethod
-    def destroy_configuration(self, conf: AnyApplyConfiguration, args: argparse.Namespace):
+    def delete_configuration(self, conf: AnyApplyConfiguration, args: argparse.Namespace):
         pass
 
     def register_args(self, parser: argparse.ArgumentParser):

@@ -57,9 +57,9 @@ class GatewayConfigurator(BaseApplyConfigurator):
             )
         print_gateways_table([gateway])
 
-    def destroy_configuration(self, conf: GatewayConfiguration, args: argparse.Namespace):
+    def delete_configuration(self, conf: GatewayConfiguration, args: argparse.Namespace):
         if conf.name is None:
-            console.print("[error]Configuration specifies no gateway to destroy[/]")
+            console.print("[error]Configuration specifies no gateway to delete[/]")
             return
 
         try:
