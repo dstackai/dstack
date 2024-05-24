@@ -96,14 +96,27 @@ There are two ways to configure AWS: using an access key or using the default cr
             {
                 "Effect": "Allow",
                 "Action": [
-                    "ec2:*"
+                    "ec2:AuthorizeSecurityGroupEgress",
+                    "ec2:AuthorizeSecurityGroupIngress",
+                    "ec2:CancelSpotInstanceRequests",
+                    "ec2:CreateSecurityGroup",
+                    "ec2:CreateTags",
+                    "ec2:DescribeImages",
+                    "ec2:DescribeInstances",
+                    "ec2:DescribeRouteTables",
+                    "ec2:DescribeSecurityGroups",
+                    "ec2:DescribeSubnets",
+                    "ec2:DescribeVpcs",
+                    "ec2:RunInstances",
+                    "ec2:TerminateInstances"
                 ],
                 "Resource": "*"
             },
             {
                 "Effect": "Allow",
                 "Action": [
-                    "servicequotas:*"
+                    "servicequotas:ListServiceQuotas",
+                    "servicequotas:GetServiceQuota"
                 ],
                 "Resource": "*"
             },
