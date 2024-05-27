@@ -363,10 +363,6 @@ def filter_pool_instances(
         if status is not None and instance.status != status:
             continue
 
-        if instance.backend == BackendType.REMOTE:
-            candidates.append(instance)
-            continue
-
         # TODO: remove on prod
         if settings.LOCAL_BACKEND_ENABLED and instance.backend == BackendType.LOCAL:
             instances.append(instance)
