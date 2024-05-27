@@ -136,10 +136,23 @@ class AWSConfigurator(Configurator):
     def _check_vpc_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
         if config.vpc_name is not None and config.vpc_ids is not None:
             raise ServerClientError(msg="Only one of vpc_name and vpc_ids can be specified")
+        allocate_public_ip = config.public_ips if config.public_ips is not None else True
+        use_default_vpcs = config.default_vpcs if config.default_vpcs is not None else True
         regions = config.regions
         if regions is None:
             regions = DEFAULT_REGIONS
-        allocate_public_ip = config.public_ips if config.public_ips is not None else True
+        if config.vpc_ids is not None and not use_default_vpcs:
+            vpc_ids_regions = list(config.vpc_ids.keys())
+            not_configured_regions = [r for r in regions if r not in vpc_ids_regions]
+            if config.regions is None:
+                raise ServerClientError(
+                    f"vpc_ids not configured for regions {not_configured_regions}. "
+                    "Configure vpc_ids for all regions or specify regions."
+                )
+            raise ServerClientError(
+                f"vpc_ids not configured for regions {not_configured_regions}. "
+                "Configure vpc_ids for all regions specified in regions."
+            )
         # The number of workers should be >= the number of regions
         with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
             futures = []

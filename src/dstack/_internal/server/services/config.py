@@ -57,15 +57,31 @@ yaml.add_representer(list, seq_representer)
 
 class AWSConfig(CoreModel):
     type: Annotated[Literal["aws"], Field(description="The type of the backend")] = "aws"
-    regions: Optional[List[str]] = None
-    vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    regions: Annotated[Optional[List[str]], Field(description="The list of AWS regions")] = None
+    vpc_name: Annotated[
+        Optional[str],
+        Field(description="The VPC name. All configured regions must have a VPC with this name"),
+    ] = None
     vpc_ids: Annotated[
-        Optional[Dict[str, str]], Field(description="The mapping from AWS regions to VPC IDs")
+        Optional[Dict[str, str]],
+        Field(
+            description="The mapping from AWS regions to VPC IDs. If `default_vpcs: true`, omitted regions will use default VPCs"
+        ),
+    ] = None
+    default_vpcs: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "A flag to enable/disable using default VPCs in regions not configured by `vpc_ids`."
+                " Set to `false` if default VPCs should never be used."
+                " Defaults to `true`"
+            )
+        ),
     ] = None
     public_ips: Annotated[
         Optional[bool],
         Field(
-            description="A flag to enable/disable public IP assigning on instances. Defaults to `true`."
+            description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
         ),
     ] = None
     creds: AnyAWSCreds = Field(..., description="The credentials", discriminator="type")
