@@ -77,21 +77,21 @@ $ dstack apply --help
     The `dstack apply` command currently supports only `gateway` configurations.
     Support for other configuration types is coming soon.
 
-### dstack destroy
+### dstack delete
 
-This command destroys the resources defined by a given configuration.
+This command deletes the resources defined by a given configuration.
 
 <div class="termy">
 
 ```shell
-$ dstack destroy --help
+$ dstack delete --help
 #GENERATE#
 ```
 
 </div>
 
 !!! info "NOTE:"
-    The `dstack destroy` command currently supports only `gateway` configurations.
+    The `dstack delete` command currently supports only `gateway` configurations.
     Support for other configuration types is coming soon.
 
 ### dstack ps
