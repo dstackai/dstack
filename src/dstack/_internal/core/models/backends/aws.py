@@ -12,6 +12,7 @@ class AWSConfigInfo(CoreModel):
     regions: Optional[List[str]] = None
     vpc_name: Optional[str] = None
     vpc_ids: Optional[Dict[str, str]] = None
+    default_vpcs: Optional[bool] = None
     public_ips: Optional[bool] = None
 
 
@@ -47,6 +48,7 @@ class AWSConfigInfoWithCredsPartial(CoreModel):
     regions: Optional[List[str]]
     vpc_name: Optional[str]
     vpc_ids: Optional[Dict[str, str]]
+    default_vpcs: Optional[bool]
     public_ips: Optional[bool]
 
 
