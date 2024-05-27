@@ -187,6 +187,8 @@ async def add_remote(instance_id: UUID) -> None:
             )
         ).one()
 
+        logger.debug("Adding remote instance %s...", instance.name)
+
         if instance.status == InstanceStatus.PENDING:
             instance.status = InstanceStatus.PROVISIONING
             await session.commit()
