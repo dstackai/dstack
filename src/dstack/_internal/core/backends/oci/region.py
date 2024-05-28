@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Dict, Iterable
 
@@ -33,6 +34,12 @@ class OCIRegionClient:
         return self.identity_client.list_availability_domains(self.client_config["tenancy"]).data
 
 
+def make_region_client(region_name: str, creds: AnyOCICreds) -> OCIRegionClient:
+    config = dict(get_client_config(creds))
+    config["region"] = region_name
+    return OCIRegionClient(config)
+
+
 def make_region_clients_map(
     region_names: Iterable[str], creds: AnyOCICreds
 ) -> Dict[str, OCIRegionClient]:
@@ -45,11 +52,20 @@ def make_region_clients_map(
     return result
 
 
-def get_subscribed_region_names(creds: AnyOCICreds) -> List[str]:
+@dataclass
+class SubscribedRegions:
+    names: List[str]
+    home_region_name: str
+
+
+def get_subscribed_regions(creds: AnyOCICreds) -> SubscribedRegions:
     config = get_client_config(creds)
     region = OCIRegionClient(config)
 
     subscriptions: List[oci.identity.models.RegionSubscription] = (
         region.identity_client.list_region_subscriptions(config["tenancy"]).data
     )
-    return [s.region_name for s in subscriptions if s.status == s.STATUS_READY]
+    names = [s.region_name for s in subscriptions if s.status == s.STATUS_READY]
+    home_region_name = next(s.region_name for s in subscriptions if s.is_home_region)
+
+    return SubscribedRegions(names=names, home_region_name=home_region_name)

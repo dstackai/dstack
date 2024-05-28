@@ -1,10 +1,14 @@
 import json
-from typing import List
+from typing import Dict, List, Tuple
 
-from dstack._internal.core.backends.oci import OCIBackend, auth
+from dstack._internal.core.backends.oci import OCIBackend, auth, resources
 from dstack._internal.core.backends.oci.config import OCIConfig
 from dstack._internal.core.backends.oci.exceptions import any_oci_exception
-from dstack._internal.core.backends.oci.region import get_subscribed_region_names
+from dstack._internal.core.backends.oci.region import (
+    get_subscribed_regions,
+    make_region_client,
+    make_region_clients_map,
+)
 from dstack._internal.core.errors import ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
@@ -38,7 +42,7 @@ class OCIConfigurator(Configurator):
     def get_default_configs(self) -> List[OCIConfigInfoWithCreds]:
         creds = OCIDefaultCreds()
         try:
-            regions = get_subscribed_region_names(creds)
+            regions = get_subscribed_regions(creds).names
         except any_oci_exception:
             return []
         return [
@@ -62,7 +66,7 @@ class OCIConfigurator(Configurator):
             raise_invalid_credentials_error(fields=[["creds"]])
 
         try:
-            available_regions = get_subscribed_region_names(config.creds)
+            available_regions = get_subscribed_regions(config.creds).names
         except any_oci_exception:
             raise_invalid_credentials_error(fields=[["creds"]])
 
@@ -81,20 +85,28 @@ class OCIConfigurator(Configurator):
         self, project: ProjectModel, config: OCIConfigInfoWithCreds
     ) -> BackendModel:
         try:
-            available_regions = get_subscribed_region_names(config.creds)
+            subscribed_regions = get_subscribed_regions(config.creds)
         except any_oci_exception:
             raise_invalid_credentials_error(fields=[["creds"]])
 
         if config.regions is None:
-            config.regions = available_regions
-        elif unsubscribed_regions := set(config.regions) - set(available_regions):
+            config.regions = subscribed_regions.names
+        elif unsubscribed_regions := set(config.regions) - set(subscribed_regions.names):
             msg = f"Regions {unsubscribed_regions} are configured but not subscribed to in OCI"
             raise ServerClientError(msg, fields=[["regions"]])
+
+        compartment_id, subnet_ids_per_region = _create_resources(
+            project, config, subscribed_regions.home_region_name
+        )
+        config.compartment_id = compartment_id
+        stored_config = OCIStoredConfig.__response__(
+            **config.dict(), subnet_ids_per_region=subnet_ids_per_region
+        )
 
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=OCIStoredConfig.__response__.parse_obj(config).json(),
+            config=stored_config.json(),
             auth=OCICreds.parse_obj(config.creds).json(),
         )
 
@@ -121,3 +133,24 @@ class OCIConfigurator(Configurator):
         for region in available:
             element.values.append(ConfigElementValue(value=region, label=region))
         return element
+
+
+def _create_resources(
+    project: ProjectModel, config: OCIConfigInfoWithCreds, home_region: str
+) -> Tuple[str, Dict[str, str]]:
+    compartment_id = config.compartment_id
+    if not compartment_id:
+        home_region_client = make_region_client(home_region, config.creds)
+        compartment_id = resources.get_or_create_compartment(
+            f"dstack-{project.name}",
+            home_region_client.client_config["tenancy"],
+            home_region_client.identity_client,
+        ).id
+
+    region_clients = make_region_clients_map(config.regions, config.creds)
+    resources.wait_until_compartment_active(compartment_id, region_clients)
+    subnets_per_region = resources.set_up_network_resources(
+        compartment_id, project.name, region_clients
+    )
+
+    return compartment_id, subnets_per_region
