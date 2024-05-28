@@ -11,12 +11,11 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.profiles import Profile, TerminationPolicy
+from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, TerminationPolicy
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     JobProvisioningData,
     JobStatus,
-    RetryPolicy,
 )
 from dstack._internal.server.background.tasks.process_instances import (
     HealthStatus,
@@ -320,7 +319,9 @@ class TestCreateInstance:
     async def test_expire_retry_duration(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         pool = await create_pool(session, project)
-        profile = Profile(name="test_profile", retry_policy=RetryPolicy(retry=True, duration=123))
+        profile = Profile(
+            name="test_profile", retry_policy=ProfileRetryPolicy(retry=True, duration=123)
+        )
         instance = await create_instance(
             session, project, pool, profile=profile, status=InstanceStatus.TERMINATING
         )
@@ -333,7 +334,9 @@ class TestCreateInstance:
     async def test_retry_delay(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         pool = await create_pool(session, project)
-        profile = Profile(name="test_profile", retry_policy=RetryPolicy(retry=True, duration=123))
+        profile = Profile(
+            name="test_profile", retry_policy=ProfileRetryPolicy(retry=True, duration=123)
+        )
         instance = await create_instance(
             session,
             project,

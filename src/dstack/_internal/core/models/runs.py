@@ -22,6 +22,7 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
     ProfileParams,
+    RetryEvent,
     SpotPolicy,
     TerminationPolicy,
 )
@@ -58,9 +59,9 @@ class JobStatus(str, Enum):
         return self in self.finished_statuses()
 
 
-class RetryPolicy(CoreModel):
-    retry: bool
-    duration: Optional[int]
+class Retry(CoreModel):
+    on: List[RetryEvent]
+    duration: int
 
 
 class RunTerminationReason(str, Enum):
@@ -187,7 +188,7 @@ class JobSpec(CoreModel):
     max_duration: Optional[int]
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
-    retry_policy: RetryPolicy
+    retry: Optional[Retry]
     working_dir: Optional[str]
 
 
@@ -225,6 +226,7 @@ class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
     submitted_at: datetime
+    last_processed_at: datetime
     finished_at: Optional[datetime]
     status: JobStatus
     termination_reason: Optional[JobTerminationReason]
@@ -323,6 +325,7 @@ class Run(CoreModel):
     project_name: str
     user: str
     submitted_at: datetime
+    last_processed_at: datetime
     status: RunStatus
     termination_reason: Optional[RunTerminationReason]
     run_spec: RunSpec

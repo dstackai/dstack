@@ -23,12 +23,10 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     max_duration = (
         f"{job_plan.job_spec.max_duration / 3600:g}h" if job_plan.job_spec.max_duration else "-"
     )
-    retry_policy = job_plan.job_spec.retry_policy
-    retry_policy = (
-        (f"{retry_policy.duration / 3600:g}h" if retry_policy.duration else "yes")
-        if retry_policy.retry
-        else "no"
-    )
+    retry = "no"
+    if job_plan.job_spec.retry is not None:
+        retry = f"{job_plan.job_spec.retry.duration / 3600:g}h"
+
     profile = run_plan.run_spec.merged_profile
     creation_policy = profile.creation_policy
     termination_policy = profile.termination_policy
@@ -54,7 +52,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Max duration"), max_duration)
     props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Retry policy"), retry_policy)
+    props.add_row(th("Retry policy"), retry)
     props.add_row(th("Creation policy"), creation_policy)
     props.add_row(th("Termination policy"), termination_policy)
     props.add_row(th("Termination idle time"), termination_idle_time)

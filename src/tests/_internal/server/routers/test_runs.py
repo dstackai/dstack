@@ -88,7 +88,8 @@ def get_dev_env_run_plan_dict(
                 "max_duration": "off",
                 "max_price": None,
                 "pool_name": DEFAULT_POOL_NAME,
-                "retry_policy": {"duration": None, "retry": False},
+                "retry": None,
+                "retry_policy": None,
                 "spot_policy": "spot",
                 "termination_idle_time": 300,
                 "termination_policy": None,
@@ -105,7 +106,8 @@ def get_dev_env_run_plan_dict(
                 "max_price": None,
                 "name": "string",
                 "pool_name": DEFAULT_POOL_NAME,
-                "retry_policy": {"duration": None, "retry": False},
+                "retry": None,
+                "retry_policy": None,
                 "spot_policy": "spot",
                 "termination_idle_time": 300,
                 "termination_policy": None,
@@ -159,7 +161,7 @@ def get_dev_env_run_plan_dict(
                         "max_price": None,
                         "spot": True,
                     },
-                    "retry_policy": {"duration": None, "retry": False},
+                    "retry": None,
                     "working_dir": ".",
                 },
                 "offers": [json.loads(o.json()) for o in offers],
@@ -178,6 +180,7 @@ def get_dev_env_run_dict(
     run_name: str = "run_name",
     repo_id: str = "test_repo",
     submitted_at: str = "2023-01-02T03:04:00+00:00",
+    last_processed_at: str = "2023-01-02T03:04:00+00:00",
     finished_at: str = "2023-01-02T03:04:00+00:00",
 ) -> Dict:
     return {
@@ -185,6 +188,7 @@ def get_dev_env_run_dict(
         "project_name": project_name,
         "user": username,
         "submitted_at": submitted_at,
+        "last_processed_at": last_processed_at,
         "status": "submitted",
         "run_spec": {
             "configuration": {
@@ -215,7 +219,8 @@ def get_dev_env_run_dict(
                 "max_duration": "off",
                 "max_price": None,
                 "pool_name": DEFAULT_POOL_NAME,
-                "retry_policy": {"duration": None, "retry": False},
+                "retry": None,
+                "retry_policy": None,
                 "spot_policy": "spot",
                 "termination_idle_time": 300,
                 "termination_policy": None,
@@ -232,7 +237,8 @@ def get_dev_env_run_dict(
                 "max_price": None,
                 "name": "string",
                 "pool_name": DEFAULT_POOL_NAME,
-                "retry_policy": {"duration": None, "retry": False},
+                "retry": None,
+                "retry_policy": None,
                 "spot_policy": "spot",
                 "termination_idle_time": 300,
                 "termination_policy": None,
@@ -286,7 +292,7 @@ def get_dev_env_run_dict(
                         "max_price": None,
                         "spot": True,
                     },
-                    "retry_policy": {"duration": None, "retry": False},
+                    "retry": None,
                     "working_dir": ".",
                 },
                 "job_submissions": [
@@ -294,6 +300,7 @@ def get_dev_env_run_dict(
                         "id": job_id,
                         "submission_num": 0,
                         "submitted_at": submitted_at,
+                        "last_processed_at": last_processed_at,
                         "finished_at": finished_at,
                         "status": "submitted",
                         "termination_reason": None,
@@ -307,6 +314,7 @@ def get_dev_env_run_dict(
             "id": job_id,
             "submission_num": 0,
             "submitted_at": submitted_at,
+            "last_processed_at": last_processed_at,
             "finished_at": finished_at,
             "status": "submitted",
             "termination_reason": None,
@@ -373,6 +381,7 @@ class TestListRuns:
                 "project_name": project.name,
                 "user": user.name,
                 "submitted_at": run1_submitted_at.isoformat(),
+                "last_processed_at": run1_submitted_at.isoformat(),
                 "status": "submitted",
                 "run_spec": run1_spec.dict(),
                 "jobs": [
@@ -382,7 +391,8 @@ class TestListRuns:
                             {
                                 "id": str(job.id),
                                 "submission_num": 0,
-                                "submitted_at": "2023-01-02T03:04:00+00:00",
+                                "submitted_at": run1_submitted_at.isoformat(),
+                                "last_processed_at": run1_submitted_at.isoformat(),
                                 "finished_at": None,
                                 "status": "submitted",
                                 "termination_reason": None,
@@ -395,7 +405,8 @@ class TestListRuns:
                 "latest_job_submission": {
                     "id": str(job.id),
                     "submission_num": 0,
-                    "submitted_at": "2023-01-02T03:04:00+00:00",
+                    "submitted_at": run1_submitted_at.isoformat(),
+                    "last_processed_at": run1_submitted_at.isoformat(),
                     "finished_at": None,
                     "status": "submitted",
                     "termination_reason_message": None,
@@ -411,6 +422,7 @@ class TestListRuns:
                 "project_name": project.name,
                 "user": user.name,
                 "submitted_at": run2_submitted_at.isoformat(),
+                "last_processed_at": run2_submitted_at.isoformat(),
                 "status": "submitted",
                 "run_spec": run2_spec.dict(),
                 "jobs": [],
@@ -555,6 +567,7 @@ class TestSubmitRun:
         run_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
         submitted_at_formatted = "2023-01-02T03:04:00+00:00"
+        last_processed_at_formatted = submitted_at_formatted
         repo = await create_repo(session=session, project_id=project.id)
         run_dict = get_dev_env_run_dict(
             run_id=str(run_id),
@@ -562,6 +575,7 @@ class TestSubmitRun:
             project_name=project.name,
             username=user.name,
             submitted_at=submitted_at_formatted,
+            last_processed_at=last_processed_at_formatted,
             finished_at=None,
             run_name="test-run",
             repo_id=repo.name,

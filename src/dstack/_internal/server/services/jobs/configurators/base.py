@@ -13,12 +13,12 @@ from dstack._internal.core.models.configurations import (
     RegistryAuth,
     RunConfigurationType,
 )
-from dstack._internal.core.models.profiles import SpotPolicy
+from dstack._internal.core.models.profiles import DEFAULT_RETRY_DURATION, RetryEvent, SpotPolicy
 from dstack._internal.core.models.runs import (
     AppSpec,
     JobSpec,
     Requirements,
-    RetryPolicy,
+    Retry,
     RunSpec,
 )
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
@@ -62,10 +62,6 @@ class JobConfigurator(ABC):
         pass
 
     @abstractmethod
-    def _retry_policy(self) -> RetryPolicy:
-        pass
-
-    @abstractmethod
     def _spot_policy(self) -> SpotPolicy:
         pass
 
@@ -92,7 +88,7 @@ class JobConfigurator(ABC):
             max_duration=self._max_duration(),
             registry_auth=self._registry_auth(),
             requirements=self._requirements(),
-            retry_policy=self._retry_policy(),
+            retry=self._retry(),
             working_dir=self._working_dir(),
         )
         return job_spec
@@ -165,6 +161,28 @@ class JobConfigurator(ABC):
             max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
         )
+
+    def _retry(self) -> Optional[Retry]:
+        profile_retry = self.run_spec.merged_profile.retry
+        if profile_retry is None:
+            # Handle retry_policy before retry was introduced
+            # TODO: Remove once retry_policy no longer supported
+            profile_retry_policy = self.run_spec.merged_profile.retry_policy
+            if profile_retry_policy is None:
+                return None
+            if not profile_retry_policy.retry:
+                return None
+            duration = profile_retry_policy.duration or DEFAULT_RETRY_DURATION
+            return Retry(
+                on=[RetryEvent.NO_CAPACITY, RetryEvent.INTERRUPTION, RetryEvent.ERROR],
+                duration=duration,
+            )
+        if profile_retry == "off":
+            return None
+        profile_retry = profile_retry.copy()
+        if profile_retry.duration is None:
+            profile_retry.duration = DEFAULT_RETRY_DURATION
+        return Retry.parse_obj(profile_retry)
 
     def _working_dir(self) -> Optional[str]:
         """

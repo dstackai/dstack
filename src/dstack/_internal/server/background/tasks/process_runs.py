@@ -11,17 +11,18 @@ from sqlalchemy.orm import joinedload
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.server.services.gateways.autoscalers as autoscalers
 from dstack._internal.core.errors import ServerError
-from dstack._internal.core.models.instances import InstanceOffer
-from dstack._internal.core.models.profiles import ProfileRetryPolicy
+from dstack._internal.core.models.profiles import RetryEvent
 from dstack._internal.core.models.runs import (
+    Job,
     JobStatus,
     JobTerminationReason,
+    Run,
     RunSpec,
     RunStatus,
     RunTerminationReason,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, JobModel, RunModel
+from dstack._internal.server.models import JobModel, RunModel
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -29,11 +30,11 @@ from dstack._internal.server.services.jobs import (
     SUBMITTED_PROCESSING_JOBS_LOCK,
     TERMINATING_PROCESSING_JOBS_IDS,
     TERMINATING_PROCESSING_JOBS_LOCK,
+    find_job,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
 )
 from dstack._internal.server.services.runs import (
-    JOB_TERMINATION_REASONS_TO_RETRY,
     PROCESSING_RUNS_IDS,
     PROCESSING_RUNS_LOCK,
     create_job_model_for_new_submission,
@@ -49,6 +50,7 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 PROCESSING_INTERVAL = datetime.timedelta(seconds=2)
+RETRY_DELAY = datetime.timedelta(seconds=15)
 
 
 async def process_runs():
@@ -87,7 +89,15 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
     )
 
     async with get_session_ctx() as session:
-        run = await session.get(RunModel, run_id)
+        res = await session.execute(
+            sa.select(RunModel)
+            .where(RunModel.id == run_id)
+            .execution_options(populate_existing=True)
+            .options(joinedload(RunModel.project))
+            .options(joinedload(RunModel.user))
+            .options(joinedload(RunModel.repo))
+        )
+        run = res.scalar()
         if run is None:
             logger.error(f"Run {run_id} not found")
             return run_id
@@ -116,21 +126,18 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
 
 async def process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
-
-    # TODO(egor-s): consider retry delay
-
-    await session.execute(
-        sa.select(RunModel)
-        .where(RunModel.id == run_model.id)
-        .execution_options(populate_existing=True)
-        .options(joinedload(RunModel.project))
-        .options(joinedload(RunModel.user))
-        .options(joinedload(RunModel.repo))
-    )
     run = run_model_to_run(run_model)
+    if run.latest_job_submission is None:
+        logger.error("%s: failed to retry: pending run has no job submissions.")
+        run_model.status = RunStatus.FAILED
+        run_model.termination_reason = RunTerminationReason.SERVER_ERROR
+        return
+
+    if get_current_datetime() - run.latest_job_submission.last_processed_at < RETRY_DELAY:
+        logger.debug("%s: pending run is not yet ready for resubmission", fmt(run_model))
+        return
 
     # TODO(egor-s) consolidate with `scale_run_replicas` if possible
-
     replicas = 1
     if run.run_spec.configuration.type == "service":
         replicas = run.run_spec.configuration.replicas.min or 0  # new default
@@ -180,8 +187,8 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
     Run is submitted, provisioning, or running.
     We handle fails, scaling, and status changes.
     """
+    run = run_model_to_run(run_model)
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-    retry_policy = run_spec.merged_profile.retry_policy or ProfileRetryPolicy()
     retry_single_job = can_retry_single_job(run_spec)
 
     run_statuses: Set[RunStatus] = set()
@@ -189,58 +196,62 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
     replicas_to_retry: List[Tuple[int, List[JobModel]]] = []
 
     replicas_info: List[autoscalers.ReplicaInfo] = []
-    for replica_num, jobs in group_jobs_by_replica_latest(run_model.jobs):
+    for replica_num, job_models in group_jobs_by_replica_latest(run_model.jobs):
         replica_statuses: Set[RunStatus] = set()
         replica_needs_retry = False
 
         replica_active = True
-        for job in jobs:
-            if job.status == JobStatus.DONE or (
-                job.status == JobStatus.TERMINATING
-                and job.termination_reason == JobTerminationReason.DONE_BY_RUNNER
+        for job_model in job_models:
+            job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+            if job_model.status == JobStatus.DONE or (
+                job_model.status == JobStatus.TERMINATING
+                and job_model.termination_reason == JobTerminationReason.DONE_BY_RUNNER
             ):
                 # the job is done or going to be done
                 replica_statuses.add(RunStatus.DONE)
                 # for some reason the replica is done, it's not active
                 replica_active = False
-            elif job.termination_reason == JobTerminationReason.SCALED_DOWN:
+            elif job_model.termination_reason == JobTerminationReason.SCALED_DOWN:
                 # the job was scaled down
                 replica_active = False
-            elif job.status == JobStatus.RUNNING:
+            elif job_model.status == JobStatus.RUNNING:
                 # the job is running
                 replica_statuses.add(RunStatus.RUNNING)
-            elif job.status in {JobStatus.PROVISIONING, JobStatus.PULLING}:
+            elif job_model.status in {JobStatus.PROVISIONING, JobStatus.PULLING}:
                 # the job is provisioning
                 replica_statuses.add(RunStatus.PROVISIONING)
-            elif job.status == JobStatus.SUBMITTED:
+            elif job_model.status == JobStatus.SUBMITTED:
                 # the job is submitted
                 replica_statuses.add(RunStatus.SUBMITTED)
-            elif job.status == JobStatus.FAILED or (
-                job.status == JobStatus.TERMINATING
-                and job.termination_reason
+            elif job_model.status == JobStatus.FAILED or (
+                job_model.status == JobStatus.TERMINATING
+                and job_model.termination_reason
                 not in {JobTerminationReason.DONE_BY_RUNNER, JobTerminationReason.SCALED_DOWN}
             ):
-                if await is_retry_enabled(session, job, retry_policy):
-                    if await is_retry_duration_exceeded(session, job, retry_policy):
+                current_duration = should_retry_job(run, job, job_model)
+                if current_duration is None:
+                    replica_statuses.add(RunStatus.FAILED)
+                    run_termination_reasons.add(RunTerminationReason.JOB_FAILED)
+                else:
+                    if is_retry_duration_exceeded(job, current_duration):
                         replica_statuses.add(RunStatus.FAILED)
                         run_termination_reasons.add(RunTerminationReason.RETRY_LIMIT_EXCEEDED)
                     else:
-                        # do a retry
                         replica_needs_retry = True
-                else:
-                    # just failed
-                    replica_statuses.add(RunStatus.FAILED)
-                    run_termination_reasons.add(RunTerminationReason.JOB_FAILED)
-            elif job.status in {JobStatus.TERMINATING, JobStatus.TERMINATED, JobStatus.ABORTED}:
+            elif job_model.status in {
+                JobStatus.TERMINATING,
+                JobStatus.TERMINATED,
+                JobStatus.ABORTED,
+            }:
                 pass  # unexpected, but let's ignore it
             else:
-                raise ValueError(f"Unexpected job status {job.status}")
+                raise ValueError(f"Unexpected job status {job_model.status}")
 
         if RunStatus.FAILED in replica_statuses:
             run_statuses.add(RunStatus.FAILED)
         else:
             if replica_needs_retry:
-                replicas_to_retry.append((replica_num, jobs))
+                replicas_to_retry.append((replica_num, job_models))
             if not replica_needs_retry or retry_single_job:
                 run_statuses.update(replica_statuses)
 
@@ -249,7 +260,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
             replicas_info.append(
                 autoscalers.ReplicaInfo(
                     active=True,
-                    timestamp=min(job.submitted_at for job in jobs).replace(
+                    timestamp=min(job.submitted_at for job in job_models).replace(
                         tzinfo=datetime.timezone.utc
                     ),
                 )
@@ -259,7 +270,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
             replicas_info.append(
                 autoscalers.ReplicaInfo(
                     active=False,
-                    timestamp=max(job.last_processed_at for job in jobs).replace(
+                    timestamp=max(job.last_processed_at for job in job_models).replace(
                         tzinfo=datetime.timezone.utc
                     ),
                 )
@@ -285,6 +296,16 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
         termination_reason = RunTerminationReason.ALL_JOBS_DONE
     else:
         new_status = RunStatus.PENDING
+
+    # Terminate active jobs if the run is to be resubmitted
+    if new_status == RunStatus.PENDING and not retry_single_job:
+        for _, replica_jobs in replicas_to_retry:
+            for job_model in replica_jobs:
+                if not (
+                    job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING
+                ):
+                    job_model.status = JobStatus.TERMINATING
+                    job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
 
     if new_status not in {RunStatus.TERMINATING, RunStatus.PENDING}:
         # No need to retry if the run is terminating,
@@ -318,30 +339,59 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
         run_model.termination_reason = termination_reason
 
 
-async def is_retry_enabled(
-    session: AsyncSession, job: JobModel, retry_policy: ProfileRetryPolicy
-) -> bool:
-    # retry for spot instances only
-    if retry_policy.retry and job.termination_reason in JOB_TERMINATION_REASONS_TO_RETRY:
-        if job.used_instance_id is None:
-            return False
-        instance = await session.get(InstanceModel, job.used_instance_id)
-        if instance is None or instance.offer is None:
-            return False
-        instance_offer = InstanceOffer.__response__.parse_raw(instance.offer)
-        if instance_offer.instance.resources.spot:
-            return True
-    return False
+def should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datetime.timedelta]:
+    """
+    Checks if the job should be retried.
+    Returns the current duration of retrying if retry is enabled.
+    """
+    if job.job_spec.retry is None:
+        return None
+
+    last_provisioned_submission = None
+    for job_submission in reversed(job.job_submissions):
+        if job_submission.job_provisioning_data is not None:
+            last_provisioned_submission = job_submission
+            break
+
+    if (
+        job_model.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+        and last_provisioned_submission is None
+        and RetryEvent.NO_CAPACITY in job.job_spec.retry.on
+    ):
+        return get_current_datetime() - run.submitted_at
+
+    if last_provisioned_submission is None:
+        return None
+
+    if (
+        last_provisioned_submission.termination_reason
+        == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+        and RetryEvent.INTERRUPTION in job.job_spec.retry.on
+    ):
+        return get_current_datetime() - last_provisioned_submission.last_processed_at
+
+    if (
+        last_provisioned_submission.termination_reason
+        in [
+            JobTerminationReason.CONTAINER_EXITED_WITH_ERROR,
+            JobTerminationReason.CREATING_CONTAINER_ERROR,
+            JobTerminationReason.EXECUTOR_ERROR,
+            JobTerminationReason.GATEWAY_ERROR,
+            JobTerminationReason.WAITING_INSTANCE_LIMIT_EXCEEDED,
+            JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED,
+            JobTerminationReason.PORTS_BINDING_FAILED,
+        ]
+        and RetryEvent.ERROR in job.job_spec.retry.on
+    ):
+        return get_current_datetime() - last_provisioned_submission.last_processed_at
+
+    return None
 
 
-async def is_retry_duration_exceeded(
-    session: AsyncSession, job: JobModel, retry_policy: ProfileRetryPolicy
-) -> bool:
-    if retry_policy.duration is not None and get_current_datetime() - job.submitted_at.replace(
-        tzinfo=datetime.timezone.utc
-    ) > datetime.timedelta(seconds=retry_policy.duration):
+def is_retry_duration_exceeded(job: Job, current_duration: datetime.timedelta) -> bool:
+    if job.job_spec.retry is None:
         return True
-    return False
+    return current_duration > datetime.timedelta(seconds=job.job_spec.retry.duration)
 
 
 def can_retry_single_job(run_spec: RunSpec) -> bool:
