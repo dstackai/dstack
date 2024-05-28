@@ -4,6 +4,7 @@ from typing import Callable, Dict, List, Optional
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
+from google.cloud import tpu_v2
 
 import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
@@ -11,6 +12,7 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     get_gateway_user_data,
     get_instance_name,
+    get_shim_commands,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
@@ -45,6 +47,8 @@ class GCPCompute(Compute):
         self.firewalls_client = compute_v1.FirewallsClient(credentials=self.credentials)
         self.regions_client = compute_v1.RegionsClient(credentials=self.credentials)
         self.subnetworks_client = compute_v1.SubnetworksClient(credentials=self.credentials)
+        self.tpu_client = tpu_v2.TpuClient(credentials=self.credentials)
+
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -70,7 +74,7 @@ class GCPCompute(Compute):
             availability = InstanceAvailability.NO_QUOTA
             if _has_gpu_quota(quotas[region], offer.instance.resources):
                 availability = InstanceAvailability.UNKNOWN
-            # todo quotas: cpu, memory, global gpu
+            # todo quotas: cpu, memory, global gpu, tpu
             offers_with_availability.append(
                 InstanceOfferWithAvailability(**offer.dict(), availability=availability)
             )
@@ -84,13 +88,22 @@ class GCPCompute(Compute):
         # Old instances have region set to zone, e.g. us-central1-a.
         # New instance have region set to region, e.g. us-central1. Zone is stored in backend_data.
         zone = region
+        is_tpu = False
         if backend_data is not None:
             backend_data_dict = json.loads(backend_data)
             zone = backend_data_dict["zone"]
+            is_tpu = backend_data_dict.get("is_tpu", False)
         try:
-            self.instances_client.delete(
-                project=self.config.project_id, zone=zone, instance=instance_id
-            )
+            if is_tpu:
+                name = f"projects/{self.project_id}/locations/{zone}/nodes/{instance_id}"
+                delete_request = tpu_v2.DeleteNodeRequest(
+                    name=name,
+                )
+                self.tpu_client.delete_node(request=delete_request)
+            else:
+                self.instances_client.delete(
+                    project=self.config.project_id, zone=zone, instance=instance_id
+                )
         except google.api_core.exceptions.NotFound:
             pass
 
@@ -120,7 +133,6 @@ class GCPCompute(Compute):
                 network=self.config.vpc_resource_name,
             )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-
         # Choose any usable subnet in a VPC.
         # Configuring a specific subnet per region is not supported yet.
         subnetwork = _get_vpc_subnet(
@@ -128,6 +140,10 @@ class GCPCompute(Compute):
             config=self.config,
             region=instance_offer.region,
         )
+        commands = get_shim_commands(authorized_keys=authorized_keys)
+        startup_script = " ".join([" && ".join(commands)])
+        startup_script = "#! /bin/bash\n" + startup_script
+        instance_id = f"tpu-{instance_config.instance_name}"
 
         labels = {
             "owner": "dstack",
@@ -135,6 +151,52 @@ class GCPCompute(Compute):
             "dstack_user": instance_config.user.lower(),
         }
         labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
+        tpu = _is_tpu(instance_offer.instance.resources.gpus[0].name)
+        if tpu:
+            for zone in _get_instance_zones(instance_offer):
+                tpu_node = gcp_resources.create_tpu_node_struct(
+                    instance_name=instance_offer.instance.name,
+                    startup_script=startup_script,
+                    authorized_keys=authorized_keys,
+                    spot=instance_offer.instance.resources.spot,
+                    labels=labels,
+                )
+
+                create_node_request = tpu_v2.CreateNodeRequest(
+                    parent=f"projects/{self.config.project_id}/locations/{zone}",
+                    node_id=instance_id,
+                    node=tpu_node,
+                )
+                try:
+                    operation = self.tpu_client.create_node(request=create_node_request)
+                    gcp_resources.wait_for_operation(
+                        operation, verbose_name="tpu instance creation"
+                    )
+                except (
+                    google.api_core.exceptions.ServiceUnavailable,
+                    google.api_core.exceptions.NotFound,
+                    google.api_core.exceptions.ResourceExhausted,
+                ):
+                    continue
+                node_request = tpu_v2.GetNodeRequest(
+                    name=f"projects/dstack/locations/{zone}/nodes/{instance_id}",
+                )
+                instance = self.tpu_client.get_node(request=node_request)
+                return JobProvisioningData(
+                    backend=instance_offer.backend,
+                    instance_type=instance_offer.instance,
+                    instance_id=instance_id,
+                    hostname=instance.network_endpoints[0].access_config.external_ip,
+                    internal_ip=None,
+                    region=zone,
+                    price=instance_offer.price,
+                    ssh_port=22,
+                    username="ubuntu",
+                    ssh_proxy=None,
+                    dockerized=True,
+                    backend_data=json.dumps({"is_tpu": tpu, "zone": zone}),
+                )
+            raise NoCapacityError()
 
         for zone in _get_instance_zones(instance_offer):
             request = compute_v1.InsertInstanceRequest()
@@ -324,6 +386,8 @@ def _has_gpu_quota(quotas: Dict[str, float], resources: Resources) -> bool:
     if not resources.gpus:
         return True
     gpu = resources.gpus[0]
+    if _is_tpu(gpu.name):
+        return True
     quota_name = f"NVIDIA_{gpu.name}_GPUS"
     if gpu.name == "A100" and gpu.memory_mib == 80 * 1024:
         quota_name = "NVIDIA_A100_80GB_GPUS"
@@ -352,3 +416,14 @@ def _get_instance_zones(instance_offer: InstanceOffer) -> List[str]:
             continue
         zones.append(offer.region)
     return zones
+
+
+def _is_tpu(name: str) -> bool:
+    tpu_versions = ["tpu-v2", "tpu-v3", "tpu-v4", "tpu-v5p", "tpu-v5litepod"]
+    parts = name.split("-")
+    if len(parts) == 3:
+        version = f"{parts[0]}-{parts[1]}"
+        cores = parts[2]
+        if version in tpu_versions and cores.isdigit():
+            return True
+    return False
