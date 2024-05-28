@@ -2,6 +2,7 @@ import base64
 import time
 from concurrent.futures import Executor, ThreadPoolExecutor, as_completed
 from functools import reduce
+from ipaddress import IPv6Network
 from itertools import islice
 from typing import Dict, Iterable, List, Mapping, Optional, Set
 
@@ -15,6 +16,13 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 LIST_SHAPES_MAX_LIMIT = 100
 CAPACITY_REPORT_MAX_SHAPES = 10  # undocumented, found by experiment
+ANY_IPV4 = "0.0.0.0/0"
+ANY_IPV6 = "::/0"
+ICMP_PROTOCOL_NUMBER = "1"
+TCP_PROTOCOL_NUMBER = "6"
+ICMPV6_PROTOCOL_NUMBER = "58"
+
+
 VCN_CIDR = "10.0.0.0/16"
 WAIT_FOR_COMPARTMENT_ATTEMPS = 36
 WAIT_FOR_COMPARTMENT_DELAY = 5
@@ -250,7 +258,10 @@ def launch_instance(
         oci.core.models.LaunchInstanceDetails(
             availability_domain=availability_domain,
             compartment_id=compartment_id,
-            create_vnic_details=oci.core.models.CreateVnicDetails(subnet_id=subnet_id),
+            create_vnic_details=oci.core.models.CreateVnicDetails(
+                assign_ipv6_ip=True,
+                subnet_id=subnet_id,
+            ),
             display_name=display_name,
             instance_options=oci.core.models.InstanceOptions(
                 are_legacy_imds_endpoints_disabled=True
@@ -376,9 +387,8 @@ def set_up_network_resources_in_region(
         f"dstack-{project_name}-default-internet-gateway", vcn.id, compartment_id, client
     )
     update_route_table(vcn.default_route_table_id, internet_gateway.id, client)
-    subnet = get_or_create_subnet(
-        f"dstack-{project_name}-default-subnet", vcn.id, compartment_id, client
-    )
+    update_security_list(vcn.default_security_list_id, client)
+    subnet = get_or_create_subnet(f"dstack-{project_name}-default-subnet", vcn, client)
     return subnet.id
 
 
@@ -393,22 +403,26 @@ def get_or_create_vcn(
             cidr_blocks=[VCN_CIDR],
             compartment_id=compartment_id,
             display_name=name,
+            is_ipv6_enabled=True,
         )
     ).data
 
 
 def get_or_create_subnet(
-    name: str, vcn_id: str, compartment_id: str, client: oci.core.VirtualNetworkClient
+    name: str, vcn: oci.core.models.Vcn, client: oci.core.VirtualNetworkClient
 ) -> oci.core.models.Subnet:
-    if subnets := client.list_subnets(compartment_id=compartment_id, display_name=name).data:
+    if subnets := client.list_subnets(compartment_id=vcn.compartment_id, display_name=name).data:
         return subnets[0]
+
+    ipv6_cidr = next(IPv6Network(vcn.ipv6_cidr_blocks[0]).subnets(new_prefix=64))
 
     return client.create_subnet(
         oci.core.models.CreateSubnetDetails(
             cidr_block=VCN_CIDR,
-            compartment_id=compartment_id,
+            compartment_id=vcn.compartment_id,
             display_name=name,
-            vcn_id=vcn_id,
+            ipv6_cidr_block=str(ipv6_cidr),
+            vcn_id=vcn.id,
         )
     ).data
 
@@ -436,8 +450,48 @@ def update_route_table(
         oci.core.models.UpdateRouteTableDetails(
             route_rules=[
                 oci.core.models.RouteRule(
-                    destination="0.0.0.0/0", network_entity_id=internet_gateway_id
-                )
+                    destination=ANY_IPV4, network_entity_id=internet_gateway_id
+                ),
+                oci.core.models.RouteRule(
+                    destination=ANY_IPV6, network_entity_id=internet_gateway_id
+                ),
             ]
         ),
     ).data
+
+
+def update_security_list(
+    security_list_id: str, client: oci.core.VirtualNetworkClient
+) -> oci.core.models.SecurityList:
+    return client.update_security_list(
+        security_list_id,
+        oci.core.models.UpdateSecurityListDetails(
+            egress_security_rules=[
+                oci.core.models.EgressSecurityRule(destination=ANY_IPV4, protocol="all"),
+                oci.core.models.EgressSecurityRule(destination=ANY_IPV6, protocol="all"),
+            ],
+            ingress_security_rules=[
+                oci.core.models.IngressSecurityRule(
+                    source=ANY_IPV4, protocol=ICMP_PROTOCOL_NUMBER
+                ),
+                oci.core.models.IngressSecurityRule(
+                    source=ANY_IPV6, protocol=ICMP_PROTOCOL_NUMBER
+                ),
+                oci.core.models.IngressSecurityRule(
+                    source=ANY_IPV6, protocol=ICMPV6_PROTOCOL_NUMBER
+                ),
+                oci.core.models.IngressSecurityRule(
+                    source=ANY_IPV4, protocol=TCP_PROTOCOL_NUMBER, tcp_options=tcp_port_opts(22)
+                ),
+                oci.core.models.IngressSecurityRule(
+                    source=ANY_IPV6, protocol=TCP_PROTOCOL_NUMBER, tcp_options=tcp_port_opts(22)
+                ),
+            ],
+        ),
+    )
+
+
+def tcp_port_opts(port: int) -> oci.core.models.TcpOptions:
+    return oci.core.models.TcpOptions(
+        destination_port_range=oci.core.models.PortRange(min=port, max=port)
+    )
