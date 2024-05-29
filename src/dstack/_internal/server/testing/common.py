@@ -253,6 +253,7 @@ def get_job_provisioning_data() -> JobProvisioningData:
         ),
         instance_id="instance_id",
         hostname="127.0.0.4",
+        internal_ip="127.0.0.4",
         region="us-east-1",
         price=10.5,
         username="ubuntu",

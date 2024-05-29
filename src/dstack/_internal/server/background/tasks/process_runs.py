@@ -45,7 +45,7 @@ from dstack._internal.server.services.runs import (
     scale_run_replicas,
 )
 from dstack._internal.server.utils.common import wait_unlock
-from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils import common
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -59,7 +59,8 @@ async def process_runs():
             res = await session.execute(
                 sa.select(RunModel).where(
                     RunModel.status.not_in(RunStatus.finished_statuses()),
-                    RunModel.last_processed_at < get_current_datetime() - PROCESSING_INTERVAL,
+                    RunModel.last_processed_at
+                    < common.get_current_datetime() - PROCESSING_INTERVAL,
                     RunModel.id.not_in(PROCESSING_RUNS_IDS),
                 )
             )
@@ -118,7 +119,7 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
             run.status = RunStatus.TERMINATING
             run.termination_reason = RunTerminationReason.SERVER_ERROR
 
-        run.last_processed_at = get_current_datetime()
+        run.last_processed_at = common.get_current_datetime()
         await session.commit()
 
     return run_id
@@ -133,7 +134,7 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
         run_model.termination_reason = RunTerminationReason.SERVER_ERROR
         return
 
-    if get_current_datetime() - run.latest_job_submission.last_processed_at < RETRY_DELAY:
+    if common.get_current_datetime() - run.latest_job_submission.last_processed_at < RETRY_DELAY:
         logger.debug("%s: pending run is not yet ready for resubmission", fmt(run_model))
         return
 
@@ -358,7 +359,7 @@ def should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[dateti
         and last_provisioned_submission is None
         and RetryEvent.NO_CAPACITY in job.job_spec.retry.on_events
     ):
-        return get_current_datetime() - run.submitted_at
+        return common.get_current_datetime() - run.submitted_at
 
     if last_provisioned_submission is None:
         return None
@@ -368,7 +369,7 @@ def should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[dateti
         == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
         and RetryEvent.INTERRUPTION in job.job_spec.retry.on_events
     ):
-        return get_current_datetime() - last_provisioned_submission.last_processed_at
+        return common.get_current_datetime() - last_provisioned_submission.last_processed_at
 
     if (
         last_provisioned_submission.termination_reason
@@ -383,7 +384,7 @@ def should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[dateti
         ]
         and RetryEvent.ERROR in job.job_spec.retry.on_events
     ):
-        return get_current_datetime() - last_provisioned_submission.last_processed_at
+        return common.get_current_datetime() - last_provisioned_submission.last_processed_at
 
     return None
 
