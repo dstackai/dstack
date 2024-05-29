@@ -38,7 +38,6 @@ from dstack._internal.core.models.profiles import (
     Profile,
     SpotPolicy,
     TerminationPolicy,
-    parse_duration,
 )
 from dstack._internal.core.models.runs import (
     InstanceStatus,
@@ -50,7 +49,6 @@ from dstack._internal.core.models.runs import (
     JobSubmission,
     JobTerminationReason,
     Requirements,
-    RetryPolicy,
     Run,
     RunPlan,
     RunSpec,
@@ -589,11 +587,6 @@ async def create_instance(
     if termination_idle_time is None:
         termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
 
-    retry_policy = RetryPolicy(retry=False, duration=None)
-    if profile.retry_policy is not None:
-        retry_policy.retry = profile.retry_policy.retry
-        retry_policy.duration = parse_duration(profile.retry_policy.duration)
-
     instance = InstanceModel(
         name=instance_name,
         project=project,
@@ -605,8 +598,6 @@ async def create_instance(
         instance_configuration=None,
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
-        retry_policy=retry_policy.retry,
-        retry_policy_duration=retry_policy.duration,
     )
     logger.info(
         "Added a new instance %s",
@@ -688,6 +679,7 @@ def run_model_to_run(
         project_name=run_model.project.name,
         user=run_model.user.name,
         submitted_at=run_model.submitted_at.replace(tzinfo=timezone.utc),
+        last_processed_at=run_model.last_processed_at.replace(tzinfo=timezone.utc),
         status=run_model.status,
         termination_reason=run_model.termination_reason,
         run_spec=run_spec,
@@ -907,14 +899,13 @@ async def retry_run_replica_jobs(
     session: AsyncSession, run_model: RunModel, latest_jobs: List[JobModel], *, only_failed: bool
 ):
     for job_model in latest_jobs:
-        if job_model.termination_reason not in JOB_TERMINATION_REASONS_TO_RETRY:
+        if not (job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING):
             if only_failed:
                 # No need to resubmit, skip
                 continue
-            if not (job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING):
-                # The job is not finished, but we have to retry all jobs. Terminate it
-                job_model.status = JobStatus.TERMINATING
-                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            # The job is not finished, but we have to retry all jobs. Terminate it
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
 
         new_job_model = create_job_model_for_new_submission(
             run_model=run_model,

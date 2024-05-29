@@ -1,12 +1,13 @@
 from typing import List
 
+from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import RunPlan
-from dstack._internal.utils.common import pretty_date
+from dstack._internal.utils.common import format_pretty_duration, pretty_date
 from dstack.api import Run
 
 
@@ -23,18 +24,18 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     max_duration = (
         f"{job_plan.job_spec.max_duration / 3600:g}h" if job_plan.job_spec.max_duration else "-"
     )
-    retry_policy = job_plan.job_spec.retry_policy
-    retry_policy = (
-        (f"{retry_policy.duration / 3600:g}h" if retry_policy.duration else "yes")
-        if retry_policy.retry
-        else "no"
-    )
+    if job_plan.job_spec.retry is None:
+        retry = "no"
+    else:
+        retry = escape(job_plan.job_spec.retry.pretty_format())
+
     profile = run_plan.run_spec.merged_profile
     creation_policy = profile.creation_policy
     termination_policy = profile.termination_policy
-    termination_idle_time = f"{profile.termination_idle_time}s"
     if termination_policy == TerminationPolicy.DONT_DESTROY:
         termination_idle_time = "-"
+    else:
+        termination_idle_time = format_pretty_duration(profile.termination_idle_time)
 
     if req.spot is None:
         spot_policy = "auto"
@@ -54,7 +55,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Max duration"), max_duration)
     props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Retry policy"), retry_policy)
+    props.add_row(th("Retry policy"), retry)
     props.add_row(th("Creation policy"), creation_policy)
     props.add_row(th("Termination policy"), termination_policy)
     props.add_row(th("Termination idle time"), termination_idle_time)

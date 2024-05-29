@@ -82,13 +82,15 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         ):
             backend_data = json.loads(job_provisioning_data.backend_data)
             job_provisioning_data.backend = backend_data["base_backend"]
+    last_processed_at = job_model.last_processed_at.replace(tzinfo=timezone.utc)
     finished_at = None
     if job_model.status.is_finished():
-        finished_at = job_model.last_processed_at.replace(tzinfo=timezone.utc)
+        finished_at = last_processed_at
     return JobSubmission(
         id=job_model.id,
         submission_num=job_model.submission_num,
         submitted_at=job_model.submitted_at.replace(tzinfo=timezone.utc),
+        last_processed_at=last_processed_at,
         finished_at=finished_at,
         status=job_model.status,
         termination_reason=job_model.termination_reason,

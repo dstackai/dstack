@@ -18,9 +18,10 @@ from dstack._internal.core.models.runs import (
     AppSpec,
     JobSpec,
     Requirements,
-    RetryPolicy,
+    Retry,
     RunSpec,
 )
+from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 from dstack._internal.server.services.docker import ImageConfig, get_image_config
 from dstack._internal.server.utils.common import run_async
@@ -62,10 +63,6 @@ class JobConfigurator(ABC):
         pass
 
     @abstractmethod
-    def _retry_policy(self) -> RetryPolicy:
-        pass
-
-    @abstractmethod
     def _spot_policy(self) -> SpotPolicy:
         pass
 
@@ -92,7 +89,7 @@ class JobConfigurator(ABC):
             max_duration=self._max_duration(),
             registry_auth=self._registry_auth(),
             requirements=self._requirements(),
-            retry_policy=self._retry_policy(),
+            retry=self._retry(),
             working_dir=self._working_dir(),
         )
         return job_spec
@@ -165,6 +162,9 @@ class JobConfigurator(ABC):
             max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
         )
+
+    def _retry(self) -> Optional[Retry]:
+        return get_retry(self.run_spec.merged_profile)
 
     def _working_dir(self) -> Optional[str]:
         """

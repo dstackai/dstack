@@ -53,14 +53,43 @@ class ProfileRetryPolicy(CoreModel):
 
     _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
 
-    @root_validator()
-    @classmethod
-    def _validate_fields(cls, field_values):
-        if field_values["retry"] and "duration" not in field_values:
-            field_values["duration"] = DEFAULT_RETRY_DURATION
-        if field_values.get("duration") is not None:
-            field_values["retry"] = True
-        return field_values
+    @root_validator
+    def _validate_fields(cls, values):
+        if values["retry"] and "duration" not in values:
+            values["duration"] = DEFAULT_RETRY_DURATION
+        if values.get("duration") is not None:
+            values["retry"] = True
+        return values
+
+
+class RetryEvent(str, Enum):
+    NO_CAPACITY = "no-capacity"
+    INTERRUPTION = "interruption"
+    ERROR = "error"
+
+
+class ProfileRetry(CoreModel):
+    on_events: Annotated[
+        List[RetryEvent],
+        Field(
+            description=(
+                "The list of events that should be handled with retry."
+                " Supported events are `no-capacity`, `interruption`, and `error`"
+            )
+        ),
+    ]
+    duration: Annotated[
+        Optional[Union[int, str]],
+        Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
+    ] = None
+
+    _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
+
+    @root_validator
+    def _validate_fields(cls, values):
+        if len(values["on_events"]) == 0:
+            raise ValueError("`on_events` cannot be empty")
+        return values
 
 
 class ProfileParams(CoreModel):
@@ -86,8 +115,13 @@ class ProfileParams(CoreModel):
             description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`"
         ),
     ]
+    retry: Annotated[
+        Optional[Union[ProfileRetry, bool]],
+        Field(description="The policy for resubmitting the run. Defaults to `false`"),
+    ]
     retry_policy: Annotated[
-        Optional[ProfileRetryPolicy], Field(description="The policy for re-submitting the run")
+        Optional[ProfileRetryPolicy],
+        Field(description="The policy for resubmitting the run. Deprecated in favor of `retry`"),
     ]
     max_duration: Annotated[
         Optional[Union[Literal["off"], str, int]],

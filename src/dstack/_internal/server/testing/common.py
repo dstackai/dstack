@@ -253,6 +253,7 @@ def get_job_provisioning_data() -> JobProvisioningData:
         ),
         instance_id="instance_id",
         hostname="127.0.0.4",
+        internal_ip="127.0.0.4",
         region="us-east-1",
         price=10.5,
         username="ubuntu",
@@ -413,10 +414,6 @@ async def create_instance(
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=instance_configuration.json(),
-        retry_policy=profile.retry_policy.retry if profile.retry_policy is not None else False,
-        retry_policy_duration=profile.retry_policy.duration
-        if profile.retry_policy is not None
-        else 123,
     )
     session.add(im)
     await session.commit()

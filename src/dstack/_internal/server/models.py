@@ -323,6 +323,8 @@ class InstanceModel(BaseModel):
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # create instance
+    # TODO: Introduce a field that would store all resolved instance profile parameters, etc, (similar to job_spec).
+    # Currently, profile parameters are parsed every time they are accessed (e.g. see profile.retry).
     profile: Mapped[Optional[str]] = mapped_column(Text)
     requirements: Mapped[Optional[str]] = mapped_column(String(10_000))
     instance_configuration: Mapped[Optional[str]] = mapped_column(Text)
@@ -334,8 +336,6 @@ class InstanceModel(BaseModel):
     )
 
     # retry policy
-    retry_policy: Mapped[bool] = mapped_column(Boolean, default=False)
-    retry_policy_duration: Mapped[Optional[int]] = mapped_column(Integer)
     last_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # instance termination handling

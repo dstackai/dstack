@@ -46,8 +46,8 @@ The profile configuration supports many properties. See below.
       max_price:
         type: 'Optional[float]'
 
-### `retry_policy`
+### `retry`
 
-#SCHEMA# dstack._internal.core.models.profiles.ProfileRetryPolicy
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
     overrides:
       show_root_heading: false
