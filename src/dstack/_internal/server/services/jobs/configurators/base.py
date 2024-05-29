@@ -13,7 +13,7 @@ from dstack._internal.core.models.configurations import (
     RegistryAuth,
     RunConfigurationType,
 )
-from dstack._internal.core.models.profiles import DEFAULT_RETRY_DURATION, RetryEvent, SpotPolicy
+from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import (
     AppSpec,
     JobSpec,
@@ -21,6 +21,7 @@ from dstack._internal.core.models.runs import (
     Retry,
     RunSpec,
 )
+from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 from dstack._internal.server.services.docker import ImageConfig, get_image_config
 from dstack._internal.server.utils.common import run_async
@@ -163,31 +164,7 @@ class JobConfigurator(ABC):
         )
 
     def _retry(self) -> Optional[Retry]:
-        profile_retry = self.run_spec.merged_profile.retry
-        if profile_retry is None:
-            # Handle retry_policy before retry was introduced
-            # TODO: Remove once retry_policy no longer supported
-            profile_retry_policy = self.run_spec.merged_profile.retry_policy
-            if profile_retry_policy is None:
-                return None
-            if not profile_retry_policy.retry:
-                return None
-            duration = profile_retry_policy.duration or DEFAULT_RETRY_DURATION
-            return Retry(
-                on_events=[RetryEvent.NO_CAPACITY, RetryEvent.INTERRUPTION, RetryEvent.ERROR],
-                duration=duration,
-            )
-        if isinstance(profile_retry, bool):
-            if profile_retry:
-                return Retry(
-                    on_events=[RetryEvent.NO_CAPACITY, RetryEvent.INTERRUPTION, RetryEvent.ERROR],
-                    duration=DEFAULT_RETRY_DURATION,
-                )
-            return None
-        profile_retry = profile_retry.copy()
-        if profile_retry.duration is None:
-            profile_retry.duration = DEFAULT_RETRY_DURATION
-        return Retry.parse_obj(profile_retry)
+        return get_retry(self.run_spec.merged_profile)
 
     def _working_dir(self) -> Optional[str]:
         """

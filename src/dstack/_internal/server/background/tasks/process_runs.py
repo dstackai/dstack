@@ -396,5 +396,7 @@ def is_retry_duration_exceeded(job: Job, current_duration: datetime.timedelta) -
 
 
 def can_retry_single_job(run_spec: RunSpec) -> bool:
-    # TODO(egor-s): handle independent and interconnected clusters
+    # TODO: Currently, we terminate and retry the entire replica if one of the job fails.
+    # We could make partial retry in some multi-node cases.
+    # E.g. restarting a worker node, independent jobs.
     return False

@@ -36,8 +36,18 @@ from dstack._internal.core.models.instances import (
     InstanceRuntime,
     RemoteConnectionInfo,
 )
-from dstack._internal.core.models.profiles import Profile, TerminationPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
+from dstack._internal.core.models.profiles import (
+    Profile,
+    RetryEvent,
+    TerminationPolicy,
+)
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobProvisioningData,
+    Requirements,
+    Retry,
+)
+from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, ProjectModel
 from dstack._internal.server.schemas.runner import HealthcheckResponse
@@ -341,24 +351,6 @@ async def create_instance(instance_id: UUID) -> None:
             )
         ).one()
 
-        if instance.retry_policy and instance.retry_policy_duration is not None:
-            retry_duration_deadline = _get_retry_duration_deadline(instance)
-            if get_current_datetime() > retry_duration_deadline:
-                instance.status = InstanceStatus.TERMINATED
-                instance.deleted = True
-                instance.deleted_at = get_current_datetime()
-                instance.termination_reason = "Retry duration expired"
-                await session.commit()
-                logger.warning(
-                    "Retry duration expired. Terminate instance %s",
-                    instance.name,
-                    extra={
-                        "instance_name": instance.name,
-                        "instance_status": InstanceStatus.TERMINATED.value,
-                    },
-                )
-                return
-
         if instance.last_retry_at is not None:
             last_retry = instance.last_retry_at.replace(tzinfo=datetime.timezone.utc)
             if get_current_datetime() < last_retry + timedelta(minutes=1):
@@ -386,10 +378,10 @@ async def create_instance(instance_id: UUID) -> None:
             return
 
         try:
-            profile = Profile.__response__.parse_raw(instance.profile)
-            requirements = Requirements.__response__.parse_raw(instance.requirements)
-            instance_configuration = InstanceConfiguration.__response__.parse_raw(
-                instance.instance_configuration
+            profile: Profile = Profile.__response__.parse_raw(instance.profile)
+            requirements: Requirements = Requirements.__response__.parse_raw(instance.requirements)
+            instance_configuration: InstanceConfiguration = (
+                InstanceConfiguration.__response__.parse_raw(instance.instance_configuration)
             )
         except ValidationError as e:
             instance.status = InstanceStatus.TERMINATED
@@ -410,6 +402,27 @@ async def create_instance(instance_id: UUID) -> None:
             await session.commit()
             return
 
+        retry = get_retry(profile)
+        should_retry = retry is not None and RetryEvent.NO_CAPACITY in retry.on_events
+
+        if retry is not None:
+            retry_duration_deadline = _get_retry_duration_deadline(instance, retry)
+            if get_current_datetime() > retry_duration_deadline:
+                instance.status = InstanceStatus.TERMINATED
+                instance.deleted = True
+                instance.deleted_at = get_current_datetime()
+                instance.termination_reason = "Retry duration expired"
+                await session.commit()
+                logger.warning(
+                    "Retry duration expired. Terminate instance %s",
+                    instance.name,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATED.value,
+                    },
+                )
+                return
+
         offers = await get_create_instance_offers(
             project=instance.project,
             profile=profile,
@@ -417,7 +430,7 @@ async def create_instance(instance_id: UUID) -> None:
             exclude_not_available=True,
         )
 
-        if not offers and instance.retry_policy:
+        if not offers and should_retry:
             instance.last_retry_at = get_current_datetime()
             await session.commit()
             logger.debug(
@@ -479,7 +492,7 @@ async def create_instance(instance_id: UUID) -> None:
 
         instance.last_retry_at = get_current_datetime()
 
-        if not instance.retry_policy:
+        if not should_retry:
             instance.status = InstanceStatus.TERMINATED
             instance.deleted = True
             instance.deleted_at = get_current_datetime()
@@ -749,9 +762,9 @@ def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:
     return get_current_datetime() - last_time
 
 
-def _get_retry_duration_deadline(instance: InstanceModel) -> datetime.datetime:
+def _get_retry_duration_deadline(instance: InstanceModel, retry: Retry) -> datetime.datetime:
     return instance.created_at.replace(tzinfo=datetime.timezone.utc) + timedelta(
-        seconds=instance.retry_policy_duration
+        seconds=retry.duration
     )
 
 

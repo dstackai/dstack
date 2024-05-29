@@ -15,7 +15,10 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.gcp.config import GCPConfig
-from dstack._internal.core.errors import ComputeResourceNotFoundError, NoCapacityError
+from dstack._internal.core.errors import (
+    ComputeResourceNotFoundError,
+    NoCapacityError,
+)
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import GatewayComputeConfiguration
 from dstack._internal.core.models.instances import (
@@ -96,7 +99,6 @@ class GCPCompute(Compute):
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
         instance_name = instance_config.instance_name
-
         if not gcp_resources.is_valid_resource_name(instance_name):
             # In a rare case the instance name is invalid in GCP,
             # we better use a random instance name than fail provisioning.

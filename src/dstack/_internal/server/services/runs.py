@@ -38,7 +38,6 @@ from dstack._internal.core.models.profiles import (
     Profile,
     SpotPolicy,
     TerminationPolicy,
-    parse_duration,
 )
 from dstack._internal.core.models.runs import (
     InstanceStatus,
@@ -50,7 +49,6 @@ from dstack._internal.core.models.runs import (
     JobSubmission,
     JobTerminationReason,
     Requirements,
-    Retry,
     Run,
     RunPlan,
     RunSpec,
@@ -589,11 +587,6 @@ async def create_instance(
     if termination_idle_time is None:
         termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
 
-    retry_policy = Retry(retry=False, duration=None)
-    if profile.retry_policy is not None:
-        retry_policy.retry = profile.retry_policy.retry
-        retry_policy.duration = parse_duration(profile.retry_policy.duration)
-
     instance = InstanceModel(
         name=instance_name,
         project=project,
@@ -605,8 +598,6 @@ async def create_instance(
         instance_configuration=None,
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
-        retry_policy=retry_policy.retry,
-        retry_policy_duration=retry_policy.duration,
     )
     logger.info(
         "Added a new instance %s",
