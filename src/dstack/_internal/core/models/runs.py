@@ -29,7 +29,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils import common as common_utils
-from dstack._internal.utils.common import pretty_resources
+from dstack._internal.utils.common import format_pretty_duration, pretty_resources
 
 
 class AppSpec(CoreModel):
@@ -60,8 +60,13 @@ class JobStatus(str, Enum):
 
 
 class Retry(CoreModel):
-    on: List[RetryEvent]
+    on_events: List[RetryEvent]
     duration: int
+
+    def pretty_format(self) -> str:
+        pretty_duration = format_pretty_duration(self.duration)
+        events = ", ".join(event.value for event in self.on_events)
+        return f"{pretty_duration}[{events}]"
 
 
 class RunTerminationReason(str, Enum):

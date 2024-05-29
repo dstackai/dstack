@@ -356,7 +356,7 @@ def should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[dateti
     if (
         job_model.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
         and last_provisioned_submission is None
-        and RetryEvent.NO_CAPACITY in job.job_spec.retry.on
+        and RetryEvent.NO_CAPACITY in job.job_spec.retry.on_events
     ):
         return get_current_datetime() - run.submitted_at
 
@@ -366,7 +366,7 @@ def should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[dateti
     if (
         last_provisioned_submission.termination_reason
         == JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-        and RetryEvent.INTERRUPTION in job.job_spec.retry.on
+        and RetryEvent.INTERRUPTION in job.job_spec.retry.on_events
     ):
         return get_current_datetime() - last_provisioned_submission.last_processed_at
 
@@ -381,7 +381,7 @@ def should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[dateti
             JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED,
             JobTerminationReason.PORTS_BINDING_FAILED,
         ]
-        and RetryEvent.ERROR in job.job_spec.retry.on
+        and RetryEvent.ERROR in job.job_spec.retry.on_events
     ):
         return get_current_datetime() - last_provisioned_submission.last_processed_at
 

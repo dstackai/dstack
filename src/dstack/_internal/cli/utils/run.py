@@ -1,12 +1,13 @@
 from typing import List
 
+from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import RunPlan
-from dstack._internal.utils.common import pretty_date
+from dstack._internal.utils.common import format_pretty_duration, pretty_date
 from dstack.api import Run
 
 
@@ -23,16 +24,18 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     max_duration = (
         f"{job_plan.job_spec.max_duration / 3600:g}h" if job_plan.job_spec.max_duration else "-"
     )
-    retry = "no"
-    if job_plan.job_spec.retry is not None:
-        retry = f"{job_plan.job_spec.retry.duration / 3600:g}h"
+    if job_plan.job_spec.retry is None:
+        retry = "no"
+    else:
+        retry = escape(job_plan.job_spec.retry.pretty_format())
 
     profile = run_plan.run_spec.merged_profile
     creation_policy = profile.creation_policy
     termination_policy = profile.termination_policy
-    termination_idle_time = f"{profile.termination_idle_time}s"
     if termination_policy == TerminationPolicy.DONT_DESTROY:
         termination_idle_time = "-"
+    else:
+        termination_idle_time = format_pretty_duration(profile.termination_idle_time)
 
     if req.spot is None:
         spot_policy = "auto"

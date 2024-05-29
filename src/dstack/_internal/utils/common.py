@@ -138,6 +138,22 @@ def parse_pretty_duration(duration: str) -> int:
     return amount * multiplier
 
 
+def format_pretty_duration(seconds: int) -> str:
+    if seconds < 0:
+        raise ValueError("Seconds cannot be negative")
+    units = [
+        ("w", 7 * 24 * 3600),
+        ("d", 24 * 3600),
+        ("h", 3600),
+        ("m", 60),
+        ("s", 1),
+    ]
+    for unit, multiplier in units:
+        if seconds % multiplier == 0:
+            return f"{seconds // multiplier}{unit}"
+    return f"{seconds}s"  # Fallback to seconds if no larger unit fits perfectly
+
+
 def sizeof_fmt(num, suffix="B"):
     for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
         if abs(num) < 1024.0:

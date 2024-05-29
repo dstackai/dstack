@@ -174,10 +174,15 @@ class JobConfigurator(ABC):
                 return None
             duration = profile_retry_policy.duration or DEFAULT_RETRY_DURATION
             return Retry(
-                on=[RetryEvent.NO_CAPACITY, RetryEvent.INTERRUPTION, RetryEvent.ERROR],
+                on_events=[RetryEvent.NO_CAPACITY, RetryEvent.INTERRUPTION, RetryEvent.ERROR],
                 duration=duration,
             )
-        if profile_retry == "off":
+        if isinstance(profile_retry, bool):
+            if profile_retry:
+                return Retry(
+                    on_events=[RetryEvent.NO_CAPACITY, RetryEvent.INTERRUPTION, RetryEvent.ERROR],
+                    duration=DEFAULT_RETRY_DURATION,
+                )
             return None
         profile_retry = profile_retry.copy()
         if profile_retry.duration is None:
