@@ -87,7 +87,7 @@ class ProfileRetry(CoreModel):
 
     @root_validator
     def _validate_fields(cls, values):
-        if len(values["on_events"]) == 0:
+        if "on_events" in values and len(values["on_events"]) == 0:
             raise ValueError("`on_events` cannot be empty")
         return values
 
