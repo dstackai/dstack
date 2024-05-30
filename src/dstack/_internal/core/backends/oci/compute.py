@@ -1,9 +1,6 @@
-import json
-import os
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, List, Optional, Set
+from typing import List, Optional
 
 import oci
 
@@ -33,34 +30,9 @@ SUPPORTED_SHAPE_FAMILIES = [
 ]
 
 
-@dataclass
-class PreConfiguredResources:
-    # TODO(#1194): remove this class and teach dstack to create or discover all
-    # necessary resources automatically
-
-    standard_image_ids: Dict[str, str]
-    cuda_image_ids: Dict[str, str]
-
-    @staticmethod
-    def load(required_regions: Set[str]) -> "PreConfiguredResources":
-        params = dict(
-            standard_image_ids=json.loads(os.getenv("DSTACK_OCI_STANDARD_IMAGE_IDS", "null")),
-            cuda_image_ids=json.loads(os.getenv("DSTACK_OCI_CUDA_IMAGE_IDS", "null")),
-        )
-        for param, value in params.items():
-            if not value or required_regions - set(value):
-                msg = (
-                    f"Invalid OCI parameter {param!r}. Make sure you set the corresponding"
-                    " environment variable when running dstack server"
-                )
-                raise ValueError(msg)
-        return PreConfiguredResources(**params)
-
-
 class OCICompute(Compute):
     def __init__(self, config: OCIConfig):
         self.config = config
-        self.pre_conf = PreConfiguredResources.load(set(config.regions or []))
         self.regions = make_region_clients_map(config.regions or [], config.creds)
 
     @cached_property
@@ -132,10 +104,13 @@ class OCICompute(Compute):
         if availability_domain is None:
             raise NoCapacityError("Shape unavailable in all availability domains")
 
-        if len(instance_offer.instance.resources.gpus) > 0:
-            image_id = self.pre_conf.cuda_image_ids[instance_offer.region]
-        else:
-            image_id = self.pre_conf.standard_image_ids[instance_offer.region]
+        listing, package = resources.get_marketplace_listing_and_package(
+            cuda=len(instance_offer.instance.resources.gpus) > 0,
+            client=region.marketplace_client,
+        )
+        resources.accept_marketplace_listing_agreements(
+            listing, self.config.compartment_id, region.marketplace_client
+        )
 
         try:
             instance = resources.launch_instance(
@@ -147,7 +122,7 @@ class OCICompute(Compute):
                 cloud_init_user_data=get_user_data(instance_config.get_public_keys()),
                 shape=instance_offer.instance.name,
                 disk_size_gb=round(instance_offer.instance.resources.disk.size_mib / 1024),
-                image_id=image_id,
+                image_id=package.image_id,
             )
         except oci.exceptions.ServiceError as e:
             if e.code in ("LimitExceeded", "QuotaExceeded"):
