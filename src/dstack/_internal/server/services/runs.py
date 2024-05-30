@@ -593,6 +593,7 @@ async def create_instance(
         pool=pool,
         created_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PENDING,
+        unreachable=False,
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=None,
@@ -719,6 +720,8 @@ def _get_pool_offers(
         offer.availability = InstanceAvailability.BUSY
         if instance.status == InstanceStatus.IDLE:
             offer.availability = InstanceAvailability.IDLE
+        if instance.unreachable:
+            offer.availability = InstanceAvailability.NOT_AVAILABLE
         pool_offers.append(offer)
     return pool_offers
 

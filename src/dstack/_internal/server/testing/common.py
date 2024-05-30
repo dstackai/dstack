@@ -402,6 +402,7 @@ async def create_instance(
         pool=pool,
         project=project,
         status=status,
+        unreachable=False,
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,

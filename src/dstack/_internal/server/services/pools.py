@@ -15,7 +15,6 @@ from dstack._internal.core.backends.base.offers import (
     requirements_to_query_filter,
 )
 from dstack._internal.core.errors import (
-    ClientError,
     ResourceExistsError,
     ResourceNotExistsError,
     ServerClientError,
@@ -207,6 +206,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     instance = Instance(
         name=instance_model.name,
         status=instance_model.status,
+        unreachable=instance_model.unreachable,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
     )
 
@@ -268,8 +268,8 @@ async def add_remote(
         try:
             interface = ipaddress.IPv4Interface(instance_network)
             instance_network = str(interface.network)
-        except ipaddress.AddressValueError as e:
-            raise ClientError(e)
+        except ipaddress.AddressValueError:
+            raise ServerClientError("Failed to parse network value")
 
     # Check instance in all instances
     pools = await list_project_pool_models(session, project)
@@ -328,6 +328,7 @@ async def add_remote(
         created_at=common_utils.get_current_datetime(),
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PENDING,
+        unreachable=False,
         job_provisioning_data=remote.json(),
         remote_connection_info=ssh_connection_info,
         offer=offer.json(),
@@ -358,6 +359,8 @@ def filter_pool_instances(
     instances: List[InstanceModel] = []
     candidates: List[InstanceModel] = []
     for instance in pool_instances:
+        if instance.unreachable:
+            continue
         if profile.instance_name is not None and instance.name != profile.instance_name:
             continue
         if status is not None and instance.status != status:

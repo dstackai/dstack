@@ -183,13 +183,16 @@ class RunCommand(APIBaseCommand):
                         console.print(
                             f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
                         )
-                    if run.attach():
-                        for entry in run.logs():
-                            sys.stdout.buffer.write(entry)
-                            sys.stdout.buffer.flush()
-                    else:
-                        console.print("[error]Failed to attach, exiting...[/]")
-                        return
+                    try:
+                        if run.attach():
+                            for entry in run.logs():
+                                sys.stdout.buffer.write(entry)
+                                sys.stdout.buffer.flush()
+                        else:
+                            console.print("[error]Failed to attach, exiting...[/]")
+                            return
+                    finally:
+                        run.detach()
 
                 # After reading the logs, the run may not be marked as finished immediately.
                 # Give the run some time to transit into a finished state before exiting.
@@ -279,7 +282,7 @@ def _get_run_termination_reason(run: Run) -> Optional[JobTerminationReason]:
 def _run_resubmitted(run: Run, current_job_submission: Optional[JobSubmission]) -> bool:
     if current_job_submission is None or run._run.latest_job_submission is None:
         return False
-    return (
+    return run.status == RunStatus.PENDING or (
         not run.status.is_finished()
         and run._run.latest_job_submission.submitted_at > current_job_submission.submitted_at
     )
