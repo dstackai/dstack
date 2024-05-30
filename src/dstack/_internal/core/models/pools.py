@@ -24,6 +24,7 @@ class Instance(CoreModel):
     job_status: Optional[JobStatus] = None
     hostname: Optional[str] = None
     status: InstanceStatus
+    unreachable: bool = False
     created: datetime.datetime
     region: Optional[str] = None
     price: Optional[float] = None

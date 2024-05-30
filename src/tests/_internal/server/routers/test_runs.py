@@ -960,6 +960,7 @@ class TestCreateInstance:
                 "job_status": None,
                 "hostname": None,
                 "status": "pending",
+                "unreachable": False,
                 "created": result["created"],
                 "pool_name": "default-pool",
                 "region": None,

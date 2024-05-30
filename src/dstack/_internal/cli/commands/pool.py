@@ -409,6 +409,10 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
             resources = instance.instance_type.resources.pretty_format()
             spot = "yes" if instance.instance_type.resources.spot else "no"
 
+        status = instance.status.value
+        if instance.unreachable:
+            status = "unreachable"
+
         row = [
             instance.name,
             (instance.backend or "").replace("remote", "ssh"),
@@ -416,7 +420,7 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
             resources,
             spot,
             f"${instance.price:.4}" if instance.price is not None else "",
-            instance.status.value,
+            status,
             pretty_date(instance.created),
         ]
         table.add_row(*row)

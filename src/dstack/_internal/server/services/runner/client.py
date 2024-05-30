@@ -29,9 +29,6 @@ class HealthStatus:
     def __str__(self) -> str:
         return self.reason
 
-    def __bool__(self) -> bool:
-        return self.healthy
-
 
 class RunnerClient:
     def __init__(

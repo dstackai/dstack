@@ -542,25 +542,26 @@ async def check_instance(instance_id: UUID) -> None:
             )
             ssh_private_key = remote_conn_info.ssh_keys[0].private
 
-        instance_health: Union[Optional[HealthStatus], bool] = await run_async(
+        # May return False if fails to establish ssh connection
+        health_status_response: Union[Optional[HealthStatus], bool] = await run_async(
             instance_healthcheck, ssh_private_key, job_provisioning_data
         )
-        if isinstance(instance_health, bool) or instance_health is None:
-            health = HealthStatus(healthy=False, reason="SSH or tunnel error")
+        if isinstance(health_status_response, bool) or health_status_response is None:
+            health_status = HealthStatus(healthy=False, reason="SSH or tunnel error")
         else:
-            health = instance_health
+            health_status = health_status_response
 
         logger.debug(
             "Check instance %s status. shim health: %s",
             instance.name,
-            health,
-            extra={"instance_name": instance.name, "shim_health": health},
+            health_status,
+            extra={"instance_name": instance.name, "shim_health": health_status},
         )
 
-        if health:
+        if health_status.healthy:
             instance.termination_deadline = None
-            # FIXME why health_status is None?
             instance.health_status = None
+            instance.unreachable = False
 
             if instance.status == InstanceStatus.PROVISIONING:
                 instance.status = (
@@ -581,7 +582,8 @@ async def check_instance(instance_id: UUID) -> None:
         if instance.termination_deadline is None:
             instance.termination_deadline = get_current_datetime() + TERMINATION_DEADLINE_OFFSET
 
-        instance.health_status = health.reason
+        instance.health_status = health_status.reason
+        instance.unreachable = True
 
         if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
             provisioning_deadline = _get_provisioning_deadline(instance)

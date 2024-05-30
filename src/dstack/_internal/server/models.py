@@ -317,6 +317,7 @@ class InstanceModel(BaseModel):
     pool: Mapped["PoolModel"] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
+    unreachable: Mapped[bool] = mapped_column(Boolean)
 
     # VM
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
