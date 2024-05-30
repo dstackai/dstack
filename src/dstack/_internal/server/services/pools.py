@@ -15,7 +15,6 @@ from dstack._internal.core.backends.base.offers import (
     requirements_to_query_filter,
 )
 from dstack._internal.core.errors import (
-    ClientError,
     ResourceExistsError,
     ResourceNotExistsError,
     ServerClientError,
@@ -269,8 +268,8 @@ async def add_remote(
         try:
             interface = ipaddress.IPv4Interface(instance_network)
             instance_network = str(interface.network)
-        except ipaddress.AddressValueError as e:
-            raise ClientError(e)
+        except ipaddress.AddressValueError:
+            raise ServerClientError("Failed to parse network value")
 
     # Check instance in all instances
     pools = await list_project_pool_models(session, project)
