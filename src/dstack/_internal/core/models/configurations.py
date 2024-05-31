@@ -85,8 +85,21 @@ class Artifact(CoreModel):
 
 
 class ScalingSpec(CoreModel):
-    metric: Annotated[Literal["rps"], Field(description="The target metric to track")]
-    target: Annotated[float, Field(description="The target value of the metric")]
+    metric: Annotated[
+        Literal["rps"],
+        Field(
+            description="The target metric to track. Currently, the only supported value is `rps` "
+            "(meaning requests per second)"
+        ),
+    ]
+    target: Annotated[
+        float,
+        Field(
+            description="The target value of the metric. "
+            "The number of replicas is calculated based on this number and automatically adjusts "
+            "(scales up or down) as this metric changes"
+        ),
+    ]
     scale_up_delay: Annotated[
         Duration, Field(description="The delay in seconds before scaling up")
     ] = Duration.parse("5m")
@@ -215,19 +228,6 @@ class TaskConfiguration(
     BaseConfigurationWithPorts,
     TaskConfigurationParams,
 ):
-    """
-    Attributes:
-        commands (List[str]): The bash commands to run
-        ports (List[PortMapping]): Port numbers/mapping to expose
-        env (Dict[str, str]): The mapping or the list of environment variables
-        image (Optional[str]): The name of the Docker image to run
-        python (Optional[str]): The major version of Python
-        entrypoint (Optional[str]): The Docker entrypoint
-        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
-        home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
-    """
-
     type: Literal["task"] = "task"
 
 
@@ -244,10 +244,14 @@ class ServiceConfigurationParams(CoreModel):
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
     replicas: Annotated[
         Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],
-        Field(description="The range "),
+        Field(
+            description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
+            "If it's a range, the `scaling` property is required"
+        ),
     ] = Range[int](min=1, max=1)
     scaling: Annotated[
-        Optional[ScalingSpec], Field(description="The auto-scaling configuration")
+        Optional[ScalingSpec],
+        Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
     ] = None
 
     @validator("port")
@@ -289,24 +293,6 @@ class ServiceConfigurationParams(CoreModel):
 class ServiceConfiguration(
     ProfileParams, BaseConfigurationWithCommands, ServiceConfigurationParams
 ):
-    """
-    Attributes:
-        commands (List[str]): The bash commands to run
-        port (PortMapping): The port, that application listens to or the mapping
-        env (Dict[str, str]): The mapping or the list of environment variables
-        image (Optional[str]): The name of the Docker image to run
-        python (Optional[str]): The major version of Python
-        entrypoint (Optional[str]): The Docker entrypoint
-        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
-        home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
-        model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
-        https (bool): Enable HTTPS. Defaults to `True`.
-        auth (bool): Enable the authorization. Defaults to `True`.
-        replicas Range[int]: The range of the number of replicas. Defaults to `1`.
-        scaling: Optional[ScalingSpec]: The auto-scaling configuration.
-    """
-
     type: Literal["service"] = "service"
 
 

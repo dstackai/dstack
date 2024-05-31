@@ -103,10 +103,14 @@ def generate_schema_reference(
                 item_id_prefix = overrides["item_id_prefix"]
             else:
                 item_id_prefix = ""
+            if hasattr(field_type, "__name__") and overrides and "item_id_mapping" in overrides:
+                link_name = overrides["item_id_mapping"].get(values["name"]) or values["name"]
+            else:
+                link_name = values["name"]
             item_header = (
                 f"`{values['name']}`"
                 if not base_model
-                else f"[`{values['name']}`](#{item_id_prefix}{values['name']})"
+                else f"[`{values['name']}`](#{item_id_prefix}{link_name})"
             )
             item_optional_marker = "(Optional)" if not values["required"] else ""
             item_description = (values["description"]).replace("\n", "<br>") + "."

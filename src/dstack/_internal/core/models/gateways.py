@@ -92,7 +92,9 @@ class Gateway(CoreModel):
 class BaseChatModel(CoreModel):
     type: Annotated[Literal["chat"], Field(description="The type of the model")]
     name: Annotated[str, Field(description="The name of the model")]
-    format: Annotated[str, Field(description="The serving format")]
+    format: Annotated[
+        str, Field(description="The serving format. Supported values include `openai` and `tgi`")
+    ]
 
 
 class TGIChatModel(BaseChatModel):
