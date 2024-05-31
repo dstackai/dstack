@@ -453,7 +453,7 @@ def print_offers_table(
     props.add_column(no_wrap=True)  # key
     props.add_column()  # value
 
-    props.add_row(th("Pool name"), profile.pool_name)
+    props.add_row(th("Pool"), profile.pool_name)
     props.add_row(th("Min resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Spot policy"), spot_policy)
