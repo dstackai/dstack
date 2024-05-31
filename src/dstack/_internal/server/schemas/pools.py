@@ -33,6 +33,6 @@ class ListPoolsRequest(CoreModel):
     pool_name: Optional[str]
     only_active: bool = False
     prev_created_at: Optional[datetime]
-    prev_name: Optional[UUID]
+    prev_id: Optional[UUID]
     limit: int = 1000
     ascending: bool = False

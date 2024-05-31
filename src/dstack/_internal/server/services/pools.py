@@ -204,6 +204,7 @@ def get_pool_instances(pool: PoolModel) -> List[InstanceModel]:
 
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     instance = Instance(
+        id=instance_model.id,
         name=instance_model.name,
         status=instance_model.status,
         unreachable=instance_model.unreachable,
@@ -321,6 +322,7 @@ async def add_remote(
     ).json()
 
     im = InstanceModel(
+        id=uuid.uuid4(),
         name=instance_name,
         project=project,
         pool=pool_model,
@@ -405,15 +407,14 @@ async def list_pools_instance_models(
     pools: List[PoolModel],
     only_active: bool,
     prev_created_at: Optional[datetime],
-    prev_name: Optional[uuid.UUID],
+    prev_id: Optional[uuid.UUID],
     limit: int,
     ascending: bool,
 ) -> List[InstanceModel]:
-    filters = [
+    filters: List = [
         InstanceModel.project_id.in_(p.id for p in projects),
         InstanceModel.pool_id.in_(p.id for p in pools),
     ]
-
     if only_active:
         filters.extend(
             [
@@ -421,10 +422,9 @@ async def list_pools_instance_models(
                 InstanceModel.status.in_([InstanceStatus.IDLE, InstanceStatus.BUSY]),
             ]
         )
-
     if prev_created_at is not None:
         if ascending:
-            if prev_name is None:
+            if prev_id is None:
                 filters.append(InstanceModel.created_at > prev_created_at)
             else:
                 filters.append(
@@ -432,12 +432,12 @@ async def list_pools_instance_models(
                         InstanceModel.created_at > prev_created_at,
                         and_(
                             InstanceModel.created_at == prev_created_at,
-                            InstanceModel.name < prev_name,
+                            InstanceModel.id < prev_id,
                         ),
                     )
                 )
         else:
-            if prev_name is None:
+            if prev_id is None:
                 filters.append(InstanceModel.created_at < prev_created_at)
             else:
                 filters.append(
@@ -445,13 +445,13 @@ async def list_pools_instance_models(
                         InstanceModel.created_at < prev_created_at,
                         and_(
                             InstanceModel.created_at == prev_created_at,
-                            InstanceModel.name > prev_name,
+                            InstanceModel.id > prev_id,
                         ),
                     )
                 )
-    order_by = (InstanceModel.created_at.desc(), InstanceModel.name)
+    order_by = (InstanceModel.created_at.desc(), InstanceModel.id)
     if ascending:
-        order_by = (InstanceModel.created_at.asc(), InstanceModel.name.desc())
+        order_by = (InstanceModel.created_at.asc(), InstanceModel.id.desc())
 
     res = await session.execute(
         select(InstanceModel)
@@ -464,14 +464,14 @@ async def list_pools_instance_models(
     return instance_models
 
 
-async def list_user_pool(
+async def list_user_pool_instances(
     session: AsyncSession,
     user: UserModel,
     project_name: Optional[str],
     pool_name: Optional[str],
     only_active: bool,
     prev_created_at: Optional[datetime],
-    prev_name: Optional[uuid.UUID],
+    prev_id: Optional[uuid.UUID],
     limit: int,
     ascending: bool,
 ) -> List[Instance]:
@@ -503,7 +503,7 @@ async def list_user_pool(
         pools=pools,
         only_active=only_active,
         prev_created_at=prev_created_at,
-        prev_name=prev_name,
+        prev_id=prev_id,
         limit=limit,
         ascending=ascending,
     )

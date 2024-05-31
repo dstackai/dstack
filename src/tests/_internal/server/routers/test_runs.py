@@ -914,9 +914,11 @@ class TestCreateInstance:
             profile=Profile(name="test_profile"),
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
         )
+        instance_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         with patch(
             "dstack._internal.server.services.runs.get_offers_by_requirements"
-        ) as run_plan_by_req:
+        ) as run_plan_by_req, patch("uuid.uuid4") as uuid_mock:
+            uuid_mock.return_value = instance_id
             offer = InstanceOfferWithAvailability(
                 backend=BackendType.AWS,
                 instance=InstanceType(
@@ -953,6 +955,7 @@ class TestCreateInstance:
             assert response.status_code == 200
             result = response.json()
             expected = {
+                "id": str(instance_id),
                 "backend": None,
                 "instance_type": None,
                 "name": result["name"],

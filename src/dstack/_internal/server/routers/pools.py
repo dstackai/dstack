@@ -18,8 +18,8 @@ root_router = APIRouter(prefix="/api/pools", tags=["pool"])
 router = APIRouter(prefix="/api/project/{project_name}/pool", tags=["pool"])
 
 
-@root_router.post("/list")
-async def list_pools(
+@root_router.post("/list_instances")
+async def list_pool_instances(
     body: ListPoolsRequest,
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
@@ -29,16 +29,16 @@ async def list_pools(
     A **project_name** and **pool_name** can be specified as filters.
 
     The results are paginated. To get the next page, pass created_at and id of
-    the last run from the previous page as **prev_created_at** and **prev_name**.
+    the last run from the previous page as **prev_created_at** and **prev_id**.
     """
-    return await pools.list_user_pool(
+    return await pools.list_user_pool_instances(
         session=session,
         user=user,
         project_name=body.project_name,
         pool_name=body.pool_name,
         only_active=body.only_active,
         prev_created_at=body.prev_created_at,
-        prev_name=body.prev_name,
+        prev_id=body.prev_id,
         limit=body.limit,
         ascending=body.ascending,
     )
