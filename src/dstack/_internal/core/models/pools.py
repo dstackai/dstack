@@ -1,5 +1,6 @@
 import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
@@ -16,6 +17,7 @@ class Pool(CoreModel):
 
 
 class Instance(CoreModel):
+    id: UUID
     backend: Optional[BackendType] = None
     instance_type: Optional[InstanceType] = None
     name: str

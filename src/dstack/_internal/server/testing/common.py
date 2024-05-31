@@ -339,7 +339,10 @@ async def create_instance(
     profile: Optional[Profile] = None,
     requirements: Optional[Requirements] = None,
     instance_configuration: Optional[InstanceConfiguration] = None,
+    instance_id: Optional[UUID] = None,
 ) -> InstanceModel:
+    if instance_id is None:
+        instance_id = uuid.uuid4()
     job_provisioning_data = {
         "backend": "datacrunch",
         "instance_type": {
@@ -398,6 +401,7 @@ async def create_instance(
         )
 
     im = InstanceModel(
+        id=instance_id,
         name="test_instance",
         pool=pool,
         project=project,

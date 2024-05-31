@@ -47,8 +47,10 @@ class TestGenerateInstanceName:
 
 class TestInstanceModelToInstance:
     def test_converts_instance(self):
+        instance_id = uuid.uuid4()
         created = get_current_datetime()
         expected_instance = Instance(
+            id=instance_id,
             backend=BackendType.LOCAL,
             instance_type=InstanceType(
                 name="instance", resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[])
@@ -61,7 +63,7 @@ class TestInstanceModelToInstance:
             price=1.0,
         )
         im = InstanceModel(
-            id=str(uuid.uuid4()),
+            id=instance_id,
             created_at=created,
             name="test_instance",
             status=InstanceStatus.PENDING,

@@ -33,7 +33,7 @@ client = TestClient(app)
 TEST_POOL_NAME = "test_router_pool_name"
 
 
-class TestListPool:
+class TestListPools:
     @pytest.mark.asyncio
     async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -258,10 +258,12 @@ class TestShowPool:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
         pool = await create_pool(session, project, pool_name=TEST_POOL_NAME)
-        await create_instance(session, project, pool)
-
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+        )
         response = client.post(
             f"/api/project/{project.name}/pool/show",
             headers=get_auth_headers(user.token),
@@ -284,6 +286,7 @@ class TestShowPool:
                             "description": "",
                         },
                     },
+                    "id": str(instance.id),
                     "name": "test_instance",
                     "job_name": None,
                     "job_status": None,
@@ -305,10 +308,12 @@ class TestShowPool:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
         pool = await create_pool(session, project, pool_name=TEST_POOL_NAME)
-        await create_instance(session, project, pool)
-
+        await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+        )
         response = client.post(
             f"/api/project/{project.name}/pool/show",
             headers=get_auth_headers(user.token),
@@ -327,6 +332,8 @@ class TestAddRemote:
         project = await create_project(session=session, owner=user)
         remote = AddRemoteInstanceRequest(
             instance_name="test_instance_name",
+            instance_network=None,
+            region="",
             host="localhost",
             port=22,
             pool_name="pool_name",
@@ -346,9 +353,10 @@ class TestAddRemote:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
         remote = AddRemoteInstanceRequest(
             instance_name="test_instance_name",
+            instance_network=None,
+            region="",
             host="localhost",
             port=22,
             pool_name="pool_name",
@@ -374,6 +382,8 @@ class TestRemoveInstance:
         project = await create_project(session=session, owner=user)
         remote = AddRemoteInstanceRequest(
             instance_name="test_instance_name",
+            instance_network=None,
+            region="",
             host="localhost",
             port=22,
             pool_name="pool_name",
@@ -393,15 +403,18 @@ class TestRemoveInstance:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-
         pool = await create_pool(session, project, pool_name=TEST_POOL_NAME)
-        instance = await create_instance(session, project, pool)
-
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+        )
         response = client.post(
             f"/api/project/{project.name}/pool/remove",
             headers=get_auth_headers(user.token),
             json=RemoveInstanceRequest(
-                pool_name=TEST_POOL_NAME, instance_name=instance.name
+                pool_name=TEST_POOL_NAME,
+                instance_name=instance.name,
             ).dict(),
         )
         assert response.status_code == 200
@@ -429,6 +442,7 @@ class TestRemoveInstance:
                             "description": "",
                         },
                     },
+                    "id": str(instance.id),
                     "name": "test_instance",
                     "job_name": None,
                     "job_status": None,
@@ -442,3 +456,93 @@ class TestRemoveInstance:
                 }
             ],
         }
+
+
+class TestListInstances:
+    @pytest.mark.asyncio
+    async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
+        response = client.post(
+            "/api/pools/list_instances",
+            json={},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_lists_instances(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        pool = await create_pool(session, project, pool_name=TEST_POOL_NAME)
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            created_at=dt.datetime(2023, 10, 4, 12, 0, tzinfo=dt.timezone.utc),
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            created_at=dt.datetime(2023, 10, 5, 12, 0, tzinfo=dt.timezone.utc),
+        )
+        response = client.post(
+            "/api/pools/list_instances",
+            headers=get_auth_headers(user.token),
+            json={},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 2
+        assert response_json[0]["id"] == str(instance2.id)
+        assert response_json[1]["id"] == str(instance1.id)
+
+    @pytest.mark.asyncio
+    async def test_lists_paginated_instances(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
+        )
+        pool = await create_pool(session, project, pool_name=TEST_POOL_NAME)
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            created_at=dt.datetime(2023, 10, 5, 12, 0, tzinfo=dt.timezone.utc),
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            created_at=dt.datetime(2023, 10, 3, 12, 0, tzinfo=dt.timezone.utc),
+        )
+        instance3 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            created_at=dt.datetime(2023, 10, 6, 12, 0, tzinfo=dt.timezone.utc),
+        )
+        response = client.post(
+            "/api/pools/list_instances",
+            headers=get_auth_headers(user.token),
+            json={"limit": 2},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 2
+        assert response_json[0]["id"] == str(instance3.id)
+        assert response_json[1]["id"] == str(instance1.id)
+        response = client.post(
+            "/api/pools/list_instances",
+            headers=get_auth_headers(user.token),
+            json={
+                "prev_id": response_json[1]["id"],
+                "prev_created_at": response_json[1]["created"],
+            },
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert len(response_json) == 1
+        assert response_json[0]["id"] == str(instance2.id)

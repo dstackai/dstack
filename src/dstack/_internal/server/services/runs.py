@@ -588,6 +588,7 @@ async def create_instance(
         termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
 
     instance = InstanceModel(
+        id=uuid.uuid4(),
         name=instance_name,
         project=project,
         pool=pool,
