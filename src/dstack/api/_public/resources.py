@@ -19,6 +19,8 @@ from dstack._internal.core.models.resources import (
 )
 
 
+# TODO(andrey): This method looks like a workaround and possibly must be reworked (replaced with something else).
+#   Currently it's only used by the `dstack pool add` command.
 def Resources(
     *,
     cpu: IntRangeLike = DEFAULT_CPU_COUNT,

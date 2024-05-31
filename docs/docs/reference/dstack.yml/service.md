@@ -147,7 +147,7 @@ and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-com
 ### Replicas and auto-scaling
 
 By default, `dstack` runs a single replica of the service.
-You can configure the number of replicas as well as the auto-scaling policy.
+You can configure the number of replicas as well as the auto-scaling rules.
 
 <div editor-title="serve.dstack.yml"> 
 
@@ -180,7 +180,12 @@ scaling:
 
 </div>
 
-If you specify the minimum number of replicas as `0`, the service will scale down to zero when there are no requests.
+The [`replicas`](#replicas) property can be a number or a range.
+
+> The [`metric`](#metric) property of [`scaling`](#scaling) only supports the `rps` metric (requests per second). In this 
+> case `dstack` adjusts the number of replicas (scales up or down) automatically based on the load. 
+
+Setting the minimum number of replicas to `0` allows the service to scale down to zero when there are no requests.
 
 ### Resources { #_resources }
 
