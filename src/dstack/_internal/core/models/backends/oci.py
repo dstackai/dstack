@@ -18,8 +18,8 @@ class OCIClientCreds(CoreModel):
     type: Annotated[Literal["client"], Field(description="The type of credentials")] = "client"
     user: Annotated[str, Field(description="User OCID")]
     tenancy: Annotated[str, Field(description="Tenancy OCID")]
-    key_file: Annotated[Path, Field(description="Path to the PEM key")]
-    fingerprint: Annotated[str, Field(description="Key fingerprint")]
+    key_content: Annotated[str, Field(description="Content of the user's private PEM key")]
+    fingerprint: Annotated[str, Field(description="User's public key fingerprint")]
     region: Annotated[
         str, Field(description="Name or key of any region the tenancy is subscribed to")
     ]
@@ -27,6 +27,10 @@ class OCIClientCreds(CoreModel):
 
 class OCIDefaultCreds(CoreModel):
     type: Annotated[Literal["default"], Field(description="The type of credentials")] = "default"
+    file: Annotated[Path, Field(description="Path to the OCI CLI-compatible config file")] = Path(
+        "~/.oci/config"
+    )
+    profile: Annotated[str, Field(description="Profile to load from the config file")] = "DEFAULT"
 
 
 AnyOCICreds = Union[OCIClientCreds, OCIDefaultCreds]
