@@ -1,5 +1,5 @@
 import json
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 
 from dstack._internal.core.backends.oci import OCIBackend, auth, resources
 from dstack._internal.core.backends.oci.config import OCIConfig
@@ -34,6 +34,15 @@ from dstack._internal.server.services.backends.configurators.base import (
 )
 from dstack._internal.settings import FeatureFlags
 
+# where dstack images are published
+SUPPORTED_REGIONS = frozenset(
+    [
+        "eu-frankfurt-1",
+        "me-dubai-1",
+        "us-ashburn-1",
+    ]
+)
+
 
 class OCIConfigurator(Configurator):
     if FeatureFlags.OCI_BACKEND:
@@ -42,12 +51,12 @@ class OCIConfigurator(Configurator):
     def get_default_configs(self) -> List[OCIConfigInfoWithCreds]:
         creds = OCIDefaultCreds()
         try:
-            regions = get_subscribed_regions(creds).names
+            subscribed_regions = get_subscribed_regions(creds).names
         except any_oci_exception:
             return []
         return [
             OCIConfigInfoWithCreds(
-                regions=regions,
+                regions=list(subscribed_regions & SUPPORTED_REGIONS),
                 creds=creds,
             )
         ]
@@ -66,14 +75,14 @@ class OCIConfigurator(Configurator):
             raise_invalid_credentials_error(fields=[["creds"]])
 
         try:
-            available_regions = get_subscribed_regions(config.creds).names
+            available_regions = get_subscribed_regions(config.creds).names & SUPPORTED_REGIONS
         except any_oci_exception:
             raise_invalid_credentials_error(fields=[["creds"]])
 
         if config.regions:
             selected_regions = [r for r in config.regions if r in available_regions]
         else:
-            selected_regions = available_regions
+            selected_regions = list(available_regions)
 
         config_values.regions = self._get_regions_element(
             available=available_regions,
@@ -90,10 +99,9 @@ class OCIConfigurator(Configurator):
             raise_invalid_credentials_error(fields=[["creds"]])
 
         if config.regions is None:
-            config.regions = subscribed_regions.names
-        elif unsubscribed_regions := set(config.regions) - set(subscribed_regions.names):
-            msg = f"Regions {unsubscribed_regions} are configured but not subscribed to in OCI"
-            raise ServerClientError(msg, fields=[["regions"]])
+            config.regions = list(subscribed_regions.names & SUPPORTED_REGIONS)
+        else:
+            _raise_if_regions_unavailable(config.regions, subscribed_regions.names)
 
         compartment_id, subnet_ids_per_region = _create_resources(
             project, config, subscribed_regions.home_region_name
@@ -127,12 +135,28 @@ class OCIConfigurator(Configurator):
         )
 
     def _get_regions_element(
-        self, available: List[str], selected: List[str]
+        self, available: Iterable[str], selected: List[str]
     ) -> ConfigMultiElement:
         element = ConfigMultiElement(selected=selected)
         for region in available:
             element.values.append(ConfigElementValue(value=region, label=region))
         return element
+
+
+def _raise_if_regions_unavailable(
+    region_names: Iterable[str], subscribed_region_names: Set[str]
+) -> None:
+    region_names = set(region_names)
+    if unsupported_regions := region_names - SUPPORTED_REGIONS:
+        msg = (
+            f"Regions {unsupported_regions} are configured but not supported by dstack yet. "
+            f"Only these regions are supported: {set(SUPPORTED_REGIONS)}. "
+            "Please contact dstack if a region you need is missing."
+        )
+        raise ServerClientError(msg, fields=[["regions"]])
+    if unsubscribed_regions := region_names - subscribed_region_names:
+        msg = f"Regions {unsubscribed_regions} are configured but not subscribed to in OCI"
+        raise ServerClientError(msg, fields=[["regions"]])
 
 
 def _create_resources(

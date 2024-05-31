@@ -1,4 +1,5 @@
 import json
+from operator import itemgetter
 from unittest.mock import Mock, patch
 
 import pytest
@@ -35,7 +36,7 @@ FAKE_OCI_CLIENT_CREDS = {
 }
 SAMPLE_OCI_COMPARTMENT_ID = "ocid1.compartment.oc1..aaaaaaaa"
 SAMPLE_OCI_SUBSCRIBED_REGIONS = oci_region.SubscribedRegions(
-    names=["me-dubai-1", "eu-frankfurt-1"], home_region_name="eu-frankfurt-1"
+    names={"me-dubai-1", "eu-frankfurt-1"}, home_region_name="eu-frankfurt-1"
 )
 SAMPLE_OCI_SUBNETS = {
     "me-dubai-1": "ocid1.subnet.oc1.me-dubai-1.aaaaaaaa",
@@ -707,15 +708,18 @@ class TestGetBackendConfigValuesOCI:
             )
             default_creds_available_mock.assert_called()
             get_regions_mock.assert_called()
+        body = response.json()
+        body["regions"]["selected"].sort()
+        body["regions"]["values"].sort(key=itemgetter("value"))
         assert response.status_code == 200, response.json()
-        assert response.json() == {
+        assert body == {
             "type": "oci",
             "default_creds": True,
             "regions": {
-                "selected": ["me-dubai-1", "eu-frankfurt-1"],
+                "selected": ["eu-frankfurt-1", "me-dubai-1"],
                 "values": [
-                    {"label": "me-dubai-1", "value": "me-dubai-1"},
                     {"label": "eu-frankfurt-1", "value": "eu-frankfurt-1"},
+                    {"label": "me-dubai-1", "value": "me-dubai-1"},
                 ],
             },
             "compartment_id": None,

@@ -3,10 +3,11 @@ import time
 from concurrent.futures import Executor, ThreadPoolExecutor, as_completed
 from functools import reduce
 from itertools import islice
-from typing import Dict, Iterable, List, Mapping, Optional, Set
+from typing import Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 import oci
 
+from dstack import version
 from dstack._internal.core.backends.oci.region import OCIRegionClient
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceOffer
@@ -277,6 +278,66 @@ def terminate_instance_if_exists(client: oci.core.ComputeClient, instance_id: st
     except oci.exceptions.ServiceError as e:
         if e.status != 404:
             raise
+
+
+def get_marketplace_listing_and_package(
+    cuda: bool, client: oci.marketplace.MarketplaceClient
+) -> Tuple[oci.marketplace.models.Listing, oci.marketplace.models.ImageListingPackage]:
+    listing_name = f"dstack-{version.base_image}"
+    if cuda:
+        listing_name = f"dstack-cuda-{version.base_image}"
+
+    listing_summaries: List[oci.marketplace.models.ListingSummary] = client.list_listings(
+        name=listing_name,
+        listing_types=[oci.marketplace.models.Listing.LISTING_TYPE_COMMUNITY],
+        limit=1000,
+    ).data
+    # filter by exact match, as list_listings seems to filter by substring
+    listing_summaries = [s for s in listing_summaries if s.name == listing_name]
+
+    if len(listing_summaries) != 1:
+        msg = f"Expected to find 1 listing by name {listing_name}, found {len(listing_summaries)}"
+        raise BackendError(msg)
+
+    listing: oci.marketplace.models.Listing = client.get_listing(listing_summaries[0].id).data
+    package = client.get_package(listing.id, listing.default_package_version).data
+    return listing, package
+
+
+def accept_marketplace_listing_agreements(
+    listing: oci.marketplace.models.Listing,
+    compartment_id: str,
+    client: oci.marketplace.MarketplaceClient,
+) -> None:
+    accepted_agreements: List[oci.marketplace.models.AcceptedAgreementSummary] = (
+        client.list_accepted_agreements(
+            compartment_id=compartment_id,
+            listing_id=listing.id,
+            package_version=listing.default_package_version,
+        ).data
+    )
+    accepted_agreement_ids = {a.agreement_id for a in accepted_agreements}
+    agreement_summaries: List[oci.marketplace.models.AgreementSummary] = client.list_agreements(
+        listing.id, listing.default_package_version
+    ).data
+    for agreement_summary in agreement_summaries:
+        if agreement_summary.id in accepted_agreement_ids:
+            continue
+        agreement: oci.marketplace.models.Agreement = client.get_agreement(
+            listing_id=listing.id,
+            package_version=listing.default_package_version,
+            agreement_id=agreement_summary.id,
+            compartment_id=compartment_id,
+        ).data
+        client.create_accepted_agreement(
+            oci.marketplace.models.CreateAcceptedAgreementDetails(
+                compartment_id=compartment_id,
+                listing_id=listing.id,
+                package_version=listing.default_package_version,
+                agreement_id=agreement_summary.id,
+                signature=agreement.signature,
+            )
+        )
 
 
 def get_or_create_compartment(
