@@ -120,14 +120,15 @@ idle duration, etc.
 
 Here are some featured examples:
 
-- [Llama 3](examples/llms/llama3/README.md)
-- [Alignment Handbook](examples/fine-tuning/alignment-handbook/README.md)
-- [vLLM](examples/deployment/vllm/README.md)
-- [Axolotl](examples/fine-tuning/axolotl/README.md)
-- [TGI](examples/deployment/tgi/README.md)
-- [Ollama](examples/deployment/ollama/README.md)
+- [Llama 3](examples/llms/llama3)
+- [Alignment Handbook](examples/fine-tuning/alignment-handbook)
+- [vLLM](examples/deployment/vllm)
+- [Axolotl](examples/fine-tuning/axolotl)
+- [TGI](examples/deployment/tgi)
+- [Ollama](examples/deployment/ollama)
+- [LoRaX](examples/deployment/lorax)
 
-Browse [examples](examples/README.md) for more examples.
+Browse [examples](examples) for more examples.
 
 ## More information
 
