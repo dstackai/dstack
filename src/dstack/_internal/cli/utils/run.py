@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from rich.markup import escape
 from rich.table import Table
@@ -6,7 +6,12 @@ from rich.table import Table
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import TerminationPolicy
-from dstack._internal.core.models.runs import RunPlan
+from dstack._internal.core.models.runs import (
+    Job,
+    JobTerminationReason,
+    RunPlan,
+    RunTerminationReason,
+)
 from dstack._internal.utils.common import format_pretty_duration, pretty_date
 from dstack.api import Run
 
@@ -129,6 +134,7 @@ def generate_runs_table(
         table.add_column("ERROR", no_wrap=True)
 
     for run in runs:
+        run_error = _get_run_error(run)
         run = run._run  # TODO(egor-s): make public attribute
 
         run_row = {
@@ -136,7 +142,7 @@ def generate_runs_table(
             "CONFIGURATION": run.run_spec.configuration_path,
             "STATUS": run.status,
             "SUBMITTED": pretty_date(run.submitted_at),
-            "ERROR": run.termination_reason,
+            "ERROR": run_error,
         }
         if len(run.jobs) != 1:
             add_row_from_dict(table, run_row)
@@ -146,7 +152,7 @@ def generate_runs_table(
                 "NAME": f"  replica {job.job_spec.replica_num}\n  job_num {job.job_spec.job_num}",
                 "STATUS": job.job_submissions[-1].status,
                 "SUBMITTED": pretty_date(job.job_submissions[-1].submitted_at),
-                "ERROR": job.job_submissions[-1].termination_reason,
+                "ERROR": _get_job_error(job),
             }
             jpd = job.job_submissions[-1].job_provisioning_data
             if jpd is not None:
@@ -166,3 +172,34 @@ def generate_runs_table(
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 
     return table
+
+
+def _get_run_error(run: Run) -> str:
+    if run._run.termination_reason is None:
+        return ""
+    if len(run._run.jobs) > 1:
+        return run._run.termination_reason.name
+    run_job_termination_reason = _get_run_job_termination_reason(run)
+    # For failed runs, also show termination reason to provide more context.
+    # For other run statuses, the job termination reason will duplicate run status.
+    if run_job_termination_reason is not None and run._run.termination_reason in [
+        RunTerminationReason.JOB_FAILED,
+        RunTerminationReason.SERVER_ERROR,
+        RunTerminationReason.RETRY_LIMIT_EXCEEDED,
+    ]:
+        return f"{run._run.termination_reason.name}\n({run_job_termination_reason.name})"
+    return run._run.termination_reason.name
+
+
+def _get_run_job_termination_reason(run: Run) -> Optional[JobTerminationReason]:
+    for job in run._run.jobs:
+        if len(job.job_submissions) > 0:
+            if job.job_submissions[-1].termination_reason is not None:
+                return job.job_submissions[-1].termination_reason
+    return None
+
+
+def _get_job_error(job: Job) -> str:
+    if job.job_submissions[-1].termination_reason is None:
+        return ""
+    return job.job_submissions[-1].termination_reason.name
