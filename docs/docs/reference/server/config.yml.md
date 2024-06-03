@@ -223,7 +223,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
         {
             "properties": {
                 "roleName": "dstack-role",
-                "description": "Minimal reqired permissions for using Azure with dstack",
+                "description": "Minimal required permissions for using Azure with dstack",
                 "assignableScopes": [
                     "/subscriptions/${YOUR_SUBSCRIPTION_ID}"
                 ],

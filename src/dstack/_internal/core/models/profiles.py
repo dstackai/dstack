@@ -95,18 +95,18 @@ class ProfileRetry(CoreModel):
 class ProfileParams(CoreModel):
     backends: Annotated[
         Optional[List[BackendType]],
-        Field(description="The backends to consider for provisionig (e.g., `[aws, gcp]`)"),
+        Field(description="The backends to consider for provisioning (e.g., `[aws, gcp]`)"),
     ]
     regions: Annotated[
         Optional[List[str]],
         Field(
-            description="The regions to consider for provisionig (e.g., `[eu-west-1, us-west4, westeurope]`)"
+            description="The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)"
         ),
     ]
     instance_types: Annotated[
         Optional[List[str]],
         Field(
-            description="The cloud-specific instance types to consider for provisionig (e.g., `[p3.8xlarge, n1-standard-4]`)"
+            description="The cloud-specific instance types to consider for provisioning (e.g., `[p3.8xlarge, n1-standard-4]`)"
         ),
     ]
     spot_policy: Annotated[

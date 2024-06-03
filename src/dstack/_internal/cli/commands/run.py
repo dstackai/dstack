@@ -139,7 +139,7 @@ class RunCommand(APIBaseCommand):
             old_run = self.api.runs.get(run_name=args.run_name)
             if old_run is not None:
                 if not args.yes and not confirm_ask(
-                    f"Run [code]{args.run_name}[/] already exist. Override the run?"
+                    f"Run [code]{args.run_name}[/] already exists. Override the run?"
                 ):
                     console.print("\nExiting...")
                     return

@@ -35,7 +35,7 @@ class GatewayConfigurator(BaseApplyConfigurator):
                         console.print("\nExiting...")
                         return
                 elif not args.yes and not confirm_ask(
-                    f"Gateway [code]{conf.name}[/] already exist. Re-create the gateway?"
+                    f"Gateway [code]{conf.name}[/] already exists. Re-create the gateway?"
                 ):
                     console.print("\nExiting...")
                     return
