@@ -11,6 +11,7 @@ class GCPConfigInfo(CoreModel):
     type: Literal["gcp"] = "gcp"
     project_id: str
     regions: Optional[List[str]] = None
+    vpc_name: Optional[str] = None
 
 
 class GCPServiceAccountCreds(CoreModel):
@@ -42,6 +43,7 @@ class GCPConfigInfoWithCredsPartial(CoreModel):
     creds: Optional[AnyGCPCreds]
     project_id: Optional[str]
     regions: Optional[List[str]]
+    vpc_name: Optional[str] = None
 
 
 class GCPConfigValues(CoreModel):

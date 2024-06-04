@@ -42,8 +42,7 @@ def create_instance_struct(
     network: str = "global/networks/default",
 ) -> compute_v1.Instance:
     network_interface = compute_v1.NetworkInterface()
-    network_interface.name = network
-
+    network_interface.network = network
     access = compute_v1.AccessConfig()
     access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
     access.name = "External NAT"

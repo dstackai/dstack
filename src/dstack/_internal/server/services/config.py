@@ -49,7 +49,7 @@ def seq_representer(dumper, sequence):
 yaml.add_representer(list, seq_representer)
 
 
-# Below we difine pydantic models for configs allowed in server/config.yml and YAML-based API.
+# Below we define pydantic models for configs allowed in server/config.yml and YAML-based API.
 # There are some differences between the two, e.g. server/config.yml fills file-based
 # credentials by looking for a file, while YAML-based API doesn't do this.
 # So for some backends there are two sets of config models.
@@ -145,6 +145,7 @@ class GCPConfig(CoreModel):
     type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
+    vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
     creds: AnyGCPCreds = Field(..., description="The credentials", discriminator="type")
 
 
@@ -152,6 +153,7 @@ class GCPAPIConfig(CoreModel):
     type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
+    vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
     creds: AnyGCPAPICreds = Field(..., description="The credentials", discriminator="type")
 
 

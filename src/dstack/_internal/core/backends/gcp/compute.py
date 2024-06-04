@@ -114,6 +114,7 @@ class GCPCompute(Compute):
         gcp_resources.create_runner_firewall_rules(
             firewalls_client=self.firewalls_client,
             project_id=self.config.project_id,
+            network=self.config.vpc_id,
         )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
@@ -146,6 +147,7 @@ class GCPCompute(Compute):
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,
                 zone=zone,
+                network=self.config.vpc_id,
             )
             try:
                 operation = self.instances_client.insert(request=request)
@@ -228,6 +230,7 @@ class GCPCompute(Compute):
             instance_name=configuration.instance_name,
             zone=zone,
             service_account=None,
+            network=self.config.vpc_id,
         )
         operation = self.instances_client.insert(request=request)
         gcp_resources.wait_for_extended_operation(operation, "instance creation")
