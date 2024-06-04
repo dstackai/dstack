@@ -30,7 +30,12 @@ FAKE_OCI_CLIENT_CREDS = {
     "type": "client",
     "user": "ocid1.user.oc1..aaaaaaaa",
     "tenancy": "ocid1.tenancy.oc1..aaaaaaaa",
-    "key_file": "/dev/null",
+    "key_content": (
+        "-----BEGIN PRIVATE KEY-----\n"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
+        "-----END PRIVATE KEY-----"
+    ),
     "fingerprint": "00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00",
     "region": "me-dubai-1",
 }

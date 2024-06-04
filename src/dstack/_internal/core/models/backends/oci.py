@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Dict
 
 from pydantic import Field
@@ -27,7 +26,7 @@ class OCIClientCreds(CoreModel):
 
 class OCIDefaultCreds(CoreModel):
     type: Annotated[Literal["default"], Field(description="The type of credentials")] = "default"
-    file: Annotated[Path, Field(description="Path to the OCI CLI-compatible config file")] = Path(
+    file: Annotated[str, Field(description="Path to the OCI CLI-compatible config file")] = (
         "~/.oci/config"
     )
     profile: Annotated[str, Field(description="Profile to load from the config file")] = "DEFAULT"

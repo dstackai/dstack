@@ -8,7 +8,7 @@ from dstack._internal.core.models.common import is_core_model_instance
 
 def get_client_config(creds: AnyOCICreds) -> Mapping[str, Any]:
     if is_core_model_instance(creds, OCIDefaultCreds):
-        return oci.config.from_file(file_location=str(creds.file), profile_name=creds.profile)
+        return oci.config.from_file(file_location=creds.file, profile_name=creds.profile)
     return creds.dict(exclude={"type"})
 
 
