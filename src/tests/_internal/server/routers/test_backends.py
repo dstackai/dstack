@@ -21,7 +21,6 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
 )
-from dstack._internal.settings import FeatureFlags
 
 client = TestClient(app)
 
@@ -62,7 +61,7 @@ class TestListBackendTypes:
             "kubernetes",
             "lambda",
             "nebius",
-            *(["oci"] if FeatureFlags.OCI_BACKEND else []),
+            "oci",
             "runpod",
             "tensordock",
             "vastai",
@@ -641,7 +640,6 @@ class TestGetBackendConfigValuesLambda:
         }
 
 
-@pytest.mark.skipif(not FeatureFlags.OCI_BACKEND, reason="behind a feature flag")
 class TestGetBackendConfigValuesOCI:
     @pytest.mark.asyncio
     async def test_returns_initial_config(self, test_db, session: AsyncSession):
@@ -838,7 +836,6 @@ class TestCreateBackend:
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
 
-    @pytest.mark.skipif(not FeatureFlags.OCI_BACKEND, reason="behind a feature flag")
     @pytest.mark.asyncio
     async def test_creates_oci_backend(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
@@ -869,7 +866,6 @@ class TestCreateBackend:
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
 
-    @pytest.mark.skipif(not FeatureFlags.OCI_BACKEND, reason="behind a feature flag")
     @pytest.mark.asyncio
     async def test_not_creates_oci_backend_if_regions_not_subscribed(
         self, test_db, session: AsyncSession
@@ -1194,7 +1190,6 @@ class TestCreateBackendYAML:
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
 
-    @pytest.mark.skipif(not FeatureFlags.OCI_BACKEND, reason="behind a feature flag")
     @pytest.mark.asyncio
     async def test_creates_oci_backend(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)

@@ -78,7 +78,6 @@ from dstack._internal.core.models.backends.vastai import (
     VastAIConfigValues,
 )
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.settings import FeatureFlags
 
 # Backend config returned by the API
 AnyConfigInfoWithoutCreds = Union[
@@ -90,14 +89,13 @@ AnyConfigInfoWithoutCreds = Union[
     KubernetesConfigInfo,
     LambdaConfigInfo,
     NebiusConfigInfo,
+    OCIConfigInfo,
     RunpodConfigInfo,
     TensorDockConfigInfo,
     VastAIConfigInfo,
     DstackConfigInfo,
     DstackBaseBackendConfigInfo,
 ]
-if FeatureFlags.OCI_BACKEND:
-    AnyConfigInfoWithoutCreds = Union[AnyConfigInfoWithoutCreds, OCIConfigInfo]
 
 # Same as AnyConfigInfoWithoutCreds but also includes creds.
 # Used to create/update backend.
@@ -111,13 +109,12 @@ AnyConfigInfoWithCreds = Union[
     KubernetesConfigInfoWithCreds,
     LambdaConfigInfoWithCreds,
     NebiusConfigInfoWithCreds,
+    OCIConfigInfoWithCreds,
     RunpodConfigInfoWithCreds,
     TensorDockConfigInfoWithCreds,
     VastAIConfigInfoWithCreds,
     DstackConfigInfo,
 ]
-if FeatureFlags.OCI_BACKEND:
-    AnyConfigInfoWithCreds = Union[AnyConfigInfoWithCreds, OCIConfigInfoWithCreds]
 
 AnyConfigInfo = Union[AnyConfigInfoWithoutCreds, AnyConfigInfoWithCreds]
 
@@ -133,15 +130,12 @@ AnyConfigInfoWithCredsPartial = Union[
     KubernetesConfigInfoWithCredsPartial,
     LambdaConfigInfoWithCredsPartial,
     NebiusConfigInfoWithCredsPartial,
+    OCIConfigInfoWithCredsPartial,
     RunpodConfigInfoWithCredsPartial,
     TensorDockConfigInfoWithCredsPartial,
     VastAIConfigInfoWithCredsPartial,
     DstackConfigInfo,
 ]
-if FeatureFlags.OCI_BACKEND:
-    AnyConfigInfoWithCredsPartial = Union[
-        AnyConfigInfoWithCredsPartial, OCIConfigInfoWithCredsPartial
-    ]
 
 # Suggestions for unfilled fields used in interactive setup.
 AnyConfigValues = Union[
@@ -153,13 +147,12 @@ AnyConfigValues = Union[
     KubernetesConfigValues,
     LambdaConfigValues,
     NebiusConfigValues,
+    OCIConfigValues,
     RunpodConfigValues,
     TensorDockConfigValues,
     VastAIConfigValues,
     DstackConfigValues,
 ]
-if FeatureFlags.OCI_BACKEND:
-    AnyConfigValues = Union[AnyConfigValues, OCIConfigValues]
 
 
 # In case we'll support multiple backends of the same type,

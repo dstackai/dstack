@@ -32,21 +32,22 @@ from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
 )
-from dstack._internal.settings import FeatureFlags
 
 # where dstack images are published
 SUPPORTED_REGIONS = frozenset(
     [
         "eu-frankfurt-1",
         "me-dubai-1",
+        "uk-london-1",
         "us-ashburn-1",
+        "us-chicago-1",
+        "us-phoenix-1",
     ]
 )
 
 
 class OCIConfigurator(Configurator):
-    if FeatureFlags.OCI_BACKEND:
-        TYPE: BackendType = BackendType.OCI
+    TYPE: BackendType = BackendType.OCI
 
     def get_default_configs(self) -> List[OCIConfigInfoWithCreds]:
         creds = OCIDefaultCreds()
@@ -99,7 +100,7 @@ class OCIConfigurator(Configurator):
             raise_invalid_credentials_error(fields=[["creds"]])
 
         if config.regions is None:
-            config.regions = list(subscribed_regions.names & SUPPORTED_REGIONS)
+            config.regions = _filter_supported_regions(subscribed_regions.names)
         else:
             _raise_if_regions_unavailable(config.regions, subscribed_regions.names)
 
@@ -141,6 +142,19 @@ class OCIConfigurator(Configurator):
         for region in available:
             element.values.append(ConfigElementValue(value=region, label=region))
         return element
+
+
+def _filter_supported_regions(subscribed_region_names: Set[str]) -> List[str]:
+    available_regions = subscribed_region_names & SUPPORTED_REGIONS
+    if not available_regions:
+        msg = (
+            f"None of your subscribed regions {subscribed_region_names} are supported "
+            "by dstack yet. Please subscribe to a supported region in OCI Console or "
+            "contact dstack if you need a specific region to become supported. "
+            f"Currently supported regions are: {set(SUPPORTED_REGIONS)}"
+        )
+        raise ServerClientError(msg)
+    return list(available_regions)
 
 
 def _raise_if_regions_unavailable(

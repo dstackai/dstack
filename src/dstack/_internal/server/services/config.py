@@ -28,7 +28,6 @@ from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.utils.common import run_async
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -273,13 +272,12 @@ AnyBackendConfig = Union[
     KubernetesConfig,
     LambdaConfig,
     NebiusConfig,
+    OCIConfig,
     RunpodConfig,
     TensorDockConfig,
     VastAIConfig,
     DstackConfig,
 ]
-if FeatureFlags.OCI_BACKEND:
-    AnyBackendConfig = Union[AnyBackendConfig, OCIConfig]
 
 BackendConfig = Annotated[AnyBackendConfig, Field(..., discriminator="type")]
 
@@ -297,13 +295,12 @@ AnyBackendAPIConfig = Union[
     KubernetesAPIConfig,
     LambdaConfig,
     NebiusAPIConfig,
+    OCIConfig,
     RunpodConfig,
     TensorDockConfig,
     VastAIConfig,
     DstackConfig,
 ]
-if FeatureFlags.OCI_BACKEND:
-    AnyBackendAPIConfig = Union[AnyBackendAPIConfig, OCIConfig]
 
 
 BackendAPIConfig = Annotated[AnyBackendAPIConfig, Field(..., discriminator="type")]
