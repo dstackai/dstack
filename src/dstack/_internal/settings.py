@@ -13,5 +13,3 @@ class FeatureFlags:
     large features. This class may be empty if there are no such features in
     development. Feature flags are environment variables of the form DSTACK_FF_*
     """
-
-    OCI_BACKEND = os.getenv("DSTACK_FF_OCI_BACKEND") is not None

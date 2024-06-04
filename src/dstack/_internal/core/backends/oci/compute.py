@@ -22,8 +22,6 @@ from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirem
 
 SUPPORTED_SHAPE_FAMILIES = [
     "VM.Standard2.",
-    "VM.DenseIO1.",
-    "VM.DenseIO2.",
     "VM.GPU2.",
     "VM.GPU3.",
     "VM.GPU.A10.",
