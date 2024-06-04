@@ -111,11 +111,13 @@ class GCPCompute(Compute):
 
         authorized_keys = instance_config.get_public_keys()
 
-        gcp_resources.create_runner_firewall_rules(
-            firewalls_client=self.firewalls_client,
-            project_id=self.config.project_id,
-            network=self.config.vpc_id,
-        )
+        # If a shared VPC is not used, we can create firewall rules for user
+        if self.config.vpc_project_id is None:
+            gcp_resources.create_runner_firewall_rules(
+                firewalls_client=self.firewalls_client,
+                project_id=self.config.project_id,
+                network=self.config.vpc_resource_name,
+            )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
         labels = {
@@ -147,7 +149,7 @@ class GCPCompute(Compute):
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,
                 zone=zone,
-                network=self.config.vpc_id,
+                network=self.config.vpc_resource_name,
             )
             try:
                 operation = self.instances_client.insert(request=request)
@@ -199,10 +201,12 @@ class GCPCompute(Compute):
         self,
         configuration: GatewayComputeConfiguration,
     ) -> LaunchedGatewayInfo:
-        gcp_resources.create_gateway_firewall_rules(
-            firewalls_client=self.firewalls_client,
-            project_id=self.config.project_id,
-        )
+        if self.config.vpc_project_id is None:
+            gcp_resources.create_gateway_firewall_rules(
+                firewalls_client=self.firewalls_client,
+                project_id=self.config.project_id,
+                network=self.config.vpc_resource_name,
+            )
         # e2-micro is available in every zone
         for i in self.regions_client.list(project=self.config.project_id):
             if i.name == configuration.region:
@@ -230,7 +234,7 @@ class GCPCompute(Compute):
             instance_name=configuration.instance_name,
             zone=zone,
             service_account=None,
-            network=self.config.vpc_id,
+            network=self.config.vpc_resource_name,
         )
         operation = self.instances_client.insert(request=request)
         gcp_resources.wait_for_extended_operation(operation, "instance creation")

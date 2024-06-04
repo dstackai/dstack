@@ -146,6 +146,10 @@ class GCPConfig(CoreModel):
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
     vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    vpc_project_id: Annotated[
+        Optional[str],
+        Field(description="The shared VPC hosted project ID. Required for shared VPC only"),
+    ] = None
     creds: AnyGCPCreds = Field(..., description="The credentials", discriminator="type")
 
 
@@ -154,6 +158,10 @@ class GCPAPIConfig(CoreModel):
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
     vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    vpc_project_id: Annotated[
+        Optional[str],
+        Field(description="The shared VPC hosted project ID. Required for shared VPC only"),
+    ] = None
     creds: AnyGCPAPICreds = Field(..., description="The credentials", discriminator="type")
 
 

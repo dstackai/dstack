@@ -8,6 +8,7 @@ import google.cloud.compute_v1 as compute_v1
 from google.api_core.extended_operation import ExtendedOperation
 
 import dstack.version as version
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.instances import Gpu
 from dstack._internal.utils.logging import get_logger
 
@@ -24,6 +25,23 @@ supported_accelerators = [
     {"accelerator_name": "nvidia-tesla-v100", "gpu_name": "V100", "memory_mb": 1024 * 16},
     {"accelerator_name": "nvidia-tesla-p100", "gpu_name": "P100", "memory_mb": 1024 * 16},
 ]
+
+
+def check_vpc(
+    network_client: compute_v1.NetworksClient,
+    project_id: str,
+    vpc_name: Optional[str] = None,
+    shared_vpc_project_id: Optional[str] = None,
+):
+    if vpc_name is None:
+        vpc_name = "default"
+    vpc_project_id = project_id
+    if shared_vpc_project_id:
+        vpc_project_id = shared_vpc_project_id
+    try:
+        network_client.get(project=vpc_project_id, network=vpc_name)
+    except google.api_core.exceptions.NotFound:
+        raise ComputeError(f"Failed to find VPC {vpc_name} in project {vpc_project_id}")
 
 
 def create_instance_struct(
