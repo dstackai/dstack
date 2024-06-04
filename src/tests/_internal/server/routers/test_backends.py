@@ -440,7 +440,9 @@ class TestGetBackendConfigValuesGCP:
             "dstack._internal.core.backends.gcp.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.gcp.auth.authenticate"
-        ) as authenticate_mock:
+        ) as authenticate_mock, patch(
+            "dstack._internal.core.backends.gcp.resources.check_vpc"
+        ) as check_vpc_mock:
             default_creds_available_mock.return_value = False
             authenticate_mock.return_value = None, "test_project"
             response = client.post(
@@ -449,6 +451,7 @@ class TestGetBackendConfigValuesGCP:
                 json=body,
             )
             authenticate_mock.assert_called()
+            check_vpc_mock.assert_called()
         assert response.status_code == 200, response.json()
         assert response.json() == {
             "type": "gcp",
@@ -793,7 +796,9 @@ class TestCreateBackend:
             "dstack._internal.core.backends.gcp.auth.default_creds_available"
         ) as default_creds_available_mock, patch(
             "dstack._internal.core.backends.gcp.auth.authenticate"
-        ) as authenticate_mock:
+        ) as authenticate_mock, patch(
+            "dstack._internal.core.backends.gcp.resources.check_vpc"
+        ) as check_vpc_mock:
             default_creds_available_mock.return_value = False
             credentials_mock = Mock()
             authenticate_mock.return_value = credentials_mock, "test_project"
@@ -802,6 +807,7 @@ class TestCreateBackend:
                 headers=get_auth_headers(user.token),
                 json=body,
             )
+            check_vpc_mock.assert_called()
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
