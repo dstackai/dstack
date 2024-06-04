@@ -73,12 +73,15 @@ class OCIConfigurator(Configurator):
             is_core_model_instance(config.creds, OCIDefaultCreds)
             and not settings.DEFAULT_CREDS_ENABLED
         ):
-            raise_invalid_credentials_error(fields=[["creds"]])
+            raise_invalid_credentials_error(
+                fields=[["creds"]],
+                details="Default credentials are forbidden by dstack settings",
+            )
 
         try:
             available_regions = get_subscribed_regions(config.creds).names & SUPPORTED_REGIONS
-        except any_oci_exception:
-            raise_invalid_credentials_error(fields=[["creds"]])
+        except any_oci_exception as e:
+            raise_invalid_credentials_error(fields=[["creds"]], details=e)
 
         if config.regions:
             selected_regions = [r for r in config.regions if r in available_regions]
@@ -96,8 +99,8 @@ class OCIConfigurator(Configurator):
     ) -> BackendModel:
         try:
             subscribed_regions = get_subscribed_regions(config.creds)
-        except any_oci_exception:
-            raise_invalid_credentials_error(fields=[["creds"]])
+        except any_oci_exception as e:
+            raise_invalid_credentials_error(fields=[["creds"]], details=e)
 
         if config.regions is None:
             config.regions = _filter_supported_regions(subscribed_regions.names)

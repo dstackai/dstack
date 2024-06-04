@@ -680,15 +680,9 @@ class TestGetBackendConfigValuesOCI:
             )
             default_creds_available_mock.assert_called()
         assert response.status_code == 400
-        assert response.json() == {
-            "detail": [
-                {
-                    "code": "invalid_credentials",
-                    "msg": "Invalid credentials",
-                    "fields": ["creds"],
-                },
-            ]
-        }
+        error = response.json()["detail"][0]
+        assert error["code"] == "invalid_credentials"
+        assert error["msg"].startswith("Invalid credentials")
 
     @pytest.mark.asyncio
     async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
