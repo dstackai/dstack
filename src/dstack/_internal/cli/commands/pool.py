@@ -410,8 +410,8 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
             spot = "yes" if instance.instance_type.resources.spot else "no"
 
         status = instance.status.value
-        if instance.unreachable:
-            status = "unreachable"
+        if instance.status in [InstanceStatus.IDLE, InstanceStatus.BUSY] and instance.unreachable:
+            status += "\n(unreachable)"
 
         row = [
             instance.name,
