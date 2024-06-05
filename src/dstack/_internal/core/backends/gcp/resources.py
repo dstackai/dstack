@@ -162,8 +162,12 @@ def create_runner_firewall_rules(
     project_id: str,
     network: str = "global/networks/default",
 ):
+    network_name = network.split("/")[-1]
+    firewall_rule_name = "dstack-ssh-in-" + network.replace("/", "-")
+    if not is_valid_resource_name(firewall_rule_name):
+        firewall_rule_name = "dstack-ssh-in-" + network_name
     firewall_rule = compute_v1.Firewall()
-    firewall_rule.name = "dstack-ssh-in-" + network.replace("/", "-")
+    firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"
 
     allowed_ssh_port = compute_v1.Allowed()
@@ -189,8 +193,12 @@ def create_gateway_firewall_rules(
     project_id: str,
     network: str = "global/networks/default",
 ):
+    network_name = network.split("/")[-1]
+    firewall_rule_name = "dstack-gateway-in-all-" + network.replace("/", "-")
+    if not is_valid_resource_name(firewall_rule_name):
+        firewall_rule_name = "dstack-gateway-in-all-" + network_name
     firewall_rule = compute_v1.Firewall()
-    firewall_rule.name = "dstack-gateway-in-all-" + network.replace("/", "-")
+    firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"
 
     allowed_ports = compute_v1.Allowed()
@@ -266,7 +274,7 @@ def is_valid_label_value(value: str) -> bool:
     return match is not None
 
 
-def generate_random_resource_name() -> str:
+def generate_random_resource_name(length: int = 40) -> str:
     return random.choice(string.ascii_lowercase) + "".join(
-        random.choice(string.ascii_lowercase + string.digits) for _ in range(40)
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(length)
     )
