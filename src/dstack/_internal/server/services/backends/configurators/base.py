@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendInvalidCredentialsError
@@ -59,5 +59,10 @@ class Configurator(ABC):
         pass
 
 
-def raise_invalid_credentials_error(fields: Optional[List[List[str]]] = None):
-    raise BackendInvalidCredentialsError(fields=fields)
+def raise_invalid_credentials_error(
+    fields: Optional[List[List[str]]] = None, details: Optional[Any] = None
+):
+    msg = BackendInvalidCredentialsError.msg
+    if details:
+        msg += f": {details}"
+    raise BackendInvalidCredentialsError(fields=fields, msg=msg)
