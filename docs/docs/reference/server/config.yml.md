@@ -210,52 +210,52 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
     </div>
 
-    !!! info "NOTE:"
-        If you don't know your `subscription_id`, run
+!!! info "NOTE:"
+    If you don't know your `subscription_id`, run
 
-        ```shell
-        az account show --query "{subscription_id: id}"
-        ```
+    ```shell
+    az account show --query "{subscription_id: id}"
+    ```
 
-    ??? info "Required Azure permissions"
-        The following Azure permissions are sufficient for `dstack` to work:
-        ```
-        {
-            "properties": {
-                "roleName": "dstack-role",
-                "description": "Minimal required permissions for using Azure with dstack",
-                "assignableScopes": [
-                    "/subscriptions/${YOUR_SUBSCRIPTION_ID}"
+??? info "Required Azure permissions"
+    The following Azure permissions are sufficient for `dstack` to work:
+    ```
+    {
+        "properties": {
+            "roleName": "dstack-role",
+            "description": "Minimal required permissions for using Azure with dstack",
+            "assignableScopes": [
+                "/subscriptions/${YOUR_SUBSCRIPTION_ID}"
+            ],
+            "permissions": [
+                {
+                "actions": [
+                    "Microsoft.Authorization/*/read",
+                    "Microsoft.Compute/availabilitySets/*",
+                    "Microsoft.Compute/locations/*",
+                    "Microsoft.Compute/virtualMachines/*",
+                    "Microsoft.Compute/virtualMachineScaleSets/*",
+                    "Microsoft.Compute/cloudServices/*",
+                    "Microsoft.Compute/disks/write",
+                    "Microsoft.Compute/disks/read",
+                    "Microsoft.Compute/disks/delete",
+                    "Microsoft.Network/networkSecurityGroups/*",
+                    "Microsoft.Network/locations/*",
+                    "Microsoft.Network/virtualNetworks/*",
+                    "Microsoft.Network/networkInterfaces/*",
+                    "Microsoft.Network/publicIPAddresses/*",
+                    "Microsoft.Resources/subscriptions/resourceGroups/read",
+                    "Microsoft.Resources/subscriptions/resourceGroups/write",
+                    "Microsoft.Resources/subscriptions/read"
                 ],
-                "permissions": [
-                    {
-                    "actions": [
-                        "Microsoft.Authorization/*/read",
-                        "Microsoft.Compute/availabilitySets/*",
-                        "Microsoft.Compute/locations/*",
-                        "Microsoft.Compute/virtualMachines/*",
-                        "Microsoft.Compute/virtualMachineScaleSets/*",
-                        "Microsoft.Compute/cloudServices/*",
-                        "Microsoft.Compute/disks/write",
-                        "Microsoft.Compute/disks/read",
-                        "Microsoft.Compute/disks/delete",
-                        "Microsoft.Network/networkSecurityGroups/*",
-                        "Microsoft.Network/locations/*",
-                        "Microsoft.Network/virtualNetworks/*",
-                        "Microsoft.Network/networkInterfaces/*",
-                        "Microsoft.Network/publicIPAddresses/*",
-                        "Microsoft.Resources/subscriptions/resourceGroups/read",
-                        "Microsoft.Resources/subscriptions/resourceGroups/write",
-                        "Microsoft.Resources/subscriptions/read"
-                    ],
-                    "notActions": [],
-                    "dataActions": [],
-                    "notDataActions": []
-                    }
-                ]
-            }
+                "notActions": [],
+                "dataActions": [],
+                "notDataActions": []
+                }
+            ]
         }
-        ```
+    }
+    ```
 
 ### GCP
 
