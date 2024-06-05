@@ -4,3 +4,13 @@ from dstack._internal.core.models.backends.gcp import AnyGCPCreds, GCPStoredConf
 
 class GCPConfig(GCPStoredConfig, BackendConfig):
     creds: AnyGCPCreds
+
+    @property
+    def vpc_resource_name(self) -> str:
+        vpc_name = self.vpc_name
+        if vpc_name is None:
+            vpc_name = "default"
+        project_id = self.project_id
+        if self.vpc_project_id is not None:
+            project_id = self.vpc_project_id
+        return f"projects/{project_id}/global/networks/{vpc_name}"

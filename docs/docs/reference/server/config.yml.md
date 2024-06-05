@@ -319,6 +319,15 @@ There are two ways to configure GCP: using a service account or using the defaul
     gcloud projects list --format="json(projectId)"
     ```
 
+??? info "Using Shared VPC"
+    You can set up `dstack` to use a [Shared VPC](https://cloud.google.com/vpc/docs/shared-vpc)
+    from another GCP project in your organization by specifying both `vpc_name` and `vpc_project_id`.
+
+    When using a Shared VPC, you'll need to configure firewall rules:
+
+    * An SSH rule allowing INGRESS traffic on port 22 and target tag "dstack-runner-instance"
+    * A gateway rule allowing INGRESS traffic on ports 22, 80, 443 and target tag "dstack-gateway-instance"
+
 ??? info "Required GCP permissions"
     The following GCP permissions are sufficient for `dstack` to work:
 
@@ -332,8 +341,10 @@ There are two ways to configure GCP: using a service account or using the defaul
     compute.instances.setLabels
     compute.instances.setMetadata
     compute.instances.setTags
+    compute.networks.get
     compute.networks.updatePolicy
     compute.regions.list
+    compute.subnetworks.list
     compute.subnetworks.use
     compute.subnetworks.useExternalIp
     compute.zoneOperations.get
