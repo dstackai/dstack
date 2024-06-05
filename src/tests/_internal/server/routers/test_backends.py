@@ -444,7 +444,7 @@ class TestGetBackendConfigValuesGCP:
             "dstack._internal.core.backends.gcp.resources.check_vpc"
         ) as check_vpc_mock:
             default_creds_available_mock.return_value = False
-            authenticate_mock.return_value = None, "test_project"
+            authenticate_mock.return_value = {}, "test_project"
             response = client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
