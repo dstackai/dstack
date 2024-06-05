@@ -162,6 +162,7 @@ def get_dev_env_run_plan_dict(
                         "spot": True,
                     },
                     "retry": None,
+                    "retry_policy": {"retry": False, "duration": None},
                     "working_dir": ".",
                 },
                 "offers": [json.loads(o.json()) for o in offers],
@@ -293,6 +294,7 @@ def get_dev_env_run_dict(
                         "spot": True,
                     },
                     "retry": None,
+                    "retry_policy": {"retry": False, "duration": None},
                     "working_dir": ".",
                 },
                 "job_submissions": [

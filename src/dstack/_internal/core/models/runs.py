@@ -22,6 +22,7 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
     ProfileParams,
+    ProfileRetryPolicy,
     RetryEvent,
     SpotPolicy,
     TerminationPolicy,
@@ -194,6 +195,9 @@ class JobSpec(CoreModel):
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
     retry: Optional[Retry]
+    # For backward compatibility with 0.18.x when retry_policy was required.
+    # TODO: remove in 0.19
+    retry_policy: ProfileRetryPolicy = ProfileRetryPolicy(retry=False)
     working_dir: Optional[str]
 
 
