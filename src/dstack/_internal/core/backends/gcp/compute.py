@@ -44,6 +44,7 @@ class GCPCompute(Compute):
         self.instances_client = compute_v1.InstancesClient(credentials=self.credentials)
         self.firewalls_client = compute_v1.FirewallsClient(credentials=self.credentials)
         self.regions_client = compute_v1.RegionsClient(credentials=self.credentials)
+        self.subnetworks_client = compute_v1.SubnetworksClient(credentials=self.credentials)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -120,6 +121,14 @@ class GCPCompute(Compute):
             )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
+        # Choose any usable subnet in a VPC.
+        # Configuring a specific subnet per region is not supported yet.
+        subnetwork = _get_vpc_subnet(
+            subnetworks_client=self.subnetworks_client,
+            config=self.config,
+            region=instance_offer.region,
+        )
+
         labels = {
             "owner": "dstack",
             "dstack_project": instance_config.project_name.lower(),
@@ -150,6 +159,7 @@ class GCPCompute(Compute):
                 instance_name=instance_name,
                 zone=zone,
                 network=self.config.vpc_resource_name,
+                subnetwork=subnetwork,
             )
             try:
                 operation = self.instances_client.insert(request=request)
@@ -207,13 +217,20 @@ class GCPCompute(Compute):
                 project_id=self.config.project_id,
                 network=self.config.vpc_resource_name,
             )
-        # e2-micro is available in every zone
         for i in self.regions_client.list(project=self.config.project_id):
             if i.name == configuration.region:
                 zone = i.zones[0].split("/")[-1]
                 break
         else:
             raise ComputeResourceNotFoundError()
+
+        # Choose any usable subnet in a VPC.
+        # Configuring a specific subnet per region is not supported yet.
+        subnetwork = _get_vpc_subnet(
+            subnetworks_client=self.subnetworks_client,
+            config=self.config,
+            region=configuration.region,
+        )
 
         request = compute_v1.InsertInstanceRequest()
         request.zone = zone
@@ -235,6 +252,7 @@ class GCPCompute(Compute):
             zone=zone,
             service_account=None,
             network=self.config.vpc_resource_name,
+            subnetwork=subnetwork,
         )
         operation = self.instances_client.insert(request=request)
         gcp_resources.wait_for_extended_operation(operation, "instance creation")
@@ -259,6 +277,21 @@ class GCPCompute(Compute):
             region=configuration.region,
             backend_data=backend_data,
         )
+
+
+def _get_vpc_subnet(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    config: GCPConfig,
+    region: str,
+) -> Optional[str]:
+    if config.vpc_name is None:
+        return None
+    return gcp_resources.get_vpc_subnet_or_error(
+        subnetworks_client=subnetworks_client,
+        vpc_project_id=config.vpc_project_id or config.project_id,
+        vpc_name=config.vpc_name,
+        region=region,
+    )
 
 
 def _supported_instances_and_zones(

@@ -10,6 +10,7 @@ from google.api_core.extended_operation import ExtendedOperation
 import dstack.version as version
 from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.instances import Gpu
+from dstack._internal.utils.common import remove_prefix
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -58,9 +59,12 @@ def create_instance_struct(
     zone: str,
     service_account: Optional[str] = None,
     network: str = "global/networks/default",
+    subnetwork: Optional[str] = None,
 ) -> compute_v1.Instance:
     network_interface = compute_v1.NetworkInterface()
     network_interface.network = network
+    if subnetwork is not None:
+        network_interface.subnetwork = subnetwork
     access = compute_v1.AccessConfig()
     access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
     access.name = "External NAT"
@@ -128,6 +132,29 @@ def get_image_id(cuda: bool) -> str:
 
 def get_gateway_image_id() -> str:
     return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
+
+
+def get_vpc_subnet_or_error(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    vpc_project_id: str,
+    vpc_name: str,
+    region: str,
+) -> str:
+    """
+    Returns resource name of any usable subnet in a given VPC
+    (e.g. "projects/example-project/regions/europe-west4/subnetworks/example-subnet")
+    """
+    request = compute_v1.ListUsableSubnetworksRequest(project=vpc_project_id)
+    for subnet in subnetworks_client.list_usable(request=request):
+        network_name = subnet.network.split("/")[-1]
+        subnet_url = subnet.subnetwork
+        subnet_resource_name = remove_prefix(subnet_url, "https://www.googleapis.com/compute/v1/")
+        subnet_region = subnet_resource_name.split("/")[3]
+        if network_name == vpc_name and subnet_region == region:
+            return subnet_resource_name
+    raise ComputeError(
+        f"No usable subnetwork found in region {region} for VPC {vpc_name} in project {vpc_project_id}"
+    )
 
 
 def create_runner_firewall_rules(
