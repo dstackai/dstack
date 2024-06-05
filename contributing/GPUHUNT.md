@@ -78,6 +78,11 @@ Some providers offer extreme flexibility in possible configurations, but not all
 - Queries all known configurations
 - Adds all known regions to all configurations
 
+### OCI
+
+- Parses Oracle's [Cost Estimator](https://www.oracle.com/cloud/costestimator.html) datasets
+- Duplicates each offer in all regions, since prices are the same everywhere and availability is mostly the same
+
 ### Nebius
 
 - Uses hardcoded CPU and GPU platforms configurations

@@ -24,7 +24,7 @@ Orchestrate AI workloads in any cloud
 
 `dstack` is an open-source container orchestration engine designed for AI workloads across any cloud or data center.
 
-The supported cloud providers include AWS, GCP, Azure, Lambda, TensorDock, Vast.ai, CUDO, and RunPod.
+The supported cloud providers include AWS, GCP, Azure, Lambda, OCI, TensorDock, Vast.ai, CUDO, and RunPod.
 You can also use `dstack` ro run workloads on on-prem servers.
 
 ## Latest news ✨
@@ -49,7 +49,7 @@ pip install "dstack[all]" -U
 
 ### Configure backends
 
-If you have default AWS, GCP, or Azure credentials on your machine, the `dstack` server will pick them up automatically.
+If you have default AWS, GCP, Azure, or OCI credentials on your machine, the `dstack` server will pick them up automatically.
 
 Otherwise, you need to manually specify the cloud credentials in `~/.dstack/server/config.yml`.
 
