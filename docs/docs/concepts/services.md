@@ -88,14 +88,14 @@ When deploying the service, `dstack run` mounts the current folder's contents.
 
 One the service is up, its endpoint is accessible at `https://<run name>.<gateway domain>`.
 
-By default, the service endpoint requires the `Authorization` header with `"Bearer <dstack token>"`. 
+By default, the service endpoint requires the `Authorization` header with `Bearer <dstack token>`. 
 
 <div class="termy">
 
 ```shell
 $ curl https://yellow-cat-1.example.com/v1/chat/completions \
     -H 'Content-Type: application/json' \
-    -H 'Authorization: "Bearer &lt;dstack token&gt;"' \
+    -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -d '{
         "model": "NousResearch/Llama-2-7b-chat-hf",
         "messages": [
