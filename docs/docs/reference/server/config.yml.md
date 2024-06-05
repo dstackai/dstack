@@ -371,6 +371,68 @@ projects:
 
 </div>
 
+### OCI
+
+There are two ways to configure OCI: using client credentials or using the default credentials.
+
+=== "Client credentials"
+
+    To create client credentials, open the [OCI Console :material-arrow-top-right-thin:{ .external }](https://cloud.oracle.com), click the Profile icon in the top bar, go to My Profile, API Keys. Add a new key by clicking "Add API key".
+
+    After you add a key, the Console will show a configuration file preview. Copy the settings from the preview to `dstack` configuration as shown below. Paste the contents of the private key file in the `key_content` property.
+
+    <div editor-title="~/.dstack/server/config.yml">
+    
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: client
+          user: ocid1.user.oc1..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          tenancy: ocid1.tenancy.oc1..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          region: eu-frankfurt-1
+          fingerprint: 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00
+          key_content: |
+            -----BEGIN PRIVATE KEY-----
+            your-oci-api-key
+            -----END PRIVATE KEY-----
+    ```
+    
+    </div>
+
+=== "Default credentials"
+
+    If you already have a configuration file for the OCI CLI, `dstack` can pick the credentials from it automatically.
+
+    ??? info "How to create the OCI CLI config file"
+        Open the [OCI Console :material-arrow-top-right-thin:{ .external }](https://cloud.oracle.com), click the Profile icon in the top bar, go to My Profile, API Keys. Add a new key by clicking "Add API key".
+
+        After you add a key, the Console will show a configuration file preview. Create the `~/.oci/config` text file and save the contents of the preview there. Configure the path to your API key as suggested in the preview.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: default
+    ```
+
+    </div>
+
+!!! info "NOTE:"
+    If you have just added your API key in the OCI Console, you may see errors when running `dstack server`, as it takes some time for the key to become fully operational. Try again in a few minutes.
+
+??? info "Required OCI permissions"
+    `dstack` is guaranteed to work with administrator permissions. An example of a more restrictive policy will be added later.
+    ```
+    ALLOW GROUP Administrators to manage all-resources IN TENANCY
+    ```
+
 ### TensorDock
 
 Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
@@ -699,6 +761,31 @@ In case of a self-managed cluster, also specify the IP address of any node in th
         show_root_heading: false
         type:
             required: true
+
+## `projects[n].backends[type=oci]` { #oci data-toc-label="backends[type=oci]" }
+
+#SCHEMA# dstack._internal.server.services.config.OCIConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: oci-
+
+## `projects[n].backends[type=oci].creds` { #oci-creds data-toc-label="backends[type=oci].creds" }
+
+=== "Client"
+    #SCHEMA# dstack._internal.core.models.backends.oci.OCIClientCreds
+        overrides:
+            show_root_heading: false
+            type:
+                required: true
+
+=== "Default"
+    #SCHEMA# dstack._internal.core.models.backends.oci.OCIDefaultCreds
+        overrides:
+            show_root_heading: false
+            type:
+                required: true
 
 ## `projects[n].backends[type=tensordock]` { #tensordock data-toc-label="backends[type=tensordock]" }
 

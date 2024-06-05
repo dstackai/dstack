@@ -175,7 +175,7 @@ Examples:
 
 ## Service quotas
 
-If you're using your own AWS, GCP, or Azure accounts, before you can use GPUs or spot instances, you have to request the
+If you're using your own AWS, GCP, Azure, or OCI accounts, before you can use GPUs or spot instances, you have to request the
 corresponding service quotas for each type of instance in each region.
 
 ??? info "AWS"
@@ -207,7 +207,7 @@ corresponding service quotas for each type of instance in each region.
     - `Preemtible H100 GPUs` (spot H100)
 
 ??? info "Azure"
-    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/azure/quotas/quickstart-increase-quota-portal){:target="_blank"} on Compute Engine service quotas.
+    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/azure/quotas/quickstart-increase-quota-portal){:target="_blank"} on Azure service quotas.
     The relevant service quotas include:
 
     - `Total Regional Spot vCPUs` (any spot instances)
@@ -218,6 +218,14 @@ corresponding service quotas for each type of instance in each region.
     - `Standard NDAMSv4_A100Family vCPUs` (on-demand A100 80GB x8)
     - `Standard NCadsH100v5 Family vCPUs` (on-demand H100)
     - `Standard NDSH100v5 Family vCPUs` (on-demand H100 x8)
+
+??? info "OCI"
+    Check this [guide  :material-arrow-top-right-thin:{ .external }](https://docs.oracle.com/en-us/iaas/Content/General/Concepts/servicelimits.htm#Requesti){:target="_blank"} on requesting OCI service limits increase.
+    The relevant service category is compute. The relevant resources include:
+
+    - `GPUs for GPU.A10 based VM and BM instances` (on-demand A10)
+    - `GPUs for GPU2 based VM and BM instances` (on-demand P100)
+    - `GPUs for GPU3 based VM and BM instances` (on-demand V100)
 
 Note, for AWS, GCP, and Azure, service quota values are measured with the number of CPUs rather than GPUs.
 
