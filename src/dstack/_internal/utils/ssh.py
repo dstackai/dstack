@@ -159,14 +159,13 @@ def generate_public_key(private_key: PKey) -> str:
     return public_key
 
 
-def check_required_ssh_version():
+def check_required_ssh_version() -> bool:
     try:
         result = subprocess.run(["ssh", "-V"], capture_output=True, text=True)
-        # TODO(loghi) - windows returns ssh -v to stdout. By default check_required_ssh_version returns True
 
         if result.returncode == 0:
-            # Extract the version number from stderr in unix-like systems
-            version_output = result.stderr.strip()
+            # Extract the version number from stderr in unix-like and window systems
+            version_output = result.stderr if result.stderr.strip() else result.stdout.strip()
 
             match = re.search(r"_(\d+\.\d+)", version_output)
             if match:
