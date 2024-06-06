@@ -157,3 +157,26 @@ def rsa_pkey_from_str(private_string: str) -> PKey:
 def generate_public_key(private_key: PKey) -> str:
     public_key = f"{private_key.get_name()} {private_key.get_base64()}"
     return public_key
+
+
+def check_required_ssh_version():
+    try:
+        result = subprocess.run(["ssh", "-V"], capture_output=True, text=True)
+        # TODO(loghi) - windows returns ssh -v to stdout. By default check_required_ssh_version returns True
+
+        if result.returncode == 0:
+            # Extract the version number from stderr in unix-like systems
+            version_output = result.stderr.strip()
+
+            match = re.search(r"_(\d+\.\d+)", version_output)
+            if match:
+                ssh_version = float(match.group(1))
+                if ssh_version >= 8.4:
+                    return True
+                else:
+                    return False
+
+    except subprocess.CalledProcessError:
+        logger.error("Failed to get ssh version information")
+
+    return True

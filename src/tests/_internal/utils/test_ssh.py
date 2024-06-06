@@ -14,11 +14,11 @@ class TestCheckRequiredSSHVersion(unittest.TestCase):
         self.assertTrue(check_required_ssh_version())
 
     @patch("subprocess.run")
-    def test_ssh_version_exactly_8_4(self, mock_run):
+    def test_ssh_version_below_8_4(self, mock_run):
         # Mock subprocess.run to return version 8.4
-        mock_run.return_value = MagicMock(returncode=0, stderr="OpenSSH_8.4p1, LibreSSL 3.2.3")
+        mock_run.return_value = MagicMock(returncode=0, stderr="OpenSSH_8.2p1, LibreSSL 3.2.3")
 
-        self.assertTrue(check_required_ssh_version())
+        self.assertFalse(check_required_ssh_version())
 
     @patch("subprocess.run")
     def test_subprocess_error(self, mock_run):
@@ -36,7 +36,3 @@ class TestCheckRequiredSSHVersion(unittest.TestCase):
         # Should ignore windows check
 
         self.assertTrue(check_required_ssh_version())
-
-
-if __name__ == "__main__":
-    unittest.main()
