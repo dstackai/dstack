@@ -78,13 +78,14 @@ There are two ways to configure AWS: using an access key or using the default cr
                 creds:
                   type: default
 
+                default_vpcs: true
                 vpc_ids:
                   us-east-1: vpc-0a2b3c4d5e6f7g8h
                   us-east-2: vpc-9i8h7g6f5e4d3c2b
                   us-west-1: vpc-4d3c2b1a0f9e8d7
         ```
 
-    Note, the VPCs are required to have a public subnet.
+        For the regions without configured `vpc_ids`, enable default VPCs by setting `default_vpcs` to `true`.
 
 ??? info "Required AWS permissions"
     The following AWS policy permissions are sufficient for `dstack` to work:
@@ -149,6 +150,24 @@ There are two ways to configure AWS: using an access key or using the default cr
 
     The `elasticloadbalancing:*` and `acm:*` permissions are only needed for provisioning gateways with ACM (AWS Certificate Manager) certificates.
 
+??? info "Private subnets"
+    By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.
+    If you want `dstack` to use private subnets, set `private_ips` to `false`."
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: aws
+            creds:
+              type: default
+
+            private_ips: false
+    ```
+    
+    Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets 
+    (e.g., through VPC peering).
+
 ### Azure
 
 There are two ways to configure Azure: using a client secret or using the default credentials.
@@ -210,12 +229,11 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
     </div>
 
-!!! info "NOTE:"
-    If you don't know your `subscription_id`, run
+If you don't know your `subscription_id`, run
 
-    ```shell
-    az account show --query "{subscription_id: id}"
-    ```
+```shell
+az account show --query "{subscription_id: id}"
+```
 
 ??? info "Required Azure permissions"
     The following Azure permissions are sufficient for `dstack` to work:
@@ -312,21 +330,53 @@ There are two ways to configure GCP: using a service account or using the defaul
 
     </div>
 
-!!! info "NOTE:"
-    If you don't know your GCP project ID, run
+If you don't know your GCP project ID, run
 
-    ```shell
-    gcloud projects list --format="json(projectId)"
+```shell
+gcloud projects list --format="json(projectId)"
+```
+
+=== "VPC"
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+        - type: gcp
+          project_id: gcp-project-id
+          creds:
+            type: default
+
+          vpc_name: my-custom-vpc
     ```
 
-??? info "Using Shared VPC"
-    You can set up `dstack` to use a [Shared VPC](https://cloud.google.com/vpc/docs/shared-vpc)
-    from another GCP project in your organization by specifying both `vpc_name` and `vpc_project_id`.
+    </div>
 
-    When using a Shared VPC, you'll need to configure firewall rules:
+=== "Shared VPC"
 
-    * An SSH rule allowing INGRESS traffic on port 22 and target tag "dstack-runner-instance"
-    * A gateway rule allowing INGRESS traffic on ports 22, 80, 443 and target tag "dstack-gateway-instance"
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+        - type: gcp
+          project_id: gcp-project-id
+          creds:
+            type: default
+
+          vpc_name: my-custom-vpc
+          vpc_project_id: another-project-id
+    ```
+
+    </div>
+
+    To use a shared VPC, that VPC has to be configured with two additional firewall rules:
+
+    * Allow `INGRESS` traffic on port `22`, with the target tag `dstack-runner-instance`
+    * Allow `INGRESS` traffic on ports `22`, `80`, `443`, with the target tag `dstack-gateway-instance`
 
 ??? info "Required GCP permissions"
     The following GCP permissions are sufficient for `dstack` to work:
@@ -350,6 +400,68 @@ There are two ways to configure GCP: using a service account or using the defaul
     compute.zoneOperations.get
     ```
 
+### OCI
+
+There are two ways to configure OCI: using client credentials or using the default credentials.
+
+=== "Client credentials"
+
+    Log into the [OCI Console :material-arrow-top-right-thin:{ .external }](https://cloud.oracle.com), go to `My profile`, 
+    select `API keys`, anc click `Add API key`.
+
+    Once created, you'll see the configuration file. Copy its values to configure the backend as follows:
+
+    <div editor-title="~/.dstack/server/config.yml">
+    
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: client
+          user: ocid1.user.oc1..g5vlaeqfu47akmaafq665xsgmyaqjktyfxtacfxc4ftjxuca7aohnd2ev66m
+          tenancy: ocid1.tenancy.oc1..ajqsftvk4qarcfaak3ha4ycdsaahxmaita5frdwg3tqo2bcokpd3n7oizwai
+          region: eu-frankfurt-1
+          fingerprint: 77:32:77:00:49:7c:cb:56:84:75:8e:77:96:7d:53:17
+          key_content: |
+            -----BEGIN PRIVATE KEY-----
+            MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDcp9beQPfM/Kwj
+            DkE2ZrtFJccWxzMEQLn5ulDkNIhsx1q2t3KbYMHht0UgrtdWzCujxE1kg3fDxUuQ
+            ...
+            msDimnquNtbXho5QP0GhWXcJwbHvS2u+Kp0V1HX2jY3r78479hfveTvC4yQ5/kBr
+            aFbZPi45n5lKl+ElwK+YNAQ=
+            -----END PRIVATE KEY-----
+    ```
+    
+    </div>
+
+    Make sure to include the contents of your private key in the backend configuration via `key_content`.
+
+[//]: # (TODO: Add support for `key_file` as an alternative to `key_content`)
+
+=== "Default credentials"
+    If you have default credentials set up in `~/.oci/config`, configure the backend like this:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: default
+    ```
+
+    </div>
+
+??? info "Required OCI permissions"
+
+    ```
+    ALLOW GROUP Administrators to manage all-resources IN TENANCY
+    ```
+
 ### Lambda
 
 Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
@@ -370,68 +482,6 @@ projects:
 ```
 
 </div>
-
-### OCI
-
-There are two ways to configure OCI: using client credentials or using the default credentials.
-
-=== "Client credentials"
-
-    To create client credentials, open the [OCI Console :material-arrow-top-right-thin:{ .external }](https://cloud.oracle.com), click the Profile icon in the top bar, go to My Profile, API Keys. Add a new key by clicking "Add API key".
-
-    After you add a key, the Console will show a configuration file preview. Copy the settings from the preview to `dstack` configuration as shown below. Paste the contents of the private key file in the `key_content` property.
-
-    <div editor-title="~/.dstack/server/config.yml">
-    
-    ```yaml
-    projects:
-    - name: main
-      backends:
-      - type: oci
-        creds:
-          type: client
-          user: ocid1.user.oc1..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-          tenancy: ocid1.tenancy.oc1..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-          region: eu-frankfurt-1
-          fingerprint: 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00
-          key_content: |
-            -----BEGIN PRIVATE KEY-----
-            your-oci-api-key
-            -----END PRIVATE KEY-----
-    ```
-    
-    </div>
-
-=== "Default credentials"
-
-    If you already have a configuration file for the OCI CLI, `dstack` can pick the credentials from it automatically.
-
-    ??? info "How to create the OCI CLI config file"
-        Open the [OCI Console :material-arrow-top-right-thin:{ .external }](https://cloud.oracle.com), click the Profile icon in the top bar, go to My Profile, API Keys. Add a new key by clicking "Add API key".
-
-        After you add a key, the Console will show a configuration file preview. Create the `~/.oci/config` text file and save the contents of the preview there. Configure the path to your API key as suggested in the preview.
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-      backends:
-      - type: oci
-        creds:
-          type: default
-    ```
-
-    </div>
-
-!!! info "NOTE:"
-    If you have just added your API key in the OCI Console, you may see errors when running `dstack server`, as it takes some time for the key to become fully operational. Try again in a few minutes.
-
-??? info "Required OCI permissions"
-    `dstack` is guaranteed to work with administrator permissions. An example of a more restrictive policy will be added later.
-    ```
-    ALLOW GROUP Administrators to manage all-resources IN TENANCY
-    ```
 
 ### TensorDock
 
@@ -455,8 +505,7 @@ projects:
 
 </div>
 
-!!! info "NOTE:"
-    The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
+The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
 
 ### Vast.ai
 
@@ -479,29 +528,7 @@ projects:
 
 </div>
 
-!!! info "NOTE:"
-    Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
-
-### CUDO
-
-Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
-
-Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: cudo
-        project_id: my-cudo-project
-        creds:
-          type: api_key
-          api_key: 7487240a466624b48de22865589
-```
-
-</div>
+Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
 ### RunPod
 
@@ -524,12 +551,26 @@ projects:
 
 </div>
 
-!!! warning "NOTE:"
-    If you're using a custom Docker image, its entrypoint cannot be anything other than `/bin/bash` or `/bin/sh`.
-    See the [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1137) for more details.
+### CUDO
 
-!!! info "NOTE:"
-    The `runpod` backend supports on-demand instances only. Spot instance support coming soon.
+Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
+
+Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: cudo
+        project_id: my-cudo-project
+        creds:
+          type: api_key
+          api_key: 7487240a466624b48de22865589
+```
+
+</div>
 
 ### DataCrunch
 

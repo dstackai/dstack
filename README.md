@@ -24,16 +24,16 @@ Orchestrate AI workloads in any cloud
 
 `dstack` is an open-source container orchestration engine designed for AI workloads across any cloud or data center.
 
-The supported cloud providers include AWS, GCP, Azure, Lambda, OCI, TensorDock, Vast.ai, CUDO, and RunPod.
+The supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
 You can also use `dstack` ro run workloads on on-prem servers.
 
 ## Latest news ✨
 
+- [2024/05] [dstack 0.18.3: OCI, and more](https://github.com/dstackai/dstack/releases/tag/0.18.3) (Release)
 - [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
 - [2024/04] [dstack 0.18.1: On-prem servers, and new example](https://github.com/dstackai/dstack/releases/tag/0.18.1) (Release)
 - [2024/04] [dstack 0.18.0: RunPod, mult-node tasks, and more](https://github.com/dstackai/dstack/releases/tag/0.18.0) (Release)
 - [2024/03] [dstack 0.17.0: Auto-scaling, and other improvements](https://github.com/dstackai/dstack/releases/tag/0.17.0) (Release)
-- [2024/02] [dstack 0.16.0: Pools](https://github.com/dstackai/dstack/releases/tag/0.16.0) (Release)
 
 ## Installation
 
