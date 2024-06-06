@@ -246,17 +246,19 @@ class NebiusAPIConfig(CoreModel):
 
 class OCIConfig(CoreModel):
     type: Annotated[Literal["oci"], Field(description="The type of backend")] = "oci"
-    creds: Annotated[AnyOCICreds, Field(description="The credentials")]
+    creds: Annotated[AnyOCICreds, Field(description="The credentials", discriminator="type")]
     regions: Annotated[
         Optional[List[str]],
-        Field(description="List of region names for running dstack jobs. Omit to use all regions"),
+        Field(
+            description="List of region names for running `dstack` jobs. Omit to use all regions"
+        ),
     ] = None
     compartment_id: Annotated[
         Optional[str],
         Field(
             description=(
-                "Compartment where dstack will create all resources. "
-                "Omit to instruct dstack to create a new compartment"
+                "Compartment where `dstack` will create all resources. "
+                "Omit to instruct `dstack` to create a new compartment"
             )
         ),
     ] = None
