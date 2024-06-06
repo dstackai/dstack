@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional
 
 from dstack._internal.core.backends.base import Compute
@@ -123,7 +124,6 @@ class RunpodCompute(Compute):
 def get_docker_args(authorized_keys: List[str]) -> str:
     commands = get_docker_commands(authorized_keys, False)
     command = " && ".join(commands)
-    command_escaped = command.replace('"', '\\"')
-    command_escaped = command_escaped.replace("'", '\\"')
-    command_escaped = command_escaped.replace("\n", "\\n")
-    return f"bash -c '{command_escaped}'"
+    docker_args = {"cmd": [command], "entrypoint": ["/bin/sh", "-c"]}
+    docker_args_escaped = json.dumps(json.dumps(docker_args)).strip('"')
+    return docker_args_escaped
