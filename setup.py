@@ -79,7 +79,7 @@ AZURE_DEPS = [
     "azure-identity>=1.12.0",
     "azure-mgmt-subscription>=3.1.1",
     "azure-mgmt-compute>=29.1.0",
-    "azure-mgmt-network==23.0.0b2",
+    "azure-mgmt-network>=23.0.0",
     "azure-mgmt-resource>=22.0.0",
     "azure-mgmt-authorization>=3.0.0",
 ]
