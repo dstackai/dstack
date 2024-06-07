@@ -25,7 +25,7 @@ class TestCheckRequiredSSHVersion(unittest.TestCase):
         # Mock subprocess.run to raise a CalledProcessError
         mock_run.side_effect = subprocess.CalledProcessError(returncode=1, cmd="ssh -V")
 
-        self.assertTrue(check_required_ssh_version())
+        self.assertFalse(check_required_ssh_version())
 
     @patch("subprocess.run")
     def test_ssh_version_on_windows_above_8_4(self, mock_run):

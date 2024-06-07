@@ -162,7 +162,9 @@ def generate_public_key(private_key: PKey) -> str:
 def check_required_ssh_version() -> bool:
     try:
         result = subprocess.run(["ssh", "-V"], capture_output=True, text=True)
-
+    except subprocess.CalledProcessError:
+        logger.error("Failed to get ssh version information")
+    else:
         if result.returncode == 0:
             # Extract the version number from stderr in unix-like and window systems
             version_output = result.stderr if result.stderr.strip() else result.stdout.strip()
@@ -175,7 +177,4 @@ def check_required_ssh_version() -> bool:
                 else:
                     return False
 
-    except subprocess.CalledProcessError:
-        logger.error("Failed to get ssh version information")
-
-    return True
+    return False
