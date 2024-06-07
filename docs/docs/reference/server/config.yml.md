@@ -407,9 +407,9 @@ There are two ways to configure OCI: using client credentials or using the defau
 === "Client credentials"
 
     Log into the [OCI Console :material-arrow-top-right-thin:{ .external }](https://cloud.oracle.com), go to `My profile`, 
-    select `API keys`, anc click `Add API key`.
+    select `API keys`, and click `Add API key`.
 
-    Once created, you'll see the configuration file. Copy its values to configure the backend as follows:
+    Once you add a key, you'll see the configuration file. Copy its values to configure the backend as follows:
 
     <div editor-title="~/.dstack/server/config.yml">
     
@@ -424,21 +424,12 @@ There are two ways to configure OCI: using client credentials or using the defau
           tenancy: ocid1.tenancy.oc1..ajqsftvk4qarcfaak3ha4ycdsaahxmaita5frdwg3tqo2bcokpd3n7oizwai
           region: eu-frankfurt-1
           fingerprint: 77:32:77:00:49:7c:cb:56:84:75:8e:77:96:7d:53:17
-          key_content: |
-            -----BEGIN PRIVATE KEY-----
-            MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDcp9beQPfM/Kwj
-            DkE2ZrtFJccWxzMEQLn5ulDkNIhsx1q2t3KbYMHht0UgrtdWzCujxE1kg3fDxUuQ
-            ...
-            msDimnquNtbXho5QP0GhWXcJwbHvS2u+Kp0V1HX2jY3r78479hfveTvC4yQ5/kBr
-            aFbZPi45n5lKl+ElwK+YNAQ=
-            -----END PRIVATE KEY-----
+          key_file: ~/.oci/private_key.pem
     ```
     
     </div>
 
-    Make sure to include the contents of your private key in the backend configuration via `key_content`.
-
-[//]: # (TODO: Add support for `key_file` as an alternative to `key_content`)
+    Make sure to include either the path to your private key via `key_file` or the contents of the key via `key_content`.
 
 === "Default credentials"
     If you have default credentials set up in `~/.oci/config`, configure the backend like this:
