@@ -325,6 +325,17 @@ async def get_project_backend_model_by_type(
     return None
 
 
+async def get_project_backend_model_by_type_or_error(
+    project: ProjectModel, backend_type: BackendType
+) -> BackendModel:
+    backend_model = await get_project_backend_model_by_type(
+        project=project, backend_type=backend_type
+    )
+    if backend_model is None:
+        raise BackendNotAvailable()
+    return backend_model
+
+
 async def get_instance_offers(
     backends: List[Backend], requirements: Requirements, exclude_not_available: bool = False
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
