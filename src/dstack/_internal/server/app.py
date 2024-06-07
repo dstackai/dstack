@@ -44,6 +44,7 @@ from dstack._internal.server.utils.routers import (
 )
 from dstack._internal.settings import DSTACK_VERSION
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.ssh import check_required_ssh_version
 
 logger = get_logger(__name__)
 
@@ -103,6 +104,9 @@ async def lifespan(app: FastAPI):
                     f"Applying [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]...",
                     {"show_path": False},
                 )
+                if not check_required_ssh_version():
+                    logger.warning("OpenSSH 8.4+ is required")
+
                 await server_config_manager.apply_config(session=session, owner=admin)
         await init_gateways(session=session)
     update_default_project(
