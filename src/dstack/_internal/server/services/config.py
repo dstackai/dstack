@@ -376,7 +376,7 @@ class ServerConfigManager:
                 )
             backends_to_delete = backends_services.list_available_backend_types()
             for backend_config in project_config.backends:
-                config_info = _config_to_internal_config(backend_config)
+                config_info = config_to_internal_config(backend_config)
                 backend_type = BackendType(config_info.type)
                 try:
                     backends_to_delete.remove(backend_type)
@@ -420,7 +420,7 @@ class ServerConfigManager:
                 project=project, backend_type=backend_type
             )
             if config_info is not None:
-                backends.append(_internal_config_to_config(config_info))
+                backends.append(internal_config_to_config(config_info))
         if init_backends and len(backends) == 0:
             backends = await self._init_backends(session=session, project=project)
         return ServerConfig(
@@ -441,7 +441,7 @@ class ServerConfigManager:
                     await backends_services.create_backend(
                         session=session, project=project, config=config_info
                     )
-                    backends.append(_internal_config_to_config(config_info))
+                    backends.append(internal_config_to_config(config_info))
                     break
                 except Exception as e:
                     logger.debug("Failed to configure backend %s: %s", config_info.type, e)
@@ -458,7 +458,7 @@ class ServerConfigManager:
 
     def _save_config(self, config: ServerConfig):
         with open(settings.SERVER_CONFIG_FILE_PATH, "w+") as f:
-            f.write(_config_to_yaml(config))
+            f.write(config_to_yaml(config))
 
 
 async def get_backend_config_yaml(
@@ -469,8 +469,8 @@ async def get_backend_config_yaml(
     )
     if config_info is None:
         raise ResourceNotExistsError()
-    config = _internal_config_to_config(config_info)
-    config_yaml = _config_to_yaml(config)
+    config = internal_config_to_config(config_info)
+    config_yaml = config_to_yaml(config)
     return BackendInfoYAML(
         name=backend_type,
         config_yaml=config_yaml,
@@ -482,8 +482,8 @@ async def create_backend_config_yaml(
     project: ProjectModel,
     config_yaml: str,
 ):
-    backend_config = _config_yaml_to_backend_config(config_yaml)
-    config_info = _config_to_internal_config(backend_config)
+    backend_config = config_yaml_to_backend_config(config_yaml)
+    config_info = config_to_internal_config(backend_config)
     await backends_services.create_backend(session=session, project=project, config=config_info)
 
 
@@ -492,15 +492,15 @@ async def update_backend_config_yaml(
     project: ProjectModel,
     config_yaml: str,
 ):
-    backend_config = _config_yaml_to_backend_config(config_yaml)
-    config_info = _config_to_internal_config(backend_config)
+    backend_config = config_yaml_to_backend_config(config_yaml)
+    config_info = config_to_internal_config(backend_config)
     await backends_services.update_backend(session=session, project=project, config=config_info)
 
 
 server_config_manager = ServerConfigManager()
 
 
-def _internal_config_to_config(config_info: AnyConfigInfoWithCreds) -> BackendConfig:
+def internal_config_to_config(config_info: AnyConfigInfoWithCreds) -> BackendConfig:
     backend_config = _BackendConfig.parse_obj(config_info.dict(exclude={"locations"}))
     if config_info.type == "azure":
         backend_config.__root__.regions = config_info.locations
@@ -511,7 +511,7 @@ class _ConfigInfoWithCreds(CoreModel):
     __root__: Annotated[AnyConfigInfoWithCreds, Field(..., discriminator="type")]
 
 
-def _config_to_internal_config(
+def config_to_internal_config(
     backend_config: Union[BackendConfig, BackendAPIConfig],
 ) -> AnyConfigInfoWithCreds:
     backend_config_dict = backend_config.dict()
@@ -526,7 +526,7 @@ def _config_to_internal_config(
     return config_info.__root__
 
 
-def _config_yaml_to_backend_config(config_yaml: str) -> BackendAPIConfig:
+def config_yaml_to_backend_config(config_yaml: str) -> BackendAPIConfig:
     try:
         config_dict = yaml.load(config_yaml, yaml.FullLoader)
     except yaml.YAMLError:
@@ -538,7 +538,7 @@ def _config_yaml_to_backend_config(config_yaml: str) -> BackendAPIConfig:
     return backend_config
 
 
-def _config_to_yaml(config: CoreModel) -> str:
+def config_to_yaml(config: CoreModel) -> str:
     return yaml.dump(config.dict(exclude_none=True), sort_keys=False)
 
 
