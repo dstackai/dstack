@@ -11,21 +11,25 @@ authorization out of the box.
 ## Why use dstack?
 
 1. Simplifies development, training, and deployment of AI
-2. Supports major GPU cloud providers as well as on-prem servers
+2. Can be used with any cloud providers and data centers
 3. Leverages the open-source AI ecosystem of libraries, frameworks, and models
 4. Reduces GPU costs and improves workload efficiency
-5. Allows the use of multiple cloud providers
 
 ## How does it work?
 
-1. [Install](installation/index.md) the open-source version of `dstack` and configure your own cloud accounts, or sign up with [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}
-2. Define configurations such as [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
+!!! info "Installation"
+    Before using `dstack`, either set up the open-source server, or sign up
+    with [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+    See [Installation](installation/index.md) for more details.
+
+1. Define configurations such as [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
    and [services](concepts/services.md).
-3. Run configurations via `dstack`'s CLI or API.
-4. Use [pools](concepts/pools.md) to manage cloud instances and on-prem servers.
+2. Run configurations via `dstack`'s CLI or API.
+3. Use [pools](concepts/pools.md) to manage cloud instances and on-prem servers.
 
 ## Where do I start?
 
-1. Follow [quickstart](quickstart.md)
-2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
-3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
+1. Proceed to [installation](installation/index.md)
+2. See [quickstart](quickstart.md)
+3. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
+4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}

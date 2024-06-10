@@ -708,10 +708,16 @@
 }
 
 .plans_card__title {
-    margin-bottom: 1rem;
+    margin-bottom: 0.7rem;
     font-size: 1.5em;
     font-weight: 800;
     line-height: 1.33;
+}
+
+.plans_card__subtitle-2 {
+    color: rgba(0, 0, 0, 0.6);
+    margin-bottom: 0.75rem;
+    font-size: 0.9em;
 }
 
 .plans_card__subtitle {
