@@ -54,15 +54,15 @@ async def list_project_pools(session: AsyncSession, project: ProjectModel) -> Li
 
 
 async def get_pool(
-    session: AsyncSession, project: ProjectModel, pool_name: str
+    session: AsyncSession, project: ProjectModel, pool_name: str, select_deleted: bool = False
 ) -> Optional[PoolModel]:
-    res = await session.scalars(
-        select(PoolModel).where(
-            PoolModel.name == pool_name,
-            PoolModel.project_id == project.id,
-            PoolModel.deleted == False,
-        )
-    )
+    filters = [
+        PoolModel.name == pool_name,
+        PoolModel.project_id == project.id,
+    ]
+    if not select_deleted:
+        filters.append(PoolModel.deleted == False)
+    res = await session.scalars(select(PoolModel).where(*filters))
     return res.one_or_none()
 
 
@@ -404,7 +404,7 @@ def filter_pool_instances(
 async def list_pools_instance_models(
     session: AsyncSession,
     projects: List[ProjectModel],
-    pools: List[PoolModel],
+    pool: Optional[PoolModel],
     only_active: bool,
     prev_created_at: Optional[datetime],
     prev_id: Optional[uuid.UUID],
@@ -413,8 +413,9 @@ async def list_pools_instance_models(
 ) -> List[InstanceModel]:
     filters: List = [
         InstanceModel.project_id.in_(p.id for p in projects),
-        InstanceModel.pool_id.in_(p.id for p in pools),
     ]
+    if pool is not None:
+        filters.append(InstanceModel.pool_id == pool.id)
     if only_active:
         filters.extend(
             [
@@ -482,25 +483,23 @@ async def list_user_pool_instances(
     if not projects:
         return []
 
+    pool = None
     if project_name is not None:
         projects = [proj for proj in projects if proj.name == project_name]
-
-    pools = []
-    for proj in projects:
-        project_pools = await list_project_pool_models(
-            session=session, project=proj, select_deleted=(not only_active)
-        )
-        available_pools = project_pools
+        if len(projects) == 0:
+            return []
         if pool_name is not None:
-            available_pools = (pool for pool in project_pools if pool.name == pool_name)
-        pools.extend(available_pools)
-    if not pools:
-        return []
+            pool = await get_pool(
+                session=session,
+                project=projects[0],
+                pool_name=pool_name,
+                select_deleted=(not only_active),
+            )
 
     instance_models = await list_pools_instance_models(
         session=session,
         projects=projects,
-        pools=pools,
+        pool=pool,
         only_active=only_active,
         prev_created_at=prev_created_at,
         prev_id=prev_id,
