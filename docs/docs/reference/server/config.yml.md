@@ -152,7 +152,7 @@ There are two ways to configure AWS: using an access key or using the default cr
 
 ??? info "Private subnets"
     By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.
-    If you want `dstack` to use private subnets, set `private_ips` to `false`."
+    If you want `dstack` to use private subnets, set `public_ips` to `false`."
 
     ```yaml
     projects:
@@ -162,7 +162,7 @@ There are two ways to configure AWS: using an access key or using the default cr
             creds:
               type: default
 
-            private_ips: false
+            public_ips: false
     ```
     
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets 
