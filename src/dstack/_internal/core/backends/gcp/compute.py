@@ -49,7 +49,6 @@ class GCPCompute(Compute):
         self.subnetworks_client = compute_v1.SubnetworksClient(credentials=self.credentials)
         self.tpu_client = tpu_v2.TpuClient(credentials=self.credentials)
 
-
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
@@ -151,7 +150,11 @@ class GCPCompute(Compute):
             "dstack_user": instance_config.user.lower(),
         }
         labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
-        tpu = _is_tpu(instance_offer.instance.resources.gpus[0].name)
+        tpu = (
+            _is_tpu(instance_offer.instance.resources.gpus[0].name)
+            if instance_offer.instance.resources.gpus
+            else False
+        )
         if tpu:
             for zone in _get_instance_zones(instance_offer):
                 tpu_node = gcp_resources.create_tpu_node_struct(
@@ -363,6 +366,9 @@ def _supported_instances_and_zones(
         # strip zone
         if offer.region[:-2] not in regions:
             return False
+        # remove TPU Pod for initial release
+        if _is_tpu(f"tpu-{offer.instance.name}") and _is_pod(offer.instance.name):
+            return False
         for family in [
             "e2-medium",
             "e2-standard-",
@@ -427,3 +433,20 @@ def _is_tpu(name: str) -> bool:
         if version in tpu_versions and cores.isdigit():
             return True
     return False
+
+
+def _is_pod(instance_name: str) -> bool:
+    parts = instance_name.split("-")
+    if len(parts) != 2:
+        raise ValueError(f"Invalid tpu type: {instance_name}")
+    version, tensor_cores = parts
+    try:
+        tensor_cores = int(tensor_cores)
+    except ValueError:
+        raise ValueError(f"Invalid number in tpu tensor cores: {tensor_cores}")
+    if version in ["v2", "v3"]:
+        return tensor_cores > 8
+    elif version in ["v4", "v5p", "v5litepod"]:
+        return True
+    else:
+        raise ValueError(f"Unknown TPU version: {version}")
