@@ -398,6 +398,9 @@ gcloud projects list --format="json(projectId)"
     compute.subnetworks.use
     compute.subnetworks.useExternalIp
     compute.zoneOperations.get
+    tpu.nodes.create
+    tpu.nodes.delete
+    tpu.nodes.get
     ```
 
 ### OCI
