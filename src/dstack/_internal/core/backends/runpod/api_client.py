@@ -5,9 +5,7 @@ from typing import Any, Dict, List, Optional
 import requests
 from requests import Response
 
-import dstack._internal.server.services.docker as docker
 from dstack._internal.core.errors import BackendError, BackendInvalidCredentialsError
-from dstack._internal.core.models.configurations import RegistryAuth
 from dstack._internal.utils.common import get_current_datetime
 
 API_URL = "https://api.runpod.io/graphql"
@@ -51,7 +49,6 @@ class RunpodApiClient:
         network_volume_id: Optional[str] = None,
         allowed_cuda_versions: Optional[List[str]] = None,
         bid_per_gpu: Optional[float] = None,
-        registry_auth: Optional[RegistryAuth] = None,
     ) -> Dict:
         resp = self._make_request(
             {
@@ -77,12 +74,48 @@ class RunpodApiClient:
                     network_volume_id,
                     allowed_cuda_versions,
                     bid_per_gpu,
-                    self._generate_container_registry_auth_id(image_name, registry_auth),
                 )
             }
         )
         data = resp.json()["data"]
         return data["podRentInterruptable"] if bid_per_gpu else data["podFindAndDeployOnDemand"]
+
+    def edit_pod(
+        self,
+        pod_id: str,
+        image_name: str,
+        container_disk_in_gb: int,
+        docker_args: str,
+        env: List[str],
+        port: str,
+        ports: str,
+        volume_in_gb: int,
+        volume_mount_path: str,
+        container_registry_auth_id: str,
+    ) -> int:
+        resp = self._make_request(
+            {
+                "query": f"""
+                mutation {{
+                    podEditJob(input: {{
+                        podId: "{pod_id}"
+                        dockerArgs: "{docker_args}"
+                        imageName: "{image_name}"
+                        env: {env}
+                        port: "{port}"
+                        ports: "{ports}"
+                        containerDiskInGb: {container_disk_in_gb}
+                        volumeInGb: {volume_in_gb}
+                        volumeMountPath: "{volume_mount_path}"
+                        containerRegistryAuthId: "{container_registry_auth_id}"
+                    }}) {{
+                        id
+                    }}
+                }}
+                """
+            }
+        )
+        return resp.json()["data"]["podEditJob"]["id"]
 
     def get_pod(self, pod_id: str) -> Dict:
         resp = self._make_request({"query": generate_pod_query(pod_id)})
@@ -94,7 +127,7 @@ class RunpodApiClient:
         data = resp.json()
         return data["data"]
 
-    def _get_container_registry_auths(self) -> List[Dict]:
+    def get_container_registry_auths(self) -> List[Dict]:
         resp = self._make_request(
             {
                 "query": """
@@ -111,7 +144,7 @@ class RunpodApiClient:
         )
         return resp.json()["data"]["myself"]["containerRegistryCreds"]
 
-    def _add_container_registry_auth(self, name: str, username: str, password: str) -> int:
+    def add_container_registry_auth(self, name: str, username: str, password: str) -> int:
         resp = self._make_request(
             {
                 "query": f"""
@@ -131,43 +164,17 @@ class RunpodApiClient:
         )
         return resp.json()["data"]["saveRegistryAuth"]["id"]
 
-    def _update_container_registry_auth(self, auth_id: str, username: str, password: str) -> None:
+    def delete_container_registry_auth(self, auth_id: str) -> None:
         self._make_request(
             {
                 "query": f"""
                 mutation {{
-                    updateRegistryAuth(input: {{
-                        id: "{auth_id}",
-                        username: "{username}",
-                        password: "{password}"
-                    }}) {{
-                        id
-                    }}
+                    deleteRegistryAuth(
+                        registryAuthId: "{auth_id}"
+                    )
                 }}
                 """
             }
-        )
-
-    def _generate_container_registry_auth_id(
-        self, image_name: str, registry_auth: Optional[RegistryAuth]
-    ) -> Optional[str]:
-        if registry_auth is None:
-            return None
-
-        registry = docker.parse_image_name(image_name).registry or docker.DEFAULT_REGISTRY
-        container_registry_auth_name = f"{registry}/{registry_auth.username}"
-
-        container_registry_auths = self._get_container_registry_auths()
-        for auth in container_registry_auths:
-            if auth["name"] == container_registry_auth_name:
-                # Always update the existing auth creds to handle the case where the password has changed
-                self._update_container_registry_auth(
-                    auth["id"], registry_auth.username, registry_auth.password
-                )
-                return auth["id"]
-
-        return self._add_container_registry_auth(
-            container_registry_auth_name, registry_auth.username, registry_auth.password
         )
 
     def _make_request(self, data: Any = None) -> Response:
@@ -283,7 +290,6 @@ def generate_pod_deployment_mutation(
     network_volume_id=None,
     allowed_cuda_versions: Optional[List[str]] = None,
     bid_per_gpu: Optional[float] = None,
-    container_registry_auth_id: Optional[str] = None,
 ) -> str:
     """
     Generates a mutation to deploy pod.
@@ -325,8 +331,6 @@ def generate_pod_deployment_mutation(
         input_fields.append(f"minMemoryInGb: {min_memory_in_gb}")
     if docker_args is not None:
         input_fields.append(f'dockerArgs: "{docker_args}"')
-    if container_registry_auth_id is not None:
-        input_fields.append(f'containerRegistryAuthId: "{container_registry_auth_id}"')
     if ports is not None:
         ports = ports.replace(" ", "")
         input_fields.append(f'ports: "{ports}"')
@@ -362,6 +366,13 @@ def generate_pod_deployment_mutation(
             id
             lastStatusChange
             imageName
+            containerDiskInGb
+            dockerArgs
+            env
+            port
+            ports
+            volumeInGb
+            volumeMountPath
             machine {{
               podHostId
             }}

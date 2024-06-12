@@ -296,7 +296,7 @@ async def _run_job_on_new_instance(
                 offer.backend.value,
                 offer.region,
             )
-            continue
+            break
     return None
 
 
