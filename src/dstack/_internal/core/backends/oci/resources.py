@@ -559,6 +559,8 @@ def get_or_create_security_group(
 def update_security_group_rules_for_runner_instances(
     security_group_id: str, client: oci.core.VirtualNetworkClient
 ) -> None:
+    # These rules are combined with subnet's default Security List that allows
+    # ingress TCP on port 22 from anywhere
     rules = [
         SecurityRule(
             description="Allow all traffic within this security group",
