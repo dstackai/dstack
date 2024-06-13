@@ -152,7 +152,7 @@ There are two ways to configure AWS: using an access key or using the default cr
 
 ??? info "Private subnets"
     By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.
-    If you want `dstack` to use private subnets, set `public_ips` to `false`."
+    If you want `dstack` to use private subnets, set `public_ips` to `false`.
 
     ```yaml
     projects:
@@ -291,11 +291,7 @@ There are two ways to configure GCP: using a service account or using the defaul
 
 === "Service account"
 
-    To create a service account, follow [this guide :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/service-accounts-create).
-    Make sure to grant it the `Service Account User` and `Compute Admin` roles.
-
-    After setting up the service account [create a key :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/keys-create-delete) for it
-    and download the corresponding JSON file.
+    To create a service account, follow [this guide :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/service-accounts-create). After setting up the service account [create a key :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/keys-create-delete) for it and download the corresponding JSON file.
 
     Then go ahead and configure the backend by specifying the downloaded file path.
 
@@ -315,6 +311,14 @@ There are two ways to configure GCP: using a service account or using the defaul
     </div>
 
 === "Default credentials"
+
+    Enable GCP application default credentials:
+
+    ```shell
+    gcloud auth application-default login 
+    ```
+
+    Then configure the backend like this:
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -398,10 +402,21 @@ gcloud projects list --format="json(projectId)"
     compute.subnetworks.use
     compute.subnetworks.useExternalIp
     compute.zoneOperations.get
+    ```
+
+??? info "Permissions for running TPUs"
+    Running TPUs also requires the following permissions:
+
+    ```
     tpu.nodes.create
     tpu.nodes.delete
     tpu.nodes.get
+    tpu.operations.get
+    tpu.operations.list
     ```
+
+    You also need to have the `serviceAccountUser` role granted.
+    `dstack` will run TPUs under the default service account, so you don't need to create one.
 
 ### OCI
 
