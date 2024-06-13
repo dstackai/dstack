@@ -259,7 +259,7 @@ async def _run_job_on_new_instance(
     )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
-    for backend, offer in offers[:15]:
+    for backend, offer in offers[:3]:
         logger.debug(
             "%s: trying %s in %s/%s for $%0.4f per hour",
             fmt(job_model),
@@ -296,7 +296,7 @@ async def _run_job_on_new_instance(
                 offer.backend.value,
                 offer.region,
             )
-            break
+            continue
     return None
 
 

@@ -85,13 +85,8 @@ class RunpodApiClient:
         pod_id: str,
         image_name: str,
         container_disk_in_gb: int,
-        docker_args: str,
-        env: List[str],
-        port: str,
-        ports: str,
-        volume_in_gb: int,
-        volume_mount_path: str,
         container_registry_auth_id: str,
+        volume_in_gb: int = 0,
     ) -> int:
         resp = self._make_request(
             {
@@ -99,15 +94,10 @@ class RunpodApiClient:
                 mutation {{
                     podEditJob(input: {{
                         podId: "{pod_id}"
-                        dockerArgs: "{docker_args}"
                         imageName: "{image_name}"
-                        env: {env}
-                        port: "{port}"
-                        ports: "{ports}"
                         containerDiskInGb: {container_disk_in_gb}
-                        volumeInGb: {volume_in_gb}
-                        volumeMountPath: "{volume_mount_path}"
                         containerRegistryAuthId: "{container_registry_auth_id}"
+                        volumeInGb: {volume_in_gb}
                     }}) {{
                         id
                     }}
@@ -366,13 +356,6 @@ def generate_pod_deployment_mutation(
             id
             lastStatusChange
             imageName
-            containerDiskInGb
-            dockerArgs
-            env
-            port
-            ports
-            volumeInGb
-            volumeMountPath
             machine {{
               podHostId
             }}

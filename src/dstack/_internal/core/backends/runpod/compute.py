@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from dstack._internal.core.backends.base import Compute
@@ -27,7 +27,7 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-CONTAINER_REGISTRY_AUTH_DELETE_TIMEOUT = 60 * 60  # 1 hour
+CONTAINER_REGISTRY_AUTH_DELETE_TIMEOUT = 60  # 60 seconds
 CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 1 day
 
 
@@ -76,10 +76,9 @@ class RunpodCompute(Compute):
         authorized_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-        # container_registry_auth_id = self._generate_container_registry_auth_id(
-        #     job.job_spec.registry_auth
-        # )
-        container_registry_auth_id = None
+        container_registry_auth_id = self._generate_container_registry_auth_id(
+            job.job_spec.registry_auth
+        )
         resp = self.api_client.create_pod(
             name=instance_config.instance_name,
             image_name=job.job_spec.image_name,
@@ -94,32 +93,14 @@ class RunpodCompute(Compute):
             ports="10022/tcp",
             bid_per_gpu=instance_offer.price if instance_offer.instance.resources.spot else None,
         )
-        raise Exception("123")
 
         instance_id = resp["id"]
-        instance_id = self.api_client.edit_pod(
-            pod_id=instance_id,
-            image_name=resp["imageName"],
-            container_disk_in_gb=resp["containerDiskInGb"],
-            docker_args=resp["dockerArgs"],
-            env=resp["env"],
-            port=resp["port"],
-            ports=resp["ports"],
-            volume_in_gb=resp["volumeInGb"],
-            volume_mount_path=resp["volumeMountPath"],
-            container_registry_auth_id=container_registry_auth_id,
-        )
+
         if container_registry_auth_id is not None:
             instance_id = self.api_client.edit_pod(
                 pod_id=instance_id,
-                image_name=resp["imageName"],
-                container_disk_in_gb=resp["containerDiskInGb"],
-                docker_args=resp["dockerArgs"],
-                env=resp["env"],
-                port=resp["port"],
-                ports=resp["ports"],
-                volume_in_gb=resp["volumeInGb"],
-                volume_mount_path=resp["volumeMountPath"],
+                image_name=job.job_spec.image_name,
+                container_disk_in_gb=disk_size,
                 container_registry_auth_id=container_registry_auth_id,
             )
             self._instance_id_to_container_registry_auth_id_mapping[instance_id] = (
@@ -152,10 +133,9 @@ class RunpodCompute(Compute):
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
-        self._delete_container_registry_auth_for_instance_id(instance_id)
-
         try:
             self.api_client.terminate_pod(instance_id)
+            self._delete_container_registry_auth_for_instance_id(instance_id)
         except BackendError as e:
             if e.args[0] == "Instance Not Found":
                 logger.debug("The instance with name %s not found", instance_id)
@@ -205,12 +185,19 @@ class RunpodCompute(Compute):
             except (IndexError, ValueError):
                 continue
 
-            create_time = datetime.fromtimestamp(timestamp)
+            create_time = datetime.fromtimestamp(timestamp, tz=timezone.utc)
             if create_time < get_current_datetime() - timedelta(
                 seconds=CONTAINER_REGISTRY_AUTH_DELETE_TIMEOUT
             ):
-                self.api_client.delete_container_registry_auth(container_registry_auth["id"])
-                deleted_ids.add(container_registry_auth["id"])
+                try:
+                    self.api_client.delete_container_registry_auth(container_registry_auth["id"])
+                    deleted_ids.add(container_registry_auth["id"])
+                except Exception as e:
+                    logger.warning(
+                        "Failed to delete container registry auth with id %s: %s",
+                        container_registry_auth["id"],
+                        e,
+                    )
 
         # Remove stale records from mapping in case when termination was not called for some reason to avoid memory leak
         for (
@@ -218,7 +205,7 @@ class RunpodCompute(Compute):
             container_registry_auth_id,
         ) in self._instance_id_to_container_registry_auth_id_mapping.items():
             if container_registry_auth_id in deleted_ids:
-                self._instance_id_to_container_registry_auth_id_mapping.pop(instance_id, None)
+                self._instance_id_to_container_registry_auth_id_mapping.pop(instance_id)
 
 
 def get_docker_args(authorized_keys: List[str]) -> str:
