@@ -28,7 +28,7 @@ func TestDocker_SSHServer(t *testing.T) {
 		sshPort:  nextPort(),
 	}
 
-	timeout := 60 // seconds
+	timeout := 180 // seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
@@ -54,7 +54,7 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 		publicSSHKey: string(publicBytes),
 	}
 
-	timeout := 60 // seconds
+	timeout := 180 // seconds
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 

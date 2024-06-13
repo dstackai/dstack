@@ -11,6 +11,11 @@ on:
     branches:
       - 'master'
   workflow_dispatch:
+    inputs:
+      intergation-tests:
+        type: boolean
+        required: true
+        default: false
 
 env:
   BUILD_INCREMENT: 150
@@ -79,11 +84,19 @@ jobs:
           args: --timeout=20m
           working-directory: runner
       - name: Test
+        # Do not run slow integration tests automatically.
+        # Slow tests can be run manually via workflow_dispatch when required.
         run: |
+          SHORT="-short"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.intergation-tests }}" == "true" ]]; then
+              SHORT=""
+            fi
+          fi
           go version
           go fmt $(go list ./... | grep -v /vendor/)
           go vet $(go list ./... | grep -v /vendor/)
-          go test -race $(go list ./... | grep -v /vendor/)
+          go test $SHORT -race $(go list ./... | grep -v /vendor/)
 
   runner-compile:
     needs: [runner-test]
