@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import List, Optional
 
 from dstack._internal.core.backends.base import Compute
@@ -27,12 +27,10 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-CONTAINER_REGISTRY_AUTH_DELETE_TIMEOUT = 60  # 60 seconds
-CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 1 day
+CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 
 
 class RunpodCompute(Compute):
-    _instance_id_to_container_registry_auth_id_mapping = {}
     _last_cleanup_time = None
 
     def __init__(self, config):
@@ -103,9 +101,6 @@ class RunpodCompute(Compute):
                 container_disk_in_gb=disk_size,
                 container_registry_auth_id=container_registry_auth_id,
             )
-            self._instance_id_to_container_registry_auth_id_mapping[instance_id] = (
-                container_registry_auth_id
-            )
 
         if (
             self._last_cleanup_time is None
@@ -135,7 +130,6 @@ class RunpodCompute(Compute):
     ) -> None:
         try:
             self.api_client.terminate_pod(instance_id)
-            self._delete_container_registry_auth_for_instance_id(instance_id)
         except BackendError as e:
             if e.args[0] == "Instance Not Found":
                 logger.debug("The instance with name %s not found", instance_id)
@@ -161,51 +155,20 @@ class RunpodCompute(Compute):
         if registry_auth is None:
             return None
 
-        name = f"{uuid.uuid4().hex}#{int(get_current_datetime().timestamp())}"
         return self.api_client.add_container_registry_auth(
-            name, registry_auth.username, registry_auth.password
+            uuid.uuid4().hex, registry_auth.username, registry_auth.password
         )
-
-    def _delete_container_registry_auth_for_instance_id(self, instance_id: str) -> None:
-        container_registry_auth_id = self._instance_id_to_container_registry_auth_id_mapping.pop(
-            instance_id, None
-        )
-
-        if container_registry_auth_id is not None:
-            self.api_client.delete_container_registry_auth(container_registry_auth_id)
 
     def _clean_stale_container_registry_auths(self) -> None:
         container_registry_auths = self.api_client.get_container_registry_auths()
 
-        deleted_ids = set()
-
+        # Container_registry_auths sorted by creation time so try to delete the oldest first
+        # when we reach container_registry_auths that is still in use, we stop
         for container_registry_auth in container_registry_auths:
             try:
-                timestamp = float(container_registry_auth["name"].rsplit("#", 1)[1])
-            except (IndexError, ValueError):
-                continue
-
-            create_time = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-            if create_time < get_current_datetime() - timedelta(
-                seconds=CONTAINER_REGISTRY_AUTH_DELETE_TIMEOUT
-            ):
-                try:
-                    self.api_client.delete_container_registry_auth(container_registry_auth["id"])
-                    deleted_ids.add(container_registry_auth["id"])
-                except Exception as e:
-                    logger.warning(
-                        "Failed to delete container registry auth with id %s: %s",
-                        container_registry_auth["id"],
-                        e,
-                    )
-
-        # Remove stale records from mapping in case when termination was not called for some reason to avoid memory leak
-        for (
-            instance_id,
-            container_registry_auth_id,
-        ) in self._instance_id_to_container_registry_auth_id_mapping.items():
-            if container_registry_auth_id in deleted_ids:
-                self._instance_id_to_container_registry_auth_id_mapping.pop(instance_id)
+                self.api_client.delete_container_registry_auth(container_registry_auth["id"])
+            except Exception:
+                break
 
 
 def get_docker_args(authorized_keys: List[str]) -> str:
