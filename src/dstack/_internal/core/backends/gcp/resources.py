@@ -205,7 +205,7 @@ def create_gateway_firewall_rules(
 
     allowed_ports = compute_v1.Allowed()
     allowed_ports.I_p_protocol = "tcp"
-    allowed_ports.ports = ["0-65535"]
+    allowed_ports.ports = ["22", "80", "443"]
 
     firewall_rule.allowed = [allowed_ports]
     firewall_rule.source_ranges = ["0.0.0.0/0"]
