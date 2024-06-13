@@ -136,7 +136,7 @@ When the run finishes, the instance remains idle for the configured time (by def
 You can change the default idle duration by using ``--idle-duration DURATION`` with `dstack run`, or
 set `termination_idle_duration` in the configuration or profile.
 
-An idle instance can be destroyed at any time via `dstack pool remove INSTANCE_NAME`.
+An idle instance can be destroyed at any time via `dstack pool rm INSTANCE_NAME`.
 
 ### Profiles
 

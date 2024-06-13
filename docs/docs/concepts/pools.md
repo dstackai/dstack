@@ -96,12 +96,12 @@ Once you've added multiple instances with the same network value, you can use th
 
 If the instance remains idle for the configured idle duration, `dstack` removes it and deletes all cloud resources.
 
-To remove an instance from the pool manually, use the `dstack pool remove` command. 
+To remove an instance from the pool manually, use the `dstack pool rm` command. 
 
 <div class="termy">
 
 ```shell
-$ dstack pool remove &lt;instance name&gt;
+$ dstack pool rm &lt;instance name&gt;
 ```
 
 </div>
