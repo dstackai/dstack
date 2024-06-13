@@ -85,27 +85,13 @@ def pretty_resources(
     """
     parts = []
     if cpus is not None:
-        if isinstance(cpus, int):
-            if cpus > 0:
-                parts.append(f"{cpus}xCPU")
-        else:
-            parts.append(f"{cpus}xCPU")
+        parts.append(f"{cpus}xCPU")
     if memory is not None:
-        if isinstance(memory, str):
-            memory_value = int(memory[:-2])
-            if memory_value > 0:
-                parts.append(f"{memory}")
-        else:
-            parts.append(f"{memory}")
+        parts.append(f"{memory}")
     if gpu_count:
         gpu_parts = []
         if gpu_memory is not None:
-            if isinstance(gpu_memory, str):
-                gpu_memory_value = int(gpu_memory[:-2])
-                if gpu_memory_value > 0:
-                    parts.append(f"{gpu_memory}")
-            else:
-                gpu_parts.append(f"{gpu_memory}")
+            gpu_parts.append(f"{gpu_memory}")
         if total_gpu_memory is not None:
             gpu_parts.append(f"total {total_gpu_memory}")
         if compute_capability is not None:

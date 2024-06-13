@@ -139,11 +139,6 @@ class GCPCompute(Compute):
             config=self.config,
             region=instance_offer.region,
         )
-        commands = get_shim_commands(authorized_keys=authorized_keys)
-        startup_script = " ".join([" && ".join(commands)])
-        startup_script = "#! /bin/bash\n" + startup_script
-        instance_id = f"tpu-{instance_config.instance_name}"
-
         labels = {
             "owner": "dstack",
             "dstack_project": instance_config.project_name.lower(),
@@ -156,6 +151,8 @@ class GCPCompute(Compute):
             else False
         )
         if tpu:
+            instance_id = f"tpu-{instance_config.instance_name}"
+            startup_script = _get_tpu_startup_script(authorized_keys)
             for zone in _get_instance_zones(instance_offer):
                 tpu_node = gcp_resources.create_tpu_node_struct(
                     instance_name=instance_offer.instance.name,
@@ -422,6 +419,13 @@ def _get_instance_zones(instance_offer: InstanceOffer) -> List[str]:
             continue
         zones.append(offer.region)
     return zones
+
+
+def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
+    commands = get_shim_commands(authorized_keys=authorized_keys)
+    startup_script = " ".join([" && ".join(commands)])
+    startup_script = "#! /bin/bash\n" + startup_script
+    return startup_script
 
 
 def _is_tpu(name: str) -> bool:
