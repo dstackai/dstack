@@ -6,6 +6,8 @@ from typing import Dict, List, Optional
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
 from google.api_core.extended_operation import ExtendedOperation
+from google.api_core.operation import Operation
+from google.cloud import tpu_v2
 
 import dstack.version as version
 from dstack._internal.core.errors import ComputeError
@@ -278,3 +280,32 @@ def generate_random_resource_name(length: int = 40) -> str:
     return random.choice(string.ascii_lowercase) + "".join(
         random.choice(string.ascii_lowercase + string.digits) for _ in range(length)
     )
+
+
+def create_tpu_node_struct(
+    instance_name: str,
+    startup_script: str,
+    authorized_keys: List[str],
+    spot: bool,
+    labels: Dict[str, str],
+) -> tpu_v2.Node:
+    node = tpu_v2.Node()
+    if spot:
+        node.scheduling_config = tpu_v2.SchedulingConfig(preemptible=True)
+    node.accelerator_type = instance_name
+    node.runtime_version = "tpu-ubuntu2204-base"
+    node.network_config = tpu_v2.NetworkConfig(enable_external_ips=True)
+    ssh_keys = "\n".join(f"ubuntu:{key}" for key in authorized_keys)
+    node.metadata = {"ssh-keys": ssh_keys, "startup-script": startup_script}
+    node.labels = labels
+    return node
+
+
+def wait_for_operation(operation: Operation, verbose_name: str = "operation", timeout: int = 300):
+    try:
+        result = operation.result(timeout=timeout)
+    except Exception as e:
+        logger.error("Error during %s: %s", verbose_name, e)
+        logger.error("Operation ID: %s", operation)
+        raise operation.exception() or RuntimeError(str(e))
+    return result

@@ -91,6 +91,7 @@ GCP_DEPS = [
     "google-cloud-logging>=2.0.0",
     "google-api-python-client>=2.80.0",
     "google-cloud-billing>=1.11.0",
+    "google-cloud-tpu>=1.18.3",
 ]
 
 DATACRUNCH_DEPS = ["datacrunch"]
