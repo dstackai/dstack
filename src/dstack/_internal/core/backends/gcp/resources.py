@@ -241,24 +241,6 @@ def get_accelerators(
     return [accelerator_config]
 
 
-def wait_for_extended_operation(
-    operation: ExtendedOperation, verbose_name: str = "operation", timeout: int = 300
-):
-    result = operation.result(timeout=timeout)
-
-    if operation.error_code:
-        logger.error(
-            "Error during %s: [Code: %s]: %s",
-            verbose_name,
-            operation.error_code,
-            operation.error_message,
-        )
-        logger.error("Operation ID: %s", operation.name)
-        raise operation.exception() or RuntimeError(operation.error_message)
-
-    return result
-
-
 NAME_PATTERN = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
 
 LABEL_VALUE_PATTERN = re.compile(r"^[-a-z0-9]{0,63}$")
@@ -288,24 +270,51 @@ def create_tpu_node_struct(
     authorized_keys: List[str],
     spot: bool,
     labels: Dict[str, str],
+    subnetwork: Optional[str] = None,
 ) -> tpu_v2.Node:
     node = tpu_v2.Node()
     if spot:
         node.scheduling_config = tpu_v2.SchedulingConfig(preemptible=True)
     node.accelerator_type = instance_name
     node.runtime_version = "tpu-ubuntu2204-base"
-    node.network_config = tpu_v2.NetworkConfig(enable_external_ips=True)
+    # subnetwork determines the network, so network shouldn't be specified
+    node.network_config = tpu_v2.NetworkConfig(
+        enable_external_ips=True,
+        subnetwork=subnetwork,
+    )
     ssh_keys = "\n".join(f"ubuntu:{key}" for key in authorized_keys)
     node.metadata = {"ssh-keys": ssh_keys, "startup-script": startup_script}
     node.labels = labels
     return node
 
 
+def wait_for_extended_operation(
+    operation: ExtendedOperation, verbose_name: str = "operation", timeout: int = 300
+):
+    result = operation.result(timeout=timeout)
+
+    if operation.error_code:
+        # Write only debug logs here.
+        # The unexpected errors will be propagated and logged appropriatly by the caller.
+        logger.debug(
+            "Error during %s: [Code: %s]: %s",
+            verbose_name,
+            operation.error_code,
+            operation.error_message,
+        )
+        logger.debug("Operation ID: %s", operation.name)
+        raise operation.exception() or RuntimeError(operation.error_message)
+
+    return result
+
+
 def wait_for_operation(operation: Operation, verbose_name: str = "operation", timeout: int = 300):
     try:
         result = operation.result(timeout=timeout)
     except Exception as e:
-        logger.error("Error during %s: %s", verbose_name, e)
-        logger.error("Operation ID: %s", operation)
+        # Write only debug logs here.
+        # The unexpected errors will be propagated and logged appropriatly by the caller.
+        logger.debug("Error during %s: %s", verbose_name, e)
+        logger.debug("Operation ID: %s", operation)
         raise operation.exception() or RuntimeError(str(e))
     return result

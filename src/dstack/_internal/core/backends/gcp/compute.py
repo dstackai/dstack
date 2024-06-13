@@ -160,8 +160,8 @@ class GCPCompute(Compute):
                     authorized_keys=authorized_keys,
                     spot=instance_offer.instance.resources.spot,
                     labels=labels,
+                    subnetwork=subnetwork,
                 )
-
                 create_node_request = tpu_v2.CreateNodeRequest(
                     parent=f"projects/{self.config.project_id}/locations/{zone}",
                     node_id=instance_id,
