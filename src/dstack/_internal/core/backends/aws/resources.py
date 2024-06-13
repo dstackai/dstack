@@ -234,10 +234,12 @@ def create_gateway_security_group(
                 "IpProtocol": "tcp",
                 "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
             },
-            {
-                "IpProtocol": "-1",
-            },
         ],
+    )
+
+    ec2_client.authorize_security_group_egress(
+        GroupId=group_id,
+        IpPermissions=[{"IpProtocol": "-1"}],
     )
     return group_id
 
