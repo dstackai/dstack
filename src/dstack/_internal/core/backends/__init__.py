@@ -5,6 +5,7 @@ BACKENDS_WITH_MULTINODE_SUPPORT = [
     BackendType.AZURE,
     BackendType.GCP,
     BackendType.REMOTE,
+    BackendType.OCI,
 ]
 BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
     BackendType.AWS,

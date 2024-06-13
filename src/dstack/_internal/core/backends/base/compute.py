@@ -99,8 +99,11 @@ def get_instance_name(run: Run, job: Job) -> str:
     return f"{run.project_name.lower()}-{job.job_spec.job_name}"
 
 
-def get_user_data(authorized_keys: List[str]) -> str:
-    commands = get_shim_commands(authorized_keys)
+def get_user_data(
+    authorized_keys: List[str], backend_specific_commands: Optional[List[str]] = None
+) -> str:
+    shim_commands = get_shim_commands(authorized_keys)
+    commands = (backend_specific_commands or []) + shim_commands
     return get_cloud_config(
         runcmd=[["sh", "-c", " && ".join(commands)]],
         ssh_authorized_keys=authorized_keys,
