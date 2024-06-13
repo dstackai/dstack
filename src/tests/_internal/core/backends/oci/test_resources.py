@@ -1,6 +1,9 @@
+import datetime
+
+import oci
 import pytest
 
-from dstack._internal.core.backends.oci.resources import ShapesQuota
+from dstack._internal.core.backends.oci.resources import SecurityRule, ShapesQuota
 
 
 class TestShapesQuota:
@@ -47,3 +50,41 @@ class TestShapesQuota:
     )
     def test_is_within_domain_quota(self, shape: str, domain: str, is_within_quota: str):
         assert is_within_quota == self.SAMPLE_QUOTA.is_within_domain_quota(shape, domain)
+
+
+class TestCompareSecurityRulesAfterConversion:
+    def test_equal(self) -> None:
+        first = SecurityRule(
+            direction=oci.core.models.SecurityRule.DIRECTION_INGRESS,
+            protocol="all",
+            source_type=oci.core.models.SecurityRule.SOURCE_TYPE_CIDR_BLOCK,
+            source="0.0.0.0/0",
+        )
+        second = oci.core.models.SecurityRule(
+            direction=oci.core.models.SecurityRule.DIRECTION_INGRESS,
+            protocol="all",
+            source_type=oci.core.models.SecurityRule.SOURCE_TYPE_CIDR_BLOCK,
+            source="0.0.0.0/0",
+            is_stateless=False,
+            id="AAAAAA",
+            time_created=datetime.datetime.now(),
+        )
+        assert first == SecurityRule.from_sdk_rule(second)
+
+    def test_unequal(self) -> None:
+        first = SecurityRule(
+            direction=oci.core.models.SecurityRule.DIRECTION_INGRESS,
+            protocol="all",
+            source_type=oci.core.models.SecurityRule.SOURCE_TYPE_CIDR_BLOCK,
+            source="0.0.0.0/0",
+        )
+        second = oci.core.models.SecurityRule(
+            direction=oci.core.models.SecurityRule.DIRECTION_INGRESS,
+            protocol="all",
+            source_type=oci.core.models.SecurityRule.SOURCE_TYPE_CIDR_BLOCK,
+            source="10.10.10.0/24",
+            is_stateless=False,
+            id="AAAAAA",
+            time_created=datetime.datetime.now(),
+        )
+        assert first != SecurityRule.from_sdk_rule(second)

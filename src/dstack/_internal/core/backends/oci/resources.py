@@ -1,9 +1,10 @@
 import base64
+import dataclasses
 import time
 from concurrent.futures import Executor, ThreadPoolExecutor, as_completed
 from functools import reduce
 from itertools import islice
-from typing import Dict, Iterable, List, Mapping, Optional, Set, Tuple
+from typing import Collection, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 import oci
 
@@ -11,14 +12,47 @@ from dstack import version
 from dstack._internal.core.backends.oci.region import OCIRegionClient
 from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceOffer
+from dstack._internal.utils.common import split_chunks
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 LIST_SHAPES_MAX_LIMIT = 100
 CAPACITY_REPORT_MAX_SHAPES = 10  # undocumented, found by experiment
+LIST_SECURITY_RULES_MAX_LIMIT = 100
+REMOVE_SECURITY_RULES_MAX_CHUNK_SIZE = 25
+ADD_SECURITY_RULES_MAX_CHUNK_SIZE = 25
 VCN_CIDR = "10.0.0.0/16"
 WAIT_FOR_COMPARTMENT_ATTEMPS = 36
 WAIT_FOR_COMPARTMENT_DELAY = 5
+
+
+@dataclasses.dataclass(frozen=True)
+class SecurityRule:
+    """
+    A rule in a security group. This class is needed as an intermediate representation,
+    as OCI SDK provides several security rule classes that are not mutually comparable.
+    """
+
+    direction: str
+    protocol: str
+    description: Optional[str] = None
+    destination: Optional[str] = None
+    destination_type: Optional[str] = None
+    icmp_options: Optional[oci.core.models.IcmpOptions] = None
+    is_stateless: bool = False
+    source: Optional[str] = None
+    source_type: Optional[str] = None
+    tcp_options: Optional[oci.core.models.TcpOptions] = None
+    udp_options: Optional[oci.core.models.UdpOptions] = None
+
+    @classmethod
+    def from_sdk_rule(cls, rule: oci.core.models.SecurityRule) -> "SecurityRule":
+        fields = {field.name: getattr(rule, field.name) for field in dataclasses.fields(cls)}
+        fields["is_stateless"] = bool(fields["is_stateless"])
+        return SecurityRule(**fields)
+
+    def to_sdk_add_rule_details(self) -> oci.core.models.AddSecurityRuleDetails:
+        return oci.core.models.AddSecurityRuleDetails(**dataclasses.asdict(self))
 
 
 class ShapesQuota:
@@ -241,6 +275,7 @@ def launch_instance(
     availability_domain: str,
     compartment_id: str,
     subnet_id: str,
+    security_group_id: str,
     display_name: str,
     cloud_init_user_data: str,
     shape: str,
@@ -251,7 +286,9 @@ def launch_instance(
         oci.core.models.LaunchInstanceDetails(
             availability_domain=availability_domain,
             compartment_id=compartment_id,
-            create_vnic_details=oci.core.models.CreateVnicDetails(subnet_id=subnet_id),
+            create_vnic_details=oci.core.models.CreateVnicDetails(
+                subnet_id=subnet_id, nsg_ids=[security_group_id]
+            ),
             display_name=display_name,
             instance_options=oci.core.models.InstanceOptions(
                 are_legacy_imds_endpoints_disabled=True
@@ -502,3 +539,89 @@ def update_route_table(
             ]
         ),
     ).data
+
+
+def get_or_create_security_group(
+    name: str, vcn_id: str, compartment_id: str, client: oci.core.VirtualNetworkClient
+) -> oci.core.models.NetworkSecurityGroup:
+    if security_groups := client.list_network_security_groups(
+        display_name=name, vcn_id=vcn_id, compartment_id=compartment_id
+    ).data:
+        return security_groups[0]
+
+    return client.create_network_security_group(
+        oci.core.models.CreateNetworkSecurityGroupDetails(
+            display_name=name, vcn_id=vcn_id, compartment_id=compartment_id
+        )
+    ).data
+
+
+def update_security_group_rules_for_runner_instances(
+    security_group_id: str, client: oci.core.VirtualNetworkClient
+) -> None:
+    rules = [
+        SecurityRule(
+            description="Allow all traffic within this security group",
+            direction=oci.core.models.AddSecurityRuleDetails.DIRECTION_INGRESS,
+            source_type=oci.core.models.AddSecurityRuleDetails.SOURCE_TYPE_NETWORK_SECURITY_GROUP,
+            source=security_group_id,
+            protocol="all",
+        ),
+    ]
+    update_security_group_rules(security_group_id, rules, client)
+
+
+def update_security_group_rules(
+    security_group_id: str, rules: Collection[SecurityRule], client: oci.core.VirtualNetworkClient
+) -> None:
+    """
+    Ensure the group `security_group_id` has all `rules` and no other rules
+    """
+
+    existing_rules = list_security_group_rules(security_group_id, client)
+    if len(existing_rules) == len(rules) and set(
+        map(SecurityRule.from_sdk_rule, existing_rules)
+    ) == set(rules):
+        return
+
+    add_security_group_rules(security_group_id, rules, client)
+    remove_security_group_rules(security_group_id, (r.id for r in existing_rules), client)
+
+
+def list_security_group_rules(
+    security_group_id: str, client: oci.core.VirtualNetworkClient
+) -> List[oci.core.models.SecurityRule]:
+    result = []
+    page_id = oci.core.virtual_network_client.missing  # first page
+
+    while page_id is not None:
+        resp = client.list_network_security_group_security_rules(
+            security_group_id, page=page_id, limit=LIST_SECURITY_RULES_MAX_LIMIT
+        )
+        result.extend(resp.data)
+        page_id = resp.headers.get("opc-next-page")
+
+    return result
+
+
+def add_security_group_rules(
+    security_group_id: str, rules: Iterable[SecurityRule], client: oci.core.VirtualNetworkClient
+) -> None:
+    rules_details = map(SecurityRule.to_sdk_add_rule_details, rules)
+    for chunk in split_chunks(rules_details, ADD_SECURITY_RULES_MAX_CHUNK_SIZE):
+        client.add_network_security_group_security_rules(
+            security_group_id,
+            oci.core.models.AddNetworkSecurityGroupSecurityRulesDetails(security_rules=chunk),
+        )
+
+
+def remove_security_group_rules(
+    security_group_id: str, rule_ids: Iterable[str], client: oci.core.VirtualNetworkClient
+) -> None:
+    for chunk in split_chunks(rule_ids, REMOVE_SECURITY_RULES_MAX_CHUNK_SIZE):
+        client.remove_network_security_group_security_rules(
+            security_group_id,
+            oci.core.models.RemoveNetworkSecurityGroupSecurityRulesDetails(
+                security_rule_ids=chunk
+            ),
+        )
