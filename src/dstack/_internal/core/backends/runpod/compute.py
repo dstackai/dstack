@@ -94,6 +94,10 @@ class RunpodCompute(Compute):
 
         instance_id = resp["id"]
 
+        # TODO: remove editPod once createPod supports docker's username and password
+        # editPod is temporary solution to set container_registry_auth_id because createPod does not
+        # support it currently. This will be removed once createPod supports container_registry_auth_id
+        # or username and password
         if container_registry_auth_id is not None:
             instance_id = self.api_client.edit_pod(
                 pod_id=instance_id,
