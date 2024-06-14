@@ -80,6 +80,33 @@ class RunpodApiClient:
         data = resp.json()["data"]
         return data["podRentInterruptable"] if bid_per_gpu else data["podFindAndDeployOnDemand"]
 
+    def edit_pod(
+        self,
+        pod_id: str,
+        image_name: str,
+        container_disk_in_gb: int,
+        container_registry_auth_id: str,
+        volume_in_gb: int = 0,
+    ) -> int:
+        resp = self._make_request(
+            {
+                "query": f"""
+                mutation {{
+                    podEditJob(input: {{
+                        podId: "{pod_id}"
+                        imageName: "{image_name}"
+                        containerDiskInGb: {container_disk_in_gb}
+                        containerRegistryAuthId: "{container_registry_auth_id}"
+                        volumeInGb: {volume_in_gb}
+                    }}) {{
+                        id
+                    }}
+                }}
+                """
+            }
+        )
+        return resp.json()["data"]["podEditJob"]["id"]
+
     def get_pod(self, pod_id: str) -> Dict:
         resp = self._make_request({"query": generate_pod_query(pod_id)})
         data = resp.json()
@@ -89,6 +116,56 @@ class RunpodApiClient:
         resp = self._make_request({"query": generate_pod_terminate_mutation(pod_id)})
         data = resp.json()
         return data["data"]
+
+    def get_container_registry_auths(self) -> List[Dict]:
+        resp = self._make_request(
+            {
+                "query": """
+                query myself {
+                    myself {
+                        containerRegistryCreds {
+                            id,
+                            name
+                        }
+                    }
+                }
+                """
+            }
+        )
+        return resp.json()["data"]["myself"]["containerRegistryCreds"]
+
+    def add_container_registry_auth(self, name: str, username: str, password: str) -> int:
+        resp = self._make_request(
+            {
+                "query": f"""
+                mutation {{
+                    saveRegistryAuth(
+                        input: {{
+                            name: "{name}",
+                            username: "{username}",
+                            password: "{password}"
+                        }}
+                    ) {{
+                        id
+                    }}
+                }}
+                """
+            }
+        )
+        return resp.json()["data"]["saveRegistryAuth"]["id"]
+
+    def delete_container_registry_auth(self, auth_id: str) -> None:
+        self._make_request(
+            {
+                "query": f"""
+                mutation {{
+                    deleteRegistryAuth(
+                        registryAuthId: "{auth_id}"
+                    )
+                }}
+                """
+            }
+        )
 
     def _make_request(self, data: Any = None) -> Response:
         try:
