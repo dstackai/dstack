@@ -431,7 +431,11 @@ def wait_until_compartment_active(id: str, regions: Mapping[str, OCIRegionClient
             time.sleep(WAIT_FOR_COMPARTMENT_DELAY)
 
     time_spent = int(time.time() - start_time)
-    msg = f"Compartment {id} did not become active in {time_spent}s. Giving up"
+    msg = (
+        f"Compartment {id} did not become active in {time_spent} seconds. "
+        "This can mean that it takes longer to activate, does not exist, "
+        "or the user does not have permission to access it"
+    )
     raise BackendError(msg)
 
 
