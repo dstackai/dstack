@@ -467,8 +467,29 @@ There are two ways to configure OCI: using client credentials or using the defau
 
 ??? info "Required OCI permissions"
 
+    This is an example of a restrictive policy for a group of `dstack` users:
+
     ```
-    ALLOW GROUP Administrators to manage all-resources IN TENANCY
+    Allow group <dstack-users> to read compartments in tenancy where target.compartment.name = '<dstack-compartment>'
+    Allow group <dstack-users> to read marketplace-community-listings in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage app-catalog-listing in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage instances in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage compute-capacity-reports in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage volumes in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage volume-attachments in compartment <dstack-compartment>
+    Allow group <dstack-users> to manage virtual-network-family in compartment <dstack-compartment>
+    ```
+
+    To use this policy, create a compartment for `dstack` and specify it in `~/.dstack/server/config.yml`.
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: default
+        compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
 
 ### Lambda
