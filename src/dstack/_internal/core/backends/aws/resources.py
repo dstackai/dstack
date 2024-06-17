@@ -217,11 +217,23 @@ def create_gateway_security_group(
         GroupId=group_id,
         IpPermissions=[
             {
-                "FromPort": 0,
-                "ToPort": 65535,
+                "FromPort": 22,
+                "ToPort": 22,
                 "IpProtocol": "tcp",
                 "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
-            }
+            },
+            {
+                "FromPort": 80,
+                "ToPort": 80,
+                "IpProtocol": "tcp",
+                "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+            },
+            {
+                "FromPort": 443,
+                "ToPort": 443,
+                "IpProtocol": "tcp",
+                "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+            },
         ],
     )
 
