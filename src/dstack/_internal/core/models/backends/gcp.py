@@ -13,6 +13,7 @@ class GCPConfigInfo(CoreModel):
     regions: Optional[List[str]] = None
     vpc_name: Optional[str] = None
     vpc_project_id: Optional[str] = None
+    public_ips: Optional[bool] = None
 
 
 class GCPServiceAccountCreds(CoreModel):
@@ -46,6 +47,7 @@ class GCPConfigInfoWithCredsPartial(CoreModel):
     regions: Optional[List[str]]
     vpc_name: Optional[str] = None
     vpc_project_id: Optional[str] = None
+    public_ips: Optional[bool]
 
 
 class GCPConfigValues(CoreModel):

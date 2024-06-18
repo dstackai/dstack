@@ -149,6 +149,12 @@ class GCPConfig(CoreModel):
         Optional[str],
         Field(description="The shared VPC hosted project ID. Required for shared VPC only"),
     ] = None
+    public_ips: Annotated[
+        Optional[bool],
+        Field(
+            description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
+        ),
+    ] = None
     creds: AnyGCPCreds = Field(..., description="The credentials", discriminator="type")
 
 
