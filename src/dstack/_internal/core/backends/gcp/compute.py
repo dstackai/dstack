@@ -22,14 +22,16 @@ from dstack._internal.core.errors import (
     NoCapacityError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.gateways import GatewayComputeConfiguration
+from dstack._internal.core.models.gateways import (
+    GatewayComputeConfiguration,
+    GatewayProvisioningData,
+)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
-    LaunchedGatewayInfo,
     Resources,
     SSHKey,
 )
@@ -272,7 +274,7 @@ class GCPCompute(Compute):
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
-    ) -> LaunchedGatewayInfo:
+    ) -> GatewayProvisioningData:
         if self.config.vpc_project_id is None:
             gcp_resources.create_gateway_firewall_rules(
                 firewalls_client=self.firewalls_client,
@@ -321,7 +323,7 @@ class GCPCompute(Compute):
         instance = self.instances_client.get(
             project=self.config.project_id, zone=zone, instance=configuration.instance_name
         )
-        return LaunchedGatewayInfo(
+        return GatewayProvisioningData(
             instance_id=configuration.instance_name,
             region=configuration.region,  # used for instance termination
             ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,

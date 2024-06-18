@@ -9,13 +9,19 @@ import requests
 import yaml
 
 from dstack._internal import settings
-from dstack._internal.core.models.gateways import GatewayComputeConfiguration
+from dstack._internal.core.models.gateways import (
+    GatewayComputeConfiguration,
+    GatewayProvisioningData,
+)
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    LaunchedGatewayInfo,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import (
+    VolumeComputeConfiguration,
+    VolumeProvisioningData,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -49,7 +55,10 @@ class Compute(ABC):
 
     @abstractmethod
     def terminate_instance(
-        self, instance_id: str, region: str, backend_data: Optional[str] = None
+        self,
+        instance_id: str,
+        region: str,
+        backend_data: Optional[str] = None,
     ) -> None:
         """
         Terminates an instance by `instance_id`. If instance does not exist,
@@ -83,13 +92,27 @@ class Compute(ABC):
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
-    ) -> LaunchedGatewayInfo:
+    ) -> GatewayProvisioningData:
         raise NotImplementedError()
 
     def terminate_gateway(
         self,
         instance_id: str,
         configuration: GatewayComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
+        raise NotImplementedError()
+
+    def create_volume(
+        self,
+        configuration: VolumeComputeConfiguration,
+    ) -> VolumeProvisioningData:
+        raise NotImplementedError()
+
+    def delete_volume(
+        self,
+        volume_id: str,
+        configuration: VolumeComputeConfiguration,
         backend_data: Optional[str] = None,
     ):
         raise NotImplementedError()

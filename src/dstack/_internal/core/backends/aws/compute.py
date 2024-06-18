@@ -22,25 +22,34 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, is_core_model_instance
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
+    GatewayProvisioningData,
 )
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    LaunchedGatewayInfo,
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import (
+    VolumeComputeConfiguration,
+    VolumeProvisioningData,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class GatewayAWSBackendData(CoreModel):
+class AWSGatewayBackendData(CoreModel):
     lb_arn: str
     tg_arn: str
     listener_arn: str
+
+
+class AWSVolumeBackendData(CoreModel):
+    volume_type: str
+    iops: int
 
 
 class AWSCompute(Compute):
@@ -97,9 +106,9 @@ class AWSCompute(Compute):
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
-        client = self.session.client("ec2", region_name=region)
+        ec2_client = self.session.client("ec2", region_name=region)
         try:
-            client.terminate_instances(InstanceIds=[instance_id])
+            ec2_client.terminate_instances(InstanceIds=[instance_id])
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
                 pass
@@ -112,7 +121,7 @@ class AWSCompute(Compute):
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
         project_name = instance_config.project_name
-        ec2 = self.session.resource("ec2", region_name=instance_offer.region)
+        ec2_resource = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         allocate_public_ip = self.config.allocate_public_ips
 
@@ -131,7 +140,7 @@ class AWSCompute(Compute):
             )
             subnet_id = subnets_ids[0]
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-            response = ec2.create_instances(
+            response = ec2_resource.create_instances(
                 **aws_resources.create_instances_struct(
                     disk_size=disk_size,
                     image_id=aws_resources.get_image_id(
@@ -201,8 +210,8 @@ class AWSCompute(Compute):
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
-    ) -> LaunchedGatewayInfo:
-        ec2 = self.session.resource("ec2", region_name=configuration.region)
+    ) -> GatewayProvisioningData:
+        ec2_resource = self.session.resource("ec2", region_name=configuration.region)
         ec2_client = self.session.client("ec2", region_name=configuration.region)
 
         tags = [
@@ -225,7 +234,7 @@ class AWSCompute(Compute):
             project_id=configuration.project_name,
             vpc_id=vpc_id,
         )
-        response = ec2.create_instances(
+        response = ec2_resource.create_instances(
             **aws_resources.create_instances_struct(
                 disk_size=10,
                 image_id=aws_resources.get_gateway_image_id(ec2_client),
@@ -244,7 +253,7 @@ class AWSCompute(Compute):
         instance.reload()  # populate instance.public_ip_address
         if configuration.certificate is None or configuration.certificate.type != "acm":
             ip_address = _get_instance_ip(instance, configuration.public_ip)
-            return LaunchedGatewayInfo(
+            return GatewayProvisioningData(
                 instance_id=instance.instance_id,
                 region=configuration.region,
                 ip_address=ip_address,
@@ -312,12 +321,12 @@ class AWSCompute(Compute):
         logger.debug("Created ALB Listener for gateway %s", configuration.instance_name)
 
         ip_address = _get_instance_ip(instance, configuration.public_ip)
-        return LaunchedGatewayInfo(
+        return GatewayProvisioningData(
             instance_id=instance.instance_id,
             region=configuration.region,
             ip_address=ip_address,
             hostname=lb_dns_name,
-            backend_data=GatewayAWSBackendData(
+            backend_data=AWSGatewayBackendData(
                 lb_arn=lb_arn,
                 tg_arn=tg_arn,
                 listener_arn=listener_arn,
@@ -346,7 +355,7 @@ class AWSCompute(Compute):
             return
 
         try:
-            backend_data_parsed = GatewayAWSBackendData.parse_raw(backend_data)
+            backend_data_parsed = AWSGatewayBackendData.parse_raw(backend_data)
         except ValidationError:
             logger.exception(
                 "Failed to terminate all gateway %s resources. backend_data parsing error.",
@@ -361,20 +370,69 @@ class AWSCompute(Compute):
         elb_client.delete_load_balancer(LoadBalancerArn=backend_data_parsed.lb_arn)
         logger.debug("Deleted ALB resources for gateway %s", configuration.instance_name)
 
+    def create_volume(
+        self,
+        configuration: VolumeComputeConfiguration,
+    ) -> VolumeProvisioningData:
+        ec2_client = self.session.client("ec2", region_name=configuration.region)
 
-def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
-    if instance_name.startswith("p"):
-        return quotas.get("P/OnDemand", 0) > 0
-    if instance_name.startswith("g"):
-        return quotas.get("G/OnDemand", 0) > 0
-    return quotas.get("Standard/OnDemand", 0) > 0
+        tags = [
+            {"Key": "Name", "Value": configuration.name},
+            {"Key": "owner", "Value": "dstack"},
+            {"Key": "dstack_project", "Value": configuration.project_name},
+        ]
 
+        zone = aws_resources.get_availability_zone(
+            ec2_client=ec2_client, region=configuration.region
+        )
+        if zone is None:
+            raise ComputeError(
+                f"Failed to find availability zone in region {configuration.region}"
+            )
 
-def _supported_instances(offer: InstanceOffer) -> bool:
-    for family in ["t2.small", "c5.", "m5.", "p3.", "g5.", "g4dn.", "p4d.", "p4de."]:
-        if offer.instance.name.startswith(family):
-            return True
-    return False
+        volume_type = "gp3"
+
+        logger.debug("Creating EBS volume %s", configuration.name)
+        response = ec2_client.create_volume(
+            Size=configuration.size_gb,
+            AvailabilityZone=zone,
+            VolumeType=volume_type,
+            TagSpecifications=[
+                {
+                    "ResourceType": "volume",
+                    "Tags": tags,
+                }
+            ],
+        )
+        logger.debug("Created EBS volume %s", configuration.name)
+
+        return VolumeProvisioningData(
+            volume_id=response["VolumeId"],
+            size_gb=response["Size"],
+            availability_zone=zone,
+            backend_data=AWSVolumeBackendData(
+                volume_type=response["VolumeType"],
+                iops=response["Iops"],
+            ).json(),
+        )
+
+    def delete_volume(
+        self,
+        volume_id: str,
+        configuration: VolumeComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
+        ec2_client = self.session.client("ec2", region_name=configuration.region)
+
+        logger.debug("Deleting EBS volume %s", configuration.name)
+        try:
+            ec2_client.delete_volume(VolumeId=volume_id)
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+                pass
+            else:
+                raise e
+        logger.debug("Deleted EBS volume %s", configuration.name)
 
 
 def get_vpc_id_subnet_id_or_error(
@@ -447,6 +505,21 @@ def _get_vpc_id_subnet_id_by_vpc_name_or_error(
     raise ComputeError(
         f"Failed to find private subnets with NAT for default VPC in region {region}"
     )
+
+
+def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
+    if instance_name.startswith("p"):
+        return quotas.get("P/OnDemand", 0) > 0
+    if instance_name.startswith("g"):
+        return quotas.get("G/OnDemand", 0) > 0
+    return quotas.get("Standard/OnDemand", 0) > 0
+
+
+def _supported_instances(offer: InstanceOffer) -> bool:
+    for family in ["t2.small", "c5.", "m5.", "p3.", "g5.", "g4dn.", "p4d.", "p4de."]:
+        if offer.instance.name.startswith(family):
+            return True
+    return False
 
 
 def _get_instance_ip(instance: Any, public_ip: bool) -> str:

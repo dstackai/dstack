@@ -43,14 +43,16 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.gateways import GatewayComputeConfiguration
+from dstack._internal.core.models.gateways import (
+    GatewayComputeConfiguration,
+    GatewayProvisioningData,
+)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
-    LaunchedGatewayInfo,
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
@@ -185,7 +187,7 @@ class AzureCompute(Compute):
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
-    ) -> LaunchedGatewayInfo:
+    ) -> GatewayProvisioningData:
         logger.info(
             "Launching %s gateway instance in %s...",
             configuration.instance_name,
@@ -224,7 +226,7 @@ class AzureCompute(Compute):
             resource_group=self.config.resource_group,
             vm=vm,
         )
-        return LaunchedGatewayInfo(
+        return GatewayProvisioningData(
             instance_id=vm.name,
             ip_address=public_ip,
             region=configuration.region,

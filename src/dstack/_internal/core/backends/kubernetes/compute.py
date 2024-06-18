@@ -23,7 +23,10 @@ from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.backends.base import BackendType
 
 # TODO: update import as KNOWN_GPUS becomes public
-from dstack._internal.core.models.gateways import GatewayComputeConfiguration
+from dstack._internal.core.models.gateways import (
+    GatewayComputeConfiguration,
+    GatewayProvisioningData,
+)
 from dstack._internal.core.models.instances import (
     Disk,
     Gpu,
@@ -31,7 +34,6 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceRuntime,
     InstanceType,
-    LaunchedGatewayInfo,
     Resources,
     SSHConnectionParams,
 )
@@ -210,7 +212,7 @@ class KubernetesCompute(Compute):
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
-    ) -> LaunchedGatewayInfo:
+    ) -> GatewayProvisioningData:
         # Gateway creation is currently limited to Kubernetes with Load Balancer support.
         # If the cluster does not support Load Balancer, the service will be provisioned but
         # the external IP/hostname will never be allocated.
@@ -290,7 +292,7 @@ class KubernetesCompute(Compute):
                 "Failed to get gateway hostname. "
                 "Ensure the Kubernetes cluster supports Load Balancer services."
             )
-        return LaunchedGatewayInfo(
+        return GatewayProvisioningData(
             instance_id=instance_name,
             ip_address=hostname,
             region="-",

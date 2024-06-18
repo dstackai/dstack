@@ -119,19 +119,19 @@ async def create_gateway_compute(
         certificate=configuration.certificate,
     )
 
-    info = await run_async(
+    gpd = await run_async(
         backend_compute.create_gateway,
         compute_configuration,
     )
 
     return GatewayComputeModel(
         backend_id=backend_id,
-        region=info.region,
-        ip_address=info.ip_address,
-        instance_id=info.instance_id,
-        hostname=info.hostname,
+        region=gpd.region,
+        ip_address=gpd.ip_address,
+        instance_id=gpd.instance_id,
+        hostname=gpd.hostname,
         configuration=compute_configuration.json(),
-        backend_data=info.backend_data,
+        backend_data=gpd.backend_data,
         ssh_private_key=gateway_ssh_private_key,
         ssh_public_key=gateway_ssh_public_key,
     )

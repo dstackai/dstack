@@ -114,11 +114,3 @@ class InstanceOffer(CoreModel):
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
     instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
-
-
-class LaunchedGatewayInfo(CoreModel):
-    instance_id: str
-    ip_address: str
-    region: str
-    hostname: Optional[str] = None
-    backend_data: Optional[str] = None  # backend-specific data in json

@@ -86,6 +86,23 @@ async def wait_to_lock(lock: asyncio.Lock, locked: Set[KeyT], key: KeyT, *, dela
         await asyncio.sleep(delay)
 
 
+async def wait_to_lock_many(
+    lock: asyncio.Lock, locked: Set[KeyT], keys: Iterable[KeyT], *, delay: float = 0.1
+):
+    """
+    Retry locking until all the keys are locked.
+    Lock is released during the sleep.
+    """
+    left_to_lock = keys.copy()
+    while len(left_to_lock) > 0:
+        async with lock:
+            for key in left_to_lock:
+                if key not in locked:
+                    locked.add(key)
+                    left_to_lock.remove(key)
+        await asyncio.sleep(delay)
+
+
 def join_byte_stream_checked(stream: Iterable[bytes], max_size: int) -> Optional[bytes]:
     """
     Join an iterable of `bytes` values into one `bytes` value,
