@@ -688,14 +688,14 @@
         border-right: none;
         border-top-left-radius: 12px;
         border-bottom-left-radius: 12px;
-        margin-right: 5px;
+        /*margin-right: 5px;*/
     }
 
     .plans_card.dstack_sky {
-        border-left: none;
+        /*border-left: none;*/
         border-top-right-radius: 12px;
         border-bottom-right-radius: 12px;
-        margin-left: 5px;
+        /*margin-left: 5px;*/
     }
 
     .plans_card.enterprise {

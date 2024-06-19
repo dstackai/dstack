@@ -1,28 +1,20 @@
-<div align="center">
-<h1 align="center">
+<div>
+<h2>
   <a target="_blank" href="https://dstack.ai">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/images/dstack-logo-dark.svg"/>
       <img alt="dstack" src="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/images/dstack-logo.svg" width="350px"/>
     </picture>
   </a>
-</h1>
-
-<h3 align="center">
-Orchestrate AI workloads in any cloud
-</h3>
-
-<p align="center">
-<a href="https://dstack.ai/docs" target="_blank"><b>Docs</b></a> •
-<a href="https://github.com/dstackai/dstack/tree/master/examples" target="_blank"><b>Examples</b></a> •
-<a href="https://discord.gg/u8SmfwPpMd" target="_blank"><b>Discord</b></a>
-</p>
+</h2>
 
 [![Last commit](https://img.shields.io/github/last-commit/dstackai/dstack?style=flat-square)](https://github.com/dstackai/dstack/commits/)
 [![PyPI - License](https://img.shields.io/pypi/l/dstack?style=flat-square&color=blue)](https://github.com/dstackai/dstack/blob/master/LICENSE.md)
+[![Discord](https://dcbadge.vercel.app/api/server/u8SmfwPpMd?style=flat-square)](https://discord.gg/CBgdrGnZjy)
+
 </div>
 
-`dstack` is an open-source container orchestration engine designed for AI workloads across any cloud or data center.
+`dstack` is an open-source container orchestration engine designed for running AI workloads across any cloud or data center.
 
 The supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
 You can also use `dstack` ro run workloads on on-prem servers.
@@ -31,7 +23,6 @@ You can also use `dstack` ro run workloads on on-prem servers.
 
 - [2024/05] [dstack 0.18.3: OCI, and more](https://github.com/dstackai/dstack/releases/tag/0.18.3) (Release)
 - [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
-- [2024/04] [dstack 0.18.1: On-prem servers, and new example](https://github.com/dstackai/dstack/releases/tag/0.18.1) (Release)
 - [2024/04] [dstack 0.18.0: RunPod, mult-node tasks, and more](https://github.com/dstackai/dstack/releases/tag/0.18.0) (Release)
 - [2024/03] [dstack 0.17.0: Auto-scaling, and other improvements](https://github.com/dstackai/dstack/releases/tag/0.17.0) (Release)
 
