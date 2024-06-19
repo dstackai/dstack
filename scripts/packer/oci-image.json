@@ -3,9 +3,9 @@
     "build_prefix": "",
     "docker_version": "20.10.17",
     "image_version": "",
-    "oci_availability_domain": "kZql:EU-FRANKFURT-1-AD-3",
-    "oci_compartment_ocid": "ocid1.compartment.oc1..aaaaaaaaxu2uq64unfa2imwkp37icxqv6f7gwp2mczdt2mukuqbkauwqmbtq",
-    "oci_subnet_ocid": "ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaaewxkaqsmbi2tig5sfw4eexzo3mkb4zrpm4gwvfhqdddnxicxe4fa"
+    "oci_availability_domain": "",
+    "oci_compartment_ocid": "",
+    "oci_subnet_ocid": ""
   },
   "builders": [
     {
