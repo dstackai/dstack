@@ -31,7 +31,11 @@ from dstack._internal.core.models.runs import (
     RunStatus,
 )
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.core.models.volumes import VolumeConfiguration, VolumeStatus
+from dstack._internal.core.models.volumes import (
+    VolumeConfiguration,
+    VolumeProvisioningData,
+    VolumeStatus,
+)
 from dstack._internal.server.models import (
     BackendModel,
     GatewayComputeModel,
@@ -433,6 +437,7 @@ async def create_volume(
     status: VolumeStatus = VolumeStatus.SUBMITTED,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     configuration: Optional[VolumeConfiguration] = None,
+    volume_provisioning_data: Optional[VolumeProvisioningData] = None,
 ) -> VolumeModel:
     if configuration is None:
         configuration = get_volume_configuration()
@@ -442,6 +447,9 @@ async def create_volume(
         status=status,
         created_at=created_at,
         configuration=configuration.json(),
+        volume_provisioning_data=volume_provisioning_data.json()
+        if volume_provisioning_data
+        else None,
     )
     session.add(vm)
     await session.commit()
@@ -461,6 +469,20 @@ def get_volume_configuration(
         region=region,
         size=size,
         volume_id=volume_id,
+    )
+
+
+def get_volume_provisioning_data(
+    volume_id: str = "vol-1234",
+    size_gb: int = 100,
+    availability_zone: Optional[str] = None,
+    backend_data: Optional[str] = None,
+) -> VolumeProvisioningData:
+    return VolumeProvisioningData(
+        volume_id=volume_id,
+        size_gb=size_gb,
+        availability_zone=availability_zone,
+        backend_data=backend_data,
     )
 
 

@@ -14,7 +14,7 @@ from dstack._internal.core.models.volumes import (
     VolumeStatus,
 )
 from dstack._internal.server.models import ProjectModel, VolumeModel
-from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
+from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.utils.common import run_async, wait_to_lock_many
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
@@ -188,7 +188,7 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
 async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_model: VolumeModel):
     configuration = get_volume_configuration(volume_model)
     try:
-        backend = await get_project_backend_by_type_or_error(
+        backend = await backends_services.get_project_backend_by_type_or_error(
             project=volume_model.project, backend_type=configuration.backend
         )
     except BackendNotAvailable:

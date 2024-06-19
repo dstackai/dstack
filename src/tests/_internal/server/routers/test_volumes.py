@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timezone
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +19,7 @@ from dstack._internal.server.testing.common import (
     create_volume,
     get_auth_headers,
     get_volume_configuration,
+    get_volume_provisioning_data,
 )
 
 client = TestClient(app)
@@ -159,12 +161,19 @@ class TestDeleteVolumes:
         volume = await create_volume(
             session=session,
             project=project,
+            volume_provisioning_data=get_volume_provisioning_data(),
         )
-        response = client.post(
-            f"/api/project/{project.name}/volumes/delete",
-            headers=get_auth_headers(user.token),
-            json={"names": [volume.name]},
-        )
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backend_by_type_or_error"
+        ) as m:
+            aws_mock = Mock()
+            m.return_value = aws_mock
+            response = client.post(
+                f"/api/project/{project.name}/volumes/delete",
+                headers=get_auth_headers(user.token),
+                json={"names": [volume.name]},
+            )
+            aws_mock.compute.return_value.delete_volume.assert_called()
         assert response.status_code == 200
         await session.refresh(volume)
         assert volume.deleted
