@@ -6,6 +6,12 @@ class GCPConfig(GCPStoredConfig, BackendConfig):
     creds: AnyGCPCreds
 
     @property
+    def allocate_public_ips(self) -> bool:
+        if self.public_ips is not None:
+            return self.public_ips
+        return True
+
+    @property
     def vpc_resource_name(self) -> str:
         vpc_name = self.vpc_name
         if vpc_name is None:

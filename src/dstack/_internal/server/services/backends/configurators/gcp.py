@@ -169,7 +169,12 @@ class GCPConfigurator(Configurator):
         if config.project_id is None:
             return config_values
         network_client = compute_v1.NetworksClient(credentials=credentials)
-        self._check_vpc_config(network_client=network_client, config=config)
+        routers_client = compute_v1.RoutersClient(credentials=credentials)
+        self._check_vpc_config(
+            network_client=network_client,
+            routers_client=routers_client,
+            config=config,
+        )
         return config_values
 
     def create_backend(
@@ -220,14 +225,21 @@ class GCPConfigurator(Configurator):
         return element
 
     def _check_vpc_config(
-        self, network_client: compute_v1.NetworksClient, config: GCPConfigInfoWithCredsPartial
+        self,
+        network_client: compute_v1.NetworksClient,
+        routers_client: compute_v1.RoutersClient,
+        config: GCPConfigInfoWithCredsPartial,
     ):
+        allocate_public_ip = config.public_ips if config.public_ips is not None else True
         try:
             resources.check_vpc(
                 network_client=network_client,
+                routers_client=routers_client,
                 project_id=config.project_id,
+                regions=config.regions or DEFAULT_REGIONS,
                 vpc_name=config.vpc_name,
                 shared_vpc_project_id=config.vpc_project_id,
+                allocate_public_ip=allocate_public_ip,
             )
         except ComputeError as e:
             raise ServerClientError(e.args[0])

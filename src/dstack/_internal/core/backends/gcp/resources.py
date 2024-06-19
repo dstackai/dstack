@@ -32,7 +32,10 @@ supported_accelerators = [
 
 def check_vpc(
     network_client: compute_v1.NetworksClient,
+    routers_client: compute_v1.RoutersClient,
     project_id: str,
+    regions: List[str],
+    allocate_public_ip: bool,
     vpc_name: Optional[str] = None,
     shared_vpc_project_id: Optional[str] = None,
 ):
@@ -45,6 +48,38 @@ def check_vpc(
         network_client.get(project=vpc_project_id, network=vpc_name)
     except google.api_core.exceptions.NotFound:
         raise ComputeError(f"Failed to find VPC {vpc_name} in project {vpc_project_id}")
+
+    if allocate_public_ip:
+        return
+
+    regions_without_nat = []
+    for region in regions:
+        if not has_vpc_nat_access(routers_client, vpc_project_id, vpc_name, region):
+            regions_without_nat.append(region)
+
+    if regions_without_nat:
+        raise ComputeError(
+            f"VPC {vpc_name} in project {vpc_project_id} does not have Cloud NAT configured for external internet access in regions: {regions_without_nat}"
+        )
+
+
+def has_vpc_nat_access(
+    routers_client: compute_v1.RoutersClient,
+    project_id: str,
+    vpc_name: str,
+    region: str,
+) -> bool:
+    try:
+        routers = routers_client.list(project=project_id, region=region)
+    except google.api_core.exceptions.NotFound:
+        return False
+
+    for router in routers:
+        if router.network.endswith(vpc_name):
+            if len(router.nats) > 0:
+                return True
+
+    return False
 
 
 def create_instance_struct(
@@ -62,16 +97,21 @@ def create_instance_struct(
     service_account: Optional[str] = None,
     network: str = "global/networks/default",
     subnetwork: Optional[str] = None,
+    allocate_public_ip: bool = True,
 ) -> compute_v1.Instance:
     network_interface = compute_v1.NetworkInterface()
     network_interface.network = network
     if subnetwork is not None:
         network_interface.subnetwork = subnetwork
-    access = compute_v1.AccessConfig()
-    access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
-    access.name = "External NAT"
-    access.network_tier = access.NetworkTier.PREMIUM.name
-    network_interface.access_configs = [access]
+
+    if allocate_public_ip:
+        access = compute_v1.AccessConfig()
+        access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
+        access.name = "External NAT"
+        access.network_tier = access.NetworkTier.PREMIUM.name
+        network_interface.access_configs = [access]
+    else:
+        network_interface.access_configs = []
 
     instance = compute_v1.Instance()
     instance.network_interfaces = [network_interface]

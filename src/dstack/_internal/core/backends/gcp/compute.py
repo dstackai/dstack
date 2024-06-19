@@ -18,6 +18,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.gcp.config import GCPConfig
 from dstack._internal.core.errors import (
+    ComputeError,
     ComputeResourceNotFoundError,
     NoCapacityError,
 )
@@ -47,6 +48,7 @@ class GCPCompute(Compute):
         self.firewalls_client = compute_v1.FirewallsClient(credentials=self.credentials)
         self.regions_client = compute_v1.RegionsClient(credentials=self.credentials)
         self.subnetworks_client = compute_v1.SubnetworksClient(credentials=self.credentials)
+        self.routers_client = compute_v1.RoutersClient(credentials=self.credentials)
         self.tpu_client = tpu_v2.TpuClient(credentials=self.credentials)
 
     def get_offers(
@@ -112,6 +114,7 @@ class GCPCompute(Compute):
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
         instance_name = instance_config.instance_name
+        allocate_public_ip = self.config.allocate_public_ips
         if not gcp_resources.is_valid_resource_name(instance_name):
             # In a rare case the instance name is invalid in GCP,
             # we better use a random instance name than fail provisioning.
@@ -198,6 +201,18 @@ class GCPCompute(Compute):
                 )
             raise NoCapacityError()
 
+        if not allocate_public_ip and not gcp_resources.has_vpc_nat_access(
+            routers_client=self.routers_client,
+            project_id=self.config.vpc_project_id or self.config.project_id,
+            vpc_name=self.config.vpc_resource_name,
+            region=instance_offer.region,
+        ):
+            raise ComputeError(
+                "VPC does not have access to the external internet through Cloud NAT. "
+                f"Region: {instance_offer.region}, VPC name: {self.config.vpc_resource_name}, "
+                f"Project ID: {self.config.vpc_project_id or self.config.project_id}."
+            )
+
         for zone in _get_instance_zones(instance_offer):
             request = compute_v1.InsertInstanceRequest()
             request.zone = zone
@@ -222,6 +237,7 @@ class GCPCompute(Compute):
                 zone=zone,
                 network=self.config.vpc_resource_name,
                 subnetwork=subnetwork,
+                allocate_public_ip=allocate_public_ip,
             )
             try:
                 operation = self.instances_client.insert(request=request)
@@ -234,11 +250,16 @@ class GCPCompute(Compute):
             instance = self.instances_client.get(
                 project=self.config.project_id, zone=zone, instance=instance_name
             )
+            if allocate_public_ip:
+                hostname = instance.network_interfaces[0].access_configs[0].nat_i_p
+            else:
+                hostname = instance.network_interfaces[0].network_i_p
             return JobProvisioningData(
                 backend=instance_offer.backend,
                 instance_type=instance_offer.instance,
                 instance_id=instance_name,
-                hostname=instance.network_interfaces[0].access_configs[0].nat_i_p,
+                public_ip_enabled=allocate_public_ip,
+                hostname=hostname,
                 internal_ip=instance.network_interfaces[0].network_i_p,
                 region=instance_offer.region,
                 price=instance_offer.price,
