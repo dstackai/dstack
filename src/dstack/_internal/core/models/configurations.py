@@ -12,6 +12,7 @@ from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
+from dstack._internal.core.models.volumes import VolumeConfiguration
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -316,14 +317,22 @@ def parse_run_configuration(data: dict) -> AnyRunConfiguration:
 
 class ApplyConfigurationType(str, Enum):
     GATEWAY = "gateway"
+    VOLUME = "volume"
 
 
-AnyApplyConfiguration = GatewayConfiguration
+AnyApplyConfiguration = Union[GatewayConfiguration, VolumeConfiguration]
+
+
+class ApplyConfiguration(CoreModel):
+    __root__: Annotated[
+        AnyApplyConfiguration,
+        Field(discriminator="type"),
+    ]
 
 
 def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
     try:
-        conf = GatewayConfiguration.parse_obj(data)
+        conf = ApplyConfiguration.parse_obj(data).__root__
     except ValidationError as e:
         raise ConfigurationError(e)
     return conf

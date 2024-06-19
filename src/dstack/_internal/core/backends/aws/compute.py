@@ -428,7 +428,7 @@ class AWSCompute(Compute):
         try:
             ec2_client.delete_volume(VolumeId=volume_id)
         except botocore.exceptions.ClientError as e:
-            if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+            if e.response["Error"]["Code"] == "InvalidVolume.NotFound":
                 pass
             else:
                 raise e

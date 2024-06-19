@@ -5,7 +5,7 @@ from typing import List, Optional
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ResourceExistsError
+from dstack._internal.core.errors import BackendNotAvailable, ResourceExistsError
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeComputeConfiguration,
@@ -14,8 +14,13 @@ from dstack._internal.core.models.volumes import (
     VolumeStatus,
 )
 from dstack._internal.server.models import ProjectModel, VolumeModel
-from dstack._internal.server.utils.common import wait_to_lock_many
+from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
+from dstack._internal.server.utils.common import run_async, wait_to_lock_many
 from dstack._internal.utils import common, random_names
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 PROCESSING_VOLUMES_LOCK = asyncio.Lock()
 PROCESSING_VOLUMES_IDS = set()
@@ -97,25 +102,43 @@ async def create_volume(
 async def delete_volumes(session: AsyncSession, project: ProjectModel, names: List[str]):
     res = await session.execute(
         select(VolumeModel).where(
-            VolumeModel.project_id == project.id, VolumeModel.name.in_(names)
+            VolumeModel.project_id == project.id,
+            VolumeModel.name.in_(names),
+            VolumeModel.deleted == False,
         )
     )
     volume_models = res.scalars().all()
     volumes_ids = [v.id for v in volume_models]
-    await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
     # TODO: check for volumes in use. refetch with lock.
-    await session.execute(
-        update(VolumeModel)
-        .where(
-            VolumeModel.project_id == project.id,
-            VolumeModel.id.in_(volumes_ids),
+    await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
+    try:
+        tasks = []
+        for volume_model in volume_models:
+            tasks.append(
+                _delete_volume(session=session, project=project, volume_model=volume_model)
+            )
+        terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
+        for volume_model, error in zip(volume_models, terminate_results):
+            if isinstance(error, Exception):
+                logger.exception(
+                    "Error when deleting volume %s",
+                    volume_model.name,
+                    exc_info=(type(error), error, error.__traceback__),
+                )
+        await session.execute(
+            update(VolumeModel)
+            .where(
+                VolumeModel.project_id == project.id,
+                VolumeModel.id.in_(volumes_ids),
+            )
+            .values(
+                deleted=True,
+                deleted_at=common.get_current_datetime(),
+            )
         )
-        .values(
-            deleted=True,
-            deleted_at=common.get_current_datetime(),
-        )
-    )
-    await session.commit()
+        await session.commit()
+    finally:
+        PROCESSING_VOLUMES_IDS.difference_update(volumes_ids)
 
 
 def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
@@ -160,3 +183,30 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
         name = random_names.generate_name()
         if name not in names:
             return name
+
+
+async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_model: VolumeModel):
+    configuration = get_volume_configuration(volume_model)
+    try:
+        backend = await get_project_backend_by_type_or_error(
+            project=volume_model.project, backend_type=configuration.backend
+        )
+    except BackendNotAvailable:
+        logger.error(
+            f"Failed to delete volume {volume_model.name}. Backend {configuration.backend} not available."
+        )
+        return
+
+    vpd = get_volume_provisioning_data(volume_model)
+    if vpd is None:
+        logger.error(
+            f"Failed to delete volume {volume_model.name}. Volume provisioning data is None."
+        )
+        return
+
+    await run_async(
+        backend.compute().delete_volume,
+        volume_id=vpd.volume_id,
+        configuration=get_volume_compute_configuration(volume_model),
+        backend_data=vpd.backend_data,
+    )
