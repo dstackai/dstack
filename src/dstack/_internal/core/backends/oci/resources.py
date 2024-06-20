@@ -1,5 +1,6 @@
 import base64
 import dataclasses
+import datetime
 import time
 from concurrent.futures import Executor, ThreadPoolExecutor, as_completed
 from functools import reduce
@@ -7,6 +8,7 @@ from itertools import islice
 from typing import Collection, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 import oci
+from oci.object_storage.models import CreatePreauthenticatedRequestDetails
 
 from dstack import version
 from dstack._internal.core.backends.oci.region import OCIRegionClient
@@ -21,6 +23,9 @@ CAPACITY_REPORT_MAX_SHAPES = 10  # undocumented, found by experiment
 LIST_SECURITY_RULES_MAX_LIMIT = 100
 REMOVE_SECURITY_RULES_MAX_CHUNK_SIZE = 25
 ADD_SECURITY_RULES_MAX_CHUNK_SIZE = 25
+LIST_WORK_REQUEST_ERRORS_MAX_LIMIT = 1000
+LIST_PARS_MAX_LIMIT = 1000
+LIST_OBJECTS_MAX_LIMIT = 1000
 VCN_CIDR = "10.0.0.0/16"
 WAIT_FOR_COMPARTMENT_ATTEMPS = 36
 WAIT_FOR_COMPARTMENT_DELAY = 5
@@ -631,3 +636,147 @@ def remove_security_group_rules(
                 security_rule_ids=chunk
             ),
         )
+
+
+def get_or_create_bucket(
+    namespace: str, name: str, compartment_id: str, client: oci.object_storage.ObjectStorageClient
+) -> oci.object_storage.models.Bucket:
+    try:
+        return client.get_bucket(namespace, name).data
+    except oci.exceptions.ServiceError as e:
+        if e.code != "BucketNotFound":
+            raise
+    return client.create_bucket(
+        namespace,
+        oci.object_storage.models.CreateBucketDetails(name=name, compartment_id=compartment_id),
+    ).data
+
+
+def create_pre_authenticated_request(
+    name: str,
+    namespace: str,
+    bucket_name: str,
+    object_name: str,
+    time_expires: datetime.datetime,
+    client: oci.object_storage.ObjectStorageClient,
+) -> oci.object_storage.models.PreauthenticatedRequest:
+    return client.create_preauthenticated_request(
+        namespace,
+        bucket_name,
+        CreatePreauthenticatedRequestDetails(
+            name=name,
+            object_name=object_name,
+            access_type=CreatePreauthenticatedRequestDetails.ACCESS_TYPE_OBJECT_READ,
+            time_expires=time_expires,
+        ),
+    ).data
+
+
+def delete_bucket(
+    namespace: str, bucket_name: str, client: oci.object_storage.ObjectStorageClient
+) -> None:
+    pars: List[oci.object_storage.models.PreauthenticatedRequestSummary]
+    while pars := client.list_preauthenticated_requests(
+        namespace, bucket_name, limit=LIST_PARS_MAX_LIMIT
+    ).data:
+        for par in pars:
+            client.delete_preauthenticated_request(namespace, bucket_name, par.id)
+
+    objects: List[oci.object_storage.models.ObjectSummary]
+    while objects := client.list_objects(
+        namespace, bucket_name, limit=LIST_OBJECTS_MAX_LIMIT
+    ).data.objects:
+        for obj in objects:
+            client.delete_object(namespace, bucket_name, obj.name)
+
+    client.delete_bucket(namespace, bucket_name)
+
+
+def find_image(
+    name: str, compartment_id: str, client: oci.core.ComputeClient
+) -> Optional[oci.core.models.Image]:
+    if images := client.list_images(compartment_id=compartment_id, display_name=name).data:
+        return images[0]
+    return None
+
+
+def export_image_to_bucket(
+    image_id: str,
+    storage_namespace: str,
+    bucket_name: str,
+    object_name: str,
+    client: oci.core.ComputeClient,
+) -> str:
+    resp: oci.response.Response = client.export_image(
+        image_id,
+        oci.core.models.ExportImageViaObjectStorageTupleDetails(
+            export_format="OCI",
+            namespace_name=storage_namespace,
+            bucket_name=bucket_name,
+            object_name=object_name,
+        ),
+    )
+    return resp.headers["opc-work-request-id"]
+
+
+def import_image_from_uri(
+    name: str, full_uri: str, compartment_id: str, client: oci.core.ComputeClient
+) -> str:
+    resp: oci.response.Response = client.create_image(
+        oci.core.models.CreateImageDetails(
+            compartment_id=compartment_id,
+            display_name=name,
+            image_source_details=oci.core.models.ImageSourceViaObjectStorageUriDetails(
+                source_uri=full_uri
+            ),
+        )
+    )
+    return resp.headers["opc-work-request-id"]
+
+
+def publish_image_in_marketplace(
+    name: str,
+    version: str,
+    short_description: str,
+    os_name: str,
+    eula_text: str,
+    contact_name: str,
+    contact_email: str,
+    image_id: str,
+    compartment_id: str,
+    client: oci.marketplace.MarketplaceClient,
+) -> oci.marketplace.models.Publication:
+    return client.create_publication(
+        create_publication_details=oci.marketplace.models.CreatePublicationDetails(
+            listing_type=oci.marketplace.models.CreatePublicationDetails.LISTING_TYPE_COMMUNITY,
+            name=name,
+            short_description=short_description,
+            support_contacts=[
+                oci.marketplace.models.SupportContact(
+                    name=contact_name,
+                    email=contact_email,
+                )
+            ],
+            compartment_id=compartment_id,
+            package_details=oci.marketplace.models.CreateImagePublicationPackage(
+                package_version=version,
+                operating_system=oci.marketplace.models.OperatingSystem(name=os_name),
+                eula=[
+                    oci.marketplace.models.TextBasedEula(
+                        eula_type="TEXT",
+                        license_text=eula_text,
+                    )
+                ],
+                image_id=image_id,
+            ),
+            is_agreement_acknowledged=True,
+        ),
+    ).data
+
+
+def list_work_request_errors(
+    work_request_id: str, client: oci.work_requests.WorkRequestClient
+) -> List[oci.work_requests.models.WorkRequestError]:
+    return client.list_work_request_errors(
+        work_request_id, limit=LIST_WORK_REQUEST_ERRORS_MAX_LIMIT
+    ).data
