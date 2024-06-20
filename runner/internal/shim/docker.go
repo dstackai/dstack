@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/user"
 	"path/filepath"
 	rt "runtime"
 	"strconv"
@@ -78,7 +79,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	var err error
 
 	if cfg.SshKey != "" {
-		ak := AuthorizedKeys{user: cfg.SshUser}
+		ak := AuthorizedKeys{user: cfg.SshUser, lookup: user.Lookup}
 		if err := ak.AppendPublicKeys([]string{cfg.SshKey}); err != nil {
 			return tracerr.Wrap(err)
 		}

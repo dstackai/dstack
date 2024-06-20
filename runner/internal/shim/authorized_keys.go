@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
+	"path/filepath"
 	"slices"
 
 	"github.com/ztrue/tracerr"
@@ -53,7 +55,7 @@ func AppendPublicKeys(fileKeys []string, keysToAppend []string) []string {
 
 type AuthorizedKeys struct {
 	user     string
-	rootPath string
+	lookup   func(username string) (*user.User, error)
 }
 
 func (ak AuthorizedKeys) AppendPublicKeys(publicKeys []string) error {
@@ -88,12 +90,28 @@ func (ak AuthorizedKeys) write(w io.Writer, lines []string) error {
 	return wr.Flush()
 }
 
-func (ak AuthorizedKeys) GetAuthorizedKeysPath() string {
-	return fmt.Sprintf("%s/home/%s/.ssh/authorized_keys", ak.rootPath, ak.user)
+func (ak AuthorizedKeys) GetHomeDirectory() (string, error) {
+	usr, err := ak.lookup(ak.user)
+	if err != nil {
+		return "", err
+	}
+	return usr.HomeDir, nil
+}
+
+func (ak AuthorizedKeys) GetAuthorizedKeysPath() (string, error) {
+	homeDir, err := ak.GetHomeDirectory()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(homeDir, ".ssh", "authorized_keys"), nil
 }
 
 func (ak AuthorizedKeys) transformAuthorizedKeys(transform func([]string, []string) []string, publicKeys []string) error {
-	authorizedKeysPath := ak.GetAuthorizedKeysPath()
+	authorizedKeysPath, err := ak.GetAuthorizedKeysPath()
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+
 	info, err := os.Stat(authorizedKeysPath)
 	if err != nil {
 		return tracerr.Wrap(err)
@@ -112,7 +130,12 @@ func (ak AuthorizedKeys) transformAuthorizedKeys(transform func([]string, []stri
 	}
 
 	// write backup
-	authorizedKeysPathBackup := ak.GetAuthorizedKeysPath() + ".bak"
+	authorizedKeysPath, err = ak.GetAuthorizedKeysPath()
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+
+	authorizedKeysPathBackup := authorizedKeysPath + ".bak"
 	authorizedKeysBackup, err := os.OpenFile(authorizedKeysPathBackup, os.O_RDWR|os.O_CREATE|os.O_TRUNC, fileMode)
 	if err != nil {
 		return tracerr.Wrap(err)
