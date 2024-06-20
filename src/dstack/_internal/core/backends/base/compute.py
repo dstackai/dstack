@@ -19,7 +19,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
-    VolumeComputeConfiguration,
+    Volume,
     VolumeProvisioningData,
 )
 from dstack._internal.utils.logging import get_logger
@@ -45,6 +45,7 @@ class Compute(ABC):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         """
         Launches a new instance for the job. It should return `JobProvisioningData` ASAP.
@@ -103,18 +104,16 @@ class Compute(ABC):
     ):
         raise NotImplementedError()
 
-    def create_volume(
-        self,
-        configuration: VolumeComputeConfiguration,
-    ) -> VolumeProvisioningData:
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
         raise NotImplementedError()
 
-    def delete_volume(
-        self,
-        volume_id: str,
-        configuration: VolumeComputeConfiguration,
-        backend_data: Optional[str] = None,
-    ):
+    def delete_volume(self, volume: Volume):
+        raise NotImplementedError()
+
+    def attach_volume(self, volume: Volume, instance_id: str):
+        raise NotImplementedError()
+
+    def detach_volume(self, volume: Volume, instance_id: str):
         raise NotImplementedError()
 
 

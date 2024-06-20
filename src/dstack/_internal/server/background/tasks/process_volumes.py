@@ -13,7 +13,6 @@ from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.volumes import (
     PROCESSING_VOLUMES_IDS,
     PROCESSING_VOLUMES_LOCK,
-    get_volume_compute_configuration,
 )
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
@@ -63,10 +62,10 @@ async def _process_volume(volume_id: UUID):
 async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeModel):
     logger.info("Started volume %s provisioning", volume_model.name)
 
-    configuration = volumes_services.get_volume_configuration(volume_model)
+    volume = volumes_services.volume_model_to_volume(volume_model)
     try:
         backend = await backends_services.get_project_backend_by_type_or_error(
-            project=volume_model.project, backend_type=configuration.backend
+            project=volume_model.project, backend_type=volume.configuration.backend
         )
     except BackendNotAvailable:
         volume_model.status = VolumeStatus.FAILED
@@ -75,12 +74,10 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
         await session.commit()
         return
 
-    compute_configuration = get_volume_compute_configuration(volume_model)
-
     try:
         vpd = await run_async(
             backend.compute().create_volume,
-            configuration=compute_configuration,
+            volume=volume,
         )
     except BackendError as e:
         logger.info("Failed to create volume %s: %s", volume_model.name, repr(e))
@@ -100,6 +97,8 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
         await session.commit()
         return
 
+    # Provisioned volumes marked as active since they become available almost immediately in AWS
+    # TODO: Consider checking volume state
     volume_model.volume_provisioning_data = vpd.json()
     volume_model.status = VolumeStatus.ACTIVE
     volume_model.last_processed_at = get_current_datetime()

@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import Field
@@ -34,6 +35,13 @@ class VolumeConfiguration(CoreModel):
     ] = None
 
 
+class VolumeProvisioningData(CoreModel):
+    volume_id: str
+    size_gb: int
+    availability_zone: Optional[str] = None
+    backend_data: Optional[str] = None  # backend-specific data in json
+
+
 class Volume(CoreModel):
     name: str
     configuration: VolumeConfiguration
@@ -41,19 +49,9 @@ class Volume(CoreModel):
     status: VolumeStatus
     status_message: Optional[str] = None
     volume_id: Optional[str] = None
+    provisioning_data: Optional[VolumeProvisioningData] = None
 
 
-class VolumeComputeConfiguration(CoreModel):
-    name: str
-    project_name: str
-    backend: BackendType
-    region: str
-    size_gb: Optional[int] = None
-    volume_id: Optional[str] = None
-
-
-class VolumeProvisioningData(CoreModel):
-    volume_id: str
-    size_gb: int
-    availability_zone: Optional[str] = None
-    backend_data: Optional[str] = None  # backend-specific data in json
+class VolumeMountPoint(CoreModel):
+    name: Annotated[str, Field(description="The name of the volume to mount")]
+    path: Annotated[Path, Field(description="The container path to mount the volume at")]

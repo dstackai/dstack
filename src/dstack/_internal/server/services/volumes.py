@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import BackendNotAvailable, ResourceExistsError
 from dstack._internal.core.models.volumes import (
     Volume,
-    VolumeComputeConfiguration,
     VolumeConfiguration,
     VolumeProvisioningData,
     VolumeStatus,
@@ -26,17 +25,26 @@ PROCESSING_VOLUMES_LOCK = asyncio.Lock()
 PROCESSING_VOLUMES_IDS = set()
 
 
-async def list_project_volumes(session: AsyncSession, project: ProjectModel) -> List[Volume]:
-    volume_models = await list_project_volume_models(session=session, project=project)
+async def list_project_volumes(
+    session: AsyncSession,
+    project: ProjectModel,
+    names: Optional[List[str]] = None,
+) -> List[Volume]:
+    volume_models = await list_project_volume_models(session=session, project=project, names=names)
     return [volume_model_to_volume(v) for v in volume_models]
 
 
 async def list_project_volume_models(
-    session: AsyncSession, project: ProjectModel, include_deleted: bool = False
+    session: AsyncSession,
+    project: ProjectModel,
+    names: Optional[List[str]] = None,
+    include_deleted: bool = False,
 ) -> List[VolumeModel]:
     filters = [
         VolumeModel.project_id == project.id,
     ]
+    if names is not None:
+        filters.append(VolumeModel.name.in_(names))
     if not include_deleted:
         filters.append(VolumeModel.deleted == False)
     res = await session.execute(select(VolumeModel).where(*filters))
@@ -154,18 +162,6 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
     )
 
 
-def get_volume_compute_configuration(volume_model: VolumeModel) -> VolumeComputeConfiguration:
-    configuration = get_volume_configuration(volume_model)
-    return VolumeComputeConfiguration(
-        name=volume_model.name,
-        project_name=volume_model.project.name,
-        backend=configuration.backend,
-        size_gb=int(configuration.size),
-        volume_id=configuration.volume_id,
-        region=configuration.region,
-    )
-
-
 def get_volume_configuration(volume_model: VolumeModel) -> VolumeConfiguration:
     return VolumeConfiguration.__response__.parse_raw(volume_model.configuration)
 
@@ -186,14 +182,15 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
 
 
 async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_model: VolumeModel):
-    configuration = get_volume_configuration(volume_model)
+    volume = volume_model_to_volume(volume_model)
+
     try:
         backend = await backends_services.get_project_backend_by_type_or_error(
-            project=volume_model.project, backend_type=configuration.backend
+            project=volume_model.project, backend_type=volume.configuration.backend
         )
     except BackendNotAvailable:
         logger.error(
-            f"Failed to delete volume {volume_model.name}. Backend {configuration.backend} not available."
+            f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
         )
         return
 
@@ -206,7 +203,5 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
 
     await run_async(
         backend.compute().delete_volume,
-        volume_id=vpd.volume_id,
-        configuration=get_volume_compute_configuration(volume_model),
-        backend_data=vpd.backend_data,
+        volume=volume,
     )

@@ -56,6 +56,7 @@ class TestListVolumes:
                 "status": "submitted",
                 "status_message": None,
                 "volume_id": None,
+                "provisioning_data": None,
             }
         ]
 
@@ -91,6 +92,7 @@ class TestGetVolume:
             "status": "submitted",
             "status_message": None,
             "volume_id": None,
+            "provisioning_data": None,
         }
 
     @pytest.mark.asyncio
@@ -139,6 +141,7 @@ class TestCreateVolume:
                 "status": "submitted",
                 "status_message": None,
                 "volume_id": None,
+                "provisioning_data": None,
             }
         )
         res = await session.execute(select(VolumeModel))

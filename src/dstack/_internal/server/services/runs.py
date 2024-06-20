@@ -58,6 +58,7 @@ from dstack._internal.core.models.runs import (
     get_policy_map,
 )
 from dstack._internal.core.models.users import GlobalRole
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -66,10 +67,12 @@ from dstack._internal.server.models import (
     RepoModel,
     RunModel,
     UserModel,
+    VolumeModel,
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
+from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.docker import parse_image_name
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
@@ -254,7 +257,10 @@ async def get_run(
 
 
 async def get_run_plan(
-    session: AsyncSession, project: ProjectModel, user: UserModel, run_spec: RunSpec
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    run_spec: RunSpec,
 ) -> RunPlan:
     if run_spec.run_name is not None:
         _validate_run_name(run_spec.run_name)
@@ -276,6 +282,12 @@ async def get_run_plan(
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
 
+    volumes = await get_run_volumes(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+    )
+
     # Get offers once for all jobs
     offers = []
     if creation_policy == CreationPolicy.REUSE_OR_CREATE:
@@ -285,6 +297,7 @@ async def get_run_plan(
             requirements=jobs[0].job_spec.requirements,
             exclude_not_available=False,
             multinode=jobs[0].job_spec.jobs_per_replica > 1,
+            volumes=volumes,
         )
 
     job_plans = []
@@ -320,6 +333,7 @@ async def get_offers_by_requirements(
     exclude_not_available=False,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
+    volumes: Optional[List[Volume]] = None,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
@@ -342,6 +356,11 @@ async def get_offers_by_requirements(
     if master_job_provisioning_data is not None:
         backend_types = [master_job_provisioning_data.backend]
         regions = [master_job_provisioning_data.region]
+
+    if volumes:
+        volume = volumes[0]
+        backend_types = [volume.configuration.backend]
+        regions = [volume.configuration.region]
 
     if backend_types is not None:
         backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
@@ -393,6 +412,13 @@ async def submit_run(
     else:
         _validate_run_name(run_spec.run_name)
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
+
+    await validate_run(
+        session=session,
+        user=user,
+        project=project,
+        run_spec=run_spec,
+    )
 
     submitted_at = common_utils.get_current_datetime()
     run_model = RunModel(
@@ -745,6 +771,74 @@ async def _generate_run_name(
         ):
             idx += 1
         return f"{run_name_base}-{idx}"
+
+
+async def validate_run(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    run_spec: RunSpec,
+):
+    volumes = await get_run_volumes(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+    )
+    check_can_attach_run_volumes(
+        run_spec=run_spec,
+        volumes=volumes,
+    )
+
+
+async def get_run_volumes(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+) -> List[Volume]:
+    volume_models = await get_run_volume_models(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+    )
+    return [volumes_services.volume_model_to_volume(v) for v in volume_models]
+
+
+async def get_run_volume_models(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+) -> List[VolumeModel]:
+    if len(run_spec.configuration.volumes) == 0:
+        return []
+    volume_models = []
+    for mount_point in run_spec.configuration.volumes:
+        volume_model = await volumes_services.get_project_volume_model_by_name(
+            session=session,
+            project=project,
+            name=mount_point.name,
+        )
+        if volume_model is None:
+            raise ResourceNotExistsError(f"Volume {mount_point.name} not found")
+        volume_models.append(volume_model)
+    return volume_models
+
+
+def check_can_attach_run_volumes(
+    run_spec: RunSpec,
+    volumes: List[Volume],
+):
+    if len(volumes) == 0:
+        return
+    # Perform basic checks if volumes can be attached.
+    # This is useful to show error ASAP (when user submits the run).
+    # If the attachment is to fail anyway, the error will be handled when proccessing submitted jobs.
+    backend = volumes[0].configuration.backend
+    region = volumes[0].configuration.region
+    for volume in volumes:
+        if backend != volume.configuration.backend:
+            raise ServerClientError("Cannot mount volumes from different backends")
+        if region != volume.configuration.region:
+            raise ServerClientError("Cannot mount volumes from different regions")
 
 
 def _get_run_cost(run: Run) -> float:

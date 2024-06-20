@@ -5,6 +5,7 @@ from typing import List, Optional
 from sqlalchemy import (
     BLOB,
     Boolean,
+    Column,
     DateTime,
     Enum,
     Float,
@@ -13,6 +14,7 @@ from sqlalchemy import (
     Integer,
     MetaData,
     String,
+    Table,
     Text,
     UniqueConstraint,
 )
@@ -363,6 +365,12 @@ class InstanceModel(BaseModel):
     job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="joined")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
+    # volumes attached to the instance
+    volumes: Mapped[List["VolumeModel"]] = relationship(
+        secondary="volumes_attachments",
+        back_populates="instances",
+    )
+
 
 class VolumeModel(BaseModel):
     __tablename__ = "volumes"
@@ -385,3 +393,17 @@ class VolumeModel(BaseModel):
 
     configuration: Mapped[str] = mapped_column(Text)
     volume_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
+
+    # instances the volume is attached to
+    instances: Mapped[List["InstanceModel"]] = relationship(
+        secondary="volumes_attachments",
+        back_populates="volumes",
+    )
+
+
+volumes_attachments_table = Table(
+    "volumes_attachments",
+    BackendModel.metadata,
+    Column("volume_id", ForeignKey("volumes.id"), primary_key=True),
+    Column("instace_id", ForeignKey("instances.id"), primary_key=True),
+)

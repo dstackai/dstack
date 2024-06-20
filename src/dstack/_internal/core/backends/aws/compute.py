@@ -33,7 +33,7 @@ from dstack._internal.core.models.instances import (
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
-    VolumeComputeConfiguration,
+    Volume,
     VolumeProvisioningData,
 )
 from dstack._internal.utils.logging import get_logger
@@ -195,6 +195,7 @@ class AWSCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
@@ -370,31 +371,28 @@ class AWSCompute(Compute):
         elb_client.delete_load_balancer(LoadBalancerArn=backend_data_parsed.lb_arn)
         logger.debug("Deleted ALB resources for gateway %s", configuration.instance_name)
 
-    def create_volume(
-        self,
-        configuration: VolumeComputeConfiguration,
-    ) -> VolumeProvisioningData:
-        ec2_client = self.session.client("ec2", region_name=configuration.region)
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         tags = [
-            {"Key": "Name", "Value": configuration.name},
+            {"Key": "Name", "Value": volume.configuration.name},
             {"Key": "owner", "Value": "dstack"},
-            {"Key": "dstack_project", "Value": configuration.project_name},
+            # {"Key": "dstack_project", "Value": configuration.project_name},
         ]
 
         zone = aws_resources.get_availability_zone(
-            ec2_client=ec2_client, region=configuration.region
+            ec2_client=ec2_client, region=volume.configuration.region
         )
         if zone is None:
             raise ComputeError(
-                f"Failed to find availability zone in region {configuration.region}"
+                f"Failed to find availability zone in region {volume.configuration.region}"
             )
 
         volume_type = "gp3"
 
-        logger.debug("Creating EBS volume %s", configuration.name)
+        logger.debug("Creating EBS volume %s", volume.configuration.name)
         response = ec2_client.create_volume(
-            Size=configuration.size_gb,
+            Size=int(volume.configuration.size),
             AvailabilityZone=zone,
             VolumeType=volume_type,
             TagSpecifications=[
@@ -404,7 +402,7 @@ class AWSCompute(Compute):
                 }
             ],
         )
-        logger.debug("Created EBS volume %s", configuration.name)
+        logger.debug("Created EBS volume %s", volume.configuration.name)
 
         return VolumeProvisioningData(
             volume_id=response["VolumeId"],
@@ -416,23 +414,38 @@ class AWSCompute(Compute):
             ).json(),
         )
 
-    def delete_volume(
-        self,
-        volume_id: str,
-        configuration: VolumeComputeConfiguration,
-        backend_data: Optional[str] = None,
-    ):
-        ec2_client = self.session.client("ec2", region_name=configuration.region)
+    def delete_volume(self, volume: Volume):
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
-        logger.debug("Deleting EBS volume %s", configuration.name)
+        logger.debug("Deleting EBS volume %s", volume.configuration.name)
         try:
-            ec2_client.delete_volume(VolumeId=volume_id)
+            ec2_client.delete_volume(VolumeId=volume.volume_id)
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InvalidVolume.NotFound":
                 pass
             else:
                 raise e
-        logger.debug("Deleted EBS volume %s", configuration.name)
+        logger.debug("Deleted EBS volume %s", volume.configuration.name)
+
+    def attach_volume(self, volume: Volume, instance_id: str):
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
+
+        logger.debug("Attaching EBS volume %s to instance %s", volume.volume_id, instance_id)
+        # TODO: Remove hardcoded device
+        ec2_client.attach_volume(
+            VolumeId=volume.volume_id, InstanceId=instance_id, Device="/dev/sdf"
+        )
+        logger.debug("Attached EBS volume %s from instance %s", volume.volume_id, instance_id)
+
+    def detach_volume(self, volume: Volume, instance_id: str):
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
+
+        logger.debug("Detaching EBS volume %s to instance %s", volume.volume_id, instance_id)
+        # TODO: Remove hardcoded device
+        ec2_client.detach_volume(
+            VolumeId=volume.volume_id, InstanceId=instance_id, Device="/dev/sdf"
+        )
+        logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
 
 
 def get_vpc_id_subnet_id_or_error(
