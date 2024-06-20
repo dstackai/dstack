@@ -69,14 +69,13 @@ class VastAICompute(Compute):
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
         )
-        registry_auth = None  # TODO(egor-s): registry auth secrets
         resp = self.api_client.create_instance(
             instance_name=get_instance_name(run, job),
             bundle_id=instance_offer.instance.name,
             image_name=job.job_spec.image_name,
             onstart=" && ".join(commands),
             disk_size=round(instance_offer.instance.resources.disk.size_mib / 1024),
-            registry_auth=registry_auth,
+            registry_auth=job.job_spec.registry_auth,
         )
         instance_id = resp["new_contract"]
         return JobProvisioningData(
@@ -99,10 +98,7 @@ class VastAICompute(Compute):
     ):
         self.api_client.destroy_instance(instance_id)
 
-    def update_provisioning_data(
-        self,
-        provisioning_data: JobProvisioningData,
-    ):
+    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
         resp = self.api_client.get_instance(provisioning_data.instance_id)
         if resp is not None:
             if resp["actual_status"] == "running":

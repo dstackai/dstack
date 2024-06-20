@@ -1,5 +1,6 @@
 import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
@@ -16,13 +17,16 @@ class Pool(CoreModel):
 
 
 class Instance(CoreModel):
+    id: UUID
     backend: Optional[BackendType] = None
     instance_type: Optional[InstanceType] = None
     name: str
+    pool_name: Optional[str] = None
     job_name: Optional[str] = None
     job_status: Optional[JobStatus] = None
     hostname: Optional[str] = None
     status: InstanceStatus
+    unreachable: bool = False
     created: datetime.datetime
     region: Optional[str] = None
     price: Optional[float] = None

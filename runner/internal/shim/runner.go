@@ -118,7 +118,7 @@ func downloadRunner(url string) (string, error) {
 		log.Printf("The runner was downloaded successfully (%d bytes)", written)
 	}
 
-	if err := tempFile.Chmod(0755); err != nil {
+	if err := tempFile.Chmod(0o755); err != nil {
 		return "", gerrors.Wrap(err)
 	}
 

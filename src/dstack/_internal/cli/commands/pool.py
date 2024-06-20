@@ -1,5 +1,6 @@
 import argparse
 import getpass
+import ipaddress
 import time
 import urllib.parse
 from pathlib import Path
@@ -11,7 +12,7 @@ from rich.table import Table
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.args import cpu_spec, disk_spec, gpu_spec, memory_spec
-from dstack._internal.cli.services.configurators.profile import (
+from dstack._internal.cli.services.profile import (
     apply_profile_args,
     register_profile_args,
 )
@@ -116,9 +117,10 @@ class PoolCommand(APIBaseCommand):
 
         # remove instance
         remove_parser = subparsers.add_parser(
-            "remove",
+            "rm",
             help="Remove instance from the pool",
             formatter_class=self._parser.formatter_class,
+            aliases=["remove"],
         )
         remove_parser.add_argument(
             "instance_name",
@@ -170,6 +172,11 @@ class PoolCommand(APIBaseCommand):
         add_ssh.add_argument("--region", help="Host region", dest="region")
         add_ssh.add_argument("--pool", help="Pool name", dest="pool_name")
         add_ssh.add_argument("--name", dest="instance_name", help="Set the name of the instance")
+        add_ssh.add_argument(
+            "--network",
+            dest="network",
+            help="Network address for multinode setup. Format <ip address>/<netmask>",
+        )
         add_ssh.set_defaults(subfunc=self._add_ssh)
 
     def _list(self, args: argparse.Namespace) -> None:
@@ -273,19 +280,11 @@ class PoolCommand(APIBaseCommand):
             console.print("\nExiting...")
             return
 
-        # TODO(egor-s): user key must be added during the `run`, not `pool add`
-        user_priv_key = Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
-        try:
-            user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
-        except FileNotFoundError:
-            user_pub_key = generate_public_key(rsa_pkey_from_str(user_priv_key))
-        user_ssh_key = SSHKey(public=user_pub_key, private=user_priv_key)
-
         try:
             with console.status("Creating instance..."):
                 # TODO: Instance name is not passed, so --instance does not work.
                 # There is profile.instance_name but it makes sense for `dstack run` only.
-                instance = self.api.runs.create_instance(profile, requirements, user_ssh_key)
+                instance = self.api.runs.create_instance(profile, requirements)
         except ServerClientError as e:
             raise CLIError(e.msg)
         console.print()
@@ -294,22 +293,22 @@ class PoolCommand(APIBaseCommand):
     def _add_ssh(self, args: argparse.Namespace) -> None:
         super()._command(args)
 
-        ssh_keys = []
-
-        try:
-            # TODO: user key must be added during the `run`, not `pool add`
-            user_priv_key = convert_pkcs8_to_pem(
-                Path("~/.dstack/ssh/id_rsa").expanduser().read_text().strip()
-            )
+        # validate network
+        if args.network is not None:
             try:
-                user_pub_key = Path("~/.dstack/ssh/id_rsa.pub").expanduser().read_text().strip()
-            except FileNotFoundError:
-                user_pub_key = generate_public_key(rsa_pkey_from_str(user_priv_key))
-            user_ssh_key = SSHKey(public=user_pub_key, private=user_priv_key)
-            ssh_keys.append(user_ssh_key)
-        except OSError:
-            pass
+                network = ipaddress.IPv4Interface(args.network).network
+            except ValueError as e:
+                console.print(
+                    f"[error]Can't parse network. The address must be in the format <network address>/<netmask>, example `10.0.0.0/24`. Error: {e}[/]"
+                )
+                return
+            if not network.is_private:
+                console.print(
+                    f"[error]The network must be private network. The {network} is not private[/]"
+                )
+                return
 
+        ssh_keys = []
         if args.ssh_identity_file:
             try:
                 private_key = convert_pkcs8_to_pem(args.ssh_identity_file.read_text())
@@ -345,6 +344,7 @@ class PoolCommand(APIBaseCommand):
             project_name=self.api.project,
             pool_name=args.pool_name,
             instance_name=args.instance_name,
+            instance_network=args.network,
             region=args.region,
             host=ssh_host,
             port=ssh_port,
@@ -409,6 +409,10 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
             resources = instance.instance_type.resources.pretty_format()
             spot = "yes" if instance.instance_type.resources.spot else "no"
 
+        status = instance.status.value
+        if instance.status in [InstanceStatus.IDLE, InstanceStatus.BUSY] and instance.unreachable:
+            status += "\n(unreachable)"
+
         row = [
             instance.name,
             (instance.backend or "").replace("remote", "ssh"),
@@ -416,7 +420,7 @@ def get_instance_table(instances: Sequence[Instance]) -> Table:
             resources,
             spot,
             f"${instance.price:.4}" if instance.price is not None else "",
-            instance.status.value,
+            status,
             pretty_date(instance.created),
         ]
         table.add_row(*row)
@@ -449,7 +453,7 @@ def print_offers_table(
     props.add_column(no_wrap=True)  # key
     props.add_column()  # value
 
-    props.add_row(th("Pool name"), profile.pool_name)
+    props.add_row(th("Pool"), profile.pool_name)
     props.add_row(th("Min resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Spot policy"), spot_policy)

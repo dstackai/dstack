@@ -22,13 +22,15 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
     Profile,
     ProfileParams,
+    ProfileRetryPolicy,
+    RetryEvent,
     SpotPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils import common as common_utils
-from dstack._internal.utils.common import pretty_resources
+from dstack._internal.utils.common import format_pretty_duration, pretty_resources
 
 
 class AppSpec(CoreModel):
@@ -58,9 +60,14 @@ class JobStatus(str, Enum):
         return self in self.finished_statuses()
 
 
-class RetryPolicy(CoreModel):
-    retry: bool
-    duration: Optional[int]
+class Retry(CoreModel):
+    on_events: List[RetryEvent]
+    duration: int
+
+    def pretty_format(self) -> str:
+        pretty_duration = format_pretty_duration(self.duration)
+        events = ", ".join(event.value for event in self.on_events)
+        return f"{pretty_duration}[{events}]"
 
 
 class RunTerminationReason(str, Enum):
@@ -187,7 +194,10 @@ class JobSpec(CoreModel):
     max_duration: Optional[int]
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
-    retry_policy: RetryPolicy
+    retry: Optional[Retry]
+    # For backward compatibility with 0.18.x when retry_policy was required.
+    # TODO: remove in 0.19
+    retry_policy: ProfileRetryPolicy = ProfileRetryPolicy(retry=False)
     working_dir: Optional[str]
 
 
@@ -195,9 +205,16 @@ class JobProvisioningData(CoreModel):
     backend: BackendType
     instance_type: InstanceType
     instance_id: str
-    # hostname may not be set immediately after instance provisioning
+    # hostname may not be set immediately after instance provisioning.
+    # It is set to a public IP or, if public IPs are disabled, to a private IP.
     hostname: Optional[str]
     internal_ip: Optional[str]
+    # public_ip_enabled can used to distinguished instances with and without public IPs.
+    # hostname being None is not enough since it can be filled after provisioning.
+    public_ip_enabled: bool = True
+    # instance_network a network address for multimode installation. Specified as `<ip address>/<netmask>`
+    # internal_ip will be selected from the specified network
+    instance_network: Optional[str] = None
     region: str
     price: float
     username: str
@@ -218,6 +235,7 @@ class JobSubmission(CoreModel):
     id: UUID4
     submission_num: int
     submitted_at: datetime
+    last_processed_at: datetime
     finished_at: Optional[datetime]
     status: JobStatus
     termination_reason: Optional[JobTerminationReason]
@@ -316,6 +334,7 @@ class Run(CoreModel):
     project_name: str
     user: str
     submitted_at: datetime
+    last_processed_at: datetime
     status: RunStatus
     termination_reason: Optional[RunTerminationReason]
     run_spec: RunSpec

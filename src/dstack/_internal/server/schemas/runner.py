@@ -71,12 +71,15 @@ class HealthcheckResponse(CoreModel):
     version: str
 
 
-class DockerImageBody(CoreModel):
+class TaskConfigBody(CoreModel):
     username: str
     password: str
     image_name: str
     container_name: str
     shm_size: int
+    public_keys: List[str]
+    ssh_user: str
+    ssh_key: str
 
 
 class StopBody(CoreModel):

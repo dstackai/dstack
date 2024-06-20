@@ -105,22 +105,26 @@ DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
 
 
 class GPUSpec(CoreModel):
-    """
-    The GPU spec
-
-    Attributes:
-        name (Optional[List[str]]): The name of the GPU (e.g., `"A100"` or `"H100"`)
-        count (Optional[Range[int]]): The number of GPUs
-        memory (Optional[Range[Memory]]): The size of a single GPU memory (e.g., `"16GB"`)
-        total_memory (Optional[Range[Memory]]): The total size of all GPUs memory (e.g., `"32GB"`)
-        compute_capability (Optional[float]): The minimum compute capability of the GPU (e.g., `7.5`)
-    """
-
-    name: Optional[List[str]] = None
-    count: Range[int] = DEFAULT_GPU_COUNT
-    memory: Optional[Range[Memory]] = None
-    total_memory: Optional[Range[Memory]] = None
-    compute_capability: Optional[ComputeCapability] = None
+    name: Annotated[
+        Optional[List[str]], Field(description="The name of the GPU (e.g., `A100` or `H100`)")
+    ] = None
+    count: Annotated[Range[int], Field(description="The number of GPUs")] = DEFAULT_GPU_COUNT
+    memory: Annotated[
+        Optional[Range[Memory]],
+        Field(
+            description="The RAM size (e.g., `16GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
+        ),
+    ] = None
+    total_memory: Annotated[
+        Optional[Range[Memory]],
+        Field(
+            description="The total RAM size (e.g., `32GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
+        ),
+    ] = None
+    compute_capability: Annotated[
+        Optional[ComputeCapability],
+        Field(description="The minimum compute capability of the GPU (e.g., `7.5`)"),
+    ] = None
 
     @classmethod
     def __get_validators__(cls):
@@ -165,14 +169,7 @@ MIN_DISK_SIZE = 50
 
 
 class DiskSpec(CoreModel):
-    """
-    The disk spec
-
-    Attributes:
-        size (Range[Memory]): The size of the disk (e.g., `"100GB"`)
-    """
-
-    size: Range[Memory]
+    size: Annotated[Range[Memory], Field(description="Disk size")]
 
     @classmethod
     def __get_validators__(cls):
@@ -198,31 +195,29 @@ DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))
 
 
 class ResourcesSpec(CoreModel):
-    """
-    The minimum resources requirements for the run.
-
-    Attributes:
-        cpu (Optional[Range[int]]): The number of CPUs
-        memory (Optional[Range[Memory]]): The size of RAM memory (e.g., `"16GB"`)
-        gpu (Optional[GPUSpec]): The GPU spec
-        shm_size (Optional[Range[Memory]]): The size of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this
-        disk (Optional[DiskSpec]): The disk spec
-    """
-
     class Config:
         @staticmethod
         def schema_extra(schema: Dict[str, Any]):
             schema.clear()
             # replace strict schema with a more permissive one
-            ref_template = "#/definitions/ResourcesSpec/definitions/{model}"
+            ref_template = "#/definitions/ResourcesSpecRequest/definitions/{model}"
             for field, value in ResourcesSpecSchema.schema(ref_template=ref_template).items():
                 schema[field] = value
 
-    cpu: Range[int] = DEFAULT_CPU_COUNT
-    memory: Range[Memory] = DEFAULT_MEMORY_SIZE
-    shm_size: Optional[Memory] = None
-    gpu: Optional[GPUSpec] = None
-    disk: Optional[DiskSpec] = DEFAULT_DISK
+    cpu: Annotated[Range[int], Field(description="The number of CPU cores")] = DEFAULT_CPU_COUNT
+    memory: Annotated[Range[Memory], Field(description="The RAM size (e.g., `8GB`)")] = (
+        DEFAULT_MEMORY_SIZE
+    )
+    shm_size: Annotated[
+        Optional[Memory],
+        Field(
+            description="The size of shared memory (e.g., `8GB`). "
+            "If you are using parallel communicating processes (e.g., dataloaders in PyTorch), "
+            "you may need to configure this"
+        ),
+    ] = None
+    gpu: Annotated[Optional[GPUSpec], Field(description="The GPU requirements")] = None
+    disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
 
 
 IntRangeLike = Union[Range[Union[int, str]], int, str]
@@ -241,13 +236,13 @@ class GPUSpecSchema(CoreModel):
     memory: Annotated[
         Optional[MemoryRangeLike],
         Field(
-            description="The VRAM size (e.g., `16GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
+            description="The RAM size (e.g., `16GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
         ),
     ] = None
     total_memory: Annotated[
         Optional[MemoryRangeLike],
         Field(
-            description="The total VRAM size (e.g., `32GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
+            description="The total RAM size (e.g., `32GB`). Can be set to a range (e.g. `16GB..`, or `16GB..80GB`)"
         ),
     ] = None
     compute_capability: Annotated[

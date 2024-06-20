@@ -1,6 +1,7 @@
 import argparse
 import os
 from abc import ABC, abstractmethod
+from typing import List, Optional
 
 from rich_argparse import RichHelpFormatter
 
@@ -13,6 +14,7 @@ class BaseCommand(ABC):
     NAME: str = "name the command"
     DESCRIPTION: str = "describe the command"
     DEFAULT_HELP: bool = True
+    ALIASES: Optional[List[str]] = None
 
     def __init__(self, parser: argparse.ArgumentParser):
         self._parser = parser
@@ -22,6 +24,8 @@ class BaseCommand(ABC):
         parser_kwargs = {}
         if cls.DESCRIPTION:
             parser_kwargs["help"] = cls.DESCRIPTION
+        if cls.ALIASES is not None:
+            parser_kwargs["aliases"] = cls.ALIASES
         parser: argparse.ArgumentParser = subparsers.add_parser(
             cls.NAME,
             add_help=False,

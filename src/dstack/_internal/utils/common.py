@@ -2,7 +2,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Iterable, List, Optional, TypeVar, Union
 
 
 def get_dstack_dir() -> Path:
@@ -138,6 +138,22 @@ def parse_pretty_duration(duration: str) -> int:
     return amount * multiplier
 
 
+def format_pretty_duration(seconds: int) -> str:
+    if seconds < 0:
+        raise ValueError("Seconds cannot be negative")
+    units = [
+        ("w", 7 * 24 * 3600),
+        ("d", 24 * 3600),
+        ("h", 3600),
+        ("m", 60),
+        ("s", 1),
+    ]
+    for unit, multiplier in units:
+        if seconds % multiplier == 0:
+            return f"{seconds // multiplier}{unit}"
+    return f"{seconds}s"  # Fallback to seconds if no larger unit fits perfectly
+
+
 def sizeof_fmt(num, suffix="B"):
     for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
         if abs(num) < 1024.0:
@@ -150,6 +166,30 @@ def remove_prefix(text: str, prefix: str) -> str:
     if text.startswith(prefix):
         return text[len(prefix) :]
     return text
+
+
+T = TypeVar("T")
+
+
+def split_chunks(iterable: Iterable[T], chunk_size: int) -> Iterable[List[T]]:
+    """
+    Splits an iterable into chunks of at most `chunk_size` items.
+
+    >>> list(split_chunks([1, 2, 3, 4, 5], 2))
+    [[1, 2], [3, 4], [5]]
+    """
+
+    if chunk_size < 1:
+        raise ValueError(f"chunk_size should be a positive integer, not {chunk_size}")
+
+    chunk = []
+    for item in iterable:
+        chunk.append(item)
+        if len(chunk) == chunk_size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
 
 
 MEMORY_UNITS = {

@@ -5,19 +5,19 @@ from pathlib import Path
 from typing import Optional
 
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.services.configurators.profile import (
-    apply_profile_args,
-    register_profile_args,
-)
 from dstack._internal.cli.services.configurators.run import (
     BaseRunConfigurator,
     run_configurators_mapping,
 )
+from dstack._internal.cli.services.profile import (
+    apply_profile_args,
+    register_profile_args,
+)
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
 from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
-from dstack._internal.core.models.configurations import ConfigurationType
-from dstack._internal.core.models.runs import JobTerminationReason
+from dstack._internal.core.models.configurations import RunConfigurationType
+from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.logging import get_logger
 from dstack.api import RunStatus
@@ -39,7 +39,7 @@ class RunCommand(APIBaseCommand):
             "-h",
             "--help",
             nargs="?",
-            type=ConfigurationType,
+            type=RunConfigurationType,
             default=NOTSET,
             help="Show this help message and exit. TYPE is one of [code]task[/], [code]dev-environment[/], [code]service[/]",
             dest="help",
@@ -83,7 +83,7 @@ class RunCommand(APIBaseCommand):
     def _command(self, args: argparse.Namespace):
         if args.help is not NOTSET:
             if args.help is not None:
-                run_configurators_mapping[ConfigurationType(args.help)].register(self._parser)
+                run_configurators_mapping[RunConfigurationType(args.help)].register(self._parser)
             else:
                 BaseRunConfigurator.register(self._parser)
             self._parser.print_help()
@@ -102,7 +102,7 @@ class RunCommand(APIBaseCommand):
             apply_profile_args(args, conf)
             logger.debug("Configuration loaded: %s", configuration_path)
             parser = argparse.ArgumentParser()
-            configurator = run_configurators_mapping[ConfigurationType(conf.type)]
+            configurator = run_configurators_mapping[RunConfigurationType(conf.type)]
             configurator.register(parser)
             known, unknown = parser.parse_known_args(args.unknown)
             configurator.apply(known, unknown, conf)
@@ -139,7 +139,7 @@ class RunCommand(APIBaseCommand):
             old_run = self.api.runs.get(run_name=args.run_name)
             if old_run is not None:
                 if not args.yes and not confirm_ask(
-                    f"Run [code]{args.run_name}[/] already exist. Override the run?"
+                    f"Run [code]{args.run_name}[/] already exists. Override the run?"
                 ):
                     console.print("\nExiting...")
                     return
@@ -154,49 +154,65 @@ class RunCommand(APIBaseCommand):
             console.print(f"Run [code]{run.name}[/] submitted, detaching...")
             return
 
-        abort_at_exit = True
+        abort_at_exit = False
         try:
-            with console.status(f"Launching [code]{run.name}[/]") as status:
-                while run.status in (
-                    RunStatus.SUBMITTED,
-                    RunStatus.PENDING,
-                    RunStatus.PROVISIONING,
-                ):
-                    job_statuses = "\n".join(
-                        f"  - {job.job_spec.job_name} [secondary]({job.job_submissions[-1].status.value})[/]"
-                        for job in run._run.jobs
-                    )
-                    status.update(
-                        f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]\n{job_statuses}"
-                    )
-                    time.sleep(5)
+            # We can attach to run multiple times if it goes from running to pending (retried).
+            while True:
+                with console.status(f"Launching [code]{run.name}[/]") as status:
+                    while run.status in (
+                        RunStatus.SUBMITTED,
+                        RunStatus.PENDING,
+                        RunStatus.PROVISIONING,
+                    ):
+                        job_statuses = "\n".join(
+                            f"  - {job.job_spec.job_name} [secondary]({job.job_submissions[-1].status.value})[/]"
+                            for job in run._run.jobs
+                        )
+                        status.update(
+                            f"Launching [code]{run.name}[/] [secondary]({run.status.value})[/]\n{job_statuses}"
+                        )
+                        time.sleep(5)
+                        run.refresh()
+                console.print(
+                    f"[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
+                )
+
+                current_job_submission = run._run.latest_job_submission
+                if run.status in (RunStatus.RUNNING, RunStatus.DONE):
+                    if run._run.run_spec.configuration.type == RunConfigurationType.SERVICE.value:
+                        console.print(
+                            f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
+                        )
+                    try:
+                        if run.attach():
+                            for entry in run.logs():
+                                sys.stdout.buffer.write(entry)
+                                sys.stdout.buffer.flush()
+                        else:
+                            console.print("[error]Failed to attach, exiting...[/]")
+                            return
+                    finally:
+                        run.detach()
+
+                # After reading the logs, the run may not be marked as finished immediately.
+                # Give the run some time to transit into a finished state before exiting.
+                reattach = False
+                for _ in range(30):
                     run.refresh()
-            console.print(
-                f"[code]{run.name}[/] provisioning completed [secondary]({run.status.value})[/]"
-            )
-
-            if run.status in (RunStatus.RUNNING, RunStatus.DONE):
-                if run._run.run_spec.configuration.type == ConfigurationType.SERVICE.value:
+                    if _run_resubmitted(run, current_job_submission):
+                        # The run was resubmitted
+                        reattach = True
+                        break
+                    if run.status.is_finished():
+                        _print_finished_message(run)
+                        return
+                    time.sleep(1)
+                if not reattach:
                     console.print(
-                        f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
+                        "[error]Lost run connection. Timed out waiting for run final status."
+                        " Check `dstack ps` to see if it's done or failed."
                     )
-                if run.attach():
-                    for entry in run.logs():
-                        sys.stdout.buffer.write(entry)
-                        sys.stdout.buffer.flush()
-                else:
-                    console.print("[error]Failed to attach, exiting...[/]")
-
-            # After reading the logs, the run may not be marked as finished immediately.
-            # Give the run some time to transit into a finished state before aborting it.
-            for _ in range(15):
-                run.refresh()
-                if run.status.is_finished():
-                    if run.status == RunStatus.FAILED:
-                        _print_fail_message(run)
-                    abort_at_exit = False
-                    break
-                time.sleep(1)
+                    return
         except KeyboardInterrupt:
             try:
                 if not confirm_ask("\nStop the run before detaching?"):
@@ -210,7 +226,6 @@ class RunCommand(APIBaseCommand):
                         time.sleep(2)
                         run.refresh()
                 console.print("Stopped")
-                abort_at_exit = False
             except KeyboardInterrupt:
                 abort_at_exit = True
         finally:
@@ -218,12 +233,19 @@ class RunCommand(APIBaseCommand):
             if abort_at_exit:
                 with console.status("Aborting..."):
                     run.stop(abort=True)
-                console.print("Aborted")
+                console.print("[error]Aborted[/]")
 
 
-def _print_fail_message(run: Run):
+def _print_finished_message(run: Run):
+    if run.status == RunStatus.DONE:
+        console.print("[code]Done[/]")
+        return
+
     termination_reason = _get_run_termination_reason(run)
     message = "Run failed due to unknown reason. Check CLI and server logs."
+    if run.status == RunStatus.TERMINATED:
+        message = "Run terminated due to unknown reason. Check CLI and server logs."
+
     if termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         message = (
             "All provisioning attempts failed. "
@@ -238,13 +260,12 @@ def _print_fail_message(run: Run):
         )
     elif termination_reason == JobTerminationReason.EXECUTOR_ERROR:
         message = (
-            "There is an error with git auth/clone or with command execution "
             f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message} "
             "Check CLI and server logs for more details."
         )
     elif termination_reason is not None:
         message = (
-            f"Run failed with error code {termination_reason}. "
+            f"Run failed with error code {termination_reason.name}. "
             "Check CLI and server logs for more details."
         )
     console.print(f"[error]{message}[/]")
@@ -256,3 +277,12 @@ def _get_run_termination_reason(run: Run) -> Optional[JobTerminationReason]:
         return None
     job_submission = job.job_submissions[0]
     return job_submission.termination_reason
+
+
+def _run_resubmitted(run: Run, current_job_submission: Optional[JobSubmission]) -> bool:
+    if current_job_submission is None or run._run.latest_job_submission is None:
+        return False
+    return run.status == RunStatus.PENDING or (
+        not run.status.is_finished()
+        and run._run.latest_job_submission.submitted_at > current_job_submission.submitted_at
+    )

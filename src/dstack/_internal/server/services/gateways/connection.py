@@ -16,6 +16,9 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
+SERVER_PORT_ON_GATEWAY = 8001
+
+
 class GatewayConnection:
     """
     `GatewayConnection` instances persist for the lifetime of the gateway.
@@ -29,9 +32,8 @@ class GatewayConnection:
         self._lock = aiorwlock.RWLock()
         self.stats: Dict[str, Dict[int, Stat]] = {}
         self.ip_address = ip_address
-
         args = ["-L", "{temp_dir}/gateway:localhost:%d" % GATEWAY_MANAGEMENT_PORT]
-        args += ["-R", f"localhost:8001:localhost:{server_port}"]
+        args += ["-R", f"localhost:{SERVER_PORT_ON_GATEWAY}:localhost:{server_port}"]
         self.tunnel = AsyncSSHTunnel(
             f"ubuntu@{ip_address}",
             id_rsa,

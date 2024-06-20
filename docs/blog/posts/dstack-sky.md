@@ -154,4 +154,4 @@ or even use them side by side.
 
 `dstack Sky`  is live on [Product Hunt](https://www.producthunt.com/posts/dstack-sky). Support it by giving it your vote!
 
-[Join Discord](https://discord.gg/u8SmfwPpMd){ .md-button .md-button-secondary .discord .small }
+[Join Discord](https://discord.gg/u8SmfwPpMd){ .md-button .md-button-secondary .discord .small .external }

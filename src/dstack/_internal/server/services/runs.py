@@ -38,7 +38,6 @@ from dstack._internal.core.models.profiles import (
     Profile,
     SpotPolicy,
     TerminationPolicy,
-    parse_duration,
 )
 from dstack._internal.core.models.runs import (
     InstanceStatus,
@@ -50,7 +49,6 @@ from dstack._internal.core.models.runs import (
     JobSubmission,
     JobTerminationReason,
     Requirements,
-    RetryPolicy,
     Run,
     RunPlan,
     RunSpec,
@@ -169,7 +167,7 @@ async def list_user_runs(
     runs = []
     for r in run_models:
         try:
-            runs.append(run_model_to_run(r))
+            runs.append(run_model_to_run(r, return_in_api=True))
         except pydantic.ValidationError:
             pass
     if len(run_models) > len(runs):
@@ -252,7 +250,7 @@ async def get_run(
     run_model = res.scalar()
     if run_model is None:
         return None
-    return run_model_to_run(run_model)
+    return run_model_to_run(run_model, return_in_api=True)
 
 
 async def get_run_plan(
@@ -428,7 +426,7 @@ async def submit_run(
     await session.commit()
     await session.refresh(run_model)
 
-    run = run_model_to_run(run_model)
+    run = run_model_to_run(run_model, return_in_api=True)
     return run
 
 
@@ -553,7 +551,6 @@ async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
-    ssh_key: SSHKey,
     profile: Profile,
     requirements: Requirements,
 ) -> Instance:
@@ -584,46 +581,25 @@ async def create_instance(
     instance_name = await generate_instance_name(
         session=session, project=project, pool_name=pool.name
     )
-    user_ssh_key = ssh_key
-    project_ssh_key = SSHKey(
-        public=project.ssh_public_key.strip(),
-        private=project.ssh_private_key.strip(),
-    )
-    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
-    instance_config = InstanceConfiguration(
-        project_name=project.name,
-        instance_name=instance_name,
-        ssh_keys=[user_ssh_key, project_ssh_key],
-        job_docker_config=DockerConfig(
-            image=dstack_default_image,
-            registry_auth=None,
-        ),
-        user=user.name,
-    )
 
     termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
     termination_idle_time = profile.termination_idle_time
     if termination_idle_time is None:
         termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
 
-    retry_policy = RetryPolicy(retry=False, duration=None)
-    if profile.retry_policy is not None:
-        retry_policy.retry = profile.retry_policy.retry
-        retry_policy.duration = parse_duration(profile.retry_policy.duration)
-
     instance = InstanceModel(
+        id=uuid.uuid4(),
         name=instance_name,
         project=project,
         pool=pool,
         created_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PENDING,
+        unreachable=False,
         profile=profile.json(),
         requirements=requirements.json(),
-        instance_configuration=instance_config.json(),
+        instance_configuration=None,
         termination_policy=termination_policy,
         termination_idle_time=termination_idle_time,
-        retry_policy=retry_policy.retry,
-        retry_policy_duration=retry_policy.duration,
     )
     logger.info(
         "Added a new instance %s",
@@ -636,10 +612,31 @@ async def create_instance(
     session.add(instance)
     await session.commit()
 
+    project_ssh_key = SSHKey(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
+    instance_config = InstanceConfiguration(
+        project_name=project.name,
+        instance_name=instance_name,
+        instance_id=str(instance.id),
+        ssh_keys=[project_ssh_key],
+        job_docker_config=DockerConfig(
+            image=dstack_default_image,
+            registry_auth=None,
+        ),
+        user=user.name,
+    )
+    instance.instance_configuration = instance_config.json()
+    await session.commit()
+
     return instance_model_to_instance(instance)
 
 
-def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) -> Run:
+def run_model_to_run(
+    run_model: RunModel, include_job_submissions: bool = True, return_in_api: bool = False
+) -> Run:
     jobs: List[Job] = []
     run_jobs = sorted(run_model.jobs, key=lambda j: (j.replica_num, j.job_num, j.submission_num))
     for replica_num, replica_submissions in itertools.groupby(
@@ -654,7 +651,16 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
                 if job_spec is None:
                     job_spec = JobSpec.__response__.parse_raw(job_model.job_spec_data)
                 if include_job_submissions:
-                    submissions.append(job_model_to_job_submission(job_model))
+                    job_submission = job_model_to_job_submission(job_model)
+                    if return_in_api:
+                        # Set default non-None values for 0.18 backward-compatibility
+                        # Remove in 0.19
+                        if job_submission.job_provisioning_data is not None:
+                            if job_submission.job_provisioning_data.hostname is None:
+                                job_submission.job_provisioning_data.hostname = ""
+                            if job_submission.job_provisioning_data.ssh_port is None:
+                                job_submission.job_provisioning_data.ssh_port = 22
+                    submissions.append(job_submission)
             if job_spec is not None:
                 jobs.append(Job(job_spec=job_spec, job_submissions=submissions))
 
@@ -675,6 +681,7 @@ def run_model_to_run(run_model: RunModel, include_job_submissions: bool = True) 
         project_name=run_model.project.name,
         user=run_model.user.name,
         submitted_at=run_model.submitted_at.replace(tzinfo=timezone.utc),
+        last_processed_at=run_model.last_processed_at.replace(tzinfo=timezone.utc),
         status=run_model.status,
         termination_reason=run_model.termination_reason,
         run_spec=run_spec,
@@ -714,6 +721,8 @@ def _get_pool_offers(
         offer.availability = InstanceAvailability.BUSY
         if instance.status == InstanceStatus.IDLE:
             offer.availability = InstanceAvailability.IDLE
+        if instance.unreachable:
+            offer.availability = InstanceAvailability.NOT_AVAILABLE
         pool_offers.append(offer)
     return pool_offers
 
@@ -894,14 +903,13 @@ async def retry_run_replica_jobs(
     session: AsyncSession, run_model: RunModel, latest_jobs: List[JobModel], *, only_failed: bool
 ):
     for job_model in latest_jobs:
-        if job_model.termination_reason not in JOB_TERMINATION_REASONS_TO_RETRY:
+        if not (job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING):
             if only_failed:
                 # No need to resubmit, skip
                 continue
-            if not (job_model.status.is_finished() or job_model.status == JobStatus.TERMINATING):
-                # The job is not finished, but we have to retry all jobs. Terminate it
-                job_model.status = JobStatus.TERMINATING
-                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            # The job is not finished, but we have to retry all jobs. Terminate it
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
 
         new_job_model = create_job_model_for_new_submission(
             run_model=run_model,

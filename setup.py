@@ -63,7 +63,7 @@ BASE_DEPS = [
     "cachetools",
     "dnspython",
     "grpcio>=1.50",  # indirect
-    "gpuhunt>=0.0.9rc3",
+    "gpuhunt>=0.0.10",
     "sentry-sdk[fastapi]",
     "httpx",
     "aiorwlock",
@@ -79,7 +79,7 @@ AZURE_DEPS = [
     "azure-identity>=1.12.0",
     "azure-mgmt-subscription>=3.1.1",
     "azure-mgmt-compute>=29.1.0",
-    "azure-mgmt-network==23.0.0b2",
+    "azure-mgmt-network>=23.0.0",
     "azure-mgmt-resource>=22.0.0",
     "azure-mgmt-authorization>=3.0.0",
 ]
@@ -91,6 +91,7 @@ GCP_DEPS = [
     "google-cloud-logging>=2.0.0",
     "google-api-python-client>=2.80.0",
     "google-cloud-billing>=1.11.0",
+    "google-cloud-tpu>=1.18.3",
 ]
 
 DATACRUNCH_DEPS = ["datacrunch"]
@@ -99,7 +100,9 @@ KUBERNETES_DEPS = ["kubernetes"]
 
 LAMBDA_DEPS = AWS_DEPS
 
-ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS
+OCI_DEPS = ["oci"]
+
+ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS + OCI_DEPS
 
 
 setup(
@@ -134,6 +137,7 @@ setup(
         "gcp": GCP_DEPS,
         "kubernetes": KUBERNETES_DEPS,
         "lambda": LAMBDA_DEPS,
+        "oci": OCI_DEPS,
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

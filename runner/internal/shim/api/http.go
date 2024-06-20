@@ -28,18 +28,18 @@ func (s *ShimServer) SubmitPostHandler(w http.ResponseWriter, r *http.Request) (
 		return nil, &api.Error{Status: http.StatusConflict}
 	}
 
-	var body DockerTaskBody
+	var body TaskConfigBody
 	if err := api.DecodeJSONBody(w, r, &body, true); err != nil {
 		log.Println("Failed to decode submit body", "err", err)
 		return nil, err
 	}
 
-	go func(taskParams shim.DockerImageConfig) {
-		err := s.runner.Run(context.Background(), taskParams)
+	go func(taskConfig shim.TaskConfig) {
+		err := s.runner.Run(context.Background(), taskConfig)
 		if err != nil {
 			fmt.Printf("failed Run %v\n", err)
 		}
-	}(body.TaskParams())
+	}(body.GetTaskConfig())
 
 	return nil, nil
 }

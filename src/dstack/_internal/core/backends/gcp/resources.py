@@ -1,11 +1,18 @@
+import random
+import re
+import string
 from typing import Dict, List, Optional
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
 from google.api_core.extended_operation import ExtendedOperation
+from google.api_core.operation import Operation
+from google.cloud import tpu_v2
 
 import dstack.version as version
+from dstack._internal.core.errors import ComputeError
 from dstack._internal.core.models.instances import Gpu
+from dstack._internal.utils.common import remove_prefix
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -23,6 +30,58 @@ supported_accelerators = [
 ]
 
 
+def check_vpc(
+    network_client: compute_v1.NetworksClient,
+    routers_client: compute_v1.RoutersClient,
+    project_id: str,
+    regions: List[str],
+    allocate_public_ip: bool,
+    vpc_name: Optional[str] = None,
+    shared_vpc_project_id: Optional[str] = None,
+):
+    if vpc_name is None:
+        vpc_name = "default"
+    vpc_project_id = project_id
+    if shared_vpc_project_id:
+        vpc_project_id = shared_vpc_project_id
+    try:
+        network_client.get(project=vpc_project_id, network=vpc_name)
+    except google.api_core.exceptions.NotFound:
+        raise ComputeError(f"Failed to find VPC {vpc_name} in project {vpc_project_id}")
+
+    if allocate_public_ip:
+        return
+
+    regions_without_nat = []
+    for region in regions:
+        if not has_vpc_nat_access(routers_client, vpc_project_id, vpc_name, region):
+            regions_without_nat.append(region)
+
+    if regions_without_nat:
+        raise ComputeError(
+            f"VPC {vpc_name} in project {vpc_project_id} does not have Cloud NAT configured for external internet access in regions: {regions_without_nat}"
+        )
+
+
+def has_vpc_nat_access(
+    routers_client: compute_v1.RoutersClient,
+    project_id: str,
+    vpc_name: str,
+    region: str,
+) -> bool:
+    try:
+        routers = routers_client.list(project=project_id, region=region)
+    except google.api_core.exceptions.NotFound:
+        return False
+
+    for router in routers:
+        if router.network.endswith(vpc_name):
+            if len(router.nats) > 0:
+                return True
+
+    return False
+
+
 def create_instance_struct(
     disk_size: int,
     image_id: str,
@@ -37,15 +96,22 @@ def create_instance_struct(
     zone: str,
     service_account: Optional[str] = None,
     network: str = "global/networks/default",
+    subnetwork: Optional[str] = None,
+    allocate_public_ip: bool = True,
 ) -> compute_v1.Instance:
     network_interface = compute_v1.NetworkInterface()
-    network_interface.name = network
+    network_interface.network = network
+    if subnetwork is not None:
+        network_interface.subnetwork = subnetwork
 
-    access = compute_v1.AccessConfig()
-    access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
-    access.name = "External NAT"
-    access.network_tier = access.NetworkTier.PREMIUM.name
-    network_interface.access_configs = [access]
+    if allocate_public_ip:
+        access = compute_v1.AccessConfig()
+        access.type_ = compute_v1.AccessConfig.Type.ONE_TO_ONE_NAT.name
+        access.name = "External NAT"
+        access.network_tier = access.NetworkTier.PREMIUM.name
+        network_interface.access_configs = [access]
+    else:
+        network_interface.access_configs = []
 
     instance = compute_v1.Instance()
     instance.network_interfaces = [network_interface]
@@ -110,13 +176,40 @@ def get_gateway_image_id() -> str:
     return "projects/ubuntu-os-cloud/global/images/ubuntu-2204-jammy-v20230714"
 
 
+def get_vpc_subnet_or_error(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    vpc_project_id: str,
+    vpc_name: str,
+    region: str,
+) -> str:
+    """
+    Returns resource name of any usable subnet in a given VPC
+    (e.g. "projects/example-project/regions/europe-west4/subnetworks/example-subnet")
+    """
+    request = compute_v1.ListUsableSubnetworksRequest(project=vpc_project_id)
+    for subnet in subnetworks_client.list_usable(request=request):
+        network_name = subnet.network.split("/")[-1]
+        subnet_url = subnet.subnetwork
+        subnet_resource_name = remove_prefix(subnet_url, "https://www.googleapis.com/compute/v1/")
+        subnet_region = subnet_resource_name.split("/")[3]
+        if network_name == vpc_name and subnet_region == region:
+            return subnet_resource_name
+    raise ComputeError(
+        f"No usable subnetwork found in region {region} for VPC {vpc_name} in project {vpc_project_id}"
+    )
+
+
 def create_runner_firewall_rules(
     firewalls_client: compute_v1.FirewallsClient,
     project_id: str,
     network: str = "global/networks/default",
 ):
+    network_name = network.split("/")[-1]
+    firewall_rule_name = "dstack-ssh-in-" + network.replace("/", "-")
+    if not is_valid_resource_name(firewall_rule_name):
+        firewall_rule_name = "dstack-ssh-in-" + network_name
     firewall_rule = compute_v1.Firewall()
-    firewall_rule.name = "dstack-ssh-in-" + network.replace("/", "-")
+    firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"
 
     allowed_ssh_port = compute_v1.Allowed()
@@ -142,13 +235,17 @@ def create_gateway_firewall_rules(
     project_id: str,
     network: str = "global/networks/default",
 ):
+    network_name = network.split("/")[-1]
+    firewall_rule_name = "dstack-gateway-in-all-" + network.replace("/", "-")
+    if not is_valid_resource_name(firewall_rule_name):
+        firewall_rule_name = "dstack-gateway-in-all-" + network_name
     firewall_rule = compute_v1.Firewall()
-    firewall_rule.name = "dstack-gateway-in-all-" + network.replace("/", "-")
+    firewall_rule.name = firewall_rule_name
     firewall_rule.direction = "INGRESS"
 
     allowed_ports = compute_v1.Allowed()
     allowed_ports.I_p_protocol = "tcp"
-    allowed_ports.ports = ["0-65535"]
+    allowed_ports.ports = ["22", "80", "443"]
 
     firewall_rule.allowed = [allowed_ports]
     firewall_rule.source_ranges = ["0.0.0.0/0"]
@@ -184,19 +281,80 @@ def get_accelerators(
     return [accelerator_config]
 
 
+NAME_PATTERN = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
+
+LABEL_VALUE_PATTERN = re.compile(r"^[-a-z0-9]{0,63}$")
+
+
+def is_valid_resource_name(name: str) -> bool:
+    if len(name) < 1 or len(name) > 63:
+        return False
+    match = re.match(NAME_PATTERN, name)
+    return match is not None
+
+
+def is_valid_label_value(value: str) -> bool:
+    match = re.match(LABEL_VALUE_PATTERN, value)
+    return match is not None
+
+
+def generate_random_resource_name(length: int = 40) -> str:
+    return random.choice(string.ascii_lowercase) + "".join(
+        random.choice(string.ascii_lowercase + string.digits) for _ in range(length)
+    )
+
+
+def create_tpu_node_struct(
+    instance_name: str,
+    startup_script: str,
+    authorized_keys: List[str],
+    spot: bool,
+    labels: Dict[str, str],
+    subnetwork: Optional[str] = None,
+) -> tpu_v2.Node:
+    node = tpu_v2.Node()
+    if spot:
+        node.scheduling_config = tpu_v2.SchedulingConfig(preemptible=True)
+    node.accelerator_type = instance_name
+    node.runtime_version = "tpu-ubuntu2204-base"
+    # subnetwork determines the network, so network shouldn't be specified
+    node.network_config = tpu_v2.NetworkConfig(
+        enable_external_ips=True,
+        subnetwork=subnetwork,
+    )
+    ssh_keys = "\n".join(f"ubuntu:{key}" for key in authorized_keys)
+    node.metadata = {"ssh-keys": ssh_keys, "startup-script": startup_script}
+    node.labels = labels
+    return node
+
+
 def wait_for_extended_operation(
     operation: ExtendedOperation, verbose_name: str = "operation", timeout: int = 300
 ):
     result = operation.result(timeout=timeout)
 
     if operation.error_code:
-        logger.error(
+        # Write only debug logs here.
+        # The unexpected errors will be propagated and logged appropriatly by the caller.
+        logger.debug(
             "Error during %s: [Code: %s]: %s",
             verbose_name,
             operation.error_code,
             operation.error_message,
         )
-        logger.error("Operation ID: %s", operation.name)
+        logger.debug("Operation ID: %s", operation.name)
         raise operation.exception() or RuntimeError(operation.error_message)
 
+    return result
+
+
+def wait_for_operation(operation: Operation, verbose_name: str = "operation", timeout: int = 300):
+    try:
+        result = operation.result(timeout=timeout)
+    except Exception as e:
+        # Write only debug logs here.
+        # The unexpected errors will be propagated and logged appropriatly by the caller.
+        logger.debug("Error during %s: %s", verbose_name, e)
+        logger.debug("Operation ID: %s", operation)
+        raise operation.exception() or RuntimeError(str(e))
     return result

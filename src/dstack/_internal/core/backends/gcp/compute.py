@@ -4,6 +4,7 @@ from typing import Callable, Dict, List, Optional
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
+from google.cloud import tpu_v2
 
 import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
@@ -11,12 +12,18 @@ from dstack._internal.core.backends.base.compute import (
     Compute,
     get_gateway_user_data,
     get_instance_name,
+    get_shim_commands,
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.gcp.config import GCPConfig
-from dstack._internal.core.errors import ComputeResourceNotFoundError, NoCapacityError
+from dstack._internal.core.errors import (
+    ComputeError,
+    ComputeResourceNotFoundError,
+    NoCapacityError,
+)
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.gateways import GatewayComputeConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -28,6 +35,9 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class GCPCompute(Compute):
@@ -37,6 +47,9 @@ class GCPCompute(Compute):
         self.instances_client = compute_v1.InstancesClient(credentials=self.credentials)
         self.firewalls_client = compute_v1.FirewallsClient(credentials=self.credentials)
         self.regions_client = compute_v1.RegionsClient(credentials=self.credentials)
+        self.subnetworks_client = compute_v1.SubnetworksClient(credentials=self.credentials)
+        self.routers_client = compute_v1.RoutersClient(credentials=self.credentials)
+        self.tpu_client = tpu_v2.TpuClient(credentials=self.credentials)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -62,7 +75,7 @@ class GCPCompute(Compute):
             availability = InstanceAvailability.NO_QUOTA
             if _has_gpu_quota(quotas[region], offer.instance.resources):
                 availability = InstanceAvailability.UNKNOWN
-            # todo quotas: cpu, memory, global gpu
+            # todo quotas: cpu, memory, global gpu, tpu
             offers_with_availability.append(
                 InstanceOfferWithAvailability(**offer.dict(), availability=availability)
             )
@@ -74,15 +87,24 @@ class GCPCompute(Compute):
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
         # Old instances have region set to zone, e.g. us-central1-a.
-        # New instance have region set to region, e.g. us-central1. Zone in stored in backend_data.
+        # New instance have region set to region, e.g. us-central1. Zone is stored in backend_data.
         zone = region
+        is_tpu = False
         if backend_data is not None:
             backend_data_dict = json.loads(backend_data)
             zone = backend_data_dict["zone"]
+            is_tpu = backend_data_dict.get("is_tpu", False)
         try:
-            self.instances_client.delete(
-                project=self.config.project_id, zone=zone, instance=instance_id
-            )
+            if is_tpu:
+                name = f"projects/{self.project_id}/locations/{zone}/nodes/{instance_id}"
+                delete_request = tpu_v2.DeleteNodeRequest(
+                    name=name,
+                )
+                self.tpu_client.delete_node(request=delete_request)
+            else:
+                self.instances_client.delete(
+                    project=self.config.project_id, zone=zone, instance=instance_id
+                )
         except google.api_core.exceptions.NotFound:
             pass
 
@@ -92,14 +114,104 @@ class GCPCompute(Compute):
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
         instance_name = instance_config.instance_name
+        allocate_public_ip = self.config.allocate_public_ips
+        if not gcp_resources.is_valid_resource_name(instance_name):
+            # In a rare case the instance name is invalid in GCP,
+            # we better use a random instance name than fail provisioning.
+            instance_name = gcp_resources.generate_random_resource_name()
+            logger.warning(
+                "Invalid GCP instance name: %s. A new valid name is generated: %s",
+                instance_config.instance_name,
+                instance_name,
+            )
 
         authorized_keys = instance_config.get_public_keys()
 
-        gcp_resources.create_runner_firewall_rules(
-            firewalls_client=self.firewalls_client,
-            project_id=self.config.project_id,
-        )
+        # If a shared VPC is not used, we can create firewall rules for user
+        if self.config.vpc_project_id is None:
+            gcp_resources.create_runner_firewall_rules(
+                firewalls_client=self.firewalls_client,
+                project_id=self.config.project_id,
+                network=self.config.vpc_resource_name,
+            )
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+        # Choose any usable subnet in a VPC.
+        # Configuring a specific subnet per region is not supported yet.
+        subnetwork = _get_vpc_subnet(
+            subnetworks_client=self.subnetworks_client,
+            config=self.config,
+            region=instance_offer.region,
+        )
+        labels = {
+            "owner": "dstack",
+            "dstack_project": instance_config.project_name.lower(),
+            "dstack_user": instance_config.user.lower(),
+        }
+        labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
+        tpu = (
+            _is_tpu(instance_offer.instance.resources.gpus[0].name)
+            if instance_offer.instance.resources.gpus
+            else False
+        )
+        if tpu:
+            instance_id = f"tpu-{instance_config.instance_name}"
+            startup_script = _get_tpu_startup_script(authorized_keys)
+            for zone in _get_instance_zones(instance_offer):
+                tpu_node = gcp_resources.create_tpu_node_struct(
+                    instance_name=instance_offer.instance.name,
+                    startup_script=startup_script,
+                    authorized_keys=authorized_keys,
+                    spot=instance_offer.instance.resources.spot,
+                    labels=labels,
+                    subnetwork=subnetwork,
+                )
+                create_node_request = tpu_v2.CreateNodeRequest(
+                    parent=f"projects/{self.config.project_id}/locations/{zone}",
+                    node_id=instance_id,
+                    node=tpu_node,
+                )
+                try:
+                    operation = self.tpu_client.create_node(request=create_node_request)
+                    gcp_resources.wait_for_operation(
+                        operation, verbose_name="tpu instance creation"
+                    )
+                except (
+                    google.api_core.exceptions.ServiceUnavailable,
+                    google.api_core.exceptions.NotFound,
+                    google.api_core.exceptions.ResourceExhausted,
+                ):
+                    continue
+                node_request = tpu_v2.GetNodeRequest(
+                    name=f"projects/dstack/locations/{zone}/nodes/{instance_id}",
+                )
+                instance = self.tpu_client.get_node(request=node_request)
+                return JobProvisioningData(
+                    backend=instance_offer.backend,
+                    instance_type=instance_offer.instance,
+                    instance_id=instance_id,
+                    hostname=instance.network_endpoints[0].access_config.external_ip,
+                    internal_ip=None,
+                    region=zone,
+                    price=instance_offer.price,
+                    ssh_port=22,
+                    username="ubuntu",
+                    ssh_proxy=None,
+                    dockerized=True,
+                    backend_data=json.dumps({"is_tpu": tpu, "zone": zone}),
+                )
+            raise NoCapacityError()
+
+        if not allocate_public_ip and not gcp_resources.has_vpc_nat_access(
+            routers_client=self.routers_client,
+            project_id=self.config.vpc_project_id or self.config.project_id,
+            vpc_name=self.config.vpc_resource_name,
+            region=instance_offer.region,
+        ):
+            raise ComputeError(
+                "VPC does not have access to the external internet through Cloud NAT. "
+                f"Region: {instance_offer.region}, VPC name: {self.config.vpc_resource_name}, "
+                f"Project ID: {self.config.vpc_project_id or self.config.project_id}."
+            )
 
         for zone in _get_instance_zones(instance_offer):
             request = compute_v1.InsertInstanceRequest()
@@ -119,14 +231,13 @@ class GCPCompute(Compute):
                 spot=instance_offer.instance.resources.spot,
                 user_data=get_user_data(authorized_keys),
                 authorized_keys=authorized_keys,
-                labels={
-                    "owner": "dstack",
-                    "dstack_project": instance_config.project_name.lower(),
-                    "dstack_user": instance_config.user.lower(),
-                },
+                labels=labels,
                 tags=[gcp_resources.DSTACK_INSTANCE_TAG],
                 instance_name=instance_name,
                 zone=zone,
+                network=self.config.vpc_resource_name,
+                subnetwork=subnetwork,
+                allocate_public_ip=allocate_public_ip,
             )
             try:
                 operation = self.instances_client.insert(request=request)
@@ -139,11 +250,16 @@ class GCPCompute(Compute):
             instance = self.instances_client.get(
                 project=self.config.project_id, zone=zone, instance=instance_name
             )
+            if allocate_public_ip:
+                hostname = instance.network_interfaces[0].access_configs[0].nat_i_p
+            else:
+                hostname = instance.network_interfaces[0].network_i_p
             return JobProvisioningData(
                 backend=instance_offer.backend,
                 instance_type=instance_offer.instance,
                 instance_id=instance_name,
-                hostname=instance.network_interfaces[0].access_configs[0].nat_i_p,
+                public_ip_enabled=allocate_public_ip,
+                hostname=hostname,
                 internal_ip=instance.network_interfaces[0].network_i_p,
                 region=instance_offer.region,
                 price=instance_offer.price,
@@ -167,7 +283,6 @@ class GCPCompute(Compute):
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
             ssh_keys=[
-                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
             job_docker_config=None,
@@ -177,22 +292,28 @@ class GCPCompute(Compute):
 
     def create_gateway(
         self,
-        instance_name: str,
-        ssh_key_pub: str,
-        region: str,
-        project_id: str,
+        configuration: GatewayComputeConfiguration,
     ) -> LaunchedGatewayInfo:
-        gcp_resources.create_gateway_firewall_rules(
-            firewalls_client=self.firewalls_client,
-            project_id=self.config.project_id,
-        )
-        # e2-micro is available in every zone
+        if self.config.vpc_project_id is None:
+            gcp_resources.create_gateway_firewall_rules(
+                firewalls_client=self.firewalls_client,
+                project_id=self.config.project_id,
+                network=self.config.vpc_resource_name,
+            )
         for i in self.regions_client.list(project=self.config.project_id):
-            if i.name == region:
+            if i.name == configuration.region:
                 zone = i.zones[0].split("/")[-1]
                 break
         else:
             raise ComputeResourceNotFoundError()
+
+        # Choose any usable subnet in a VPC.
+        # Configuring a specific subnet per region is not supported yet.
+        subnetwork = _get_vpc_subnet(
+            subnetworks_client=self.subnetworks_client,
+            config=self.config,
+            region=configuration.region,
+        )
 
         request = compute_v1.InsertInstanceRequest()
         request.zone = zone
@@ -200,30 +321,60 @@ class GCPCompute(Compute):
         request.instance_resource = gcp_resources.create_instance_struct(
             disk_size=10,
             image_id=gcp_resources.get_gateway_image_id(),
-            machine_type="e2-micro",
+            machine_type="e2-small",
             accelerators=[],
             spot=False,
-            user_data=get_gateway_user_data(ssh_key_pub),
-            authorized_keys=[ssh_key_pub],
+            user_data=get_gateway_user_data(configuration.ssh_key_pub),
+            authorized_keys=[configuration.ssh_key_pub],
             labels={
                 "owner": "dstack",
-                "dstack_project": project_id,
+                "dstack_project": configuration.project_name,
             },
             tags=[gcp_resources.DSTACK_GATEWAY_TAG],
-            instance_name=instance_name,
+            instance_name=configuration.instance_name,
             zone=zone,
             service_account=None,
+            network=self.config.vpc_resource_name,
+            subnetwork=subnetwork,
         )
         operation = self.instances_client.insert(request=request)
         gcp_resources.wait_for_extended_operation(operation, "instance creation")
         instance = self.instances_client.get(
-            project=self.config.project_id, zone=zone, instance=instance_name
+            project=self.config.project_id, zone=zone, instance=configuration.instance_name
         )
         return LaunchedGatewayInfo(
-            instance_id=instance_name,
-            region=zone,  # used for instance termination
+            instance_id=configuration.instance_name,
+            region=configuration.region,  # used for instance termination
             ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
+            backend_data=json.dumps({"zone": zone}),
         )
+
+    def terminate_gateway(
+        self,
+        instance_id: str,
+        configuration: GatewayComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
+        self.terminate_instance(
+            instance_id=instance_id,
+            region=configuration.region,
+            backend_data=backend_data,
+        )
+
+
+def _get_vpc_subnet(
+    subnetworks_client: compute_v1.SubnetworksClient,
+    config: GCPConfig,
+    region: str,
+) -> Optional[str]:
+    if config.vpc_name is None:
+        return None
+    return gcp_resources.get_vpc_subnet_or_error(
+        subnetworks_client=subnetworks_client,
+        vpc_project_id=config.vpc_project_id or config.project_id,
+        vpc_name=config.vpc_name,
+        region=region,
+    )
 
 
 def _supported_instances_and_zones(
@@ -232,6 +383,9 @@ def _supported_instances_and_zones(
     def _filter(offer: InstanceOffer) -> bool:
         # strip zone
         if offer.region[:-2] not in regions:
+            return False
+        # remove TPU Pod for initial release
+        if _is_tpu(f"tpu-{offer.instance.name}") and _is_pod(offer.instance.name):
             return False
         for family in [
             "e2-medium",
@@ -256,6 +410,8 @@ def _has_gpu_quota(quotas: Dict[str, float], resources: Resources) -> bool:
     if not resources.gpus:
         return True
     gpu = resources.gpus[0]
+    if _is_tpu(gpu.name):
+        return True
     quota_name = f"NVIDIA_{gpu.name}_GPUS"
     if gpu.name == "A100" and gpu.memory_mib == 80 * 1024:
         quota_name = "NVIDIA_A100_80GB_GPUS"
@@ -284,3 +440,38 @@ def _get_instance_zones(instance_offer: InstanceOffer) -> List[str]:
             continue
         zones.append(offer.region)
     return zones
+
+
+def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
+    commands = get_shim_commands(authorized_keys=authorized_keys)
+    startup_script = " ".join([" && ".join(commands)])
+    startup_script = "#! /bin/bash\n" + startup_script
+    return startup_script
+
+
+def _is_tpu(name: str) -> bool:
+    tpu_versions = ["tpu-v2", "tpu-v3", "tpu-v4", "tpu-v5p", "tpu-v5litepod"]
+    parts = name.split("-")
+    if len(parts) == 3:
+        version = f"{parts[0]}-{parts[1]}"
+        cores = parts[2]
+        if version in tpu_versions and cores.isdigit():
+            return True
+    return False
+
+
+def _is_pod(instance_name: str) -> bool:
+    parts = instance_name.split("-")
+    if len(parts) != 2:
+        raise ValueError(f"Invalid tpu type: {instance_name}")
+    version, tensor_cores = parts
+    try:
+        tensor_cores = int(tensor_cores)
+    except ValueError:
+        raise ValueError(f"Invalid number in tpu tensor cores: {tensor_cores}")
+    if version in ["v2", "v3"]:
+        return tensor_cores > 8
+    elif version in ["v4", "v5p", "v5litepod"]:
+        return True
+    else:
+        raise ValueError(f"Unknown TPU version: {version}")

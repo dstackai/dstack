@@ -3,7 +3,9 @@ import argparse
 from rich.markup import escape
 from rich_argparse import RichHelpFormatter
 
+from dstack._internal.cli.commands.apply import ApplyCommand
 from dstack._internal.cli.commands.config import ConfigCommand
+from dstack._internal.cli.commands.delete import DeleteCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogsCommand
@@ -50,7 +52,9 @@ def main():
     parser.set_defaults(func=lambda _: parser.print_help())
 
     subparsers = parser.add_subparsers(metavar="COMMAND")
+    ApplyCommand.register(subparsers)
     ConfigCommand.register(subparsers)
+    DeleteCommand.register(subparsers)
     GatewayCommand.register(subparsers)
     PoolCommand.register(subparsers)
     InitCommand.register(subparsers)

@@ -11,10 +11,10 @@ from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import (
     BaseConfiguration,
     BaseConfigurationWithPorts,
-    ConfigurationType,
     DevEnvironmentConfiguration,
     EnvSentinel,
     PortMapping,
+    RunConfigurationType,
     ServiceConfiguration,
     TaskConfiguration,
 )
@@ -22,7 +22,7 @@ from dstack._internal.utils.interpolator import VariablesInterpolator
 
 
 class BaseRunConfigurator:
-    TYPE: ConfigurationType = None
+    TYPE: RunConfigurationType = None
 
     @classmethod
     def register(cls, parser: argparse.ArgumentParser):
@@ -102,7 +102,7 @@ class RunWithPortsConfigurator(BaseRunConfigurator):
 
 
 class TaskRunConfigurator(RunWithPortsConfigurator):
-    TYPE = ConfigurationType.TASK
+    TYPE = RunConfigurationType.TASK
 
     @classmethod
     def apply(cls, args: argparse.Namespace, unknown: List[str], conf: TaskConfiguration):
@@ -112,7 +112,7 @@ class TaskRunConfigurator(RunWithPortsConfigurator):
 
 
 class DevEnvironmentRunConfigurator(RunWithPortsConfigurator):
-    TYPE = ConfigurationType.DEV_ENVIRONMENT
+    TYPE = RunConfigurationType.DEV_ENVIRONMENT
 
     @classmethod
     def apply(
@@ -130,7 +130,7 @@ class DevEnvironmentRunConfigurator(RunWithPortsConfigurator):
 
 
 class ServiceRunConfigurator(BaseRunConfigurator):
-    TYPE = ConfigurationType.SERVICE
+    TYPE = RunConfigurationType.SERVICE
 
     @classmethod
     def apply(cls, args: argparse.Namespace, unknown: List[str], conf: ServiceConfiguration):
@@ -169,7 +169,7 @@ def _detect_vscode_version(exe: str = "code") -> Optional[str]:
     return None
 
 
-run_configurators_mapping: Dict[ConfigurationType, Type[BaseRunConfigurator]] = {
+run_configurators_mapping: Dict[RunConfigurationType, Type[BaseRunConfigurator]] = {
     cls.TYPE: cls
     for cls in [
         TaskRunConfigurator,

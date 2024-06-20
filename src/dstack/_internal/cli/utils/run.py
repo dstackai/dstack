@@ -1,12 +1,18 @@
-from typing import List
+from typing import List, Optional
 
+from rich.markup import escape
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import add_row_from_dict, console
 from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import TerminationPolicy
-from dstack._internal.core.models.runs import RunPlan
-from dstack._internal.utils.common import pretty_date
+from dstack._internal.core.models.runs import (
+    Job,
+    JobTerminationReason,
+    RunPlan,
+    RunTerminationReason,
+)
+from dstack._internal.utils.common import format_pretty_duration, pretty_date
 from dstack.api import Run
 
 
@@ -23,18 +29,18 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     max_duration = (
         f"{job_plan.job_spec.max_duration / 3600:g}h" if job_plan.job_spec.max_duration else "-"
     )
-    retry_policy = job_plan.job_spec.retry_policy
-    retry_policy = (
-        (f"{retry_policy.duration / 3600:g}h" if retry_policy.duration else "yes")
-        if retry_policy.retry
-        else "no"
-    )
+    if job_plan.job_spec.retry is None:
+        retry = "no"
+    else:
+        retry = escape(job_plan.job_spec.retry.pretty_format())
+
     profile = run_plan.run_spec.merged_profile
     creation_policy = profile.creation_policy
     termination_policy = profile.termination_policy
-    termination_idle_time = f"{profile.termination_idle_time}s"
     if termination_policy == TerminationPolicy.DONT_DESTROY:
         termination_idle_time = "-"
+    else:
+        termination_idle_time = format_pretty_duration(profile.termination_idle_time)
 
     if req.spot is None:
         spot_policy = "auto"
@@ -49,12 +55,12 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     props.add_row(th("Configuration"), run_plan.run_spec.configuration_path)
     props.add_row(th("Project"), run_plan.project_name)
     props.add_row(th("User"), run_plan.user)
-    props.add_row(th("Pool name"), profile.pool_name)
+    props.add_row(th("Pool"), profile.pool_name)
     props.add_row(th("Min resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Max duration"), max_duration)
     props.add_row(th("Spot policy"), spot_policy)
-    props.add_row(th("Retry policy"), retry_policy)
+    props.add_row(th("Retry policy"), retry)
     props.add_row(th("Creation policy"), creation_policy)
     props.add_row(th("Termination policy"), termination_policy)
     props.add_row(th("Termination idle time"), termination_idle_time)
@@ -128,6 +134,7 @@ def generate_runs_table(
         table.add_column("ERROR", no_wrap=True)
 
     for run in runs:
+        run_error = _get_run_error(run)
         run = run._run  # TODO(egor-s): make public attribute
 
         run_row = {
@@ -135,7 +142,7 @@ def generate_runs_table(
             "CONFIGURATION": run.run_spec.configuration_path,
             "STATUS": run.status,
             "SUBMITTED": pretty_date(run.submitted_at),
-            "ERROR": run.termination_reason,
+            "ERROR": run_error,
         }
         if len(run.jobs) != 1:
             add_row_from_dict(table, run_row)
@@ -145,7 +152,7 @@ def generate_runs_table(
                 "NAME": f"  replica {job.job_spec.replica_num}\n  job_num {job.job_spec.job_num}",
                 "STATUS": job.job_submissions[-1].status,
                 "SUBMITTED": pretty_date(job.job_submissions[-1].submitted_at),
-                "ERROR": job.job_submissions[-1].termination_reason,
+                "ERROR": _get_job_error(job),
             }
             jpd = job.job_submissions[-1].job_provisioning_data
             if jpd is not None:
@@ -165,3 +172,34 @@ def generate_runs_table(
             add_row_from_dict(table, job_row, style="secondary" if len(run.jobs) != 1 else None)
 
     return table
+
+
+def _get_run_error(run: Run) -> str:
+    if run._run.termination_reason is None:
+        return ""
+    if len(run._run.jobs) > 1:
+        return run._run.termination_reason.name
+    run_job_termination_reason = _get_run_job_termination_reason(run)
+    # For failed runs, also show termination reason to provide more context.
+    # For other run statuses, the job termination reason will duplicate run status.
+    if run_job_termination_reason is not None and run._run.termination_reason in [
+        RunTerminationReason.JOB_FAILED,
+        RunTerminationReason.SERVER_ERROR,
+        RunTerminationReason.RETRY_LIMIT_EXCEEDED,
+    ]:
+        return f"{run._run.termination_reason.name}\n({run_job_termination_reason.name})"
+    return run._run.termination_reason.name
+
+
+def _get_run_job_termination_reason(run: Run) -> Optional[JobTerminationReason]:
+    for job in run._run.jobs:
+        if len(job.job_submissions) > 0:
+            if job.job_submissions[-1].termination_reason is not None:
+                return job.job_submissions[-1].termination_reason
+    return None
+
+
+def _get_job_error(job: Job) -> str:
+    if job.job_submissions[-1].termination_reason is None:
+        return ""
+    return job.job_submissions[-1].termination_reason.name

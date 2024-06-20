@@ -31,6 +31,7 @@ class BackendType(str, enum.Enum):
     LOCAL = "local"
     REMOTE = "remote"  # TODO: replace for LOCAL
     NEBIUS = "nebius"
+    OCI = "oci"
     RUNPOD = "runpod"
     TENSORDOCK = "tensordock"
     VASTAI = "vastai"

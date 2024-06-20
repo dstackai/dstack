@@ -1,3 +1,4 @@
+import uuid
 from typing import Optional, Tuple
 from uuid import UUID
 
@@ -316,12 +317,14 @@ def _create_instance_model_for_job(
         termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
         termination_idle_time = 0
     instance = InstanceModel(
+        id=uuid.uuid4(),
         name=job.job_spec.job_name,  # TODO: make new name
         project=project_model,
         pool=pool,
         created_at=common_utils.get_current_datetime(),
         started_at=common_utils.get_current_datetime(),
         status=InstanceStatus.PROVISIONING,
+        unreachable=False,
         job_provisioning_data=job_provisioning_data.json(),
         offer=offer.json(),
         termination_policy=termination_policy,

@@ -33,8 +33,10 @@ class GatewayClient:
         self.is_server_ready = False
 
         self.base_url = "http://gateway" if uds else f"http://localhost:{port}"
+        # We set large timeout because service registration can take time.
+        # Consider making gateway API async to avoid long-running requests.
         self._client = AsyncClientWrapper(
-            transport=httpx.AsyncHTTPTransport(uds=uds) if uds else None, timeout=30
+            transport=httpx.AsyncHTTPTransport(uds=uds) if uds else None, timeout=120
         )
 
     async def register_service(
@@ -42,17 +44,20 @@ class GatewayClient:
         project: str,
         run_id: uuid.UUID,
         domain: str,
+        service_https: bool,
+        gateway_https: bool,
         auth: bool,
         options: dict,
         ssh_private_key: str,
     ):
         if "openai" in options:
             entrypoint = f"gateway.{domain.split('.', maxsplit=1)[1]}"
-            await self.register_openai_entrypoint(project, entrypoint)
+            await self.register_openai_entrypoint(project, entrypoint, gateway_https)
 
         payload = {
             "run_id": run_id.hex,
             "domain": domain,
+            "https": service_https,
             "auth": auth,
             "options": options,
             "ssh_private_key": ssh_private_key,
@@ -124,12 +129,13 @@ class GatewayClient:
         resp.raise_for_status()
         self.is_server_ready = True
 
-    async def register_openai_entrypoint(self, project: str, domain: str):
+    async def register_openai_entrypoint(self, project: str, domain: str, https: bool):
         resp = await self._client.post(
             self._url(f"/api/registry/{project}/entrypoints/register"),
             json={
                 "module": "openai",
                 "domain": domain,
+                "https": https,
             },
         )
         if resp.status_code == 400:

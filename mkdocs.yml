@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source engine that automates infrastructure provisioning on any cloud — for development, training, and deployment of AI models.
+  dstack is an open-source orchestration platform for development, training, and deployment of AI models in any cloud or data center.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -193,21 +193,24 @@ nav:
           - Dev environments: docs/concepts/dev-environments.md
           - Tasks: docs/concepts/tasks.md
           - Services: docs/concepts/services.md
+          - Gateways: docs/concepts/gateways.md
           - Pools: docs/concepts/pools.md
       - Reference:
+          - server/config.yml: docs/reference/server/config.yml.md
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
               - task: docs/reference/dstack.yml/task.md
               - service: docs/reference/dstack.yml/service.md
+              - gateway: docs/reference/dstack.yml/gateway.md
           - profiles.yml: docs/reference/profiles.yml.md
           - CLI: docs/reference/cli/index.md
-          - server/config.yml: docs/reference/server/config.yml.md
           - API:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
-  - Examples: https://github.com/dstackai/dstack/blob/master/examples/README.md" target="_blank
+  - Examples: https://github.com/dstackai/dstack/tree/master/examples" target="_blank
   - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
   - Blog:
       - blog/index.md
   - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
   - GitHub: https://github.com/dstackai/dstack" target="_blank
+  - Sign in: https://sky.dstack.ai" target="_blank

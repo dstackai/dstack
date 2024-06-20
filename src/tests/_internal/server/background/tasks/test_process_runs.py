@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.background.tasks.process_runs as process_runs
 from dstack._internal.core.models.configurations import ServiceConfiguration
-from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy
+from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import Range
 from dstack._internal.core.models.runs import (
     JobStatus,
@@ -45,7 +45,7 @@ async def make_run(
     run_name = "test-run"
     profile = Profile(
         name="test-profile",
-        retry_policy=ProfileRetryPolicy(retry=True),
+        retry=True,
     )
     run_spec = get_run_spec(
         repo_id=repo.name,
@@ -136,10 +136,12 @@ class TestProcessRuns:
             session=session,
             run=run,
             status=JobStatus.FAILED,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.submitted_at,
             termination_reason=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
             instance=instance,
+            job_provisioning_data=get_job_provisioning_data(),
         )
-
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
             await process_runs.process_single_run(run.id, [])
@@ -210,22 +212,27 @@ class TestProcessRunsReplicas:
             run=run,
             status=JobStatus.TERMINATING,
             termination_reason=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.submitted_at,
             replica_num=0,
             instance=await create_instance(
                 session, project=run.project, pool=run.project.default_pool, spot=True
             ),
+            job_provisioning_data=get_job_provisioning_data(),
         )
         await create_job(
             session=session,
             run=run,
             status=JobStatus.TERMINATING,
             termination_reason=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.submitted_at,
             replica_num=1,
             instance=await create_instance(
                 session, project=run.project, pool=run.project.default_pool, spot=True
             ),
+            job_provisioning_data=get_job_provisioning_data(),
         )
-
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
             await process_runs.process_single_run(run.id, [])
@@ -240,14 +247,26 @@ class TestProcessRunsReplicas:
             run=run,
             status=JobStatus.TERMINATING,
             termination_reason=JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.last_processed_at,
             replica_num=0,
             instance=await create_instance(
                 session, project=run.project, pool=run.project.default_pool, spot=True
             ),
+            job_provisioning_data=get_job_provisioning_data(),
         )
-        await create_job(session=session, run=run, status=JobStatus.RUNNING, replica_num=1)
-
-        await process_runs.process_single_run(run.id, [])
+        await create_job(
+            session=session,
+            run=run,
+            status=JobStatus.RUNNING,
+            submitted_at=run.submitted_at,
+            last_processed_at=run.last_processed_at,
+            replica_num=1,
+            job_provisioning_data=get_job_provisioning_data(),
+        )
+        with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
+            datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
+            await process_runs.process_single_run(run.id, [])
         await session.refresh(run)
         assert run.status == RunStatus.RUNNING
         assert len(run.jobs) == 3

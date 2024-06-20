@@ -11,7 +11,7 @@ import (
 
 type DockerParameters interface {
 	DockerKeepContainer() bool
-	DockerShellCommands() []string
+	DockerShellCommands([]string) []string
 	DockerMounts(string) ([]mount.Mount, error)
 	DockerPorts() []int
 	MakeRunnerDir() (string, error)
@@ -35,21 +35,24 @@ type CLIArgs struct {
 	}
 
 	Docker struct {
-		SSHPort       int
-		KeepContainer bool
-		PublicSSHKey  string
+		SSHPort                   int
+		KeepContainer             bool
+		ConcatinatedPublicSSHKeys string
 	}
 }
 
-type DockerImageConfig struct {
+type TaskConfig struct {
 	Username      string
 	Password      string
 	ImageName     string
 	ContainerName string
 	ShmSize       int64
+	PublicKeys    []string
+	SshUser       string
+	SshKey        string
 }
 
-func (ra DockerImageConfig) EncodeRegistryAuth() (string, error) {
+func (ra TaskConfig) EncodeRegistryAuth() (string, error) {
 	if ra.Username == "" && ra.Password == "" {
 		return "", nil
 	}

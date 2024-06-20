@@ -26,17 +26,19 @@ class Resources(CoreModel):
     description: str = ""
 
     def pretty_format(self) -> str:
-        resources = {
-            "cpus": self.cpus,
-            "memory": f"{self.memory_mib / 1024:g}GB",
-            "disk_size": f"{self.disk.size_mib / 1024:g}GB",
-        }
+        resources = {}
+        if self.cpus > 0:
+            resources["cpus"] = self.cpus
+        if self.memory_mib > 0:
+            resources["memory"] = f"{self.memory_mib / 1024:.0f}GB"
+        if self.disk.size_mib > 0:
+            resources["disk_size"] = f"{self.disk.size_mib / 1024:.1f}GB"
         if self.gpus:
             gpu = self.gpus[0]
             resources.update(
                 gpu_name=gpu.name,
                 gpu_count=len(self.gpus),
-                gpu_memory=f"{gpu.memory_mib / 1024:g}GB",
+                gpu_memory=f"{gpu.memory_mib / 1024:.0f}GB",
             )
         return pretty_resources(**resources)
 
@@ -72,6 +74,7 @@ class DockerConfig(CoreModel):
 class InstanceConfiguration(CoreModel):
     project_name: str
     instance_name: str  # unique in pool
+    instance_id: Optional[str] = None
     ssh_keys: List[SSHKey]
     job_docker_config: Optional[DockerConfig]
     user: str  # dstack user name
@@ -117,3 +120,5 @@ class LaunchedGatewayInfo(CoreModel):
     instance_id: str
     ip_address: str
     region: str
+    hostname: Optional[str] = None
+    backend_data: Optional[str] = None  # backend-specific data in json

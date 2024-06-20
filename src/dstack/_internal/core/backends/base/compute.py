@@ -9,6 +9,7 @@ import requests
 import yaml
 
 from dstack._internal import settings
+from dstack._internal.core.models.gateways import GatewayComputeConfiguration
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
@@ -68,10 +69,7 @@ class Compute(ABC):
         """
         raise NotImplementedError()
 
-    def update_provisioning_data(
-        self,
-        provisioning_data: JobProvisioningData,
-    ):
+    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
         """
         This method is called if `JobProvisioningData` returned from `run_job()`/`create_instance()`
         is not complete, e.g. missing `hostname` or `ssh_port`.
@@ -84,20 +82,28 @@ class Compute(ABC):
 
     def create_gateway(
         self,
-        instance_name: str,
-        ssh_key_pub: str,
-        region: str,
-        project_id: str,
+        configuration: GatewayComputeConfiguration,
     ) -> LaunchedGatewayInfo:
+        raise NotImplementedError()
+
+    def terminate_gateway(
+        self,
+        instance_id: str,
+        configuration: GatewayComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
         raise NotImplementedError()
 
 
 def get_instance_name(run: Run, job: Job) -> str:
-    return f"{run.project_name}-{job.job_spec.job_name}"
+    return f"{run.project_name.lower()}-{job.job_spec.job_name}"
 
 
-def get_user_data(authorized_keys: List[str]) -> str:
-    commands = get_shim_commands(authorized_keys)
+def get_user_data(
+    authorized_keys: List[str], backend_specific_commands: Optional[List[str]] = None
+) -> str:
+    shim_commands = get_shim_commands(authorized_keys)
+    commands = (backend_specific_commands or []) + shim_commands
     return get_cloud_config(
         runcmd=[["sh", "-c", " && ".join(commands)]],
         ssh_authorized_keys=authorized_keys,

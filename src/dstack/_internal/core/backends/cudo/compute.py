@@ -57,7 +57,6 @@ class CudoCompute(Compute):
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),
             ssh_keys=[
-                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
             job_docker_config=None,
@@ -142,10 +141,7 @@ class CudoCompute(Compute):
                 return
             raise BackendError(e.response.text)
 
-    def update_provisioning_data(
-        self,
-        provisioning_data: JobProvisioningData,
-    ):
+    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
         vm = self.api_client.get_vm(self.config.project_id, provisioning_data.instance_id)
         if vm["VM"]["state"] == "ACTIVE":
             provisioning_data.hostname = vm["VM"]["publicIpAddress"]

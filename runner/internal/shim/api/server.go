@@ -10,7 +10,7 @@ import (
 )
 
 type TaskRunner interface {
-	Run(context.Context, shim.DockerImageConfig) error
+	Run(context.Context, shim.TaskConfig) error
 	GetState() (shim.RunnerStatus, shim.ContainerStatus, string, shim.JobResult)
 	Stop(bool)
 }

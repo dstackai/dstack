@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from dstack._internal.core.models.common import CoreModel
 
@@ -24,3 +26,13 @@ class RemoveInstanceRequest(CoreModel):
 
 class SetDefaultPoolRequest(CoreModel):
     pool_name: str
+
+
+class ListPoolsRequest(CoreModel):
+    project_name: Optional[str]
+    pool_name: Optional[str]
+    only_active: bool = False
+    prev_created_at: Optional[datetime]
+    prev_id: Optional[UUID]
+    limit: int = 1000
+    ascending: bool = False

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import ComputeResourceNotFoundError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import ConfigurationType
+from dstack._internal.core.models.configurations import RunConfigurationType
 from dstack._internal.core.models.instances import RemoteConnectionInfo
 from dstack._internal.core.models.runs import (
     InstanceStatus,
@@ -82,13 +82,15 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         ):
             backend_data = json.loads(job_provisioning_data.backend_data)
             job_provisioning_data.backend = backend_data["base_backend"]
+    last_processed_at = job_model.last_processed_at.replace(tzinfo=timezone.utc)
     finished_at = None
     if job_model.status.is_finished():
-        finished_at = job_model.last_processed_at.replace(tzinfo=timezone.utc)
+        finished_at = last_processed_at
     return JobSubmission(
         id=job_model.id,
         submission_num=job_model.submission_num,
         submitted_at=job_model.submitted_at.replace(tzinfo=timezone.utc),
+        last_processed_at=last_processed_at,
         finished_at=finished_at,
         status=job_model.status,
         termination_reason=job_model.termination_reason,
@@ -113,6 +115,12 @@ async def terminate_job_provisioning_data_instance(
         project=project,
         backend_type=job_provisioning_data.backend,
     )
+    if backend is None:
+        logger.error(
+            "Failed to terminate the instance. "
+            f"Backend {job_provisioning_data.backend} is not configured in project {project.name}."
+        )
+        return
     logger.debug("Terminating runner instance %s", job_provisioning_data.hostname)
     await run_async(
         backend.compute().terminate_instance,
@@ -127,7 +135,7 @@ def delay_job_instance_termination(job_model: JobModel):
 
 
 def _get_job_configurator(run_spec: RunSpec) -> JobConfigurator:
-    configuration_type = ConfigurationType(run_spec.configuration.type)
+    configuration_type = RunConfigurationType(run_spec.configuration.type)
     configurator_class = _configuration_type_to_configurator_class_map[configuration_type]
     return configurator_class(run_spec)
 
@@ -207,8 +215,8 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
 
     if instance is not None:
         await wait_to_lock(PROCESSING_POOL_LOCK, PROCESSING_POOL_IDS, instance.id)
-        await session.refresh(instance)
         try:
+            await session.refresh(instance)
             # there is an associated instance to empty
             jpd: Optional[JobProvisioningData] = None
             if job_model.job_provisioning_data is not None:

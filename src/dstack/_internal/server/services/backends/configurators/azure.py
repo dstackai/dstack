@@ -408,7 +408,7 @@ class NetworkManager:
                         source_address_prefix="Internet",
                         source_port_range="*",
                         destination_address_prefix="*",
-                        destination_port_range="0-65535",
+                        destination_port_ranges=["22", "80", "443"],
                         access=SecurityRuleAccess.ALLOW,
                         priority=101,
                         direction=SecurityRuleDirection.INBOUND,

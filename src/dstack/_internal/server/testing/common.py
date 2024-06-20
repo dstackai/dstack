@@ -11,6 +11,7 @@ from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
 )
+from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceConfiguration, InstanceType, Resources
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
@@ -168,7 +169,7 @@ def get_run_spec(
         configuration_path="dstack.yaml",
         configuration=configuration or DevEnvironmentConfiguration(ide="vscode"),
         profile=profile,
-        ssh_key_pub="",
+        ssh_key_pub="user_ssh_key",
     )
 
 
@@ -252,6 +253,7 @@ def get_job_provisioning_data() -> JobProvisioningData:
         ),
         instance_id="instance_id",
         hostname="127.0.0.4",
+        internal_ip="127.0.0.4",
         region="us-east-1",
         price=10.5,
         username="ubuntu",
@@ -270,6 +272,8 @@ async def create_gateway(
     region: str = "us",
     wildcard_domain: Optional[str] = None,
     gateway_compute_id: Optional[UUID] = None,
+    status: Optional[GatewayStatus] = GatewayStatus.SUBMITTED,
+    last_processed_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
 ) -> GatewayModel:
     gateway = GatewayModel(
         project_id=project_id,
@@ -278,6 +282,8 @@ async def create_gateway(
         region=region,
         wildcard_domain=wildcard_domain,
         gateway_compute_id=gateway_compute_id,
+        status=status,
+        last_processed_at=last_processed_at,
     )
     session.add(gateway)
     await session.commit()
@@ -333,7 +339,10 @@ async def create_instance(
     profile: Optional[Profile] = None,
     requirements: Optional[Requirements] = None,
     instance_configuration: Optional[InstanceConfiguration] = None,
+    instance_id: Optional[UUID] = None,
 ) -> InstanceModel:
+    if instance_id is None:
+        instance_id = uuid.uuid4()
     job_provisioning_data = {
         "backend": "datacrunch",
         "instance_type": {
@@ -385,15 +394,19 @@ async def create_instance(
         instance_configuration = InstanceConfiguration(
             project_name="test_proj",
             instance_name="test_instance_name",
+            instance_id="test instance id",
+            job_docker_config=None,
             ssh_keys=[],
             user="test_user",
         )
 
     im = InstanceModel(
+        id=instance_id,
         name="test_instance",
         pool=pool,
         project=project,
         status=status,
+        unreachable=False,
         created_at=created_at,
         started_at=created_at,
         finished_at=finished_at,
@@ -406,11 +419,15 @@ async def create_instance(
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=instance_configuration.json(),
-        retry_policy=profile.retry_policy.retry if profile.retry_policy is not None else False,
-        retry_policy_duration=profile.retry_policy.duration
-        if profile.retry_policy is not None
-        else 123,
     )
     session.add(im)
     await session.commit()
     return im
+
+
+class AsyncContextManager:
+    async def __aenter__(self):
+        pass
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        pass

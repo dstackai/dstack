@@ -21,6 +21,7 @@ from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     TerminationPolicy,
@@ -97,9 +98,7 @@ class ProjectModel(BaseModel):
     default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
         ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )
-    default_pool: Mapped[Optional["PoolModel"]] = relationship(
-        foreign_keys=[default_pool_id], lazy="selectin"
-    )
+    default_pool: Mapped[Optional["PoolModel"]] = relationship(foreign_keys=[default_pool_id])
 
 
 class MemberModel(BaseModel):
@@ -232,7 +231,11 @@ class GatewayModel(BaseModel):
     name: Mapped[str] = mapped_column(String(100))
     region: Mapped[str] = mapped_column(String(100))
     wildcard_domain: Mapped[str] = mapped_column(String(100), nullable=True)
+    configuration: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    status: Mapped[GatewayStatus] = mapped_column(Enum(GatewayStatus))
+    status_message: Mapped[Optional[str]] = mapped_column(Text)
+    last_processed_at: Mapped[datetime] = mapped_column(DateTime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
@@ -258,6 +261,9 @@ class GatewayComputeModel(BaseModel):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
     instance_id: Mapped[str] = mapped_column(String(100))
     ip_address: Mapped[str] = mapped_column(String(100))
+    hostname: Mapped[Optional[str]] = mapped_column(String(100))
+    configuration: Mapped[Optional[str]] = mapped_column(Text)
+    backend_data: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[str] = mapped_column(String(100))
 
     backend_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -269,6 +275,8 @@ class GatewayComputeModel(BaseModel):
     ssh_private_key: Mapped[str] = mapped_column(Text)
     ssh_public_key: Mapped[str] = mapped_column(Text)
 
+    # active means the server should maintain connection to gateway.
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
 
 
@@ -309,12 +317,15 @@ class InstanceModel(BaseModel):
     pool: Mapped["PoolModel"] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
+    unreachable: Mapped[bool] = mapped_column(Boolean)
 
     # VM
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # create instance
+    # TODO: Introduce a field that would store all resolved instance profile parameters, etc, (similar to job_spec).
+    # Currently, profile parameters are parsed every time they are accessed (e.g. see profile.retry).
     profile: Mapped[Optional[str]] = mapped_column(Text)
     requirements: Mapped[Optional[str]] = mapped_column(String(10_000))
     instance_configuration: Mapped[Optional[str]] = mapped_column(Text)
@@ -326,8 +337,6 @@ class InstanceModel(BaseModel):
     )
 
     # retry policy
-    retry_policy: Mapped[bool] = mapped_column(Boolean, default=False)
-    retry_policy_duration: Mapped[Optional[int]] = mapped_column(Integer)
     last_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
     # instance termination handling
@@ -350,5 +359,5 @@ class InstanceModel(BaseModel):
 
     # current job
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
-    job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="immediate")
+    job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="joined")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)

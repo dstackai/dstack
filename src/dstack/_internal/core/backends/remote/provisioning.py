@@ -13,6 +13,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.utils.gpu import convert_gpu_name
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -32,7 +33,7 @@ def sftp_upload(client: paramiko.SSHClient, path: str, body: str) -> None:
         sftp.putfo(io.BytesIO(body.encode()), path)
         sftp.close()
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"sft_upload failed: {e}") from e
 
 
 def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, str]) -> None:
@@ -50,7 +51,7 @@ def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, st
                 f"The command 'upload_envs' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"upload_envs failed: {e}") from e
 
 
 def run_pre_start_commands(
@@ -68,7 +69,7 @@ def run_pre_start_commands(
                 f"The command 'authorized_keys' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"upload authorized_keys failed: {e}") from e
 
     script = " && ".join(shim_pre_start_commands)
     try:
@@ -80,7 +81,7 @@ def run_pre_start_commands(
                 f"The command 'run_pre_start_commands' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"run_pre-start_commands failed: {e}") from e
 
 
 def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, dev: bool) -> None:
@@ -112,7 +113,7 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
             sudo mv /tmp/dstack-shim.service /etc/systemd/system/dstack-shim.service && \
             sudo systemctl daemon-reload && \
             sudo systemctl --quiet enable dstack-shim && \
-            sudo systemctl start dstack-shim
+            sudo systemctl restart dstack-shim
         """
         _, stdout, stderr = client.exec_command(cmd, timeout=100)
         out = stdout.read().strip().decode()
@@ -122,7 +123,7 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
                 f"The command 'run_shim_as_systemd_service' didn't work. stdout: {out}, stderr: {err}"
             )
     except (paramiko.SSHException, OSError) as e:
-        raise ProvisioningError() from e
+        raise ProvisioningError(f"run_shim_as_systemd failed: {e}") from e
 
 
 def check_dstack_shim_service(client: paramiko.SSHClient):
@@ -145,7 +146,7 @@ def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any
             )
             err = stderr.read().decode().strip()
             if err:
-                logger.debug("Cannot read `host_info.json`: %s", err)
+                logger.debug("Retry after error: %s", err)
                 time.sleep(iter_delay)
                 continue
         except (paramiko.SSHException, OSError) as e:
@@ -184,13 +185,14 @@ def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
                 continue
             return out
         except (paramiko.SSHException, OSError) as e:
-            raise ProvisioningError() from e
+            raise ProvisioningError(f"get_shim_healthcheck failed: {e}") from e
 
 
 def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
+    gpu_name = convert_gpu_name(host_info["gpu_name"])
     if host_info.get("gpu_count", 0):
         gpu_memory = int(host_info["gpu_memory"].lower().replace("mib", "").strip())
-        gpus = [Gpu(name=host_info["gpu_name"], memory_mib=gpu_memory)] * host_info["gpu_count"]
+        gpus = [Gpu(name=gpu_name, memory_mib=gpu_memory)] * host_info["gpu_count"]
     else:
         gpus = []
     instance_type = InstanceType(
@@ -226,9 +228,12 @@ def get_paramiko_connection(
                     timeout=SSH_CONNECT_TIMEOUT,
                 )
             except paramiko.AuthenticationException:
+                logger.debug(
+                    f'Authentication faild to connect to "{conn_url}" and {pkey.fingerprint}'
+                )
                 continue  # try next key
             except (paramiko.SSHException, OSError) as e:
-                raise ProvisioningError() from e
+                raise ProvisioningError(f"Connect failed: {e}") from e
             else:
                 yield client
                 return

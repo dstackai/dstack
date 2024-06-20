@@ -6,11 +6,13 @@ from urllib.parse import urlparse
 
 import httpx
 import sqlalchemy.orm as sa_orm
-from sqlalchemy import delete, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.jobs as jobs_services
 import dstack._internal.utils.random_names as random_names
+from dstack._internal.core.backends import BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT
+from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.base.compute import (
     Compute,
     get_dstack_gateway_wheel,
@@ -23,7 +25,13 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.gateways import Gateway
+from dstack._internal.core.models.gateways import (
+    Gateway,
+    GatewayComputeConfiguration,
+    GatewayConfiguration,
+    GatewayStatus,
+    LetsEncryptGatewayCertificate,
+)
 from dstack._internal.core.models.runs import (
     Run,
     RunSpec,
@@ -40,20 +48,29 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services.backends import (
     get_project_backend_by_type_or_error,
-    get_project_backends_with_models,
+    get_project_backend_with_model_by_type_or_error,
 )
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.options import get_service_options
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.logging import fmt
-from dstack._internal.server.utils.common import gather_map_async, run_async
+from dstack._internal.server.utils.common import (
+    gather_map_async,
+    run_async,
+    wait_to_lock,
+)
+from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-GATEWAY_CONNECT_ATTEMPTS = 9
+PROCESSING_GATEWAYS_LOCK = asyncio.Lock()
+PROCESSING_GATEWAYS_IDS = set()
+
+
+GATEWAY_CONNECT_ATTEMPTS = 30
 GATEWAY_CONNECT_DELAY = 10
 GATEWAY_CONFIGURE_ATTEMPTS = 40
 GATEWAY_CONFIGURE_DELAY = 3
@@ -83,29 +100,38 @@ async def get_project_default_gateway(
 
 
 async def create_gateway_compute(
+    project_name: str,
     backend_compute: Compute,
-    instance_name: str,
-    region: str,
-    project_id: str,
+    configuration: GatewayConfiguration,
     backend_id: Optional[uuid.UUID] = None,
 ) -> GatewayComputeModel:
     private_bytes, public_bytes = generate_rsa_key_pair_bytes()
     gateway_ssh_private_key = private_bytes.decode()
     gateway_ssh_public_key = public_bytes.decode()
 
+    compute_configuration = GatewayComputeConfiguration(
+        project_name=project_name,
+        instance_name=configuration.name,
+        backend=configuration.backend,
+        region=configuration.region,
+        public_ip=configuration.public_ip,
+        ssh_key_pub=gateway_ssh_public_key,
+        certificate=configuration.certificate,
+    )
+
     info = await run_async(
         backend_compute.create_gateway,
-        instance_name,
-        gateway_ssh_public_key,
-        region,
-        project_id,
+        compute_configuration,
     )
 
     return GatewayComputeModel(
         backend_id=backend_id,
-        ip_address=info.ip_address,
         region=info.region,
+        ip_address=info.ip_address,
         instance_id=info.instance_id,
+        hostname=info.hostname,
+        configuration=compute_configuration.json(),
+        backend_data=info.backend_data,
         ssh_private_key=gateway_ssh_private_key,
         ssh_public_key=gateway_ssh_public_key,
     )
@@ -114,62 +140,32 @@ async def create_gateway_compute(
 async def create_gateway(
     session: AsyncSession,
     project: ProjectModel,
-    name: Optional[str],
-    backend_type: BackendType,
-    region: str,
+    configuration: GatewayConfiguration,
 ) -> Gateway:
-    # TODO: Gateay creation may take significant time. Make it asynchronous.
-    for backend_model, backend in await get_project_backends_with_models(project):
-        if backend_model.type == backend_type:
-            break
-    else:
-        raise ResourceNotExistsError()
+    _validate_gateway_configuration(configuration)
 
-    if name is None:
-        name = await generate_gateway_name(session=session, project=project)
+    backend_model, _ = await get_project_backend_with_model_by_type_or_error(
+        project=project, backend_type=configuration.backend
+    )
 
-    gateway = GatewayModel(  # reserve name
-        name=name,
-        region=region,
+    if configuration.name is None:
+        configuration.name = await generate_gateway_name(session=session, project=project)
+
+    gateway = GatewayModel(
+        name=configuration.name,
+        region=configuration.region,
         project_id=project.id,
         backend_id=backend_model.id,
+        wildcard_domain=configuration.domain,
+        configuration=configuration.json(),
+        status=GatewayStatus.SUBMITTED,
+        last_processed_at=get_current_datetime(),
     )
     session.add(gateway)
     await session.commit()
 
-    if project.default_gateway is None:
-        await set_default_gateway(session=session, project=project, name=name)
-
-    try:
-        gateway.gateway_compute = await create_gateway_compute(
-            backend_compute=backend.compute(),
-            instance_name=gateway.name,
-            region=region,
-            project_id=project.name,
-            backend_id=backend_model.id,
-        )
-        session.add(gateway)
-        await session.commit()
-        await session.refresh(gateway)
-    except Exception:  # rollback, release reserved name
-        await session.execute(
-            delete(GatewayModel).where(
-                GatewayModel.project_id == project.id,
-                GatewayModel.name == name,
-            )
-        )
-        await session.commit()
-        raise
-
-    connection = await connect_to_gateway_with_retry(gateway.gateway_compute)
-
-    if connection:
-        try:
-            await configure_gateway(connection)
-        except Exception as e:
-            logger.error(
-                "Failed to configure gateway %s: %r", gateway.gateway_compute.ip_address, e
-            )
+    if project.default_gateway is None or configuration.default:
+        await set_default_gateway(session=session, project=project, name=configuration.name)
 
     return gateway_model_to_gateway(gateway)
 
@@ -211,29 +207,43 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
         if gateway.name not in gateways_names:
             continue
         backend = await get_project_backend_by_type_or_error(project, gateway.backend.type)
-        if gateway.gateway_compute is not None:
-            tasks.append(
-                run_async(
-                    backend.compute().terminate_instance,
-                    gateway.gateway_compute.instance_id,
-                    gateway.gateway_compute.region,  # use LaunchedGatewayInfo.region
-                    None,
-                )
-            )
-        else:
-            tasks.append(run_async(lambda: ...))
+        tasks.append(_terminate_gateway(session=session, gateway=gateway, backend=backend))
         gateways.append(gateway)
+    logger.info("Deleting gateways: %s", [g.name for g in gateways])
     # terminate in parallel
     terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
     for gateway, error in zip(gateways, terminate_results):
         if isinstance(error, Exception):
-            continue  # ignore error, but keep gateway
+            logger.exception(
+                "Error when deleting gateway compute for %s",
+                gateway.name,
+                exc_info=(type(error), error, error.__traceback__),
+            )
+            continue  # keep gateway
         if gateway.gateway_compute is not None:
             await gateway_connections_pool.remove(gateway.gateway_compute.ip_address)
+            gateway.gateway_compute.active = False
             gateway.gateway_compute.deleted = True
             session.add(gateway.gateway_compute)
         await session.delete(gateway)
+    for gateway in gateways:
+        PROCESSING_GATEWAYS_IDS.remove(gateway.id)
     await session.commit()
+
+
+async def _terminate_gateway(session: AsyncSession, gateway: GatewayModel, backend: Backend):
+    await wait_to_lock(PROCESSING_GATEWAYS_LOCK, PROCESSING_GATEWAYS_IDS, gateway.id)
+    await session.refresh(gateway)
+    gateway_compute_configuration = get_gateway_compute_configuration(gateway)
+    if gateway.gateway_compute is not None and gateway_compute_configuration is not None:
+        logger.info("Deleting gateway compute for %s...", gateway.name)
+        await run_async(
+            backend.compute().terminate_gateway,
+            gateway.gateway_compute.instance_id,
+            gateway_compute_configuration,
+            gateway.gateway_compute.backend_data,
+        )
+        logger.info("Deleted gateway compute for %s", gateway.name)
 
 
 async def set_gateway_wildcard_domain(
@@ -330,15 +340,36 @@ async def register_service(session: AsyncSession, run_model: RunModel):
     if gateway.gateway_compute is None:
         raise ServerClientError("Gateway has no instance associated with it")
 
+    if gateway.status != GatewayStatus.RUNNING:
+        raise ServerClientError("Gateway status is not running")
+
+    gateway_configuration = None
+    if gateway.configuration is not None:
+        gateway_configuration = GatewayConfiguration.__response__.parse_raw(gateway.configuration)
+
+    service_https = _get_service_https(run_spec, gateway_configuration)
+    service_protocol = "https" if service_https else "http"
+
+    if (
+        service_https
+        and gateway_configuration is not None
+        and gateway_configuration.certificate is None
+    ):
+        raise ServerClientError(
+            "Cannot run HTTPS service on gateway with no SSL cerfificates configured"
+        )
+
+    gateway_https = _get_gateway_https(run_spec, gateway_configuration)
+    gateway_protocol = "https" if gateway_https else "http"
+
     wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     if wildcard_domain is None:
         raise ServerClientError("Domain is required for gateway")
-    # we force port 443 for now
-    service_spec = ServiceSpec(url=f"https://{run_model.run_name}.{wildcard_domain}")
+    service_spec = ServiceSpec(url=f"{service_protocol}://{run_model.run_name}.{wildcard_domain}")
     if run_spec.configuration.model is not None:
         service_spec.model = ServiceModelSpec(
             name=run_spec.configuration.model.name,
-            base_url=f"https://gateway.{wildcard_domain}",
+            base_url=f"{gateway_protocol}://gateway.{wildcard_domain}",
             type=run_spec.configuration.model.type,
         )
         service_spec.options = get_service_options(run_spec.configuration)
@@ -357,6 +388,8 @@ async def register_service(session: AsyncSession, run_model: RunModel):
                 project=run_model.project.name,
                 run_id=run_model.id,
                 domain=urlparse(service_spec.url).hostname,
+                service_https=service_https,
+                gateway_https=gateway_https,
                 auth=run_spec.configuration.auth,
                 options=service_spec.options,
                 ssh_private_key=run_model.project.ssh_private_key,
@@ -365,7 +398,8 @@ async def register_service(session: AsyncSession, run_model: RunModel):
     except SSHError:
         raise ServerClientError("Gateway tunnel is not working")
     except httpx.RequestError as e:
-        raise GatewayError(f"Gateway is not working: {e}")
+        logger.debug("Gateway request failed", exc_info=True)
+        raise GatewayError(f"Gateway is not working: {e!r}")
 
 
 async def register_replica(
@@ -382,7 +416,8 @@ async def register_replica(
             )
         logger.info("%s: replica is registered for service %s", fmt(job_model), run.id.hex)
     except (httpx.RequestError, SSHError) as e:
-        raise GatewayError(str(e))
+        logger.debug("Gateway request failed", exc_info=True)
+        raise GatewayError(repr(e))
 
 
 async def unregister_service(session: AsyncSession, run_model: RunModel):
@@ -400,7 +435,8 @@ async def unregister_service(session: AsyncSession, run_model: RunModel):
         # ignore if service is not registered
         logger.warning("%s: unregistering service: %s", fmt(run_model), e)
     except (httpx.RequestError, SSHError) as e:
-        raise GatewayError(str(e))
+        logger.debug("Gateway request failed", exc_info=True)
+        raise GatewayError(repr(e))
 
 
 async def unregister_replica(session: AsyncSession, job_model: JobModel):
@@ -431,7 +467,8 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
         # ignore if replica is not registered
         logger.warning("%s: unregistering replica from service: %s", fmt(job_model), e)
     except (httpx.RequestError, SSHError) as e:
-        raise GatewayError(str(e))
+        logger.debug("Gateway request failed", exc_info=True)
+        raise GatewayError(repr(e))
 
 
 async def get_gateway_connection(
@@ -450,7 +487,10 @@ async def get_gateway_connection(
 
 async def init_gateways(session: AsyncSession):
     res = await session.execute(
-        select(GatewayComputeModel).where(GatewayComputeModel.deleted == False)
+        select(GatewayComputeModel).where(
+            GatewayComputeModel.active == True,
+            GatewayComputeModel.deleted == False,
+        )
     )
     gateway_computes = res.scalars().all()
 
@@ -524,22 +564,105 @@ async def configure_gateway(connection: GatewayConnection) -> None:
     logger.info("Gateway %s configured", connection.ip_address)
 
 
+def get_gateway_configuration(gateway_model: GatewayModel) -> GatewayConfiguration:
+    if gateway_model.configuration is not None:
+        return GatewayConfiguration.__response__.parse_raw(gateway_model.configuration)
+    # Handle gateways created before GatewayConfiguration was introduced
+    return GatewayConfiguration(
+        name=gateway_model.name,
+        default=False,
+        backend=gateway_model.backend.type,
+        region=gateway_model.region,
+        domain=gateway_model.wildcard_domain,
+    )
+
+
+def get_gateway_compute_configuration(
+    gateway_model: GatewayModel,
+) -> Optional[GatewayComputeConfiguration]:
+    if gateway_model.gateway_compute is None:
+        return None
+    if gateway_model.gateway_compute.configuration is not None:
+        return GatewayComputeConfiguration.__response__.parse_raw(
+            gateway_model.gateway_compute.configuration
+        )
+    # Handle gateways created before GatewayComputeConfiguration was introduced
+    return GatewayComputeConfiguration(
+        project_name=gateway_model.project.name,
+        instance_name=gateway_model.gateway_compute.instance_id,
+        backend=gateway_model.backend.type,
+        region=gateway_model.gateway_compute.region,
+        public_ip=True,
+        ssh_key_pub=gateway_model.gateway_compute.ssh_public_key,
+        certificate=LetsEncryptGatewayCertificate(),
+    )
+
+
 def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
     ip_address = ""
     instance_id = ""
+    hostname = ""
     if gateway_model.gateway_compute is not None:
         ip_address = gateway_model.gateway_compute.ip_address
         instance_id = gateway_model.gateway_compute.instance_id
+        hostname = gateway_model.gateway_compute.hostname
+        if hostname is None:
+            hostname = ip_address
     backend_type = gateway_model.backend.type
     if gateway_model.backend.type == BackendType.DSTACK:
         backend_type = BackendType.AWS
+    configuration = get_gateway_configuration(gateway_model)
+    configuration.default = gateway_model.project.default_gateway_id == gateway_model.id
     return Gateway(
         name=gateway_model.name,
         ip_address=ip_address,
         instance_id=instance_id,
+        hostname=hostname,
+        backend=backend_type,
         region=gateway_model.region,
         wildcard_domain=gateway_model.wildcard_domain,
         default=gateway_model.project.default_gateway_id == gateway_model.id,
         created_at=gateway_model.created_at.replace(tzinfo=timezone.utc),
-        backend=backend_type,
+        status=gateway_model.status,
+        status_message=gateway_model.status_message,
+        configuration=configuration,
     )
+
+
+def _validate_gateway_configuration(configuration: GatewayConfiguration):
+    if (
+        not configuration.public_ip
+        and configuration.backend not in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT
+    ):
+        raise ServerClientError(
+            f"Private gateways are not supported for {configuration.backend.value} backend. "
+            f"Supported backends: {[b.value for b in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT]}."
+        )
+
+    if configuration.certificate is not None:
+        if configuration.certificate.type == "lets-encrypt" and not configuration.public_ip:
+            raise ServerClientError(
+                "lets-encrypt certificate type is not supported for private gateways"
+            )
+        if configuration.certificate.type == "acm" and configuration.backend != BackendType.AWS:
+            raise ServerClientError("acm certificate type is supported for aws backend only")
+
+
+def _get_service_https(run_spec: RunSpec, configuration: Optional[GatewayConfiguration]) -> bool:
+    if not run_spec.configuration.https:
+        return False
+    if configuration is None:
+        return True
+    if configuration.certificate is not None and configuration.certificate.type == "acm":
+        return False
+    return True
+
+
+def _get_gateway_https(run_spec: RunSpec, configuration: Optional[GatewayConfiguration]) -> bool:
+    if configuration is None:
+        return True
+    if configuration.certificate is not None and configuration.certificate.type == "acm":
+        return False
+    if configuration.certificate is not None and configuration.certificate.type == "lets-encrypt":
+        return True
+    return False

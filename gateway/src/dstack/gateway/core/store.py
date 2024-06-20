@@ -36,6 +36,7 @@ class Replica(BaseModel):
 class Service(BaseModel):
     id: str
     domain: str
+    https: bool = True
     auth: bool
     options: dict
     replicas: List[Replica] = []
@@ -56,6 +57,7 @@ class Store(PersistentModel):
     projects: DefaultDict[str, Set[str]] = defaultdict(set)
     entrypoints: Dict[str, Tuple[str, str]] = {}
     nginx: Nginx = Field(default_factory=Nginx)
+    gateway_https: Optional[bool] = True
     _lock: Lock = Lock()
     _subscribers: List["StoreSubscriber"] = []
     _ssh_keys_dir = PrivateAttr(
@@ -103,6 +105,7 @@ class Store(PersistentModel):
                     project,
                     service.id,
                     service.domain,
+                    service.https,
                     service.auth,
                 )
                 stack.push_async_callback(
@@ -267,19 +270,24 @@ class Store(PersistentModel):
             service.domain,
         )
 
-    async def register_entrypoint(self, project: str, domain: str, module: str):
+    async def register_entrypoint(self, project: str, domain: str, https: bool, module: str):
         async with self._lock:
             if domain in self.entrypoints:
-                if self.entrypoints[domain] == (project, module):
+                if self.entrypoints[domain] == (project, module) and self.gateway_https == https:
                     return
-                raise GatewayError(
-                    f"Domain {domain} is already registered as {self.entrypoints[domain]}"
-                )
+                # If the gateway's https settings changed, re-register the endpoint.
+                elif self.entrypoints[domain] == (project, module) and self.gateway_https != https:
+                    await self.nginx.unregister_domain(domain)
+                else:
+                    raise GatewayError(
+                        f"Domain {domain} is already registered as {self.entrypoints[domain]}"
+                    )
 
             logger.debug("%s: registering entrypoint %s for module %s", project, domain, module)
 
-            await self.nginx.register_entrypoint(domain, f"/api/{module}/{project}")
+            await self.nginx.register_entrypoint(domain, f"/api/{module}/{project}", https)
             self.entrypoints[domain] = (project, module)
+            self.gateway_https = https
 
         logger.info("%s: entrypoint %s is now registered", project, domain)
 

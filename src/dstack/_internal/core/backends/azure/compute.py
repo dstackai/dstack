@@ -43,6 +43,7 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.gateways import GatewayComputeConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -165,7 +166,6 @@ class AzureCompute(Compute):
             project_name=run.project_name,
             instance_name=get_instance_name(run, job),  # TODO: generate name
             ssh_keys=[
-                SSHKey(public=run.run_spec.ssh_key_pub.strip()),
                 SSHKey(public=project_ssh_public_key.strip()),
             ],
             job_docker_config=None,
@@ -184,35 +184,36 @@ class AzureCompute(Compute):
 
     def create_gateway(
         self,
-        instance_name: str,
-        ssh_key_pub: str,
-        region: str,
-        project_id: str,
+        configuration: GatewayComputeConfiguration,
     ) -> LaunchedGatewayInfo:
-        logger.info("Launching %s gateway instance in %s...", instance_name, region)
+        logger.info(
+            "Launching %s gateway instance in %s...",
+            configuration.instance_name,
+            configuration.region,
+        )
         vm = _launch_instance(
             compute_client=self._compute_client,
             subscription_id=self.config.subscription_id,
-            location=region,
+            location=configuration.region,
             resource_group=self.config.resource_group,
             network_security_group=azure_utils.get_gateway_network_security_group_name(
                 resource_group=self.config.resource_group,
-                location=region,
+                location=configuration.region,
             ),
             network=azure_utils.get_default_network_name(
                 resource_group=self.config.resource_group,
-                location=region,
+                location=configuration.region,
             ),
             subnet=azure_utils.get_default_subnet_name(
                 resource_group=self.config.resource_group,
-                location=region,
+                location=configuration.region,
             ),
             managed_identity=None,
             image_reference=_get_gateway_image_ref(),
             vm_size="Standard_B1s",
-            instance_name=instance_name,
-            user_data=get_gateway_user_data(ssh_key_pub),
-            ssh_pub_keys=[ssh_key_pub],
+            instance_name=configuration.instance_name,
+            user_data=get_gateway_user_data(configuration.ssh_key_pub),
+            ssh_pub_keys=[configuration.ssh_key_pub],
             spot=False,
             disk_size=30,
             computer_name="gatewayvm",
@@ -226,7 +227,19 @@ class AzureCompute(Compute):
         return LaunchedGatewayInfo(
             instance_id=vm.name,
             ip_address=public_ip,
-            region=region,
+            region=configuration.region,
+        )
+
+    def terminate_gateway(
+        self,
+        instance_id: str,
+        configuration: GatewayComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
+        self.terminate_instance(
+            instance_id=instance_id,
+            region=configuration.region,
+            backend_data=backend_data,
         )
 
 

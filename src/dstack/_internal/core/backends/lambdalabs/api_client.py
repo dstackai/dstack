@@ -75,8 +75,8 @@ class LambdaAPIClient:
         resp.raise_for_status()
 
     def _make_request(self, method: str, path: str, data: Any = None):
-        # TODO: set adequate timeout here or in every method
-        return requests.request(
+        # TODO: fix S113 by setting an adequate timeout here or in every method
+        return requests.request(  # noqa: S113
             method=method,
             url=API_URL + path,
             json=data,

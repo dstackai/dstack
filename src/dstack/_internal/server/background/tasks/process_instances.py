@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import ipaddress
 from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union, cast
 from uuid import UUID
@@ -37,8 +36,18 @@ from dstack._internal.core.models.instances import (
     InstanceRuntime,
     RemoteConnectionInfo,
 )
-from dstack._internal.core.models.profiles import Profile, TerminationPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
+from dstack._internal.core.models.profiles import (
+    Profile,
+    RetryEvent,
+    TerminationPolicy,
+)
+from dstack._internal.core.models.runs import (
+    InstanceStatus,
+    JobProvisioningData,
+    Requirements,
+    Retry,
+)
+from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import InstanceModel, ProjectModel
 from dstack._internal.server.schemas.runner import HealthcheckResponse
@@ -55,6 +64,7 @@ from dstack._internal.server.services.runs import get_create_instance_offers
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.network import get_ip_from_network
 from dstack._internal.utils.ssh import (
     rsa_pkey_from_str,
 )
@@ -90,30 +100,44 @@ async def process_instances() -> None:
             if not instances:
                 return
 
-            PROCESSING_POOL_IDS.update(i.id for i in instances)
+            unprocessed_instances_ids = set(i.id for i in instances)
+            PROCESSING_POOL_IDS.update(unprocessed_instances_ids)
 
     try:
-        for instance in instances:
-            if (
-                instance.status == InstanceStatus.PENDING
-                and instance.remote_connection_info is not None
-            ):
-                await add_remote(instance.id)
-
-            if instance.status == InstanceStatus.PENDING:
-                await create_instance(instance.id)
-
-            if instance.status in (
-                InstanceStatus.PROVISIONING,
-                InstanceStatus.IDLE,
-                InstanceStatus.BUSY,
-            ):
-                await check_instance(instance.id)
-
-            if instance.status == InstanceStatus.TERMINATING:
-                await terminate(instance.id)
+        futures = [process_instance(i) for i in instances]
+        for future in asyncio.as_completed(futures):
+            instance_id = await future
+            PROCESSING_POOL_IDS.remove(instance_id)
+            unprocessed_instances_ids.remove(instance_id)
     finally:
-        PROCESSING_POOL_IDS.difference_update(i.id for i in instances)
+        PROCESSING_POOL_IDS.difference_update(unprocessed_instances_ids)
+
+
+async def process_instance(instance: InstanceModel) -> UUID:
+    if (
+        instance.status == InstanceStatus.IDLE
+        and instance.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE
+        and instance.job_id is None
+    ):
+        await terminate_idle_instance(instance.id)
+
+    if instance.status == InstanceStatus.PENDING and instance.remote_connection_info is not None:
+        await add_remote(instance.id)
+
+    if instance.status == InstanceStatus.PENDING and instance.remote_connection_info is None:
+        await create_instance(instance.id)
+
+    if instance.status in (
+        InstanceStatus.PROVISIONING,
+        InstanceStatus.IDLE,
+        InstanceStatus.BUSY,
+    ):
+        await check_instance(instance.id)
+
+    if instance.status == InstanceStatus.TERMINATING:
+        await terminate(instance.id)
+
+    return instance.id
 
 
 def deploy_instance(
@@ -173,6 +197,8 @@ async def add_remote(instance_id: UUID) -> None:
             )
         ).one()
 
+        logger.debug("Adding remote instance %s...", instance.name)
+
         if instance.status == InstanceStatus.PENDING:
             instance.status = InstanceStatus.PROVISIONING
             await session.commit()
@@ -220,10 +246,10 @@ async def add_remote(instance_id: UUID) -> None:
                 result = await asyncio.wait_for(future, timeout=deploy_timeout)
                 health, host_info = result
             except (asyncio.TimeoutError, TimeoutError) as e:
-                raise ProvisioningError() from e
+                raise ProvisioningError(f"Deploy timeout {e}") from e
             except Exception as e:
                 logger.debug("deploy_instance raise an error: %s", e)
-                raise ProvisioningError() from e
+                raise ProvisioningError(f"Deploy instance raise an error {e}") from e
             else:
                 logger.info(
                     "The instance %s (%s) was successfully added",
@@ -232,7 +258,11 @@ async def add_remote(instance_id: UUID) -> None:
                 )
 
         except ProvisioningError as e:
-            logger.warning("Provisioning could not be completed because of the error: %s", e)
+            logger.warning(
+                "Provisioning the instance '%s' could not be completed because of the error: %s",
+                instance.name,
+                e,
+            )
             instance.status = InstanceStatus.PENDING
             instance.last_retry_at = get_current_datetime()
             await session.commit()
@@ -240,22 +270,48 @@ async def add_remote(instance_id: UUID) -> None:
 
         instance_type = host_info_to_instance_type(host_info)
 
-        addresses = []
-        for address in host_info.get("addresses", []):
-            try:
-                addresses.append(str(ipaddress.IPv4Address(address.rstrip("/32"))))
-            except ipaddress.AddressValueError:
-                continue
-        internal_ip = addresses[0] if addresses else None
+        instance_network = None
+        try:
+            default_jpd = JobProvisioningData.__response__.parse_raw(
+                instance.job_provisioning_data
+            )
+            instance_network = default_jpd.instance_network
+        except ValidationError:
+            pass
+
+        internal_ip = get_ip_from_network(
+            network=instance_network,
+            addresses=host_info.get("addresses", []),
+        )
+        if instance_network is not None and internal_ip is None:
+            instance.status = InstanceStatus.TERMINATED
+            instance.deleted = True
+            instance.deleted_at = get_current_datetime()
+            instance.termination_reason = (
+                "Unable to locate the internal ip-address for the given network"
+            )
+            await session.commit()
+            logger.warning(
+                "Failed to configure internal ip-address on instance %s. Terminate it",
+                instance.name,
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
+            )
+            return
+
+        region = instance.region
 
         jpd = JobProvisioningData(
             backend=BackendType.REMOTE,
             instance_type=instance_type,
             instance_id="instance_id",
             hostname=remote_details.host,
-            region="remote",
+            region=region,
             price=0,
             internal_ip=internal_ip,
+            instance_network=instance_network,
             username=remote_details.ssh_user,
             ssh_port=22,
             dockerized=True,
@@ -266,12 +322,10 @@ async def add_remote(instance_id: UUID) -> None:
         instance.status = InstanceStatus.IDLE if health else InstanceStatus.PROVISIONING
         instance.backend = BackendType.REMOTE
 
-        instance.region = "remote"
-
         instance_offer = InstanceOfferWithAvailability(
             backend=BackendType.REMOTE,
             instance=instance_type,
-            region="remote",
+            region=region,
             price=0,
             availability=InstanceAvailability.AVAILABLE,
             instance_runtime=InstanceRuntime.SHIM,
@@ -296,24 +350,6 @@ async def create_instance(instance_id: UUID) -> None:
                 .options(joinedload(InstanceModel.project))
             )
         ).one()
-
-        if instance.retry_policy and instance.retry_policy_duration is not None:
-            retry_duration_deadline = _get_retry_duration_deadline(instance)
-            if get_current_datetime() > retry_duration_deadline:
-                instance.status = InstanceStatus.TERMINATED
-                instance.deleted = True
-                instance.deleted_at = get_current_datetime()
-                instance.termination_reason = "Retry duration expired"
-                await session.commit()
-                logger.warning(
-                    "Retry duration expired. Terminate instance %s",
-                    instance.name,
-                    extra={
-                        "instance_name": instance.name,
-                        "instance_status": InstanceStatus.TERMINATED.value,
-                    },
-                )
-                return
 
         if instance.last_retry_at is not None:
             last_retry = instance.last_retry_at.replace(tzinfo=datetime.timezone.utc)
@@ -342,10 +378,10 @@ async def create_instance(instance_id: UUID) -> None:
             return
 
         try:
-            profile = Profile.__response__.parse_raw(instance.profile)
-            requirements = Requirements.__response__.parse_raw(instance.requirements)
-            instance_configuration = InstanceConfiguration.__response__.parse_raw(
-                instance.instance_configuration
+            profile: Profile = Profile.__response__.parse_raw(instance.profile)
+            requirements: Requirements = Requirements.__response__.parse_raw(instance.requirements)
+            instance_configuration: InstanceConfiguration = (
+                InstanceConfiguration.__response__.parse_raw(instance.instance_configuration)
             )
         except ValidationError as e:
             instance.status = InstanceStatus.TERMINATED
@@ -366,6 +402,27 @@ async def create_instance(instance_id: UUID) -> None:
             await session.commit()
             return
 
+        retry = get_retry(profile)
+        should_retry = retry is not None and RetryEvent.NO_CAPACITY in retry.on_events
+
+        if retry is not None:
+            retry_duration_deadline = _get_retry_duration_deadline(instance, retry)
+            if get_current_datetime() > retry_duration_deadline:
+                instance.status = InstanceStatus.TERMINATED
+                instance.deleted = True
+                instance.deleted_at = get_current_datetime()
+                instance.termination_reason = "Retry duration expired"
+                await session.commit()
+                logger.warning(
+                    "Retry duration expired. Terminate instance %s",
+                    instance.name,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATED.value,
+                    },
+                )
+                return
+
         offers = await get_create_instance_offers(
             project=instance.project,
             profile=profile,
@@ -373,7 +430,7 @@ async def create_instance(instance_id: UUID) -> None:
             exclude_not_available=True,
         )
 
-        if not offers and instance.retry_policy:
+        if not offers and should_retry:
             instance.last_retry_at = get_current_datetime()
             await session.commit()
             logger.debug(
@@ -435,7 +492,7 @@ async def create_instance(instance_id: UUID) -> None:
 
         instance.last_retry_at = get_current_datetime()
 
-        if not instance.retry_policy:
+        if not should_retry:
             instance.status = InstanceStatus.TERMINATED
             instance.deleted = True
             instance.deleted_at = get_current_datetime()
@@ -485,25 +542,26 @@ async def check_instance(instance_id: UUID) -> None:
             )
             ssh_private_key = remote_conn_info.ssh_keys[0].private
 
-        instance_health: Union[Optional[HealthStatus], bool] = await run_async(
+        # May return False if fails to establish ssh connection
+        health_status_response: Union[Optional[HealthStatus], bool] = await run_async(
             instance_healthcheck, ssh_private_key, job_provisioning_data
         )
-        if isinstance(instance_health, bool) or instance_health is None:
-            health = HealthStatus(healthy=False, reason="SSH or tunnel error")
+        if isinstance(health_status_response, bool) or health_status_response is None:
+            health_status = HealthStatus(healthy=False, reason="SSH or tunnel error")
         else:
-            health = instance_health
+            health_status = health_status_response
 
         logger.debug(
             "Check instance %s status. shim health: %s",
             instance.name,
-            health,
-            extra={"instance_name": instance.name, "shim_health": health},
+            health_status,
+            extra={"instance_name": instance.name, "shim_health": health_status},
         )
 
-        if health:
+        if health_status.healthy:
             instance.termination_deadline = None
-            # FIXME why health_status is None?
             instance.health_status = None
+            instance.unreachable = False
 
             if instance.status == InstanceStatus.PROVISIONING:
                 instance.status = (
@@ -524,7 +582,8 @@ async def check_instance(instance_id: UUID) -> None:
         if instance.termination_deadline is None:
             instance.termination_deadline = get_current_datetime() + TERMINATION_DEADLINE_OFFSET
 
-        instance.health_status = health.reason
+        instance.health_status = health_status.reason
+        instance.unreachable = True
 
         if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
             provisioning_deadline = _get_provisioning_deadline(instance)
@@ -663,60 +722,51 @@ async def terminate(instance_id: UUID) -> None:
         await session.commit()
 
 
-async def terminate_idle_instances() -> None:
+async def terminate_idle_instance(instance_id: UUID):
     async with get_session_ctx() as session:
-        async with PROCESSING_POOL_LOCK:
-            res = await session.execute(
+        instance = (
+            await session.scalars(
                 select(InstanceModel)
-                .where(
-                    InstanceModel.termination_policy == TerminationPolicy.DESTROY_AFTER_IDLE,
-                    InstanceModel.deleted == False,
-                    InstanceModel.job == None,  # noqa: E711
-                    InstanceModel.status == InstanceStatus.IDLE,
-                )
+                .where(InstanceModel.id == instance_id)
                 .options(joinedload(InstanceModel.project))
             )
-            instances = res.scalars().all()
-
-            for instance in instances:
-                last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
-                if instance.last_job_processed_at is not None:
-                    last_time = instance.last_job_processed_at.replace(
-                        tzinfo=datetime.timezone.utc
-                    )
-
-                idle_seconds = instance.termination_idle_time
-                delta = datetime.timedelta(seconds=idle_seconds)
-
-                current_time = get_current_datetime()
-                if last_time + delta < current_time:
-                    jpd = JobProvisioningData.__response__.parse_raw(
-                        instance.job_provisioning_data
-                    )
-                    await terminate_job_provisioning_data_instance(
-                        project=instance.project, job_provisioning_data=jpd
-                    )
-                    instance.deleted = True
-                    instance.deleted_at = get_current_datetime()
-                    instance.finished_at = get_current_datetime()
-                    instance.status = InstanceStatus.TERMINATED
-                    instance.termination_reason = "Idle timeout"
-                    idle_time = current_time - last_time
-                    logger.info(
-                        "Instance %s terminated by termination policy: idle time %ss",
-                        instance.name,
-                        str(idle_time.seconds),
-                        extra={
-                            "instance_name": instance.name,
-                            "instance_status": InstanceStatus.TERMINATED.value,
-                        },
-                    )
-            await session.commit()
+        ).one()
+        current_time = get_current_datetime()
+        idle_duration = _get_instance_idle_duration(instance)
+        idle_seconds = instance.termination_idle_time
+        delta = datetime.timedelta(seconds=idle_seconds)
+        if idle_duration > delta:
+            jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
+            await terminate_job_provisioning_data_instance(
+                project=instance.project, job_provisioning_data=jpd
+            )
+            instance.deleted = True
+            instance.deleted_at = current_time
+            instance.finished_at = current_time
+            instance.status = InstanceStatus.TERMINATED
+            instance.termination_reason = "Idle timeout"
+            logger.info(
+                "Instance %s terminated by termination policy: idle time %ss",
+                instance.name,
+                str(idle_duration.seconds),
+                extra={
+                    "instance_name": instance.name,
+                    "instance_status": InstanceStatus.TERMINATED.value,
+                },
+            )
+        await session.commit()
 
 
-def _get_retry_duration_deadline(instance: InstanceModel) -> datetime.datetime:
+def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:
+    last_time = instance.created_at.replace(tzinfo=datetime.timezone.utc)
+    if instance.last_job_processed_at is not None:
+        last_time = instance.last_job_processed_at.replace(tzinfo=datetime.timezone.utc)
+    return get_current_datetime() - last_time
+
+
+def _get_retry_duration_deadline(instance: InstanceModel, retry: Retry) -> datetime.datetime:
     return instance.created_at.replace(tzinfo=datetime.timezone.utc) + timedelta(
-        seconds=instance.retry_policy_duration
+        seconds=retry.duration
     )
 
 

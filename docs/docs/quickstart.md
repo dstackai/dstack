@@ -1,14 +1,11 @@
 # Quickstart
 
-??? info "Prerequisites"
-    To use the open-source version, make sure to [install the server](installation/index.md) and configure backends.
+??? info "Installation"
+    To use the open-source version, make sure to [set up the server](installation/index.md) and configure backends.
 
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}, install the CLI and run the `dstack config` command:
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+    you only need to [set up the CLI](installation/index.md#set-up-the-cli).
     
-    ![](../assets/images/dstack-cloud-config.png){ width=800 }
-
-    Once the CLI is set up, follow the quickstart.
-
 ## Initialize a repo
 
 To use `dstack`'s CLI in a folder, first run [`dstack init`](reference/cli/index.md#dstack-init) within that folder.
@@ -134,5 +131,5 @@ To exclude any files from uploading, use `.gitignore`.
 
 1. Read about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
     [services](concepts/services.md), and [pools](concepts/pools.md) 
-2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/README.md){:target="_blank"}
+2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
 3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

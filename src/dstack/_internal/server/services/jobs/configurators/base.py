@@ -8,19 +8,20 @@ from cachetools import TTLCache, cached
 import dstack.version as version
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
 from dstack._internal.core.models.configurations import (
-    ConfigurationType,
     PortMapping,
     PythonVersion,
     RegistryAuth,
+    RunConfigurationType,
 )
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.runs import (
     AppSpec,
     JobSpec,
     Requirements,
-    RetryPolicy,
+    Retry,
     RunSpec,
 )
+from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.core.services.ssh.ports import filter_reserved_ports
 from dstack._internal.server.services.docker import ImageConfig, get_image_config
 from dstack._internal.server.utils.common import run_async
@@ -44,7 +45,7 @@ def get_default_image(python_version: str) -> str:
 
 
 class JobConfigurator(ABC):
-    TYPE: ConfigurationType
+    TYPE: RunConfigurationType
 
     def __init__(self, run_spec: RunSpec):
         self.run_spec = run_spec
@@ -59,10 +60,6 @@ class JobConfigurator(ABC):
 
     @abstractmethod
     def _default_max_duration(self) -> Optional[int]:
-        pass
-
-    @abstractmethod
-    def _retry_policy(self) -> RetryPolicy:
         pass
 
     @abstractmethod
@@ -92,7 +89,7 @@ class JobConfigurator(ABC):
             max_duration=self._max_duration(),
             registry_auth=self._registry_auth(),
             requirements=self._requirements(),
-            retry_policy=self._retry_policy(),
+            retry=self._retry(),
             working_dir=self._working_dir(),
         )
         return job_spec
@@ -165,6 +162,9 @@ class JobConfigurator(ABC):
             max_price=self.run_spec.merged_profile.max_price,
             spot=None if spot_policy == SpotPolicy.AUTO else (spot_policy == SpotPolicy.SPOT),
         )
+
+    def _retry(self) -> Optional[Retry]:
+        return get_retry(self.run_spec.merged_profile)
 
     def _working_dir(self) -> Optional[str]:
         """

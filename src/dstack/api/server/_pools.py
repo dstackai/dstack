@@ -42,6 +42,7 @@ class PoolAPIClient(APIClientGroup):
         project_name: str,
         pool_name: Optional[str],
         instance_name: Optional[str],
+        instance_network: Optional[str],
         region: Optional[str],
         host: str,
         port: int,
@@ -51,6 +52,7 @@ class PoolAPIClient(APIClientGroup):
         body = AddRemoteInstanceRequest(
             pool_name=pool_name,
             instance_name=instance_name,
+            instance_network=instance_network,
             region=region,
             host=host,
             port=port,

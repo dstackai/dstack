@@ -53,6 +53,12 @@ from dstack._internal.core.models.backends.nebius import (
     NebiusConfigInfoWithCredsPartial,
     NebiusConfigValues,
 )
+from dstack._internal.core.models.backends.oci import (
+    OCIConfigInfo,
+    OCIConfigInfoWithCreds,
+    OCIConfigInfoWithCredsPartial,
+    OCIConfigValues,
+)
 from dstack._internal.core.models.backends.runpod import (
     RunpodConfigInfo,
     RunpodConfigInfoWithCreds,
@@ -73,6 +79,13 @@ from dstack._internal.core.models.backends.vastai import (
 )
 from dstack._internal.core.models.common import CoreModel
 
+# The following models are the basis of the JSON-based backend API.
+# They are also the models used by the Configurator interface.
+# The JSON-based backend API is replaced by the YAML-based backend API and not used.
+# It's likely to be deprecated and removed.
+# Some of the models below like those needed for interactive backend setup could be removed then.
+# Still, others are going to stay as Configurator models to keep YAML-based configs and internal configs separated.
+
 # Backend config returned by the API
 AnyConfigInfoWithoutCreds = Union[
     AWSConfigInfo,
@@ -83,6 +96,7 @@ AnyConfigInfoWithoutCreds = Union[
     KubernetesConfigInfo,
     LambdaConfigInfo,
     NebiusConfigInfo,
+    OCIConfigInfo,
     RunpodConfigInfo,
     TensorDockConfigInfo,
     VastAIConfigInfo,
@@ -102,6 +116,7 @@ AnyConfigInfoWithCreds = Union[
     KubernetesConfigInfoWithCreds,
     LambdaConfigInfoWithCreds,
     NebiusConfigInfoWithCreds,
+    OCIConfigInfoWithCreds,
     RunpodConfigInfoWithCreds,
     TensorDockConfigInfoWithCreds,
     VastAIConfigInfoWithCreds,
@@ -122,6 +137,7 @@ AnyConfigInfoWithCredsPartial = Union[
     KubernetesConfigInfoWithCredsPartial,
     LambdaConfigInfoWithCredsPartial,
     NebiusConfigInfoWithCredsPartial,
+    OCIConfigInfoWithCredsPartial,
     RunpodConfigInfoWithCredsPartial,
     TensorDockConfigInfoWithCredsPartial,
     VastAIConfigInfoWithCredsPartial,
@@ -138,6 +154,7 @@ AnyConfigValues = Union[
     KubernetesConfigValues,
     LambdaConfigValues,
     NebiusConfigValues,
+    OCIConfigValues,
     RunpodConfigValues,
     TensorDockConfigValues,
     VastAIConfigValues,

@@ -1,0 +1,18 @@
+type: task
+
+image: ghcr.io/predibase/lorax:latest
+
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+
+commands:
+  - cd /usr/src
+  - lorax-launcher --port 8000 --model-id $MODEL_ID
+
+ports:
+  - 8000
+
+resources:
+  gpu: 24GB
+  shm_size: 1GB

@@ -2,9 +2,10 @@
 
 The `task` configuration type allows running [tasks](../../concepts/tasks.md).
 
-> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `train.dstack.yml` are both acceptable)
-> and can be located in the project's root directory or any nested folder.
-> Any configuration can be run via [`dstack run . -f PATH`](../cli/index.md#dstack-run).
+!!! info "Filename"
+    Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
+    and can be located in the project's root directory or any nested folder.
+    Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
 
 ## Examples
 
@@ -166,7 +167,7 @@ The following environment variables are available in any run and are passed by `
 | `DSTACK_NODE_RANK`      | The rank of the node                    |
 | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node |
 
-### Nodes
+### Nodes { #_nodes }
 
 By default, the task runs on a single node. However, you can run it on a cluster of nodes.
 
@@ -205,7 +206,8 @@ is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, 
 `DSTACK_MASTER_NODE_IP`, and `DSTACK_GPUS_NUM` (see [System environment variables](#default-environment-variables)).
 
 ??? info "Backends"
-    Running on multiple nodes is supported only with AWS, GCP, and Azure.
+    Running on multiple nodes is supported only with `aws`, `gcp`, `azure`, `oci`, and instances added via
+    [`dstack pool add-ssh`](../../concepts/pools.md#adding-on-prem-servers).
 
 ### Arguments
 
@@ -225,8 +227,15 @@ commands:
 
 </div>
 
-Now, you can pass your arguments to the `dstack run` command. 
-See [tasks](../../concepts/tasks.md#parametrize-tasks) for more detail.
+Now, you can pass your arguments to the `dstack run` command:
+
+<div class="termy">
+
+```shell
+$ dstack run . -f train.dstack.yml --train_batch_size=1 --num_train_epochs=100
+```
+
+</div>
 
 ### Web applications
 

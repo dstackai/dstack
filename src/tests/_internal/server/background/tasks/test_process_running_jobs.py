@@ -191,7 +191,8 @@ class TestProcessRunningJobs:
 
     @pytest.mark.asyncio
     async def test_provisioning_shim(self, test_db, session: AsyncSession):
-        project = await create_project(session=session)
+        project_ssh_pub_key = "__project_ssh_pub_key__"
+        project = await create_project(session=session, ssh_public_key=project_ssh_pub_key)
         user = await create_user(session=session)
         repo = await create_repo(
             session=session,
@@ -232,6 +233,9 @@ class TestProcessRunningJobs:
                 image_name="dstackai/base:py3.11-0.4rc4-cuda-12.1",
                 container_name="test-run-0-0",
                 shm_size=None,
+                public_keys=[project_ssh_pub_key, "user_ssh_key"],
+                ssh_user="ubuntu",
+                ssh_key="user_ssh_key",
             )
         await session.refresh(job)
         assert job is not None

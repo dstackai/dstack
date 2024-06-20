@@ -188,7 +188,7 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 }
 
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
-	node_rank := ex.clusterInfo.GPUSPerJob
+	node_rank := ex.jobSpec.JobNum
 	nodes_num := ex.jobSpec.JobsPerReplica
 	gpus_per_node_num := ex.clusterInfo.GPUSPerJob
 	gpus_num := nodes_num * gpus_per_node_num

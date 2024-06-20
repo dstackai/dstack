@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 from typing import List
 
@@ -133,18 +134,45 @@ class AWSConfigurator(Configurator):
         return element
 
     def _check_vpc_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
+        allocate_public_ip = config.public_ips if config.public_ips is not None else True
+        use_default_vpcs = config.default_vpcs if config.default_vpcs is not None else True
         if config.vpc_name is not None and config.vpc_ids is not None:
-            raise ServerClientError(msg="Only one of vpc_name and vpc_ids can be specified")
+            raise ServerClientError(msg="Only one of `vpc_name` and `vpc_ids` can be specified")
+        if not use_default_vpcs and config.vpc_name is None and config.vpc_ids is None:
+            raise ServerClientError(
+                msg="`vpc_name` or `vpc_ids` must be specified if `default_vpcs: false`."
+            )
         regions = config.regions
         if regions is None:
             regions = DEFAULT_REGIONS
-        for region in regions:
-            ec2_client = session.client("ec2", region_name=region)
-            try:
-                compute.get_vpc_id_subnet_id_or_error(
+        if config.vpc_ids is not None and not use_default_vpcs:
+            vpc_ids_regions = list(config.vpc_ids.keys())
+            not_configured_regions = [r for r in regions if r not in vpc_ids_regions]
+            if len(not_configured_regions) > 0:
+                if config.regions is None:
+                    raise ServerClientError(
+                        f"`vpc_ids` not configured for regions {not_configured_regions}. "
+                        "Configure `vpc_ids` for all regions or specify `regions`."
+                    )
+                raise ServerClientError(
+                    f"`vpc_ids` not configured for regions {not_configured_regions}. "
+                    "Configure `vpc_ids` for all regions specified in `regions`."
+                )
+        # The number of workers should be >= the number of regions
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+            futures = []
+            for region in regions:
+                ec2_client = session.client("ec2", region_name=region)
+                future = executor.submit(
+                    compute.get_vpc_id_subnet_id_or_error,
                     ec2_client=ec2_client,
                     config=AWSConfig.parse_obj(config),
                     region=region,
+                    allocate_public_ip=allocate_public_ip,
                 )
-            except ComputeError as e:
-                raise ServerClientError(e.args[0])
+                futures.append(future)
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()
+                except ComputeError as e:
+                    raise ServerClientError(e.args[0])

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import BinaryIO, Dict, Optional, Union
+from typing import BinaryIO, Dict, List, Optional, Union
 
 import requests
 import requests.exceptions
@@ -8,12 +8,12 @@ from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
 from dstack._internal.server.schemas.runner import (
-    DockerImageBody,
     HealthcheckResponse,
     PullBody,
     PullResponse,
     StopBody,
     SubmitBody,
+    TaskConfigBody,
 )
 
 REMOTE_SHIM_PORT = 10998
@@ -28,9 +28,6 @@ class HealthStatus:
 
     def __str__(self) -> str:
         return self.reason
-
-    def __bool__(self) -> bool:
-        return self.healthy
 
 
 class RunnerClient:
@@ -125,14 +122,20 @@ class ShimClient:
         image_name: str,
         container_name: str,
         shm_size: Optional[Memory],
+        public_keys: List[str],
+        ssh_user: str,
+        ssh_key: str,
     ):
         _shm_size = int(shm_size * 1024 * 1024 * 1014) if shm_size else 0
-        post_body = DockerImageBody(
+        post_body = TaskConfigBody(
             username=username,
             password=password,
             image_name=image_name,
             container_name=container_name,
             shm_size=_shm_size,
+            public_keys=public_keys,
+            ssh_user=ssh_user,
+            ssh_key=ssh_key,
         ).dict()
         resp = requests.post(
             self._url("/api/submit"),

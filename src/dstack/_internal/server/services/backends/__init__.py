@@ -1,6 +1,7 @@
 import asyncio
 import heapq
 from typing import List, Optional, Tuple, Type, Union
+from uuid import UUID
 
 from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -99,6 +100,13 @@ except ImportError:
     pass
 
 try:
+    from dstack._internal.server.services.backends.configurators.oci import OCIConfigurator
+
+    _CONFIGURATOR_CLASSES.append(OCIConfigurator)
+except ImportError:
+    pass
+
+try:
     from dstack._internal.server.services.backends.configurators.runpod import RunpodConfigurator
 
     _CONFIGURATOR_CLASSES.append(RunpodConfigurator)
@@ -169,7 +177,7 @@ async def create_backend(
     backend = await run_async(configurator.create_backend, project=project, config=config)
     session.add(backend)
     await session.commit()
-    clear_backend_cache(project.name)
+    clear_backend_cache(project.id)
     return config
 
 
@@ -200,7 +208,7 @@ async def update_backend(
             auth=backend.auth,
         )
     )
-    clear_backend_cache(project.name)
+    clear_backend_cache(project.id)
     return config
 
 
@@ -230,7 +238,7 @@ async def delete_backends(
             BackendModel.project_id == project.id,
         )
     )
-    clear_backend_cache(project.name)
+    clear_backend_cache(project.id)
 
 
 _BACKENDS_CACHE = {}
@@ -239,7 +247,7 @@ BackendTuple = Tuple[BackendModel, Backend]
 
 
 async def get_project_backends_with_models(project: ProjectModel) -> List[BackendTuple]:
-    key = project.name
+    key = project.id
     backends = _BACKENDS_CACHE.get(key)
     if backends is not None:
         return backends
@@ -264,6 +272,16 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
 
     _BACKENDS_CACHE[key] = backends
     return _BACKENDS_CACHE[key]
+
+
+async def get_project_backend_with_model_by_type_or_error(
+    project: ProjectModel, backend_type: BackendType
+) -> BackendTuple:
+    backends_with_models = await get_project_backends_with_models(project=project)
+    for backend_model, backend in backends_with_models:
+        if backend.TYPE == backend_type:
+            return backend_model, backend
+    raise BackendNotAvailable()
 
 
 async def get_project_backends(project: ProjectModel) -> List[Backend]:
@@ -293,9 +311,9 @@ async def get_project_backend_by_type_or_error(
     return backend
 
 
-def clear_backend_cache(project_name: str):
-    if project_name in _BACKENDS_CACHE:
-        del _BACKENDS_CACHE[project_name]
+def clear_backend_cache(project_id: UUID):
+    if project_id in _BACKENDS_CACHE:
+        del _BACKENDS_CACHE[project_id]
 
 
 async def get_project_backend_model_by_type(
@@ -305,6 +323,17 @@ async def get_project_backend_model_by_type(
         if backend.type == backend_type:
             return backend
     return None
+
+
+async def get_project_backend_model_by_type_or_error(
+    project: ProjectModel, backend_type: BackendType
+) -> BackendModel:
+    backend_model = await get_project_backend_model_by_type(
+        project=project, backend_type=backend_type
+    )
+    if backend_model is None:
+        raise BackendNotAvailable()
+    return backend_model
 
 
 async def get_instance_offers(

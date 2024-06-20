@@ -59,6 +59,41 @@ $ dstack run . --help
 
     If there are large files, consider creating a `.gitignore` file to exclude them for better performance.
 
+### dstack apply
+
+This command applies a given configuration. If a resource does not exist, `dstack apply` creates the resource.
+If a resource exists, `dstack apply` updates the resource in-place or re-creates the resource if the update is not possible.
+
+<div class="termy">
+
+```shell
+$ dstack apply --help
+#GENERATE#
+```
+
+</div>
+
+!!! info "NOTE:"
+    The `dstack apply` command currently supports only `gateway` configurations.
+    Support for other configuration types is coming soon.
+
+### dstack delete
+
+This command deletes the resources defined by a given configuration.
+
+<div class="termy">
+
+```shell
+$ dstack delete --help
+#GENERATE#
+```
+
+</div>
+
+!!! info "NOTE:"
+    The `dstack delete` command currently supports only `gateway` configurations.
+    Support for other configuration types is coming soon.
+
 ### dstack ps
 
 This command shows the status of runs.
@@ -124,12 +159,26 @@ The default pool is created automatically.
 
 ##### dstack pool add
 
-The `dstack pool add` command adds an instance to a pool. If no pool name is specified, the instance goes to the default pool.
+The `dstack pool add` command provisions a cloud instance and adds it to a pool. If no pool name is specified, the instance goes to the default pool.
 
 <div class="termy">
 
 ```shell
 $ dstack pool add --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool add-ssh
+
+The `dstack pool add-ssh` command adds an existing remote instance to a pool.
+If no pool name is specified, the instance goes to the default pool.
+
+<div class="termy">
+
+```shell
+$ dstack pool add-ssh --help
 #GENERATE#
 ```
 
@@ -144,6 +193,20 @@ If no pool name is specified, default pool instances are displayed.
 
 ```shell
 $ dstack pool ps --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool rm
+
+The `dstack pool rm` command removes an instance from a pool.
+Cloud instances are terminated upon removal.
+
+<div class="termy">
+
+```shell
+$ dstack pool rm --help
 #GENERATE#
 ```
 
@@ -164,12 +227,25 @@ $ dstack pool create --help
 
 ##### dstack pool list
 
-The `dstack pool list` lists all existing pools.
+The `dstack pool list` command lists all existing pools.
 
 <div class="termy">
 
 ```shell
 $ dstack pool delete --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack pool set-default
+
+The `dstack pool set-default` command sets the project's default pool.
+
+<div class="termy">
+
+```shell
+$ dstack pool set-default --help
 #GENERATE#
 ```
 

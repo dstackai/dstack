@@ -18,6 +18,7 @@ from dstack._internal.core.models.backends.cudo import AnyCudoCreds
 from dstack._internal.core.models.backends.datacrunch import AnyDataCrunchCreds
 from dstack._internal.core.models.backends.kubernetes import KubernetesNetworkingConfig
 from dstack._internal.core.models.backends.lambdalabs import AnyLambdaCreds
+from dstack._internal.core.models.backends.oci import AnyOCICreds
 from dstack._internal.core.models.backends.runpod import AnyRunpodCreds
 from dstack._internal.core.models.backends.tensordock import AnyTensorDockCreds
 from dstack._internal.core.models.backends.vastai import AnyVastAICreds
@@ -47,7 +48,7 @@ def seq_representer(dumper, sequence):
 yaml.add_representer(list, seq_representer)
 
 
-# Below we difine pydantic models for configs allowed in server/config.yml and YAML-based API.
+# Below we define pydantic models for configs allowed in server/config.yml and YAML-based API.
 # There are some differences between the two, e.g. server/config.yml fills file-based
 # credentials by looking for a file, while YAML-based API doesn't do this.
 # So for some backends there are two sets of config models.
@@ -55,10 +56,32 @@ yaml.add_representer(list, seq_representer)
 
 class AWSConfig(CoreModel):
     type: Annotated[Literal["aws"], Field(description="The type of the backend")] = "aws"
-    regions: Optional[List[str]] = None
-    vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    regions: Annotated[Optional[List[str]], Field(description="The list of AWS regions")] = None
+    vpc_name: Annotated[
+        Optional[str],
+        Field(description="The VPC name. All configured regions must have a VPC with this name"),
+    ] = None
     vpc_ids: Annotated[
-        Optional[Dict[str, str]], Field(description="The mapping from AWS regions to VPC IDs")
+        Optional[Dict[str, str]],
+        Field(
+            description="The mapping from AWS regions to VPC IDs. If `default_vpcs: true`, omitted regions will use default VPCs"
+        ),
+    ] = None
+    default_vpcs: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "A flag to enable/disable using default VPCs in regions not configured by `vpc_ids`."
+                " Set to `false` if default VPCs should never be used."
+                " Defaults to `true`"
+            )
+        ),
+    ] = None
+    public_ips: Annotated[
+        Optional[bool],
+        Field(
+            description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
+        ),
     ] = None
     creds: AnyAWSCreds = Field(..., description="The credentials", discriminator="type")
 
@@ -74,8 +97,8 @@ class AzureConfig(CoreModel):
 class CudoConfig(CoreModel):
     type: Annotated[Literal["cudo"], Field(description="The type of backend")] = "cudo"
     regions: Optional[List[str]] = None
-    creds: Annotated[AnyCudoCreds, Field(description="The credentials")]
     project_id: Annotated[str, Field(description="The project ID")]
+    creds: Annotated[AnyCudoCreds, Field(description="The credentials")]
 
 
 class DataCrunchConfig(CoreModel):
@@ -121,6 +144,17 @@ class GCPConfig(CoreModel):
     type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
+    vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    vpc_project_id: Annotated[
+        Optional[str],
+        Field(description="The shared VPC hosted project ID. Required for shared VPC only"),
+    ] = None
+    public_ips: Annotated[
+        Optional[bool],
+        Field(
+            description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
+        ),
+    ] = None
     creds: AnyGCPCreds = Field(..., description="The credentials", discriminator="type")
 
 
@@ -128,6 +162,11 @@ class GCPAPIConfig(CoreModel):
     type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
+    vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    vpc_project_id: Annotated[
+        Optional[str],
+        Field(description="The shared VPC hosted project ID. Required for shared VPC only"),
+    ] = None
     creds: AnyGCPAPICreds = Field(..., description="The credentials", discriminator="type")
 
 
@@ -211,6 +250,26 @@ class NebiusAPIConfig(CoreModel):
     creds: AnyNebiusAPICreds
 
 
+class OCIConfig(CoreModel):
+    type: Annotated[Literal["oci"], Field(description="The type of backend")] = "oci"
+    creds: Annotated[AnyOCICreds, Field(description="The credentials", discriminator="type")]
+    regions: Annotated[
+        Optional[List[str]],
+        Field(
+            description="List of region names for running `dstack` jobs. Omit to use all regions"
+        ),
+    ] = None
+    compartment_id: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "Compartment where `dstack` will create all resources. "
+                "Omit to instruct `dstack` to create a new compartment"
+            )
+        ),
+    ] = None
+
+
 class RunpodConfig(CoreModel):
     type: Literal["runpod"] = "runpod"
     regions: Optional[List[str]] = None
@@ -242,6 +301,7 @@ AnyBackendConfig = Union[
     KubernetesConfig,
     LambdaConfig,
     NebiusConfig,
+    OCIConfig,
     RunpodConfig,
     TensorDockConfig,
     VastAIConfig,
@@ -264,6 +324,7 @@ AnyBackendAPIConfig = Union[
     KubernetesAPIConfig,
     LambdaConfig,
     NebiusAPIConfig,
+    OCIConfig,
     RunpodConfig,
     TensorDockConfig,
     VastAIConfig,
@@ -321,7 +382,7 @@ class ServerConfigManager:
                 )
             backends_to_delete = backends_services.list_available_backend_types()
             for backend_config in project_config.backends:
-                config_info = _config_to_internal_config(backend_config)
+                config_info = config_to_internal_config(backend_config)
                 backend_type = BackendType(config_info.type)
                 try:
                     backends_to_delete.remove(backend_type)
@@ -365,7 +426,7 @@ class ServerConfigManager:
                 project=project, backend_type=backend_type
             )
             if config_info is not None:
-                backends.append(_internal_config_to_config(config_info))
+                backends.append(internal_config_to_config(config_info))
         if init_backends and len(backends) == 0:
             backends = await self._init_backends(session=session, project=project)
         return ServerConfig(
@@ -386,7 +447,7 @@ class ServerConfigManager:
                     await backends_services.create_backend(
                         session=session, project=project, config=config_info
                     )
-                    backends.append(_internal_config_to_config(config_info))
+                    backends.append(internal_config_to_config(config_info))
                     break
                 except Exception as e:
                     logger.debug("Failed to configure backend %s: %s", config_info.type, e)
@@ -403,7 +464,7 @@ class ServerConfigManager:
 
     def _save_config(self, config: ServerConfig):
         with open(settings.SERVER_CONFIG_FILE_PATH, "w+") as f:
-            f.write(_config_to_yaml(config))
+            f.write(config_to_yaml(config))
 
 
 async def get_backend_config_yaml(
@@ -414,8 +475,8 @@ async def get_backend_config_yaml(
     )
     if config_info is None:
         raise ResourceNotExistsError()
-    config = _internal_config_to_config(config_info)
-    config_yaml = _config_to_yaml(config)
+    config = internal_config_to_config(config_info)
+    config_yaml = config_to_yaml(config)
     return BackendInfoYAML(
         name=backend_type,
         config_yaml=config_yaml,
@@ -427,8 +488,8 @@ async def create_backend_config_yaml(
     project: ProjectModel,
     config_yaml: str,
 ):
-    backend_config = _config_yaml_to_backend_config(config_yaml)
-    config_info = _config_to_internal_config(backend_config)
+    backend_config = config_yaml_to_backend_config(config_yaml)
+    config_info = config_to_internal_config(backend_config)
     await backends_services.create_backend(session=session, project=project, config=config_info)
 
 
@@ -437,15 +498,15 @@ async def update_backend_config_yaml(
     project: ProjectModel,
     config_yaml: str,
 ):
-    backend_config = _config_yaml_to_backend_config(config_yaml)
-    config_info = _config_to_internal_config(backend_config)
+    backend_config = config_yaml_to_backend_config(config_yaml)
+    config_info = config_to_internal_config(backend_config)
     await backends_services.update_backend(session=session, project=project, config=config_info)
 
 
 server_config_manager = ServerConfigManager()
 
 
-def _internal_config_to_config(config_info: AnyConfigInfoWithCreds) -> BackendConfig:
+def internal_config_to_config(config_info: AnyConfigInfoWithCreds) -> BackendConfig:
     backend_config = _BackendConfig.parse_obj(config_info.dict(exclude={"locations"}))
     if config_info.type == "azure":
         backend_config.__root__.regions = config_info.locations
@@ -456,7 +517,7 @@ class _ConfigInfoWithCreds(CoreModel):
     __root__: Annotated[AnyConfigInfoWithCreds, Field(..., discriminator="type")]
 
 
-def _config_to_internal_config(
+def config_to_internal_config(
     backend_config: Union[BackendConfig, BackendAPIConfig],
 ) -> AnyConfigInfoWithCreds:
     backend_config_dict = backend_config.dict()
@@ -471,7 +532,7 @@ def _config_to_internal_config(
     return config_info.__root__
 
 
-def _config_yaml_to_backend_config(config_yaml: str) -> BackendAPIConfig:
+def config_yaml_to_backend_config(config_yaml: str) -> BackendAPIConfig:
     try:
         config_dict = yaml.load(config_yaml, yaml.FullLoader)
     except yaml.YAMLError:
@@ -483,7 +544,7 @@ def _config_yaml_to_backend_config(config_yaml: str) -> BackendAPIConfig:
     return backend_config
 
 
-def _config_to_yaml(config: CoreModel) -> str:
+def config_to_yaml(config: CoreModel) -> str:
     return yaml.dump(config.dict(exclude_none=True), sort_keys=False)
 
 

@@ -7,7 +7,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration
-from dstack._internal.core.models.gateways import AnyModel
+from dstack._internal.core.models.gateways import AnyModel, GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
@@ -17,7 +17,7 @@ CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
 
 
-class ConfigurationType(str, Enum):
+class RunConfigurationType(str, Enum):
     DEV_ENVIRONMENT = "dev-environment"
     TASK = "task"
     SERVICE = "service"
@@ -85,8 +85,21 @@ class Artifact(CoreModel):
 
 
 class ScalingSpec(CoreModel):
-    metric: Annotated[Literal["rps"], Field(description="The target metric to track")]
-    target: Annotated[float, Field(description="The target value of the metric")]
+    metric: Annotated[
+        Literal["rps"],
+        Field(
+            description="The target metric to track. Currently, the only supported value is `rps` "
+            "(meaning requests per second)"
+        ),
+    ]
+    target: Annotated[
+        float,
+        Field(
+            description="The target value of the metric. "
+            "The number of replicas is calculated based on this number and automatically adjusts "
+            "(scales up or down) as this metric changes"
+        ),
+    ]
     scale_up_delay: Annotated[
         Duration, Field(description="The delay in seconds before scaling up")
     ] = Duration.parse("5m")
@@ -215,19 +228,6 @@ class TaskConfiguration(
     BaseConfigurationWithPorts,
     TaskConfigurationParams,
 ):
-    """
-    Attributes:
-        commands (List[str]): The bash commands to run
-        ports (List[PortMapping]): Port numbers/mapping to expose
-        env (Dict[str, str]): The mapping or the list of environment variables
-        image (Optional[str]): The name of the Docker image to run
-        python (Optional[str]): The major version of Python
-        entrypoint (Optional[str]): The Docker entrypoint
-        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
-        home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
-    """
-
     type: Literal["task"] = "task"
 
 
@@ -240,13 +240,18 @@ class ServiceConfigurationParams(CoreModel):
         Optional[AnyModel],
         Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
     ] = None
+    https: Annotated[bool, Field(description="Enable HTTPS")] = True
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
     replicas: Annotated[
         Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],
-        Field(description="The range "),
+        Field(
+            description="The number of replicas. Can be a number (e.g. `2`) or a range (`0..4` or `1..8`). "
+            "If it's a range, the `scaling` property is required"
+        ),
     ] = Range[int](min=1, max=1)
     scaling: Annotated[
-        Optional[ScalingSpec], Field(description="The auto-scaling configuration")
+        Optional[ScalingSpec],
+        Field(description="The auto-scaling rules. Required if `replicas` is set to a range"),
     ] = None
 
     @validator("port")
@@ -288,23 +293,6 @@ class ServiceConfigurationParams(CoreModel):
 class ServiceConfiguration(
     ProfileParams, BaseConfigurationWithCommands, ServiceConfigurationParams
 ):
-    """
-    Attributes:
-        commands (List[str]): The bash commands to run
-        port (PortMapping): The port, that application listens to or the mapping
-        env (Dict[str, str]): The mapping or the list of environment variables
-        image (Optional[str]): The name of the Docker image to run
-        python (Optional[str]): The major version of Python
-        entrypoint (Optional[str]): The Docker entrypoint
-        registry_auth (Optional[RegistryAuth]): Credentials for pulling a private Docker image
-        home_dir (str): The absolute path to the home directory inside the container. Defaults to `/root`.
-        resources (Optional[ResourcesSpec]): The requirements to run the configuration.
-        model (Optional[ModelMapping]): Mapping of the model for the OpenAI-compatible endpoint.
-        auth (bool): Enable the authorization. Defaults to `True`.
-        replicas Range[int]: The range of the number of replicas. Defaults to `1`.
-        scaling: Optional[ScalingSpec]: The auto-scaling configuration.
-    """
-
     type: Literal["service"] = "service"
 
 
@@ -317,13 +305,38 @@ class RunConfiguration(CoreModel):
         Field(discriminator="type"),
     ]
 
-    class Config:
-        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
-
-def parse(data: dict) -> AnyRunConfiguration:
+def parse_run_configuration(data: dict) -> AnyRunConfiguration:
     try:
         conf = RunConfiguration.parse_obj(data).__root__
     except ValidationError as e:
         raise ConfigurationError(e)
     return conf
+
+
+class ApplyConfigurationType(str, Enum):
+    GATEWAY = "gateway"
+
+
+AnyApplyConfiguration = GatewayConfiguration
+
+
+def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
+    try:
+        conf = GatewayConfiguration.parse_obj(data)
+    except ValidationError as e:
+        raise ConfigurationError(e)
+    return conf
+
+
+AnyDstackConfiguration = Union[AnyRunConfiguration, GatewayConfiguration]
+
+
+class DstackConfiguration(CoreModel):
+    __root__: Annotated[
+        AnyDstackConfiguration,
+        Field(discriminator="type"),
+    ]
+
+    class Config:
+        schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}

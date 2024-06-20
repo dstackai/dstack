@@ -1,9 +1,11 @@
 import json
 from typing import List
 
-from dstack._internal.core.backends.gcp import GCPBackend, auth
+import google.cloud.compute_v1 as compute_v1
+
+from dstack._internal.core.backends.gcp import GCPBackend, auth, resources
 from dstack._internal.core.backends.gcp.config import GCPConfig
-from dstack._internal.core.errors import BackendAuthError, ServerClientError
+from dstack._internal.core.errors import BackendAuthError, ComputeError, ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
     ConfigElement,
@@ -148,7 +150,7 @@ class GCPConfigurator(Configurator):
         ):
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
-            _, project_id = auth.authenticate(creds=config.creds)
+            credentials, project_id = auth.authenticate(creds=config.creds)
         except BackendAuthError:
             if is_core_model_instance(config.creds, GCPServiceAccountCreds):
                 raise_invalid_credentials_error(fields=[["creds", "data"]])
@@ -163,6 +165,15 @@ class GCPConfigurator(Configurator):
         config_values.project_id = self._get_project_id_element(selected=project_id)
         config_values.regions = self._get_regions_element(
             selected=config.regions or DEFAULT_REGIONS
+        )
+        if config.project_id is None:
+            return config_values
+        network_client = compute_v1.NetworksClient(credentials=credentials)
+        routers_client = compute_v1.RoutersClient(credentials=credentials)
+        self._check_vpc_config(
+            network_client=network_client,
+            routers_client=routers_client,
+            config=config,
         )
         return config_values
 
@@ -212,3 +223,23 @@ class GCPConfigurator(Configurator):
         for region_name in REGIONS:
             element.values.append(ConfigElementValue(value=region_name, label=region_name))
         return element
+
+    def _check_vpc_config(
+        self,
+        network_client: compute_v1.NetworksClient,
+        routers_client: compute_v1.RoutersClient,
+        config: GCPConfigInfoWithCredsPartial,
+    ):
+        allocate_public_ip = config.public_ips if config.public_ips is not None else True
+        try:
+            resources.check_vpc(
+                network_client=network_client,
+                routers_client=routers_client,
+                project_id=config.project_id,
+                regions=config.regions or DEFAULT_REGIONS,
+                vpc_name=config.vpc_name,
+                shared_vpc_project_id=config.vpc_project_id,
+                allocate_public_ip=allocate_public_ip,
+            )
+        except ComputeError as e:
+            raise ServerClientError(e.args[0])

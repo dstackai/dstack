@@ -26,6 +26,10 @@ on:
         description: "Build GCP images"
         type: boolean
         default: true
+      build_oci:
+        description: "Build OCI images"
+        type: boolean
+        default: true
       build_nebius:
         description: "Build Nebius images"
         type: boolean
@@ -126,7 +130,7 @@ jobs:
         run: |
           IMAGE_DEFINITION=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
           IMAGE_NAME=${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }}
-          ../scripts/publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
+          ../publish_azure_image.sh $IMAGE_DEFINITION $IMAGE_NAME
 
   build-gcp-images:
     needs: build-docker
@@ -165,6 +169,76 @@ jobs:
           gcloud compute images add-iam-policy-binding ${BUILD_PREFIX}dstack${{ matrix.variant }}-$IMAGE_VERSION --member='allAuthenticatedUsers' --role='roles/compute.imageUser'
         env:
           IMAGE_VERSION: ${{ inputs.image_version }}
+
+  build-oci-images:
+    needs: build-docker
+    if: always() && inputs.build_oci && (needs.build-docker.result == 'success' || needs.build-docker.result == 'skipped')
+    runs-on: ubuntu-latest
+    env:
+      OCI_COMPARTMENT: ocid1.compartment.oc1..aaaaaaaaxu2uq64unfa2imwkp37icxqv6f7gwp2mczdt2mukuqbkauwqmbtq
+      OCI_SUBNET: ocid1.subnet.oc1.eu-frankfurt-1.aaaaaaaaewxkaqsmbi2tig5sfw4eexzo3mkb4zrpm4gwvfhqdddnxicxe4fa
+      OCI_AVAILABILITY_DOMAIN: kZql:EU-FRANKFURT-1-AD-3
+      OCI_REGION: eu-frankfurt-1
+    strategy:
+      matrix:
+        variant: [ "", "-cuda" ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup OCI config
+        run: |
+          mkdir ~/.oci
+          echo "$OCI_KEY_CONTENT" > ~/.oci/key.pem
+          echo [DEFAULT]                     > ~/.oci/config
+          echo region=$OCI_REGION           >> ~/.oci/config
+          echo tenancy=$OCI_TENANCY         >> ~/.oci/config
+          echo user=$OCI_USER               >> ~/.oci/config
+          echo fingerprint=$OCI_FINGERPRINT >> ~/.oci/config
+          echo key_file=~/.oci/key.pem      >> ~/.oci/config
+        env:
+          OCI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
+          OCI_USER: ${{ secrets.OCI_CLI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
+          OCI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
+      - name: Install packer
+        working-directory: scripts/packer
+        run: |
+          wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          unzip packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
+          chmod +x packer
+          ./packer plugins install github.com/hashicorp/oracle
+      - name: Run packer
+        working-directory: scripts/packer
+        run: |
+          ./packer build \
+            -var-file=versions.json \
+            -var image_version=${{ inputs.image_version }} \
+            -var build_prefix=$BUILD_PREFIX \
+            -var oci_compartment_ocid=$OCI_COMPARTMENT \
+            -var oci_subnet_ocid=$OCI_SUBNET \
+            -var oci_availability_domain=$OCI_AVAILABILITY_DOMAIN \
+            oci-image${{ matrix.variant }}.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies for publishing
+        run: |
+          pip install .[oci]
+      - name: Copy image to target regions
+        run: |
+          python scripts/oci_image_tools.py copy \
+            --image ${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
+            --from $OCI_REGION \
+            --compartment $OCI_COMPARTMENT
+      - name: Publish image in OCI Marketplace
+        run: |
+          python scripts/oci_image_tools.py publish \
+            --image ${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
+            --compartment $OCI_COMPARTMENT \
+            --version ${{ inputs.image_version }} \
+            --description "Image for running workloads with dstack - https://dstack.ai/" \
+            --os "Ubuntu 22.04" \
+            --contact-name dstack \
+            --contact-email hello@dstack.ai
 
   build-nebius-images:
     needs: build-docker
