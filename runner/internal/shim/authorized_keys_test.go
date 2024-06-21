@@ -1,7 +1,9 @@
 package shim
 
 import (
+	"fmt"
 	"os"
+	"os/user"
 	"path"
 	"testing"
 
@@ -92,10 +94,67 @@ func TestAppendPublicKeys(t *testing.T) {
 	require.Equal(t, []string{keyLeft, keyRight, comment}, newKeys)
 }
 
+func mockUserLookup(username string) (*user.User, error) {
+	if username == "test_user" {
+		return &user.User{
+			Username: "test_user",
+			HomeDir:  "/tmp/home/test_user",
+		}, nil
+	}
+	if username == "test_user2" {
+		return &user.User{
+			Username: "test_user2",
+			HomeDir:  "/tmp/home/test_user2",
+		}, nil
+	}
+	return nil, fmt.Errorf("user not found")
+}
+
+func TestGetAuthorizedKeysPath(t *testing.T) {
+	testCases := []struct {
+		user     string
+		exists   bool
+		expected string
+		isError  bool
+	}{
+		{
+			user:     "test_user",
+			exists:   true,
+			expected: "/tmp/home/test_user/.ssh/authorized_keys",
+			isError:  false,
+		},
+		{
+			user:     "test_user2",
+			exists:   true,
+			expected: "/tmp/home/test_user2/.ssh/authorized_keys",
+			isError:  false,
+		},
+		{
+			user:     "test_user3",
+			exists:   false,
+			expected: "",
+			isError:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		ak := AuthorizedKeys{user: tc.user, lookup: mockUserLookup}
+		filePath, err := ak.GetAuthorizedKeysPath()
+		if tc.isError {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, filePath)
+		}
+	}
+}
+
 func TestAppendKey(t *testing.T) {
-	ak := AuthorizedKeys{user: "test_user", rootPath: t.TempDir()}
-	filePath := ak.GetAuthorizedKeysPath()
-	err := os.MkdirAll(path.Dir(filePath), os.ModePerm)
+	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
+	filePath, err := ak.GetAuthorizedKeysPath()
+	require.NoError(t, err)
+
+	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
 	require.NoError(t, err)
 
 	key := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
@@ -112,9 +171,11 @@ func TestAppendKey(t *testing.T) {
 }
 
 func TestRemoveKey(t *testing.T) {
-	ak := AuthorizedKeys{user: "test_user", rootPath: t.TempDir()}
-	filePath := ak.GetAuthorizedKeysPath()
-	err := os.MkdirAll(path.Dir(filePath), os.ModePerm)
+	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
+	filePath, err := ak.GetAuthorizedKeysPath()
+	require.NoError(t, err)
+
+	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
 	require.NoError(t, err)
 
 	key := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
@@ -134,9 +195,11 @@ func TestRemoveKey(t *testing.T) {
 }
 
 func TestRemoveTwoKey(t *testing.T) {
-	ak := AuthorizedKeys{user: "test_user", rootPath: t.TempDir()}
-	filePath := ak.GetAuthorizedKeysPath()
-	err := os.MkdirAll(path.Dir(filePath), os.ModePerm)
+	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
+	filePath, err := ak.GetAuthorizedKeysPath()
+	require.NoError(t, err)
+
+	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
 	require.NoError(t, err)
 
 	first := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"
@@ -157,9 +220,11 @@ func TestRemoveTwoKey(t *testing.T) {
 }
 
 func TestAppendTwoKey(t *testing.T) {
-	ak := AuthorizedKeys{user: "test_user", rootPath: t.TempDir()}
-	filePath := ak.GetAuthorizedKeysPath()
-	err := os.MkdirAll(path.Dir(filePath), os.ModePerm)
+	ak := AuthorizedKeys{user: "test_user", lookup: mockUserLookup}
+	filePath, err := ak.GetAuthorizedKeysPath()
+	require.NoError(t, err)
+
+	err = os.MkdirAll(path.Dir(filePath), os.ModePerm)
 	require.NoError(t, err)
 
 	first := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCdqa9VimGtCppxtz6T0kXfA6csnRlGS0zmTNvH2XCIYYbNFcymjL1SpFXfYQvXrnoK7nR+4dHP66um5Mi4OWHC1pB4t2OPYNnEYuYJ/VFpPv0/ykGAijV+IZjh6wS5r1o/EfiG8kMlv2TGhDb/jjsJXl9zb3i0urTrG0Sk6iw7F7QL/pXUe1cKuhdxOUzw/ddNZ5fBCikAr2cYfI0kiqe4U/pRSV5mPNAuQvBFK+K7UDdKfKIf4YxTFjXFbcgD7XUC5nInhIdSvGFYLdHSuafwWz8Q5ds/EyAPCyMU2wsA+AIP5XpdIraJLDTQT1J4PjcYwecNibWU2rkobl9FDVcflZq+0s0HbmJRlB4uExTNRZP7ykMKp9MtJsQGB6uA41KYNsvV5a+7SX39syNDHGTB13gHQHmYEHgSmHIcyEE2tEh7Zb6OAFCsytUKzBl51FIS3V70ve9kqJUcldBEkGJh6PeFOvYQZ95Gl2Uob0ujKCVDrzMylepnadfhB5dSnEM= thebits@barracuda"

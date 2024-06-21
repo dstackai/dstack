@@ -909,6 +909,23 @@ In case of a self-managed cluster, also specify the IP address of any node in th
         type:
             required: true
 
+## `projects[n].backends[type=cudo]` { #cudo data-toc-label="backends[type=cudo]" }
+
+#SCHEMA# dstack._internal.server.services.config.CudoConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: cudo-
+
+## `projects[n].backends[type=cudo].creds` { #cudo-creds data-toc-label="backends[type=cudo].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.cudo.CudoAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
 ## `projects[n].backends[type=kubernetes]` { #kubernetes data-toc-label="backends[type=kubernetes]" }
 
 #SCHEMA# dstack._internal.server.services.config.KubernetesConfig
