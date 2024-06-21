@@ -1,6 +1,5 @@
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Literal, Optional
 
 from pydantic import Field
@@ -54,4 +53,4 @@ class Volume(CoreModel):
 
 class VolumeMountPoint(CoreModel):
     name: Annotated[str, Field(description="The name of the volume to mount")]
-    path: Annotated[Path, Field(description="The container path to mount the volume at")]
+    path: Annotated[str, Field(description="The container path to mount the volume at")]

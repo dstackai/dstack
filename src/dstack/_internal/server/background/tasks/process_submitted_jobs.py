@@ -216,7 +216,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await _attach_volumes(
             project=project_model,
             job_model=job_model,
-            job_provisioning_data=job_provisioning_data,
             instance=instance,
             volume_models=volume_models,
         )
@@ -253,6 +252,13 @@ async def _run_job_on_pool_instance(
             return None
         sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
         instance = sorted_instances[0]
+        # Reload InstanceModel with volumes
+        res = await session.execute(
+            select(InstanceModel)
+            .where(InstanceModel.id == instance.id)
+            .options(joinedload(InstanceModel.volumes))
+        )
+        instance = res.unique().scalar_one()
         instance.status = InstanceStatus.BUSY
         instance.job = job_model
         logger.info(
@@ -379,10 +385,12 @@ def _create_instance_model_for_job(
 async def _attach_volumes(
     project: ProjectModel,
     job_model: JobModel,
-    job_provisioning_data: JobProvisioningData,
     instance: InstanceModel,
     volume_models: List[VolumeModel],
 ):
+    job_provisioning_data = JobProvisioningData.__response__.parse_raw(
+        instance.job_provisioning_data
+    )
     # TODO: Volumes lock
     backend = await get_project_backend_by_type_or_error(
         project=project,

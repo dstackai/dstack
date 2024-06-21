@@ -11,6 +11,7 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -66,6 +67,7 @@ class LocalCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         return JobProvisioningData(
             backend=instance_offer.backend,
@@ -81,3 +83,18 @@ class LocalCompute(Compute):
             dockerized=True,
             backend_data=None,
         )
+
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        return VolumeProvisioningData(
+            volume_id=volume.name,
+            size_gb=int(volume.configuration.size),
+        )
+
+    def delete_volume(self, volume: Volume):
+        pass
+
+    def attach_volume(self, volume: Volume, instance_id: str):
+        pass
+
+    def detach_volume(self, volume: Volume, instance_id: str):
+        pass

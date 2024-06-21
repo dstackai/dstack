@@ -7,6 +7,7 @@ from typing_extensions import Annotated
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.runs import ClusterInfo, JobSpec, JobStatus, RunSpec
+from dstack._internal.core.models.volumes import VolumeMountPoint
 
 
 class JobStateEvent(CoreModel):
@@ -71,6 +72,11 @@ class HealthcheckResponse(CoreModel):
     version: str
 
 
+class ShimVolumeInfo(CoreModel):
+    name: str
+    volume_id: str
+
+
 class TaskConfigBody(CoreModel):
     username: str
     password: str
@@ -80,6 +86,8 @@ class TaskConfigBody(CoreModel):
     public_keys: List[str]
     ssh_user: str
     ssh_key: str
+    mounts: List[VolumeMountPoint]
+    volumes: List[ShimVolumeInfo]
 
 
 class StopBody(CoreModel):

@@ -21,6 +21,7 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     Run,
 )
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     JobModel,
@@ -42,6 +43,7 @@ from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
     PROCESSING_RUNS_IDS,
     PROCESSING_RUNS_LOCK,
+    get_run_volumes,
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
@@ -126,6 +128,12 @@ async def _process_job(job_id: UUID):
             gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
         )
 
+        volumes = await get_run_volumes(
+            session=session,
+            project=project,
+            run_spec=run.run_spec,
+        )
+
         server_ssh_private_key = project.ssh_private_key
         if (
             job_model.instance is not None
@@ -155,11 +163,16 @@ async def _process_job(job_id: UUID):
                     ssh_user = job_provisioning_data.username
                     user_ssh_key = run.run_spec.ssh_key_pub.strip()
                     public_keys = [project.ssh_public_key.strip(), user_ssh_key]
+                    if job_provisioning_data.backend == BackendType.LOCAL:
+                        # No need to update ~/.ssh/authorized_keys when running shim localy
+                        user_ssh_key = ""
                     success = await run_async(
                         _process_provisioning_with_shim,
                         server_ssh_private_key,
                         job_provisioning_data,
+                        run,
                         job_model,
+                        volumes,
                         secrets,
                         job.job_spec.registry_auth,
                         public_keys,
@@ -342,7 +355,9 @@ def _process_provisioning_no_shim(
 
 @runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)
 def _process_provisioning_with_shim(
+    run: Run,
     job_model: JobModel,
+    volumes: List[Volume],
     secrets: Dict[str, str],
     registry_auth: Optional[RegistryAuth],
     public_keys: List[str],
@@ -385,6 +400,8 @@ def _process_provisioning_with_shim(
         public_keys=public_keys,
         ssh_user=ssh_user,
         ssh_key=ssh_key,
+        mounts=run.run_spec.configuration.volumes,
+        volumes=volumes,
     )
 
     job_model.status = JobStatus.PULLING

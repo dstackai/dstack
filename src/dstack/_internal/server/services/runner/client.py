@@ -7,10 +7,12 @@ import requests.exceptions
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
+from dstack._internal.core.models.volumes import Volume, VolumeMountPoint
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     PullBody,
     PullResponse,
+    ShimVolumeInfo,
     StopBody,
     SubmitBody,
     TaskConfigBody,
@@ -125,8 +127,11 @@ class ShimClient:
         public_keys: List[str],
         ssh_user: str,
         ssh_key: str,
+        mounts: List[VolumeMountPoint],
+        volumes: List[Volume],
     ):
         _shm_size = int(shm_size * 1024 * 1024 * 1014) if shm_size else 0
+        volume_infos = [_volume_to_shim_volume_info(v) for v in volumes]
         post_body = TaskConfigBody(
             username=username,
             password=password,
@@ -136,6 +141,8 @@ class ShimClient:
             public_keys=public_keys,
             ssh_user=ssh_user,
             ssh_key=ssh_key,
+            mounts=mounts,
+            volumes=volume_infos,
         ).dict()
         resp = requests.post(
             self._url("/api/submit"),
@@ -166,3 +173,10 @@ def health_response_to_health_status(data: HealthcheckResponse) -> HealthStatus:
             healthy=False,
             reason=f"Service name is {data.service}, service version: {data.version}",
         )
+
+
+def _volume_to_shim_volume_info(volume: Volume) -> ShimVolumeInfo:
+    return ShimVolumeInfo(
+        name=volume.name,
+        volume_id=volume.volume_id,
+    )
