@@ -52,11 +52,13 @@ class TestListVolumes:
             {
                 "name": volume.name,
                 "configuration": json.loads(volume.configuration),
+                "external": False,
                 "created_at": "2023-01-02T03:04:00+00:00",
                 "status": "submitted",
                 "status_message": None,
                 "volume_id": None,
                 "provisioning_data": None,
+                "attachment_data": None,
             }
         ]
 
@@ -88,11 +90,13 @@ class TestGetVolume:
         assert response.json() == {
             "name": volume.name,
             "configuration": json.loads(volume.configuration),
+            "external": False,
             "created_at": "2023-01-02T03:04:00+00:00",
             "status": "submitted",
             "status_message": None,
             "volume_id": None,
             "provisioning_data": None,
+            "attachment_data": None,
         }
 
     @pytest.mark.asyncio
@@ -137,11 +141,13 @@ class TestCreateVolume:
             == {
                 "name": configuration.name,
                 "configuration": configuration,
+                "external": False,
                 "created_at": "2023-01-02T03:04:00+00:00",
                 "status": "submitted",
                 "status_message": None,
                 "volume_id": None,
                 "provisioning_data": None,
+                "attachment_data": None,
             }
         )
         res = await session.execute(select(VolumeModel))

@@ -372,6 +372,33 @@ class AWSCompute(Compute):
         elb_client.delete_load_balancer(LoadBalancerArn=backend_data_parsed.lb_arn)
         logger.debug("Deleted ALB resources for gateway %s", configuration.instance_name)
 
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
+
+        logger.debug("Requesting EBS volume %s", volume.configuration.volume_id)
+        try:
+            response = ec2_client.describe_volumes(VolumeIds=[volume.configuration.volume_id])
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "InvalidParameterValue":
+                raise ComputeError(f"Bad volume id: {volume.configuration.volume_id}")
+            else:
+                raise e
+        response_volumes = response["Volumes"]
+        if len(response_volumes) == 0:
+            raise ComputeError(f"Volume {volume.configuration.name} not found")
+        logger.debug("Found EBS volume %s", volume.configuration.volume_id)
+
+        response_volume = response_volumes[0]
+        return VolumeProvisioningData(
+            volume_id=response_volume["VolumeId"],
+            size_gb=response_volume["Size"],
+            availability_zone=response_volume["AvailabilityZone"],
+            backend_data=AWSVolumeBackendData(
+                volume_type=response_volume["VolumeType"],
+                iops=response_volume["Iops"],
+            ).json(),
+        )
+
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 

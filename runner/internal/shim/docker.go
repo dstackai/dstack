@@ -231,7 +231,7 @@ func formatAndMountVolume(volume VolumeInfo) error {
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	_, err = createFileSystem(deviceName)
+	_, err = initFileSystem(deviceName, !volume.InitFs)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -247,6 +247,7 @@ func formatAndMountVolume(volume VolumeInfo) error {
 // (e.g. NVMe block devices built on the Nitro System).
 func getRealDeviceName(volumeID string) (string, error) {
 	// Run the lsblk command to get block device information
+	// TODO: On AWS SERIAL contains volume id. This may not be true for other clouds.
 	cmd := exec.Command("lsblk", "-o", "NAME,SERIAL")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -269,9 +270,9 @@ func getRealDeviceName(volumeID string) (string, error) {
 	return "", fmt.Errorf("volume %s not found among block devices", volumeID)
 }
 
-// createFileSystem creates an ext4 file system on a disk only if the disk is not already has a file system.
+// initFileSystem creates an ext4 file system on a disk only if the disk is not already has a file system.
 // Returns true if the file system is created.
-func createFileSystem(deviceName string) (bool, error) {
+func initFileSystem(deviceName string, errorIfNotExists bool) (bool, error) {
 	// Run the lsblk command to get filesystem type
 	cmd := exec.Command("lsblk", "-no", "FSTYPE", deviceName)
 	var out bytes.Buffer
@@ -284,6 +285,10 @@ func createFileSystem(deviceName string) (bool, error) {
 	fsType := strings.TrimSpace(out.String())
 	if fsType != "" {
 		return false, nil
+	}
+
+	if errorIfNotExists {
+		return false, fmt.Errorf("disk has no file system")
 	}
 
 	log.Printf("Formatting disk %s with ext4 filesystem...\n", deviceName)

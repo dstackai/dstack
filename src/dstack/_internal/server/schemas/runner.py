@@ -75,6 +75,7 @@ class HealthcheckResponse(CoreModel):
 class ShimVolumeInfo(CoreModel):
     name: str
     volume_id: str
+    init_fs: bool
 
 
 class TaskConfigBody(CoreModel):

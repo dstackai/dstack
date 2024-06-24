@@ -105,6 +105,9 @@ class Compute(ABC):
     ):
         raise NotImplementedError()
 
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        raise NotImplementedError()
+
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
         raise NotImplementedError()
 

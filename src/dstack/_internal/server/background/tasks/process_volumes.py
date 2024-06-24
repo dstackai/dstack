@@ -60,7 +60,7 @@ async def _process_volume(volume_id: UUID):
 
 
 async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeModel):
-    logger.info("Started volume %s provisioning", volume_model.name)
+    logger.info("Started submitted volume %s processing", volume_model.name)
 
     volume = volumes_services.volume_model_to_volume(volume_model)
     try:
@@ -75,10 +75,18 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
         return
 
     try:
-        vpd = await run_async(
-            backend.compute().create_volume,
-            volume=volume,
-        )
+        if volume.configuration.volume_id is not None:
+            logger.info("Registering external volume %s", volume_model.name)
+            vpd = await run_async(
+                backend.compute().register_volume,
+                volume=volume,
+            )
+        else:
+            logger.info("Provisioning new volume %s", volume_model.name)
+            vpd = await run_async(
+                backend.compute().create_volume,
+                volume=volume,
+            )
     except BackendError as e:
         logger.info("Failed to create volume %s: %s", volume_model.name, repr(e))
         volume_model.status = VolumeStatus.FAILED

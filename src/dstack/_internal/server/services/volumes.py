@@ -118,6 +118,7 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
     )
     volume_models = res.scalars().all()
     volumes_ids = [v.id for v in volume_models]
+    logger.info("Deleting volumes: %s", [v.name for v in volume_models])
     # TODO: check for volumes in use. refetch with lock.
     await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
     try:
@@ -157,6 +158,7 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
     return Volume(
         name=volume_model.name,
         configuration=configuration,
+        external=configuration.volume_id is not None,
         created_at=volume_model.created_at.replace(tzinfo=timezone.utc),
         status=volume_model.status,
         status_message=volume_model.status_message,
@@ -193,6 +195,9 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
 
 async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_model: VolumeModel):
     volume = volume_model_to_volume(volume_model)
+
+    if volume.external:
+        return
 
     try:
         backend = await backends_services.get_project_backend_by_type_or_error(

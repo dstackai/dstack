@@ -49,6 +49,7 @@ type MountPoint struct {
 type VolumeInfo struct {
 	Name     string `json:"name"`
 	VolumeId string `json:"volume_id"`
+	InitFs   bool   `json:"init_fs"`
 }
 
 type TaskConfig struct {

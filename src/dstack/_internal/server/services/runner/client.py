@@ -179,4 +179,5 @@ def _volume_to_shim_volume_info(volume: Volume) -> ShimVolumeInfo:
     return ShimVolumeInfo(
         name=volume.name,
         volume_id=volume.volume_id,
+        init_fs=not volume.external,
     )
