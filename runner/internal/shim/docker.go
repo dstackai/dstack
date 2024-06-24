@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	rt "runtime"
 	"strconv"
@@ -88,6 +89,11 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 				log.Printf("Error RemovePublicKeys: %s\n", err.Error())
 			}
 		}(cfg)
+	}
+
+	err = prepareVolumes(cfg)
+	if err != nil {
+		return err
 	}
 
 	d.containerStatus = ContainerStatus{
@@ -197,6 +203,105 @@ func (d *DockerRunner) Stop(force bool) {
 
 func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus, string, JobResult) {
 	return d.state, d.containerStatus, d.executorError, d.jobResult
+}
+
+func prepareVolumes(taskConfig TaskConfig) error {
+	for _, volume := range taskConfig.Volumes {
+		err := formatAndMountVolume(volume)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func formatAndMountVolume(volume VolumeInfo) error {
+	deviceName, err := getRealDeviceName(volume.VolumeId)
+	if err != nil {
+		return err
+	}
+	_, err = createFileSystem(deviceName)
+	if err != nil {
+		return err
+	}
+	err = mountDisk(deviceName, "/"+volume.Name)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// getRealDeviceName returns the device name for the given EBS volume ID.
+// The device name on instance can be different from device name specified in block-device mapping
+// (e.g. NVMe block devices built on the Nitro System).
+func getRealDeviceName(volumeID string) (string, error) {
+	// Run the lsblk command to get block device information
+	cmd := exec.Command("lsblk", "-o", "NAME,SERIAL")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to list block devices: %v", err)
+	}
+
+	// Parse the output to find the device that matches the volume ID
+	lines := strings.Split(out.String(), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && strings.HasPrefix(fields[1], "vol-") {
+			serial := strings.TrimPrefix(fields[1], "vol-")
+			if "vol-"+serial == volumeID {
+				return "/dev/" + fields[0], nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("volume %s not found among block devices", volumeID)
+}
+
+// createFileSystem creates an ext4 file system on a disk only if the disk is not already has a file system.
+// Returns true if the file system is created.
+func createFileSystem(deviceName string) (bool, error) {
+	// Run the lsblk command to get filesystem type
+	cmd := exec.Command("lsblk", "-no", "FSTYPE", deviceName)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return false, fmt.Errorf("failed to check if disk is formatted: %v", err)
+	}
+
+	// If the output is not empty, the disk is already formatted
+	fsType := strings.TrimSpace(out.String())
+	if fsType != "" {
+		return false, nil
+	}
+
+	log.Printf("Formatting disk %s with ext4 filesystem...\n", deviceName)
+	cmd = exec.Command("mkfs.ext4", "-F", deviceName)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return false, fmt.Errorf("failed to format disk: %s, output: %s", err, string(output))
+	}
+	log.Println("Disk formatted succesfully!")
+	return true, nil
+}
+
+func mountDisk(deviceName, mountPoint string) error {
+	// Create the mount point directory if it doesn't exist
+	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
+		fmt.Printf("Creating mount point %s...\n", mountPoint)
+		if err := os.MkdirAll(mountPoint, 0755); err != nil {
+			return fmt.Errorf("failed to create mount point: %s", err)
+		}
+	}
+
+	// Mount the disk to the mount point
+	log.Printf("Mounting disk %s to %s...\n", deviceName, mountPoint)
+	cmd := exec.Command("mount", deviceName, mountPoint)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to mount disk: %s, output: %s", err, string(output))
+	}
+
+	log.Println("Disk mounted successfully!")
+	return nil
 }
 
 func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConfig) error {
@@ -310,6 +415,11 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
+	volumeMounts, err := getVolumeMounts(taskConfig.Mounts)
+	if err != nil {
+		return "", tracerr.Wrap(err)
+	}
+	mounts = append(mounts, volumeMounts...)
 
 	containerConfig := &container.Config{
 		Image:        taskConfig.ImageName,
@@ -328,6 +438,8 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		Mounts:  mounts,
 		ShmSize: taskConfig.ShmSize,
 	}
+
+	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", taskConfig.ContainerName, containerConfig, hostConfig)
 	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskConfig.ContainerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
@@ -417,6 +529,14 @@ func requestGpuIfAvailable(ctx context.Context, client docker.APIClient) ([]cont
 	}
 
 	return nil, nil
+}
+
+func getVolumeMounts(mountPoints []MountPoint) ([]mount.Mount, error) {
+	mounts := []mount.Mount{}
+	for _, mountPoint := range mountPoints {
+		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: "/" + mountPoint.Name, Target: mountPoint.Path})
+	}
+	return mounts, nil
 }
 
 /* DockerParameters interface implementation for CLIArgs */
