@@ -81,6 +81,11 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	if cfg.SshKey != "" {
 		ak := AuthorizedKeys{user: cfg.SshUser}
 		if err := ak.AppendPublicKeys([]string{cfg.SshKey}); err != nil {
+			d.state = Pending
+			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
+			d.containerStatus.Error = errMessage
+			log.Println(errMessage)
+			d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
 			return tracerr.Wrap(err)
 		}
 		defer func(cfg TaskConfig) {
@@ -91,9 +96,15 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		}(cfg)
 	}
 
+	log.Println("Preparing volumes")
 	err = prepareVolumes(cfg)
 	if err != nil {
-		return err
+		d.state = Pending
+		errMessage := fmt.Sprintf("prepareVolumes error: %s", err.Error())
+		d.containerStatus.Error = errMessage
+		log.Println(errMessage)
+		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
+		return tracerr.Wrap(err)
 	}
 
 	d.containerStatus = ContainerStatus{
@@ -113,7 +124,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		d.containerStatus.Error = errMessage
 		log.Print(errMessage + "\n")
 		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
-		return err
+		return tracerr.Wrap(err)
 	}
 
 	runnerDir, err := d.dockerParams.MakeRunnerDir()
@@ -123,7 +134,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		d.containerStatus.Error = errMessage
 		log.Print(errMessage + "\n")
 		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
-		return err
+		return tracerr.Wrap(err)
 	}
 
 	log.Println("Creating container")
@@ -135,7 +146,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		d.containerStatus.Error = errMessage
 		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		log.Print(errMessage + "\n")
-		return err
+		return tracerr.Wrap(err)
 	}
 
 	if !d.dockerParams.DockerKeepContainer() {
@@ -165,7 +176,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 			errMessage = "Container killed by OOM"
 		}
 		d.jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: errMessage}
-		return err
+		return tracerr.Wrap(err)
 	}
 
 	log.Printf("Container finished successfully, name=%s, id=%s", d.containerStatus.ContainerName, containerID)
@@ -209,7 +220,7 @@ func prepareVolumes(taskConfig TaskConfig) error {
 	for _, volume := range taskConfig.Volumes {
 		err := formatAndMountVolume(volume)
 		if err != nil {
-			return err
+			return tracerr.Wrap(err)
 		}
 	}
 	return nil
@@ -218,15 +229,15 @@ func prepareVolumes(taskConfig TaskConfig) error {
 func formatAndMountVolume(volume VolumeInfo) error {
 	deviceName, err := getRealDeviceName(volume.VolumeId)
 	if err != nil {
-		return err
+		return tracerr.Wrap(err)
 	}
 	_, err = createFileSystem(deviceName)
 	if err != nil {
-		return err
+		return tracerr.Wrap(err)
 	}
 	err = mountDisk(deviceName, "/"+volume.Name)
 	if err != nil {
-		return err
+		return tracerr.Wrap(err)
 	}
 	return nil
 }
@@ -247,8 +258,8 @@ func getRealDeviceName(volumeID string) (string, error) {
 	lines := strings.Split(out.String(), "\n")
 	for _, line := range lines {
 		fields := strings.Fields(line)
-		if len(fields) == 2 && strings.HasPrefix(fields[1], "vol-") {
-			serial := strings.TrimPrefix(fields[1], "vol-")
+		if len(fields) == 2 && strings.HasPrefix(fields[1], "vol") {
+			serial := strings.TrimPrefix(fields[1], "vol")
 			if "vol-"+serial == volumeID {
 				return "/dev/" + fields[0], nil
 			}
