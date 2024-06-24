@@ -53,7 +53,7 @@ jobs:
         run: pytest src/tests
 
   update-get-dstack:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [ python-test ]
     runs-on: ubuntu-latest
     env:
@@ -136,7 +136,7 @@ jobs:
           retention-days: 1
 
   runner-upload:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [runner-compile]
     runs-on: ubuntu-latest
     steps:
@@ -158,7 +158,7 @@ jobs:
           aws s3 cp . "s3://dstack-runner-downloads-stgn/latest/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
 
   generate-json-schema:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [ python-test ]
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -186,7 +186,7 @@ jobs:
           aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/latest/schemas/profiles.json" --acl public-read
 
   gateway-build:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     defaults:
       run:
