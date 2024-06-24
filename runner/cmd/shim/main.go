@@ -97,6 +97,11 @@ func main() {
 						Usage:       "Do not delete container on exit",
 						Destination: &args.Docker.KeepContainer,
 					},
+                    &cli.BoolFlag{
+						Name:        "privileged",
+						Usage:       "Give extended privileges to the container",
+						Destination: &args.Docker.Privileged,
+					},
 					&cli.StringFlag{
 						Name:        "ssh-key",
 						Usage:       "Public SSH key",

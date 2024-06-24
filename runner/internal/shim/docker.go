@@ -317,8 +317,12 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(taskConfig.PublicKeys), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
+		Env: []string{
+			"PJRT_DEVICE=TPU",
+		},
 	}
 	hostConfig := &container.HostConfig{
+	    Privileged:      dockerParams.DockerPrivileged(),
 		NetworkMode:     getNetworkMode(),
 		PortBindings:    bindPorts(dockerParams.DockerPorts()...),
 		PublishAllPorts: true,
@@ -424,6 +428,10 @@ func requestGpuIfAvailable(ctx context.Context, client docker.APIClient) ([]cont
 
 func (c CLIArgs) DockerKeepContainer() bool {
 	return c.Docker.KeepContainer
+}
+
+func (c CLIArgs) DockerPrivileged() bool {
+	return c.Docker.Privileged
 }
 
 func (c CLIArgs) DockerShellCommands(publicKeys []string) []string {

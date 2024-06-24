@@ -10,6 +10,7 @@ import (
 )
 
 type DockerParameters interface {
+    DockerPrivileged() bool
 	DockerKeepContainer() bool
 	DockerShellCommands([]string) []string
 	DockerMounts(string) ([]mount.Mount, error)
@@ -38,6 +39,7 @@ type CLIArgs struct {
 		SSHPort                   int
 		KeepContainer             bool
 		ConcatinatedPublicSSHKeys string
+		Privileged                bool
 	}
 }
 

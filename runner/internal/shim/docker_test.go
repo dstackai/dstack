@@ -98,6 +98,10 @@ func (c *dockerParametersMock) DockerKeepContainer() bool {
 	return false
 }
 
+func (c *dockerParametersMock) DockerPrivileged() bool {
+	return false
+}
+
 func (c *dockerParametersMock) DockerShellCommands(publicKeys []string) []string {
 	userPublicKey := c.publicSSHKey
 	if len(publicKeys) > 0 {
