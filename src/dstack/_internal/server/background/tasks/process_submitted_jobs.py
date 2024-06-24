@@ -399,11 +399,12 @@ async def _attach_volumes(
     try:
         for volume_model in volume_models:
             volume = volume_model_to_volume(volume_model)
-            await run_async(
+            attachment_data = await run_async(
                 backend.compute().attach_volume,
                 volume=volume,
                 instance_id=job_provisioning_data.instance_id,
             )
+            volume_model.volume_attachment_data = attachment_data.json()
         instance.volumes.append(volume_model)
     except BackendError as e:
         logger.warning(

@@ -20,6 +20,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
+    VolumeAttachmentData,
     VolumeProvisioningData,
 )
 from dstack._internal.utils.logging import get_logger
@@ -110,7 +111,7 @@ class Compute(ABC):
     def delete_volume(self, volume: Volume):
         raise NotImplementedError()
 
-    def attach_volume(self, volume: Volume, instance_id: str):
+    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
         raise NotImplementedError()
 
     def detach_volume(self, volume: Volume, instance_id: str):

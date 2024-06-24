@@ -34,6 +34,7 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
+    VolumeAttachmentData,
     VolumeProvisioningData,
 )
 from dstack._internal.utils.logging import get_logger
@@ -427,23 +428,36 @@ class AWSCompute(Compute):
                 raise e
         logger.debug("Deleted EBS volume %s", volume.configuration.name)
 
-    def attach_volume(self, volume: Volume, instance_id: str):
+    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
-        logger.debug("Attaching EBS volume %s to instance %s", volume.volume_id, instance_id)
-        # TODO: Remove hardcoded device
-        ec2_client.attach_volume(
-            VolumeId=volume.volume_id, InstanceId=instance_id, Device="/dev/sdf"
+        device_name = aws_resources.get_available_device_name(
+            ec2_client=ec2_client, instance_id=instance_id
         )
+        if device_name is None:
+            raise ComputeError(f"Failed to find available device name for volume {volume.name}")
+
+        logger.debug("Attaching EBS volume %s to instance %s", volume.volume_id, instance_id)
+        try:
+            ec2_client.attach_volume(
+                VolumeId=volume.volume_id, InstanceId=instance_id, Device=device_name
+            )
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "VolumeInUse":
+                raise ComputeError(f"Failed to attach volume in use: {volume.volume_id}")
+            raise e
         logger.debug("Attached EBS volume %s from instance %s", volume.volume_id, instance_id)
+
+        return VolumeAttachmentData(device_name=device_name)
 
     def detach_volume(self, volume: Volume, instance_id: str):
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
         logger.debug("Detaching EBS volume %s to instance %s", volume.volume_id, instance_id)
-        # TODO: Remove hardcoded device
         ec2_client.detach_volume(
-            VolumeId=volume.volume_id, InstanceId=instance_id, Device="/dev/sdf"
+            VolumeId=volume.volume_id,
+            InstanceId=instance_id,
+            Device=volume.attachment_data.device_name,
         )
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
 

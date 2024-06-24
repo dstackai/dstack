@@ -41,6 +41,10 @@ class VolumeProvisioningData(CoreModel):
     backend_data: Optional[str] = None  # backend-specific data in json
 
 
+class VolumeAttachmentData(CoreModel):
+    device_name: Optional[str] = None
+
+
 class Volume(CoreModel):
     name: str
     configuration: VolumeConfiguration
@@ -49,6 +53,7 @@ class Volume(CoreModel):
     status_message: Optional[str] = None
     volume_id: Optional[str] = None
     provisioning_data: Optional[VolumeProvisioningData] = None
+    attachment_data: Optional[VolumeAttachmentData] = None
 
 
 class VolumeMountPoint(CoreModel):

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.errors import BackendNotAvailable, ResourceExistsError
 from dstack._internal.core.models.volumes import (
     Volume,
+    VolumeAttachmentData,
     VolumeConfiguration,
     VolumeProvisioningData,
     VolumeStatus,
@@ -152,6 +153,7 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
 def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
     configuration = get_volume_configuration(volume_model)
     vpd = get_volume_provisioning_data(volume_model)
+    vad = get_volume_attachment_data(volume_model)
     return Volume(
         name=volume_model.name,
         configuration=configuration,
@@ -159,6 +161,8 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         status=volume_model.status,
         status_message=volume_model.status_message,
         volume_id=vpd.volume_id if vpd is not None else None,
+        provisioning_data=vpd,
+        attachment_data=vad,
     )
 
 
@@ -170,6 +174,12 @@ def get_volume_provisioning_data(volume_model: VolumeModel) -> Optional[VolumePr
     if volume_model.volume_provisioning_data is None:
         return None
     return VolumeProvisioningData.__response__.parse_raw(volume_model.volume_provisioning_data)
+
+
+def get_volume_attachment_data(volume_model: VolumeModel) -> Optional[VolumeAttachmentData]:
+    if volume_model.volume_attachment_data is None:
+        return None
+    return VolumeAttachmentData.__response__.parse_raw(volume_model.volume_attachment_data)
 
 
 async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> str:

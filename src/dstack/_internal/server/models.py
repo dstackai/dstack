@@ -393,6 +393,7 @@ class VolumeModel(BaseModel):
 
     configuration: Mapped[str] = mapped_column(Text)
     volume_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
+    volume_attachment_data: Mapped[Optional[str]] = mapped_column(Text)
 
     # instances the volume is attached to
     instances: Mapped[List["InstanceModel"]] = relationship(

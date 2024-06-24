@@ -311,6 +311,35 @@ def get_availability_zones(ec2_client: botocore.client.BaseClient, region: str) 
     return zone_names
 
 
+def get_available_device_name(
+    ec2_client: botocore.client.BaseClient, instance_id: str
+) -> Optional[str]:
+    device_names = _list_possible_device_names()
+    used_device_names = list_instance_device_names(ec2_client, instance_id)
+    for name in device_names:
+        if name not in used_device_names:
+            return name
+    return None
+
+
+def list_instance_device_names(
+    ec2_client: botocore.client.BaseClient, instance_id: str
+) -> List[str]:
+    device_names = []
+    response = ec2_client.describe_instance_attribute(
+        InstanceId=instance_id, Attribute="blockDeviceMapping"
+    )
+    block_device_mappings = response["BlockDeviceMappings"]
+    for mapping in block_device_mappings:
+        device_names.append(mapping["DeviceName"])
+    return device_names
+
+
+def _list_possible_device_names() -> List[str]:
+    suffixes = ["f", "g", "h", "i", "j", "k", "l", "m", "n"]
+    return [f"/dev/sd{s}" for s in suffixes]
+
+
 def _add_ingress_security_group_rule_if_missing(
     ec2_client: botocore.client.BaseClient,
     security_group: Dict,
