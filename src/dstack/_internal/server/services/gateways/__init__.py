@@ -38,6 +38,7 @@ from dstack._internal.core.models.runs import (
     ServiceModelSpec,
     ServiceSpec,
 )
+from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
 from dstack._internal.server.models import (
     GatewayComputeModel,
@@ -630,6 +631,8 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
 
 
 def _validate_gateway_configuration(configuration: GatewayConfiguration):
+    if configuration.name is not None:
+        validate_dstack_resource_name(configuration.name)
     if (
         not configuration.public_ip
         and configuration.backend not in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT

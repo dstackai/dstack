@@ -1,7 +1,6 @@
 import asyncio
 import itertools
 import math
-import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Set, Tuple
@@ -59,6 +58,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -262,8 +262,7 @@ async def get_run_plan(
     user: UserModel,
     run_spec: RunSpec,
 ) -> RunPlan:
-    if run_spec.run_name is not None:
-        _validate_run_name(run_spec.run_name)
+    _validate_run_spec(run_spec)
 
     profile = run_spec.merged_profile
     creation_policy = profile.creation_policy
@@ -392,6 +391,8 @@ async def submit_run(
     project: ProjectModel,
     run_spec: RunSpec,
 ) -> Run:
+    _validate_run_spec(run_spec)
+
     repo = await repos_services.get_repo_model(
         session=session,
         project=project,
@@ -410,7 +411,6 @@ async def submit_run(
             project=project,
         )
     else:
-        _validate_run_name(run_spec.run_name)
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
     await validate_run(
@@ -857,12 +857,9 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
     return job_submission.job_provisioning_data.price * duration_hours
 
 
-# The run_name validation is not performed in pydantic models since
-# the models are reused on the client, and we don't want to
-# tie run_name validation to the client side.
-def _validate_run_name(run_name: str):
-    if not re.match("^[a-z][a-z0-9-]{1,40}$", run_name):
-        raise ServerClientError("run_name should match regex '^[a-z][a-z0-9-]{1,40}$'")
+def _validate_run_spec(run_spec: RunSpec):
+    if run_spec.run_name is not None:
+        validate_dstack_resource_name(run_spec.run_name)
 
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):

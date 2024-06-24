@@ -13,6 +13,7 @@ from dstack._internal.core.models.volumes import (
     VolumeProvisioningData,
     VolumeStatus,
 )
+from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.models import ProjectModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.utils.common import run_async, wait_to_lock_many
@@ -84,6 +85,8 @@ async def create_volume(
     project: ProjectModel,
     configuration: VolumeConfiguration,
 ) -> Volume:
+    _validate_volume_configuration(configuration)
+
     if configuration.name is not None:
         volume_model = await get_project_volume_model_by_name(
             session=session,
@@ -191,6 +194,11 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
         name = random_names.generate_name()
         if name not in names:
             return name
+
+
+def _validate_volume_configuration(configuration: VolumeConfiguration):
+    if configuration.name is not None:
+        validate_dstack_resource_name(configuration.name)
 
 
 async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_model: VolumeModel):

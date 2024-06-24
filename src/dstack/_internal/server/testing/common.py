@@ -457,7 +457,7 @@ async def create_volume(
 
 
 def get_volume_configuration(
-    name: str = "test_volume",
+    name: str = "test-volume",
     backend: BackendType = BackendType.AWS,
     region: str = "eu-west-1",
     size: Optional[Memory] = Memory(100),
