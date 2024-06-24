@@ -73,7 +73,7 @@ from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import volumes as volumes_services
-from dstack._internal.server.services.docker import parse_image_name
+from dstack._internal.server.services.docker import is_valid_docker_volume_target, parse_image_name
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -860,6 +860,9 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
 def _validate_run_spec(run_spec: RunSpec):
     if run_spec.run_name is not None:
         validate_dstack_resource_name(run_spec.run_name)
+    for mount_point in run_spec.configuration.volumes:
+        if not is_valid_docker_volume_target(mount_point.path):
+            raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
 
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):

@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -141,3 +142,14 @@ def is_host(s: str) -> bool:
     False
     """
     return s == "localhost" or ":" in s or "." in s
+
+
+DOCKER_TARGET_PATH_PATTERN = re.compile(r"^(/[^/\0]*)+/?$")
+
+
+def is_valid_docker_volume_target(path: str) -> bool:
+    if not path.startswith("/"):
+        return False
+    if path.endswith("/") and path != "/":
+        return False
+    return DOCKER_TARGET_PATH_PATTERN.match(path) is not None
