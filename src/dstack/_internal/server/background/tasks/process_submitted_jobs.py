@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from typing import List, Optional, Tuple
 from uuid import UUID
@@ -6,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
@@ -55,8 +57,12 @@ from dstack._internal.server.services.runs import (
     get_run_volume_models,
     run_model_to_run,
 )
-from dstack._internal.server.services.volumes import volume_model_to_volume
-from dstack._internal.server.utils.common import run_async
+from dstack._internal.server.services.volumes import (
+    PROCESSING_VOLUMES_IDS,
+    PROCESSING_VOLUMES_LOCK,
+    volume_model_to_volume,
+)
+from dstack._internal.server.utils.common import run_async, wait_to_lock_many
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
@@ -214,6 +220,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     if len(volume_models) > 0:
         await _attach_volumes(
+            session=session,
             project=project_model,
             job_model=job_model,
             instance=instance,
@@ -383,6 +390,7 @@ def _create_instance_model_for_job(
 
 
 async def _attach_volumes(
+    session: AsyncSession,
     project: ProjectModel,
     job_model: JobModel,
     instance: InstanceModel,
@@ -391,32 +399,59 @@ async def _attach_volumes(
     job_provisioning_data = JobProvisioningData.__response__.parse_raw(
         instance.job_provisioning_data
     )
-    # TODO: Volumes lock
     backend = await get_project_backend_by_type_or_error(
         project=project,
         backend_type=job_provisioning_data.backend,
     )
+    volumes_ids = [v.id for v in volume_models]
+    logger.info("Attaching volumes: %s", [v.name for v in volume_models])
+    # Take lock to prevent attaching deleted volumes.
+    # If the volume was deleted before the lock, fail the job.
+    await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
     try:
+        tasks = []
         for volume_model in volume_models:
-            volume = volume_model_to_volume(volume_model)
-            attachment_data = await run_async(
-                backend.compute().attach_volume,
-                volume=volume,
-                instance_id=job_provisioning_data.instance_id,
+            tasks.append(
+                _attach_volume(
+                    session=session,
+                    backend=backend,
+                    volume_model=volume_model,
+                    instance=instance,
+                    instance_id=job_provisioning_data.instance_id,
+                )
             )
-            volume_model.volume_attachment_data = attachment_data.json()
-        instance.volumes.append(volume_model)
-    except BackendError as e:
-        logger.warning(
-            "%s: failed to attached volume %s: %s", fmt(job_model), volume.name, repr(e)
-        )
-        job_model.status = JobStatus.TERMINATING
-        job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
-    except Exception:
-        logger.exception(
-            "%s: got exception when attaching volume %s",
-            fmt(job_model),
-            volume.name,
-        )
-        job_model.status = JobStatus.TERMINATING
-        job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
+        try:
+            await asyncio.gather(*tasks)
+        except (ServerClientError, BackendError) as e:
+            logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
+        except Exception:
+            logger.exception(
+                "%s: got exception when attaching volume",
+                fmt(job_model),
+            )
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
+    finally:
+        PROCESSING_VOLUMES_IDS.difference_update(volumes_ids)
+
+
+async def _attach_volume(
+    session: AsyncSession,
+    backend: Backend,
+    volume_model: VolumeModel,
+    instance: InstanceModel,
+    instance_id: str,
+):
+    await session.refresh(volume_model)
+    if volume_model.deleted:
+        raise ServerClientError("Cannot attach a deleted volume")
+    volume = volume_model_to_volume(volume_model)
+    attachment_data = await run_async(
+        backend.compute().attach_volume,
+        volume=volume,
+        instance_id=instance_id,
+    )
+    volume_model.volume_attachment_data = attachment_data.json()
+    instance.volumes.append(volume_model)

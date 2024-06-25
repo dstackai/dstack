@@ -4,8 +4,13 @@ from typing import List, Optional
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
-from dstack._internal.core.errors import BackendNotAvailable, ResourceExistsError
+from dstack._internal.core.errors import (
+    BackendNotAvailable,
+    ResourceExistsError,
+    ServerClientError,
+)
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeAttachmentData,
@@ -122,9 +127,25 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
     volume_models = res.scalars().all()
     volumes_ids = [v.id for v in volume_models]
     logger.info("Deleting volumes: %s", [v.name for v in volume_models])
-    # TODO: check for volumes in use. refetch with lock.
     await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
     try:
+        # Refetch after lock
+        res = await session.execute(
+            select(VolumeModel)
+            .where(
+                VolumeModel.project_id == project.id,
+                VolumeModel.name.in_(names),
+                VolumeModel.deleted == False,
+            )
+            .options(joinedload(VolumeModel.instances))
+            .execution_options(populate_existing=True)
+        )
+        volume_models = res.scalars().unique().all()
+        for volume_model in volume_models:
+            if len(volume_model.instances) > 0:
+                raise ServerClientError(
+                    f"Failed to delete volume {volume_model.name}. Volume is in use."
+                )
         tasks = []
         for volume_model in volume_models:
             tasks.append(

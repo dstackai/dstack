@@ -14,6 +14,8 @@ from dstack._internal.server.main import app
 from dstack._internal.server.models import VolumeModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
+    create_instance,
+    create_pool,
     create_project,
     create_user,
     create_volume,
@@ -187,4 +189,31 @@ class TestDeleteVolumes:
         await session.refresh(volume)
         assert volume.deleted
 
-    # TODO: test cannot delete volume in use
+    @pytest.mark.asyncio
+    async def test_returns_400_when_deleting_volumes_in_use(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        pool = await create_pool(session=session, project=project)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        volume = await create_volume(
+            session=session,
+            project=project,
+            volume_provisioning_data=get_volume_provisioning_data(),
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+        )
+        volume.instances.append(instance)
+        await session.commit()
+        response = client.post(
+            f"/api/project/{project.name}/volumes/delete",
+            headers=get_auth_headers(user.token),
+            json={"names": [volume.name]},
+        )
+        assert response.status_code == 400
+        await session.refresh(volume)
+        assert not volume.deleted

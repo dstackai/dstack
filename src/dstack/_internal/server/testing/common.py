@@ -450,6 +450,7 @@ async def create_volume(
         volume_provisioning_data=volume_provisioning_data.json()
         if volume_provisioning_data
         else None,
+        instances=[],
     )
     session.add(vm)
     await session.commit()

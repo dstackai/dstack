@@ -57,7 +57,7 @@ from dstack._internal.core.models.runs import (
     get_policy_map,
 )
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.volumes import Volume, VolumeStatus
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.models import (
     InstanceModel,
@@ -839,6 +839,8 @@ def check_can_attach_run_volumes(
             raise ServerClientError("Cannot mount volumes from different backends")
         if region != volume.configuration.region:
             raise ServerClientError("Cannot mount volumes from different regions")
+        if volume.status != VolumeStatus.ACTIVE:
+            raise ServerClientError("Cannot mount volumes that are not active")
 
 
 def _get_run_cost(run: Run) -> float:
