@@ -22,6 +22,7 @@ from dstack._internal.core.errors import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
@@ -230,6 +231,12 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance.pool_name = instance_model.pool.name
 
     return instance
+
+
+def get_instance_configuration(instance: InstanceModel) -> Optional[InstanceConfiguration]:
+    if instance.instance_configuration is None:
+        return None
+    return InstanceConfiguration.__response__.parse_raw(instance.instance_configuration)
 
 
 _GENERATE_POOL_NAME_LOCK: Dict[str, asyncio.Lock] = {}

@@ -12,6 +12,7 @@ from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceRuntime,
 )
@@ -98,7 +99,11 @@ class VastAICompute(Compute):
     ):
         self.api_client.destroy_instance(instance_id)
 
-    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        instance_config: InstanceConfiguration,
+    ):
         resp = self.api_client.get_instance(provisioning_data.instance_id)
         if resp is not None:
             if resp["actual_status"] == "running":

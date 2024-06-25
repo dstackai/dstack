@@ -140,7 +140,11 @@ class RunpodCompute(Compute):
                 return
             raise
 
-    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        instance_config: InstanceConfiguration,
+    ):
         instance_id = provisioning_data.instance_id
         pod = self.api_client.get_pod(instance_id)
         if pod is None or pod["runtime"] is None:

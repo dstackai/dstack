@@ -141,7 +141,11 @@ class CudoCompute(Compute):
                 return
             raise BackendError(e.response.text)
 
-    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        instance_config: InstanceConfiguration,
+    ):
         vm = self.api_client.get_vm(self.config.project_id, provisioning_data.instance_id)
         if vm["VM"]["state"] == "ACTIVE":
             provisioning_data.hostname = vm["VM"]["publicIpAddress"]

@@ -174,7 +174,11 @@ class OCICompute(Compute):
             backend_data=None,
         )
 
-    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        instance_config: InstanceConfiguration,
+    ):
         if vnic := resources.get_instance_vnic(
             provisioning_data.instance_id,
             self.regions[provisioning_data.region],

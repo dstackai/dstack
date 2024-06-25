@@ -57,6 +57,7 @@ from dstack._internal.server.services.jobs import (
     PROCESSING_POOL_LOCK,
     terminate_job_provisioning_data_instance,
 )
+from dstack._internal.server.services.pools import get_instance_configuration
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
@@ -635,32 +636,48 @@ async def wait_for_instance_provisioning_data(
         )
         instance.status = InstanceStatus.TERMINATING
         instance.termination_reason = "Instance has not become running in time"
-    else:
-        backend = await backends_services.get_project_backend_by_type(
-            project=project,
-            backend_type=job_provisioning_data.backend,
+        return
+
+    backend = await backends_services.get_project_backend_by_type(
+        project=project,
+        backend_type=job_provisioning_data.backend,
+    )
+    if backend is None:
+        logger.warning(
+            "Instance %s failed because instance's backend is not available",
+            instance.name,
         )
-        if backend is None:
-            logger.warning(
-                "Cannot stop instance %s because instance's backend is not configured",
-                instance.name,
-            )
-        else:
-            try:
-                backend.compute().update_provisioning_data(job_provisioning_data)
-                instance.job_provisioning_data = job_provisioning_data.json()
-            except ProvisioningError as e:
-                logger.warning(
-                    "Error while waiting for instance %s to become running: %s",
-                    instance.name,
-                    repr(e),
-                )
-                instance.status = InstanceStatus.TERMINATING
-                instance.termination_reason = "Error while waiting for instance to become running"
-            except Exception:
-                logger.exception(
-                    "Got exception when updating instance %s provisioning data", instance.name
-                )
+        instance.status = InstanceStatus.TERMINATING
+        instance.termination_reason = "Backend not available"
+        return
+    instance_configuration = get_instance_configuration(instance)
+    if instance_configuration is None:
+        logger.error(
+            "Instance %s failed because instance_configuration is None",
+            instance.name,
+        )
+        instance.status = InstanceStatus.TERMINATING
+        instance.termination_reason = "instance_configuration is None"
+        return
+    try:
+        await run_async(
+            backend.compute().update_provisioning_data,
+            job_provisioning_data,
+            instance_configuration,
+        )
+        instance.job_provisioning_data = job_provisioning_data.json()
+    except ProvisioningError as e:
+        logger.warning(
+            "Error while waiting for instance %s to become running: %s",
+            instance.name,
+            repr(e),
+        )
+        instance.status = InstanceStatus.TERMINATING
+        instance.termination_reason = "Error while waiting for instance to become running"
+    except Exception:
+        logger.exception(
+            "Got exception when updating instance %s provisioning data", instance.name
+        )
 
 
 @runner_ssh_tunnel(ports=[runner_client.REMOTE_SHIM_PORT], retries=1)
