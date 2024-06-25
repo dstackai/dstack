@@ -196,7 +196,8 @@ def _setup_instance(
     setup_commands = (
         "mkdir /home/ubuntu/.dstack && "
         "sudo apt-get update && "
-        "sudo apt-get install -y --no-install-recommends nvidia-docker2 && "
+        "sudo apt-get install -y --no-install-recommends nvidia-container-toolkit && "
+        "sudo nvidia-ctk runtime configure --runtime=docker && "
         "sudo pkill -SIGHUP dockerd"
     )
     _run_ssh_command(hostname=hostname, ssh_private_key=ssh_private_key, command=setup_commands)
