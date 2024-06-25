@@ -72,7 +72,8 @@ class Compute(ABC):
     def update_provisioning_data(
         self,
         provisioning_data: JobProvisioningData,
-        instance_config: InstanceConfiguration,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ):
         """
         This method is called if `JobProvisioningData` returned from `run_job()`/`create_instance()`

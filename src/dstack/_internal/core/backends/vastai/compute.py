@@ -12,7 +12,6 @@ from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
-    InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceRuntime,
 )
@@ -102,7 +101,8 @@ class VastAICompute(Compute):
     def update_provisioning_data(
         self,
         provisioning_data: JobProvisioningData,
-        instance_config: InstanceConfiguration,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ):
         resp = self.api_client.get_instance(provisioning_data.instance_id)
         if resp is not None:

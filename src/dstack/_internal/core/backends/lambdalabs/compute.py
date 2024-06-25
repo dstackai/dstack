@@ -74,20 +74,20 @@ class LambdaCompute(Compute):
     def update_provisioning_data(
         self,
         provisioning_data: JobProvisioningData,
-        instance_config: InstanceConfiguration,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ):
         instance_info = _get_instance_info(self.api_client, provisioning_data.instance_id)
         if instance_info is not None and instance_info["status"] != "booting":
             provisioning_data.hostname = instance_info["ip"]
-            commands = get_shim_commands(authorized_keys=instance_config.get_public_keys())
+            commands = get_shim_commands(authorized_keys=[project_ssh_public_key])
             # shim is asssumed to be run under root
             launch_command = "sudo sh -c '" + "&& ".join(commands) + "'"
-            project_ssh_key = instance_config.ssh_keys[0]
             thread = Thread(
                 target=_start_runner,
                 kwargs={
                     "hostname": instance_info["ip"],
-                    "project_ssh_private_key": project_ssh_key.private,
+                    "project_ssh_private_key": project_ssh_private_key,
                     "launch_command": launch_command,
                 },
                 daemon=True,

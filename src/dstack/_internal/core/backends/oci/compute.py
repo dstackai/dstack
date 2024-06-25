@@ -177,7 +177,8 @@ class OCICompute(Compute):
     def update_provisioning_data(
         self,
         provisioning_data: JobProvisioningData,
-        instance_config: InstanceConfiguration,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ):
         if vnic := resources.get_instance_vnic(
             provisioning_data.instance_id,

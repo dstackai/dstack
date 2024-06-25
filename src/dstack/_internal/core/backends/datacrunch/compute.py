@@ -162,7 +162,8 @@ class DataCrunchCompute(Compute):
     def update_provisioning_data(
         self,
         provisioning_data: JobProvisioningData,
-        instance_config: InstanceConfiguration,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
     ):
         instance = self.api_client.get_instance_by_id(provisioning_data.instance_id)
         if instance is not None and instance.status == "running":
