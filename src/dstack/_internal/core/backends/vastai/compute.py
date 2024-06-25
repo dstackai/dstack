@@ -98,7 +98,12 @@ class VastAICompute(Compute):
     ):
         self.api_client.destroy_instance(instance_id)
 
-    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ):
         resp = self.api_client.get_instance(provisioning_data.instance_id)
         if resp is not None:
             if resp["actual_status"] == "running":
