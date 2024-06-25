@@ -443,7 +443,9 @@ def _get_instance_zones(instance_offer: InstanceOffer) -> List[str]:
 
 
 def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
-    commands = get_shim_commands(authorized_keys=authorized_keys, is_privileged=True)
+    commands = get_shim_commands(
+        authorized_keys=authorized_keys, is_privileged=True, pjrt_device="TPU"
+    )
     startup_script = " ".join([" && ".join(commands)])
     startup_script = "#! /bin/bash\n" + startup_script
     return startup_script

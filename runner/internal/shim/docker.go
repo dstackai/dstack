@@ -318,11 +318,11 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		Entrypoint:   []string{"/bin/sh", "-c"},
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
 		Env: []string{
-			"PJRT_DEVICE=TPU",
+			fmt.Sprintf("PJRT_DEVICE=%s", dockerParams.DockerPJRTDevice()),
 		},
 	}
 	hostConfig := &container.HostConfig{
-	    Privileged:      dockerParams.DockerPrivileged(),
+		Privileged:      dockerParams.DockerPrivileged(),
 		NetworkMode:     getNetworkMode(),
 		PortBindings:    bindPorts(dockerParams.DockerPorts()...),
 		PublishAllPorts: true,
@@ -432,6 +432,10 @@ func (c CLIArgs) DockerKeepContainer() bool {
 
 func (c CLIArgs) DockerPrivileged() bool {
 	return c.Docker.Privileged
+}
+
+func (c CLIArgs) DockerPJRTDevice() string {
+	return c.Docker.PJRTDevice
 }
 
 func (c CLIArgs) DockerShellCommands(publicKeys []string) []string {
