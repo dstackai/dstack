@@ -1,3 +1,4 @@
+import concurrent.futures
 import random
 import re
 import string
@@ -352,10 +353,12 @@ def wait_for_extended_operation(
 def wait_for_operation(operation: Operation, verbose_name: str = "operation", timeout: int = 300):
     try:
         result = operation.result(timeout=timeout)
+    except concurrent.futures.TimeoutError as e:
+        logger.debug("Error during %s: %s", verbose_name, e)
+        raise
     except Exception as e:
         # Write only debug logs here.
         # The unexpected errors will be propagated and logged appropriatly by the caller.
         logger.debug("Error during %s: %s", verbose_name, e)
-        logger.debug("Operation ID: %s", operation)
-        raise operation.exception() or RuntimeError(str(e))
+        raise operation.exception() or e
     return result

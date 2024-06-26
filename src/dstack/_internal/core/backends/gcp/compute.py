@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 from collections import defaultdict
 from typing import Callable, Dict, List, Optional
@@ -173,13 +174,19 @@ class GCPCompute(Compute):
                     node=tpu_node,
                 )
                 try:
-                    self.tpu_client.create_node(request=create_node_request)
+                    # TPUs may get created and then deleted immediately in case of no capacity.
+                    # We call wait_for_operation() only to get the capacity error and try another option.
+                    # If the request succeeds, we'll probably timeout and update_provisioning_data() will get hostname.
+                    operation = self.tpu_client.create_node(request=create_node_request)
+                    gcp_resources.wait_for_operation(operation, timeout=5)
                 except (
                     google.api_core.exceptions.ServiceUnavailable,
                     google.api_core.exceptions.NotFound,
                     google.api_core.exceptions.ResourceExhausted,
                 ):
                     continue
+                except concurrent.futures.TimeoutError:
+                    pass
                 return JobProvisioningData(
                     backend=instance_offer.backend,
                     instance_type=instance_offer.instance,
@@ -279,7 +286,6 @@ class GCPCompute(Compute):
             try:
                 instance = self.tpu_client.get_node(request=node_request)
             except google.api_core.exceptions.NotFound:
-                # TPUs may get created and then deleted immediately in case of no capacity.
                 raise ProvisioningError("Failed to get instance IP address. Instance not found.")
 
             # See states https://cloud.google.com/python/docs/reference/tpu/latest/google.cloud.tpu_v2.types.Node.State
