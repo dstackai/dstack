@@ -236,11 +236,15 @@ func formatAndMountVolume(volume VolumeInfo) error {
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
-	err = mountDisk(deviceName, "/"+volume.Name)
+	err = mountDisk(deviceName, getVolumeMountPoint(volume.Name))
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
 	return nil
+}
+
+func getVolumeMountPoint(volumeName string) string {
+	return fmt.Sprintf("/%s/data", volumeName)
 }
 
 // getRealDeviceName returns the device name for the given EBS volume ID.
@@ -551,7 +555,7 @@ func requestGpuIfAvailable(ctx context.Context, client docker.APIClient) ([]cont
 func getVolumeMounts(mountPoints []MountPoint) ([]mount.Mount, error) {
 	mounts := []mount.Mount{}
 	for _, mountPoint := range mountPoints {
-		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: "/" + mountPoint.Name, Target: mountPoint.Path})
+		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: getVolumeMountPoint(mountPoint.Name), Target: mountPoint.Path})
 	}
 	return mounts, nil
 }
