@@ -38,7 +38,7 @@ class Resources(CoreModel):
             resources["gpu_name"] = gpu.name
             resources["gpu_count"] = len(self.gpus)
             if gpu.memory_mib > 0:
-                resources["gpu_memory"] = (f"{gpu.memory_mib / 1024:.0f}GB",)
+                resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
         return pretty_resources(**resources)
 
 
