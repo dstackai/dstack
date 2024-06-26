@@ -16,6 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceRuntime,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -65,6 +66,7 @@ class VastAICompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]

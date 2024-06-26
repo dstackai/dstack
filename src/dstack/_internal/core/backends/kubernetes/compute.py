@@ -38,6 +38,7 @@ from dstack._internal.core.models.instances import (
     SSHConnectionParams,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import parse_memory
 from dstack._internal.utils.logging import get_logger
 
@@ -95,6 +96,7 @@ class KubernetesCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         instance_name = get_instance_name(run, job)
         commands = get_docker_commands(
