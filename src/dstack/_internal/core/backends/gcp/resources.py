@@ -311,6 +311,7 @@ def create_tpu_node_struct(
     spot: bool,
     labels: Dict[str, str],
     subnetwork: Optional[str] = None,
+    allocate_public_ip: bool = True,
 ) -> tpu_v2.Node:
     node = tpu_v2.Node()
     if spot:
@@ -319,7 +320,7 @@ def create_tpu_node_struct(
     node.runtime_version = "tpu-ubuntu2204-base"
     # subnetwork determines the network, so network shouldn't be specified
     node.network_config = tpu_v2.NetworkConfig(
-        enable_external_ips=True,
+        enable_external_ips=allocate_public_ip,
         subnetwork=subnetwork,
     )
     ssh_keys = "\n".join(f"ubuntu:{key}" for key in authorized_keys)
