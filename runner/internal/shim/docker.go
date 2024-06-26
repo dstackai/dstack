@@ -312,14 +312,18 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		return "", tracerr.Wrap(err)
 	}
 
+	//Set the environment variables
+	envVars := []string{}
+	if dockerParams.DockerPJRTDevice() != "" {
+		envVars = append(envVars, fmt.Sprintf("PJRT_DEVICE=%s", dockerParams.DockerPJRTDevice()))
+	}
+
 	containerConfig := &container.Config{
 		Image:        taskConfig.ImageName,
 		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(taskConfig.PublicKeys), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
-		Env: []string{
-			fmt.Sprintf("PJRT_DEVICE=%s", dockerParams.DockerPJRTDevice()),
-		},
+		Env:          envVars,
 	}
 	hostConfig := &container.HostConfig{
 		Privileged:      dockerParams.DockerPrivileged(),
