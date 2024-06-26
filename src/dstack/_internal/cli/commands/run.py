@@ -255,12 +255,12 @@ def _print_finished_message(run: Run):
     elif termination_reason == JobTerminationReason.CREATING_CONTAINER_ERROR:
         message = (
             "Cannot create container. "
-            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message} "
+            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message}\n"
             "Check CLI and server logs for more details."
         )
     elif termination_reason == JobTerminationReason.EXECUTOR_ERROR:
         message = (
-            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message} "
+            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message}\n"
             "Check CLI and server logs for more details."
         )
     elif termination_reason is not None:

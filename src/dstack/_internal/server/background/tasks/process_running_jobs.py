@@ -430,59 +430,27 @@ def _process_pulling_with_shim(
         is successful
     """
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
-    container_status = shim_client.pull()  # raises error if shim is down, causes retry
+    shim_status = shim_client.pull()  # raises error if shim is down, causes retry
 
-    shim_status = container_status
-
-    if shim_status.status == "pending" and shim_status.result:
-        logger.error(
-            "The docker container of the job '%s' stops with error: %s(%s)",
+    # If shim goes to pending before the job is submitted to runner, then an error occured
+    if shim_status.state == "pending" and shim_status.result is not None:
+        logger.warning(
+            "shim failed to execute job %s: %s (%s)",
             job_model.job_name,
             shim_status.result.reason,
             shim_status.result.reason_message,
         )
-        logger.debug("shim status: %s", container_status.dict())
+        logger.debug("shim status: %s", shim_status.dict())
         job_model.termination_reason = JobTerminationReason[shim_status.result.reason.upper()]
         job_model.termination_reason_message = shim_status.result.reason_message
         return False
-    if shim_status.status in ("pulling", "creating"):
+
+    if shim_status.state in ("pulling", "creating"):
         return True
 
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
-    resp = runner_client.healthcheck()
 
-    # TODO: Remove in release 0.19
-    if resp is None or container_status.state == "pending":
-        if container_status.executor_error:
-            logger.error(
-                "The docker container of the job '%s' stops with executor error: %s",
-                job_model.job_name,
-                container_status.executor_error,
-            )
-            logger.debug("runner healthcheck: %s", container_status.dict())
-            job_model.termination_reason = JobTerminationReason.EXECUTOR_ERROR
-            job_model.termination_reason_message = (
-                f"Executor error: {container_status.executor_error}"
-            )
-            return False
-        if (
-            container_status.container_name == job_model.job_name
-            and container_status.state == "pending"
-        ):
-            logger.error(
-                "The docker container of the job '%s' is not working: exit code: %s, error %r",
-                job_model.job_name,
-                container_status.exit_code,
-                container_status.error,
-            )
-            logger.debug("runner healthcheck: %s", container_status.dict())
-            job_model.termination_reason = JobTerminationReason.CREATING_CONTAINER_ERROR
-            job_model.termination_reason_message = (
-                f"Failed to run docker pull or docker create: {container_status.error}"
-            )
-            return False
-        return True  # runner is not available yet, but shim is alive (pulling)
-
+    # shim_status.state == "running"
     _submit_job_to_runner(
         runner_client=runner_client,
         run=run,

@@ -143,7 +143,8 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     except ServerClientError as e:
         logger.error("%s: ", fmt(job_model))
         job_model.status = JobStatus.TERMINATING
-        job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
+        # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
+        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
         job_model.termination_reason_message = e.msg
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
@@ -425,14 +426,18 @@ async def _attach_volumes(
         except (ServerClientError, BackendError) as e:
             logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
             job_model.status = JobStatus.TERMINATING
-            job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
+            # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = "Failed to attach volume"
         except Exception:
             logger.exception(
                 "%s: got exception when attaching volume",
                 fmt(job_model),
             )
             job_model.status = JobStatus.TERMINATING
-            job_model.termination_reason = JobTerminationReason.VOLUME_ERROR
+            # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = "Failed to attach volume"
     finally:
         PROCESSING_VOLUMES_IDS.difference_update(volumes_ids)
 
