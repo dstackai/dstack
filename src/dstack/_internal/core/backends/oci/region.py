@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Dict, Iterable, Set
+from typing import Any, Dict, Iterable, List, Mapping, Set
 
 import oci
-from typing_extensions import Any, List, Mapping
 
 from dstack._internal.core.backends.oci.auth import get_client_config
 from dstack._internal.core.models.backends.oci import AnyOCICreds
@@ -16,6 +15,10 @@ class OCIRegionClient:
 
     def __init__(self, client_config: Mapping[str, Any]):
         self.client_config = client_config
+
+    @property
+    def name(self) -> str:
+        return self.client_config["region"]
 
     @cached_property
     def compute_client(self) -> oci.core.ComputeClient:
@@ -30,8 +33,16 @@ class OCIRegionClient:
         return oci.marketplace.MarketplaceClient(self.client_config)
 
     @cached_property
+    def object_storage_client(self) -> oci.object_storage.ObjectStorageClient:
+        return oci.object_storage.ObjectStorageClient(self.client_config)
+
+    @cached_property
     def virtual_network_client(self) -> oci.core.VirtualNetworkClient:
         return oci.core.VirtualNetworkClient(self.client_config)
+
+    @cached_property
+    def work_request_client(self) -> oci.work_requests.WorkRequestClient:
+        return oci.work_requests.WorkRequestClient(self.client_config)
 
     @cached_property
     def availability_domains(self) -> List[oci.identity.models.AvailabilityDomain]:

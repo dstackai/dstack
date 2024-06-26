@@ -418,6 +418,23 @@ gcloud projects list --format="json(projectId)"
     You also need to have the `serviceAccountUser` role granted.
     `dstack` will run TPUs under the default service account, so you don't need to create one.
 
+??? info "Private subnets"
+    By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.
+    If you want `dstack` to use private subnets, set `public_ips` to `false`.
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: gcp
+            creds:
+              type: default
+
+            public_ips: false
+    ```
+    
+    Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets (e.g., through VPC peering). Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
+
 ### OCI
 
 There are two ways to configure OCI: using client credentials or using the default credentials.
@@ -887,6 +904,23 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 ## `projects[n].backends[type=vastai].creds` { #vastai-creds data-toc-label="backends[type=vastai].creds" }
 
 #SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `projects[n].backends[type=cudo]` { #cudo data-toc-label="backends[type=cudo]" }
+
+#SCHEMA# dstack._internal.server.services.config.CudoConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: cudo-
+
+## `projects[n].backends[type=cudo].creds` { #cudo-creds data-toc-label="backends[type=cudo].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.cudo.CudoAPIKeyCreds
     overrides:
         show_root_heading: false
         type:

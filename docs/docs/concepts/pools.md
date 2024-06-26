@@ -11,7 +11,7 @@ requirements, `dstack` automatically provisions a new cloud instance and adds it
 
 ??? info "Reuse policy"
     To avoid provisioning new cloud instances with `dstack run`, use `--reuse`. Your run will be assigned to an idle instance in
-    the pool.
+    the pool. If there are no available idle instances in the pool, the run will fail.
 
 ??? info "Idle duration"
     By default, `dstack run` sets the idle duration of a newly provisioned instance to `5m`.

@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	rt "runtime"
 	"strconv"
@@ -79,7 +80,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	var err error
 
 	if cfg.SshKey != "" {
-		ak := AuthorizedKeys{user: cfg.SshUser}
+		ak := AuthorizedKeys{user: cfg.SshUser, lookup: user.Lookup}
 		if err := ak.AppendPublicKeys([]string{cfg.SshKey}); err != nil {
 			d.state = Pending
 			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
