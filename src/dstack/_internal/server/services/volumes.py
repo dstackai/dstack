@@ -6,6 +6,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
+from dstack._internal.core.backends import BACKENDS_WITH_VOLUMES_SUPPORT
 from dstack._internal.core.errors import (
     BackendNotAvailable,
     ResourceExistsError,
@@ -218,6 +219,11 @@ async def generate_volume_name(session: AsyncSession, project: ProjectModel) -> 
 
 
 def _validate_volume_configuration(configuration: VolumeConfiguration):
+    if configuration.backend not in BACKENDS_WITH_VOLUMES_SUPPORT:
+        raise ServerClientError(
+            f"Volumes are not supported for {configuration.backend.value} backend. "
+            f"Supported backends: {[b.value for b in BACKENDS_WITH_VOLUMES_SUPPORT]}."
+        )
     if configuration.name is not None:
         validate_dstack_resource_name(configuration.name)
 

@@ -18,4 +18,11 @@ BACKENDS_WITH_CREATE_INSTANCE_SUPPORT = [
     BackendType.OCI,
     BackendType.TENSORDOCK,
 ]
+BACKENDS_WITH_GATEWAY_SUPPORT = [
+    BackendType.AWS,
+    BackendType.AZURE,
+    BackendType.GCP,
+    BackendType.KUBERNETES,
+]
 BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT = [BackendType.AWS]
+BACKENDS_WITH_VOLUMES_SUPPORT = [BackendType.AWS, BackendType.LOCAL]

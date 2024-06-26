@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.jobs as jobs_services
 import dstack._internal.utils.random_names as random_names
-from dstack._internal.core.backends import BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT
+from dstack._internal.core.backends import (
+    BACKENDS_WITH_GATEWAY_SUPPORT,
+    BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
+)
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.base.compute import (
     Compute,
@@ -631,8 +634,15 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
 
 
 def _validate_gateway_configuration(configuration: GatewayConfiguration):
+    if configuration.backend not in BACKENDS_WITH_GATEWAY_SUPPORT:
+        raise ServerClientError(
+            f"Gateways are not supported for {configuration.backend.value} backend. "
+            f"Supported backends: {[b.value for b in BACKENDS_WITH_GATEWAY_SUPPORT]}."
+        )
+
     if configuration.name is not None:
         validate_dstack_resource_name(configuration.name)
+
     if (
         not configuration.public_ip
         and configuration.backend not in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT

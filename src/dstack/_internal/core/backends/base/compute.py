@@ -100,6 +100,9 @@ class Compute(ABC):
         self,
         configuration: GatewayComputeConfiguration,
     ) -> GatewayProvisioningData:
+        """
+        Creates a gateway instance.
+        """
         raise NotImplementedError()
 
     def terminate_gateway(
@@ -108,21 +111,41 @@ class Compute(ABC):
         configuration: GatewayComputeConfiguration,
         backend_data: Optional[str] = None,
     ):
+        """
+        Terminates a gateway instance. Generally, it passes the call to `terminate_instance()`,
+        but may perform additional work such as deleting a load balancer when a gateway has one.
+        """
         raise NotImplementedError()
 
     def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        """
+        Returns VolumeProvisioningData for an existing volume.
+        Used to add external volumes to dstack.
+        """
         raise NotImplementedError()
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        """
+        Creates a new volume.
+        """
         raise NotImplementedError()
 
     def delete_volume(self, volume: Volume):
+        """
+        Deletes a volume.
+        """
         raise NotImplementedError()
 
     def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+        """
+        Attaches a volumes to the instance.
+        """
         raise NotImplementedError()
 
     def detach_volume(self, volume: Volume, instance_id: str):
+        """
+        Detaches a volume from the instance.
+        """
         raise NotImplementedError()
 
 
