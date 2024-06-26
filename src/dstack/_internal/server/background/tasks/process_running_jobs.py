@@ -194,7 +194,7 @@ async def _process_job(job_id: UUID):
                 if not success:
                     # check timeout
                     if job_submission.age > _get_runner_timeout_interval(
-                        job_provisioning_data.backend
+                        job_provisioning_data.backend, job_provisioning_data.instance_type.name
                     ):
                         logger.warning(
                             "%s: failed because runner has not become available in time, age=%s",
@@ -574,9 +574,11 @@ def _submit_job_to_runner(
     # do not log here, because the runner will send a new status
 
 
-def _get_runner_timeout_interval(backend_type: BackendType) -> timedelta:
+def _get_runner_timeout_interval(backend_type: BackendType, instance_type_name: str) -> timedelta:
     if backend_type == BackendType.LAMBDA:
         return timedelta(seconds=1200)
     if backend_type == BackendType.KUBERNETES:
+        return timedelta(seconds=1200)
+    if backend_type == BackendType.OCI and instance_type_name.startswith("BM."):
         return timedelta(seconds=1200)
     return timedelta(seconds=600)
