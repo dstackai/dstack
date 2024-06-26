@@ -443,7 +443,9 @@ def _get_instance_zones(instance_offer: InstanceOffer) -> List[str]:
 
 
 def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
-    commands = get_shim_commands(authorized_keys=authorized_keys)
+    commands = get_shim_commands(
+        authorized_keys=authorized_keys, is_privileged=True, pjrt_device="TPU"
+    )
     startup_script = " ".join([" && ".join(commands)])
     startup_script = "#! /bin/bash\n" + startup_script
     return startup_script
@@ -469,9 +471,9 @@ def _is_pod(instance_name: str) -> bool:
         tensor_cores = int(tensor_cores)
     except ValueError:
         raise ValueError(f"Invalid number in tpu tensor cores: {tensor_cores}")
-    if version in ["v2", "v3"]:
+    if version in ["v2", "v3", "v5p", "v5litepod"]:
         return tensor_cores > 8
-    elif version in ["v4", "v5p", "v5litepod"]:
+    elif version == "v4":
         return True
     else:
         raise ValueError(f"Unknown TPU version: {version}")

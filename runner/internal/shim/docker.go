@@ -312,13 +312,21 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		return "", tracerr.Wrap(err)
 	}
 
+	//Set the environment variables
+	envVars := []string{}
+	if dockerParams.DockerPJRTDevice() != "" {
+		envVars = append(envVars, fmt.Sprintf("PJRT_DEVICE=%s", dockerParams.DockerPJRTDevice()))
+	}
+
 	containerConfig := &container.Config{
 		Image:        taskConfig.ImageName,
 		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(taskConfig.PublicKeys), " && ")},
 		Entrypoint:   []string{"/bin/sh", "-c"},
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
+		Env:          envVars,
 	}
 	hostConfig := &container.HostConfig{
+		Privileged:      dockerParams.DockerPrivileged(),
 		NetworkMode:     getNetworkMode(),
 		PortBindings:    bindPorts(dockerParams.DockerPorts()...),
 		PublishAllPorts: true,
@@ -424,6 +432,14 @@ func requestGpuIfAvailable(ctx context.Context, client docker.APIClient) ([]cont
 
 func (c CLIArgs) DockerKeepContainer() bool {
 	return c.Docker.KeepContainer
+}
+
+func (c CLIArgs) DockerPrivileged() bool {
+	return c.Docker.Privileged
+}
+
+func (c CLIArgs) DockerPJRTDevice() string {
+	return c.Docker.PJRTDevice
 }
 
 func (c CLIArgs) DockerShellCommands(publicKeys []string) []string {
