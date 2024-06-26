@@ -447,6 +447,7 @@ def _supported_instances_and_zones(
             "e2-highcpu-",
             "m1-",
             "a2-",
+            "a3-",
             "g2-",
         ]:
             if offer.instance.name.startswith(family):
@@ -464,6 +465,9 @@ def _has_gpu_quota(quotas: Dict[str, float], resources: Resources) -> bool:
         return True
     gpu = resources.gpus[0]
     if _is_tpu(gpu.name):
+        return True
+    if gpu.name == "H100":
+        # H100 and H100_MEGA quotas are not returned by `regions_client.list`
         return True
     quota_name = f"NVIDIA_{gpu.name}_GPUS"
     if gpu.name == "A100" and gpu.memory_mib == 80 * 1024:

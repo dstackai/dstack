@@ -132,8 +132,13 @@ def create_instance_struct(
     if accelerators:
         instance.guest_accelerators = accelerators
 
-    if accelerators or machine_type.startswith("a2-") or machine_type.startswith("g2-"):
-        # Attachable GPUs, A100, and L4
+    if (
+        accelerators
+        or machine_type.startswith("a3-")
+        or machine_type.startswith("a2-")
+        or machine_type.startswith("g2-")
+    ):
+        # Attachable GPUs, H100, A100, and L4
         instance.scheduling.on_host_maintenance = "TERMINATE"
 
     if spot:
@@ -265,8 +270,8 @@ def create_gateway_firewall_rules(
 def get_accelerators(
     project_id: str, zone: str, gpus: List[Gpu]
 ) -> List[compute_v1.AcceleratorConfig]:
-    if len(gpus) == 0 or gpus[0].name in {"A100", "L4"}:
-        # A100 and L4 are bundled with the instance
+    if len(gpus) == 0 or gpus[0].name in {"H100", "A100", "L4"}:
+        # H100, A100, and L4 are bundled with the instance
         return []
     accelerator_config = compute_v1.AcceleratorConfig()
     accelerator_config.accelerator_count = len(gpus)
