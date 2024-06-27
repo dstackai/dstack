@@ -92,6 +92,18 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB), 
 `A100:40GB:2` (two A100 GPUs of 40GB).
 
+??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture prefixed by `tpu-` via the `gpu` property.
+
+    ```yaml
+    type: dev-environment
+    
+    ide: vscode
+    
+    resources:
+      gpu:  tpu-v2-8
+    ```
+
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
     `shm_size`, e.g. set it to `16GB`.

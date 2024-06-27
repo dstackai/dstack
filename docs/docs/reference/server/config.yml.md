@@ -668,31 +668,32 @@ In case of a self-managed cluster, also specify the IP address of any node in th
       backends:
         - type: kubernetes
           kubeconfig:
-          filename: ~/.kube/config
+            filename: ~/.kube/config
           networking:
-          ssh_host: localhost # The external IP address of any node
-          ssh_port: 32000 # Any port accessible outside of the cluster
+            ssh_host: localhost # The external IP address of any node
+            ssh_port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>
 
     The port specified to `ssh_port` must be accessible outside of the cluster.
 
-    For example, if you are using Kind, make sure to add it via `extraPortMappings`:
-
-    <div editor-title="installation/kind-config.yml">
-
-    ```yaml
-    kind: Cluster
-    apiVersion: kind.x-k8s.io/v1alpha4
-    nodes:
-      - role: control-plane
-        extraPortMappings:
-      - containerPort: 32000 # Must be same as `ssh_port`
-        hostPort: 32000 # Must be same as `ssh_port`
-    ```
-
-    </div>
+    ??? info "Kind"
+        For example, if you are using Kind, make sure to add it via `extraPortMappings`:
+    
+        <div editor-title="installation/kind-config.yml">
+    
+        ```yaml
+        kind: Cluster
+        apiVersion: kind.x-k8s.io/v1alpha4
+        nodes:
+          - role: control-plane
+            extraPortMappings:
+          - containerPort: 32000 # Must be same as `ssh_port`
+            hostPort: 32000 # Must be same as `ssh_port`
+        ```
+    
+        </div>
 
 [//]: # (TODO: Elaborate on the Kind's IP address on Linux)
 
@@ -707,21 +708,22 @@ In case of a self-managed cluster, also specify the IP address of any node in th
         backends:
           - type: kubernetes
             kubeconfig:
-            filename: ~/.kube/config
+              filename: ~/.kube/config
             networking:
-            ssh_port: 32000 # Any port accessible outside of the cluster
+              ssh_port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>
 
     The port specified to `ssh_port` must be accessible outside of the cluster.
 
-    For example, if you are using EKS, make sure to add it via an ingress rule
-    of the corresponding security group:
-
-    ```shell
-    aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
-    ```
+    ??? info "EKS"
+        For example, if you are using EKS, make sure to add it via an ingress rule
+        of the corresponding security group:
+    
+        ```shell
+        aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
+        ```
 
 [//]: # (TODO: Elaborate on gateways, and what backends allow configuring them)
 

@@ -144,7 +144,7 @@ and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-com
     If you encounter any other issues, please make sure to file a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 
-### Replicas and auto-scaling
+### Auto-scaling
 
 By default, `dstack` runs a single replica of the service.
 You can configure the number of replicas as well as the auto-scaling rules.

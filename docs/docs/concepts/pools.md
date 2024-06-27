@@ -51,7 +51,7 @@ For more details on policies and their defaults, refer to [`.dstack/profiles.yml
 ??? info "Limitations"
     The `dstack pool add` command is not supported for Kubernetes, VastAI, and RunPod backends yet.
 
-### Adding on-prem servers
+### Adding on-prem clusters
 
 Any on-prem server that can be accessed via SSH can be added to a pool and used to run workloads.
 
@@ -73,7 +73,7 @@ The command accepts the same arguments as the standard `ssh` command.
 
 Once the instance is provisioned, you'll see it in the pool and will be able to run workloads on it.
 
-#### Network
+#### Clusters
 
 If you want on-prem instances to run multi-node tasks, ensure these on-prem servers share the same private network.
 Additionally, you need to pass the `--network` option to `dstack pool add-ssh`:

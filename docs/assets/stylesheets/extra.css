@@ -1119,7 +1119,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         visibility: visible;
     }
 
-    .md-tabs__item:nth-child(3) .md-tabs__link:after, .md-tabs__item:nth-child(4) .md-tabs__link:after, .md-tabs__item:nth-child(8) .md-tabs__link:after {
+    .md-tabs__item:nth-child(4) .md-tabs__link:after, .md-tabs__item:nth-child(8) .md-tabs__link:after {
         content: url('data:image/svg+xml,<svg fill="black" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
         line-height: 14px;
         margin-left: 4px;
@@ -1400,10 +1400,12 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 */
 
 [dir=ltr] .md-typeset blockquote {
-    border: 1px solid black;
+    /*border: 1px solid black;*/
+    border: none;
     color: var(--md-default-fg-color);
     padding: 8px 25px;
-    border-radius: 12px;
+    border-radius: 6px;
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05));
 }
 
 a.md-go-to-action.secondary {

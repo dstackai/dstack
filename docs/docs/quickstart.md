@@ -99,8 +99,8 @@ or `train.dstack.yml` are both acceptable).
 
 ## Run configuration
 
-Run a configuration using the [`dstack run`](reference/cli/index.md#dstack-run) command, followed by the working directory path (e.g., `.`), the path to the
-configuration file, and run options (e.g., configuring hardware resources, spot policy, etc.)
+Run a configuration using the [`dstack run`](reference/cli/index.md#dstack-run) command, followed by the working directory path (e.g., `.`), 
+and the path to the configuration file.
 
 <div class="termy">
 

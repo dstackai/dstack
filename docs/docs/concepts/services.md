@@ -42,7 +42,7 @@ model:
 If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
 (pre-configured with Python, Conda, and essential CUDA drivers).
 
-!!! info "Replicas and scaling"
+!!! info "Auto-scaling"
     By default, the service is deployed to a single instance. However, you can specify the
     [number of replicas and scaling policy](../reference/dstack.yml/service.md#replicas-and-auto-scaling).
     In this case, `dstack` auto-scales it based on the load.

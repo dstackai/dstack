@@ -125,6 +125,26 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB), 
 `A100:40GB:2` (two A100 GPUs of 40GB).
 
+??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture prefixed by `tpu-` via the `gpu` property.
+
+    ```yaml
+    type: task
+    
+    python: "3.11"
+    
+    commands:
+      - pip install torch~=2.3.0 torch_xla[tpu]~=2.3.0 torchvision -f https://storage.googleapis.com/libtpu-releases/index.html
+      - git clone --recursive https://github.com/pytorch/xla.git
+      - python3 xla/test/test_train_mp_imagenet.py --fake_data --model=resnet50 --num_epochs=1
+
+    resources:
+      gpu:  tpu-v2-8
+    ```
+
+    !!! info "Limitations"
+        Multi-node tasks aren't supported yet with TPU, but this support is coming soon.
+
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
     `shm_size`, e.g. set it to `16GB`.
@@ -167,7 +187,7 @@ The following environment variables are available in any run and are passed by `
 | `DSTACK_NODE_RANK`      | The rank of the node                    |
 | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node |
 
-### Nodes { #_nodes }
+### Distributed tasks { #_nodes }
 
 By default, the task runs on a single node. However, you can run it on a cluster of nodes.
 

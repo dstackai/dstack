@@ -207,7 +207,7 @@ nav:
           - API:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
-  - Examples: https://github.com/dstackai/dstack/tree/master/examples" target="_blank
+  - Examples: /#examples
   - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
   - Blog:
       - blog/index.md
