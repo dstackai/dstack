@@ -404,8 +404,7 @@ gcloud projects list --format="json(projectId)"
     compute.zoneOperations.get
     ```
 
-??? info "Permissions for running TPUs"
-    Running TPUs also requires the following permissions:
+    If you plan to use TPUs, additional permissions are required:
 
     ```
     tpu.nodes.create
@@ -415,8 +414,8 @@ gcloud projects list --format="json(projectId)"
     tpu.operations.list
     ```
 
-    You also need to have the `serviceAccountUser` role granted.
-    `dstack` will run TPUs under the default service account, so you don't need to create one.
+    Also, the use of TPUs requires the `serviceAccountUser` role.
+    For TPU VMs, dstack will use the default service account.
 
 ??? info "Private subnets"
     By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.

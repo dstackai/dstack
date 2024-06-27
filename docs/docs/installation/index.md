@@ -138,7 +138,7 @@ To use your own cloud accounts, click the settings icon of the corresponding bac
 
 ## What's next?
 
-1. Check the [`server/config.yml` reference](../reference/server/config.yml.md) on how to configure backends
+1. Check the [server/config.yml reference](../reference/server/config.yml.md) on how to configure backends
 2. Follow [quickstart](../quickstart.md)
 3. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples)
 4. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

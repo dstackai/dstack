@@ -47,8 +47,9 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
     [number of replicas and scaling policy](../reference/dstack.yml/service.md#replicas-and-auto-scaling).
     In this case, `dstack` auto-scales it based on the load.
 
-> See the [.dstack.yml reference](../reference/dstack.yml/service.md)
-> for many examples on service configuration.
+!!! info "Reference"
+    See the [.dstack.yml reference](../reference/dstack.yml/service.md)
+    for all supported configuration options and multiple examples.
 
 ## Running
 
@@ -81,8 +82,9 @@ When deploying the service, `dstack run` mounts the current folder's contents.
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
-> See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
-> on how `dstack run` works.
+!!! info "Reference"
+    See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+    on how `dstack run` works.
 
 ## Service endpoint
 

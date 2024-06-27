@@ -41,8 +41,9 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
     the [number of nodes](../reference/dstack.yml/task.md#_nodes).
     In this case, `dstack` provisions a cluster of instances.
 
-> See the [.dstack.yml reference](../reference/dstack.yml/task.md)
-> for many examples on task configuration.
+!!! info "Reference"
+    See the [.dstack.yml reference](../reference/dstack.yml/task.md)
+    for all supported configuration options and multiple examples.
 
 ## Running
 
@@ -82,8 +83,9 @@ When running the task, `dstack run` mounts the current folder's contents.
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
-> See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
-> on how `dstack run` works.
+!!! info "Reference"
+    See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+    on how `dstack run` works.
 
 ## Managing runs
 

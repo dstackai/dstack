@@ -2,10 +2,9 @@
 
 The `task` configuration type allows running [tasks](../../concepts/tasks.md).
 
-!!! info "Filename"
-    Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
-    and can be located in the project's root directory or any nested folder.
-    Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
+> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
+> and can be located in the project's root directory or any nested folder.
+> Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
 
 ## Examples
 
@@ -142,8 +141,7 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
       gpu:  tpu-v2-8
     ```
 
-    !!! info "Limitations"
-        Multi-node tasks aren't supported yet with TPU, but this support is coming soon.
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
 
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 

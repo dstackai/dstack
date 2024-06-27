@@ -9,7 +9,7 @@ allow you to run commands interactively.
 
 Once the commands work, go ahead and run them as a task or a service.
 
-??? tip "Jupyter"
+??? info "Notebooks"
     **VS Code**
     
     When you access a dev environment using your desktop VS Code, it allows you to work with Jupyter notebooks via its
@@ -115,7 +115,7 @@ Or via the `-e` option of the `dstack run` command:
 dstack run . -f .dstack.yml -e HUGGING_FACE_HUB_TOKEN=...
 ```
 
-!!! tip ".env"
+??? info ".env"
     A better way to configure environment variables not hardcoded in YAML is by specifying them in a `.env` file:
 
     ```
@@ -159,6 +159,8 @@ To run in detached mode, use `-d` with `dstack run`.
 
 ## GPU
 
+`dstack` natively supports NVIDIA GPU, and Google Cloud TPU accelerator chips.
+
 The `gpu` property withing `resources` (or the `--gpu` option with `dstack run`)
 allows specifying not only memory size but also GPU names, their memory, and quantity.
 
@@ -172,6 +174,11 @@ Examples:
 - `A100:80GB` (one A100 of 80GB)
 - `A100:2` (two A100)
 - `A100:40GB:2` (two A100 40GB)
+- `tpu-v5-8` (`v5` with 8 TPU cores)
+
+??? info "Google Cloud TPU"
+    Currently, you can't specify other than 8 TPU cores. This means only single TPU device workloads are supported.
+    Support for multiple TPU devices is coming soon.
 
 ## Service quotas
 

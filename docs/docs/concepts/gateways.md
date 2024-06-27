@@ -26,8 +26,9 @@ domain: example.com
 
 A domain name is required to create a gateway.
 
-> See the [.dstack.yml reference](../reference/dstack.yml/gateway.md)
-> for many examples on gateway configuration.
+!!! info "Reference"
+    See the [.dstack.yml reference](../reference/dstack.yml/gateway.md)
+    for all supported configuration options and examples.
 
 ## Creating and updating gateways
 
@@ -47,7 +48,7 @@ The example-gateway doesn't exist. Create it? [y/n]: y
 
 </div>
 
-## Updating DNS reconds
+## Updating DNS records
 
 Once the gateway is assigned a hostname, go to your domain's DNS settings
 and add an `A` DNS record for `*.<gateway domain>` (e.g., `*.example.com`) pointing to the gateway's hostname.

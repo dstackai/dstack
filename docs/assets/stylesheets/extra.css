@@ -118,10 +118,12 @@
 
 [dir=ltr] .md-typeset :is(.admonition,details) {
     border-style: solid;
-    border-width: 1px;
+    /*border-width: 1px;*/
+    border-width: 0;
     border-radius: 6px;
     box-shadow: none;
     padding: .6rem .8rem;
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05));
 }
 
 .md-typeset iframe {
@@ -148,11 +150,16 @@
 [dir=ltr] .md-typeset :is(.admonition-title,summary) {
     font-size: 18px !important;
     letter-spacing: -0.5px;
-    font-weight: 800;
+    /*font-weight: 800;*/
+    font-weight: 700;
     /*padding-left: 18px;*/
     padding-bottom: 0;
     border: none;
     border-radius: 0;
+}
+
+.md-typeset .admonition.info:focus-within, .md-typeset details.info:focus-within {
+    box-shadow: none;
 }
 
 .md-typeset :is(.info,.tip, .warning)>:is(.admonition-title) {
