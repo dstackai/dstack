@@ -28,9 +28,7 @@ class VolumeConfiguration(CoreModel):
     ] = None
     volume_id: Annotated[
         Optional[str],
-        Field(
-            description="The volume ID. Must be specified only for registering existing volumes"
-        ),
+        Field(description="The volume ID. Must be specified when registering external volumes"),
     ] = None
 
 

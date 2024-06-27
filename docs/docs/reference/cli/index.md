@@ -74,7 +74,7 @@ $ dstack apply --help
 </div>
 
 !!! info "NOTE:"
-    The `dstack apply` command currently supports only `gateway` configurations.
+    The `dstack apply` command currently supports only `gateway` and `volume` configurations.
     Support for other configuration types is coming soon.
 
 ### dstack delete
@@ -316,6 +316,23 @@ The `dstack gateway update` command updates the specified gateway.
 
 ```shell
 $ dstack gateway update --help
+#GENERATE#
+```
+
+</div>
+
+### dstack volume
+
+The volumes commands.
+
+##### dstack volume list
+
+The `dstack volume list` command lists volumes.
+
+<div class="termy">
+
+```shell
+$ dstack volume list --help
 #GENERATE#
 ```
 
