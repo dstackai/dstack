@@ -10,11 +10,13 @@ import (
 )
 
 type DockerParameters interface {
+	DockerPrivileged() bool
 	DockerKeepContainer() bool
 	DockerShellCommands([]string) []string
 	DockerMounts(string) ([]mount.Mount, error)
 	DockerPorts() []int
 	MakeRunnerDir() (string, error)
+	DockerPJRTDevice() string
 }
 
 type CLIArgs struct {
@@ -38,6 +40,8 @@ type CLIArgs struct {
 		SSHPort                   int
 		KeepContainer             bool
 		ConcatinatedPublicSSHKeys string
+		Privileged                bool
+		PJRTDevice                string
 	}
 }
 

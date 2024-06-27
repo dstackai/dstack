@@ -1,3 +1,4 @@
+import concurrent.futures
 import random
 import re
 import string
@@ -311,6 +312,7 @@ def create_tpu_node_struct(
     spot: bool,
     labels: Dict[str, str],
     subnetwork: Optional[str] = None,
+    allocate_public_ip: bool = True,
 ) -> tpu_v2.Node:
     node = tpu_v2.Node()
     if spot:
@@ -319,7 +321,7 @@ def create_tpu_node_struct(
     node.runtime_version = "tpu-ubuntu2204-base"
     # subnetwork determines the network, so network shouldn't be specified
     node.network_config = tpu_v2.NetworkConfig(
-        enable_external_ips=True,
+        enable_external_ips=allocate_public_ip,
         subnetwork=subnetwork,
     )
     ssh_keys = "\n".join(f"ubuntu:{key}" for key in authorized_keys)
@@ -351,10 +353,12 @@ def wait_for_extended_operation(
 def wait_for_operation(operation: Operation, verbose_name: str = "operation", timeout: int = 300):
     try:
         result = operation.result(timeout=timeout)
+    except concurrent.futures.TimeoutError as e:
+        logger.debug("Error during %s: %s", verbose_name, e)
+        raise
     except Exception as e:
         # Write only debug logs here.
         # The unexpected errors will be propagated and logged appropriatly by the caller.
         logger.debug("Error during %s: %s", verbose_name, e)
-        logger.debug("Operation ID: %s", operation)
-        raise operation.exception() or RuntimeError(str(e))
+        raise operation.exception() or e
     return result

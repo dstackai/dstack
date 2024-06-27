@@ -27,7 +27,6 @@ from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-
 DSTACK_WORKING_DIR = "/root/.dstack"
 
 
@@ -175,14 +174,16 @@ def get_shim_env(build: str, authorized_keys: List[str]) -> Dict[str, str]:
     return envs
 
 
-def get_shim_commands(authorized_keys: List[str]) -> List[str]:
+def get_shim_commands(
+    authorized_keys: List[str], *, is_privileged: bool = False, pjrt_device: Optional[str] = None
+) -> List[str]:
     build = get_dstack_runner_version()
     commands = get_shim_pre_start_commands(
         build,
     )
     for k, v in get_shim_env(build, authorized_keys).items():
         commands += [f'export "{k}={v}"']
-    commands += get_run_shim_script()
+    commands += get_run_shim_script(is_privileged, pjrt_device)
     return commands
 
 
@@ -215,10 +216,13 @@ def get_shim_pre_start_commands(build: str) -> List[str]:
     ]
 
 
-def get_run_shim_script() -> List[str]:
+def get_run_shim_script(is_privileged: bool, pjrt_device: Optional[str]) -> List[str]:
     dev_flag = "" if settings.DSTACK_VERSION is not None else "--dev"
+    privileged_flag = "--privileged" if is_privileged else ""
+    pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
+
     return [
-        f"nohup dstack-shim {dev_flag} docker --keep-container >{DSTACK_WORKING_DIR}/shim.log 2>&1 &",
+        f"nohup dstack-shim {dev_flag} docker --keep-container {privileged_flag} {pjrt_device_env} >{DSTACK_WORKING_DIR}/shim.log 2>&1 &",
     ]
 
 

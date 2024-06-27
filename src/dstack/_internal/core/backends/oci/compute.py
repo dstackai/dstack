@@ -36,8 +36,6 @@ SUPPORTED_SHAPE_FAMILIES = [
     "BM.GPU4.",
     "VM.GPU.A10.",
     "BM.GPU.A10.",
-    "BM.GPU.A100-",
-    "BM.GPU.H100.",
 ]
 
 

@@ -1,3 +1,4 @@
+import concurrent.futures
 import json
 from collections import defaultdict
 from typing import Callable, Dict, List, Optional
@@ -21,6 +22,7 @@ from dstack._internal.core.errors import (
     ComputeError,
     ComputeResourceNotFoundError,
     NoCapacityError,
+    ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
@@ -167,6 +169,7 @@ class GCPCompute(Compute):
                     spot=instance_offer.instance.resources.spot,
                     labels=labels,
                     subnetwork=subnetwork,
+                    allocate_public_ip=allocate_public_ip,
                 )
                 create_node_request = tpu_v2.CreateNodeRequest(
                     parent=f"projects/{self.config.project_id}/locations/{zone}",
@@ -174,25 +177,24 @@ class GCPCompute(Compute):
                     node=tpu_node,
                 )
                 try:
+                    # TPUs may get created and then deleted immediately in case of no capacity.
+                    # We call wait_for_operation() only to get the capacity error and try another option.
+                    # If the request succeeds, we'll probably timeout and update_provisioning_data() will get hostname.
                     operation = self.tpu_client.create_node(request=create_node_request)
-                    gcp_resources.wait_for_operation(
-                        operation, verbose_name="tpu instance creation"
-                    )
+                    gcp_resources.wait_for_operation(operation, timeout=5)
                 except (
                     google.api_core.exceptions.ServiceUnavailable,
                     google.api_core.exceptions.NotFound,
                     google.api_core.exceptions.ResourceExhausted,
                 ):
                     continue
-                node_request = tpu_v2.GetNodeRequest(
-                    name=f"projects/dstack/locations/{zone}/nodes/{instance_id}",
-                )
-                instance = self.tpu_client.get_node(request=node_request)
+                except concurrent.futures.TimeoutError:
+                    pass
                 return JobProvisioningData(
                     backend=instance_offer.backend,
                     instance_type=instance_offer.instance,
                     instance_id=instance_id,
-                    hostname=instance.network_endpoints[0].access_config.external_ip,
+                    hostname=None,
                     internal_ip=None,
                     region=zone,
                     price=instance_offer.price,
@@ -243,27 +245,19 @@ class GCPCompute(Compute):
                 allocate_public_ip=allocate_public_ip,
             )
             try:
-                operation = self.instances_client.insert(request=request)
-                gcp_resources.wait_for_extended_operation(operation, "instance creation")
+                self.instances_client.insert(request=request)
             except (
                 google.api_core.exceptions.ServiceUnavailable,
                 google.api_core.exceptions.NotFound,
             ):
                 continue
-            instance = self.instances_client.get(
-                project=self.config.project_id, zone=zone, instance=instance_name
-            )
-            if allocate_public_ip:
-                hostname = instance.network_interfaces[0].access_configs[0].nat_i_p
-            else:
-                hostname = instance.network_interfaces[0].network_i_p
             return JobProvisioningData(
                 backend=instance_offer.backend,
                 instance_type=instance_offer.instance,
                 instance_id=instance_name,
                 public_ip_enabled=allocate_public_ip,
-                hostname=hostname,
-                internal_ip=instance.network_interfaces[0].network_i_p,
+                hostname=None,
+                internal_ip=None,
                 region=instance_offer.region,
                 price=instance_offer.price,
                 username="ubuntu",
@@ -273,6 +267,65 @@ class GCPCompute(Compute):
                 backend_data=json.dumps({"zone": zone}),
             )
         raise NoCapacityError()
+
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ):
+        allocate_public_ip = self.config.allocate_public_ips
+        zone = provisioning_data.region
+        is_tpu = False
+        if provisioning_data.backend_data is not None:
+            backend_data_dict = json.loads(provisioning_data.backend_data)
+            zone = backend_data_dict["zone"]
+            is_tpu = backend_data_dict.get("is_tpu", False)
+
+        if is_tpu:
+            node_request = tpu_v2.GetNodeRequest(
+                name=f"projects/dstack/locations/{zone}/nodes/{provisioning_data.instance_id}",
+            )
+            try:
+                instance = self.tpu_client.get_node(request=node_request)
+            except google.api_core.exceptions.NotFound:
+                raise ProvisioningError("Failed to get instance IP address. Instance not found.")
+
+            # See states https://cloud.google.com/python/docs/reference/tpu/latest/google.cloud.tpu_v2.types.Node.State
+            if instance.state in [0, 1]:
+                return
+            if instance.state == 2:
+                if allocate_public_ip:
+                    hostname = instance.network_endpoints[0].access_config.external_ip
+                else:
+                    hostname = instance.network_endpoints[0].ip_address
+                provisioning_data.hostname = hostname
+                provisioning_data.internal_ip = instance.network_endpoints[0].ip_address
+                return
+            raise ProvisioningError(
+                f"Failed to get instance IP address. Instance state: {instance.state}"
+            )
+
+        try:
+            instance = self.instances_client.get(
+                project=self.config.project_id, zone=zone, instance=provisioning_data.instance_id
+            )
+        except google.api_core.exceptions.NotFound:
+            raise ProvisioningError("Failed to get instance IP address. Instance not found.")
+
+        if instance.status in ["PROVISIONING", "STAGING"]:
+            return
+        if instance.status == "RUNNING":
+            if allocate_public_ip:
+                hostname = instance.network_interfaces[0].access_configs[0].nat_i_p
+            else:
+                hostname = instance.network_interfaces[0].network_i_p
+            provisioning_data.hostname = hostname
+            provisioning_data.internal_ip = instance.network_interfaces[0].network_i_p
+            return
+        raise ProvisioningError(
+            f"Failed to get instance IP address. Instance status: {instance.status}"
+        )
 
     def run_job(
         self,
@@ -447,7 +500,9 @@ def _get_instance_zones(instance_offer: InstanceOffer) -> List[str]:
 
 
 def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
-    commands = get_shim_commands(authorized_keys=authorized_keys)
+    commands = get_shim_commands(
+        authorized_keys=authorized_keys, is_privileged=True, pjrt_device="TPU"
+    )
     startup_script = " ".join([" && ".join(commands)])
     startup_script = "#! /bin/bash\n" + startup_script
     return startup_script
@@ -473,9 +528,9 @@ def _is_pod(instance_name: str) -> bool:
         tensor_cores = int(tensor_cores)
     except ValueError:
         raise ValueError(f"Invalid number in tpu tensor cores: {tensor_cores}")
-    if version in ["v2", "v3"]:
+    if version in ["v2", "v3", "v5p", "v5litepod"]:
         return tensor_cores > 8
-    elif version in ["v4", "v5p", "v5litepod"]:
+    elif version == "v4":
         return True
     else:
         raise ValueError(f"Unknown TPU version: {version}")

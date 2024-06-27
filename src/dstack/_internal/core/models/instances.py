@@ -35,11 +35,10 @@ class Resources(CoreModel):
             resources["disk_size"] = f"{self.disk.size_mib / 1024:.1f}GB"
         if self.gpus:
             gpu = self.gpus[0]
-            resources.update(
-                gpu_name=gpu.name,
-                gpu_count=len(self.gpus),
-                gpu_memory=f"{gpu.memory_mib / 1024:.0f}GB",
-            )
+            resources["gpu_name"] = gpu.name
+            resources["gpu_count"] = len(self.gpus)
+            if gpu.memory_mib > 0:
+                resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
         return pretty_resources(**resources)
 
 
