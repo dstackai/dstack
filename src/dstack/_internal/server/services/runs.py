@@ -270,6 +270,12 @@ async def get_run_plan(
     # TODO(egor-s): do we need to generate all replicas here?
     jobs = await get_jobs_from_run_spec(run_spec, replica_num=0)
 
+    volumes = await get_run_volumes(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+    )
+
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
     )
@@ -277,15 +283,10 @@ async def get_run_plan(
         pool=pool,
         run_spec=run_spec,
         job=jobs[0],
+        volumes=volumes,
     )
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
-
-    volumes = await get_run_volumes(
-        session=session,
-        project=project,
-        run_spec=run_spec,
-    )
 
     # Get offers once for all jobs
     offers = []
@@ -346,20 +347,26 @@ async def get_offers_by_requirements(
 
     backend_types = profile.backends
     regions = profile.regions
-    if multinode:
-        if not backend_types:
-            backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
-        backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
-    # For multi-node, restrict backend and region.
-    # The default behavior is to provision all nodes in the same backend and region.
-    if master_job_provisioning_data is not None:
-        backend_types = [master_job_provisioning_data.backend]
-        regions = [master_job_provisioning_data.region]
 
     if volumes:
         volume = volumes[0]
         backend_types = [volume.configuration.backend]
         regions = [volume.configuration.region]
+
+    if multinode:
+        if not backend_types:
+            backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
+
+    # For multi-node, restrict backend and region.
+    # The default behavior is to provision all nodes in the same backend and region.
+    if master_job_provisioning_data is not None:
+        if not backend_types:
+            backend_types = [master_job_provisioning_data.backend]
+        if not regions:
+            regions = [master_job_provisioning_data.region]
+        backend_types = [b for b in backend_types if b == master_job_provisioning_data.backend]
+        regions = [b for b in backend_types if b == master_job_provisioning_data.region]
 
     if backend_types is not None:
         backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
@@ -726,6 +733,7 @@ def _get_pool_offers(
     pool: PoolModel,
     run_spec: RunSpec,
     job: Job,
+    volumes: List[Volume],
 ) -> List[InstanceOfferWithAvailability]:
     profile = run_spec.merged_profile
     requirements = Requirements(
@@ -738,6 +746,7 @@ def _get_pool_offers(
         profile=profile,
         requirements=requirements,
         multinode=job.job_spec.jobs_per_replica > 1,
+        volumes=volumes,
     )
     pool_offers: List[InstanceOfferWithAvailability] = []
     for instance in pool_filtered_instances:

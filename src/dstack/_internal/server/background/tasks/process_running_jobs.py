@@ -433,7 +433,11 @@ def _process_pulling_with_shim(
     shim_status = shim_client.pull()  # raises error if shim is down, causes retry
 
     # If shim goes to pending before the job is submitted to runner, then an error occured
-    if shim_status.state == "pending" and shim_status.result is not None:
+    if (
+        shim_status.state == "pending"
+        and shim_status.result is not None
+        and shim_status.result.reason != ""
+    ):
         logger.warning(
             "shim failed to execute job %s: %s (%s)",
             job_model.job_name,

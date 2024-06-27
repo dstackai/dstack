@@ -323,15 +323,12 @@ def get_availability_zones(ec2_client: botocore.client.BaseClient, region: str) 
     return zone_names
 
 
-def get_available_device_name(
+def list_available_device_names(
     ec2_client: botocore.client.BaseClient, instance_id: str
-) -> Optional[str]:
+) -> List[str]:
     device_names = _list_possible_device_names()
     used_device_names = list_instance_device_names(ec2_client, instance_id)
-    for name in device_names:
-        if name not in used_device_names:
-            return name
-    return None
+    return [n for n in device_names if n not in used_device_names]
 
 
 def list_instance_device_names(

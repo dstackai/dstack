@@ -164,6 +164,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_model=job_model,
         job=job,
         master_job_provisioning_data=master_job_provisioning_data,
+        volumes=volumes,
     )
     if instance is None:
         if profile.creation_policy == CreationPolicy.REUSE:
@@ -239,6 +240,7 @@ async def _run_job_on_pool_instance(
     job_model: JobModel,
     job: Job,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
+    volumes: Optional[List[Volume]] = None,
 ) -> Optional[InstanceModel]:
     profile = run_spec.merged_profile
     async with PROCESSING_POOL_LOCK:
@@ -255,6 +257,7 @@ async def _run_job_on_pool_instance(
             status=InstanceStatus.IDLE,
             multinode=job.job_spec.jobs_per_replica > 1,
             master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
         )
         if len(relevant_instances) == 0:
             return None
@@ -294,8 +297,8 @@ async def _run_job_on_new_instance(
     job: Job,
     project_ssh_public_key: str,
     project_ssh_private_key: str,
-    volumes: Optional[List[Volume]] = None,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
+    volumes: Optional[List[Volume]] = None,
 ) -> Optional[Tuple[JobProvisioningData, InstanceOfferWithAvailability]]:
     if volumes is None:
         volumes = []

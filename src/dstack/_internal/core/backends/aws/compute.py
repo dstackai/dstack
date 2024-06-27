@@ -458,29 +458,38 @@ class AWSCompute(Compute):
     def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
-        device_name = aws_resources.get_available_device_name(
+        device_names = aws_resources.list_available_device_names(
             ec2_client=ec2_client, instance_id=instance_id
         )
-        if device_name is None:
-            raise ComputeError(f"Failed to find available device name for volume {volume.name}")
 
         logger.debug("Attaching EBS volume %s to instance %s", volume.volume_id, instance_id)
-        try:
-            ec2_client.attach_volume(
-                VolumeId=volume.volume_id, InstanceId=instance_id, Device=device_name
-            )
-        except botocore.exceptions.ClientError as e:
-            if e.response["Error"]["Code"] == "VolumeInUse":
-                raise ComputeError(f"Failed to attach volume in use: {volume.volume_id}")
-            raise e
-        logger.debug("Attached EBS volume %s from instance %s", volume.volume_id, instance_id)
+        for device_name in device_names:
+            try:
+                ec2_client.attach_volume(
+                    VolumeId=volume.volume_id, InstanceId=instance_id, Device=device_name
+                )
+                break
+            except botocore.exceptions.ClientError as e:
+                if e.response["Error"]["Code"] == "VolumeInUse":
+                    raise ComputeError(f"Failed to attach volume in use: {volume.volume_id}")
+                if (
+                    e.response["Error"]["Code"] == "InvalidParameterValue"
+                    and f"Invalid value '{device_name}' for unixDevice"
+                    in e.response["Error"]["Message"]
+                ):
+                    # device name is taken but list API hasn't returned it yet
+                    continue
+                raise e
+        else:
+            raise ComputeError(f"Failed to find available device name for volume {volume.name}")
 
+        logger.debug("Attached EBS volume %s to instance %s", volume.volume_id, instance_id)
         return VolumeAttachmentData(device_name=device_name)
 
     def detach_volume(self, volume: Volume, instance_id: str):
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
-        logger.debug("Detaching EBS volume %s to instance %s", volume.volume_id, instance_id)
+        logger.debug("Detaching EBS volume %s from instance %s", volume.volume_id, instance_id)
         ec2_client.detach_volume(
             VolumeId=volume.volume_id,
             InstanceId=instance_id,

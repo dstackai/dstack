@@ -2,7 +2,7 @@ import argparse
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.cli.services.configurators.run import (
@@ -241,7 +241,7 @@ def _print_finished_message(run: Run):
         console.print("[code]Done[/]")
         return
 
-    termination_reason = _get_run_termination_reason(run)
+    termination_reason, termination_reason_message = _get_run_termination_reason(run)
     message = "Run failed due to unknown reason. Check CLI and server logs."
     if run.status == RunStatus.TERMINATED:
         message = "Run terminated due to unknown reason. Check CLI and server logs."
@@ -254,29 +254,29 @@ def _print_finished_message(run: Run):
         )
     elif termination_reason == JobTerminationReason.CREATING_CONTAINER_ERROR:
         message = (
-            "Cannot create container. "
-            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message}\n"
+            "Cannot create container.\n"
+            f"Error: {termination_reason_message}\n"
             "Check CLI and server logs for more details."
         )
     elif termination_reason == JobTerminationReason.EXECUTOR_ERROR:
         message = (
-            f"Error: {run._run.jobs[0].job_submissions[0].termination_reason_message}\n"
-            "Check CLI and server logs for more details."
+            f"Error: {termination_reason_message}\n" "Check CLI and server logs for more details."
         )
     elif termination_reason is not None:
         message = (
-            f"Run failed with error code {termination_reason.name}. "
+            f"Run failed with error code {termination_reason.name}.\n"
+            f"Error: {termination_reason_message}\n"
             "Check CLI and server logs for more details."
         )
     console.print(f"[error]{message}[/]")
 
 
-def _get_run_termination_reason(run: Run) -> Optional[JobTerminationReason]:
+def _get_run_termination_reason(run: Run) -> Tuple[Optional[JobTerminationReason], Optional[str]]:
     job = run._run.jobs[0]
     if len(job.job_submissions) == 0:
-        return None
+        return None, None
     job_submission = job.job_submissions[0]
-    return job_submission.termination_reason
+    return job_submission.termination_reason, job_submission.termination_reason_message
 
 
 def _run_resubmitted(run: Run, current_job_submission: Optional[JobSubmission]) -> bool:
