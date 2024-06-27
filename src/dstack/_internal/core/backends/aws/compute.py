@@ -609,7 +609,18 @@ def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
 
 
 def _supported_instances(offer: InstanceOffer) -> bool:
-    for family in ["t2.small", "c5.", "m5.", "p3.", "g5.", "g4dn.", "p4d.", "p4de."]:
+    for family in [
+        "t2.small",
+        "c5.",
+        "m5.",
+        "p3.",
+        "g4dn.",
+        "g5.",
+        "g6.",
+        "gr6.",
+        "p4d.",
+        "p4de.",
+    ]:
         if offer.instance.name.startswith(family):
             return True
     return False
