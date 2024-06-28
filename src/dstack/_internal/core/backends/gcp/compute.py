@@ -196,7 +196,8 @@ class GCPCompute(Compute):
                     instance_id=instance_id,
                     hostname=None,
                     internal_ip=None,
-                    region=zone,
+                    region=instance_offer.region,
+                    availability_zone=zone,
                     price=instance_offer.price,
                     ssh_port=22,
                     username="ubuntu",
@@ -259,6 +260,7 @@ class GCPCompute(Compute):
                 hostname=None,
                 internal_ip=None,
                 region=instance_offer.region,
+                availability_zone=zone,
                 price=instance_offer.price,
                 username="ubuntu",
                 ssh_port=22,
@@ -402,6 +404,7 @@ class GCPCompute(Compute):
         return GatewayProvisioningData(
             instance_id=configuration.instance_name,
             region=configuration.region,  # used for instance termination
+            availability_zone=zone,
             ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,
             backend_data=json.dumps({"zone": zone}),
         )
