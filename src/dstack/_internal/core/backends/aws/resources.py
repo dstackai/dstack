@@ -272,12 +272,17 @@ def get_subnets_ids_for_vpc(
     ec2_client: botocore.client.BaseClient,
     vpc_id: str,
     allocate_public_ip: bool,
+    availability_zones: Optional[List[str]] = None,
 ) -> List[str]:
     """
     If `allocate_public_ip` is True, returns public subnets found in the VPC.
     If `allocate_public_ip` is False, returns subnets with NAT found in the VPC.
     """
-    subnets = _get_subnets_by_vpc_id(ec2_client=ec2_client, vpc_id=vpc_id)
+    subnets = _get_subnets_by_vpc_id(
+        ec2_client=ec2_client,
+        vpc_id=vpc_id,
+        availability_zones=availability_zones,
+    )
     if len(subnets) == 0:
         return []
     subnets_ids = []
@@ -400,8 +405,12 @@ def _is_subset(subset, superset) -> bool:
 def _get_subnets_by_vpc_id(
     ec2_client: botocore.client.BaseClient,
     vpc_id: str,
+    availability_zones: Optional[List[str]] = None,
 ) -> List[Dict]:
-    response = ec2_client.describe_subnets(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
+    filters = [{"Name": "vpc-id", "Values": [vpc_id]}]
+    if availability_zones is not None:
+        filters.append({"Name": "availability-zone", "Values": availability_zones})
+    response = ec2_client.describe_subnets(Filters=filters)
     return response["Subnets"]
 
 

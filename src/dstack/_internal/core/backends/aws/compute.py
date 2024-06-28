@@ -125,6 +125,9 @@ class AWSCompute(Compute):
         ec2_resource = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         allocate_public_ip = self.config.allocate_public_ips
+        availability_zones = None
+        if instance_config.availability_zone is not None:
+            availability_zones = [instance_config.availability_zone]
 
         tags = [
             {"Key": "Name", "Value": instance_config.instance_name},
@@ -138,6 +141,7 @@ class AWSCompute(Compute):
                 config=self.config,
                 region=instance_offer.region,
                 allocate_public_ip=allocate_public_ip,
+                availability_zones=availability_zones,
             )
             subnet_id = subnets_ids[0]
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
@@ -207,6 +211,13 @@ class AWSCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
+        if len(volumes) > 0:
+            volume = volumes[0]
+            if (
+                volume.provisioning_data is not None
+                and volume.provisioning_data.availability_zone is not None
+            ):
+                instance_config.availability_zone = volume.provisioning_data.availability_zone
         return self.create_instance(instance_offer, instance_config)
 
     def create_gateway(
@@ -507,6 +518,7 @@ def get_vpc_id_subnet_id_or_error(
     config: AWSConfig,
     region: str,
     allocate_public_ip: bool,
+    availability_zones: Optional[List[str]] = None,
 ) -> Tuple[str, List[str]]:
     if config.vpc_ids is not None:
         vpc_id = config.vpc_ids.get(region)
@@ -518,6 +530,7 @@ def get_vpc_id_subnet_id_or_error(
                 ec2_client=ec2_client,
                 vpc_id=vpc_id,
                 allocate_public_ip=allocate_public_ip,
+                availability_zones=availability_zones,
             )
             if len(subnets_ids) > 0:
                 return vpc_id, subnets_ids
@@ -532,6 +545,7 @@ def get_vpc_id_subnet_id_or_error(
         vpc_name=config.vpc_name,
         region=region,
         allocate_public_ip=allocate_public_ip,
+        availability_zones=availability_zones,
     )
 
 
@@ -540,6 +554,7 @@ def _get_vpc_id_subnet_id_by_vpc_name_or_error(
     vpc_name: Optional[str],
     region: str,
     allocate_public_ip: bool,
+    availability_zones: Optional[List[str]] = None,
 ) -> Tuple[str, List[str]]:
     if vpc_name is not None:
         vpc_id = aws_resources.get_vpc_id_by_name(
@@ -556,6 +571,7 @@ def _get_vpc_id_subnet_id_by_vpc_name_or_error(
         ec2_client=ec2_client,
         vpc_id=vpc_id,
         allocate_public_ip=allocate_public_ip,
+        availability_zones=availability_zones,
     )
     if len(subnets_ids) > 0:
         return vpc_id, subnets_ids
