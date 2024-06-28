@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from typing import List, Optional, Tuple
 from uuid import UUID
@@ -412,34 +411,30 @@ async def _attach_volumes(
     # If the volume was deleted before the lock, fail the job.
     await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
     try:
-        tasks = []
         for volume_model in volume_models:
-            tasks.append(
-                _attach_volume(
+            try:
+                await _attach_volume(
                     session=session,
                     backend=backend,
                     volume_model=volume_model,
                     instance=instance,
                     instance_id=job_provisioning_data.instance_id,
                 )
-            )
-        try:
-            await asyncio.gather(*tasks)
-        except (ServerClientError, BackendError) as e:
-            logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
-            job_model.status = JobStatus.TERMINATING
-            # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
-            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-            job_model.termination_reason_message = "Failed to attach volume"
-        except Exception:
-            logger.exception(
-                "%s: got exception when attaching volume",
-                fmt(job_model),
-            )
-            job_model.status = JobStatus.TERMINATING
-            # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
-            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-            job_model.termination_reason_message = "Failed to attach volume"
+            except (ServerClientError, BackendError) as e:
+                logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
+                job_model.status = JobStatus.TERMINATING
+                # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
+                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+                job_model.termination_reason_message = "Failed to attach volume"
+            except Exception:
+                logger.exception(
+                    "%s: got exception when attaching volume",
+                    fmt(job_model),
+                )
+                job_model.status = JobStatus.TERMINATING
+                # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
+                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+                job_model.termination_reason_message = "Failed to attach volume"
     finally:
         PROCESSING_VOLUMES_IDS.difference_update(volumes_ids)
 

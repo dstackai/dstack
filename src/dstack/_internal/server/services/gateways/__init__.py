@@ -215,6 +215,7 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
         gateways.append(gateway)
     logger.info("Deleting gateways: %s", [g.name for g in gateways])
     # terminate in parallel
+    # FIXME: not safe to share session between tasks – sqlalchemy can error
     terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
     for gateway, error in zip(gateways, terminate_results):
         if isinstance(error, Exception):

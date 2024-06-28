@@ -506,6 +506,7 @@ async def stop_runs(
     )
     runs = res.scalars().all()
     # TODO(egor-s): consider raising an exception if no runs found
+    # FIXME: not safe to share session between tasks – sqlalchemy can error
     await asyncio.gather(*(stop_run(session, run, abort) for run in runs))
 
 

@@ -146,19 +146,11 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
                 raise ServerClientError(
                     f"Failed to delete volume {volume_model.name}. Volume is in use."
                 )
-        tasks = []
         for volume_model in volume_models:
-            tasks.append(
-                _delete_volume(session=session, project=project, volume_model=volume_model)
-            )
-        terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
-        for volume_model, error in zip(volume_models, terminate_results):
-            if isinstance(error, Exception):
-                logger.exception(
-                    "Error when deleting volume %s",
-                    volume_model.name,
-                    exc_info=(type(error), error, error.__traceback__),
-                )
+            try:
+                await _delete_volume(session=session, project=project, volume_model=volume_model)
+            except Exception:
+                logger.exception("Error when deleting volume %s", volume_model.name)
         await session.execute(
             update(VolumeModel)
             .where(
