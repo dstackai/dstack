@@ -1,7 +1,6 @@
 import asyncio
 import itertools
 import math
-import re
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Set, Tuple
@@ -58,6 +57,8 @@ from dstack._internal.core.models.runs import (
     get_policy_map,
 )
 from dstack._internal.core.models.users import GlobalRole
+from dstack._internal.core.models.volumes import Volume, VolumeStatus
+from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.models import (
     InstanceModel,
     JobModel,
@@ -66,11 +67,13 @@ from dstack._internal.server.models import (
     RepoModel,
     RunModel,
     UserModel,
+    VolumeModel,
 )
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
-from dstack._internal.server.services.docker import parse_image_name
+from dstack._internal.server.services import volumes as volumes_services
+from dstack._internal.server.services.docker import is_valid_docker_volume_target, parse_image_name
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -254,16 +257,24 @@ async def get_run(
 
 
 async def get_run_plan(
-    session: AsyncSession, project: ProjectModel, user: UserModel, run_spec: RunSpec
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    run_spec: RunSpec,
 ) -> RunPlan:
-    if run_spec.run_name is not None:
-        _validate_run_name(run_spec.run_name)
+    _validate_run_spec(run_spec)
 
     profile = run_spec.merged_profile
     creation_policy = profile.creation_policy
 
     # TODO(egor-s): do we need to generate all replicas here?
     jobs = await get_jobs_from_run_spec(run_spec, replica_num=0)
+
+    volumes = await get_run_volumes(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+    )
 
     pool = await get_or_create_pool_by_name(
         session=session, project=project, pool_name=profile.pool_name
@@ -272,6 +283,7 @@ async def get_run_plan(
         pool=pool,
         run_spec=run_spec,
         job=jobs[0],
+        volumes=volumes,
     )
     run_name = run_spec.run_name  # preserve run_name
     run_spec.run_name = "dry-run"  # will regenerate jobs on submission
@@ -285,6 +297,7 @@ async def get_run_plan(
             requirements=jobs[0].job_spec.requirements,
             exclude_not_available=False,
             multinode=jobs[0].job_spec.jobs_per_replica > 1,
+            volumes=volumes,
         )
 
     job_plans = []
@@ -320,6 +333,7 @@ async def get_offers_by_requirements(
     exclude_not_available=False,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
+    volumes: Optional[List[Volume]] = None,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
@@ -333,15 +347,26 @@ async def get_offers_by_requirements(
 
     backend_types = profile.backends
     regions = profile.regions
+
+    if volumes:
+        volume = volumes[0]
+        backend_types = [volume.configuration.backend]
+        regions = [volume.configuration.region]
+
     if multinode:
         if not backend_types:
             backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
+
     # For multi-node, restrict backend and region.
     # The default behavior is to provision all nodes in the same backend and region.
     if master_job_provisioning_data is not None:
-        backend_types = [master_job_provisioning_data.backend]
-        regions = [master_job_provisioning_data.region]
+        if not backend_types:
+            backend_types = [master_job_provisioning_data.backend]
+        if not regions:
+            regions = [master_job_provisioning_data.region]
+        backend_types = [b for b in backend_types if b == master_job_provisioning_data.backend]
+        regions = [b for b in backend_types if b == master_job_provisioning_data.region]
 
     if backend_types is not None:
         backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
@@ -373,6 +398,8 @@ async def submit_run(
     project: ProjectModel,
     run_spec: RunSpec,
 ) -> Run:
+    _validate_run_spec(run_spec)
+
     repo = await repos_services.get_repo_model(
         session=session,
         project=project,
@@ -391,8 +418,14 @@ async def submit_run(
             project=project,
         )
     else:
-        _validate_run_name(run_spec.run_name)
         await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
+
+    await validate_run(
+        session=session,
+        user=user,
+        project=project,
+        run_spec=run_spec,
+    )
 
     submitted_at = common_utils.get_current_datetime()
     run_model = RunModel(
@@ -473,6 +506,7 @@ async def stop_runs(
     )
     runs = res.scalars().all()
     # TODO(egor-s): consider raising an exception if no runs found
+    # FIXME: not safe to share session between tasks – sqlalchemy can error
     await asyncio.gather(*(stop_run(session, run, abort) for run in runs))
 
 
@@ -700,6 +734,7 @@ def _get_pool_offers(
     pool: PoolModel,
     run_spec: RunSpec,
     job: Job,
+    volumes: List[Volume],
 ) -> List[InstanceOfferWithAvailability]:
     profile = run_spec.merged_profile
     requirements = Requirements(
@@ -712,6 +747,7 @@ def _get_pool_offers(
         profile=profile,
         requirements=requirements,
         multinode=job.job_spec.jobs_per_replica > 1,
+        volumes=volumes,
     )
     pool_offers: List[InstanceOfferWithAvailability] = []
     for instance in pool_filtered_instances:
@@ -747,6 +783,76 @@ async def _generate_run_name(
         return f"{run_name_base}-{idx}"
 
 
+async def validate_run(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    run_spec: RunSpec,
+):
+    volumes = await get_run_volumes(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+    )
+    check_can_attach_run_volumes(
+        run_spec=run_spec,
+        volumes=volumes,
+    )
+
+
+async def get_run_volumes(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+) -> List[Volume]:
+    volume_models = await get_run_volume_models(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+    )
+    return [volumes_services.volume_model_to_volume(v) for v in volume_models]
+
+
+async def get_run_volume_models(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+) -> List[VolumeModel]:
+    if len(run_spec.configuration.volumes) == 0:
+        return []
+    volume_models = []
+    for mount_point in run_spec.configuration.volumes:
+        volume_model = await volumes_services.get_project_volume_model_by_name(
+            session=session,
+            project=project,
+            name=mount_point.name,
+        )
+        if volume_model is None:
+            raise ResourceNotExistsError(f"Volume {mount_point.name} not found")
+        volume_models.append(volume_model)
+    return volume_models
+
+
+def check_can_attach_run_volumes(
+    run_spec: RunSpec,
+    volumes: List[Volume],
+):
+    if len(volumes) == 0:
+        return
+    # Perform basic checks if volumes can be attached.
+    # This is useful to show error ASAP (when user submits the run).
+    # If the attachment is to fail anyway, the error will be handled when proccessing submitted jobs.
+    backend = volumes[0].configuration.backend
+    region = volumes[0].configuration.region
+    for volume in volumes:
+        if backend != volume.configuration.backend:
+            raise ServerClientError("Cannot mount volumes from different backends")
+        if region != volume.configuration.region:
+            raise ServerClientError("Cannot mount volumes from different regions")
+        if volume.status != VolumeStatus.ACTIVE:
+            raise ServerClientError("Cannot mount volumes that are not active")
+
+
 def _get_run_cost(run: Run) -> float:
     run_cost = math.fsum(
         _get_job_submission_cost(submission)
@@ -763,12 +869,12 @@ def _get_job_submission_cost(job_submission: JobSubmission) -> float:
     return job_submission.job_provisioning_data.price * duration_hours
 
 
-# The run_name validation is not performed in pydantic models since
-# the models are reused on the client, and we don't want to
-# tie run_name validation to the client side.
-def _validate_run_name(run_name: str):
-    if not re.match("^[a-z][a-z0-9-]{1,40}$", run_name):
-        raise ServerClientError("run_name should match regex '^[a-z][a-z0-9-]{1,40}$'")
+def _validate_run_spec(run_spec: RunSpec):
+    if run_spec.run_name is not None:
+        validate_dstack_resource_name(run_spec.run_name)
+    for mount_point in run_spec.configuration.volumes:
+        if not is_valid_docker_volume_target(mount_point.path):
+            raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
 
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):

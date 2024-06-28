@@ -25,18 +25,21 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.gateways import GatewayComputeConfiguration
+from dstack._internal.core.models.gateways import (
+    GatewayComputeConfiguration,
+    GatewayProvisioningData,
+)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
     InstanceType,
-    LaunchedGatewayInfo,
     Resources,
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -331,6 +334,7 @@ class GCPCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
@@ -346,7 +350,7 @@ class GCPCompute(Compute):
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
-    ) -> LaunchedGatewayInfo:
+    ) -> GatewayProvisioningData:
         if self.config.vpc_project_id is None:
             gcp_resources.create_gateway_firewall_rules(
                 firewalls_client=self.firewalls_client,
@@ -395,7 +399,7 @@ class GCPCompute(Compute):
         instance = self.instances_client.get(
             project=self.config.project_id, zone=zone, instance=configuration.instance_name
         )
-        return LaunchedGatewayInfo(
+        return GatewayProvisioningData(
             instance_id=configuration.instance_name,
             region=configuration.region,  # used for instance termination
             ip_address=instance.network_interfaces[0].access_configs[0].nat_i_p,

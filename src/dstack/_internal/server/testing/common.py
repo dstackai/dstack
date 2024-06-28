@@ -20,7 +20,7 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.resources import Memory, ResourcesSpec
 from dstack._internal.core.models.runs import (
     InstanceStatus,
     JobProvisioningData,
@@ -31,6 +31,11 @@ from dstack._internal.core.models.runs import (
     RunStatus,
 )
 from dstack._internal.core.models.users import GlobalRole
+from dstack._internal.core.models.volumes import (
+    VolumeConfiguration,
+    VolumeProvisioningData,
+    VolumeStatus,
+)
 from dstack._internal.server.models import (
     BackendModel,
     GatewayComputeModel,
@@ -42,6 +47,7 @@ from dstack._internal.server.models import (
     RepoModel,
     RunModel,
     UserModel,
+    VolumeModel,
 )
 from dstack._internal.server.services.jobs import get_job_specs_from_run_spec
 
@@ -423,6 +429,62 @@ async def create_instance(
     session.add(im)
     await session.commit()
     return im
+
+
+async def create_volume(
+    session: AsyncSession,
+    project: ProjectModel,
+    status: VolumeStatus = VolumeStatus.SUBMITTED,
+    created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    configuration: Optional[VolumeConfiguration] = None,
+    volume_provisioning_data: Optional[VolumeProvisioningData] = None,
+) -> VolumeModel:
+    if configuration is None:
+        configuration = get_volume_configuration()
+    vm = VolumeModel(
+        project=project,
+        name=configuration.name,
+        status=status,
+        created_at=created_at,
+        configuration=configuration.json(),
+        volume_provisioning_data=volume_provisioning_data.json()
+        if volume_provisioning_data
+        else None,
+        instances=[],
+    )
+    session.add(vm)
+    await session.commit()
+    return vm
+
+
+def get_volume_configuration(
+    name: str = "test-volume",
+    backend: BackendType = BackendType.AWS,
+    region: str = "eu-west-1",
+    size: Optional[Memory] = Memory(100),
+    volume_id: Optional[str] = None,
+) -> VolumeConfiguration:
+    return VolumeConfiguration(
+        name=name,
+        backend=backend,
+        region=region,
+        size=size,
+        volume_id=volume_id,
+    )
+
+
+def get_volume_provisioning_data(
+    volume_id: str = "vol-1234",
+    size_gb: int = 100,
+    availability_zone: Optional[str] = None,
+    backend_data: Optional[str] = None,
+) -> VolumeProvisioningData:
+    return VolumeProvisioningData(
+        volume_id=volume_id,
+        size_gb=size_gb,
+        availability_zone=availability_zone,
+        backend_data=backend_data,
+    )
 
 
 class AsyncContextManager:

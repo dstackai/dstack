@@ -108,6 +108,7 @@ class JobTerminationReason(str, Enum):
     WAITING_INSTANCE_LIMIT_EXCEEDED = "waiting_instance_limit_exceeded"
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
     TERMINATED_BY_USER = "terminated_by_user"
+    VOLUME_ERROR = "volume_error"
     GATEWAY_ERROR = "gateway_error"
     SCALED_DOWN = "scaled_down"
     DONE_BY_RUNNER = "done_by_runner"
@@ -126,6 +127,7 @@ class JobTerminationReason(str, Enum):
             self.WAITING_INSTANCE_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.WAITING_RUNNER_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.TERMINATED_BY_USER: JobStatus.TERMINATED,
+            self.VOLUME_ERROR: JobStatus.FAILED,
             self.GATEWAY_ERROR: JobStatus.FAILED,
             self.SCALED_DOWN: JobStatus.TERMINATED,
             self.DONE_BY_RUNNER: JobStatus.DONE,

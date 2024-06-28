@@ -236,6 +236,8 @@ class TestProcessRunningJobs:
                 public_keys=[project_ssh_pub_key, "user_ssh_key"],
                 ssh_user="ubuntu",
                 ssh_key="user_ssh_key",
+                mounts=[],
+                volumes=[],
             )
         await session.refresh(job)
         assert job is not None

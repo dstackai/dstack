@@ -9,13 +9,20 @@ import requests
 import yaml
 
 from dstack._internal import settings
-from dstack._internal.core.models.gateways import GatewayComputeConfiguration
+from dstack._internal.core.models.gateways import (
+    GatewayComputeConfiguration,
+    GatewayProvisioningData,
+)
 from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
-    LaunchedGatewayInfo,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import (
+    Volume,
+    VolumeAttachmentData,
+    VolumeProvisioningData,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -38,6 +45,7 @@ class Compute(ABC):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         """
         Launches a new instance for the job. It should return `JobProvisioningData` ASAP.
@@ -48,7 +56,10 @@ class Compute(ABC):
 
     @abstractmethod
     def terminate_instance(
-        self, instance_id: str, region: str, backend_data: Optional[str] = None
+        self,
+        instance_id: str,
+        region: str,
+        backend_data: Optional[str] = None,
     ) -> None:
         """
         Terminates an instance by `instance_id`. If instance does not exist,
@@ -87,7 +98,10 @@ class Compute(ABC):
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
-    ) -> LaunchedGatewayInfo:
+    ) -> GatewayProvisioningData:
+        """
+        Creates a gateway instance.
+        """
         raise NotImplementedError()
 
     def terminate_gateway(
@@ -96,6 +110,41 @@ class Compute(ABC):
         configuration: GatewayComputeConfiguration,
         backend_data: Optional[str] = None,
     ):
+        """
+        Terminates a gateway instance. Generally, it passes the call to `terminate_instance()`,
+        but may perform additional work such as deleting a load balancer when a gateway has one.
+        """
+        raise NotImplementedError()
+
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        """
+        Returns VolumeProvisioningData for an existing volume.
+        Used to add external volumes to dstack.
+        """
+        raise NotImplementedError()
+
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        """
+        Creates a new volume.
+        """
+        raise NotImplementedError()
+
+    def delete_volume(self, volume: Volume):
+        """
+        Deletes a volume.
+        """
+        raise NotImplementedError()
+
+    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+        """
+        Attaches a volume to the instance.
+        """
+        raise NotImplementedError()
+
+    def detach_volume(self, volume: Volume, instance_id: str):
+        """
+        Detaches a volume from the instance.
+        """
         raise NotImplementedError()
 
 

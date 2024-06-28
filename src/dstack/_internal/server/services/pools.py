@@ -33,6 +33,7 @@ from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.core.models.users import GlobalRole
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.server import settings
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel, UserModel
 from dstack._internal.server.services.jobs import PROCESSING_POOL_LOCK
@@ -354,12 +355,34 @@ def filter_pool_instances(
     status: Optional[InstanceStatus] = None,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
+    volumes: Optional[List[Volume]] = None,
 ) -> List[InstanceModel]:
-    """
-    Filter instances by `instance_name`, `backends`, `resources`, `spot_policy`, `max_price`, `status`
-    """
     instances: List[InstanceModel] = []
     candidates: List[InstanceModel] = []
+
+    backend_types = profile.backends
+    regions = profile.regions
+
+    if volumes:
+        volume = volumes[0]
+        backend_types = [volume.configuration.backend]
+        regions = [volume.configuration.region]
+
+    if multinode:
+        if not backend_types:
+            backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
+
+    # For multi-node, restrict backend and region.
+    # The default behavior is to provision all nodes in the same backend and region.
+    if master_job_provisioning_data is not None:
+        if not backend_types:
+            backend_types = [master_job_provisioning_data.backend]
+        backend_types = [b for b in backend_types if b == master_job_provisioning_data.backend]
+        if not regions:
+            regions = [master_job_provisioning_data.region]
+        regions = [b for b in backend_types if b == master_job_provisioning_data.region]
+
     for instance in pool_instances:
         if instance.unreachable:
             continue
@@ -373,19 +396,10 @@ def filter_pool_instances(
             instances.append(instance)
             continue
 
-        if profile.backends is not None and instance.backend not in profile.backends:
+        if backend_types is not None and instance.backend not in backend_types:
             continue
 
-        if profile.regions is not None and instance.region not in profile.regions:
-            continue
-
-        if multinode and instance.backend not in BACKENDS_WITH_MULTINODE_SUPPORT:
-            continue
-
-        if master_job_provisioning_data is not None and (
-            instance.backend != master_job_provisioning_data.backend
-            or instance.region != master_job_provisioning_data.region
-        ):
+        if regions is not None and instance.region not in regions:
             continue
 
         candidates.append(instance)

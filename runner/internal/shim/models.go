@@ -45,15 +45,28 @@ type CLIArgs struct {
 	}
 }
 
+type MountPoint struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+type VolumeInfo struct {
+	Name     string `json:"name"`
+	VolumeId string `json:"volume_id"`
+	InitFs   bool   `json:"init_fs"`
+}
+
 type TaskConfig struct {
-	Username      string
-	Password      string
-	ImageName     string
-	ContainerName string
-	ShmSize       int64
-	PublicKeys    []string
-	SshUser       string
-	SshKey        string
+	Username      string       `json:"username"`
+	Password      string       `json:"password"`
+	ImageName     string       `json:"image_name"`
+	ContainerName string       `json:"container_name"`
+	ShmSize       int64        `json:"shm_size"`
+	PublicKeys    []string     `json:"public_keys"`
+	SshUser       string       `json:"ssh_user"`
+	SshKey        string       `json:"ssh_key"`
+	Mounts        []MountPoint `json:"mounts"`
+	Volumes       []VolumeInfo `json:"volumes"`
 }
 
 func (ra TaskConfig) EncodeRegistryAuth() (string, error) {

@@ -77,6 +77,7 @@ class InstanceConfiguration(CoreModel):
     ssh_keys: List[SSHKey]
     job_docker_config: Optional[DockerConfig]
     user: str  # dstack user name
+    availability_zone: Optional[str] = None
 
     def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]
@@ -113,11 +114,3 @@ class InstanceOffer(CoreModel):
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
     instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
-
-
-class LaunchedGatewayInfo(CoreModel):
-    instance_id: str
-    ip_address: str
-    region: str
-    hostname: Optional[str] = None
-    backend_data: Optional[str] = None  # backend-specific data in json

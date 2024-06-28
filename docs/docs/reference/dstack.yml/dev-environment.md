@@ -232,3 +232,11 @@ The `dev-environment` configuration type supports many other options. See below.
       show_root_heading: false
       type:
         required: true
+
+## `volumes`
+
+#SCHEMA# dstack._internal.core.models.volumes.VolumeMountPoint
+    overrides:
+      show_root_heading: false
+      type:
+        required: true

@@ -33,7 +33,7 @@ async def gather_map_async(
     func: Callable[[ItemT], Awaitable[ResultT]],
     *,
     return_exceptions: bool = False,
-) -> List[Tuple[ItemT, Union[ResultT, Exception]]]:
+) -> List[Tuple[ItemT, Union[ResultT, BaseException]]]:
     """
     A parallel wrapper around asyncio.gather that returns a list of tuples (item, result).
     Args:
@@ -83,6 +83,24 @@ async def wait_to_lock(lock: asyncio.Lock, locked: Set[KeyT], key: KeyT, *, dela
             if key not in locked:
                 locked.add(key)
                 return
+        await asyncio.sleep(delay)
+
+
+async def wait_to_lock_many(
+    lock: asyncio.Lock, locked: Set[KeyT], keys: List[KeyT], *, delay: float = 0.1
+):
+    """
+    Retry locking until all the keys are locked.
+    Lock is released during the sleep.
+    The keys must be sorted to prevent deadlock.
+    """
+    left_to_lock = keys.copy()
+    while len(left_to_lock) > 0:
+        async with lock:
+            for key in left_to_lock:
+                if key not in locked:
+                    locked.add(key)
+                    left_to_lock.remove(key)
         await asyncio.sleep(delay)
 
 

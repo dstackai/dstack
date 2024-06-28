@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	rt "runtime"
@@ -81,6 +82,11 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	if cfg.SshKey != "" {
 		ak := AuthorizedKeys{user: cfg.SshUser, lookup: user.Lookup}
 		if err := ak.AppendPublicKeys([]string{cfg.SshKey}); err != nil {
+			d.state = Pending
+			errMessage := fmt.Sprintf("ak.AppendPublicKeys error: %s", err.Error())
+			d.containerStatus.Error = errMessage
+			log.Println(errMessage)
+			d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
 			return tracerr.Wrap(err)
 		}
 		defer func(cfg TaskConfig) {
@@ -89,6 +95,17 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 				log.Printf("Error RemovePublicKeys: %s\n", err.Error())
 			}
 		}(cfg)
+	}
+
+	log.Println("Preparing volumes")
+	err = prepareVolumes(cfg)
+	if err != nil {
+		d.state = Pending
+		errMessage := fmt.Sprintf("prepareVolumes error: %s", err.Error())
+		d.containerStatus.Error = errMessage
+		log.Println(errMessage)
+		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
+		return tracerr.Wrap(err)
 	}
 
 	d.containerStatus = ContainerStatus{
@@ -108,7 +125,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		d.containerStatus.Error = errMessage
 		log.Print(errMessage + "\n")
 		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
-		return err
+		return tracerr.Wrap(err)
 	}
 
 	runnerDir, err := d.dockerParams.MakeRunnerDir()
@@ -118,7 +135,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		d.containerStatus.Error = errMessage
 		log.Print(errMessage + "\n")
 		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
-		return err
+		return tracerr.Wrap(err)
 	}
 
 	log.Println("Creating container")
@@ -130,7 +147,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		d.containerStatus.Error = errMessage
 		d.jobResult = JobResult{Reason: "CREATING_CONTAINER_ERROR", ReasonMessage: errMessage}
 		log.Print(errMessage + "\n")
-		return err
+		return tracerr.Wrap(err)
 	}
 
 	if !d.dockerParams.DockerKeepContainer() {
@@ -160,7 +177,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 			errMessage = "Container killed by OOM"
 		}
 		d.jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: errMessage}
-		return err
+		return tracerr.Wrap(err)
 	}
 
 	log.Printf("Container finished successfully, name=%s, id=%s", d.containerStatus.ContainerName, containerID)
@@ -198,6 +215,115 @@ func (d *DockerRunner) Stop(force bool) {
 
 func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus, string, JobResult) {
 	return d.state, d.containerStatus, d.executorError, d.jobResult
+}
+
+func prepareVolumes(taskConfig TaskConfig) error {
+	for _, volume := range taskConfig.Volumes {
+		err := formatAndMountVolume(volume)
+		if err != nil {
+			return tracerr.Wrap(err)
+		}
+	}
+	return nil
+}
+
+func formatAndMountVolume(volume VolumeInfo) error {
+	deviceName, err := getRealDeviceName(volume.VolumeId)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+	_, err = initFileSystem(deviceName, !volume.InitFs)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+	err = mountDisk(deviceName, getVolumeMountPoint(volume.Name))
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+	return nil
+}
+
+func getVolumeMountPoint(volumeName string) string {
+	// Put volumes in data-specific dir to avoid clashes with host dirs
+	return fmt.Sprintf("/dstack-volumes/%s", volumeName)
+}
+
+// getRealDeviceName returns the device name for the given EBS volume ID.
+// The device name on instance can be different from device name specified in block-device mapping
+// (e.g. NVMe block devices built on the Nitro System).
+func getRealDeviceName(volumeID string) (string, error) {
+	// Run the lsblk command to get block device information
+	// TODO: On AWS SERIAL contains volume id. This may not be true for other clouds.
+	cmd := exec.Command("lsblk", "-o", "NAME,SERIAL")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to list block devices: %v", err)
+	}
+
+	// Parse the output to find the device that matches the volume ID
+	lines := strings.Split(out.String(), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && strings.HasPrefix(fields[1], "vol") {
+			serial := strings.TrimPrefix(fields[1], "vol")
+			if "vol-"+serial == volumeID {
+				return "/dev/" + fields[0], nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("volume %s not found among block devices", volumeID)
+}
+
+// initFileSystem creates an ext4 file system on a disk only if the disk is not already has a file system.
+// Returns true if the file system is created.
+func initFileSystem(deviceName string, errorIfNotExists bool) (bool, error) {
+	// Run the lsblk command to get filesystem type
+	cmd := exec.Command("lsblk", "-no", "FSTYPE", deviceName)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return false, fmt.Errorf("failed to check if disk is formatted: %v", err)
+	}
+
+	// If the output is not empty, the disk is already formatted
+	fsType := strings.TrimSpace(out.String())
+	if fsType != "" {
+		return false, nil
+	}
+
+	if errorIfNotExists {
+		return false, fmt.Errorf("disk has no file system")
+	}
+
+	log.Printf("Formatting disk %s with ext4 filesystem...\n", deviceName)
+	cmd = exec.Command("mkfs.ext4", "-F", deviceName)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return false, fmt.Errorf("failed to format disk: %s, output: %s", err, string(output))
+	}
+	log.Println("Disk formatted succesfully!")
+	return true, nil
+}
+
+func mountDisk(deviceName, mountPoint string) error {
+	// Create the mount point directory if it doesn't exist
+	if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
+		fmt.Printf("Creating mount point %s...\n", mountPoint)
+		if err := os.MkdirAll(mountPoint, 0755); err != nil {
+			return fmt.Errorf("failed to create mount point: %s", err)
+		}
+	}
+
+	// Mount the disk to the mount point
+	log.Printf("Mounting disk %s to %s...\n", deviceName, mountPoint)
+	cmd := exec.Command("mount", deviceName, mountPoint)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to mount disk: %s, output: %s", err, string(output))
+	}
+
+	log.Println("Disk mounted successfully!")
+	return nil
 }
 
 func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConfig) error {
@@ -311,6 +437,11 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
+	volumeMounts, err := getVolumeMounts(taskConfig.Mounts)
+	if err != nil {
+		return "", tracerr.Wrap(err)
+	}
+	mounts = append(mounts, volumeMounts...)
 
 	//Set the environment variables
 	envVars := []string{}
@@ -337,6 +468,8 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		Mounts:  mounts,
 		ShmSize: taskConfig.ShmSize,
 	}
+
+	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", taskConfig.ContainerName, containerConfig, hostConfig)
 	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskConfig.ContainerName)
 	if err != nil {
 		return "", tracerr.Wrap(err)
@@ -426,6 +559,15 @@ func requestGpuIfAvailable(ctx context.Context, client docker.APIClient) ([]cont
 	}
 
 	return nil, nil
+}
+
+func getVolumeMounts(mountPoints []MountPoint) ([]mount.Mount, error) {
+	mounts := []mount.Mount{}
+	for _, mountPoint := range mountPoints {
+		source := getVolumeMountPoint(mountPoint.Name)
+		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: source, Target: mountPoint.Path})
+	}
+	return mounts, nil
 }
 
 /* DockerParameters interface implementation for CLIArgs */
