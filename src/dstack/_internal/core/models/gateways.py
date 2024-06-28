@@ -93,6 +93,7 @@ class GatewayProvisioningData(CoreModel):
     instance_id: str
     ip_address: str
     region: str
+    availability_zone: Optional[str] = None
     hostname: Optional[str] = None
     backend_data: Optional[str] = None  # backend-specific data in json
 

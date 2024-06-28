@@ -95,6 +95,7 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
     generate_instance_name,
+    get_instance_offer,
     get_or_create_pool_by_name,
     get_pool_instances,
     instance_model_to_instance,
@@ -751,9 +752,9 @@ def _get_pool_offers(
     )
     pool_offers: List[InstanceOfferWithAvailability] = []
     for instance in pool_filtered_instances:
-        if instance.offer is None:
+        offer = get_instance_offer(instance)
+        if offer is None:
             continue
-        offer = InstanceOfferWithAvailability.__response__.parse_raw(instance.offer)
         offer.availability = InstanceAvailability.BUSY
         if instance.status == InstanceStatus.IDLE:
             offer.availability = InstanceAvailability.IDLE

@@ -144,6 +144,10 @@ class AWSCompute(Compute):
                 availability_zones=availability_zones,
             )
             subnet_id = subnets_ids[0]
+            availability_zone = aws_resources.get_availability_zone_by_subnet_id(
+                ec2_client=ec2_client,
+                subnet_id=subnet_id,
+            )
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
             response = ec2_resource.create_instances(
                 **aws_resources.create_instances_struct(
@@ -182,6 +186,7 @@ class AWSCompute(Compute):
                 hostname=hostname,
                 internal_ip=instance.private_ip_address,
                 region=instance_offer.region,
+                availability_zone=availability_zone,
                 price=instance_offer.price,
                 username="ubuntu",
                 ssh_port=22,
@@ -242,6 +247,10 @@ class AWSCompute(Compute):
             allocate_public_ip=configuration.public_ip,
         )
         subnet_id = subnets_ids[0]
+        availability_zone = aws_resources.get_availability_zone_by_subnet_id(
+            ec2_client=ec2_client,
+            subnet_id=subnet_id,
+        )
         security_group_id = aws_resources.create_gateway_security_group(
             ec2_client=ec2_client,
             project_id=configuration.project_name,
@@ -269,6 +278,7 @@ class AWSCompute(Compute):
             return GatewayProvisioningData(
                 instance_id=instance.instance_id,
                 region=configuration.region,
+                availability_zone=availability_zone,
                 ip_address=ip_address,
             )
 

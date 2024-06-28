@@ -328,6 +328,13 @@ def get_availability_zones(ec2_client: botocore.client.BaseClient, region: str) 
     return zone_names
 
 
+def get_availability_zone_by_subnet_id(
+    ec2_client: botocore.client.BaseClient, subnet_id: str
+) -> str:
+    response = ec2_client.describe_subnets(SubnetIds=[subnet_id])
+    return response["Subnets"][0]["AvailabilityZone"]
+
+
 def list_available_device_names(
     ec2_client: botocore.client.BaseClient, instance_id: str
 ) -> List[str]:

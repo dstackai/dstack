@@ -212,14 +212,14 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
     )
 
-    if instance_model.offer is not None:
-        offer = InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
+    offer = get_instance_offer(instance_model)
+    if offer is not None:
         instance.backend = offer.backend
         instance.region = offer.region
         instance.price = offer.price
 
-    if instance_model.job_provisioning_data is not None:
-        jpd = JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
+    jpd = get_instance_provisioning_data(instance_model)
+    if jpd is not None:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
 
@@ -231,6 +231,18 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance.pool_name = instance_model.pool.name
 
     return instance
+
+
+def get_instance_provisioning_data(instance_model: InstanceModel) -> Optional[JobProvisioningData]:
+    if instance_model.job_provisioning_data is None:
+        return None
+    return JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
+
+
+def get_instance_offer(instance_model: InstanceModel) -> Optional[InstanceOfferWithAvailability]:
+    if instance_model.offer is None:
+        return None
+    return InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
 
 
 _GENERATE_POOL_NAME_LOCK: Dict[str, asyncio.Lock] = {}
@@ -362,11 +374,14 @@ def filter_pool_instances(
 
     backend_types = profile.backends
     regions = profile.regions
+    zone = None
 
     if volumes:
         volume = volumes[0]
         backend_types = [volume.configuration.backend]
         regions = [volume.configuration.region]
+        if volume.provisioning_data is not None:
+            zone = volume.provisioning_data.availability_zone
 
     if multinode:
         if not backend_types:
@@ -400,6 +415,15 @@ def filter_pool_instances(
             continue
 
         if regions is not None and instance.region not in regions:
+            continue
+
+        jpd = get_instance_provisioning_data(instance)
+        if (
+            jpd is not None
+            and jpd.availability_zone is not None
+            and zone is not None
+            and jpd.availability_zone != zone
+        ):
             continue
 
         candidates.append(instance)
