@@ -334,7 +334,6 @@ async def detach_volumes_from_instance(
     instance: InstanceModel,
     jpd: JobProvisioningData,
 ):
-    # TODO: Volumes lock
     backend = await get_project_backend_by_type(
         project=project,
         backend_type=jpd.backend,

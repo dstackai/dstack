@@ -406,7 +406,7 @@ async def _attach_volumes(
         project=project,
         backend_type=job_provisioning_data.backend,
     )
-    volumes_ids = [v.id for v in volume_models]
+    volumes_ids = sorted([v.id for v in volume_models])
     logger.info("Attaching volumes: %s", [v.name for v in volume_models])
     # Take lock to prevent attaching deleted volumes.
     # If the volume was deleted before the lock, fail the job.

@@ -101,8 +101,7 @@ async def create_volume(
         )
         if volume_model is not None:
             raise ResourceExistsError()
-
-    if configuration.name is None:
+    else:
         configuration.name = await generate_volume_name(session=session, project=project)
 
     volume_model = VolumeModel(
@@ -126,7 +125,7 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
         )
     )
     volume_models = res.scalars().all()
-    volumes_ids = [v.id for v in volume_models]
+    volumes_ids = sorted([v.id for v in volume_models])
     logger.info("Deleting volumes: %s", [v.name for v in volume_models])
     await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
     try:

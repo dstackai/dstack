@@ -92,6 +92,7 @@ async def wait_to_lock_many(
     """
     Retry locking until all the keys are locked.
     Lock is released during the sleep.
+    The keys must be sorted to prevent deadlock.
     """
     left_to_lock = keys.copy()
     while len(left_to_lock) > 0:
