@@ -457,7 +457,7 @@ def _process_pulling_with_shim(
     if resp is None:
         return True  # runner is not available yet
 
-    # shim_status.state == "running"
+    # Expect shim_status.state == "running"
     _submit_job_to_runner(
         runner_client=runner_client,
         run=run,
