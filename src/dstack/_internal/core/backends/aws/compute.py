@@ -472,6 +472,10 @@ class AWSCompute(Compute):
             except botocore.exceptions.ClientError as e:
                 if e.response["Error"]["Code"] == "VolumeInUse":
                     raise ComputeError(f"Failed to attach volume in use: {volume.volume_id}")
+                if e.response["Error"]["Code"] == "InvalidVolume.ZoneMismatch":
+                    raise ComputeError(
+                        f"Failed to attach volume {volume.volume_id}. Volume zone is different from instance zone."
+                    )
                 if (
                     e.response["Error"]["Code"] == "InvalidParameterValue"
                     and f"Invalid value '{device_name}' for unixDevice"
