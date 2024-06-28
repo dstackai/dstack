@@ -358,7 +358,7 @@ The `task` configuration type supports many other options. See below.
       type:
         required: true
 
-## `volumes`
+## `volumes[n]`
 
 #SCHEMA# dstack._internal.core.models.volumes.VolumeMountPoint
     overrides:
