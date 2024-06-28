@@ -244,7 +244,8 @@ func formatAndMountVolume(volume VolumeInfo) error {
 }
 
 func getVolumeMountPoint(volumeName string) string {
-	return fmt.Sprintf("/%s", volumeName)
+	// Put volumes in data-specific dir to avoid clashes with host dirs
+	return fmt.Sprintf("/dstack-volumes/%s", volumeName)
 }
 
 // getRealDeviceName returns the device name for the given EBS volume ID.
@@ -563,21 +564,10 @@ func requestGpuIfAvailable(ctx context.Context, client docker.APIClient) ([]cont
 func getVolumeMounts(mountPoints []MountPoint) ([]mount.Mount, error) {
 	mounts := []mount.Mount{}
 	for _, mountPoint := range mountPoints {
-		source := getVolumeSource(mountPoint.Name)
-		if _, err := os.Stat(source); os.IsNotExist(err) {
-			fmt.Printf("Creating mount point %s...\n", mountPoint)
-			if err := os.MkdirAll(source, 0755); err != nil {
-				return mounts, fmt.Errorf("failed to create mount point source dir: %s", err)
-			}
-		}
+		source := getVolumeMountPoint(mountPoint.Name)
 		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: source, Target: mountPoint.Path})
 	}
 	return mounts, nil
-}
-
-func getVolumeSource(volumeName string) string {
-	// Nest volume data so that users don't see FS-specific files like lost+foind dir
-	return fmt.Sprintf("/%s/data", volumeName)
 }
 
 /* DockerParameters interface implementation for CLIArgs */
