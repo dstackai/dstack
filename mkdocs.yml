@@ -195,6 +195,7 @@ nav:
           - Services: docs/concepts/services.md
           - Gateways: docs/concepts/gateways.md
           - Pools: docs/concepts/pools.md
+          - Volumes: docs/concepts/volumes.md
       - Reference:
           - server/config.yml: docs/reference/server/config.yml.md
           - .dstack.yml:

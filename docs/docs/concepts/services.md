@@ -1,7 +1,8 @@
 # Services
 
-Services make it very easy to deploy any kind of model or application as public,
-secure, and scalable endpoints.
+Services make it easy to deploy models and web applications as public,
+secure, and scalable endpoints. They provisioned behind a [gateway](gateways.md) that
+automatically provides an HTTPS domain, handles authentication, distributes load, and performs auto-scaling.
 
 ??? info "Gateways"
     If you're using the open-source server, you must set up a [gateway](gateways.md) before you can run a service.

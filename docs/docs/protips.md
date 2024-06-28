@@ -2,7 +2,7 @@
 
 Below are tips and tricks to use `dstack` more efficiently.
 
-### Dev environments
+## Dev environments
 
 Before running a task or service, it's recommended that you first start with a dev environment. Dev environments
 allow you to run commands interactively.
@@ -31,7 +31,7 @@ Once the commands work, go ahead and run them as a task or a service.
     
     ```
 
-### Tasks
+## Tasks vs Services for web applications
 
 Tasks can be used not only for batch jobs but also for web applications.
 
@@ -82,9 +82,11 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     
     This will forward the remote `8501` port to `localhost:3000`.
 
-If the task works, go ahead and run it as a service.
+[Services](concepts/services.md) require a gateway but they also provide additional features for
+production-grade service deployment not offered by tasks such as HTTPS domains and auto-scaling.
+If run a web app as a task and it works, go ahead and run it as a service.
 
-### Environment variables
+## Environment variables
 
 If a configuration requires an environment variable that you don't want to hardcode in the YAML, you can define it
 without assigning a value:
@@ -127,7 +129,18 @@ dstack run . -f .dstack.yml -e HUGGING_FACE_HUB_TOKEN=...
 
     Remember to add `.env` to `.gitignore` to avoid pushing it to the repo.    
 
-### Idle instances
+## Data and models
+
+`dstack` has support for [volumes](concepts/volumes.md)
+to persist data across different runs and instance interruptions.
+Volumes are ideal for storing intermediate work and data that should be quickly accessible.
+
+You can also load and save data using an object storage like S3 or HuggingFace Datasets.
+For models, it's best to use services like HuggingFace Hub.
+`dstack` has no explicit support for object storage.
+You can use load and save data directly from your code.
+
+## Idle instances
 
 By default, the `dstack` run command reuses an idle instance from the pool. If no instance matches the requirements, it creates a new one.
 
@@ -138,7 +151,7 @@ set `termination_idle_duration` in the configuration or profile.
 
 An idle instance can be destroyed at any time via `dstack pool rm INSTANCE_NAME`.
 
-### Profiles
+## Profiles
 
 If you don't want to specify the same parameters for each configuration, you can define them once via [profiles](reference/profiles.yml.md)
 and reuse them across configurations.
@@ -235,9 +248,3 @@ corresponding service quotas for each type of instance in each region.
     - `GPUs for GPU3 based VM and BM instances` (on-demand V100)
 
 Note, for AWS, GCP, and Azure, service quota values are measured with the number of CPUs rather than GPUs.
-
-## Data and models
-
-For loading and saving data, it's best to use object storage like S3 or HuggingFace Datasets.
-
-For models, it's best to use services like HuggingFace Hub.
