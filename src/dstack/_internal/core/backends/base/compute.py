@@ -137,7 +137,7 @@ class Compute(ABC):
 
     def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
         """
-        Attaches a volumes to the instance.
+        Attaches a volume to the instance.
         """
         raise NotImplementedError()
 

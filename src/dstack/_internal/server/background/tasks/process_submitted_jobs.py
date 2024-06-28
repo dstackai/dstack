@@ -156,7 +156,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         project=project_model,
         pool_name=profile.pool_name,
     )
-    # TODO: Take volumes into account when picking instances
     instance = await _run_job_on_pool_instance(
         session=session,
         pool=pool,
