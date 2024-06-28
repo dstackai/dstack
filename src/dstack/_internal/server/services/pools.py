@@ -396,8 +396,16 @@ def filter_pool_instances(
             continue
         offer = InstanceOffer.__response__.parse_raw(instance.offer)
         catalog_item = offer_to_catalog_item(offer)
-        if gpuhunt.matches(catalog_item, query_filter):
-            instances.append(instance)
+        if query_filter.gpu_name is not None:
+            if any(gpuhunt._is_tpu(name) for name in query_filter.gpu_name):
+                if gpuhunt.tpu_matches(catalog_item, query_filter):
+                    instances.append(instance)
+            else:
+                if gpuhunt.matches(catalog_item, query_filter):
+                    instances.append(instance)
+        else:
+            if gpuhunt.matches(catalog_item, query_filter):
+                instances.append(instance)
     return instances
 
 

@@ -524,9 +524,7 @@ def _is_pod(instance_name: str) -> bool:
         tensor_cores = int(tensor_cores)
     except ValueError:
         raise ValueError(f"Invalid number in tpu tensor cores: {tensor_cores}")
-    if version in ["v2", "v3", "v5p", "v5litepod"]:
+    if version in ["v2", "v3", "v4", "v5p", "v5litepod"]:
         return tensor_cores > 8
-    elif version == "v4":
-        return True
     else:
         raise ValueError(f"Unknown TPU version: {version}")
