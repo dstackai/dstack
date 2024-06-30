@@ -1,0 +1,14 @@
+type: task
+
+image: runpod/pytorch:2.2.1-py3.10-cuda12.1.1-devel-ubuntu22.04
+env:
+  - HF_TOKEN=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
+  - HF_MODEL_NAME=meta-llama/Meta-Llama-3-8B-Instruct
+  - HF_USERNAME=quocdat25
+  - COMPILED_MODEL_NAME=A100_trt-llm_engine-dstack_task
+commands:
+  - sh install.sh
+  - sh compile.sh
+
+resources:
+  gpu: 80GB
