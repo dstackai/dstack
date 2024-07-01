@@ -129,6 +129,7 @@ Volume my-new-volume deleted
 ```
 
 Note that deleting `dstack`-managed volumes destroys all the volumes data!
+Deleting external volumes makes `dstack` "forget" about the volumes, but they remain in the cloud.
 
 ## FAQ
 
@@ -140,4 +141,5 @@ Note that deleting `dstack`-managed volumes destroys all the volumes data!
 2. Can I mount volumes from one region/zone on instances from other regions/zones?
 
     It depends on the cloud and volume type. Generally, network volumes are tied to regions so they cannot be
-    used in other regions. Some clouds support volumes that can be used across availability zones.
+    used in other regions. Volumes are also often tied to availability zones but
+    some clouds support volumes that can be used across availability zones within a region.
