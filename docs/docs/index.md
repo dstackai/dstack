@@ -1,13 +1,13 @@
 # What is dstack?
 
-`dstack` is a robust, open-source container orchestration engine for running AI workloads across diverse cloud platforms
-and on-premises data centers.
-It streamlines the management of dev environments, task execution on clusters, and deployment.
+`dstack` is an open-source container orchestration engine for running AI workloads across diverse cloud providers
+and on-premises data centers. It simplifies provisioning compute resources, managing dev environments, executing tasks on clusters, and deploying services.
 
-> Compatible with any cloud provider, including AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO, as
-> well as on-premises clusters.
->
-> Offers native support for NVIDIA GPU and Google Cloud TPU accelerator chips.
+!!! info "Supported clouds"
+    `dstack` supports many cloud providers including AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO, as well as on-premises clusters.
+
+!!! info "Supported accelerators"
+    `dstack` offers native support for NVIDIA GPU and Google Cloud TPU chips.
 
 ## Why use dstack?
 
@@ -19,15 +19,21 @@ It streamlines the management of dev environments, task execution on clusters, a
 
 ## How does it work?
 
-!!! info "Installation"
-    Before using `dstack`, either set up the open-source server, or sign up
-    with `dstack Sky`.
-    See [Installation](installation/index.md) for more details.
-
-1. Define configurations such as [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
+1. [Install](installation/index.md) `dstack`.
+   Configure the open-source server or sign up with [`dstack Sky`](https://sky.dstack.ai/).
+   With the open-source option, you host the server and bring your cloud credentials.
+   With `dstack Sky`, the server is managed for you and you can run on any cloud without setting up an account for each.
+2. Define configurations such as [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
    and [services](concepts/services.md).
+   `dstack` offers three types of configurations optimized for development, batch jobs, and service deployment.
+   You can configure commands to execute, required compute resources, retry policy, autoscaling, authorization and more.
 2. Run configurations via `dstack`'s CLI or API.
+   `dstack` will provision the best compute offer on the market that meets the requirements,
+   be it a GPU cluster or a CPU instance, and execute the configuration commands.
+   With retry enabled, `dstack` can handle no capacity situations, spot interruptions, and run failures.
 3. Use [pools](concepts/pools.md) to manage cloud instances and on-prem clusters.
+   `dstack` gives you the control to terminate instances as soon as runs finish or keep them in a pool
+    to save on provisioning time and guarantee compute availability.
 
 ## Where do I start?
 
