@@ -453,13 +453,17 @@ class AWSCompute(Compute):
         )
         logger.debug("Created EBS volume %s", volume.configuration.name)
 
+        size = response["Size"]
+        iops = response["Iops"]
+
         return VolumeProvisioningData(
             volume_id=response["VolumeId"],
-            size_gb=response["Size"],
+            size_gb=size,
             availability_zone=zone,
+            price=_get_volume_price(size=size, iops=iops),
             backend_data=AWSVolumeBackendData(
                 volume_type=response["VolumeType"],
-                iops=response["Iops"],
+                iops=iops,
             ).json(),
         )
 
@@ -619,3 +623,8 @@ def _get_instance_ip(instance: Any, public_ip: bool) -> str:
     if public_ip:
         return instance.public_ip_address
     return instance.private_ip_address
+
+
+def _get_volume_price(size: int, iops: int) -> float:
+    # https://aws.amazon.com/ebs/pricing/
+    return size * 0.08 + (iops - 3000) * 0.005

@@ -236,6 +236,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                     ssh_private_key = remote_conn_info.ssh_keys[0].private
                 await stop_container(job_model, jpd, ssh_private_key)
                 if len(instance.volumes) > 0:
+                    logger.info("Detaching volumes: %s", [v.name for v in instance.volumes])
                     await detach_volumes_from_instance(
                         project=instance.project,
                         instance=instance,

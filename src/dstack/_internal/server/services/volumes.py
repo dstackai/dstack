@@ -181,6 +181,7 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         volume_id=vpd.volume_id if vpd is not None else None,
         provisioning_data=vpd,
         attachment_data=vad,
+        volume_model_id=str(volume_model.id),
     )
 
 

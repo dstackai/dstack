@@ -36,6 +36,8 @@ class VolumeProvisioningData(CoreModel):
     volume_id: str
     size_gb: int
     availability_zone: Optional[str] = None
+    # price per month
+    price: Optional[float] = None
     backend_data: Optional[str] = None  # backend-specific data in json
 
 
@@ -50,9 +52,10 @@ class Volume(CoreModel):
     created_at: datetime
     status: VolumeStatus
     status_message: Optional[str] = None
-    volume_id: Optional[str] = None
+    volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
     attachment_data: Optional[VolumeAttachmentData] = None
+    volume_model_id: Optional[str] = None  # uuid of VolumeModel
 
 
 class VolumeMountPoint(CoreModel):
