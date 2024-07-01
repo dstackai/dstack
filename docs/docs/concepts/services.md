@@ -1,7 +1,7 @@
 # Services
 
 Services make it easy to deploy models and web applications as public,
-secure, and scalable endpoints. They provisioned behind a [gateway](gateways.md) that
+secure, and scalable endpoints. They are provisioned behind a [gateway](gateways.md) that
 automatically provides an HTTPS domain, handles authentication, distributes load, and performs auto-scaling.
 
 ??? info "Gateways"

@@ -83,8 +83,8 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     This will forward the remote `8501` port to `localhost:3000`.
 
 [Services](concepts/services.md) require a gateway but they also provide additional features for
-production-grade service deployment not offered by tasks such as HTTPS domains and auto-scaling.
-If run a web app as a task and it works, go ahead and run it as a service.
+production-grade service deployment not offered by tasks, such as HTTPS domains and auto-scaling.
+If you run a web app as a task and it works, go ahead and run it as a service.
 
 ## Environment variables
 
@@ -138,7 +138,7 @@ Volumes are ideal for storing intermediate work and data that should be quickly 
 You can also load and save data using an object storage like S3 or HuggingFace Datasets.
 For models, it's best to use services like HuggingFace Hub.
 `dstack` has no explicit support for object storage.
-You can use load and save data directly from your code.
+You can load and save data directly from your code.
 
 ## Idle instances
 

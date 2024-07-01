@@ -1,7 +1,7 @@
 # Gateways
 
 Gateways handle the ingress traffic of running services.
-They provide services with HTTPS domains, handle authentication, distribute load, and perform auto-scaling.
+They provide [services](services.md) with HTTPS domains, handle authentication, distribute load, and perform auto-scaling.
 In order to run a service, you need to have at least one gateway set up.
 
 !!! info "dstack Sky"

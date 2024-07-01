@@ -1,13 +1,13 @@
 # Volumes
 
 Volumes allow persisting data between runs. When you add a volume,
-`dstack` provisions a network disk in the cloud such as an AWS EBS.
+`dstack` provisions a network disk in the cloud, such as an AWS EBS.
 Then you can mount the volume as a directory in a run and store data there.
 After the run is terminated, the volume can be mounted again and the stored data will persist.
 
 `dstack` supports creating new volumes (a.k.a. `dstack`-managed volumes)
 and also registering existing volumes (a.k.a. external volumes).
-The latter allows accessing data that is already stored on some volume such as pre-processed training data.
+The latter allows accessing data that is already stored on some volume, such as pre-processed training data.
 
 !!! info "Backends"
     Currently, volumes are supported only for `aws`. Support for other backends is coming soon!
