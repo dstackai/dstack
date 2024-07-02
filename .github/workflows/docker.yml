@@ -224,12 +224,14 @@ jobs:
         run: |
           pip install .[oci]
       - name: Copy image to target regions
+        if: ${{ !inputs.staging }}
         run: |
           python scripts/oci_image_tools.py copy \
             --image ${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
             --from $OCI_REGION \
             --compartment $OCI_COMPARTMENT
       - name: Publish image in OCI Marketplace
+        if: ${{ !inputs.staging }}
         run: |
           python scripts/oci_image_tools.py publish \
             --image ${BUILD_PREFIX}dstack${{ matrix.variant }}-${{ inputs.image_version }} \
