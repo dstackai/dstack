@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -61,6 +62,7 @@ class TestListVolumes:
                 "volume_id": None,
                 "provisioning_data": None,
                 "attachment_data": None,
+                "volume_model_id": str(volume.id),
             }
         ]
 
@@ -99,6 +101,7 @@ class TestGetVolume:
             "volume_id": None,
             "provisioning_data": None,
             "attachment_data": None,
+            "volume_model_id": str(volume.id),
         }
 
     @pytest.mark.asyncio
@@ -131,27 +134,26 @@ class TestCreateVolume:
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         configuration = get_volume_configuration(backend=BackendType.AWS)
-        response = client.post(
-            f"/api/project/{project.name}/volumes/create",
-            headers=get_auth_headers(user.token),
-            json={"configuration": configuration.dict()},
-        )
+        with patch("uuid.uuid4") as m:
+            m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+            response = client.post(
+                f"/api/project/{project.name}/volumes/create",
+                headers=get_auth_headers(user.token),
+                json={"configuration": configuration.dict()},
+            )
         assert response.status_code == 200
-        assert (
-            response.json()
-            == response.json()
-            == {
-                "name": configuration.name,
-                "configuration": configuration,
-                "external": False,
-                "created_at": "2023-01-02T03:04:00+00:00",
-                "status": "submitted",
-                "status_message": None,
-                "volume_id": None,
-                "provisioning_data": None,
-                "attachment_data": None,
-            }
-        )
+        assert response.json() == {
+            "name": configuration.name,
+            "configuration": configuration,
+            "external": False,
+            "created_at": "2023-01-02T03:04:00+00:00",
+            "status": "submitted",
+            "status_message": None,
+            "volume_id": None,
+            "provisioning_data": None,
+            "attachment_data": None,
+            "volume_model_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+        }
         res = await session.execute(select(VolumeModel))
         assert res.scalar_one()
 

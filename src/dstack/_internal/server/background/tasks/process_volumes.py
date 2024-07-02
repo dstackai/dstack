@@ -65,9 +65,16 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
     volume = volumes_services.volume_model_to_volume(volume_model)
     try:
         backend = await backends_services.get_project_backend_by_type_or_error(
-            project=volume_model.project, backend_type=volume.configuration.backend
+            project=volume_model.project,
+            backend_type=volume.configuration.backend,
+            overrides=True,
         )
     except BackendNotAvailable:
+        logger.error(
+            "Failed to process volume %s. Backend %s not available.",
+            volume.name,
+            volume.configuration.backend.value,
+        )
         volume_model.status = VolumeStatus.FAILED
         volume_model.status_message = "Backend not available"
         volume_model.last_processed_at = get_current_datetime()

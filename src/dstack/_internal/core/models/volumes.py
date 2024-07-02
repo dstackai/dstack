@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from enum import Enum
 from typing import Literal, Optional
@@ -33,6 +34,7 @@ class VolumeConfiguration(CoreModel):
 
 
 class VolumeProvisioningData(CoreModel):
+    backend: Optional[BackendType] = None
     volume_id: str
     size_gb: int
     availability_zone: Optional[str] = None
@@ -55,7 +57,7 @@ class Volume(CoreModel):
     volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
     attachment_data: Optional[VolumeAttachmentData] = None
-    volume_model_id: Optional[str] = None  # uuid of VolumeModel
+    volume_model_id: uuid.UUID  # uuid of VolumeModel
 
 
 class VolumeMountPoint(CoreModel):

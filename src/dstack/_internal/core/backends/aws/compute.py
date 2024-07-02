@@ -457,6 +457,7 @@ class AWSCompute(Compute):
         iops = response["Iops"]
 
         return VolumeProvisioningData(
+            backend=BackendType.AWS,
             volume_id=response["VolumeId"],
             size_gb=size,
             availability_zone=zone,

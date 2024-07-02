@@ -438,6 +438,7 @@ async def create_volume(
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     configuration: Optional[VolumeConfiguration] = None,
     volume_provisioning_data: Optional[VolumeProvisioningData] = None,
+    deleted_at: Optional[datetime] = None,
 ) -> VolumeModel:
     if configuration is None:
         configuration = get_volume_configuration()
@@ -451,6 +452,7 @@ async def create_volume(
         if volume_provisioning_data
         else None,
         instances=[],
+        deleted_at=deleted_at,
     )
     session.add(vm)
     await session.commit()

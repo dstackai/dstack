@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from datetime import timezone
 from typing import List, Optional
 
@@ -105,6 +106,7 @@ async def create_volume(
         configuration.name = await generate_volume_name(session=session, project=project)
 
     volume_model = VolumeModel(
+        id=uuid.uuid4(),
         name=configuration.name,
         project=project,
         status=VolumeStatus.SUBMITTED,
@@ -171,6 +173,9 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
     configuration = get_volume_configuration(volume_model)
     vpd = get_volume_provisioning_data(volume_model)
     vad = get_volume_attachment_data(volume_model)
+    # Initially VolumeProvisionigData lacked backend
+    if vpd is not None and vpd.backend is None:
+        vpd.backend = configuration.backend
     return Volume(
         name=volume_model.name,
         configuration=configuration,
@@ -181,7 +186,7 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         volume_id=vpd.volume_id if vpd is not None else None,
         provisioning_data=vpd,
         attachment_data=vad,
-        volume_model_id=str(volume_model.id),
+        volume_model_id=volume_model.id,
     )
 
 
@@ -224,24 +229,28 @@ def _validate_volume_configuration(configuration: VolumeConfiguration):
 
 async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_model: VolumeModel):
     volume = volume_model_to_volume(volume_model)
-
     if volume.external:
+        return
+
+    if volume.provisioning_data is None:
+        logger.error(
+            f"Failed to delete volume {volume_model.name}. volume.provisioning_data is None."
+        )
+        return
+    if volume.provisioning_data.backend is None:
+        logger.error(
+            f"Failed to delete volume {volume_model.name}. volume.provisioning_data.backend is None."
+        )
         return
 
     try:
         backend = await backends_services.get_project_backend_by_type_or_error(
-            project=volume_model.project, backend_type=volume.configuration.backend
+            project=volume_model.project,
+            backend_type=volume.provisioning_data.backend,
         )
     except BackendNotAvailable:
         logger.error(
             f"Failed to delete volume {volume_model.name}. Backend {volume.configuration.backend} not available."
-        )
-        return
-
-    vpd = get_volume_provisioning_data(volume_model)
-    if vpd is None:
-        logger.error(
-            f"Failed to delete volume {volume_model.name}. Volume provisioning data is None."
         )
         return
 

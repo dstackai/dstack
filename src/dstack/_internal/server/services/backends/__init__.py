@@ -1,6 +1,6 @@
 import asyncio
 import heapq
-from typing import List, Optional, Tuple, Type, Union
+from typing import Callable, Coroutine, List, Optional, Tuple, Type, Union
 from uuid import UUID
 
 from sqlalchemy import delete, update
@@ -274,14 +274,49 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
     return _BACKENDS_CACHE[key]
 
 
-async def get_project_backend_with_model_by_type_or_error(
-    project: ProjectModel, backend_type: BackendType
-) -> BackendTuple:
+_get_project_backend_with_model_by_type = None
+
+
+def set_get_project_backend_with_model_by_type(
+    func: Callable[[ProjectModel, BackendType], Coroutine[None, None, Optional[BackendTuple]]],
+):
+    """
+    Overrides `get_project_effective_backend_with_model_by_type` with `func`.
+    Then get_project_backend_* functions can pass overrides=True to call `func`
+    This can be used if a backend needs to be replaced with another backend.
+    For example, DstackBackend in dstack Sky can be used in place of other backends.
+    """
+    global _get_project_backend_with_model_by_type
+    _get_project_backend_with_model_by_type = func
+
+
+async def get_project_backend_with_model_by_type(
+    project: ProjectModel,
+    backend_type: BackendType,
+    overrides: bool = False,
+) -> Optional[BackendTuple]:
+    if overrides and _get_project_backend_with_model_by_type is not None:
+        return await _get_project_backend_with_model_by_type(project, backend_type)
     backends_with_models = await get_project_backends_with_models(project=project)
     for backend_model, backend in backends_with_models:
         if backend.TYPE == backend_type:
             return backend_model, backend
-    raise BackendNotAvailable()
+    return None
+
+
+async def get_project_backend_with_model_by_type_or_error(
+    project: ProjectModel,
+    backend_type: BackendType,
+    overrides: bool = False,
+) -> BackendTuple:
+    backend_with_model = await get_project_backend_with_model_by_type(
+        project=project,
+        backend_type=backend_type,
+        overrides=overrides,
+    )
+    if backend_with_model is None:
+        raise BackendNotAvailable()
+    return backend_with_model
 
 
 async def get_project_backends(project: ProjectModel) -> List[Backend]:
@@ -293,19 +328,30 @@ async def get_project_backends(project: ProjectModel) -> List[Backend]:
 
 
 async def get_project_backend_by_type(
-    project: ProjectModel, backend_type: BackendType
+    project: ProjectModel,
+    backend_type: BackendType,
+    overrides: bool = False,
 ) -> Optional[Backend]:
-    backends = await get_project_backends(project=project)
-    for backend in backends:
-        if backend.TYPE == backend_type:
-            return backend
-    return None
+    backend_with_model = await get_project_backend_with_model_by_type(
+        project=project,
+        backend_type=backend_type,
+        overrides=overrides,
+    )
+    if backend_with_model is None:
+        return None
+    return backend_with_model[1]
 
 
 async def get_project_backend_by_type_or_error(
-    project: ProjectModel, backend_type: BackendType
+    project: ProjectModel,
+    backend_type: BackendType,
+    overrides: bool = False,
 ) -> Backend:
-    backend = await get_project_backend_by_type(project=project, backend_type=backend_type)
+    backend = await get_project_backend_by_type(
+        project=project,
+        backend_type=backend_type,
+        overrides=overrides,
+    )
     if backend is None:
         raise BackendNotAvailable()
     return backend
