@@ -1,7 +1,7 @@
 {
   "variables": {
     "build_prefix": "",
-    "docker_version": "20.10.17",
+    "docker_version": "",
     "image_version": "",
     "oci_availability_domain": "",
     "oci_compartment_ocid": "",

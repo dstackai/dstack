@@ -8,8 +8,8 @@
     "azure_location": "westeurope",
     "azure_vm_size": "Standard_DS1_v2",
     "build_prefix": "",
-    "docker_version": "20.10.17",
-    "cuda_drivers_version": "535.54.03-1",
+    "docker_version": "",
+    "cuda_drivers_version": "",
     "image_version": ""
   },
   "builders": [{
