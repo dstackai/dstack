@@ -1,7 +1,8 @@
 # Tasks
 
 Tasks allow for convenient scheduling of various batch jobs, such as training, fine-tuning, or
-data processing, as well as running web applications.
+data processing. They can also be used to run web applications
+when features offered by [services](services.md) are not needed, such as for debugging.
 
 You can run tasks on a single machine or on a cluster of nodes.
 

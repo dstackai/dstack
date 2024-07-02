@@ -1,10 +1,12 @@
 # Gateways
 
-Gateways handle the ingress traffic of running services. In order to run a service, you need to have at least one
-gateway set up.
+Gateways handle the ingress traffic of running services.
+They provide [services](services.md) with HTTPS domains, handle authentication, distribute load, and perform auto-scaling.
+In order to run a service, you need to have at least one gateway set up.
 
-If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-the gateway is already set up for you.
+!!! info "dstack Sky"
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+    the gateway is already set up for you.
 
 ## Configuration
 
@@ -57,14 +59,14 @@ This will allow you to access runs and models using this domain.
 
 ## Managing gateways
 
-**Destroying gateways**
+**Deleting gateways**
 
-To delete a gateway, use [`dstack destroy`](../reference/cli/index.md#dstack-destroy):
+To delete a gateway, pass gateway configuration to [`dstack delete`](../reference/cli/index.md#dstack-delete):
 
 <div class="termy">
 
 ```shell
-$ dstack destroy . -f examples/deployment/gateway.dstack.yml
+$ dstack delete . -f examples/deployment/gateway.dstack.yml
 ```
 
 </div>
