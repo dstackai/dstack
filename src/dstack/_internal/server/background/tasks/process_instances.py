@@ -710,12 +710,24 @@ async def terminate(instance_id: UUID) -> None:
                         "Failed to terminate instance %s. Backend not available.", instance.name
                     )
                 else:
-                    await run_async(
-                        backend.compute().terminate_instance,
-                        jpd.instance_id,
-                        jpd.region,
-                        jpd.backend_data,
-                    )
+                    try:
+                        await run_async(
+                            backend.compute().terminate_instance,
+                            jpd.instance_id,
+                            jpd.region,
+                            jpd.backend_data,
+                        )
+                    except BackendError as e:
+                        logger.error(
+                            "Failed to terminate instance %s: %s",
+                            instance.name,
+                            repr(e),
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Got exception when terminating instance %s",
+                            instance.name,
+                        )
 
         instance.deleted = True
         instance.deleted_at = get_current_datetime()
