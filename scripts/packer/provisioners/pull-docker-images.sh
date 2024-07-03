@@ -3,6 +3,7 @@
 set -e
 
 IMAGES="
+ dstackai/base:py3.12-${IMAGE_VERSION}-cuda-12.1
  dstackai/base:py3.11-${IMAGE_VERSION}-cuda-12.1
  dstackai/base:py3.10-${IMAGE_VERSION}-cuda-12.1
  dstackai/base:py3.9-${IMAGE_VERSION}-cuda-12.1

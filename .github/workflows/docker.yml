@@ -63,11 +63,7 @@ jobs:
        uses: docker/setup-qemu-action@v2
      - name: Build and upload to DockerHub
        run: |
-         docker buildx build --platform linux/arm64/v8 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-arm64 -f cpu/Dockerfile .
-         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-amd64 -f cpu/Dockerfile .
-         docker manifest create dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }} --amend dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-arm64 --amend dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-amd64
-         docker manifest push dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}
-         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1 -f cuda/Dockerfile .
+         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1 -f base/Dockerfile .
 
   build-aws-images:
     needs: build-docker
