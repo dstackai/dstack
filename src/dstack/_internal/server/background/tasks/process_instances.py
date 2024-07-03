@@ -704,14 +704,28 @@ async def terminate(instance_id: UUID) -> None:
                 backends = await backends_services.get_project_backends(project=instance.project)
                 backend = next((b for b in backends if b.TYPE == jpd.backend), None)
                 if backend is None:
-                    raise ValueError(f"there is no backend {jpd.backend}")
-
-                await run_async(
-                    backend.compute().terminate_instance,
-                    jpd.instance_id,
-                    jpd.region,
-                    jpd.backend_data,
-                )
+                    logger.error(
+                        "Failed to terminate instance %s. Backend not available.", instance.name
+                    )
+                else:
+                    try:
+                        await run_async(
+                            backend.compute().terminate_instance,
+                            jpd.instance_id,
+                            jpd.region,
+                            jpd.backend_data,
+                        )
+                    except BackendError as e:
+                        logger.error(
+                            "Failed to terminate instance %s: %s",
+                            instance.name,
+                            repr(e),
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Got exception when terminating instance %s",
+                            instance.name,
+                        )
 
         instance.deleted = True
         instance.deleted_at = get_current_datetime()
