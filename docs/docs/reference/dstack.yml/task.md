@@ -333,6 +333,37 @@ regions: [eu-west-1, eu-west-2]
 
 </div>
 
+### Volumes
+
+Volumes allow you to persist data between runs.
+To attach a volume, simply specify its name using the `volumes` property and specify where to mount its contents:
+
+<div editor-title="train.dstack.yml"> 
+
+```yaml
+type: task
+
+python: "3.11"
+
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+volumes:
+  - name: my-new-volume
+    path: /volume_data
+```
+
+</div>
+
+Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the task, 
+and its contents will persist across runs.
+
+!!! info "Limitations"
+    When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
+    to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
+    attach volumes to `/workflow` or any of its subdirectories.
+
 The `task` configuration type supports many other options. See below.
 
 ## Root reference

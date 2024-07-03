@@ -349,6 +349,31 @@ regions: [eu-west-1, eu-west-2]
 
 </div>
 
+### Volumes
+
+Volumes allow you to persist data between runs.
+To attach a volume, simply specify its name using the `volumes` property and specify where to mount its contents:
+
+<div editor-title="serve.dstack.yml"> 
+
+```yaml
+type: service
+
+commands:
+  - python3 -m http.server
+
+port: 8000
+
+volumes:
+  - name: my-new-volume
+    path: /volume_data
+```
+
+</div>
+
+Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the service, 
+and its contents will persist across runs.
+
 The `service` configuration type supports many other options. See below.
 
 ## Root reference

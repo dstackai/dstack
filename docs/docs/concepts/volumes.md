@@ -1,26 +1,17 @@
 # Volumes
 
-Volumes allow persisting data between runs. When you add a volume,
-`dstack` provisions a network disk in the cloud, such as an AWS EBS.
-Then you can mount the volume as a directory in a run and store data there.
-After the run is terminated, the volume can be mounted again and the stored data will persist.
+Volumes allow you to persist data between runs. `dstack` simplifies managing volumes and lets you mount them to a specific
+directory when working with dev environments, tasks, and services.
 
-`dstack` supports creating new volumes (a.k.a. `dstack`-managed volumes)
-and also registering existing volumes (a.k.a. external volumes).
-The latter allows accessing data that is already stored on some volume, such as pre-processed training data.
+!!! info "Experimental"
+    Volumes are currently experimental and only work with the `aws` backend. Support for other backends is coming soon.
 
-!!! info "Backends"
-    Currently, volumes are supported only for `aws`. Support for other backends is coming soon!
+## Configuration
 
-!!! info "File system"
-    `dstack` creates an ext4 file system on `dstack`-managed volumes automatically.
-    If you register an external volume, you must ensure it already has a file system.
+First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `vol.dstack.yml`
+are both acceptable).
 
-## Creating new volumes
-
-First create a `volume` configuration file and specify `size` of the volume you'd like to provision:
-
-<div editor-title="new-volume.dstack.yml"> 
+<div editor-title="vol.dstack.yml"> 
 
 ```yaml
 type: volume
@@ -32,12 +23,25 @@ size: 100GB
 
 </div>
 
-Then apply the configuration to create the volume:
+If you use this configuration, `dstack` will create a new volume based on the specified options.
+
+!!! info "Registering existing volumes"
+    If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
+    [specify its ID via `volume_id`](../reference/dstack.yml/volume.md#register-volume). In this case, `dstack` will register the specified volume so that you can use it with development
+    environments, tasks, and services.
+
+!!! info "Reference"
+    See the [.dstack.yml reference](../reference/dstack.yml/dev-environment.md)
+    for all supported configuration options and multiple examples.
+
+## Creating and registering volumes
+
+To create or register the volume, simply call the `dstack apply` command:
 
 <div class="termy">
 
 ```shell
-$ dstack apply -f new-volume.dstack.yml
+$ dstack apply -f volume.dstack.yml
 Volume my-new-volume does not exist yet. Create the volume? [y/n]: y
  NAME           BACKEND  REGION        STATUS     CREATED 
  my-new-volume  aws      eu-central-1  submitted  now     
@@ -46,56 +50,16 @@ Volume my-new-volume does not exist yet. Create the volume? [y/n]: y
 
 </div>
 
-The volume is created and can be mounted in runs!
+> When creating the volume `dstack` automatically creates an `ext4` file system on it.
 
-!!! info "Volume parameters"
-    `dstack` has default volume parameters for every backend so you can specify only `size`.
-    On AWS, `dstack` provisions EBS gp3 volumes.
+Once created, the volume can be attached with dev environments, tasks, and services.
 
+## Attaching volumes
 
-## Register existing volumes
+Dev environments, tasks, and services let you attach any number of volumes.
+To attach a volume, simply specify its name using the `volumes` property and specify where to mount its contents:
 
-If you already have a volume in your cloud account that you'd like to use with `dstack`,
-create a `volume` configuration file with `volume_id` specified:
-
-<div editor-title="external-volume.dstack.yml"> 
-
-```yaml
-type: volume
-name: my-external-volume
-backend: aws
-region: eu-central-1
-volume_id: vol1235
-```
-
-</div>
-
-Then apply the configuration to register the volume:
-
-<div class="termy">
-
-```shell
-$ dstack apply -f external-volume.dstack.yml
-Volume my-external-volume does not exist yet. Create the volume? [y/n]: y
- NAME                BACKEND  REGION        STATUS     CREATED 
- my-external-volume  aws      eu-central-1  submitted  now     
-
-```
-
-</div>
-
-The volume is registered and can be mounted in runs!
-
-
-## Mount volumes in runs
-
-Suppose we need to run a dev environment.
-We could mount a volume and store our work there so it's not lost between run restarts or instance interruptions.
-We do it by specifying a list of `volumes`.
-Each item in `volumes` should have `name` of the volume and `path` where the volume should be mounted in the run.
-Here's what it looks like:
-
-<div editor-title="dev.dstack.yml"> 
+<div editor-title=".dstack.yml"> 
 
 ```yaml
 type: dev-environment
@@ -107,39 +71,38 @@ volumes:
 
 </div>
 
-Then we can run this `dev-environment` configuration, ssh into the run, and see `/volume_data`:
+Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the dev environment, 
+and its contents will persist across runs.
+
+!!! info "Limitations"
+    When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
+    to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
+    attach volumes to `/workflow` or any of its subdirectories.
+
+## Managing gateways
+
+**Deleting gateways**
+
+When the volume isn't attached to any active dev environment, task, or service, you can delete it using `dstack delete`:
 
 ```shell
--(workflow) root@ip-10-0-10-73:/workflow# ls -l /
-total 92
-drwxr-xr-x   2 root root  4096 Apr 15  2020 home
-...
-drwxr-xr-x   3 root root  4096 Jun 28 07:02 volume_data
-drwxr-xr-x   5 root root  4096 Jun 28 07:13 workflow
+$ dstack delete -f vol.dstack.yaml
 ```
 
-## Deleting volumes
+If the volume was created using `dstack`, it will be physically destroyed along with the data.
+If you've registered an existing volume, it will be de-registered with `dstack` but will keep the data.
 
-After the run is stopped, a volume can be deleted with `dstack delete`:
+**Listing volumes**
 
-```shell
-$ dstack delete -f .dstack/confs/volume.yaml
-Delete the volume my-new-volume? [y/n]: y
-Volume my-new-volume deleted
-```
-
-Note that deleting `dstack`-managed volumes destroys all the volumes data!
-Deleting external volumes makes `dstack` "forget" about the volumes, but they remain in the cloud.
+The [`dstack volume list`](../reference/cli/index.md#dstack-gateway-list) command lists created and registered volumes.
 
 ## FAQ
 
-1. Can I mount volumes from one cloud on instances from other clouds?
+??? info "Using volumes across backends"
+    Since volumes are backed up by cloud network disks, you can only use them within the same cloud. If you need to access
+    data across different backends, you should either use object storage (or replicate the data across multiple volumes).
 
-    No. Since volumes are backed up by cloud network disks, they can only be used with instances in the same cloud.
-    If you need to access data from different clouds, consider uploading it to an object storage.
-
-2. Can I mount volumes from one region/zone on instances from other regions/zones?
-
-    It depends on the cloud and volume type. Generally, network volumes are tied to regions so they cannot be
-    used in other regions. Volumes are also often tied to availability zones but
-    some clouds support volumes that can be used across availability zones within a region.
+??? info "Using volumes across regions"
+    Typically, network volumes are associated with specific regions, so you can't use them in other regions. Sometimes,
+    volumes are also linked to availability zones, but some systems allow volumes that can be used across different
+    availability zones within the same region.
