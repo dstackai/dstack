@@ -177,16 +177,17 @@ class GCPCompute(Compute):
                     node=tpu_node,
                 )
                 try:
-                    # TPUs may get created and then deleted immediately in case of no capacity.
-                    # We call wait_for_operation() only to get the capacity error and try another option.
+                    # GCP needs some time to return an error in case of no capacity (< 30s).
+                    # Call wait_for_operation() to get the capacity error and try another option.
                     # If the request succeeds, we'll probably timeout and update_provisioning_data() will get hostname.
                     operation = self.tpu_client.create_node(request=create_node_request)
-                    gcp_resources.wait_for_operation(operation, timeout=5)
+                    gcp_resources.wait_for_operation(operation, timeout=30)
                 except (
                     google.api_core.exceptions.ServiceUnavailable,
                     google.api_core.exceptions.NotFound,
                     google.api_core.exceptions.ResourceExhausted,
-                ):
+                ) as e:
+                    logger.debug("Got GCP error when provisioning a TPU: %s", e)
                     continue
                 except concurrent.futures.TimeoutError:
                     pass
@@ -246,12 +247,19 @@ class GCPCompute(Compute):
                 allocate_public_ip=allocate_public_ip,
             )
             try:
-                self.instances_client.insert(request=request)
+                # GCP needs some time to return an error in case of no capacity (< 30s).
+                # Call wait_for_operation() to get the capacity error and try another option.
+                # If the request succeeds, we'll probably timeout and update_provisioning_data() will get hostname.
+                operation = self.instances_client.insert(request=request)
+                gcp_resources.wait_for_extended_operation(operation, timeout=30)
             except (
                 google.api_core.exceptions.ServiceUnavailable,
                 google.api_core.exceptions.NotFound,
-            ):
+            ) as e:
+                logger.debug("Got GCP error when provisioning a VM: %s", e)
                 continue
+            except concurrent.futures.TimeoutError:
+                pass
             return JobProvisioningData(
                 backend=instance_offer.backend,
                 instance_type=instance_offer.instance,
