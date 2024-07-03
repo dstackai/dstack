@@ -876,6 +876,8 @@ def _validate_run_spec(run_spec: RunSpec):
     for mount_point in run_spec.configuration.volumes:
         if not is_valid_docker_volume_target(mount_point.path):
             raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
+        if mount_point.path.startswith("/workflow"):
+            raise ServerClientError("Mounting volumes inside /workflow is not supported")
 
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):
