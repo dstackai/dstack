@@ -40,6 +40,6 @@ build {
 
   provisioner "shell" {
     environment_vars = ["IMAGE_VERSION=${var.image_version}"]
-    script           = "provisioners/docker-image-with-cuda.sh"
+    script           = "provisioners/pull-docker-images.sh"
   }
 }
