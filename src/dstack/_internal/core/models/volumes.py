@@ -49,6 +49,7 @@ class VolumeAttachmentData(CoreModel):
 
 class Volume(CoreModel):
     name: str
+    project_name: str
     configuration: VolumeConfiguration
     external: bool
     created_at: datetime

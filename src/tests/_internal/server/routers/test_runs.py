@@ -960,6 +960,7 @@ class TestCreateInstance:
             result = response.json()
             expected = {
                 "id": str(instance_id),
+                "project_name": project.name,
                 "backend": None,
                 "instance_type": None,
                 "name": result["name"],

@@ -178,6 +178,7 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         vpd.backend = configuration.backend
     return Volume(
         name=volume_model.name,
+        project_name=volume_model.project.name,
         configuration=configuration,
         external=configuration.volume_id is not None,
         created_at=volume_model.created_at.replace(tzinfo=timezone.utc),

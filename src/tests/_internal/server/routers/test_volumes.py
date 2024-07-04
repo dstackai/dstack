@@ -54,6 +54,7 @@ class TestListVolumes:
         assert response.json() == [
             {
                 "name": volume.name,
+                "project_name": project.name,
                 "configuration": json.loads(volume.configuration),
                 "external": False,
                 "created_at": "2023-01-02T03:04:00+00:00",
@@ -93,6 +94,7 @@ class TestGetVolume:
         assert response.status_code == 200
         assert response.json() == {
             "name": volume.name,
+            "project_name": project.name,
             "configuration": json.loads(volume.configuration),
             "external": False,
             "created_at": "2023-01-02T03:04:00+00:00",
@@ -144,6 +146,7 @@ class TestCreateVolume:
         assert response.status_code == 200
         assert response.json() == {
             "name": configuration.name,
+            "project_name": project.name,
             "configuration": configuration,
             "external": False,
             "created_at": "2023-01-02T03:04:00+00:00",
