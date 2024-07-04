@@ -14,11 +14,11 @@
 
 </div>
 
-dstack is an open-source container orchestration engine designed for running AI workloads across any cloud or data
+`dstack` is an open-source container orchestration engine designed for running AI workloads across any cloud or data
 center. It simplifies dev environments, running tasks on clusters, and deployment.
 
 The supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
-You can also use `dstack` ro run workloads on on-prem clusters.
+You can also use `dstack` to run workloads on on-prem clusters.
 
 `dstack` natively supports NVIDIA GPU, and Google Cloud TPU accelerator chips.
  
@@ -26,7 +26,7 @@ You can also use `dstack` ro run workloads on on-prem clusters.
 
 - [2024/05] [dstack 0.18.3: OCI, and more](https://github.com/dstackai/dstack/releases/tag/0.18.3) (Release)
 - [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
-- [2024/04] [dstack 0.18.0: RunPod, mult-node tasks, and more](https://github.com/dstackai/dstack/releases/tag/0.18.0) (Release)
+- [2024/04] [dstack 0.18.0: RunPod, multi-node tasks, and more](https://github.com/dstackai/dstack/releases/tag/0.18.0) (Release)
 - [2024/03] [dstack 0.17.0: Auto-scaling, and other improvements](https://github.com/dstackai/dstack/releases/tag/0.17.0) (Release)
 
 ## Installation
@@ -77,7 +77,7 @@ Below is a live demo of how it works with the CLI.
 
 ### Dev environments
 
-You specify the required environment and resources, then run it. dstack provisions the dev
+You specify the required environment and resources, then run it. `dstack` provisions the dev
 environment in the cloud and enables access via your desktop IDE.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif" width="650"/>
@@ -87,7 +87,7 @@ environment in the cloud and enables access via your desktop IDE.
 Tasks allow for convenient scheduling of any kind of batch jobs, such as training, fine-tuning,
 or data processing, as well as running web applications.
 
-Specify the environment and resources, then run it. dstack executes the task in the
+Specify the environment and resources, then run it. `dstack` executes the task in the
 cloud, enabling port forwarding to your local machine for convenient access.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="650"/>
@@ -96,7 +96,7 @@ cloud, enabling port forwarding to your local machine for convenient access.
 
 Services make it very easy to deploy any kind of model or web application as public endpoints.
 
-Use any serving frameworks and specify required resources. dstack deploys it in the configured
+Use any serving frameworks and specify required resources. `dstack` deploys it in the configured
 backend, handles authorization, and provides an OpenAI-compatible interface if needed.
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="650"/>
@@ -131,6 +131,11 @@ For additional information and examples, see the following links:
 - [Docs](https://dstack.ai/docs)
 - [Discord](https://discord.gg/u8SmfwPpMd)
 
-## Licence
+## Contributing
+
+We welcome contributions to `dstack`!
+To learn more about getting involved in the project, please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
 
 [Mozilla Public License 2.0](LICENSE.md)
