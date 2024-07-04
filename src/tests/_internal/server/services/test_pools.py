@@ -5,10 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.pools as services_pools
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import (
-    InstanceType,
-    Resources,
-)
+from dstack._internal.core.models.instances import InstanceType, Resources
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.runs import InstanceStatus
 from dstack._internal.server.models import InstanceModel
@@ -18,7 +15,7 @@ from dstack._internal.utils.common import get_current_datetime
 
 class TestGenerateInstanceName:
     @pytest.mark.asyncio
-    async def test_generates_instance_name(self, session: AsyncSession, test_db):
+    async def test_generates_instance_name(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
         pool = await services_pools.create_pool(session=session, project=project, name="test_pool")
@@ -46,11 +43,17 @@ class TestGenerateInstanceName:
 
 
 class TestInstanceModelToInstance:
-    def test_converts_instance(self):
+    @pytest.mark.asyncio
+    async def test_converts_instance(self, test_db, session: AsyncSession):
+        project = await create_project(
+            session=session,
+            name="test_project",
+        )
         instance_id = uuid.uuid4()
         created = get_current_datetime()
         expected_instance = Instance(
             id=instance_id,
+            project_name=project.name,
             backend=BackendType.LOCAL,
             instance_type=InstanceType(
                 name="instance", resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[])
@@ -68,7 +71,7 @@ class TestInstanceModelToInstance:
             name="test_instance",
             status=InstanceStatus.PENDING,
             unreachable=False,
-            project_id=str(uuid.uuid4()),
+            project=project,
             pool=None,
             job_provisioning_data='{"ssh_proxy":null, "backend":"local","hostname":"hostname_test","region":"eu-west","price":1.0,"username":"user1","ssh_port":12345,"dockerized":false,"instance_id":"test_instance","instance_type": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',
             offer='{"price":"LOCAL", "price":1.0, "backend":"local", "region":"eu-west-1", "availability":"available","instance": {"name": "instance", "resources": {"cpus": 1, "memory_mib": 512, "gpus": [], "spot": false, "disk": {"size_mib": 102400}, "description":""}}}',

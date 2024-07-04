@@ -426,7 +426,7 @@ class AWSCompute(Compute):
         tags = [
             {"Key": "Name", "Value": volume.configuration.name},
             {"Key": "owner", "Value": "dstack"},
-            # {"Key": "dstack_project", "Value": configuration.project_name},
+            {"Key": "dstack_project", "Value": volume.project_name},
         ]
 
         zone = aws_resources.get_availability_zone(

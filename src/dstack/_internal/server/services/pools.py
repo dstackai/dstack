@@ -206,6 +206,7 @@ def get_pool_instances(pool: PoolModel) -> List[InstanceModel]:
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     instance = Instance(
         id=instance_model.id,
+        project_name=instance_model.project.name,
         name=instance_model.name,
         status=instance_model.status,
         unreachable=instance_model.unreachable,
