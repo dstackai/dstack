@@ -230,7 +230,7 @@ class TestProcessRunningJobs:
             ShimClientMock.return_value.submit.assert_called_once_with(
                 username="",
                 password="",
-                image_name="dstackai/base:py3.11-0.4rc4-cuda-12.1",
+                image_name="dstackai/base:py3.11-0.4-cuda-12.1",
                 container_name="test-run-0-0",
                 shm_size=None,
                 public_keys=[project_ssh_pub_key, "user_ssh_key"],

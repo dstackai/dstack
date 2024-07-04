@@ -618,13 +618,14 @@ def _supported_instances(offer: InstanceOffer) -> bool:
         "t2.small",
         "c5.",
         "m5.",
-        "p3.",
         "g4dn.",
         "g5.",
         "g6.",
         "gr6.",
+        "p3.",
         "p4d.",
         "p4de.",
+        "p5.",
     ]:
         if offer.instance.name.startswith(family):
             return True
