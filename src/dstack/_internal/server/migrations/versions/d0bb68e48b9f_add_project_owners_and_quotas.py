@@ -64,7 +64,7 @@ def upgrade() -> None:
     # ### end Alembic commands ###
 
     op.execute(
-        "UPDATE projects SET owner_id = (SELECT id FROM users WHERE name == 'admin') WHERE owner_id IS NULL"
+        "UPDATE projects SET owner_id = (SELECT id FROM users WHERE name = 'admin') WHERE owner_id IS NULL"
     )
     op.execute("UPDATE users SET projects_quota = 3 WHERE projects_quota IS NULL")
 

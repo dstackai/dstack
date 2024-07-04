@@ -21,11 +21,16 @@ def upgrade() -> None:
     with op.batch_alter_table("gateway_computes", schema=None) as batch_op:
         batch_op.add_column(sa.Column("active", sa.Boolean(), nullable=True))
 
+    gateway_status_enum = sa.Enum(
+        "SUBMITTED", "PROVISIONING", "RUNNING", "FAILED", name="gatewaystatus"
+    )
+    gateway_status_enum.create(op.get_bind(), checkfirst=True)
+
     with op.batch_alter_table("gateways", schema=None) as batch_op:
         batch_op.add_column(
             sa.Column(
                 "status",
-                sa.Enum("SUBMITTED", "PROVISIONING", "RUNNING", "FAILED", name="gatewaystatus"),
+                gateway_status_enum,
                 nullable=True,
             )
         )
@@ -60,5 +65,10 @@ def downgrade() -> None:
 
     with op.batch_alter_table("gateway_computes", schema=None) as batch_op:
         batch_op.drop_column("active")
+
+    gateway_status_enum = sa.Enum(
+        "SUBMITTED", "PROVISIONING", "RUNNING", "FAILED", name="gatewaystatus"
+    )
+    gateway_status_enum.drop(op.get_bind(), checkfirst=True)
 
     # ### end Alembic commands ###
