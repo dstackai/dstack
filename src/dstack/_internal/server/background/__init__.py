@@ -14,6 +14,7 @@ from dstack._internal.server.background.tasks.process_submitted_jobs import proc
 from dstack._internal.server.background.tasks.process_terminating_jobs import (
     process_terminating_jobs,
 )
+from dstack._internal.server.background.tasks.process_volumes import process_submitted_volumes
 
 _scheduler = AsyncIOScheduler()
 
@@ -30,5 +31,6 @@ def start_background_tasks() -> AsyncIOScheduler:
     _scheduler.add_job(process_runs, IntervalTrigger(seconds=1))
     _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
     _scheduler.add_job(process_submitted_gateways, IntervalTrigger(seconds=10), max_instances=5)
+    _scheduler.add_job(process_submitted_volumes, IntervalTrigger(seconds=5))
     _scheduler.start()
     return _scheduler

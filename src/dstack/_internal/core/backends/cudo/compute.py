@@ -19,6 +19,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -52,6 +53,7 @@ class CudoCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
@@ -141,7 +143,12 @@ class CudoCompute(Compute):
                 return
             raise BackendError(e.response.text)
 
-    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ):
         vm = self.api_client.get_vm(self.config.project_id, provisioning_data.instance_id)
         if vm["VM"]["state"] == "ACTIVE":
             provisioning_data.hostname = vm["VM"]["publicIpAddress"]

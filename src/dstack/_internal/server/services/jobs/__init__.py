@@ -10,7 +10,7 @@ import sqlalchemy.orm as sa_orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.gateways as gateways
-from dstack._internal.core.errors import ComputeResourceNotFoundError, SSHError
+from dstack._internal.core.errors import BackendError, ComputeResourceNotFoundError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RunConfigurationType
 from dstack._internal.core.models.instances import RemoteConnectionInfo
@@ -33,6 +33,7 @@ from dstack._internal.server.services.jobs.configurators.task import TaskJobConf
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import get_runner_ports, runner_ssh_tunnel
+from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.utils.common import run_async, wait_to_lock
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -209,7 +210,10 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             InstanceModel.project_id == job_model.project_id,
             InstanceModel.job_id == job_model.id,
         )
-        .options(sa_orm.joinedload(InstanceModel.project))
+        .options(
+            sa_orm.joinedload(InstanceModel.project),
+            sa_orm.joinedload(InstanceModel.volumes),
+        )
     )
     instance: Optional[InstanceModel] = res.scalar()
 
@@ -218,7 +222,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
         try:
             await session.refresh(instance)
             # there is an associated instance to empty
-            jpd: Optional[JobProvisioningData] = None
+            jpd = None
             if job_model.job_provisioning_data is not None:
                 jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
                 logger.debug("%s: stopping container", fmt(job_model))
@@ -231,6 +235,13 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                     )
                     ssh_private_key = remote_conn_info.ssh_keys[0].private
                 await stop_container(job_model, jpd, ssh_private_key)
+                if len(instance.volumes) > 0:
+                    logger.info("Detaching volumes: %s", [v.name for v in instance.volumes])
+                    await detach_volumes_from_instance(
+                        project=instance.project,
+                        instance=instance,
+                        jpd=jpd,
+                    )
 
             if instance.status == InstanceStatus.BUSY:
                 instance.status = InstanceStatus.IDLE
@@ -254,6 +265,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             await gateways.unregister_replica(
                 session, job_model
             )  # TODO(egor-s) ensure always runs
+
         finally:
             PROCESSING_POOL_IDS.remove(instance.id)
 
@@ -316,3 +328,44 @@ def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, Li
             *_, latest_job_submission = job_submissions
             replica_jobs.append(latest_job_submission)
         yield replica_num, replica_jobs
+
+
+async def detach_volumes_from_instance(
+    project: ProjectModel,
+    instance: InstanceModel,
+    jpd: JobProvisioningData,
+):
+    backend = await get_project_backend_by_type(
+        project=project,
+        backend_type=jpd.backend,
+    )
+    if backend is None:
+        logger.error("Failed to detach volumes from %s. Backend not available.", instance.name)
+        return
+
+    detached_volumes = []
+    for volume_model in instance.volumes:
+        volume = volume_model_to_volume(volume_model)
+        try:
+            await run_async(
+                backend.compute().detach_volume,
+                volume=volume,
+                instance_id=jpd.instance_id,
+            )
+            detached_volumes.append(volume_model)
+        except BackendError as e:
+            logger.error(
+                "Failed to detach volume %s from %s: %s",
+                volume_model.name,
+                instance.name,
+                repr(e),
+            )
+        except Exception:
+            logger.exception(
+                "Got exception when detaching volume %s from instance %s",
+                volume_model.name,
+                instance.name,
+            )
+
+    detached_volumes_ids = {v.id for v in detached_volumes}
+    instance.volumes = [v for v in instance.volumes if v.id not in detached_volumes_ids]

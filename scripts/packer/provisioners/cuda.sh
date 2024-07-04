@@ -16,4 +16,7 @@ rm cuda-keyring_1.0-1_all.deb
 
 CUDA_BRANCH=$(cut -d '.' -f 1 <<< "$CUDA_DRIVERS_VERSION")
 sudo apt-get update
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cuda-drivers-$CUDA_BRANCH=$CUDA_DRIVERS_VERSION
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    cuda-drivers-$CUDA_BRANCH=$CUDA_DRIVERS_VERSION \
+    nvidia-fabricmanager-$CUDA_BRANCH=$CUDA_DRIVERS_VERSION
+sudo systemctl enable nvidia-fabricmanager

@@ -19,6 +19,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume
 
 SUPPORTED_SHAPE_FAMILIES = [
     "VM.Standard2.",
@@ -35,8 +36,6 @@ SUPPORTED_SHAPE_FAMILIES = [
     "BM.GPU4.",
     "VM.GPU.A10.",
     "BM.GPU.A10.",
-    "BM.GPU.A100-",
-    "BM.GPU.H100.",
 ]
 
 
@@ -85,6 +84,7 @@ class OCICompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
@@ -174,7 +174,12 @@ class OCICompute(Compute):
             backend_data=None,
         )
 
-    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ):
         if vnic := resources.get_instance_vnic(
             provisioning_data.instance_id,
             self.regions[provisioning_data.region],

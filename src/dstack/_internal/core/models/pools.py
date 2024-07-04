@@ -18,6 +18,7 @@ class Pool(CoreModel):
 
 class Instance(CoreModel):
     id: UUID
+    project_name: str
     backend: Optional[BackendType] = None
     instance_type: Optional[InstanceType] = None
     name: str

@@ -40,7 +40,6 @@ def get_default_python_verison() -> str:
 
 
 def get_default_image(python_version: str) -> str:
-    # TODO: non-cuda image
     return f"dstackai/base:py{python_version}-{version.base_image}-cuda-12.1"
 
 

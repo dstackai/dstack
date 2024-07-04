@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -205,6 +206,15 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"DSTACK_GPUS_NUM":       strconv.Itoa(gpus_num),
 	}
 
+	// Call buildLDLibraryPathEnv and update jobEnvs if no error occurs
+	newLDPath, err := buildLDLibraryPathEnv()
+	if err != nil {
+		log.Info(ctx, "Continuing without updating LD_LIBRARY_PATH")
+	} else {
+		jobEnvs["LD_LIBRARY_PATH"] = newLDPath
+		log.Info(ctx, "New LD_LIBRARY_PATH set", newLDPath)
+	}
+
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
 	cmd.Env = makeEnv(ex.homeDir, jobEnvs, ex.jobSpec.Env, ex.secrets)
 	cmd.Cancel = func() error {
@@ -290,4 +300,39 @@ func isPtyError(err error) bool {
 	/* read /dev/ptmx: input/output error */
 	var e *os.PathError
 	return errors.As(err, &e) && e.Err == syscall.EIO
+}
+
+func buildLDLibraryPathEnv() (string, error) {
+	// Execute shell command to get Python prefix
+	cmd := exec.Command("bash", "-i", "-c", "python3-config --prefix")
+	output, err := cmd.Output()
+
+	if err != nil {
+		return "", fmt.Errorf("error executing command: %v", err)
+	}
+
+	// Extract and trim the prefix path
+	prefixPath := strings.TrimSpace(string(output))
+
+	// Check if the prefix path exists
+	if _, err := os.Stat(prefixPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("python prefix path does not exist: %s", prefixPath)
+	}
+
+	// Construct the path to Python's shared libraries
+	sharedLibPath := fmt.Sprintf("%s/lib", prefixPath)
+
+	// Get current LD_LIBRARY_PATH
+	currentLDPath := os.Getenv("LD_LIBRARY_PATH")
+
+	// Append Python's shared library path if not already present
+	if !strings.Contains(currentLDPath, sharedLibPath) {
+		if currentLDPath == "" {
+			currentLDPath = sharedLibPath
+		} else {
+			currentLDPath = fmt.Sprintf("%s:%s", currentLDPath, sharedLibPath)
+		}
+	}
+
+	return currentLDPath, nil
 }

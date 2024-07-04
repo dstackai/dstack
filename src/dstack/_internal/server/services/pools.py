@@ -33,6 +33,7 @@ from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, TerminationPolicy
 from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
 from dstack._internal.core.models.users import GlobalRole
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.server import settings
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel, UserModel
 from dstack._internal.server.services.jobs import PROCESSING_POOL_LOCK
@@ -205,20 +206,21 @@ def get_pool_instances(pool: PoolModel) -> List[InstanceModel]:
 def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
     instance = Instance(
         id=instance_model.id,
+        project_name=instance_model.project.name,
         name=instance_model.name,
         status=instance_model.status,
         unreachable=instance_model.unreachable,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
     )
 
-    if instance_model.offer is not None:
-        offer = InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
+    offer = get_instance_offer(instance_model)
+    if offer is not None:
         instance.backend = offer.backend
         instance.region = offer.region
         instance.price = offer.price
 
-    if instance_model.job_provisioning_data is not None:
-        jpd = JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
+    jpd = get_instance_provisioning_data(instance_model)
+    if jpd is not None:
         instance.instance_type = jpd.instance_type
         instance.hostname = jpd.hostname
 
@@ -230,6 +232,18 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance.pool_name = instance_model.pool.name
 
     return instance
+
+
+def get_instance_provisioning_data(instance_model: InstanceModel) -> Optional[JobProvisioningData]:
+    if instance_model.job_provisioning_data is None:
+        return None
+    return JobProvisioningData.__response__.parse_raw(instance_model.job_provisioning_data)
+
+
+def get_instance_offer(instance_model: InstanceModel) -> Optional[InstanceOfferWithAvailability]:
+    if instance_model.offer is None:
+        return None
+    return InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
 
 
 _GENERATE_POOL_NAME_LOCK: Dict[str, asyncio.Lock] = {}
@@ -354,12 +368,37 @@ def filter_pool_instances(
     status: Optional[InstanceStatus] = None,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
+    volumes: Optional[List[Volume]] = None,
 ) -> List[InstanceModel]:
-    """
-    Filter instances by `instance_name`, `backends`, `resources`, `spot_policy`, `max_price`, `status`
-    """
     instances: List[InstanceModel] = []
     candidates: List[InstanceModel] = []
+
+    backend_types = profile.backends
+    regions = profile.regions
+    zone = None
+
+    if volumes:
+        volume = volumes[0]
+        backend_types = [volume.configuration.backend]
+        regions = [volume.configuration.region]
+        if volume.provisioning_data is not None:
+            zone = volume.provisioning_data.availability_zone
+
+    if multinode:
+        if not backend_types:
+            backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
+
+    # For multi-node, restrict backend and region.
+    # The default behavior is to provision all nodes in the same backend and region.
+    if master_job_provisioning_data is not None:
+        if not backend_types:
+            backend_types = [master_job_provisioning_data.backend]
+        backend_types = [b for b in backend_types if b == master_job_provisioning_data.backend]
+        if not regions:
+            regions = [master_job_provisioning_data.region]
+        regions = [b for b in backend_types if b == master_job_provisioning_data.region]
+
     for instance in pool_instances:
         if instance.unreachable:
             continue
@@ -373,18 +412,18 @@ def filter_pool_instances(
             instances.append(instance)
             continue
 
-        if profile.backends is not None and instance.backend not in profile.backends:
+        if backend_types is not None and instance.backend not in backend_types:
             continue
 
-        if profile.regions is not None and instance.region not in profile.regions:
+        if regions is not None and instance.region not in regions:
             continue
 
-        if multinode and instance.backend not in BACKENDS_WITH_MULTINODE_SUPPORT:
-            continue
-
-        if master_job_provisioning_data is not None and (
-            instance.backend != master_job_provisioning_data.backend
-            or instance.region != master_job_provisioning_data.region
+        jpd = get_instance_provisioning_data(instance)
+        if (
+            jpd is not None
+            and jpd.availability_zone is not None
+            and zone is not None
+            and jpd.availability_zone != zone
         ):
             continue
 

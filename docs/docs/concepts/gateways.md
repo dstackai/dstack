@@ -1,10 +1,12 @@
 # Gateways
 
-Gateways handle the ingress traffic of running services. In order to run a service, you need to have at least one
-gateway set up.
+Gateways handle the ingress traffic of running services.
+They provide [services](services.md) with HTTPS domains, handle authentication, distribute load, and perform auto-scaling.
+In order to run a service, you need to have at least one gateway set up.
 
-If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-the gateway is already set up for you.
+!!! info "dstack Sky"
+    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+    the gateway is already set up for you.
 
 ## Configuration
 
@@ -26,8 +28,9 @@ domain: example.com
 
 A domain name is required to create a gateway.
 
-> See the [.dstack.yml reference](../reference/dstack.yml/gateway.md)
-> for many examples on gateway configuration.
+!!! info "Reference"
+    See the [.dstack.yml reference](../reference/dstack.yml/gateway.md)
+    for all supported configuration options and examples.
 
 ## Creating and updating gateways
 
@@ -47,7 +50,7 @@ The example-gateway doesn't exist. Create it? [y/n]: y
 
 </div>
 
-## Updating DNS reconds
+## Updating DNS records
 
 Once the gateway is assigned a hostname, go to your domain's DNS settings
 and add an `A` DNS record for `*.<gateway domain>` (e.g., `*.example.com`) pointing to the gateway's hostname.
@@ -56,14 +59,14 @@ This will allow you to access runs and models using this domain.
 
 ## Managing gateways
 
-**Destroying gateways**
+**Deleting gateways**
 
-To delete a gateway, use [`dstack destroy`](../reference/cli/index.md#dstack-destroy):
+To delete a gateway, pass gateway configuration to [`dstack delete`](../reference/cli/index.md#dstack-delete):
 
 <div class="termy">
 
 ```shell
-$ dstack destroy . -f examples/deployment/gateway.dstack.yml
+$ dstack delete . -f examples/deployment/gateway.dstack.yml
 ```
 
 </div>

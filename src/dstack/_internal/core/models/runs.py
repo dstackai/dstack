@@ -108,6 +108,7 @@ class JobTerminationReason(str, Enum):
     WAITING_INSTANCE_LIMIT_EXCEEDED = "waiting_instance_limit_exceeded"
     WAITING_RUNNER_LIMIT_EXCEEDED = "waiting_runner_limit_exceeded"
     TERMINATED_BY_USER = "terminated_by_user"
+    VOLUME_ERROR = "volume_error"
     GATEWAY_ERROR = "gateway_error"
     SCALED_DOWN = "scaled_down"
     DONE_BY_RUNNER = "done_by_runner"
@@ -126,6 +127,7 @@ class JobTerminationReason(str, Enum):
             self.WAITING_INSTANCE_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.WAITING_RUNNER_LIMIT_EXCEEDED: JobStatus.FAILED,
             self.TERMINATED_BY_USER: JobStatus.TERMINATED,
+            self.VOLUME_ERROR: JobStatus.FAILED,
             self.GATEWAY_ERROR: JobStatus.FAILED,
             self.SCALED_DOWN: JobStatus.TERMINATED,
             self.DONE_BY_RUNNER: JobStatus.DONE,
@@ -207,8 +209,8 @@ class JobProvisioningData(CoreModel):
     instance_id: str
     # hostname may not be set immediately after instance provisioning.
     # It is set to a public IP or, if public IPs are disabled, to a private IP.
-    hostname: Optional[str]
-    internal_ip: Optional[str]
+    hostname: Optional[str] = None
+    internal_ip: Optional[str] = None
     # public_ip_enabled can used to distinguished instances with and without public IPs.
     # hostname being None is not enough since it can be filled after provisioning.
     public_ip_enabled: bool = True
@@ -216,14 +218,15 @@ class JobProvisioningData(CoreModel):
     # internal_ip will be selected from the specified network
     instance_network: Optional[str] = None
     region: str
+    availability_zone: Optional[str] = None
     price: float
     username: str
     # ssh_port be different from 22 for some backends.
     # ssh_port may not be set immediately after instance provisioning
-    ssh_port: Optional[int]
+    ssh_port: Optional[int] = None
     dockerized: bool  # True if backend starts shim
-    ssh_proxy: Optional[SSHConnectionParams]
-    backend_data: Optional[str]  # backend-specific data in json
+    ssh_proxy: Optional[SSHConnectionParams] = None
+    backend_data: Optional[str] = None  # backend-specific data in json
 
 
 class ClusterInfo(CoreModel):

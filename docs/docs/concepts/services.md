@@ -1,7 +1,8 @@
 # Services
 
-Services make it very easy to deploy any kind of model or application as public,
-secure, and scalable endpoints.
+Services make it easy to deploy models and web applications as public,
+secure, and scalable endpoints. They are provisioned behind a [gateway](gateways.md) that
+automatically provides an HTTPS domain, handles authentication, distributes load, and performs auto-scaling.
 
 ??? info "Gateways"
     If you're using the open-source server, you must set up a [gateway](gateways.md) before you can run a service.
@@ -42,13 +43,14 @@ model:
 If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
 (pre-configured with Python, Conda, and essential CUDA drivers).
 
-!!! info "Replicas and scaling"
+!!! info "Auto-scaling"
     By default, the service is deployed to a single instance. However, you can specify the
     [number of replicas and scaling policy](../reference/dstack.yml/service.md#replicas-and-auto-scaling).
     In this case, `dstack` auto-scales it based on the load.
 
-> See the [.dstack.yml reference](../reference/dstack.yml/service.md)
-> for many examples on service configuration.
+!!! info "Reference"
+    See the [.dstack.yml reference](../reference/dstack.yml/service.md)
+    for all supported configuration options and multiple examples.
 
 ## Running
 
@@ -81,8 +83,9 @@ When deploying the service, `dstack run` mounts the current folder's contents.
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
-> See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
-> on how `dstack run` works.
+!!! info "Reference"
+    See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+    on how `dstack run` works.
 
 ## Service endpoint
 

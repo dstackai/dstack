@@ -80,6 +80,7 @@ def get_dev_env_run_plan_dict(
                     "gpu": None,
                     "shm_size": None,
                 },
+                "volumes": [],
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
                 "instance_types": None,
@@ -212,6 +213,7 @@ def get_dev_env_run_dict(
                     "gpu": None,
                     "shm_size": None,
                 },
+                "volumes": [],
                 "backends": ["local", "aws", "azure", "gcp", "lambda"],
                 "regions": ["us"],
                 "instance_types": None,
@@ -958,6 +960,7 @@ class TestCreateInstance:
             result = response.json()
             expected = {
                 "id": str(instance_id),
+                "project_name": project.name,
                 "backend": None,
                 "instance_type": None,
                 "name": result["name"],

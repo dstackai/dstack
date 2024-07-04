@@ -11,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.jobs as jobs_services
 import dstack._internal.utils.random_names as random_names
-from dstack._internal.core.backends import BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT
+from dstack._internal.core.backends import (
+    BACKENDS_WITH_GATEWAY_SUPPORT,
+    BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
+)
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.base.compute import (
     Compute,
@@ -38,6 +41,7 @@ from dstack._internal.core.models.runs import (
     ServiceModelSpec,
     ServiceSpec,
 )
+from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
 from dstack._internal.server.models import (
     GatewayComputeModel,
@@ -119,19 +123,19 @@ async def create_gateway_compute(
         certificate=configuration.certificate,
     )
 
-    info = await run_async(
+    gpd = await run_async(
         backend_compute.create_gateway,
         compute_configuration,
     )
 
     return GatewayComputeModel(
         backend_id=backend_id,
-        region=info.region,
-        ip_address=info.ip_address,
-        instance_id=info.instance_id,
-        hostname=info.hostname,
+        region=gpd.region,
+        ip_address=gpd.ip_address,
+        instance_id=gpd.instance_id,
+        hostname=gpd.hostname,
         configuration=compute_configuration.json(),
-        backend_data=info.backend_data,
+        backend_data=gpd.backend_data,
         ssh_private_key=gateway_ssh_private_key,
         ssh_public_key=gateway_ssh_public_key,
     )
@@ -211,6 +215,7 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
         gateways.append(gateway)
     logger.info("Deleting gateways: %s", [g.name for g in gateways])
     # terminate in parallel
+    # FIXME: not safe to share session between tasks – sqlalchemy can error
     terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
     for gateway, error in zip(gateways, terminate_results):
         if isinstance(error, Exception):
@@ -630,6 +635,15 @@ def gateway_model_to_gateway(gateway_model: GatewayModel) -> Gateway:
 
 
 def _validate_gateway_configuration(configuration: GatewayConfiguration):
+    if configuration.backend not in BACKENDS_WITH_GATEWAY_SUPPORT:
+        raise ServerClientError(
+            f"Gateways are not supported for {configuration.backend.value} backend. "
+            f"Supported backends: {[b.value for b in BACKENDS_WITH_GATEWAY_SUPPORT]}."
+        )
+
+    if configuration.name is not None:
+        validate_dstack_resource_name(configuration.name)
+
     if (
         not configuration.public_ip
         and configuration.backend not in BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT

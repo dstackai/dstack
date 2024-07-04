@@ -2,10 +2,9 @@
 
 The `task` configuration type allows running [tasks](../../concepts/tasks.md).
 
-!!! info "Filename"
-    Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
-    and can be located in the project's root directory or any nested folder.
-    Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
+> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
+> and can be located in the project's root directory or any nested folder.
+> Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
 
 ## Examples
 
@@ -125,6 +124,25 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB), 
 `A100:40GB:2` (two A100 GPUs of 40GB).
 
+??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture prefixed by `tpu-` via the `gpu` property.
+
+    ```yaml
+    type: task
+    
+    python: "3.11"
+    
+    commands:
+      - pip install torch~=2.3.0 torch_xla[tpu]~=2.3.0 torchvision -f https://storage.googleapis.com/libtpu-releases/index.html
+      - git clone --recursive https://github.com/pytorch/xla.git
+      - python3 xla/test/test_train_mp_imagenet.py --fake_data --model=resnet50 --num_epochs=1
+
+    resources:
+      gpu:  tpu-v2-8
+    ```
+
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
+
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
     `shm_size`, e.g. set it to `16GB`.
@@ -167,7 +185,7 @@ The following environment variables are available in any run and are passed by `
 | `DSTACK_NODE_RANK`      | The rank of the node                    |
 | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node |
 
-### Nodes { #_nodes }
+### Distributed tasks { #_nodes }
 
 By default, the task runs on a single node. However, you can run it on a cluster of nodes.
 
@@ -315,6 +333,37 @@ regions: [eu-west-1, eu-west-2]
 
 </div>
 
+### Volumes
+
+Volumes allow you to persist data between runs.
+To attach a volume, simply specify its name using the `volumes` property and specify where to mount its contents:
+
+<div editor-title="train.dstack.yml"> 
+
+```yaml
+type: task
+
+python: "3.11"
+
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+volumes:
+  - name: my-new-volume
+    path: /volume_data
+```
+
+</div>
+
+Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the task, 
+and its contents will persist across runs.
+
+!!! info "Limitations"
+    When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
+    to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
+    attach volumes to `/workflow` or any of its subdirectories.
+
 The `task` configuration type supports many other options. See below.
 
 ## Root reference
@@ -353,6 +402,14 @@ The `task` configuration type supports many other options. See below.
 ## `registry_auth`
 
 #SCHEMA# dstack._internal.core.models.configurations.RegistryAuth
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+## `volumes[n]`
+
+#SCHEMA# dstack._internal.core.models.volumes.VolumeMountPoint
     overrides:
       show_root_heading: false
       type:

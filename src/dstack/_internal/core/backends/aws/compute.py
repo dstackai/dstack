@@ -22,25 +22,35 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, is_core_model_instance
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
+    GatewayProvisioningData,
 )
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    LaunchedGatewayInfo,
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import (
+    Volume,
+    VolumeAttachmentData,
+    VolumeProvisioningData,
+)
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class GatewayAWSBackendData(CoreModel):
+class AWSGatewayBackendData(CoreModel):
     lb_arn: str
     tg_arn: str
     listener_arn: str
+
+
+class AWSVolumeBackendData(CoreModel):
+    volume_type: str
+    iops: int
 
 
 class AWSCompute(Compute):
@@ -97,9 +107,9 @@ class AWSCompute(Compute):
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
     ) -> None:
-        client = self.session.client("ec2", region_name=region)
+        ec2_client = self.session.client("ec2", region_name=region)
         try:
-            client.terminate_instances(InstanceIds=[instance_id])
+            ec2_client.terminate_instances(InstanceIds=[instance_id])
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
                 pass
@@ -112,9 +122,12 @@ class AWSCompute(Compute):
         instance_config: InstanceConfiguration,
     ) -> JobProvisioningData:
         project_name = instance_config.project_name
-        ec2 = self.session.resource("ec2", region_name=instance_offer.region)
+        ec2_resource = self.session.resource("ec2", region_name=instance_offer.region)
         ec2_client = self.session.client("ec2", region_name=instance_offer.region)
         allocate_public_ip = self.config.allocate_public_ips
+        availability_zones = None
+        if instance_config.availability_zone is not None:
+            availability_zones = [instance_config.availability_zone]
 
         tags = [
             {"Key": "Name", "Value": instance_config.instance_name},
@@ -128,10 +141,15 @@ class AWSCompute(Compute):
                 config=self.config,
                 region=instance_offer.region,
                 allocate_public_ip=allocate_public_ip,
+                availability_zones=availability_zones,
             )
             subnet_id = subnets_ids[0]
+            availability_zone = aws_resources.get_availability_zone_by_subnet_id(
+                ec2_client=ec2_client,
+                subnet_id=subnet_id,
+            )
             disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-            response = ec2.create_instances(
+            response = ec2_resource.create_instances(
                 **aws_resources.create_instances_struct(
                     disk_size=disk_size,
                     image_id=aws_resources.get_image_id(
@@ -168,6 +186,7 @@ class AWSCompute(Compute):
                 hostname=hostname,
                 internal_ip=instance.private_ip_address,
                 region=instance_offer.region,
+                availability_zone=availability_zone,
                 price=instance_offer.price,
                 username="ubuntu",
                 ssh_port=22,
@@ -186,6 +205,7 @@ class AWSCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
@@ -196,13 +216,20 @@ class AWSCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
+        if len(volumes) > 0:
+            volume = volumes[0]
+            if (
+                volume.provisioning_data is not None
+                and volume.provisioning_data.availability_zone is not None
+            ):
+                instance_config.availability_zone = volume.provisioning_data.availability_zone
         return self.create_instance(instance_offer, instance_config)
 
     def create_gateway(
         self,
         configuration: GatewayComputeConfiguration,
-    ) -> LaunchedGatewayInfo:
-        ec2 = self.session.resource("ec2", region_name=configuration.region)
+    ) -> GatewayProvisioningData:
+        ec2_resource = self.session.resource("ec2", region_name=configuration.region)
         ec2_client = self.session.client("ec2", region_name=configuration.region)
 
         tags = [
@@ -220,12 +247,16 @@ class AWSCompute(Compute):
             allocate_public_ip=configuration.public_ip,
         )
         subnet_id = subnets_ids[0]
+        availability_zone = aws_resources.get_availability_zone_by_subnet_id(
+            ec2_client=ec2_client,
+            subnet_id=subnet_id,
+        )
         security_group_id = aws_resources.create_gateway_security_group(
             ec2_client=ec2_client,
             project_id=configuration.project_name,
             vpc_id=vpc_id,
         )
-        response = ec2.create_instances(
+        response = ec2_resource.create_instances(
             **aws_resources.create_instances_struct(
                 disk_size=10,
                 image_id=aws_resources.get_gateway_image_id(ec2_client),
@@ -244,9 +275,10 @@ class AWSCompute(Compute):
         instance.reload()  # populate instance.public_ip_address
         if configuration.certificate is None or configuration.certificate.type != "acm":
             ip_address = _get_instance_ip(instance, configuration.public_ip)
-            return LaunchedGatewayInfo(
+            return GatewayProvisioningData(
                 instance_id=instance.instance_id,
                 region=configuration.region,
+                availability_zone=availability_zone,
                 ip_address=ip_address,
             )
 
@@ -312,12 +344,12 @@ class AWSCompute(Compute):
         logger.debug("Created ALB Listener for gateway %s", configuration.instance_name)
 
         ip_address = _get_instance_ip(instance, configuration.public_ip)
-        return LaunchedGatewayInfo(
+        return GatewayProvisioningData(
             instance_id=instance.instance_id,
             region=configuration.region,
             ip_address=ip_address,
             hostname=lb_dns_name,
-            backend_data=GatewayAWSBackendData(
+            backend_data=AWSGatewayBackendData(
                 lb_arn=lb_arn,
                 tg_arn=tg_arn,
                 listener_arn=listener_arn,
@@ -346,7 +378,7 @@ class AWSCompute(Compute):
             return
 
         try:
-            backend_data_parsed = GatewayAWSBackendData.parse_raw(backend_data)
+            backend_data_parsed = AWSGatewayBackendData.parse_raw(backend_data)
         except ValidationError:
             logger.exception(
                 "Failed to terminate all gateway %s resources. backend_data parsing error.",
@@ -361,20 +393,139 @@ class AWSCompute(Compute):
         elb_client.delete_load_balancer(LoadBalancerArn=backend_data_parsed.lb_arn)
         logger.debug("Deleted ALB resources for gateway %s", configuration.instance_name)
 
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
-def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
-    if instance_name.startswith("p"):
-        return quotas.get("P/OnDemand", 0) > 0
-    if instance_name.startswith("g"):
-        return quotas.get("G/OnDemand", 0) > 0
-    return quotas.get("Standard/OnDemand", 0) > 0
+        logger.debug("Requesting EBS volume %s", volume.configuration.volume_id)
+        try:
+            response = ec2_client.describe_volumes(VolumeIds=[volume.configuration.volume_id])
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "InvalidParameterValue":
+                raise ComputeError(f"Bad volume id: {volume.configuration.volume_id}")
+            else:
+                raise e
+        response_volumes = response["Volumes"]
+        if len(response_volumes) == 0:
+            raise ComputeError(f"Volume {volume.configuration.name} not found")
+        logger.debug("Found EBS volume %s", volume.configuration.volume_id)
 
+        response_volume = response_volumes[0]
+        return VolumeProvisioningData(
+            volume_id=response_volume["VolumeId"],
+            size_gb=response_volume["Size"],
+            availability_zone=response_volume["AvailabilityZone"],
+            backend_data=AWSVolumeBackendData(
+                volume_type=response_volume["VolumeType"],
+                iops=response_volume["Iops"],
+            ).json(),
+        )
 
-def _supported_instances(offer: InstanceOffer) -> bool:
-    for family in ["t2.small", "c5.", "m5.", "p3.", "g5.", "g4dn.", "p4d.", "p4de."]:
-        if offer.instance.name.startswith(family):
-            return True
-    return False
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
+
+        tags = [
+            {"Key": "Name", "Value": volume.configuration.name},
+            {"Key": "owner", "Value": "dstack"},
+            {"Key": "dstack_project", "Value": volume.project_name},
+        ]
+
+        zone = aws_resources.get_availability_zone(
+            ec2_client=ec2_client, region=volume.configuration.region
+        )
+        if zone is None:
+            raise ComputeError(
+                f"Failed to find availability zone in region {volume.configuration.region}"
+            )
+
+        volume_type = "gp3"
+
+        logger.debug("Creating EBS volume %s", volume.configuration.name)
+        response = ec2_client.create_volume(
+            Size=int(volume.configuration.size),
+            AvailabilityZone=zone,
+            VolumeType=volume_type,
+            TagSpecifications=[
+                {
+                    "ResourceType": "volume",
+                    "Tags": tags,
+                }
+            ],
+        )
+        logger.debug("Created EBS volume %s", volume.configuration.name)
+
+        size = response["Size"]
+        iops = response["Iops"]
+
+        return VolumeProvisioningData(
+            backend=BackendType.AWS,
+            volume_id=response["VolumeId"],
+            size_gb=size,
+            availability_zone=zone,
+            price=_get_volume_price(size=size, iops=iops),
+            backend_data=AWSVolumeBackendData(
+                volume_type=response["VolumeType"],
+                iops=iops,
+            ).json(),
+        )
+
+    def delete_volume(self, volume: Volume):
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
+
+        logger.debug("Deleting EBS volume %s", volume.configuration.name)
+        try:
+            ec2_client.delete_volume(VolumeId=volume.volume_id)
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "InvalidVolume.NotFound":
+                pass
+            else:
+                raise e
+        logger.debug("Deleted EBS volume %s", volume.configuration.name)
+
+    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
+
+        device_names = aws_resources.list_available_device_names(
+            ec2_client=ec2_client, instance_id=instance_id
+        )
+
+        logger.debug("Attaching EBS volume %s to instance %s", volume.volume_id, instance_id)
+        for device_name in device_names:
+            try:
+                ec2_client.attach_volume(
+                    VolumeId=volume.volume_id, InstanceId=instance_id, Device=device_name
+                )
+                break
+            except botocore.exceptions.ClientError as e:
+                if e.response["Error"]["Code"] == "VolumeInUse":
+                    raise ComputeError(f"Failed to attach volume in use: {volume.volume_id}")
+                if e.response["Error"]["Code"] == "InvalidVolume.ZoneMismatch":
+                    raise ComputeError(
+                        f"Failed to attach volume {volume.volume_id}. Volume zone is different from instance zone."
+                    )
+                if (
+                    e.response["Error"]["Code"] == "InvalidParameterValue"
+                    and f"Invalid value '{device_name}' for unixDevice"
+                    in e.response["Error"]["Message"]
+                ):
+                    # device name is taken but list API hasn't returned it yet
+                    continue
+                raise e
+        else:
+            raise ComputeError(f"Failed to find available device name for volume {volume.name}")
+
+        logger.debug("Attached EBS volume %s to instance %s", volume.volume_id, instance_id)
+        return VolumeAttachmentData(device_name=device_name)
+
+    def detach_volume(self, volume: Volume, instance_id: str):
+        ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
+
+        logger.debug("Detaching EBS volume %s from instance %s", volume.volume_id, instance_id)
+        ec2_client.detach_volume(
+            VolumeId=volume.volume_id,
+            InstanceId=instance_id,
+            Device=volume.attachment_data.device_name,
+        )
+        logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
 
 
 def get_vpc_id_subnet_id_or_error(
@@ -382,6 +533,7 @@ def get_vpc_id_subnet_id_or_error(
     config: AWSConfig,
     region: str,
     allocate_public_ip: bool,
+    availability_zones: Optional[List[str]] = None,
 ) -> Tuple[str, List[str]]:
     if config.vpc_ids is not None:
         vpc_id = config.vpc_ids.get(region)
@@ -393,6 +545,7 @@ def get_vpc_id_subnet_id_or_error(
                 ec2_client=ec2_client,
                 vpc_id=vpc_id,
                 allocate_public_ip=allocate_public_ip,
+                availability_zones=availability_zones,
             )
             if len(subnets_ids) > 0:
                 return vpc_id, subnets_ids
@@ -407,6 +560,7 @@ def get_vpc_id_subnet_id_or_error(
         vpc_name=config.vpc_name,
         region=region,
         allocate_public_ip=allocate_public_ip,
+        availability_zones=availability_zones,
     )
 
 
@@ -415,6 +569,7 @@ def _get_vpc_id_subnet_id_by_vpc_name_or_error(
     vpc_name: Optional[str],
     region: str,
     allocate_public_ip: bool,
+    availability_zones: Optional[List[str]] = None,
 ) -> Tuple[str, List[str]]:
     if vpc_name is not None:
         vpc_id = aws_resources.get_vpc_id_by_name(
@@ -431,6 +586,7 @@ def _get_vpc_id_subnet_id_by_vpc_name_or_error(
         ec2_client=ec2_client,
         vpc_id=vpc_id,
         allocate_public_ip=allocate_public_ip,
+        availability_zones=availability_zones,
     )
     if len(subnets_ids) > 0:
         return vpc_id, subnets_ids
@@ -449,7 +605,38 @@ def _get_vpc_id_subnet_id_by_vpc_name_or_error(
     )
 
 
+def _has_quota(quotas: Dict[str, int], instance_name: str) -> bool:
+    if instance_name.startswith("p"):
+        return quotas.get("P/OnDemand", 0) > 0
+    if instance_name.startswith("g"):
+        return quotas.get("G/OnDemand", 0) > 0
+    return quotas.get("Standard/OnDemand", 0) > 0
+
+
+def _supported_instances(offer: InstanceOffer) -> bool:
+    for family in [
+        "t2.small",
+        "c5.",
+        "m5.",
+        "p3.",
+        "g4dn.",
+        "g5.",
+        "g6.",
+        "gr6.",
+        "p4d.",
+        "p4de.",
+    ]:
+        if offer.instance.name.startswith(family):
+            return True
+    return False
+
+
 def _get_instance_ip(instance: Any, public_ip: bool) -> str:
     if public_ip:
         return instance.public_ip_address
     return instance.private_ip_address
+
+
+def _get_volume_price(size: int, iops: int) -> float:
+    # https://aws.amazon.com/ebs/pricing/
+    return size * 0.08 + (iops - 3000) * 0.005

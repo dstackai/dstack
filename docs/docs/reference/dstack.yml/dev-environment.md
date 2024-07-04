@@ -2,10 +2,9 @@
 
 The `dev-environment` configuration type allows running [dev environments](../../concepts/dev-environments.md).
 
-!!! info "Filename"
-    Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
-    and can be located in the project's root directory or any nested folder.
-    Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
+> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
+> and can be located in the project's root directory or any nested folder.
+> Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
 
 ## Examples
 
@@ -92,6 +91,20 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB), 
 `A100:40GB:2` (two A100 GPUs of 40GB).
 
+??? info "Google Cloud TPU"
+    To use TPUs, specify its architecture prefixed by `tpu-` via the `gpu` property.
+
+    ```yaml
+    type: dev-environment
+    
+    ide: vscode
+    
+    resources:
+      gpu:  tpu-v2-8
+    ```
+
+    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
+
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
     `shm_size`, e.g. set it to `16GB`.
@@ -177,6 +190,33 @@ regions: [eu-west-1, eu-west-2]
 
 </div>
 
+### Volumes
+
+Volumes allow you to persist data between runs.
+To attach a volume, simply specify its name using the `volumes` property and specify where to mount its contents:
+
+<div editor-title=".dstack.yml"> 
+
+```yaml
+type: dev-environment
+
+ide: vscode
+
+volumes:
+  - name: my-new-volume
+    path: /volume_data
+```
+
+</div>
+
+Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the development
+environment, and its contents will persist across runs.
+
+!!! info "Limitations"
+    When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
+    to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
+    attach volumes to `/workflow` or any of its subdirectories.
+
 The `dev-environment` configuration type supports many other options. See below.
 
 ## Root reference
@@ -215,6 +255,14 @@ The `dev-environment` configuration type supports many other options. See below.
 ## `registry_auth`
 
 #SCHEMA# dstack._internal.core.models.configurations.RegistryAuth
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+## `volumes`
+
+#SCHEMA# dstack._internal.core.models.volumes.VolumeMountPoint
     overrides:
       show_root_heading: false
       type:

@@ -144,7 +144,7 @@ and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-com
     If you encounter any other issues, please make sure to file a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 
-### Replicas and auto-scaling
+### Auto-scaling
 
 By default, `dstack` runs a single replica of the service.
 You can configure the number of replicas as well as the auto-scaling rules.
@@ -349,6 +349,31 @@ regions: [eu-west-1, eu-west-2]
 
 </div>
 
+### Volumes
+
+Volumes allow you to persist data between runs.
+To attach a volume, simply specify its name using the `volumes` property and specify where to mount its contents:
+
+<div editor-title="serve.dstack.yml"> 
+
+```yaml
+type: service
+
+commands:
+  - python3 -m http.server
+
+port: 8000
+
+volumes:
+  - name: my-new-volume
+    path: /volume_data
+```
+
+</div>
+
+Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the service, 
+and its contents will persist across runs.
+
 The `service` configuration type supports many other options. See below.
 
 ## Root reference
@@ -403,6 +428,14 @@ The `service` configuration type supports many other options. See below.
 ## `registry_auth`
 
 #SCHEMA# dstack._internal.core.models.configurations.RegistryAuth
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+## `volumes`
+
+#SCHEMA# dstack._internal.core.models.volumes.VolumeMountPoint
     overrides:
       show_root_heading: false
       type:

@@ -17,6 +17,7 @@ from dstack.api.server._repos import ReposAPIClient
 from dstack.api.server._runs import RunsAPIClient
 from dstack.api.server._secrets import SecretsAPIClient
 from dstack.api.server._users import UsersAPIClient
+from dstack.api.server._volumes import VolumesAPIClient
 
 logger = get_logger(__name__)
 
@@ -88,6 +89,10 @@ class APIClient:
     @property
     def pool(self) -> PoolAPIClient:
         return PoolAPIClient(self._request)
+
+    @property
+    def volumes(self) -> VolumesAPIClient:
+        return VolumesAPIClient(self._request)
 
     def _request(
         self,

@@ -16,6 +16,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger("datacrunch.compute")
@@ -142,6 +143,7 @@ class DataCrunchCompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         instance_config = InstanceConfiguration(
             project_name=run.project_name,
@@ -159,7 +161,12 @@ class DataCrunchCompute(Compute):
     ) -> None:
         self.api_client.delete_instance(instance_id)
 
-    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ):
         instance = self.api_client.get_instance_by_id(provisioning_data.instance_id)
         if instance is not None and instance.status == "running":
             provisioning_data.hostname = instance.ip

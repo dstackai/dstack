@@ -97,12 +97,23 @@ func main() {
 						Usage:       "Do not delete container on exit",
 						Destination: &args.Docker.KeepContainer,
 					},
+					&cli.BoolFlag{
+						Name:        "privileged",
+						Usage:       "Give extended privileges to the container",
+						Destination: &args.Docker.Privileged,
+					},
 					&cli.StringFlag{
 						Name:        "ssh-key",
 						Usage:       "Public SSH key",
 						Required:    true,
 						Destination: &args.Docker.ConcatinatedPublicSSHKeys,
 						EnvVars:     []string{"DSTACK_PUBLIC_SSH_KEY"},
+					},
+					&cli.StringFlag{
+						Name:        "pjrt-device",
+						Usage:       "Set the PJRT_DEVICE environment variable (e.g., TPU, GPU)",
+						Destination: &args.Docker.PJRTDevice,
+						EnvVars:     []string{"PJRT_DEVICE"},
 					},
 					&cli.BoolFlag{
 						Name:        "service",

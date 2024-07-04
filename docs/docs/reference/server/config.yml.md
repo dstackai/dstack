@@ -97,17 +97,24 @@ There are two ways to configure AWS: using an access key or using the default cr
             {
                 "Effect": "Allow",
                 "Action": [
+                    "ec2:AttachVolume",
                     "ec2:AuthorizeSecurityGroupEgress",
                     "ec2:AuthorizeSecurityGroupIngress",
                     "ec2:CancelSpotInstanceRequests",
                     "ec2:CreateSecurityGroup",
                     "ec2:CreateTags",
+                    "ec2:CreateVolume",
+                    "ec2:DeleteVolume",
+                    "ec2:DescribeAvailabilityZones",
                     "ec2:DescribeImages",
                     "ec2:DescribeInstances",
+                    "ec2:DescribeInstanceAttribute",
                     "ec2:DescribeRouteTables",
                     "ec2:DescribeSecurityGroups",
                     "ec2:DescribeSubnets",
                     "ec2:DescribeVpcs",
+                    "ec2:DescribeVolumes",
+                    "ec2:DetachVolume",
                     "ec2:RunInstances",
                     "ec2:TerminateInstances"
                 ],
@@ -404,8 +411,7 @@ gcloud projects list --format="json(projectId)"
     compute.zoneOperations.get
     ```
 
-??? info "Permissions for running TPUs"
-    Running TPUs also requires the following permissions:
+    If you plan to use TPUs, additional permissions are required:
 
     ```
     tpu.nodes.create
@@ -415,8 +421,8 @@ gcloud projects list --format="json(projectId)"
     tpu.operations.list
     ```
 
-    You also need to have the `serviceAccountUser` role granted.
-    `dstack` will run TPUs under the default service account, so you don't need to create one.
+    Also, the use of TPUs requires the `serviceAccountUser` role.
+    For TPU VMs, dstack will use the default service account.
 
 ??? info "Private subnets"
     By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.
@@ -668,31 +674,32 @@ In case of a self-managed cluster, also specify the IP address of any node in th
       backends:
         - type: kubernetes
           kubeconfig:
-          filename: ~/.kube/config
+            filename: ~/.kube/config
           networking:
-          ssh_host: localhost # The external IP address of any node
-          ssh_port: 32000 # Any port accessible outside of the cluster
+            ssh_host: localhost # The external IP address of any node
+            ssh_port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>
 
     The port specified to `ssh_port` must be accessible outside of the cluster.
 
-    For example, if you are using Kind, make sure to add it via `extraPortMappings`:
-
-    <div editor-title="installation/kind-config.yml">
-
-    ```yaml
-    kind: Cluster
-    apiVersion: kind.x-k8s.io/v1alpha4
-    nodes:
-      - role: control-plane
-        extraPortMappings:
-      - containerPort: 32000 # Must be same as `ssh_port`
-        hostPort: 32000 # Must be same as `ssh_port`
-    ```
-
-    </div>
+    ??? info "Kind"
+        For example, if you are using Kind, make sure to add it via `extraPortMappings`:
+    
+        <div editor-title="installation/kind-config.yml">
+    
+        ```yaml
+        kind: Cluster
+        apiVersion: kind.x-k8s.io/v1alpha4
+        nodes:
+          - role: control-plane
+            extraPortMappings:
+          - containerPort: 32000 # Must be same as `ssh_port`
+            hostPort: 32000 # Must be same as `ssh_port`
+        ```
+    
+        </div>
 
 [//]: # (TODO: Elaborate on the Kind's IP address on Linux)
 
@@ -707,21 +714,22 @@ In case of a self-managed cluster, also specify the IP address of any node in th
         backends:
           - type: kubernetes
             kubeconfig:
-            filename: ~/.kube/config
+              filename: ~/.kube/config
             networking:
-            ssh_port: 32000 # Any port accessible outside of the cluster
+              ssh_port: 32000 # Any port accessible outside of the cluster
     ```
 
     </div>
 
     The port specified to `ssh_port` must be accessible outside of the cluster.
 
-    For example, if you are using EKS, make sure to add it via an ingress rule
-    of the corresponding security group:
-
-    ```shell
-    aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
-    ```
+    ??? info "EKS"
+        For example, if you are using EKS, make sure to add it via an ingress rule
+        of the corresponding security group:
+    
+        ```shell
+        aws ec2 authorize-security-group-ingress --group-id <cluster-security-group-id> --protocol tcp --port 32000 --cidr 0.0.0.0/0
+        ```
 
 [//]: # (TODO: Elaborate on gateways, and what backends allow configuring them)
 
@@ -904,6 +912,23 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 ## `projects[n].backends[type=vastai].creds` { #vastai-creds data-toc-label="backends[type=vastai].creds" }
 
 #SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `projects[n].backends[type=cudo]` { #cudo data-toc-label="backends[type=cudo]" }
+
+#SCHEMA# dstack._internal.server.services.config.CudoConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+        item_id_prefix: cudo-
+
+## `projects[n].backends[type=cudo].creds` { #cudo-creds data-toc-label="backends[type=cudo].creds" }
+
+#SCHEMA# dstack._internal.core.models.backends.cudo.CudoAPIKeyCreds
     overrides:
         show_root_heading: false
         type:

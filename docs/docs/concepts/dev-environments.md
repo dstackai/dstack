@@ -29,8 +29,9 @@ resources:
 If you don't specify your Docker image, `dstack` uses the [base](https://hub.docker.com/r/dstackai/base/tags) image
 (pre-configured with Python, Conda, and essential CUDA drivers).
 
-> See the [.dstack.yml reference](../reference/dstack.yml/dev-environment.md)
-> for many examples on dev envioronment configuration.
+!!! info "Reference"
+    See the [.dstack.yml reference](../reference/dstack.yml/dev-environment.md)
+    for all supported configuration options and multiple examples.
 
 ## Running
 
@@ -64,8 +65,9 @@ When `dstack` provisions the dev environment, it mounts the project folder conte
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
-> See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
-> on how `dstack run` works.
+!!! info "Reference"
+    See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+    on how `dstack run` works.
 
 ### VS Code
 

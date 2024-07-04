@@ -16,6 +16,7 @@ from dstack._internal.core.models.instances import (
     InstanceRuntime,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -65,6 +66,7 @@ class VastAICompute(Compute):
         instance_offer: InstanceOfferWithAvailability,
         project_ssh_public_key: str,
         project_ssh_private_key: str,
+        volumes: List[Volume],
     ) -> JobProvisioningData:
         commands = get_docker_commands(
             [run.run_spec.ssh_key_pub.strip(), project_ssh_public_key.strip()]
@@ -98,7 +100,12 @@ class VastAICompute(Compute):
     ):
         self.api_client.destroy_instance(instance_id)
 
-    def update_provisioning_data(self, provisioning_data: JobProvisioningData) -> None:
+    def update_provisioning_data(
+        self,
+        provisioning_data: JobProvisioningData,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+    ):
         resp = self.api_client.get_instance(provisioning_data.instance_id)
         if resp is not None:
             if resp["actual_status"] == "running":

@@ -5,6 +5,7 @@ from typing import List, Optional
 from sqlalchemy import (
     BLOB,
     Boolean,
+    Column,
     DateTime,
     Enum,
     Float,
@@ -13,6 +14,7 @@ from sqlalchemy import (
     Integer,
     MetaData,
     String,
+    Table,
     Text,
     UniqueConstraint,
 )
@@ -35,6 +37,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server import settings
 from dstack._internal.utils.common import get_current_datetime
 
@@ -361,3 +364,47 @@ class InstanceModel(BaseModel):
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
     job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="joined")
     last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    # volumes attached to the instance
+    volumes: Mapped[List["VolumeModel"]] = relationship(
+        secondary="volumes_attachments",
+        back_populates="instances",
+    )
+
+
+class VolumeModel(BaseModel):
+    __tablename__ = "volumes"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100))
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
+    status: Mapped[VolumeStatus] = mapped_column(Enum(VolumeStatus))
+    status_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    configuration: Mapped[str] = mapped_column(Text)
+    volume_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
+    volume_attachment_data: Mapped[Optional[str]] = mapped_column(Text)
+
+    # instances the volume is attached to
+    instances: Mapped[List["InstanceModel"]] = relationship(
+        secondary="volumes_attachments",
+        back_populates="volumes",
+    )
+
+
+volumes_attachments_table = Table(
+    "volumes_attachments",
+    BackendModel.metadata,
+    Column("volume_id", ForeignKey("volumes.id"), primary_key=True),
+    Column("instace_id", ForeignKey("instances.id"), primary_key=True),
+)

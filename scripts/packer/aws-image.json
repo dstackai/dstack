@@ -7,7 +7,7 @@
     "base_ami": "ami-0cffefff2d52e0a23",
     "instance_type": "c5.large",
     "subnet_id": "subnet-c39cb6a5",
-    "docker_version": "20.10.17",
+    "docker_version": "",
     "build_prefix": "",
     "ami_regions": "",
     "ami_groups": "",
@@ -74,7 +74,7 @@
     {
       "type": "shell",
       "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
-      "script": "provisioners/docker-image-without-cuda.sh"
+      "script": "provisioners/pull-docker-images.sh"
     }
   ]
 }

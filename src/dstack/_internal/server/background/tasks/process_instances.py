@@ -57,6 +57,7 @@ from dstack._internal.server.services.jobs import (
     PROCESSING_POOL_LOCK,
     terminate_job_provisioning_data_instance,
 )
+from dstack._internal.server.services.pools import get_instance_provisioning_data
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
@@ -635,32 +636,40 @@ async def wait_for_instance_provisioning_data(
         )
         instance.status = InstanceStatus.TERMINATING
         instance.termination_reason = "Instance has not become running in time"
-    else:
-        backend = await backends_services.get_project_backend_by_type(
-            project=project,
-            backend_type=job_provisioning_data.backend,
+        return
+
+    backend = await backends_services.get_project_backend_by_type(
+        project=project,
+        backend_type=job_provisioning_data.backend,
+    )
+    if backend is None:
+        logger.warning(
+            "Instance %s failed because instance's backend is not available",
+            instance.name,
         )
-        if backend is None:
-            logger.warning(
-                "Cannot stop instance %s because instance's backend is not configured",
-                instance.name,
-            )
-        else:
-            try:
-                backend.compute().update_provisioning_data(job_provisioning_data)
-                instance.job_provisioning_data = job_provisioning_data.json()
-            except ProvisioningError as e:
-                logger.warning(
-                    "Error while waiting for instance %s to become running: %s",
-                    instance.name,
-                    repr(e),
-                )
-                instance.status = InstanceStatus.TERMINATING
-                instance.termination_reason = "Error while waiting for instance to become running"
-            except Exception:
-                logger.exception(
-                    "Got exception when updating instance %s provisioning data", instance.name
-                )
+        instance.status = InstanceStatus.TERMINATING
+        instance.termination_reason = "Backend not available"
+        return
+    try:
+        await run_async(
+            backend.compute().update_provisioning_data,
+            job_provisioning_data,
+            project.ssh_public_key,
+            project.ssh_private_key,
+        )
+        instance.job_provisioning_data = job_provisioning_data.json()
+    except ProvisioningError as e:
+        logger.warning(
+            "Error while waiting for instance %s to become running: %s",
+            instance.name,
+            repr(e),
+        )
+        instance.status = InstanceStatus.TERMINATING
+        instance.termination_reason = "Error while waiting for instance to become running"
+    except Exception:
+        logger.exception(
+            "Got exception when updating instance %s provisioning data", instance.name
+        )
 
 
 @runner_ssh_tunnel(ports=[runner_client.REMOTE_SHIM_PORT], retries=1)
@@ -690,20 +699,35 @@ async def terminate(instance_id: UUID) -> None:
             )
         ).one()
 
-        if instance.job_provisioning_data is not None:
-            jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
+        jpd = get_instance_provisioning_data(instance)
+        if jpd is not None:
             if jpd.backend != BackendType.REMOTE:
-                backends = await backends_services.get_project_backends(project=instance.project)
-                backend = next((b for b in backends if b.TYPE == jpd.backend), None)
-                if backend is None:
-                    raise ValueError(f"there is no backend {jpd.backend}")
-
-                await run_async(
-                    backend.compute().terminate_instance,
-                    jpd.instance_id,
-                    jpd.region,
-                    jpd.backend_data,
+                backend = await backends_services.get_project_backend_by_type(
+                    project=instance.project, backend_type=jpd.backend
                 )
+                if backend is None:
+                    logger.error(
+                        "Failed to terminate instance %s. Backend not available.", instance.name
+                    )
+                else:
+                    try:
+                        await run_async(
+                            backend.compute().terminate_instance,
+                            jpd.instance_id,
+                            jpd.region,
+                            jpd.backend_data,
+                        )
+                    except BackendError as e:
+                        logger.error(
+                            "Failed to terminate instance %s: %s",
+                            instance.name,
+                            repr(e),
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Got exception when terminating instance %s",
+                            instance.name,
+                        )
 
         instance.deleted = True
         instance.deleted_at = get_current_datetime()
@@ -736,10 +760,16 @@ async def terminate_idle_instance(instance_id: UUID):
         idle_seconds = instance.termination_idle_time
         delta = datetime.timedelta(seconds=idle_seconds)
         if idle_duration > delta:
-            jpd = JobProvisioningData.__response__.parse_raw(instance.job_provisioning_data)
-            await terminate_job_provisioning_data_instance(
-                project=instance.project, job_provisioning_data=jpd
-            )
+            jpd = get_instance_provisioning_data(instance)
+            if jpd is None:
+                logger.error(
+                    "Failed to terminate idle instance %s. provisioning_data is None.",
+                    instance.name,
+                )
+            else:
+                await terminate_job_provisioning_data_instance(
+                    project=instance.project, job_provisioning_data=jpd
+                )
             instance.deleted = True
             instance.deleted_at = current_time
             instance.finished_at = current_time

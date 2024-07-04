@@ -1,6 +1,6 @@
 ---
 template: pricing.html
-title: Orchestrate AI workloads in any cloud
+title: AI container orchestration platform for everyone
 hide:
    - navigation
    - toc

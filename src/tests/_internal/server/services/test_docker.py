@@ -1,6 +1,10 @@
 import pytest
 
-from dstack._internal.server.services.docker import ImageConfigObject, ImageManifest
+from dstack._internal.server.services.docker import (
+    ImageConfigObject,
+    ImageManifest,
+    is_valid_docker_volume_target,
+)
 
 
 @pytest.fixture
@@ -102,3 +106,35 @@ def test_parse_image_config_object_with_config_null(sample_image_config_object):
     sample_image_config_object["config"] = None
     config_object = ImageConfigObject.__response__.parse_obj(sample_image_config_object)
     assert config_object.config is not None
+
+
+class TestIsValidDockerVolumeTarget:
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/valid/path",
+            "/valid-path_with.mixed123",
+            "/valid_path",
+            "/valid.path",
+            "/valid-path",
+            "/",
+        ],
+    )
+    def test_valid_paths(self, path):
+        assert is_valid_docker_volume_target(path)
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "invalid/path",
+            "",
+            "relative/path",
+            "./relative/path",
+            "../relative/path",
+        ],
+    )
+    def test_invalid_paths(self, path):
+        assert not is_valid_docker_volume_target(path)
+
+    def test_trailing_slash(self):
+        assert not is_valid_docker_volume_target("/invalid/path/")

@@ -59,16 +59,6 @@ class GatewayConfiguration(CoreModel):
     ] = LetsEncryptGatewayCertificate()
 
 
-class GatewayComputeConfiguration(CoreModel):
-    project_name: str
-    instance_name: str
-    backend: BackendType
-    region: str
-    public_ip: bool
-    ssh_key_pub: str
-    certificate: Optional[AnyGatewayCertificate]
-
-
 class Gateway(CoreModel):
     name: str
     configuration: GatewayConfiguration
@@ -87,6 +77,25 @@ class Gateway(CoreModel):
     region: str
     default: bool
     wildcard_domain: Optional[str]
+
+
+class GatewayComputeConfiguration(CoreModel):
+    project_name: str
+    instance_name: str
+    backend: BackendType
+    region: str
+    public_ip: bool
+    ssh_key_pub: str
+    certificate: Optional[AnyGatewayCertificate]
+
+
+class GatewayProvisioningData(CoreModel):
+    instance_id: str
+    ip_address: str
+    region: str
+    availability_zone: Optional[str] = None
+    hostname: Optional[str] = None
+    backend_data: Optional[str] = None  # backend-specific data in json
 
 
 class BaseChatModel(CoreModel):

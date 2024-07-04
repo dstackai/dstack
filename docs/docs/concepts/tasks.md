@@ -1,7 +1,8 @@
 # Tasks
 
 Tasks allow for convenient scheduling of various batch jobs, such as training, fine-tuning, or
-data processing, as well as running web applications.
+data processing. They can also be used to run web applications
+when features offered by [services](services.md) are not needed, such as for debugging.
 
 You can run tasks on a single machine or on a cluster of nodes.
 
@@ -36,13 +37,14 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 (pre-configured with Python, Conda, and essential CUDA drivers).
 
 
-!!! info "Nodes"
+!!! info "Distributed tasks"
     By default, tasks run on a single instance. However, you can specify
     the [number of nodes](../reference/dstack.yml/task.md#_nodes).
     In this case, `dstack` provisions a cluster of instances.
 
-> See the [.dstack.yml reference](../reference/dstack.yml/task.md)
-> for many examples on task configuration.
+!!! info "Reference"
+    See the [.dstack.yml reference](../reference/dstack.yml/task.md)
+    for all supported configuration options and multiple examples.
 
 ## Running
 
@@ -82,8 +84,9 @@ When running the task, `dstack run` mounts the current folder's contents.
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
-> See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
-> on how `dstack run` works.
+!!! info "Reference"
+    See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+    on how `dstack run` works.
 
 ## Managing runs
 

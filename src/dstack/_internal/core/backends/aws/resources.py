@@ -272,12 +272,17 @@ def get_subnets_ids_for_vpc(
     ec2_client: botocore.client.BaseClient,
     vpc_id: str,
     allocate_public_ip: bool,
+    availability_zones: Optional[List[str]] = None,
 ) -> List[str]:
     """
     If `allocate_public_ip` is True, returns public subnets found in the VPC.
     If `allocate_public_ip` is False, returns subnets with NAT found in the VPC.
     """
-    subnets = _get_subnets_by_vpc_id(ec2_client=ec2_client, vpc_id=vpc_id)
+    subnets = _get_subnets_by_vpc_id(
+        ec2_client=ec2_client,
+        vpc_id=vpc_id,
+        availability_zones=availability_zones,
+    )
     if len(subnets) == 0:
         return []
     subnets_ids = []
@@ -298,6 +303,62 @@ def get_subnets_ids_for_vpc(
             if subnet_behind_nat:
                 subnets_ids.append(subnet_id)
     return subnets_ids
+
+
+def get_availability_zone(ec2_client: botocore.client.BaseClient, region: str) -> Optional[str]:
+    zone_names = get_availability_zones(
+        ec2_client=ec2_client,
+        region=region,
+    )
+    if len(zone_names) == 0:
+        return None
+    return zone_names[0]
+
+
+def get_availability_zones(ec2_client: botocore.client.BaseClient, region: str) -> List[str]:
+    response = ec2_client.describe_availability_zones(
+        Filters=[
+            {
+                "Name": "region-name",
+                "Values": [region],
+            }
+        ]
+    )
+    zone_names = [z["ZoneName"] for z in response["AvailabilityZones"]]
+    return zone_names
+
+
+def get_availability_zone_by_subnet_id(
+    ec2_client: botocore.client.BaseClient, subnet_id: str
+) -> str:
+    response = ec2_client.describe_subnets(SubnetIds=[subnet_id])
+    return response["Subnets"][0]["AvailabilityZone"]
+
+
+def list_available_device_names(
+    ec2_client: botocore.client.BaseClient, instance_id: str
+) -> List[str]:
+    device_names = _list_possible_device_names()
+    used_device_names = list_instance_device_names(ec2_client, instance_id)
+    return [n for n in device_names if n not in used_device_names]
+
+
+def list_instance_device_names(
+    ec2_client: botocore.client.BaseClient, instance_id: str
+) -> List[str]:
+    device_names = []
+    response = ec2_client.describe_instance_attribute(
+        InstanceId=instance_id, Attribute="blockDeviceMapping"
+    )
+    block_device_mappings = response["BlockDeviceMappings"]
+    for mapping in block_device_mappings:
+        device_names.append(mapping["DeviceName"])
+    return device_names
+
+
+def _list_possible_device_names() -> List[str]:
+    suffixes = ["f", "g", "h", "i", "j", "k", "l", "m", "n"]
+    return [f"/dev/sd{s}" for s in suffixes]
 
 
 def _add_ingress_security_group_rule_if_missing(
@@ -351,8 +412,12 @@ def _is_subset(subset, superset) -> bool:
 def _get_subnets_by_vpc_id(
     ec2_client: botocore.client.BaseClient,
     vpc_id: str,
+    availability_zones: Optional[List[str]] = None,
 ) -> List[Dict]:
-    response = ec2_client.describe_subnets(Filters=[{"Name": "vpc-id", "Values": [vpc_id]}])
+    filters = [{"Name": "vpc-id", "Values": [vpc_id]}]
+    if availability_zones is not None:
+        filters.append({"Name": "availability-zone", "Values": availability_zones})
+    response = ec2_client.describe_subnets(Filters=filters)
     return response["Subnets"]
 
 

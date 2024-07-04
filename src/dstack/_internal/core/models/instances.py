@@ -35,11 +35,10 @@ class Resources(CoreModel):
             resources["disk_size"] = f"{self.disk.size_mib / 1024:.1f}GB"
         if self.gpus:
             gpu = self.gpus[0]
-            resources.update(
-                gpu_name=gpu.name,
-                gpu_count=len(self.gpus),
-                gpu_memory=f"{gpu.memory_mib / 1024:.0f}GB",
-            )
+            resources["gpu_name"] = gpu.name
+            resources["gpu_count"] = len(self.gpus)
+            if gpu.memory_mib > 0:
+                resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
         return pretty_resources(**resources)
 
 
@@ -78,6 +77,7 @@ class InstanceConfiguration(CoreModel):
     ssh_keys: List[SSHKey]
     job_docker_config: Optional[DockerConfig]
     user: str  # dstack user name
+    availability_zone: Optional[str] = None
 
     def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]
@@ -114,11 +114,3 @@ class InstanceOffer(CoreModel):
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
     instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
-
-
-class LaunchedGatewayInfo(CoreModel):
-    instance_id: str
-    ip_address: str
-    region: str
-    hostname: Optional[str] = None
-    backend_data: Optional[str] = None  # backend-specific data in json

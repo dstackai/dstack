@@ -4,8 +4,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import BackendError
-from dstack._internal.core.models.gateways import GatewayStatus
-from dstack._internal.core.models.instances import LaunchedGatewayInfo
+from dstack._internal.core.models.gateways import GatewayProvisioningData, GatewayStatus
 from dstack._internal.server.background.tasks.process_gateways import process_submitted_gateways
 from dstack._internal.server.testing.common import (
     AsyncContextManager,
@@ -34,7 +33,7 @@ class TestProcessSubmittedGateways:
             m.return_value = (backend, aws)
             pool_add.return_value = MagicMock()
             pool_add.return_value.client.return_value = MagicMock(AsyncContextManager())
-            aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
+            aws.compute.return_value.create_gateway.return_value = GatewayProvisioningData(
                 instance_id="i-1234567890",
                 ip_address="2.2.2.2",
                 region="us",
@@ -91,7 +90,7 @@ class TestProcessSubmittedGateways:
             aws = Mock()
             m.return_value = (backend, aws)
             connect_to_gateway_with_retry_mock.return_value = None
-            aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
+            aws.compute.return_value.create_gateway.return_value = GatewayProvisioningData(
                 instance_id="i-1234567890",
                 ip_address="2.2.2.2",
                 region="us",
