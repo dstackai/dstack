@@ -45,6 +45,12 @@ from dstack._internal.utils.common import get_current_datetime
 
 
 class NaiveDateTime(TypeDecorator):
+    """
+    The custom type decorator that ensures datetime objects are offset-naive when stored in the database.
+    This is needed because we use datetimes in UTC only and store them as offset-naive.
+    Some databases (e.g. Postgres) throw an error if the timezone is set.
+    """
+
     impl = DateTime
 
     cache_ok = True

@@ -131,6 +131,6 @@ For additional information and examples, see the following links:
 - [Docs](https://dstack.ai/docs)
 - [Discord](https://discord.gg/u8SmfwPpMd)
 
-## Licence
+## License
 
 [Mozilla Public License 2.0](LICENSE.md)
