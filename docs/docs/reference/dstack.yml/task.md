@@ -65,7 +65,7 @@ See [tasks](../../concepts/tasks.md#configure-ports) for more detail.
 ```yaml
 type: dev-environment
 
-image: dstackai/base:py3.11-0.4rc4-cuda-12.1
+image: dstackai/base:py3.11-0.4-cuda-12.1
 
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
@@ -80,7 +80,7 @@ commands:
     ```yaml
     type: dev-environment
     
-    image: dstackai/base:py3.11-0.4rc4-cuda-12.1
+    image: dstackai/base:py3.11-0.4-cuda-12.1
     registry_auth:
       username: peterschmidt85
       password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5

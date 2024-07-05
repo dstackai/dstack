@@ -40,7 +40,7 @@ port: 8000
     ```yaml
     type: service
     
-    image: dstackai/base:py3.11-0.4rc4-cuda-12.1
+    image: dstackai/base:py3.11-0.4-cuda-12.1
     
     commands:
       - python3 -m http.server
@@ -57,7 +57,7 @@ port: 8000
     ```yaml
     type: service
     
-    image: dstackai/base:py3.11-0.4rc4-cuda-12.1
+    image: dstackai/base:py3.11-0.4-cuda-12.1
     
     commands:
       - python3 -m http.server
