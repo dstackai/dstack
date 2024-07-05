@@ -37,6 +37,7 @@ from dstack._internal.server.services.backends.configurators.base import (
 SUPPORTED_REGIONS = frozenset(
     [
         "eu-frankfurt-1",
+        "eu-milan-1",
         "me-dubai-1",
         "uk-london-1",
         "us-ashburn-1",
