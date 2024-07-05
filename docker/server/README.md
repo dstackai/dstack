@@ -42,20 +42,21 @@ To configure this, use the `dstack config` command:
 dstack config --project main --server http://0.0.0.0:3000 --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
 ```
 
-This will update `~/.dstack/config` allowing the CLI and API to connect to the server by default.
+This will update `~/.dstack/config.yml` allowing the CLI and API to connect to the server by default.
 
 ## Environment variables
 
 Here's the list of environment variables which you can override:
 
 - `DSTACK_SERVER_DIR` – (Optional) The path to the directory where the `dstack` server stores the state. Defaults to `/root/.dstack/server`.
+- `DSTACK_DATABASE_URL` – (Optional) The database URL to use instead of default SQLite. Currently `dstack` supports Postgres.
 - `DSTACK_SERVER_ADMIN_TOKEN` – (Optional) The default token of the `admin` user. By default, it's generated randomly
   at the first startup.
 
 ## Persist state
 
-`dstack` stores its state in the `$DSTACK_SERVER_DIR/data` folder (by default ``/root/.dstack/server/data`) using
-SQLite.
+`dstack` stores its state in the `$DSTACK_SERVER_DIR/data` folder (by default `/root/.dstack/server/data`) using
+SQLite. If you need to persist the database, you can either use specify `DSTACK_DATABASE_URL` to use Postgres or replicate SQLite to an object storage as described below.
 
 ### Use Litestream to replicate state 
 
@@ -87,7 +88,7 @@ To persist state into an Azure blog storage, provide the following environment v
 
 More [details](https://litestream.io/guides/) on options for configuring replication.
 
-_**️Note:** The use of Litestream requires that only one instance of the dstack server is running at a time._
+_**️Note:** The use of Litestream requires that only one instance of the `dstack` server is running at a time._
 
 ## More information
 
@@ -98,6 +99,6 @@ For additional information and examples, see the following links:
 * [Changelog](https://github.com/dstackai/dstack/releases)
 * [Discord](https://discord.gg/u8SmfwPpMd)
  
-##  Licence
+##  License
 
 [Mozilla Public License 2.0](https://github.com/dstackai/dstack/blob/master/LICENSE.md)

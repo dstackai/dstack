@@ -24,7 +24,7 @@ def upgrade() -> None:
         sa.Column("id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
         sa.Column("repo_id", sqlalchemy_utils.types.uuid.UUIDType(binary=False), nullable=False),
         sa.Column("blob_hash", sa.String(length=4000), nullable=False),
-        sa.Column("blob", sa.BLOB(), nullable=False),
+        sa.Column("blob", sa.LargeBinary(), nullable=False),
         sa.ForeignKeyConstraint(
             ["repo_id"], ["repos.id"], name=op.f("fk_codes_repo_id_repos"), ondelete="CASCADE"
         ),

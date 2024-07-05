@@ -16,16 +16,23 @@ class Database:
         self.url = url
         self.engine = create_async_engine(self.url, echo=settings.SQL_ECHO_ENABLED)
         self.session_maker = sessionmaker(
-            bind=self.engine, expire_on_commit=False, class_=AsyncSession
+            bind=self.engine,
+            expire_on_commit=False,
+            class_=AsyncSession,
         )
 
-        @event.listens_for(self.engine.sync_engine, "connect")
-        def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry):
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL;")
-            cursor.execute("PRAGMA foreign_keys=ON;")
-            cursor.execute("PRAGMA busy_timeout=5000;")
-            cursor.close()
+        if self.get_dialect_name() == "sqlite":
+
+            @event.listens_for(self.engine.sync_engine, "connect")
+            def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA journal_mode=WAL;")
+                cursor.execute("PRAGMA foreign_keys=ON;")
+                cursor.execute("PRAGMA busy_timeout=5000;")
+                cursor.close()
+
+    def get_dialect_name(self) -> str:
+        return self.engine.dialect.name
 
     def get_session(self) -> AsyncSession:
         return self.session_maker()

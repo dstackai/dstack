@@ -68,6 +68,8 @@ BASE_DEPS = [
     "httpx",
     "aiorwlock",
     "python-json-logger",
+    "alembic-postgresql-enum",
+    "asyncpg",
 ]
 
 AWS_DEPS = [
