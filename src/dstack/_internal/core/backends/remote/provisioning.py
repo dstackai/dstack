@@ -127,8 +127,12 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
 
 
 def check_dstack_shim_service(client: paramiko.SSHClient):
-    _, stdout, _ = client.exec_command("sudo systemctl status dstack-shim.service")
-    status = stdout.read()
+    try:
+        _, stdout, _ = client.exec_command("sudo systemctl status dstack-shim.service", timeout=10)
+        status = stdout.read()
+    except (paramiko.SSHException, OSError) as e:
+        raise ProvisioningError(f"Checking dstack-shim.service status failed: {e}") from e
+
     for raw_line in status.splitlines():
         line = raw_line.decode()
         if line.strip().startswith("Active: failed"):

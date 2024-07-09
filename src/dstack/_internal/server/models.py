@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import (
-    BLOB,
+    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -12,10 +12,12 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     MetaData,
     String,
     Table,
     Text,
+    TypeDecorator,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -40,6 +42,27 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server import settings
 from dstack._internal.utils.common import get_current_datetime
+
+
+class NaiveDateTime(TypeDecorator):
+    """
+    The custom type decorator that ensures datetime objects are offset-naive when stored in the database.
+    This is needed because we use datetimes in UTC only and store them as offset-naive.
+    Some databases (e.g. Postgres) throw an error if the timezone is set.
+    """
+
+    impl = DateTime
+
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is not None:
+            return value.replace(tzinfo=None)
+        return value
+
+    def process_result_value(self, value, dialect):
+        return value
+
 
 constraint_naming_convention = {
     "ix": "ix_%(column_0_label)s",
@@ -127,8 +150,8 @@ class BackendModel(BaseModel):
     project: Mapped["ProjectModel"] = relationship()
     type: Mapped[BackendType] = mapped_column(Enum(BackendType))
 
-    config: Mapped[str] = mapped_column(String(2000))
-    auth: Mapped[str] = mapped_column(String(2000))
+    config: Mapped[str] = mapped_column(String(20000))
+    auth: Mapped[str] = mapped_column(String(20000))
 
     gateways: Mapped[List["GatewayModel"]] = relationship(back_populates="backend")
 
@@ -160,7 +183,7 @@ class CodeModel(BaseModel):
     repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
     repo: Mapped["RepoModel"] = relationship()
     blob_hash: Mapped[str] = mapped_column(String(4000))
-    blob: Mapped[Optional[bytes]] = mapped_column(BLOB)  # None means blob is stored on s3
+    blob: Mapped[Optional[bytes]] = mapped_column(LargeBinary)  # None means blob is stored on s3
 
 
 class RunModel(BaseModel):
@@ -176,12 +199,12 @@ class RunModel(BaseModel):
     repo: Mapped["RepoModel"] = relationship()
     user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped["UserModel"] = relationship()
-    submitted_at: Mapped[datetime] = mapped_column(DateTime)
+    submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     run_name: Mapped[str] = mapped_column(String(100))
     status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
     run_spec: Mapped[str] = mapped_column(String(4000))
     jobs: Mapped[List["JobModel"]] = relationship(back_populates="run", lazy="selectin")
-    last_processed_at: Mapped[datetime] = mapped_column(DateTime)
+    last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateways.id", ondelete="SET NULL")
     )
@@ -208,8 +231,8 @@ class JobModel(BaseModel):
     job_num: Mapped[int] = mapped_column(Integer)
     job_name: Mapped[str] = mapped_column(String(100))
     submission_num: Mapped[int] = mapped_column(Integer)
-    submitted_at: Mapped[datetime] = mapped_column(DateTime)
-    last_processed_at: Mapped[datetime] = mapped_column(DateTime)
+    submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     status: Mapped[JobStatus] = mapped_column(Enum(JobStatus))
     termination_reason: Mapped[Optional[JobTerminationReason]] = mapped_column(
         Enum(JobTerminationReason)
@@ -217,9 +240,9 @@ class JobModel(BaseModel):
     termination_reason_message: Mapped[Optional[str]] = mapped_column(Text)
     job_spec_data: Mapped[str] = mapped_column(String(4000))
     job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
-    runner_timestamp: Mapped[Optional[int]] = mapped_column(Integer)
+    runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
     # `removed` is used to ensure that the instance is killed after the job is finished
-    remove_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))
     replica_num: Mapped[int] = mapped_column(Integer)
@@ -235,10 +258,10 @@ class GatewayModel(BaseModel):
     region: Mapped[str] = mapped_column(String(100))
     wildcard_domain: Mapped[str] = mapped_column(String(100), nullable=True)
     configuration: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     status: Mapped[GatewayStatus] = mapped_column(Enum(GatewayStatus))
     status_message: Mapped[Optional[str]] = mapped_column(Text)
-    last_processed_at: Mapped[datetime] = mapped_column(DateTime)
+    last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
@@ -261,7 +284,7 @@ class GatewayComputeModel(BaseModel):
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     instance_id: Mapped[str] = mapped_column(String(100))
     ip_address: Mapped[str] = mapped_column(String(100))
     hostname: Mapped[Optional[str]] = mapped_column(String(100))
@@ -290,9 +313,9 @@ class PoolModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
@@ -309,9 +332,9 @@ class InstanceModel(BaseModel):
     name: Mapped[str] = mapped_column(String(50))
 
     # instance
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
@@ -323,8 +346,10 @@ class InstanceModel(BaseModel):
     unreachable: Mapped[bool] = mapped_column(Boolean)
 
     # VM
-    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=get_current_datetime)
-    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    started_at: Mapped[Optional[datetime]] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
+    finished_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     # create instance
     # TODO: Introduce a field that would store all resolved instance profile parameters, etc, (similar to job_spec).
@@ -340,10 +365,10 @@ class InstanceModel(BaseModel):
     )
 
     # retry policy
-    last_retry_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    last_retry_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     # instance termination handling
-    termination_deadline: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    termination_deadline: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
     termination_reason: Mapped[Optional[str]] = mapped_column(String(4000))
     health_status: Mapped[Optional[str]] = mapped_column(String(4000))
 
@@ -363,7 +388,7 @@ class InstanceModel(BaseModel):
     # current job
     job_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("jobs.id"))
     job: Mapped[Optional["JobModel"]] = relationship(back_populates="instance", lazy="joined")
-    last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    last_job_processed_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     # volumes attached to the instance
     volumes: Mapped[List["VolumeModel"]] = relationship(
@@ -383,10 +408,12 @@ class VolumeModel(BaseModel):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
-    last_processed_at: Mapped[datetime] = mapped_column(DateTime, default=get_current_datetime)
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     status: Mapped[VolumeStatus] = mapped_column(Enum(VolumeStatus))
     status_message: Mapped[Optional[str]] = mapped_column(Text)

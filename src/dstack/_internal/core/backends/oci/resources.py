@@ -284,9 +284,16 @@ def launch_instance(
     display_name: str,
     cloud_init_user_data: str,
     shape: str,
+    is_spot: bool,
     disk_size_gb: int,
     image_id: str,
 ) -> oci.core.models.Instance:
+    preemptible_config = None
+    if is_spot:
+        preemptible_config = oci.core.models.PreemptibleInstanceConfigDetails(
+            preemption_action=oci.core.models.TerminatePreemptionAction(preserve_boot_volume=False)
+        )
+
     return region.compute_client.launch_instance(
         oci.core.models.LaunchInstanceDetails(
             availability_domain=availability_domain,
@@ -301,6 +308,7 @@ def launch_instance(
             metadata=dict(
                 user_data=base64.b64encode(cloud_init_user_data.encode()).decode(),
             ),
+            preemptible_instance_config=preemptible_config,
             shape=shape,
             source_details=oci.core.models.InstanceSourceViaImageDetails(
                 image_id=image_id,

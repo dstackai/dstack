@@ -165,7 +165,7 @@ def deploy_instance(
             runner_build, authorized_keys=[sk.public for sk in remote_details.ssh_keys]
         )
         upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
-        logger.debug("The dstack-shim environemnt variables has been installed")
+        logger.debug("The dstack-shim environment variables have been installed")
 
         # Run dstack-shim as a systemd service
         run_shim_as_systemd_service(

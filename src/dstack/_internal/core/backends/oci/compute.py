@@ -151,6 +151,7 @@ class OCICompute(Compute):
                 display_name=instance_config.instance_name,
                 cloud_init_user_data=cloud_init_user_data,
                 shape=instance_offer.instance.name,
+                is_spot=instance_offer.instance.resources.spot,
                 disk_size_gb=round(instance_offer.instance.resources.disk.size_mib / 1024),
                 image_id=package.image_id,
             )

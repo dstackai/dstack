@@ -9,7 +9,9 @@ SERVER_CONFIG_FILE_PATH = SERVER_DIR_PATH / "config.yml"
 
 SERVER_DATA_DIR_PATH = SERVER_DIR_PATH / "data"
 SERVER_DATA_DIR_PATH.mkdir(parents=True, exist_ok=True)
-DATABASE_URL = f"sqlite+aiosqlite:///{str(SERVER_DATA_DIR_PATH.absolute())}/sqlite.db"
+DATABASE_URL = os.getenv(
+    "DSTACK_DATABASE_URL", f"sqlite+aiosqlite:///{str(SERVER_DATA_DIR_PATH.absolute())}/sqlite.db"
+)
 
 SERVER_HOST = os.getenv("DSTACK_SERVER_HOST", "localhost")
 SERVER_PORT = int(os.getenv("DSTACK_SERVER_PORT", "8000"))

@@ -409,10 +409,6 @@ async def submit_run(
     if repo is None:
         raise RepoDoesNotExistError.with_id(run_spec.repo_id)
 
-    backends = await backends_services.get_project_backends(project)
-    if len(backends) == 0:
-        raise ServerClientError("No backends configured")
-
     if run_spec.run_name is None:
         run_spec.run_name = await _generate_run_name(
             session=session,
