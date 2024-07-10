@@ -42,7 +42,7 @@ or `train.dstack.yml` are both acceptable).
 
     # (Optional) Configure `gpu`, `memory`, `disk`, etc
     resources:
-      gpu: 80GB
+      gpu: 24GB
     ```
 
     </div>
@@ -65,12 +65,12 @@ or `train.dstack.yml` are both acceptable).
 
     # (Optional) Configure `gpu`, `memory`, `disk`, etc
     resources:
-      gpu: 80GB
+      gpu: 24GB
     ```
 
     </div>
 
-    Ensure `requirements.txt` and `train.py` are in your folder. You can take them from [`dstack-examples`](https://github.com/dstackai/dstack-examples/tree/main/fine-tuning/qlora).
+    Ensure `requirements.txt` and `train.py` are in your folder. You can take them from [`examples`](https://github.com/dstackai/dstack/tree/master/examples/fine-tuning/qlora).
 
 === "Service"
 
@@ -91,7 +91,7 @@ or `train.dstack.yml` are both acceptable).
 
     # (Optional) Configure `gpu`, `memory`, `disk`, etc
     resources:
-      gpu: 80GB
+      gpu: 24GB
     ```
 
     </div>

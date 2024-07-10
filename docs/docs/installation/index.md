@@ -72,6 +72,9 @@ Once the `~/.dstack/server/config.yml` file is configured, proceed to start the 
 
     > For more details on how to deploy `dstack` using Docker, check its [Docker repo](https://hub.docker.com/r/dstackai/dstack).
 
+> By default, `dstack` stores its state in `~/.dstack/server/data` using SQLite.
+> To use a database, set the [`DSTACK_DATABASE_URL`](../reference/cli/index.md#environment-variables) environment variable.
+
 Once the `dstack` server is up, feel free to use the CLI or API to work with it.
 
 ### Set up the CLI
@@ -94,7 +97,7 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-### Adding on-prem clusters
+### Add on-prem clusters
     
 If you'd like to use `dstack` to run workloads on your on-prem clusters,
 check out the [dstack pool add-ssh](../concepts/pools.md#adding-on-prem-clusters) command.

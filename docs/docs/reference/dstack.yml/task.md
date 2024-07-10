@@ -141,7 +141,7 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
       gpu:  tpu-v2-8
     ```
 
-    Currently, only 8 TPU cores can be specified, supporting single TPU device workloads. Multi-TPU support is coming soon.
+    Currently, only 8 TPU cores can be specified, supporting single host workloads. Multi-host support is coming soon.
 
 ??? info "Shared memory"
     If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure 
@@ -225,7 +225,7 @@ is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, 
 
 ??? info "Backends"
     Running on multiple nodes is supported only with `aws`, `gcp`, `azure`, `oci`, and instances added via
-    [`dstack pool add-ssh`](../../concepts/pools.md#adding-on-prem-servers).
+    [`dstack pool add-ssh`](../../concepts/pools.md#adding-on-prem-clusters).
 
 ### Arguments
 
