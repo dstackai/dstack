@@ -5,7 +5,19 @@ import time
 from concurrent.futures import Executor, ThreadPoolExecutor, as_completed
 from functools import reduce
 from itertools import islice
-from typing import Collection, Dict, Iterable, List, Mapping, Optional, Set, Tuple
+from typing import (
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+)
 
 import oci
 from oci.object_storage.models import CreatePreauthenticatedRequestDetails
@@ -20,11 +32,8 @@ from dstack._internal.utils.logging import get_logger
 logger = get_logger(__name__)
 LIST_SHAPES_MAX_LIMIT = 100
 CAPACITY_REPORT_MAX_SHAPES = 10  # undocumented, found by experiment
-LIST_SECURITY_RULES_MAX_LIMIT = 100
 REMOVE_SECURITY_RULES_MAX_CHUNK_SIZE = 25
 ADD_SECURITY_RULES_MAX_CHUNK_SIZE = 25
-LIST_WORK_REQUEST_ERRORS_MAX_LIMIT = 1000
-LIST_PARS_MAX_LIMIT = 1000
 LIST_OBJECTS_MAX_LIMIT = 1000
 VCN_CIDR = "10.0.0.0/16"
 WAIT_FOR_COMPARTMENT_ATTEMPS = 36
@@ -84,6 +93,26 @@ class ShapesQuota:
             return ShapesQuota(list_shapes(regions, compartment_id, executor))
 
 
+def chain_paginated_responses(
+    api_method: Callable[..., oci.response.Response], *args, **kwargs
+) -> Iterator[Any]:
+    """
+    Call `api_method` multiple times to fetch all response pages.
+    Entries from all pages are chained into one iterator.
+
+    It is recommended to always use this function with API methods that support
+    pagination, as OCI's paginated responses are inconsistent, e.g. the first
+    page may have 0 entries while the other pages have more entries.
+    """
+
+    has_next_page = True
+    while has_next_page:
+        resp = api_method(*args, **kwargs)
+        yield from resp.data
+        kwargs["page"] = resp.next_page
+        has_next_page = resp.has_next_page
+
+
 def list_shapes_in_domain(
     availability_domain_name: str, client: oci.core.ComputeClient, compartment_id: str
 ) -> Set[str]:
@@ -91,20 +120,15 @@ def list_shapes_in_domain(
     Returns a set of shape names allowed to be used in `availability_domain_name`.
     """
 
-    shape_names = set()
-    page_id = oci.core.compute_client.missing  # first page
-
-    while page_id is not None:
-        resp = client.list_shapes(
+    return {
+        shape.shape
+        for shape in chain_paginated_responses(
+            client.list_shapes,
             availability_domain=availability_domain_name,
             compartment_id=compartment_id,
             limit=LIST_SHAPES_MAX_LIMIT,
-            page=page_id,
         )
-        shape_names = shape_names.union(shape.shape for shape in resp.data)
-        page_id = resp.headers.get("opc-next-page")
-
-    return shape_names
+    }
 
 
 def list_shapes_in_region(region: OCIRegionClient, compartment_id: str) -> Dict[str, Set[str]]:
@@ -267,12 +291,12 @@ def choose_available_domain(
 def get_instance_vnic(
     instance_id: str, region: OCIRegionClient, compartment_id: str
 ) -> Optional[oci.core.models.Vnic]:
-    attachments: List[oci.core.models.VnicAttachment] = (
-        region.compute_client.list_vnic_attachments(compartment_id, instance_id=instance_id).data
+    attachments: Iterator[oci.core.models.VnicAttachment] = chain_paginated_responses(
+        region.compute_client.list_vnic_attachments, compartment_id, instance_id=instance_id
     )
-    if not attachments:
-        return None
-    return region.virtual_network_client.get_vnic(attachments[0].vnic_id).data
+    if attachment := next(attachments, None):
+        return region.virtual_network_client.get_vnic(attachment.vnic_id).data
+    return None
 
 
 def launch_instance(
@@ -337,13 +361,15 @@ def get_marketplace_listing_and_package(
     if cuda:
         listing_name = f"dstack-cuda-{version.base_image}"
 
-    listing_summaries: List[oci.marketplace.models.ListingSummary] = client.list_listings(
-        name=listing_name,
-        listing_types=[oci.marketplace.models.Listing.LISTING_TYPE_COMMUNITY],
-        limit=1000,
-    ).data
-    # filter by exact match, as list_listings seems to filter by substring
-    listing_summaries = [s for s in listing_summaries if s.name == listing_name]
+    listing_summaries: List[oci.marketplace.models.ListingSummary] = [
+        listing
+        for listing in chain_paginated_responses(
+            client.list_listings,
+            name=listing_name,
+            listing_types=[oci.marketplace.models.Listing.LISTING_TYPE_COMMUNITY],
+        )
+        if listing.name == listing_name  # list_listings returns inexact matches
+    ]
 
     if len(listing_summaries) != 1:
         msg = f"Expected to find 1 listing by name {listing_name}, found {len(listing_summaries)}"
@@ -359,17 +385,20 @@ def accept_marketplace_listing_agreements(
     compartment_id: str,
     client: oci.marketplace.MarketplaceClient,
 ) -> None:
-    accepted_agreements: List[oci.marketplace.models.AcceptedAgreementSummary] = (
-        client.list_accepted_agreements(
+    accepted_agreement_ids = {
+        a.agreement_id
+        for a in chain_paginated_responses(
+            client.list_accepted_agreements,
             compartment_id=compartment_id,
             listing_id=listing.id,
             package_version=listing.default_package_version,
-        ).data
+        )
+    }
+    agreement_summaries: Iterator[oci.marketplace.models.AgreementSummary] = (
+        chain_paginated_responses(
+            client.list_agreements, listing.id, listing.default_package_version
+        )
     )
-    accepted_agreement_ids = {a.agreement_id for a in accepted_agreements}
-    agreement_summaries: List[oci.marketplace.models.AgreementSummary] = client.list_agreements(
-        listing.id, listing.default_package_version
-    ).data
     for agreement_summary in agreement_summaries:
         if agreement_summary.id in accepted_agreement_ids:
             continue
@@ -384,7 +413,7 @@ def accept_marketplace_listing_agreements(
                 compartment_id=compartment_id,
                 listing_id=listing.id,
                 package_version=listing.default_package_version,
-                agreement_id=agreement_summary.id,
+                agreement_id=agreement.id,
                 signature=agreement.signature,
             )
         )
@@ -393,10 +422,11 @@ def accept_marketplace_listing_agreements(
 def get_or_create_compartment(
     name: str, parent_compartment_id: str, client: oci.identity.IdentityClient
 ) -> oci.identity.models.Compartment:
-    if compartments := client.list_compartments(
-        compartment_id=parent_compartment_id, name=name
-    ).data:
-        return compartments[0]
+    query_results = chain_paginated_responses(
+        client.list_compartments, compartment_id=parent_compartment_id, name=name
+    )
+    if compartment := next(query_results, None):
+        return compartment
 
     return client.create_compartment(
         oci.identity.models.CreateCompartmentDetails(
@@ -500,8 +530,11 @@ def set_up_network_resources_in_region(
 def get_or_create_vcn(
     name: str, compartment_id: str, client: oci.core.VirtualNetworkClient
 ) -> oci.core.models.Vcn:
-    if vcns := client.list_vcns(compartment_id=compartment_id, display_name=name).data:
-        return vcns[0]
+    query_results = chain_paginated_responses(
+        client.list_vcns, compartment_id=compartment_id, display_name=name
+    )
+    if vcn := next(query_results, None):
+        return vcn
 
     return client.create_vcn(
         oci.core.models.CreateVcnDetails(
@@ -515,8 +548,11 @@ def get_or_create_vcn(
 def get_or_create_subnet(
     name: str, vcn_id: str, compartment_id: str, client: oci.core.VirtualNetworkClient
 ) -> oci.core.models.Subnet:
-    if subnets := client.list_subnets(compartment_id=compartment_id, display_name=name).data:
-        return subnets[0]
+    query_results = chain_paginated_responses(
+        client.list_subnets, compartment_id=compartment_id, display_name=name
+    )
+    if subnet := next(query_results, None):
+        return subnet
 
     return client.create_subnet(
         oci.core.models.CreateSubnetDetails(
@@ -531,10 +567,14 @@ def get_or_create_subnet(
 def get_or_create_internet_gateway(
     name: str, vcn_id: str, compartment_id: str, client: oci.core.VirtualNetworkClient
 ) -> oci.core.models.InternetGateway:
-    if gateways := client.list_internet_gateways(
-        compartment_id=compartment_id, vcn_id=vcn_id, display_name=name
-    ).data:
-        return gateways[0]
+    query_results = chain_paginated_responses(
+        client.list_internet_gateways,
+        compartment_id=compartment_id,
+        vcn_id=vcn_id,
+        display_name=name,
+    )
+    if gateway := next(query_results, None):
+        return gateway
 
     return client.create_internet_gateway(
         oci.core.models.CreateInternetGatewayDetails(
@@ -561,10 +601,14 @@ def update_route_table(
 def get_or_create_security_group(
     name: str, vcn_id: str, compartment_id: str, client: oci.core.VirtualNetworkClient
 ) -> oci.core.models.NetworkSecurityGroup:
-    if security_groups := client.list_network_security_groups(
-        display_name=name, vcn_id=vcn_id, compartment_id=compartment_id
-    ).data:
-        return security_groups[0]
+    query_results = chain_paginated_responses(
+        client.list_network_security_groups,
+        display_name=name,
+        vcn_id=vcn_id,
+        compartment_id=compartment_id,
+    )
+    if security_group := next(query_results, None):
+        return security_group
 
     return client.create_network_security_group(
         oci.core.models.CreateNetworkSecurityGroupDetails(
@@ -610,17 +654,11 @@ def update_security_group_rules(
 def list_security_group_rules(
     security_group_id: str, client: oci.core.VirtualNetworkClient
 ) -> List[oci.core.models.SecurityRule]:
-    result = []
-    page_id = oci.core.virtual_network_client.missing  # first page
-
-    while page_id is not None:
-        resp = client.list_network_security_group_security_rules(
-            security_group_id, page=page_id, limit=LIST_SECURITY_RULES_MAX_LIMIT
+    return list(
+        chain_paginated_responses(
+            client.list_network_security_group_security_rules, security_group_id
         )
-        result.extend(resp.data)
-        page_id = resp.headers.get("opc-next-page")
-
-    return result
+    )
 
 
 def add_security_group_rules(
@@ -683,12 +721,14 @@ def create_pre_authenticated_request(
 def delete_bucket(
     namespace: str, bucket_name: str, client: oci.object_storage.ObjectStorageClient
 ) -> None:
-    pars: List[oci.object_storage.models.PreauthenticatedRequestSummary]
-    while pars := client.list_preauthenticated_requests(
-        namespace, bucket_name, limit=LIST_PARS_MAX_LIMIT
-    ).data:
-        for par in pars:
-            client.delete_preauthenticated_request(namespace, bucket_name, par.id)
+    par_ids = {
+        par.id
+        for par in chain_paginated_responses(
+            client.list_preauthenticated_requests, namespace, bucket_name
+        )
+    }
+    for par_id in par_ids:
+        client.delete_preauthenticated_request(namespace, bucket_name, par_id)
 
     objects: List[oci.object_storage.models.ObjectSummary]
     while objects := client.list_objects(
@@ -703,9 +743,10 @@ def delete_bucket(
 def find_image(
     name: str, compartment_id: str, client: oci.core.ComputeClient
 ) -> Optional[oci.core.models.Image]:
-    if images := client.list_images(compartment_id=compartment_id, display_name=name).data:
-        return images[0]
-    return None
+    query_results = chain_paginated_responses(
+        client.list_images, compartment_id=compartment_id, display_name=name
+    )
+    return next(query_results, None)
 
 
 def export_image_to_bucket(
@@ -785,6 +826,4 @@ def publish_image_in_marketplace(
 def list_work_request_errors(
     work_request_id: str, client: oci.work_requests.WorkRequestClient
 ) -> List[oci.work_requests.models.WorkRequestError]:
-    return client.list_work_request_errors(
-        work_request_id, limit=LIST_WORK_REQUEST_ERRORS_MAX_LIMIT
-    ).data
+    return list(chain_paginated_responses(client.list_work_request_errors, work_request_id))
