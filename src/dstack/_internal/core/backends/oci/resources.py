@@ -361,7 +361,20 @@ def get_marketplace_listing_and_package(
     if cuda:
         listing_name = f"dstack-cuda-{version.base_image}"
 
-    listing_summaries: List[oci.marketplace.models.ListingSummary] = [
+    listing_summaries = list_marketplace_listings(listing_name, client)
+    if len(listing_summaries) != 1:
+        msg = f"Expected to find 1 listing by name {listing_name}, found {len(listing_summaries)}"
+        raise BackendError(msg)
+
+    listing: oci.marketplace.models.Listing = client.get_listing(listing_summaries[0].id).data
+    package = client.get_package(listing.id, listing.default_package_version).data
+    return listing, package
+
+
+def list_marketplace_listings(
+    listing_name: str, client: oci.marketplace.MarketplaceClient
+) -> List[oci.marketplace.models.ListingSummary]:
+    return [
         listing
         for listing in chain_paginated_responses(
             client.list_listings,
@@ -370,14 +383,6 @@ def get_marketplace_listing_and_package(
         )
         if listing.name == listing_name  # list_listings returns inexact matches
     ]
-
-    if len(listing_summaries) != 1:
-        msg = f"Expected to find 1 listing by name {listing_name}, found {len(listing_summaries)}"
-        raise BackendError(msg)
-
-    listing: oci.marketplace.models.Listing = client.get_listing(listing_summaries[0].id).data
-    package = client.get_package(listing.id, listing.default_package_version).data
-    return listing, package
 
 
 def accept_marketplace_listing_agreements(

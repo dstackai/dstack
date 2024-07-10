@@ -107,6 +107,28 @@ class PublishCommandArgs:
         )
 
 
+@dataclass
+class CheckCommandArgs:
+    image_name: str
+    regions: List[str]
+    compartment_id: str
+
+    @classmethod
+    def setup_parser(cls, parser: ArgumentParser) -> None:
+        parser.add_argument("--image", dest="image_name", required=True)
+        parser.add_argument("--regions", metavar="REGION_NAME", nargs="*")
+        parser.add_argument("--compartment", dest="compartment_id", required=True)
+        parser.set_defaults(to_struct=cls.from_namespace, run_command=check_command)
+
+    @staticmethod
+    def from_namespace(args: Namespace) -> "PublishCommandArgs":
+        return CheckCommandArgs(
+            image_name=args.image_name,
+            regions=args.regions or [],
+            compartment_id=args.compartment_id,
+        )
+
+
 def main() -> None:
     parser = ArgumentParser(description="Tools for delivering OCI images")
     subparsers = parser.add_subparsers()
@@ -129,6 +151,15 @@ def main() -> None:
         ),
     )
     PublishCommandArgs.setup_parser(publish_parser)
+
+    check_parser = subparsers.add_parser(
+        name="check",
+        description=(
+            "Check that Custom Image is published in OCI Marketplace in all subscribed "
+            "regions or in specified regions."
+        ),
+    )
+    CheckCommandArgs.setup_parser(check_parser)
 
     args = parser.parse_args()
     args.run_command(args.to_struct(args))
@@ -177,15 +208,37 @@ def publish_command(args: PublishCommandArgs) -> None:
             compartment_id=args.compartment_id,
             client=region_clients[region_name].marketplace_client,
         )
-        logging.info("Published in %s (%d/%d)", region_name, i, len(regions_for_publishing))
+        logging.info("Submitted in %s (%d/%d)", region_name, i, len(regions_for_publishing))
 
-    logging.info("Published image %s in regions: %s", args.image_name, regions_for_publishing)
+    logging.info("Submitted image %s in regions: %s", args.image_name, regions_for_publishing)
     logging.info(
-        "Note that the publications need to go through OCI's review process "
-        "that may take a few hours. The publications will be unavailable until then. "
-        "See the review statuses at https://cloud.oracle.com/marketplace/community-images. "
-        "Do not forget to choose the region and the compartment."
+        "The publications will now go through OCI's review process that may take a few hours. "
+        "The publications will be unavailable until the review finishes. "
+        "Use `python oci_image_tools.py check` to check publication statuses."
     )
+
+
+def check_command(args: CheckCommandArgs) -> None:
+    region_clients = get_region_clients(required_regions=args.regions)
+    regions_to_check = args.regions or list(region_clients)
+    some_not_published = False
+
+    for region in sorted(regions_to_check):
+        if not resources.list_marketplace_listings(
+            args.image_name, region_clients[region].marketplace_client
+        ):
+            some_not_published = True
+            status = "Not published"
+        else:
+            status = "Published"
+        logging.info("%24s: %s", region, status)
+
+    if some_not_published:
+        raise ScriptError(
+            f"Image {args.image_name} is not published or is still under review in some regions. "
+            "Check the review status by choosing the correct region and compartment here: "
+            "https://cloud.oracle.com/marketplace/community-images"
+        )
 
 
 def get_region_clients(
