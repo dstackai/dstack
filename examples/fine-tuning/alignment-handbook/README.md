@@ -45,7 +45,7 @@ ACCELERATE_LOG_LEVEL=info accelerate launch \
 For more details and other alignment methods, please check out the
 alignment-handbook's [official repository](https://github.com/huggingface/alignment-handbook).
 
-## Running via `dstack`
+## Running via `dstack` {#running-via-dstack}
 
 This example demonstrate how to run an Alignment Handbook recipe via `dstack`.
 
@@ -104,6 +104,64 @@ HUGGING_FACE_HUB_TOKEN=<...> \
 WANDB_API_KEY=<...> \
 dstack run . -f examples/fine-tuning/alignment-handbook/train.dstack.yaml
 ```
+
+## Multi-node 
+
+With `dstack`, we can easily manage multiple nodes with multiple GPUs. To leverage multiple nodes for Alignment Handbook with `dstack`, we need to adjust two things: the configurations of Hugging Face's `accelerate` and the `dstack`'s task description.
+
+### Accelerate configurations
+
+Basically, the configurations of the `accelerate` don't have to be changed. It could remain the same as the `multi_gpu.yaml` used in the previous [Running via `dstack`](#running-via-dstack) section. However, it is worth knowing about the `fsdp_sharding_strategy` configuration.
+
+```yaml
+compute_environment: LOCAL_MACHINE
+distributed_type: FSDP  # Use Fully Sharded Data Parallelism
+fsdp_config: 
+  fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP
+  fsdp_backward_prefetch: BACKWARD_PRE
+  fsdp_cpu_ram_efficient_loading: true
+  fsdp_use_orig_params: false 
+  fsdp_offload_params: true
+  fsdp_sharding_strategy: FULL_SHARD
+  # ... (other FSDP configurations)
+# ... (other configurations)
+```
+
+With the FSDP of `distributed_type` and `FULL_SHARD` of `fsdp_config`’s `fsdp_sharding_strategy`, a model will be sharded across multiple GPUs in a single machine. If there are multiple nodes, each node will have the same model sharded across multiple GPUs within itself. That means each sharded model instance in each node will learn different parts/batches of a given dataset. If you want to shard a model across multiple GPUs on multiple nodes, the value of `fsdp_sharding_strategy` should be set as HYBRID_SHARD.
+
+### dstack task description
+
+Fine-tuning LLMs on multiple nodes means each node should be connected and managed in the same network. `dstack` automatically comes with the features for these. The below `dstack`'s task description assumes that there are three nodes, and each node has two GPUs:
+
+```yaml
+type: task
+python: "3.11" 
+nodes: 3
+env:
+  - ACCEL_CONFIG_PATH
+  - FT_MODEL_CONFIG_PATH
+  - HUGGING_FACE_HUB_TOKEN
+  - WANDB_API_KEY 
+commands:
+  # ... (setup steps, cloning repo, installing requirements)
+  - ACCELERATE_LOG_LEVEL=info accelerate launch \
+      --config_file recipes/custom/accel_config.yaml \
+      --main_process_ip=$DSTACK_MASTER_NODE_IP \
+      --main_process_port=8008 \
+      --machine_rank=$DSTACK_NODE_RANK \
+      --num_processes=$DSTACK_GPUS_NUM \
+      --num_machines=$DSTACK_NODES_NUM \
+      scripts/run_sft.py recipes/custom/config.yaml
+ports:
+  - 6006 
+resources:
+  gpu: 1..2
+  shm_size: 24GB
+```
+
+Once you set `nodes` to the number bigger than `1`, `dstack` magically sets up a multiple nodes' environment. Furthermore, within the yaml file, you can access special variables that `dstack` automatically provides for you. For instance, `$DSTACK_MASTER_NODE_IP`, `$DSTACK_NODE_RANK`, `$DSTACK_GPUS_NUM`, and `$DSTACK_NODES_NUM` variables are the essential pieces of information to run jobs across multiple nodes with `accelerage`. Hence, `dstack` effortlessly integrates with Hugging Face's open source ecosystem. 
+
+Also, it is worth noting that those special variables are better to be determined at runtime instead of hard-coded. It is common to run a job within a cluster of cheaper machines for the unit-testing phase then run the same job with much bigger cluster of expensive machines for the actual fine-tuning phase. `dstack` allows us to focus on setting up the `nodes` and `resources` only. 
 
 ## Results
 
