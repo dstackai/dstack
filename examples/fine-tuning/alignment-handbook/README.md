@@ -145,7 +145,7 @@ env:
 commands:
   # ... (setup steps, cloning repo, installing requirements)
   - ACCELERATE_LOG_LEVEL=info accelerate launch \
-      --config_file recipes/custom/accel_config.yaml \
+      --config_file examples/fine-tuning/alignment-handbook/fsdp_qlora_full_shard.yaml \
       --main_process_ip=$DSTACK_MASTER_NODE_IP \
       --main_process_port=8008 \
       --machine_rank=$DSTACK_NODE_RANK \
@@ -155,13 +155,26 @@ commands:
 ports:
   - 6006 
 resources:
-  gpu: 1..2
+  gpu: 24GB:2
   shm_size: 24GB
 ```
 
 Once you set `nodes` to the number bigger than `1`, `dstack` magically sets up a multiple nodes' environment. Furthermore, within the yaml file, you can access special variables that `dstack` automatically provides for you. For instance, `$DSTACK_MASTER_NODE_IP`, `$DSTACK_NODE_RANK`, `$DSTACK_GPUS_NUM`, and `$DSTACK_NODES_NUM` variables are the essential pieces of information to run jobs across multiple nodes with `accelerage`. Hence, `dstack` effortlessly integrates with Hugging Face's open source ecosystem. 
 
 Also, it is worth noting that those special variables are better to be determined at runtime instead of hard-coded. It is common to run a job within a cluster of cheaper machines for the unit-testing phase then run the same job with much bigger cluster of expensive machines for the actual fine-tuning phase. `dstack` allows us to focus on setting up the `nodes` and `resources` only. 
+
+### Running multi-node task
+
+This tutorial comes with pre-defined yaml files for [accelerate configurations](./fsdp_qlora_full_shard.yaml) and `dstack`'s [task description](./train-distrib.dstack.yaml). You can experience multi-node fine-tuning with `dstack` by running the following commands:
+
+```shell
+HUGGING_FACE_HUB_TOKEN=<...> \
+WANDB_API_KEY=<...> \
+dstack run . -f examples/fine-tuning/alignment-handbook/train-distrib.dstack.yaml
+```
+
+> [!NOTE]
+> Weights and Biases doesn't log everything from multiple nodes since Hugging Face's library doesn't support it yet.
 
 ## Results
 
