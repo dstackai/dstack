@@ -21,12 +21,13 @@ from dstack._internal.core.errors import CLIError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceStatus,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool
 from dstack._internal.core.models.profiles import Profile, SpotPolicy, parse_duration
 from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_MEMORY_SIZE
-from dstack._internal.core.models.runs import InstanceStatus, Requirements, get_policy_map
+from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_pkcs8_to_pem, generate_public_key, rsa_pkey_from_str

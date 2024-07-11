@@ -10,13 +10,13 @@ from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError, ServerClientError
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
+    InstanceStatus,
 )
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     Job,
     JobProvisioningData,
     JobStatus,
@@ -37,7 +37,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.jobs import (
-    PROCESSING_POOL_LOCK,
+    PROCESSING_INSTANCES_LOCK,
     SUBMITTED_PROCESSING_JOBS_IDS,
     SUBMITTED_PROCESSING_JOBS_LOCK,
     find_job,
@@ -241,7 +241,7 @@ async def _run_job_on_pool_instance(
     volumes: Optional[List[Volume]] = None,
 ) -> Optional[InstanceModel]:
     profile = run_spec.merged_profile
-    async with PROCESSING_POOL_LOCK:
+    async with PROCESSING_INSTANCES_LOCK:
         pool_instances = get_pool_instances(pool)
         requirements = Requirements(
             resources=run_spec.configuration.resources,

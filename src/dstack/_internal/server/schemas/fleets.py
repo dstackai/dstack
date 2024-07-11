@@ -1,0 +1,16 @@
+from typing import List
+
+from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.fleets import FleetSpec
+
+
+class GetFleetRequest(CoreModel):
+    name: str
+
+
+class CreateFleetRequest(CoreModel):
+    spec: FleetSpec
+
+
+class DeleteFleetsRequest(CoreModel):
+    names: List[str]

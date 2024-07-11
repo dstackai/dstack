@@ -8,12 +8,12 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
+    InstanceStatus,
     InstanceType,
     Resources,
 )
 from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, TerminationPolicy
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     JobProvisioningData,
     JobStatus,
 )

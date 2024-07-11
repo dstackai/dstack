@@ -1,7 +1,9 @@
 import re
 from typing import Any, Type, Union
 
+from pydantic import Field
 from pydantic_duality import DualBaseModel
+from typing_extensions import Annotated
 
 
 # DualBaseModel creates two classes for the model:
@@ -45,6 +47,22 @@ class Duration(int):
             }[unit]
             return cls(amount * multiplier)
         raise ValueError(f"Cannot parse the duration {v}")
+
+
+class RegistryAuth(CoreModel):
+    """
+    Credentials for pulling a private Docker image.
+
+    Attributes:
+        username (str): The username
+        password (str): The password or access token
+    """
+
+    class Config:
+        frozen = True
+
+    username: Annotated[str, Field(description="The username")]
+    password: Annotated[str, Field(description="The password or access token")]
 
 
 def is_core_model_instance(instance: Any, class_: Type[CoreModel]) -> bool:

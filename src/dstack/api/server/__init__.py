@@ -9,6 +9,7 @@ from dstack import version
 from dstack._internal.core.errors import ClientError, ServerClientError
 from dstack._internal.utils.logging import get_logger
 from dstack.api.server._backends import BackendsAPIClient
+from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
 from dstack.api.server._pools import PoolAPIClient
@@ -89,6 +90,10 @@ class APIClient:
     @property
     def pool(self) -> PoolAPIClient:
         return PoolAPIClient(self._request)
+
+    @property
+    def fleets(self) -> FleetsAPIClient:
+        return FleetsAPIClient(self._request)
 
     @property
     def volumes(self) -> VolumesAPIClient:

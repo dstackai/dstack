@@ -145,9 +145,7 @@ class ProfileParams(CoreModel):
     ]
     termination_policy: Annotated[
         Optional[TerminationPolicy],
-        Field(
-            description="The policy for termination instances. Defaults to `destroy-after-idle`"
-        ),
+        Field(description="The policy for instance termination. Defaults to `destroy-after-idle`"),
     ]
     termination_idle_time: Annotated[
         Optional[Union[str, int]],

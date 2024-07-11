@@ -195,7 +195,7 @@ class TestDeleteVolumes:
         assert volume.deleted
 
     @pytest.mark.asyncio
-    async def test_returns_400_when_deleting_volumes_in_use(self, test_db, session: AsyncSession):
+    async def test_returns_400_when_volumes_in_use(self, test_db, session: AsyncSession):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         pool = await create_pool(session=session, project=project)

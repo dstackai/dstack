@@ -6,7 +6,8 @@ from pydantic import Field, ValidationError, conint, constr, root_validator, val
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import CoreModel, Duration
+from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
+from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import AnyModel, GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
@@ -32,22 +33,6 @@ class PythonVersion(str, Enum):
     PY312 = "3.12"
 
 
-class RegistryAuth(CoreModel):
-    """
-    Credentials for pulling a private Docker image.
-
-    Attributes:
-        username (str): The username
-        password (str): The password or access token
-    """
-
-    class Config:
-        frozen = True
-
-    username: Annotated[str, Field(description="The username")]
-    password: Annotated[str, Field(description="The password or access token")]
-
-
 class PortMapping(CoreModel):
     local_port: Optional[ValidPort] = None
     container_port: ValidPort
@@ -71,18 +56,6 @@ class PortMapping(CoreModel):
         else:
             local_port = int(local_port)
         return PortMapping(local_port=local_port, container_port=int(container_port))
-
-
-class Artifact(CoreModel):
-    path: Annotated[
-        str, Field(description="The path to the folder that must be stored as an output artifact")
-    ]
-    mount: Annotated[
-        bool,
-        Field(
-            description="Must be set to `true` if the artifact files must be saved in real-time"
-        ),
-    ] = False
 
 
 class ScalingSpec(CoreModel):
@@ -317,11 +290,16 @@ def parse_run_configuration(data: dict) -> AnyRunConfiguration:
 
 
 class ApplyConfigurationType(str, Enum):
+    FLEET = "fleet"
     GATEWAY = "gateway"
     VOLUME = "volume"
 
 
-AnyApplyConfiguration = Union[GatewayConfiguration, VolumeConfiguration]
+AnyApplyConfiguration = Union[
+    FleetConfiguration,
+    GatewayConfiguration,
+    VolumeConfiguration,
+]
 
 
 class ApplyConfiguration(CoreModel):

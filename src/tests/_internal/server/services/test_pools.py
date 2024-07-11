@@ -5,9 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.pools as services_pools
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import InstanceType, Resources
+from dstack._internal.core.models.instances import InstanceStatus, InstanceType, Resources
 from dstack._internal.core.models.pools import Instance
-from dstack._internal.core.models.runs import InstanceStatus
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.testing.common import create_project, create_user
 from dstack._internal.utils.common import get_current_datetime

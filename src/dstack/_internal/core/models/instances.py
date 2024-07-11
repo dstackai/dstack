@@ -2,8 +2,7 @@ from enum import Enum
 from typing import List, Optional
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.core.models.common import CoreModel, RegistryAuth
 from dstack._internal.server.services.docker import DockerImage
 from dstack._internal.utils.common import pretty_resources
 
@@ -114,3 +113,18 @@ class InstanceOffer(CoreModel):
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
     instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
+
+
+class InstanceStatus(str, Enum):
+    PENDING = "pending"
+    PROVISIONING = "provisioning"
+    IDLE = "idle"
+    BUSY = "busy"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
+
+    def is_available(self) -> bool:
+        return self in (
+            self.IDLE,
+            self.BUSY,
+        )

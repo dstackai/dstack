@@ -34,6 +34,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceRuntime,
+    InstanceStatus,
     RemoteConnectionInfo,
 )
 from dstack._internal.core.models.profiles import (
@@ -42,7 +43,6 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     JobProvisioningData,
     Requirements,
     Retry,
@@ -53,8 +53,8 @@ from dstack._internal.server.models import InstanceModel, ProjectModel
 from dstack._internal.server.schemas.runner import HealthcheckResponse
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.jobs import (
-    PROCESSING_POOL_IDS,
-    PROCESSING_POOL_LOCK,
+    PROCESSING_INSTANCES_IDS,
+    PROCESSING_INSTANCES_LOCK,
     terminate_job_provisioning_data_instance,
 )
 from dstack._internal.server.services.pools import get_instance_provisioning_data
@@ -82,7 +82,7 @@ logger = get_logger(__name__)
 
 async def process_instances() -> None:
     async with get_session_ctx() as session:
-        async with PROCESSING_POOL_LOCK:
+        async with PROCESSING_INSTANCES_LOCK:
             res = await session.scalars(
                 select(InstanceModel).where(
                     InstanceModel.status.in_(
@@ -94,7 +94,7 @@ async def process_instances() -> None:
                             InstanceStatus.TERMINATING,
                         ]
                     ),
-                    InstanceModel.id.not_in(PROCESSING_POOL_IDS),
+                    InstanceModel.id.not_in(PROCESSING_INSTANCES_IDS),
                 )
             )
             instances = res.all()
@@ -102,16 +102,16 @@ async def process_instances() -> None:
                 return
 
             unprocessed_instances_ids = set(i.id for i in instances)
-            PROCESSING_POOL_IDS.update(unprocessed_instances_ids)
+            PROCESSING_INSTANCES_IDS.update(unprocessed_instances_ids)
 
     try:
         futures = [process_instance(i) for i in instances]
         for future in asyncio.as_completed(futures):
             instance_id = await future
-            PROCESSING_POOL_IDS.remove(instance_id)
+            PROCESSING_INSTANCES_IDS.remove(instance_id)
             unprocessed_instances_ids.remove(instance_id)
     finally:
-        PROCESSING_POOL_IDS.difference_update(unprocessed_instances_ids)
+        PROCESSING_INSTANCES_IDS.difference_update(unprocessed_instances_ids)
 
 
 async def process_instance(instance: InstanceModel) -> UUID:

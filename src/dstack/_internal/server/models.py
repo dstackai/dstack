@@ -25,14 +25,15 @@ from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     JobStatus,
     JobTerminationReason,
     RunStatus,
@@ -323,6 +324,46 @@ class PoolModel(BaseModel):
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="pool", lazy="selectin")
 
 
+class FleetModel(BaseModel):
+    __tablename__ = "fleets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100))
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
+    status: Mapped[FleetStatus] = mapped_column(Enum(FleetStatus))
+    status_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    spec: Mapped[str] = mapped_column(Text)
+
+    instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
+
+
+# class InstanceGroupModel(BaseModel):
+#     __tablename__ = "instance_groups"
+
+#     id: Mapped[uuid.UUID] = mapped_column(
+#         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+#     )
+#     name: Mapped[str] = mapped_column(String(100))
+
+#     fleet_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fleets.id", ondelete="CASCADE"))
+#     fleet: Mapped["FleetModel"] = relationship(foreign_keys=[fleet_id])
+
+#     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="instance_group")
+
+
 class InstanceModel(BaseModel):
     __tablename__ = "instances"
 
@@ -341,6 +382,12 @@ class InstanceModel(BaseModel):
 
     pool_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pools.id"))
     pool: Mapped["PoolModel"] = relationship(back_populates="instances")
+
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
+
+    # instance_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("pools.id"))
+    # instance_group: Mapped[Optional["InstanceGroupModel"]] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
     unreachable: Mapped[bool] = mapped_column(Boolean)

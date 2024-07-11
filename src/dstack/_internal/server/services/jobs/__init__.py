@@ -13,9 +13,8 @@ import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import BackendError, ComputeResourceNotFoundError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RunConfigurationType
-from dstack._internal.core.models.instances import RemoteConnectionInfo
+from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     Job,
     JobProvisioningData,
     JobSpec,
@@ -47,8 +46,8 @@ SUBMITTED_PROCESSING_JOBS_IDS = set()
 RUNNING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 RUNNING_PROCESSING_JOBS_IDS = set()
 
-PROCESSING_POOL_LOCK = asyncio.Lock()
-PROCESSING_POOL_IDS = set()
+PROCESSING_INSTANCES_LOCK = asyncio.Lock()
+PROCESSING_INSTANCES_IDS = set()
 
 TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 TERMINATING_PROCESSING_JOBS_IDS = set()
@@ -218,7 +217,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
     instance: Optional[InstanceModel] = res.scalar()
 
     if instance is not None:
-        await wait_to_lock(PROCESSING_POOL_LOCK, PROCESSING_POOL_IDS, instance.id)
+        await wait_to_lock(PROCESSING_INSTANCES_LOCK, PROCESSING_INSTANCES_IDS, instance.id)
         try:
             await session.refresh(instance)
             # there is an associated instance to empty
@@ -267,7 +266,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             )  # TODO(egor-s) ensure always runs
 
         finally:
-            PROCESSING_POOL_IDS.remove(instance.id)
+            PROCESSING_INSTANCES_IDS.remove(instance.id)
 
     if job_model.termination_reason is not None:
         job_model.status = job_model.termination_reason.to_status()

@@ -21,22 +21,35 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    DockerConfig,
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
+    InstanceStatus,
     InstanceType,
     RemoteConnectionInfo,
     Resources,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, TerminationPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
+from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_NAME,
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    Profile,
+    TerminationPolicy,
+)
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.server import settings
 from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel, UserModel
-from dstack._internal.server.services.jobs import PROCESSING_POOL_LOCK
+from dstack._internal.server.services.docker import parse_image_name
+from dstack._internal.server.services.jobs import PROCESSING_INSTANCES_LOCK
+from dstack._internal.server.services.jobs.configurators.base import (
+    get_default_image,
+    get_default_python_verison,
+)
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
@@ -170,7 +183,7 @@ async def remove_instance(
     pool = await get_pool(session, project, pool_name)
     if pool is None:
         raise ResourceNotExistsError("Pool not found")
-    async with PROCESSING_POOL_LOCK:
+    async with PROCESSING_INSTANCES_LOCK:
         terminated = False
         for instance in pool.instances:
             if instance.name == instance_name:
@@ -226,10 +239,6 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
 
     if instance_model.job is not None:
         instance.job_name = instance_model.job.job_name
-        instance.job_status = instance_model.job.status
-
-    if instance_model.pool is not None:
-        instance.pool_name = instance_model.pool.name
 
     return instance
 
@@ -549,3 +558,69 @@ async def list_user_pool_instances(
     for instance in instance_models:
         instances.append(instance_model_to_instance(instance))
     return instances
+
+
+async def create_instance_model(
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    pool: PoolModel,
+    profile: Profile,
+    requirements: Requirements,
+    instance_name: Optional[str] = None,
+) -> InstanceModel:
+    if instance_name is None:
+        instance_name = await generate_instance_name(
+            session=session, project=project, pool_name=pool.name
+        )
+
+    termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
+    termination_idle_time = profile.termination_idle_time
+    if termination_idle_time is None:
+        termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
+
+    instance = InstanceModel(
+        id=uuid.uuid4(),
+        name=instance_name,
+        project=project,
+        pool=pool,
+        created_at=common_utils.get_current_datetime(),
+        status=InstanceStatus.PENDING,
+        unreachable=False,
+        profile=profile.json(),
+        requirements=requirements.json(),
+        instance_configuration=None,
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
+    )
+    logger.info(
+        "Added a new instance %s",
+        instance.name,
+        extra={
+            "instance_name": instance.name,
+            "instance_status": InstanceStatus.PENDING.value,
+        },
+    )
+    session.add(instance)
+    await session.commit()
+
+    project_ssh_key = SSHKey(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
+    instance_config = InstanceConfiguration(
+        project_name=project.name,
+        instance_name=instance_name,
+        instance_id=str(instance.id),
+        ssh_keys=[project_ssh_key],
+        job_docker_config=DockerConfig(
+            image=dstack_default_image,
+            registry_auth=None,
+        ),
+        user=user.name,
+    )
+    instance.instance_configuration = instance_config.json()
+    await session.commit()
+
+    return instance

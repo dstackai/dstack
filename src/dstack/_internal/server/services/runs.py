@@ -28,6 +28,7 @@ from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
+    InstanceStatus,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance
@@ -39,7 +40,6 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     Job,
     JobPlan,
     JobProvisioningData,
@@ -602,11 +602,6 @@ async def create_instance(
         raise ServerClientError(
             f"Backends {backends} do not support create_instance. Try to select other backends."
         )
-
-    if not offers:
-        raise ServerClientError(
-            "Failed to find offers to create the instance."
-        )  # TODO(sergeyme): ComputeError?
 
     pool = await pools_services.get_or_create_pool_by_name(session, project, profile.pool_name)
     instance_name = await generate_instance_name(

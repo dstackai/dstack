@@ -965,12 +965,11 @@ class TestCreateInstance:
                 "instance_type": None,
                 "name": result["name"],
                 "job_name": None,
-                "job_status": None,
                 "hostname": None,
                 "status": "pending",
                 "unreachable": False,
                 "created": result["created"],
-                "pool_name": "default-pool",
+                "pool_name": None,
                 "region": None,
                 "price": None,
             }
