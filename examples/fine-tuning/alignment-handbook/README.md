@@ -165,7 +165,7 @@ Also, it is worth noting that those special variables are better to be determine
 
 ### Running multi-node task
 
-This tutorial comes with pre-defined yaml files for [accelerate configurations](./fsdp_qlora_full_shard.yaml) and `dstack`'s [task description](./train-distrib.dstack.yaml). You can experience multi-node fine-tuning with `dstack` by running the following commands:
+This tutorial comes with pre-defined yaml files for [accelerate configurations](./fsdp_qlora_full_shard.yaml) and `dstack`'s [task description](./train-distrib.dstack.yml). You can experience multi-node fine-tuning with `dstack` by running the following commands:
 
 ```shell
 HUGGING_FACE_HUB_TOKEN=<...> \
