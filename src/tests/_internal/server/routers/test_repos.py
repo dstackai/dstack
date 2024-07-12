@@ -153,13 +153,10 @@ class TestInitRepo:
             "repo_id": "test_repo",
             "repo_info": {
                 "repo_type": "remote",
-                "repo_host_name": "github.com",
-                "repo_port": None,
-                "repo_user_name": "dstackai",
                 "repo_name": "dstack",
             },
             "repo_creds": {
-                "protocol": "https",
+                "clone_url": "https://github.com/dstackai/dstack.git",
                 "private_key": None,
                 "oauth_token": "test_token",
             },
@@ -187,13 +184,10 @@ class TestInitRepo:
             "repo_id": "test_repo",
             "repo_info": {
                 "repo_type": "remote",
-                "repo_host_name": "github.com",
-                "repo_port": None,
-                "repo_user_name": "dstackai",
                 "repo_name": "dstack",
             },
             "repo_creds": {
-                "protocol": "https",
+                "clone_url": "https://github.com/dstackai/dstack.git",
                 "private_key": None,
                 "oauth_token": "test_token",
             },
@@ -208,13 +202,10 @@ class TestInitRepo:
             "repo_id": "test_repo",
             "repo_info": {
                 "repo_type": "remote",
-                "repo_host_name": "github.com",
-                "repo_port": None,
-                "repo_user_name": "dstackai",
                 "repo_name": "dstack",
             },
             "repo_creds": {
-                "protocol": "https",
+                "clone_url": "https://github.com/dstackai/dstack.git",
                 "private_key": None,
                 "oauth_token": "test_token_updated",
             },

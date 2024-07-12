@@ -1,19 +1,22 @@
 import io
+import re
 import subprocess
 import time
-from typing import BinaryIO, Optional
+from dataclasses import dataclass
+from typing import BinaryIO, Callable, Dict, Optional
 
 import git
-import giturlparse
+import pydantic
 from pydantic import Field
 from typing_extensions import Literal
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo, RepoProtocol
+from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.path import PathLike
-from dstack._internal.utils.ssh import get_host_config
+
+SCP_LOCATION_REGEX = re.compile(r"(?P<user>[^/]+)@(?P<host>[^/]+?):(?P<path>.+)", re.IGNORECASE)
 
 
 class RepoError(DstackError):
@@ -21,16 +24,13 @@ class RepoError(DstackError):
 
 
 class RemoteRepoCreds(CoreModel):
-    protocol: RepoProtocol
+    clone_url: str
     private_key: Optional[str]
     oauth_token: Optional[str]
 
 
 class RemoteRepoInfo(BaseRepoInfo):
     repo_type: Literal["remote"] = "remote"
-    repo_host_name: str
-    repo_port: Optional[int]
-    repo_user_name: str
     repo_name: str
 
 
@@ -42,39 +42,8 @@ class RemoteRunRepoData(RemoteRepoInfo):
     repo_config_email: Optional[str] = None
 
     @staticmethod
-    def from_url(url: str, parse_ssh_config: bool = True):
-        url = giturlparse.parse(url)
-        data = RemoteRunRepoData(
-            repo_host_name=url.resource,
-            repo_port=url.port,
-            repo_user_name=url.owner,
-            repo_name=url.name,
-        )
-        if parse_ssh_config and url.protocol == "ssh":
-            host_config = get_host_config(data.repo_host_name)
-            data.repo_host_name = host_config.get("hostname", data.repo_host_name)
-            data.repo_port = host_config.get("port", data.repo_port)
-        return data
-
-    def path(self, sep: str = ".") -> str:
-        return sep.join(
-            [
-                self.repo_host_name
-                if self.repo_port is None
-                else f"{self.repo_host_name}:{self.repo_port}",
-                self.repo_user_name,
-                self.repo_name,
-            ]
-        )
-
-    def make_url(self, protocol: RepoProtocol, oauth_token: Optional[str] = None) -> str:
-        if protocol == RepoProtocol.HTTPS:
-            return f"https://{(oauth_token + '@') if oauth_token else ''}{self.path(sep='/')}.git"
-        elif protocol == RepoProtocol.SSH:
-            if self.repo_port:
-                return f"ssh@{self.path(sep='/')}.git"
-            else:
-                return f"git@{self.repo_host_name}:{self.repo_user_name}/{self.repo_name}.git"
+    def from_url(url: str):
+        return RemoteRunRepoData(repo_name=GitRepoURL.parse(url).get_repo_name())
 
 
 class RemoteRepo(Repo):
@@ -173,7 +142,7 @@ class RemoteRepo(Repo):
             if tracking_branch is None:
                 raise RepoError("No remote branch is configured")
             self.repo_url = repo.remote(tracking_branch.remote_name).url
-            repo_data = RemoteRunRepoData.from_url(self.repo_url, parse_ssh_config=True)
+            repo_data = RemoteRunRepoData.from_url(self.repo_url)
             repo_data.repo_branch = tracking_branch.remote_head
             repo_data.repo_hash = tracking_branch.commit.hexsha
             repo_data.repo_config_name = repo.config_reader().get_value("user", "name", "") or None
@@ -182,7 +151,7 @@ class RemoteRepo(Repo):
             )
             repo_data.repo_diff = _repo_diff_verbose(repo, repo_data.repo_hash)
         elif self.repo_url is not None:
-            repo_data = RemoteRunRepoData.from_url(self.repo_url, parse_ssh_config=True)
+            repo_data = RemoteRunRepoData.from_url(self.repo_url)
             if repo_branch is not None:
                 repo_data.repo_branch = repo_branch
             if repo_hash is not None:
@@ -191,7 +160,9 @@ class RemoteRepo(Repo):
             raise RepoError("No remote repo data provided")
 
         if repo_id is None:
-            repo_id = slugify(repo_data.repo_name, repo_data.path("/"))
+            repo_id = slugify(
+                repo_data.repo_name, GitRepoURL.parse(self.repo_url).get_unique_location()
+            )
         self.repo_id = repo_id
         self.run_repo_data = repo_data
 
@@ -201,12 +172,7 @@ class RemoteRepo(Repo):
         return get_sha256(fp)
 
     def get_repo_info(self) -> RemoteRepoInfo:
-        return RemoteRepoInfo(
-            repo_host_name=self.run_repo_data.repo_host_name,
-            repo_port=self.run_repo_data.repo_port,
-            repo_user_name=self.run_repo_data.repo_user_name,
-            repo_name=self.run_repo_data.repo_name,
-        )
+        return RemoteRepoInfo(repo_name=self.run_repo_data.repo_name)
 
 
 class _DiffCollector:
@@ -239,6 +205,93 @@ class _DiffCollector:
         if self.warned:
             print()
         return self.buffer.getvalue()
+
+
+@dataclass
+class GitRepoURL:
+    """
+    Class for best-effort repo URLs parsing and conversion to https:// or ssh:// form.
+    """
+
+    ssh_user: Optional[str]
+    host: str
+    https_port: Optional[str]
+    ssh_port: Optional[str]
+    path: str
+
+    original_host: str  # before SSH config lookup
+
+    @staticmethod
+    def parse(
+        value: str,
+        get_ssh_config: Callable[[str], Dict[str, str]] = lambda host: {},
+    ) -> "GitRepoURL":
+        try:
+            url = pydantic.parse_obj_as(pydantic.AnyUrl, value)
+        except pydantic.ValidationError:
+            url = scp_location_to_ssh_url(value)
+
+        if url is None:
+            raise RepoError(f"Could not parse git URL {value}")
+
+        ssh_config = get_ssh_config(url.host)
+
+        if url.scheme.lower() == "https":
+            return GitRepoURL(
+                ssh_user=ssh_config.get("user"),
+                host=url.host.lower(),
+                https_port=url.port,
+                ssh_port=ssh_config.get("port"),
+                path=url.path or "/",
+                original_host=url.host.lower(),
+            )
+
+        if url.scheme.lower() == "ssh":
+            return GitRepoURL(
+                ssh_user=url.user or ssh_config.get("user"),
+                host=ssh_config.get("hostname", "").lower() or url.host.lower(),
+                https_port=None,
+                ssh_port=url.port or ssh_config.get("port"),
+                path=url.path or "/",
+                original_host=url.host.lower(),
+            )
+
+        raise RepoError(f"Unsupported URL scheme {url.scheme}")
+
+    def as_https(self, oauth_token: Optional[str] = None) -> str:
+        optional_creds = f"{oauth_token}@" if oauth_token else ""
+        optional_port = f":{self.https_port}" if self.https_port else ""
+        return f"https://{optional_creds}{self.host}{optional_port}{self.path}"
+
+    def as_ssh(self) -> str:
+        user = self.ssh_user or "git"
+        optional_port = f":{self.ssh_port}" if self.ssh_port else ""
+        return f"ssh://{user}@{self.host}{optional_port}{self.path}"
+
+    def get_clean_path(self) -> str:
+        return self.path.rstrip("/").rstrip(".git")
+
+    def get_repo_name(self) -> str:
+        return self.get_clean_path().rsplit("/")[-1] or "unknown"
+
+    def get_unique_location(self) -> str:
+        return self.host + self.get_clean_path()
+
+
+def scp_location_to_ssh_url(scp_location: str) -> Optional[pydantic.AnyHttpUrl]:
+    """
+    Converts scp-format location to SSH URL.
+    E.g. git@github.com:dstackai/dstack.git" -> ssh://git@github.com/dstackai/dstack.git
+    """
+
+    match = re.match(SCP_LOCATION_REGEX, scp_location)
+    if match is None:
+        return None
+    user, host, path = match.group("user"), match.group("host"), match.group("path")
+    try:
+        return pydantic.parse_obj_as(pydantic.AnyUrl, f"ssh://{user}@{host}/{path}")
+    except pydantic.ValidationError:
+        return None
 
 
 def _interactive_git_proc(
