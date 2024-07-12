@@ -7,6 +7,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
@@ -33,8 +34,44 @@ class InstanceGroupPlacement(str, Enum):
     CLUSTER = "cluster"
 
 
+class SSHHostParams(CoreModel):
+    hostname: Annotated[
+        Optional[str], Field(description="The IP address or domain to connect to")
+    ] = None
+    port: Annotated[
+        Optional[int], Field(description="The SSH port to connect to on this host")
+    ] = None
+    user: Annotated[Optional[str], Field(description="The user to log in with on this host")] = (
+        None
+    )
+    ssh_key_path: Annotated[
+        Optional[str], Field(description="The private key to use for this host")
+    ] = None
+    # TODO: do not return ssh key in api
+    ssh_key: Optional[SSHKey] = None
+
+
+class SSHParams(CoreModel):
+    user: Annotated[Optional[str], Field(description="The user to log in with on all hosts")] = (
+        None
+    )
+    port: Annotated[Optional[int], Field(description="The SSH port to connect to")] = None
+    ssh_key_path: Annotated[
+        Optional[str], Field(description="The private key to use for all hosts")
+    ] = None
+    ssh_key: Optional[SSHKey] = None
+    hosts: Annotated[
+        List[Union[SSHHostParams, str]], Field(description="The per host connection parameters")
+    ]
+
+
 class InstanceGroupParams(CoreModel):
-    nodes: Annotated[Range[int], Field(description="The number of instances")]
+    ssh: Annotated[
+        Optional[SSHParams],
+        Field(description="The parameters for adding instances via SSH"),
+    ] = None
+
+    nodes: Annotated[Optional[Range[int]], Field(description="The number of instances")] = None
     placement: Annotated[
         Optional[InstanceGroupPlacement],
         Field(description="The placement of instances"),
@@ -92,7 +129,7 @@ class FleetProps(CoreModel):
     name: Annotated[Optional[str], Field(description="The fleet name")] = None
 
 
-class FleetConfiguration(FleetProps, InstanceGroupParams):
+class FleetConfiguration(InstanceGroupParams, FleetProps):
     pass
 
 

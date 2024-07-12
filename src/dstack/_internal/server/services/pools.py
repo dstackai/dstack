@@ -569,6 +569,8 @@ async def create_instance_model(
     requirements: Requirements,
     instance_name: Optional[str] = None,
 ) -> InstanceModel:
+    # TODO: remove commit
+
     if instance_name is None:
         instance_name = await generate_instance_name(
             session=session, project=project, pool_name=pool.name
@@ -622,5 +624,76 @@ async def create_instance_model(
     )
     instance.instance_configuration = instance_config.json()
     await session.commit()
-
     return instance
+
+
+async def create_ssh_instance_model(
+    session: AsyncSession,
+    project: ProjectModel,
+    pool: PoolModel,
+    instance_name: Optional[str],
+    instance_network: Optional[str],
+    region: Optional[str],
+    host: str,
+    port: int,
+    ssh_user: str,
+    ssh_keys: List[SSHKey],
+) -> InstanceModel:
+    # TODO: remove commit
+    # TODO: check instance is not added already
+
+    if instance_name is None:
+        instance_name = await generate_instance_name(session, project, pool_name=pool.name)
+
+    # TODO: doc - will overwrite after remote connected
+    instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
+    instance_type = InstanceType(name="ssh", resources=instance_resource)
+
+    host_region = region if region is not None else "remote"
+
+    remote = JobProvisioningData(
+        backend=BackendType.REMOTE,
+        instance_type=instance_type,
+        instance_id=instance_name,
+        hostname=host,
+        region=host_region,
+        internal_ip=None,
+        instance_network=instance_network,
+        price=0,
+        username=ssh_user,
+        ssh_port=port,
+        dockerized=True,
+        backend_data="",
+        ssh_proxy=None,
+    )
+    offer = InstanceOfferWithAvailability(
+        backend=BackendType.REMOTE,
+        instance=instance_type,
+        region=host_region,
+        price=0.0,
+        availability=InstanceAvailability.AVAILABLE,
+    )
+    ssh_connection_info = RemoteConnectionInfo(
+        host=host, port=port, ssh_user=ssh_user, ssh_keys=ssh_keys
+    )
+    im = InstanceModel(
+        id=uuid.uuid4(),
+        name=instance_name,
+        project=project,
+        pool=pool,
+        backend=BackendType.REMOTE,
+        created_at=common_utils.get_current_datetime(),
+        started_at=common_utils.get_current_datetime(),
+        status=InstanceStatus.PENDING,
+        unreachable=False,
+        job_provisioning_data=remote.json(),
+        remote_connection_info=ssh_connection_info.json(),
+        offer=offer.json(),
+        region=offer.region,
+        price=offer.price,
+        termination_policy=TerminationPolicy.DONT_DESTROY,
+        termination_idle_time=0,
+    )
+    session.add(im)
+    await session.commit()
+    return im

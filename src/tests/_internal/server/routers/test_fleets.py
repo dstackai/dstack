@@ -9,7 +9,8 @@ from freezegun import freeze_time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.fleets import FleetConfiguration, SSHParams
+from dstack._internal.core.models.instances import InstanceStatus, SSHKey
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import FleetModel, InstanceModel
@@ -146,6 +147,7 @@ class TestCreateFleet:
                 "configuration": {
                     "nodes": {"min": 1, "max": 1},
                     "placement": None,
+                    "ssh": None,
                     "resources": {
                         "cpu": {"min": 2, "max": None},
                         "memory": {"min": 8.0, "max": None},
@@ -207,6 +209,119 @@ class TestCreateFleet:
         assert res.scalar_one()
         res = await session.execute(select(InstanceModel))
         assert res.scalar_one()
+
+    @pytest.mark.asyncio
+    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    async def test_creates_ssh_fleet(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        spec = get_fleet_spec(
+            conf=FleetConfiguration(
+                name="test-ssh-fleet",
+                ssh=SSHParams(
+                    user="ubuntu",
+                    ssh_key=SSHKey(public="", private="123"),
+                    hosts=["1.1.1.1"],
+                ),
+            )
+        )
+        with patch("uuid.uuid4") as m:
+            m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+            response = client.post(
+                f"/api/project/{project.name}/fleets/create",
+                headers=get_auth_headers(user.token),
+                json={"spec": spec.dict()},
+            )
+        assert response.status_code == 200
+        assert response.json() == {
+            "name": spec.configuration.name,
+            "project_name": project.name,
+            "spec": {
+                "configuration": {
+                    "ssh": {
+                        "user": "ubuntu",
+                        "port": None,
+                        "ssh_key_path": None,
+                        "ssh_key": {"public": "", "private": "123"},
+                        "hosts": ["1.1.1.1"],
+                    },
+                    "nodes": None,
+                    "placement": None,
+                    "resources": {
+                        "cpu": {"min": 2, "max": None},
+                        "memory": {"min": 8.0, "max": None},
+                        "shm_size": None,
+                        "gpu": None,
+                        "disk": {"size": {"min": 100.0, "max": None}},
+                    },
+                    "backends": None,
+                    "regions": None,
+                    "instance_types": None,
+                    "spot_policy": None,
+                    "retry": None,
+                    "max_price": None,
+                    "termination_policy": None,
+                    "termination_idle_time": None,
+                    "type": "fleet",
+                    "name": spec.configuration.name,
+                },
+                "profile": {
+                    "backends": None,
+                    "regions": None,
+                    "instance_types": None,
+                    "spot_policy": None,
+                    "retry": None,
+                    "retry_policy": None,
+                    "max_duration": None,
+                    "max_price": None,
+                    "pool_name": None,
+                    "instance_name": None,
+                    "creation_policy": None,
+                    "termination_policy": None,
+                    "termination_idle_time": None,
+                    "name": "",
+                    "default": False,
+                },
+            },
+            "created_at": "2023-01-02T03:04:00+00:00",
+            "status": "active",
+            "status_message": None,
+            "instances": [
+                {
+                    "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                    "project_name": project.name,
+                    "backend": "remote",
+                    "instance_type": {
+                        "name": "ssh",
+                        "resources": {
+                            "cpus": 2,
+                            "memory_mib": 8,
+                            "gpus": [],
+                            "spot": False,
+                            "disk": {"size_mib": 102400},
+                            "description": "",
+                        },
+                    },
+                    "name": f"{spec.configuration.name}-0",
+                    "pool_name": None,
+                    "job_name": None,
+                    "hostname": "1.1.1.1",
+                    "status": "pending",
+                    "unreachable": False,
+                    "created": "2023-01-02T03:04:00+00:00",
+                    "region": "remote",
+                    "price": 0.0,
+                }
+            ],
+        }
+        res = await session.execute(select(FleetModel))
+        assert res.scalar_one()
+        res = await session.execute(select(InstanceModel))
+        instance = res.scalar_one()
+        assert instance.remote_connection_info is not None
 
 
 class TestDeleteFleets:

@@ -133,17 +133,27 @@ async def create_fleet(
         instances=[],
     )
     session.add(fleet_model)
-    # TODO: require min nodes?
-    for i in range(spec.configuration.nodes.min):
-        instance_model = await create_fleet_instance_model(
+    if spec.configuration.ssh is not None:
+        instances_models = await create_fleet_ssh_instance_models(
             session=session,
             project=project,
             user=user,
             pool=pool,
             fleet_spec=spec,
-            instance_num=i,
         )
-        fleet_model.instances.append(instance_model)
+        fleet_model.instances.extend(instances_models)
+    else:
+        # TODO: require min nodes?
+        for i in range(spec.configuration.nodes.min):
+            instance_model = await create_fleet_instance_model(
+                session=session,
+                project=project,
+                user=user,
+                pool=pool,
+                fleet_spec=spec,
+                instance_num=i,
+            )
+            fleet_model.instances.append(instance_model)
     await session.commit()
     return fleet_model_to_fleet(fleet_model)
 
@@ -172,6 +182,42 @@ async def create_fleet_instance_model(
         instance_name=f"{fleet_spec.configuration.name}-{instance_num}",
     )
     return instance_model
+
+
+async def create_fleet_ssh_instance_models(
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    pool: PoolModel,
+    fleet_spec: FleetSpec,
+) -> List[InstanceModel]:
+    instances_models = []
+    for i, host in enumerate(fleet_spec.configuration.ssh.hosts):
+        if isinstance(host, str):
+            hostname = host
+            ssh_user = fleet_spec.configuration.ssh.user
+            ssh_key = fleet_spec.configuration.ssh.ssh_key
+            port = fleet_spec.configuration.ssh.port
+        else:
+            hostname = host.hostname
+            ssh_user = host.user or fleet_spec.configuration.ssh.user
+            ssh_key = host.ssh_key or fleet_spec.configuration.ssh.ssh_key
+            port = host.port or fleet_spec.configuration.ssh.port
+
+        im = await pools_services.create_ssh_instance_model(
+            session=session,
+            project=project,
+            pool=pool,
+            instance_name=f"{fleet_spec.configuration.name}-{i}",
+            region="remote",
+            host=hostname,
+            ssh_user=ssh_user,
+            ssh_keys=[ssh_key],
+            instance_network=None,
+            port=port or 22,
+        )
+        instances_models.append(im)
+    return instances_models
 
 
 async def delete_fleets(session: AsyncSession, project: ProjectModel, names: List[str]):

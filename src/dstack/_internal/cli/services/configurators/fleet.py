@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+from typing import Optional
 
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
 from dstack._internal.cli.utils.common import confirm_ask, console
@@ -7,7 +8,12 @@ from dstack._internal.cli.utils.fleet import print_fleets_table
 from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec
+from dstack._internal.core.models.instances import SSHKey
+from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.ssh import convert_pkcs8_to_pem, generate_public_key, rsa_pkey_from_str
 from dstack.api.utils import load_profile
+
+logger = get_logger(__name__)
 
 
 class FleetConfigurator(BaseApplyConfigurator):
@@ -19,6 +25,7 @@ class FleetConfigurator(BaseApplyConfigurator):
             configuration=conf,
             profile=profile,
         )
+        _preprocess_spec(spec)
         confirmed = False
         if conf.name is not None:
             try:
@@ -87,3 +94,28 @@ class FleetConfigurator(BaseApplyConfigurator):
             )
 
         console.print(f"Fleet [code]{conf.name}[/] deleted")
+
+
+def _preprocess_spec(spec: FleetSpec):
+    if spec.configuration.ssh is not None:
+        spec.configuration.ssh.ssh_key = _resolve_ssh_key(spec.configuration.ssh.ssh_key_path)
+        for host in spec.configuration.ssh.hosts:
+            if not isinstance(host, str):
+                host.ssh_key = _resolve_ssh_key(host.ssh_key_path)
+
+
+def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:
+    if ssh_key_path is None:
+        return None
+    ssh_key_path_obj = Path(ssh_key_path).expanduser()
+    try:
+        private_key = convert_pkcs8_to_pem(ssh_key_path_obj.read_text())
+        try:
+            pub_key = ssh_key_path_obj.with_suffix(".pub").read_text()
+        except FileNotFoundError:
+            pub_key = generate_public_key(rsa_pkey_from_str(private_key))
+        return SSHKey(public=pub_key, private=private_key)
+    except OSError as e:
+        logger.debug("Got OSError: %s", repr(e))
+        console.print("[error]Unable to read the SSH key.[/]")
+        exit()
