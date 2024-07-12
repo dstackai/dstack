@@ -123,7 +123,6 @@ async def create_fleet(
     pool = await pools_services.get_or_create_pool_by_name(
         session=session, project=project, pool_name=None
     )
-
     fleet_model = FleetModel(
         id=uuid.uuid4(),
         name=spec.configuration.name,
@@ -295,6 +294,7 @@ async def generate_fleet_name(session: AsyncSession, project: ProjectModel) -> s
 def _validate_fleet_spec(spec: FleetSpec):
     if spec.configuration.name is not None:
         validate_dstack_resource_name(spec.configuration.name)
+    # TODO validate ssh params
 
 
 async def _terminate_fleet_instances(fleet_model: FleetModel):

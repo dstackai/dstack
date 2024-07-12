@@ -52,6 +52,7 @@ class SSHHostParams(CoreModel):
 
 
 class SSHParams(CoreModel):
+    # TODO: network
     user: Annotated[Optional[str], Field(description="The user to log in with on all hosts")] = (
         None
     )
