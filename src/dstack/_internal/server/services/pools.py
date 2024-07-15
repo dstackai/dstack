@@ -406,7 +406,7 @@ def filter_pool_instances(
         backend_types = [b for b in backend_types if b == master_job_provisioning_data.backend]
         if not regions:
             regions = [master_job_provisioning_data.region]
-        regions = [b for b in backend_types if b == master_job_provisioning_data.region]
+        regions = [r for r in regions if r == master_job_provisioning_data.region]
 
     for instance in pool_instances:
         if instance.unreachable:

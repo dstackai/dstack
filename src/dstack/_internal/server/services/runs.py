@@ -370,7 +370,7 @@ async def get_offers_by_requirements(
         if not regions:
             regions = [master_job_provisioning_data.region]
         backend_types = [b for b in backend_types if b == master_job_provisioning_data.backend]
-        regions = [b for b in backend_types if b == master_job_provisioning_data.region]
+        regions = [r for r in regions if r == master_job_provisioning_data.region]
 
     if backend_types is not None:
         backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
