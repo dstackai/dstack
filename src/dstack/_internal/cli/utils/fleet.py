@@ -53,4 +53,18 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
             ]
             table.add_row(*row)
 
+        if len(fleet.instances) == 0:
+            row = [
+                fleet.name,
+                "-",
+                "-",
+                "-",
+                "-",
+                "-",
+                "-",
+                "-",
+                pretty_date(fleet.created_at),
+            ]
+            table.add_row(*row)
+
     return table

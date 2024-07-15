@@ -194,12 +194,21 @@ class RunModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
-    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
-    repo: Mapped["RepoModel"] = relationship()
+
     user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped["UserModel"] = relationship()
+
+    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    repo: Mapped["RepoModel"] = relationship()
+
+    # Runs reference fleets so that fleets cannot be deleted while they are used.
+    # A fleet can have no busy instances but still be used by a run (e.g. a service with 0 replicas).
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="runs")
+
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     run_name: Mapped[str] = mapped_column(String(100))
     status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
@@ -347,6 +356,7 @@ class FleetModel(BaseModel):
 
     spec: Mapped[str] = mapped_column(Text)
 
+    runs: Mapped[List["RunModel"]] = relationship(back_populates="fleet")
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
 
 

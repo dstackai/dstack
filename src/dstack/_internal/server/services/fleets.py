@@ -241,6 +241,7 @@ async def delete_fleets(session: AsyncSession, project: ProjectModel, names: Lis
                 FleetModel.deleted == False,
             )
             .options(joinedload(FleetModel.instances))
+            .options(joinedload(FleetModel.runs))
             .execution_options(populate_existing=True)
         )
         fleet_models = res.scalars().unique().all()
@@ -291,6 +292,17 @@ async def generate_fleet_name(session: AsyncSession, project: ProjectModel) -> s
             return name
 
 
+def is_fleet_in_use(fleet_model: FleetModel) -> bool:
+    instances_in_use = [i for i in fleet_model.instances if i.job_id is not None]
+    active_runs = [r for r in fleet_model.runs if not r.status.is_finished()]
+    return len(instances_in_use) > 0 or len(active_runs) > 0
+
+
+def is_fleet_empty(fleet_model: FleetModel) -> bool:
+    active_instances = [i for i in fleet_model.instances if not i.deleted]
+    return len(active_instances) == 0
+
+
 def _validate_fleet_spec(spec: FleetSpec):
     if spec.configuration.name is not None:
         validate_dstack_resource_name(spec.configuration.name)
@@ -298,8 +310,7 @@ def _validate_fleet_spec(spec: FleetSpec):
 
 
 async def _terminate_fleet_instances(fleet_model: FleetModel):
-    instances_in_use = [i for i in fleet_model.instances if i.job_id is not None]
-    if len(instances_in_use) > 0:
+    if is_fleet_in_use(fleet_model):
         raise ServerClientError(f"Failed to delete fleet {fleet_model.name}. Fleet is in use.")
     instances_ids = sorted([i.id for i in fleet_model.instances])
     await wait_to_lock_many(PROCESSING_INSTANCES_LOCK, PROCESSING_INSTANCES_IDS, instances_ids)

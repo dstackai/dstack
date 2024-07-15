@@ -359,6 +359,7 @@ async def create_fleet(
         created_at=created_at,
         spec=spec.json(),
         instances=[],
+        runs=[],
     )
     session.add(fm)
     await session.commit()
