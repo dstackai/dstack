@@ -201,14 +201,14 @@ def repo_model_to_repo_head(
     include_creds: bool = False,
 ) -> AnyRepoHead:
     if include_creds:
-        return RepoHeadWithCreds.parse_obj(
+        return RepoHeadWithCreds.__response__.parse_obj(
             {
                 "repo_id": repo_model.name,
                 "repo_info": json.loads(repo_model.info),
                 "repo_creds": json.loads(repo_model.creds) if repo_model.creds else None,
             }
         )
-    return RepoHead.parse_obj(
+    return RepoHead.__response__.parse_obj(
         {
             "repo_id": repo_model.name,
             "repo_info": json.loads(repo_model.info),

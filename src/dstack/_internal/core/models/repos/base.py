@@ -12,6 +12,11 @@ class RepoType(str, Enum):
     VIRTUAL = "virtual"
 
 
+class RepoProtocol(str, Enum):
+    SSH = "ssh"
+    HTTPS = "https"
+
+
 class BaseRepoInfo(CoreModel):
     repo_type: str
 

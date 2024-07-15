@@ -12,9 +12,10 @@ from typing_extensions import Literal
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo
+from dstack._internal.core.models.repos.base import BaseRepoInfo, Repo, RepoProtocol
 from dstack._internal.utils.hash import get_sha256, slugify
 from dstack._internal.utils.path import PathLike
+from dstack._internal.utils.ssh import get_host_config
 
 SCP_LOCATION_REGEX = re.compile(r"(?P<user>[^/]+)@(?P<host>[^/]+?):(?P<path>.+)", re.IGNORECASE)
 
@@ -24,6 +25,7 @@ class RepoError(DstackError):
 
 
 class RemoteRepoCreds(CoreModel):
+    protocol: RepoProtocol  # TODO: remove in 0.19
     clone_url: str
     private_key: Optional[str]
     oauth_token: Optional[str]
@@ -32,6 +34,11 @@ class RemoteRepoCreds(CoreModel):
 class RemoteRepoInfo(BaseRepoInfo):
     repo_type: Literal["remote"] = "remote"
     repo_name: str
+
+    # TODO: remove in 0.19
+    repo_host_name: str = ""
+    repo_port: Optional[int] = None
+    repo_user_name: str = ""
 
 
 class RemoteRunRepoData(RemoteRepoInfo):
@@ -161,7 +168,10 @@ class RemoteRepo(Repo):
 
         if repo_id is None:
             repo_id = slugify(
-                repo_data.repo_name, GitRepoURL.parse(self.repo_url).get_unique_location()
+                repo_data.repo_name,
+                GitRepoURL.parse(
+                    self.repo_url, get_ssh_config=get_host_config
+                ).get_unique_location(),
             )
         self.repo_id = repo_id
         self.run_repo_data = repo_data
