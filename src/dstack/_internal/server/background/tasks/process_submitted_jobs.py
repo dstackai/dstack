@@ -8,7 +8,12 @@ from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError, ServerClientError
-from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec, FleetStatus
+from dstack._internal.core.models.fleets import (
+    FleetConfiguration,
+    FleetSpec,
+    FleetStatus,
+    InstanceGroupPlacement,
+)
 from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceStatus,
@@ -38,6 +43,7 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
+from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.jobs import (
     PROCESSING_INSTANCES_LOCK,
     SUBMITTED_PROCESSING_JOBS_IDS,
@@ -112,8 +118,9 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         .where(RunModel.id == job_model.run_id)
         .options(joinedload(RunModel.project))
         .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.fleet).joinedload(FleetModel.instances))
     )
-    run_model = res.scalar_one()
+    run_model = res.unique().scalar_one()
     project = run_model.project
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
     profile = run_spec.merged_profile
@@ -121,22 +128,23 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     run = run_model_to_run(run_model)
     job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
 
-    # Wait until the master job is provisioned to provision in the same cluster, fleet, etc.
     master_job = find_job(run.jobs, job_model.replica_num, 0)
-    master_job_model = await _get_master_job_model(
-        session=session,
-        master_job_model_id=master_job.job_submissions[-1].id,
-    )
     master_job_provisioning_data = None
     if job.job_spec.job_num != 0:
         if master_job.job_submissions[-1].job_provisioning_data is None:
+            logger.debug("%s: waiting for master job to be provisioned", fmt(job_model))
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
         master_job_provisioning_data = JobProvisioningData.__response__.parse_obj(
             master_job.job_submissions[-1].job_provisioning_data
         )
-
+    if job.job_spec.job_num != 0 or job.job_spec.replica_num != 0:
+        if run_model.fleet_id is None:
+            logger.debug("%s: waiting for the run to be assigned to the fleet", fmt(job_model))
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
     try:
         volume_models = await get_run_volume_models(
             session=session,
@@ -182,6 +190,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         # Create a new cloud instance
         run_job_result = await _run_job_on_new_instance(
             project=project,
+            fleet_model=run_model.fleet,
             job_model=job_model,
             run=run,
             job=job,
@@ -202,12 +211,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_provisioning_data, offer = run_job_result
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
-        fleet = _get_or_create_fleet_model_for_job(
-            project=project,
-            run=run,
-            job_model=job_model,
-            master_job_model=master_job_model,
-        )
         instance = _create_instance_model_for_job(
             project=project,
             pool=pool,
@@ -217,7 +220,12 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             job_provisioning_data=job_provisioning_data,
             offer=offer,
         )
-        fleet.instances.append(instance)
+        fleet_model = _get_or_create_fleet_model_for_job(
+            project=project,
+            run_model=run_model,
+            run=run,
+        )
+        fleet_model.instances.append(instance)
         logger.info(
             "The job %s created the new instance %s",
             job_model.job_name,
@@ -227,7 +235,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
                 "instance_status": InstanceStatus.PROVISIONING.value,
             },
         )
-        session.add(fleet)
+        session.add(fleet_model)
         await session.flush()  # to get im.id
         job_model.used_instance_id = instance.id
 
@@ -242,15 +250,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
 
     job_model.last_processed_at = common_utils.get_current_datetime()
     await session.commit()
-
-
-async def _get_master_job_model(session: AsyncSession, master_job_model_id: UUID) -> JobModel:
-    res = await session.execute(
-        select(JobModel)
-        .where(JobModel.id == master_job_model_id)
-        .options(joinedload(JobModel.instance))
-    )
-    return res.scalar_one()
 
 
 async def _run_job_on_pool_instance(
@@ -319,15 +318,22 @@ async def _run_job_on_new_instance(
     project_ssh_private_key: str,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[Volume]] = None,
+    fleet_model: Optional[FleetModel] = None,
 ) -> Optional[Tuple[JobProvisioningData, InstanceOfferWithAvailability]]:
     if volumes is None:
         volumes = []
+    fleet = None
+    if fleet_model is not None:
+        fleet = fleet_model_to_fleet(fleet_model)
+    multinode = job.job_spec.jobs_per_replica > 1 or (
+        fleet is not None and fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+    )
     offers = await get_offers_by_requirements(
         project=project,
         profile=run.run_spec.merged_profile,
         requirements=job.job_spec.requirements,
         exclude_not_available=True,
-        multinode=job.job_spec.jobs_per_replica > 1,
+        multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
     )
@@ -377,15 +383,21 @@ async def _run_job_on_new_instance(
 
 def _get_or_create_fleet_model_for_job(
     project: ProjectModel,
+    run_model: RunModel,
     run: Run,
-    job_model: JobModel,
-    master_job_model: JobModel,
 ) -> FleetModel:
-    if master_job_model.instance is not None and master_job_model.instance.fleet is not None:
-        return master_job_model.instance.fleet
+    if run_model.fleet is not None:
+        return run_model.fleet
+    placement = InstanceGroupPlacement.ANY
+    if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
+        placement = InstanceGroupPlacement.CLUSTER
     spec = FleetSpec(
-        configuration=FleetConfiguration(name=run.run_spec.run_name),
+        configuration=FleetConfiguration(
+            name=run.run_spec.run_name,
+            placement=placement,
+        ),
         profile=run.run_spec.merged_profile,
+        autocreated=True,
     )
     fleet_model = FleetModel(
         id=uuid.uuid4(),

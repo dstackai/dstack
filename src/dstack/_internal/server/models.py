@@ -360,20 +360,6 @@ class FleetModel(BaseModel):
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
 
 
-# class InstanceGroupModel(BaseModel):
-#     __tablename__ = "instance_groups"
-
-#     id: Mapped[uuid.UUID] = mapped_column(
-#         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
-#     )
-#     name: Mapped[str] = mapped_column(String(100))
-
-#     fleet_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fleets.id", ondelete="CASCADE"))
-#     fleet: Mapped["FleetModel"] = relationship(foreign_keys=[fleet_id])
-
-#     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="instance_group")
-
-
 class InstanceModel(BaseModel):
     __tablename__ = "instances"
 
@@ -395,9 +381,6 @@ class InstanceModel(BaseModel):
 
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
-
-    # instance_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("pools.id"))
-    # instance_group: Mapped[Optional["InstanceGroupModel"]] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
     unreachable: Mapped[bool] = mapped_column(Boolean)

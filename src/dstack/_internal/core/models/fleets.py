@@ -137,6 +137,7 @@ class FleetConfiguration(InstanceGroupParams, FleetProps):
 class FleetSpec(CoreModel):
     configuration: FleetConfiguration
     profile: Profile
+    autocreated: bool = False
     # TODO: make merged_profile a computed field after migrating to pydanticV2
     merged_profile: Annotated[Profile, Field(exclude=True)] = None
 

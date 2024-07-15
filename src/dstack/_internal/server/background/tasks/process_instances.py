@@ -29,6 +29,7 @@ from dstack._internal.core.backends.remote.provisioning import (
 )
 from dstack._internal.core.errors import BackendError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -49,9 +50,10 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, ProjectModel
+from dstack._internal.server.models import FleetModel, InstanceModel, ProjectModel
 from dstack._internal.server.schemas.runner import HealthcheckResponse
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.jobs import (
     PROCESSING_INSTANCES_IDS,
     PROCESSING_INSTANCES_LOCK,
@@ -345,12 +347,17 @@ async def add_remote(instance_id: UUID) -> None:
 async def create_instance(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project))
+                    .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
 
         if instance.last_retry_at is not None:
             last_retry = instance.last_retry_at.replace(tzinfo=datetime.timezone.utc)
@@ -376,6 +383,10 @@ async def create_instance(instance_id: UUID) -> None:
                     "instance_status": InstanceStatus.TERMINATED.value,
                 },
             )
+            return
+
+        if _need_to_wait_fleet_provisioning(instance):
+            logger.debug("Waiting for the first instance in the fleet to be provisioned")
             return
 
         try:
@@ -429,6 +440,7 @@ async def create_instance(instance_id: UUID) -> None:
             profile=profile,
             requirements=requirements,
             exclude_not_available=True,
+            fleet_model=instance.fleet,
         )
 
         if not offers and should_retry:
@@ -785,6 +797,23 @@ async def terminate_idle_instance(instance_id: UUID):
                 },
             )
         await session.commit()
+
+
+def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
+    # Cluster cloud instances should wait for the first fleet instance to be provisioned
+    # so that they are provisioned in the same backend/region
+    if instance.fleet is None:
+        return False
+    if (
+        instance.id == instance.fleet.instances[0].id
+        or instance.fleet.instances[0].job_provisioning_data is not None
+    ):
+        return False
+    fleet = fleet_model_to_fleet(instance.fleet)
+    return (
+        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        and fleet.spec.configuration.ssh is None
+    )
 
 
 def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:
