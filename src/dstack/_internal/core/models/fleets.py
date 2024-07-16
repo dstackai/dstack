@@ -22,10 +22,12 @@ from dstack._internal.core.models.resources import Range, ResourcesSpec
 
 
 class FleetStatus(str, Enum):
-    # Currently all fleets are active
-    # submitted/failed may be used if fleets require async processing
+    # Currently all fleets are ACTIVE/TERMINATING/TERMINATED
+    # SUBMITTED/FAILED may be used if fleets require async processing
     SUBMITTED = "submitted"
     ACTIVE = "active"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
     FAILED = "failed"
 
 

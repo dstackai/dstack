@@ -253,10 +253,9 @@ async def delete_fleets(
         )
         fleet_models = res.scalars().unique().all()
         for fleet_model in fleet_models:
-            # Terminate instances but do not delete the fleet yet so
-            # it's shown while the instances are terminating.
-            # The fleet will be auto-deleted when all instances are terminated.
             await _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
+        # TERMINATING fleets are deleted by process_fleets after intsances are terminated
+        fleet_model.status = FleetStatus.TERMINATING
         await session.commit()
     finally:
         PROCESSING_FLEETS_IDS.difference_update(fleets_ids)
