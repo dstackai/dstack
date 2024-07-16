@@ -34,9 +34,9 @@ class FleetCommand(APIBaseCommand):
             "-i",
             "--instance",
             action="append",
-            metavar="INSTANCE",
+            metavar="INSTANCE_NUM",
             dest="instances",
-            help="The instance to delete",
+            help="The instances to delete",
             type=int,
         )
         rm_parser.add_argument(
@@ -59,7 +59,7 @@ class FleetCommand(APIBaseCommand):
             console.print(f"Fleet [code]{args.name}[/] does not exist")
             return
 
-        if len(args.instances) == 0:
+        if not args.instances:
             if not args.yes and not confirm_ask(f"Delete the fleet [code]{args.name}[/]?"):
                 console.print("\nExiting...")
                 return
