@@ -74,5 +74,6 @@ class TestGitRepoURL:
     def test_oauth_token(self):
         url = GitRepoURL.parse("https://github.com/dstackai/dstack.git")
         assert (
-            url.as_https("secret-token") == "https://secret-token@github.com/dstackai/dstack.git"
+            url.as_https("secret-token")
+            == "https://anything:secret-token@github.com/dstackai/dstack.git"
         )
