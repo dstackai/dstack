@@ -14,3 +14,8 @@ class CreateFleetRequest(CoreModel):
 
 class DeleteFleetsRequest(CoreModel):
     names: List[str]
+
+
+class DeleteFleetInstancesRequest(CoreModel):
+    name: str
+    instance_nums: List[int]

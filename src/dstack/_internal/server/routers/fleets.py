@@ -10,6 +10,7 @@ from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.fleets import (
     CreateFleetRequest,
+    DeleteFleetInstancesRequest,
     DeleteFleetsRequest,
     GetFleetRequest,
 )
@@ -65,3 +66,15 @@ async def delete_fleets(
 ):
     _, project = user_project
     await fleets_services.delete_fleets(session=session, project=project, names=body.names)
+
+
+@router.post("/delete_instances")
+async def delete_fleet_instances(
+    body: DeleteFleetInstancesRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+):
+    _, project = user_project
+    await fleets_services.delete_fleets(
+        session=session, project=project, names=[body.name], instance_nums=body.instance_nums
+    )

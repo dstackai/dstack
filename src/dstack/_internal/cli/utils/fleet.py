@@ -61,8 +61,6 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
                 "-",
                 "-",
                 "-",
-                "-",
-                "-",
                 pretty_date(fleet.created_at),
             ]
             table.add_row(*row)

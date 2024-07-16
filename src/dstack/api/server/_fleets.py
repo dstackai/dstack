@@ -5,6 +5,7 @@ from pydantic import parse_obj_as
 from dstack._internal.core.models.fleets import Fleet, FleetSpec
 from dstack._internal.server.schemas.fleets import (
     CreateFleetRequest,
+    DeleteFleetInstancesRequest,
     DeleteFleetsRequest,
     GetFleetRequest,
 )
@@ -33,3 +34,7 @@ class FleetsAPIClient(APIClientGroup):
     def delete(self, project_name: str, names: List[str]) -> None:
         body = DeleteFleetsRequest(names=names)
         self._request(f"/api/project/{project_name}/fleets/delete", body=body.json())
+
+    def delete_instances(self, project_name: str, name: str, instance_nums: List[int]) -> None:
+        body = DeleteFleetInstancesRequest(name=name, instance_nums=instance_nums)
+        self._request(f"/api/project/{project_name}/fleets/delete_instances", body=body.json())

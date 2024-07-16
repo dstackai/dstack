@@ -402,3 +402,47 @@ class TestDeleteFleets:
         await session.refresh(fleet)
         assert not fleet.deleted
         assert instance.status == InstanceStatus.BUSY
+
+
+class TestDeleteFleetInstances:
+    @pytest.mark.asyncio
+    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
+        response = client.post("/api/project/main/fleets/delete_instances")
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_terminates_fleet_instances(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        pool = await create_pool(session=session, project=project)
+        fleet = await create_fleet(session=session, project=project)
+        instance1 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            instance_num=1,
+        )
+        instance2 = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            instance_num=2,
+        )
+        fleet.instances.append(instance1)
+        fleet.instances.append(instance2)
+        await session.commit()
+        response = client.post(
+            f"/api/project/{project.name}/fleets/delete_instances",
+            headers=get_auth_headers(user.token),
+            json={"name": fleet.name, "instance_nums": [1]},
+        )
+        assert response.status_code == 200
+        await session.refresh(fleet)
+        await session.refresh(instance1)
+        await session.refresh(instance2)
+
+        assert instance1.status == InstanceStatus.TERMINATING
+        assert instance2.status != InstanceStatus.TERMINATING

@@ -221,7 +221,12 @@ async def create_fleet_ssh_instance_models(
     return instances_models
 
 
-async def delete_fleets(session: AsyncSession, project: ProjectModel, names: List[str]):
+async def delete_fleets(
+    session: AsyncSession,
+    project: ProjectModel,
+    names: List[str],
+    instance_nums: Optional[List[int]] = None,
+):
     res = await session.execute(
         select(FleetModel).where(
             FleetModel.project_id == project.id,
@@ -251,14 +256,18 @@ async def delete_fleets(session: AsyncSession, project: ProjectModel, names: Lis
             # Terminate instances but do not delete the fleet yet so
             # it's shown while the instances are terminating.
             # The fleet will be auto-deleted when all instances are terminated.
-            await _terminate_fleet_instances(fleet_model=fleet_model)
+            await _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
         await session.commit()
     finally:
         PROCESSING_FLEETS_IDS.difference_update(fleets_ids)
 
 
 def fleet_model_to_fleet(fleet_model: FleetModel) -> Fleet:
-    instances = [pools_services.instance_model_to_instance(i) for i in fleet_model.instances]
+    instances = [
+        pools_services.instance_model_to_instance(i)
+        for i in fleet_model.instances
+        if not i.deleted
+    ]
     instances = sorted(instances, key=lambda i: i.instance_num)
     spec = get_fleet_spec(fleet_model)
     return Fleet(
@@ -285,8 +294,12 @@ async def generate_fleet_name(session: AsyncSession, project: ProjectModel) -> s
             return name
 
 
-def is_fleet_in_use(fleet_model: FleetModel) -> bool:
+def is_fleet_in_use(
+    fleet_model: FleetModel, ignore_instance_nums: Optional[List[int]] = None
+) -> bool:
     instances_in_use = [i for i in fleet_model.instances if i.job_id is not None]
+    if ignore_instance_nums is not None:
+        instances_in_use = [i for i in instances_in_use if i not in ignore_instance_nums]
     active_runs = [r for r in fleet_model.runs if not r.status.is_finished()]
     return len(instances_in_use) > 0 or len(active_runs) > 0
 
@@ -302,13 +315,15 @@ def _validate_fleet_spec(spec: FleetSpec):
     # TODO validate ssh params
 
 
-async def _terminate_fleet_instances(fleet_model: FleetModel):
-    if is_fleet_in_use(fleet_model):
+async def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):
+    if is_fleet_in_use(fleet_model, ignore_instance_nums=instance_nums):
         raise ServerClientError(f"Failed to delete fleet {fleet_model.name}. Fleet is in use.")
     instances_ids = sorted([i.id for i in fleet_model.instances])
     await wait_to_lock_many(PROCESSING_INSTANCES_LOCK, PROCESSING_INSTANCES_IDS, instances_ids)
     try:
         for instance in fleet_model.instances:
+            if instance_nums is not None and instance.instance_num not in instance_nums:
+                continue
             instance.status = InstanceStatus.TERMINATING
     finally:
         PROCESSING_INSTANCES_IDS.difference_update(instances_ids)
