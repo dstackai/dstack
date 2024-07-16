@@ -333,7 +333,7 @@ class TestDeleteFleets:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_deletes_fleets(self, test_db, session: AsyncSession):
+    async def test_terminates_fleet_instances(self, test_db, session: AsyncSession):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -356,7 +356,7 @@ class TestDeleteFleets:
         assert response.status_code == 200
         await session.refresh(fleet)
         await session.refresh(instance)
-        assert fleet.deleted
+        assert not fleet.deleted  # should not be deleted yet
         assert instance.status == InstanceStatus.TERMINATING
 
     @pytest.mark.asyncio

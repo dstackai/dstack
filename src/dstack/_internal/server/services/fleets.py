@@ -3,7 +3,7 @@ import uuid
 from datetime import timezone
 from typing import List, Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -34,7 +34,7 @@ from dstack._internal.server.services.jobs import (
     PROCESSING_INSTANCES_LOCK,
 )
 from dstack._internal.server.utils.common import wait_to_lock_many
-from dstack._internal.utils import common, random_names
+from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -246,20 +246,10 @@ async def delete_fleets(session: AsyncSession, project: ProjectModel, names: Lis
         )
         fleet_models = res.scalars().unique().all()
         for fleet_model in fleet_models:
-            # TODO: deleted fleets have instances terminating.
-            # Consider deleting fleets only after all instanes are terminated.
+            # Terminate instances but do not delete the fleet yet so
+            # it's shown while the instances are terminating.
+            # The fleet will be auto-deleted when all instances are terminated.
             await _terminate_fleet_instances(fleet_model=fleet_model)
-        await session.execute(
-            update(FleetModel)
-            .where(
-                FleetModel.project_id == project.id,
-                FleetModel.id.in_(fleets_ids),
-            )
-            .values(
-                deleted=True,
-                deleted_at=common.get_current_datetime(),
-            )
-        )
         await session.commit()
     finally:
         PROCESSING_FLEETS_IDS.difference_update(fleets_ids)
