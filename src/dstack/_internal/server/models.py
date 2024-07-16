@@ -368,6 +368,8 @@ class InstanceModel(BaseModel):
     )
     name: Mapped[str] = mapped_column(String(50))
 
+    instance_num: Mapped[int] = mapped_column(Integer, default=0)
+
     # instance
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)

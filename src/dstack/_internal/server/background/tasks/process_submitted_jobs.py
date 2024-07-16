@@ -211,19 +211,20 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         job_provisioning_data, offer = run_job_result
         job_model.job_provisioning_data = job_provisioning_data.json()
         job_model.status = JobStatus.PROVISIONING
+        fleet_model = _get_or_create_fleet_model_for_job(
+            project=project,
+            run_model=run_model,
+            run=run,
+        )
         instance = _create_instance_model_for_job(
             project=project,
             pool=pool,
+            fleet_model=fleet_model,
             run_spec=run_spec,
             job_model=job_model,
             job=job,
             job_provisioning_data=job_provisioning_data,
             offer=offer,
-        )
-        fleet_model = _get_or_create_fleet_model_for_job(
-            project=project,
-            run_model=run_model,
-            run=run,
         )
         fleet_model.instances.append(instance)
         logger.info(
@@ -413,6 +414,7 @@ def _get_or_create_fleet_model_for_job(
 def _create_instance_model_for_job(
     project: ProjectModel,
     pool: PoolModel,
+    fleet_model: FleetModel,
     run_spec: RunSpec,
     job_model: JobModel,
     job: Job,
@@ -426,9 +428,12 @@ def _create_instance_model_for_job(
         # terminate vastai/k8s instances immediately
         termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
         termination_idle_time = 0
+    # TODO: Ensure instances don't get the same instance_num
+    instance_num = len(fleet_model.instances)
     instance = InstanceModel(
         id=uuid.uuid4(),
-        name=job.job_spec.job_name,  # TODO: make new name
+        name=f"{fleet_model.name}-{instance_num}",
+        instance_num=instance_num,
         project=project,
         pool=pool,
         created_at=common_utils.get_current_datetime(),

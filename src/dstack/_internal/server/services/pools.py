@@ -221,6 +221,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         id=instance_model.id,
         project_name=instance_model.project.name,
         name=instance_model.name,
+        instance_num=instance_model.instance_num,
         status=instance_model.status,
         unreachable=instance_model.unreachable,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
@@ -347,6 +348,7 @@ async def add_remote(
     im = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
+        instance_num=0,
         project=project,
         pool=pool_model,
         backend=BackendType.REMOTE,
@@ -567,7 +569,8 @@ async def create_instance_model(
     pool: PoolModel,
     profile: Profile,
     requirements: Requirements,
-    instance_name: Optional[str] = None,
+    instance_name: str,
+    instance_num: int,
 ) -> InstanceModel:
     # TODO: remove commit
 
@@ -584,6 +587,7 @@ async def create_instance_model(
     instance = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
+        instance_num=instance_num,
         project=project,
         pool=pool,
         created_at=common_utils.get_current_datetime(),
@@ -631,7 +635,8 @@ async def create_ssh_instance_model(
     session: AsyncSession,
     project: ProjectModel,
     pool: PoolModel,
-    instance_name: Optional[str],
+    instance_name: str,
+    instance_num: int,
     instance_network: Optional[str],
     region: Optional[str],
     host: str,
@@ -641,9 +646,6 @@ async def create_ssh_instance_model(
 ) -> InstanceModel:
     # TODO: remove commit
     # TODO: check instance is not added already
-
-    if instance_name is None:
-        instance_name = await generate_instance_name(session, project, pool_name=pool.name)
 
     # TODO: doc - will overwrite after remote connected
     instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
@@ -679,6 +681,7 @@ async def create_ssh_instance_model(
     im = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
+        instance_num=instance_num,
         project=project,
         pool=pool,
         backend=BackendType.REMOTE,

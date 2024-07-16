@@ -633,6 +633,7 @@ async def create_instance(
     instance = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
+        instance_num=0,
         project=project,
         pool=pool,
         created_at=common_utils.get_current_datetime(),

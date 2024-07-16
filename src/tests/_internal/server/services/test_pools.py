@@ -58,6 +58,7 @@ class TestInstanceModelToInstance:
                 name="instance", resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[])
             ),
             name="test_instance",
+            instance_num=0,
             hostname="hostname_test",
             status=InstanceStatus.PENDING,
             created=created,
@@ -68,6 +69,7 @@ class TestInstanceModelToInstance:
             id=instance_id,
             created_at=created,
             name="test_instance",
+            instance_num=0,
             status=InstanceStatus.PENDING,
             unreachable=False,
             project=project,

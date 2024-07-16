@@ -179,6 +179,7 @@ async def create_fleet_instance_model(
         profile=profile,
         requirements=requirements,
         instance_name=f"{fleet_spec.configuration.name}-{instance_num}",
+        instance_num=instance_num,
     )
     return instance_model
 
@@ -208,6 +209,7 @@ async def create_fleet_ssh_instance_models(
             project=project,
             pool=pool,
             instance_name=f"{fleet_spec.configuration.name}-{i}",
+            instance_num=i,
             region="remote",
             host=hostname,
             ssh_user=ssh_user,
@@ -257,6 +259,7 @@ async def delete_fleets(session: AsyncSession, project: ProjectModel, names: Lis
 
 def fleet_model_to_fleet(fleet_model: FleetModel) -> Fleet:
     instances = [pools_services.instance_model_to_instance(i) for i in fleet_model.instances]
+    instances = sorted(instances, key=lambda i: i.instance_num)
     spec = get_fleet_spec(fleet_model)
     return Fleet(
         name=fleet_model.name,

@@ -398,6 +398,7 @@ async def create_instance(
     instance_configuration: Optional[InstanceConfiguration] = None,
     instance_id: Optional[UUID] = None,
     job: Optional[JobModel] = None,
+    instance_num: int = 0,
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -461,6 +462,7 @@ async def create_instance(
     im = InstanceModel(
         id=instance_id,
         name="test_instance",
+        instance_num=instance_num,
         pool=pool,
         project=project,
         status=status,

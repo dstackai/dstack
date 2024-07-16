@@ -964,6 +964,7 @@ class TestCreateInstance:
                 "backend": None,
                 "instance_type": None,
                 "name": result["name"],
+                "instance_num": 0,
                 "job_name": None,
                 "hostname": None,
                 "status": "pending",
