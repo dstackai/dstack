@@ -269,7 +269,7 @@ class GitRepoURL:
         raise RepoError(f"Unsupported URL scheme {url.scheme}")
 
     def as_https(self, oauth_token: Optional[str] = None) -> str:
-        optional_creds = f"{oauth_token}@" if oauth_token else ""
+        optional_creds = f"anything:{oauth_token}@" if oauth_token else ""
         optional_port = f":{self.https_port}" if self.https_port else ""
         return f"https://{optional_creds}{self.host}{optional_port}{self.path}"
 
