@@ -37,7 +37,6 @@ BASE_DEPS = [
     "gitpython",
     "jsonschema",
     "paramiko",
-    "git-url-parse",
     "cursor",
     "rich",
     "rich-argparse",

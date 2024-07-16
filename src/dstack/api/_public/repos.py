@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Optional, Union
 
-import giturlparse
 from git import InvalidGitRepositoryError
 
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
@@ -71,10 +70,9 @@ class RepoCollection:
         if isinstance(repo, RemoteRepo):
             try:
                 creds = get_local_repo_credentials(
-                    repo_data=repo.run_repo_data,
+                    repo_url=repo.repo_url,
                     identity_file=git_identity_file,
                     oauth_token=oauth_token,
-                    original_hostname=giturlparse.parse(repo.repo_url).resource,
                 )
             except InvalidRepoCredentialsError as e:
                 raise ConfigurationError(*e.args)

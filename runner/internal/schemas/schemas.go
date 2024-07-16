@@ -1,6 +1,6 @@
 package schemas
 
-import "fmt"
+import "strings"
 
 type JobStateEvent struct {
 	State     string `json:"state"`
@@ -55,17 +55,13 @@ type ClusterInfo struct {
 }
 
 type RepoCredentials struct {
-	Protocol   string  `json:"protocol"`
+	CloneURL   string  `json:"clone_url"`
 	PrivateKey *string `json:"private_key"`
 	OAuthToken *string `json:"oauth_token"`
 }
 
 type RepoData struct {
-	RepoType     string `json:"repo_type"`
-	RepoHostName string `json:"repo_host_name"`
-	RepoPort     int    `json:"repo_port"`
-	RepoUserName string `json:"repo_user_name"`
-	RepoName     string `json:"repo_name"`
+	RepoType string `json:"repo_type"`
 
 	RepoBranch string `json:"repo_branch"`
 	RepoHash   string `json:"repo_hash"`
@@ -93,12 +89,8 @@ type HealthcheckResponse struct {
 	Version string `json:"version"`
 }
 
-func (d *RepoData) FormatURL(format string) string {
-	host := d.RepoHostName
-	if d.RepoPort != 0 {
-		host = fmt.Sprintf("%s:%d", d.RepoHostName, d.RepoPort)
-	}
-	return fmt.Sprintf(format, host, d.RepoUserName, d.RepoName)
+func (c *RepoCredentials) GetProtocol() string {
+	return strings.SplitN(c.CloneURL, "://", 2)[0]
 }
 
 func (e JobStateEvent) GetTimestamp() int64 {
