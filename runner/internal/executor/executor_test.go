@@ -53,7 +53,7 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "cat ~/.ssh/id_rsa")
 	ex.repoCredentials = &schemas.RepoCredentials{
-		Protocol:   "ssh",
+		CloneURL:   "ssh://git@example.example/example/example.git",
 		PrivateKey: &key,
 	}
 
@@ -115,10 +115,6 @@ func TestExecutor_RemoteRepo(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.run.RepoData = schemas.RepoData{
 		RepoType:        "remote",
-		RepoHostName:    "github.com",
-		RepoPort:        0,
-		RepoUserName:    "dstackai",
-		RepoName:        "dstack-examples",
 		RepoBranch:      "main",
 		RepoHash:        "2b83592e506ed6fe8e49f4eaa97c3866bc9402b1",
 		RepoConfigName:  "Dstack Developer",
@@ -161,8 +157,10 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 			MaxDuration: 0, // no timeout
 			WorkingDir:  &workingDir,
 		},
-		Secrets:         make(map[string]string),
-		RepoCredentials: &schemas.RepoCredentials{Protocol: "https"},
+		Secrets: make(map[string]string),
+		RepoCredentials: &schemas.RepoCredentials{
+			CloneURL: "https://example.example/example/example.git",
+		},
 	}
 
 	temp := filepath.Join(baseDir, "temp")

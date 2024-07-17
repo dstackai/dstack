@@ -6,6 +6,7 @@ from dstack._internal.core.models.repos import AnyRepoInfo, RemoteRepoCreds, Rep
 from dstack._internal.server.schemas.repos import (
     DeleteReposRequest,
     GetRepoRequest,
+    RemoteRepoCredsDto,
     SaveRepoCredsRequest,
 )
 from dstack.api.server._group import APIClientGroup
@@ -28,7 +29,13 @@ class ReposAPIClient(APIClientGroup):
         repo_info: AnyRepoInfo,
         repo_creds: Optional[RemoteRepoCreds] = None,
     ):
-        body = SaveRepoCredsRequest(repo_id=repo_id, repo_info=repo_info, repo_creds=repo_creds)
+        body = SaveRepoCredsRequest(
+            repo_id=repo_id,
+            repo_info=repo_info,
+            repo_creds=RemoteRepoCredsDto.from_remote_repo_creds(repo_creds)
+            if repo_creds
+            else None,
+        )
         self._request(f"/api/project/{project_name}/repos/init", body=body.json())
 
     def delete(self, project_name: str, repos_ids: List[str]):

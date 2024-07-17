@@ -187,11 +187,11 @@ Examples:
 - `A100:80GB` (one A100 of 80GB)
 - `A100:2` (two A100)
 - `A100:40GB:2` (two A100 40GB)
-- `tpu-v5-8` (`v5` with 8 TPU cores)
+- `tpu-v2-8` (`v2` with 8 TPU cores)
 
 ??? info "Google Cloud TPU"
-    Currently, you can't specify other than 8 TPU cores. This means only single TPU device workloads are supported.
-    Support for multiple TPU devices is coming soon.
+    Currently, you can't specify other than 8 TPU cores. This means only single host workloads are supported.
+    Support for multiple hosts is coming soon.
 
 ## Service quotas
 

@@ -141,14 +141,15 @@ async def create_repo(
     if info is None:
         info = {
             "repo_type": "remote",
-            "repo_host_name": "github.com",
+            "repo_host_name": "",
             "repo_port": None,
-            "repo_user_name": "dstackai",
+            "repo_user_name": "",
             "repo_name": "dstack",
         }
     if creds is None:
         creds = {
             "protocol": "https",
+            "clone_url": "https://github.com/dstackai/dstack.git",
             "private_key": None,
             "oauth_token": "test_token",
         }

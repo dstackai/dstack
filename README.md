@@ -24,6 +24,7 @@ You can also use `dstack` to run workloads on on-prem clusters.
  
 ## Latest news ✨
 
+- [2024/05] [dstack 0.18.4: Google Cloud TPU, and more](https://github.com/dstackai/dstack/releases/tag/0.18.4) (Release)
 - [2024/05] [dstack 0.18.3: OCI, and more](https://github.com/dstackai/dstack/releases/tag/0.18.3) (Release)
 - [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
 - [2024/04] [dstack 0.18.0: RunPod, multi-node tasks, and more](https://github.com/dstackai/dstack/releases/tag/0.18.0) (Release)

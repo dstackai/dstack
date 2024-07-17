@@ -171,7 +171,7 @@ class RepoModel(BaseModel):
     type: Mapped[RepoType] = mapped_column(Enum(RepoType))
 
     info: Mapped[str] = mapped_column(String(2000))
-    creds: Mapped[Optional[str]] = mapped_column(String(2000))
+    creds: Mapped[Optional[str]] = mapped_column(String(5000))
 
 
 class CodeModel(BaseModel):

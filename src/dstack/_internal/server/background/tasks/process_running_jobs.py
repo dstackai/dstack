@@ -545,9 +545,9 @@ def _submit_job_to_runner(
 ):
     logger.debug("%s: submitting job spec", fmt(job_model))
     logger.debug(
-        "%s: repo credentials are %s",
+        "%s: repo clone URL is %s",
         fmt(job_model),
-        None if repo_credentials is None else repo_credentials.protocol.value,
+        None if repo_credentials is None else repo_credentials.clone_url,
     )
     runner_client.submit_job(
         run_spec=run.run_spec,

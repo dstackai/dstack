@@ -42,6 +42,7 @@ theme:
   #          icon: material/weather-sunny
   #          name: Switch to light mode
   features:
+    - content.tooltips
     #    - navigation.path
     - content.code.copy
     - content.action.edit

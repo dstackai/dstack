@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -252,7 +253,7 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 	if ex.repoCredentials == nil {
 		return func() {}, nil
 	}
-	switch ex.repoCredentials.Protocol {
+	switch ex.repoCredentials.GetProtocol() {
 	case "ssh":
 		if ex.repoCredentials.PrivateKey == nil {
 			return nil, gerrors.New("private key is missing")
@@ -284,7 +285,11 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 			return nil, gerrors.Wrap(err)
 		}
 		log.Info(ctx, "Writing OAuth token", "path", hostsPath)
-		ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", ex.run.RepoData.RepoHostName, *ex.repoCredentials.OAuthToken)
+		cloneURL, err := url.Parse(ex.repoCredentials.CloneURL)
+		if err != nil {
+			return nil, gerrors.Wrap(err)
+		}
+		ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", cloneURL.Hostname(), *ex.repoCredentials.OAuthToken)
 		if err := os.WriteFile(hostsPath, []byte(ghHost), 0644); err != nil {
 			return nil, gerrors.Wrap(err)
 		}
@@ -293,7 +298,7 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 			_ = os.Remove(hostsPath)
 		}, nil
 	}
-	return nil, gerrors.Newf("unknown protocol %s", ex.repoCredentials.Protocol)
+	return nil, gerrors.Newf("unknown protocol %s", ex.repoCredentials.GetProtocol())
 }
 
 func isPtyError(err error) bool {
