@@ -1,3 +1,4 @@
+import ipaddress
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type, Union
@@ -37,9 +38,7 @@ class InstanceGroupPlacement(str, Enum):
 
 
 class SSHHostParams(CoreModel):
-    hostname: Annotated[
-        Optional[str], Field(description="The IP address or domain to connect to")
-    ] = None
+    hostname: Annotated[str, Field(description="The IP address or domain to connect to")]
     port: Annotated[
         Optional[int], Field(description="The SSH port to connect to on this host")
     ] = None
@@ -49,12 +48,10 @@ class SSHHostParams(CoreModel):
     ssh_key_path: Annotated[
         Optional[str], Field(description="The private key to use for this host")
     ] = None
-    # TODO: do not return ssh key in api
     ssh_key: Optional[SSHKey] = None
 
 
 class SSHParams(CoreModel):
-    # TODO: network
     user: Annotated[Optional[str], Field(description="The user to log in with on all hosts")] = (
         None
     )
@@ -66,6 +63,22 @@ class SSHParams(CoreModel):
     hosts: Annotated[
         List[Union[SSHHostParams, str]], Field(description="The per host connection parameters")
     ]
+    network: Annotated[
+        Optional[str],
+        Field(description="The network address for cluster setup in the format `<ip>/<netmask>`"),
+    ]
+
+    @validator("network")
+    def validate_network(cls, value):
+        if value is None:
+            return value
+        try:
+            network = ipaddress.ip_network(value, strict=False)
+        except ValueError as e:
+            raise ValueError(f"Failed to parse network: {value}") from e
+        if not network.is_private:
+            raise ValueError("Public network is specified when private network is required")
+        return value
 
 
 class InstanceGroupParams(CoreModel):

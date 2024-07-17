@@ -237,7 +237,7 @@ class TestCreateFleet:
                 headers=get_auth_headers(user.token),
                 json={"spec": spec.dict()},
             )
-        assert response.status_code == 200
+        assert response.status_code == 200, response.json()
         assert response.json() == {
             "name": spec.configuration.name,
             "project_name": project.name,
@@ -247,8 +247,9 @@ class TestCreateFleet:
                         "user": "ubuntu",
                         "port": None,
                         "ssh_key_path": None,
-                        "ssh_key": {"public": "", "private": "123"},
+                        "ssh_key": None,  # should not return ssh_key
                         "hosts": ["1.1.1.1"],
+                        "network": None,
                     },
                     "nodes": None,
                     "placement": None,

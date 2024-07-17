@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from datetime import timezone
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +15,8 @@ from dstack._internal.core.models.fleets import (
     Fleet,
     FleetSpec,
     FleetStatus,
+    SSHHostParams,
+    SSHParams,
 )
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import SpotPolicy
@@ -133,23 +135,24 @@ async def create_fleet(
     )
     session.add(fleet_model)
     if spec.configuration.ssh is not None:
-        instances_models = await create_fleet_ssh_instance_models(
-            session=session,
-            project=project,
-            user=user,
-            pool=pool,
-            fleet_spec=spec,
-        )
-        fleet_model.instances.extend(instances_models)
+        for i, host in enumerate(spec.configuration.ssh.hosts):
+            instances_model = await create_fleet_ssh_instance_model(
+                project=project,
+                pool=pool,
+                spec=spec,
+                ssh_params=spec.configuration.ssh,
+                instance_num=i,
+                host=host,
+            )
+            fleet_model.instances.append(instances_model)
     else:
-        # TODO: require min nodes?
-        for i in range(spec.configuration.nodes.min):
+        for i in range(_get_fleet_nodes_to_provision(spec)):
             instance_model = await create_fleet_instance_model(
                 session=session,
                 project=project,
                 user=user,
                 pool=pool,
-                fleet_spec=spec,
+                spec=spec,
                 instance_num=i,
             )
             fleet_model.instances.append(instance_model)
@@ -162,12 +165,12 @@ async def create_fleet_instance_model(
     project: ProjectModel,
     user: UserModel,
     pool: PoolModel,
-    fleet_spec: FleetSpec,
+    spec: FleetSpec,
     instance_num: int,
 ) -> InstanceModel:
-    profile = fleet_spec.merged_profile
+    profile = spec.merged_profile
     requirements = Requirements(
-        resources=fleet_spec.configuration.resources or ResourcesSpec(),
+        resources=spec.configuration.resources or ResourcesSpec(),
         max_price=profile.max_price,
         spot=get_policy_map(profile.spot_policy, default=SpotPolicy.AUTO),
     )
@@ -178,47 +181,48 @@ async def create_fleet_instance_model(
         pool=pool,
         profile=profile,
         requirements=requirements,
-        instance_name=f"{fleet_spec.configuration.name}-{instance_num}",
+        instance_name=f"{spec.configuration.name}-{instance_num}",
         instance_num=instance_num,
     )
     return instance_model
 
 
-async def create_fleet_ssh_instance_models(
-    session: AsyncSession,
+async def create_fleet_ssh_instance_model(
     project: ProjectModel,
-    user: UserModel,
     pool: PoolModel,
-    fleet_spec: FleetSpec,
-) -> List[InstanceModel]:
-    instances_models = []
-    for i, host in enumerate(fleet_spec.configuration.ssh.hosts):
-        if isinstance(host, str):
-            hostname = host
-            ssh_user = fleet_spec.configuration.ssh.user
-            ssh_key = fleet_spec.configuration.ssh.ssh_key
-            port = fleet_spec.configuration.ssh.port
-        else:
-            hostname = host.hostname
-            ssh_user = host.user or fleet_spec.configuration.ssh.user
-            ssh_key = host.ssh_key or fleet_spec.configuration.ssh.ssh_key
-            port = host.port or fleet_spec.configuration.ssh.port
+    spec: FleetSpec,
+    ssh_params: SSHParams,
+    instance_num: int,
+    host: Union[SSHHostParams, str],
+) -> InstanceModel:
+    if isinstance(host, str):
+        hostname = host
+        ssh_user = ssh_params.user
+        ssh_key = ssh_params.ssh_key
+        port = ssh_params.port
+    else:
+        hostname = host.hostname
+        ssh_user = host.user or ssh_params.user
+        ssh_key = host.ssh_key or ssh_params.ssh_key
+        port = host.port or ssh_params.port
 
-        im = await pools_services.create_ssh_instance_model(
-            session=session,
-            project=project,
-            pool=pool,
-            instance_name=f"{fleet_spec.configuration.name}-{i}",
-            instance_num=i,
-            region="remote",
-            host=hostname,
-            ssh_user=ssh_user,
-            ssh_keys=[ssh_key],
-            instance_network=None,
-            port=port or 22,
-        )
-        instances_models.append(im)
-    return instances_models
+    if ssh_user is None or ssh_key is None:
+        # This should be reachable but checked by fleet spec validation
+        raise ServerClientError("ssh key or user not specified")
+
+    instance_model = await pools_services.create_ssh_instance_model(
+        project=project,
+        pool=pool,
+        instance_name=f"{spec.configuration.name}-{instance_num}",
+        instance_num=instance_num,
+        region="remote",
+        host=hostname,
+        ssh_user=ssh_user,
+        ssh_keys=[ssh_key],
+        instance_network=ssh_params.network,
+        port=port or 22,
+    )
+    return instance_model
 
 
 async def delete_fleets(
@@ -261,7 +265,7 @@ async def delete_fleets(
         PROCESSING_FLEETS_IDS.difference_update(fleets_ids)
 
 
-def fleet_model_to_fleet(fleet_model: FleetModel) -> Fleet:
+def fleet_model_to_fleet(fleet_model: FleetModel, include_sensitive: bool = False) -> Fleet:
     instances = [
         pools_services.instance_model_to_instance(i)
         for i in fleet_model.instances
@@ -269,6 +273,8 @@ def fleet_model_to_fleet(fleet_model: FleetModel) -> Fleet:
     ]
     instances = sorted(instances, key=lambda i: i.instance_num)
     spec = get_fleet_spec(fleet_model)
+    if not include_sensitive:
+        _remove_fleet_spec_sensitive_info(spec)
     return Fleet(
         name=fleet_model.name,
         project_name=fleet_model.project.name,
@@ -308,10 +314,35 @@ def is_fleet_empty(fleet_model: FleetModel) -> bool:
     return len(active_instances) == 0
 
 
+def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
+    if spec.configuration.ssh is not None:
+        spec.configuration.ssh.ssh_key = None
+        for host in spec.configuration.ssh.hosts:
+            if not isinstance(host, str):
+                host.ssh_key = None
+
+
 def _validate_fleet_spec(spec: FleetSpec):
     if spec.configuration.name is not None:
         validate_dstack_resource_name(spec.configuration.name)
-    # TODO validate ssh params
+    if spec.configuration.ssh is not None:
+        for host in spec.configuration.ssh.hosts:
+            if isinstance(host, str):
+                if spec.configuration.ssh.ssh_key is None:
+                    raise ServerClientError(f"No ssh key specified for host {host}")
+                if spec.configuration.ssh.user is None:
+                    raise ServerClientError(f"No ssh user specified for host {host}")
+            else:
+                if spec.configuration.ssh.ssh_key is None and host.ssh_key is None:
+                    raise ServerClientError(f"No ssh key specified for host {host.hostname}")
+                if spec.configuration.ssh.user is None and host.user is None:
+                    raise ServerClientError(f"No ssh user specified for host {host.hostname}")
+
+
+def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:
+    if spec.configuration.nodes is None or spec.configuration.nodes.min is None:
+        return 0
+    return spec.configuration.nodes.min
 
 
 async def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):

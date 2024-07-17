@@ -35,7 +35,6 @@ from dstack._internal.core.models.instances import (
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     Profile,
     TerminationPolicy,
 )
@@ -572,18 +571,6 @@ async def create_instance_model(
     instance_name: str,
     instance_num: int,
 ) -> InstanceModel:
-    # TODO: remove commit
-
-    if instance_name is None:
-        instance_name = await generate_instance_name(
-            session=session, project=project, pool_name=pool.name
-        )
-
-    termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
-    termination_idle_time = profile.termination_idle_time
-    if termination_idle_time is None:
-        termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
-
     instance = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
@@ -596,20 +583,11 @@ async def create_instance_model(
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=None,
-        termination_policy=termination_policy,
-        termination_idle_time=termination_idle_time,
-    )
-    logger.info(
-        "Added a new instance %s",
-        instance.name,
-        extra={
-            "instance_name": instance.name,
-            "instance_status": InstanceStatus.PENDING.value,
-        },
+        termination_policy=profile.termination_policy,
+        termination_idle_time=profile.termination_idle_time,
     )
     session.add(instance)
-    await session.commit()
-
+    await session.flush()
     project_ssh_key = SSHKey(
         public=project.ssh_public_key.strip(),
         private=project.ssh_private_key.strip(),
@@ -627,12 +605,10 @@ async def create_instance_model(
         user=user.name,
     )
     instance.instance_configuration = instance_config.json()
-    await session.commit()
     return instance
 
 
 async def create_ssh_instance_model(
-    session: AsyncSession,
     project: ProjectModel,
     pool: PoolModel,
     instance_name: str,
@@ -644,9 +620,6 @@ async def create_ssh_instance_model(
     ssh_user: str,
     ssh_keys: List[SSHKey],
 ) -> InstanceModel:
-    # TODO: remove commit
-    # TODO: check instance is not added already
-
     # TODO: doc - will overwrite after remote connected
     instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
     instance_type = InstanceType(name="ssh", resources=instance_resource)
@@ -676,7 +649,10 @@ async def create_ssh_instance_model(
         availability=InstanceAvailability.AVAILABLE,
     )
     ssh_connection_info = RemoteConnectionInfo(
-        host=host, port=port, ssh_user=ssh_user, ssh_keys=ssh_keys
+        host=host,
+        port=port,
+        ssh_user=ssh_user,
+        ssh_keys=ssh_keys,
     )
     im = InstanceModel(
         id=uuid.uuid4(),
@@ -697,6 +673,4 @@ async def create_ssh_instance_model(
         termination_policy=TerminationPolicy.DONT_DESTROY,
         termination_idle_time=0,
     )
-    session.add(im)
-    await session.commit()
     return im
