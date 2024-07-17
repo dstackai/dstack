@@ -3,6 +3,7 @@ from typing import List
 from rich.table import Table
 
 from dstack._internal.cli.utils.common import console
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import Fleet
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.utils.common import pretty_date
@@ -26,7 +27,10 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
     for fleet in fleets:
         for i, instance in enumerate(fleet.instances):
             resources = ""
-            if instance.instance_type is not None:
+            if instance.instance_type is not None and (
+                instance.backend != BackendType.REMOTE
+                or instance.status not in [InstanceStatus.PENDING, InstanceStatus.PROVISIONING]
+            ):
                 resources = instance.instance_type.resources.pretty_format(include_spot=True)
 
             status = instance.status.value
