@@ -182,99 +182,85 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
     )
-    try:
-        if instance is None:
-            if profile.creation_policy == CreationPolicy.REUSE:
-                logger.debug("%s: reuse instance failed", fmt(job_model))
-                job_model.status = JobStatus.TERMINATING
-                job_model.termination_reason = (
-                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-                )
-                job_model.last_processed_at = common_utils.get_current_datetime()
-                await session.commit()
-                return
+    if instance is None:
+        if profile.creation_policy == CreationPolicy.REUSE:
+            logger.debug("%s: reuse instance failed", fmt(job_model))
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
 
-            # Create a new cloud instance
-            run_job_result = await _run_job_on_new_instance(
-                project=project,
-                fleet_model=run_model.fleet,
-                job_model=job_model,
-                run=run,
-                job=job,
-                project_ssh_public_key=project.ssh_public_key,
-                project_ssh_private_key=project.ssh_private_key,
-                master_job_provisioning_data=master_job_provisioning_data,
-                volumes=volumes,
-            )
-            if run_job_result is None:
-                logger.debug("%s: provisioning failed", fmt(job_model))
-                job_model.status = JobStatus.TERMINATING
-                job_model.termination_reason = (
-                    JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-                )
-                job_model.last_processed_at = common_utils.get_current_datetime()
-                await session.commit()
-                return
+        # Create a new cloud instance
+        run_job_result = await _run_job_on_new_instance(
+            project=project,
+            fleet_model=run_model.fleet,
+            job_model=job_model,
+            run=run,
+            job=job,
+            project_ssh_public_key=project.ssh_public_key,
+            project_ssh_private_key=project.ssh_private_key,
+            master_job_provisioning_data=master_job_provisioning_data,
+            volumes=volumes,
+        )
+        if run_job_result is None:
+            logger.debug("%s: provisioning failed", fmt(job_model))
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
 
-            logger.info("%s: now is provisioning a new instance", fmt(job_model))
-            job_provisioning_data, offer = run_job_result
-            job_model.job_provisioning_data = job_provisioning_data.json()
-            job_model.status = JobStatus.PROVISIONING
-            fleet_model = run_model.fleet
-            if fleet_model is not None:
-                await wait_to_lock(PROCESSING_FLEETS_LOCK, PROCESSING_FLEETS_IDS, fleet_model.id)
-                # Refetch fleet instances to correctly set instance_num
-                fleet_model = (
-                    await session.execute(
-                        select(FleetModel)
-                        .where(FleetModel.id == fleet_model.id)
-                        .options(joinedload(FleetModel.instances))
-                        .execution_options(populate_existing=True)
-                    )
-                ).scalar_one()
-            else:
-                fleet_model = _create_fleet_model_for_job(
-                    project=project,
-                    run=run,
-                )
-            instance = _create_instance_model_for_job(
-                project=project,
-                pool=pool,
-                fleet_model=fleet_model,
-                run_spec=run_spec,
-                job_model=job_model,
-                job=job,
-                job_provisioning_data=job_provisioning_data,
-                offer=offer,
-            )
-            fleet_model.instances.append(instance)
-            logger.info(
-                "The job %s created the new instance %s",
-                job_model.job_name,
-                instance.name,
-                extra={
-                    "instance_name": instance.name,
-                    "instance_status": InstanceStatus.PROVISIONING.value,
-                },
-            )
-            session.add(fleet_model)
-            await session.flush()  # to get im.id
-            job_model.used_instance_id = instance.id
+        logger.info("%s: now is provisioning a new instance", fmt(job_model))
+        job_provisioning_data, offer = run_job_result
+        job_model.job_provisioning_data = job_provisioning_data.json()
+        job_model.status = JobStatus.PROVISIONING
+        fleet_model = _get_or_create_fleet_model_for_job(
+            project=project,
+            run_model=run_model,
+            run=run,
+        )
+        instance_num = await _get_next_instance_num(
+            session=session,
+            fleet_model=fleet_model,
+        )
+        instance = _create_instance_model_for_job(
+            project=project,
+            pool=pool,
+            fleet_model=fleet_model,
+            run_spec=run_spec,
+            job_model=job_model,
+            job=job,
+            job_provisioning_data=job_provisioning_data,
+            offer=offer,
+            instance_num=instance_num,
+        )
+        instance.fleet_id = fleet_model.id
+        logger.info(
+            "The job %s created the new instance %s",
+            job_model.job_name,
+            instance.name,
+            extra={
+                "instance_name": instance.name,
+                "instance_status": InstanceStatus.PROVISIONING.value,
+            },
+        )
+        session.add(instance)
+        session.add(fleet_model)
+        await session.flush()  # to get im.id
+        job_model.used_instance_id = instance.id
 
-        if len(volume_models) > 0:
-            await _attach_volumes(
-                session=session,
-                project=project,
-                job_model=job_model,
-                instance=instance,
-                volume_models=volume_models,
-            )
+    if len(volume_models) > 0:
+        await _attach_volumes(
+            session=session,
+            project=project,
+            job_model=job_model,
+            instance=instance,
+            volume_models=volume_models,
+        )
 
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
-    finally:
-        if run_model.fleet_id is not None:
-            PROCESSING_FLEETS_IDS.difference_update([run_model.fleet_id])
+    job_model.last_processed_at = common_utils.get_current_datetime()
+    await session.commit()
 
 
 async def _run_job_on_pool_instance(
@@ -406,10 +392,13 @@ async def _run_job_on_new_instance(
     return None
 
 
-def _create_fleet_model_for_job(
+def _get_or_create_fleet_model_for_job(
     project: ProjectModel,
+    run_model: RunModel,
     run: Run,
 ) -> FleetModel:
+    if run_model.fleet is not None:
+        return run_model.fleet
     placement = InstanceGroupPlacement.ANY
     if run.run_spec.configuration.type == "task" and run.run_spec.configuration.nodes > 1:
         placement = InstanceGroupPlacement.CLUSTER
@@ -432,6 +421,25 @@ def _create_fleet_model_for_job(
     return fleet_model
 
 
+async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel) -> int:
+    if len(fleet_model.instances) == 0:
+        # No instances means the fleet is not in the db yet, so don't lock.
+        return 0
+    await wait_to_lock(PROCESSING_FLEETS_LOCK, PROCESSING_FLEETS_IDS, fleet_model.id)
+    try:
+        fleet_model = (
+            await session.execute(
+                select(FleetModel)
+                .where(FleetModel.id == fleet_model.id)
+                .options(joinedload(FleetModel.instances))
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one()
+        return len(fleet_model.instances)
+    finally:
+        PROCESSING_FLEETS_IDS.difference_update([fleet_model.id])
+
+
 def _create_instance_model_for_job(
     project: ProjectModel,
     pool: PoolModel,
@@ -441,6 +449,7 @@ def _create_instance_model_for_job(
     job: Job,
     job_provisioning_data: JobProvisioningData,
     offer: InstanceOfferWithAvailability,
+    instance_num: int,
 ) -> InstanceModel:
     profile = run_spec.merged_profile
     termination_policy = profile.termination_policy
@@ -449,8 +458,6 @@ def _create_instance_model_for_job(
         # terminate vastai/k8s instances immediately
         termination_policy = TerminationPolicy.DESTROY_AFTER_IDLE
         termination_idle_time = 0
-    # TODO: Ensure instances don't get the same instance_num
-    instance_num = len(fleet_model.instances)
     instance = InstanceModel(
         id=uuid.uuid4(),
         name=f"{fleet_model.name}-{instance_num}",
