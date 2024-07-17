@@ -361,6 +361,10 @@ class PoolCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace) -> None:
         super()._command(args)
+        logger.warning(
+            "Pools are deprecated in favor of fleets and will be removed in 0.19.0. "
+            "Learn more about fleets at https://dstack.ai/docs/concepts/fleets/"
+        )
         # TODO handle 404 and other errors
         args.subfunc(args)
 
