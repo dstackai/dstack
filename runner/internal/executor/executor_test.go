@@ -53,7 +53,7 @@ func TestExecutor_SSHCredentials(t *testing.T) {
 	ex := makeTestExecutor(t)
 	ex.jobSpec.Commands = append(ex.jobSpec.Commands, "cat ~/.ssh/id_rsa")
 	ex.repoCredentials = &schemas.RepoCredentials{
-		CloneURL:   "ssh://git@example.example/example/example.git",
+		CloneURL:   "ssh://git@github.com/dstackai/dstack-examples.git",
 		PrivateKey: &key,
 	}
 
@@ -159,7 +159,7 @@ func makeTestExecutor(t *testing.T) *RunExecutor {
 		},
 		Secrets: make(map[string]string),
 		RepoCredentials: &schemas.RepoCredentials{
-			CloneURL: "https://example.example/example/example.git",
+			CloneURL: "https://github.com/dstackai/dstack-examples.git",
 		},
 	}
 
