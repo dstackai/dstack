@@ -129,13 +129,11 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
 async def process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
     run = run_model_to_run(run_model)
-    if run.latest_job_submission is None:
-        logger.error("%s: failed to retry: pending run has no job submissions.")
-        run_model.status = RunStatus.FAILED
-        run_model.termination_reason = RunTerminationReason.SERVER_ERROR
-        return
-
-    if common.get_current_datetime() - run.latest_job_submission.last_processed_at < RETRY_DELAY:
+    if (
+        run.latest_job_submission is not None
+        and common.get_current_datetime() - run.latest_job_submission.last_processed_at
+        < RETRY_DELAY
+    ):
         logger.debug("%s: pending run is not yet ready for resubmission", fmt(run_model))
         return
 
