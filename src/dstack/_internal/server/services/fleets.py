@@ -207,7 +207,7 @@ async def create_fleet_ssh_instance_model(
         port = host.port or ssh_params.port
 
     if ssh_user is None or ssh_key is None:
-        # This should be reachable but checked by fleet spec validation
+        # This should not be reachable but checked by fleet spec validation
         raise ServerClientError("ssh key or user not specified")
 
     instance_model = await pools_services.create_ssh_instance_model(

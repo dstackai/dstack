@@ -34,7 +34,7 @@ Then apply the configuration by running `dstack apply`:
 <div class="termy">
 
 ```shell
-$ dstack apply -f .dstack/confs/fleet.yaml
+$ dstack apply -f my-gcp-fleet.dstack.yml
 Fleet my-gcp-fleet does not exist yet. Create the fleet? [y/n]: y
  FLEET         INSTANCE  BACKEND  RESOURCES  PRICE  STATUS   CREATED 
  my-gcp-fleet  0                                    pending  now     
@@ -107,7 +107,7 @@ Then apply the configuration by running `dstack apply`:
 <div class="termy">
 
 ```shell
-✗ dstack apply -f .dstack/confs/fleet-ssh.yaml 
+✗ dstack apply -f my-ssh-fleet.dstack.yml
 Fleet my-ssh-fleet does not exist yet. Create the fleet? [y/n]: y
  FLEET         INSTANCE  BACKEND       RESOURCES  PRICE  STATUS   CREATED 
  my-ssh-fleet  0         ssh (remote)             $0.0   pending  now     
@@ -163,7 +163,7 @@ Fleets created with `dstack apply` can be deleted by passing the `fleet` configu
 <div class="termy">
 
 ```shell
-$ dstack delete -f .dstack/confs/fleet.yaml
+$ dstack delete -f my-gcp-fleet.dstack.yml
 Delete the fleet my-gcp-fleet? [y/n]: y
 Fleet my-gcp-fleet deleted
 ```
