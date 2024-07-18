@@ -179,6 +179,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         run_spec=run_spec,
         job_model=job_model,
         job=job,
+        fleet_model=run_model.fleet,
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
     )
@@ -269,6 +270,7 @@ async def _run_job_on_pool_instance(
     run_spec: RunSpec,
     job_model: JobModel,
     job: Job,
+    fleet_model: Optional[FleetModel],
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[Volume]] = None,
 ) -> Optional[InstanceModel]:
@@ -285,6 +287,7 @@ async def _run_job_on_pool_instance(
             profile=profile,
             requirements=requirements,
             status=InstanceStatus.IDLE,
+            fleet_model=fleet_model,
             multinode=job.job_spec.jobs_per_replica > 1,
             master_job_provisioning_data=master_job_provisioning_data,
             volumes=volumes,

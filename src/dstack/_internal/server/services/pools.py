@@ -42,7 +42,13 @@ from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.server import settings
-from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel, UserModel
+from dstack._internal.server.models import (
+    FleetModel,
+    InstanceModel,
+    PoolModel,
+    ProjectModel,
+    UserModel,
+)
 from dstack._internal.server.services.docker import parse_image_name
 from dstack._internal.server.services.jobs import PROCESSING_INSTANCES_LOCK
 from dstack._internal.server.services.jobs.configurators.base import (
@@ -376,6 +382,7 @@ def filter_pool_instances(
     requirements: Requirements,
     *,
     status: Optional[InstanceStatus] = None,
+    fleet_model: Optional[FleetModel] = None,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[Volume]] = None,
@@ -410,6 +417,8 @@ def filter_pool_instances(
         regions = [r for r in regions if r == master_job_provisioning_data.region]
 
     for instance in pool_instances:
+        if fleet_model is not None and instance.fleet_id != fleet_model.id:
+            continue
         if instance.unreachable:
             continue
         if profile.instance_name is not None and instance.name != profile.instance_name:
