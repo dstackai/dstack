@@ -40,9 +40,9 @@ class InstanceGroupPlacement(str, Enum):
 class SSHHostParams(CoreModel):
     hostname: Annotated[str, Field(description="The IP address or domain to connect to")]
     port: Annotated[
-        Optional[int], Field(description="The SSH port to connect to on this host")
+        Optional[int], Field(description="The SSH port to connect to for this host")
     ] = None
-    user: Annotated[Optional[str], Field(description="The user to log in with on this host")] = (
+    user: Annotated[Optional[str], Field(description="The user to log in with for this host")] = (
         None
     )
     ssh_key_path: Annotated[
@@ -61,7 +61,10 @@ class SSHParams(CoreModel):
     ] = None
     ssh_key: Optional[SSHKey] = None
     hosts: Annotated[
-        List[Union[SSHHostParams, str]], Field(description="The per host connection parameters")
+        List[Union[SSHHostParams, str]],
+        Field(
+            description="The per host connection parameters: a hostname or an object that overrides default ssh parameters"
+        ),
     ]
     network: Annotated[
         Optional[str],
@@ -90,7 +93,7 @@ class InstanceGroupParams(CoreModel):
     nodes: Annotated[Optional[Range[int]], Field(description="The number of instances")] = None
     placement: Annotated[
         Optional[InstanceGroupPlacement],
-        Field(description="The placement of instances"),
+        Field(description="The placement of instances: `any` or `cluster`"),
     ] = None
     resources: Annotated[
         Optional[ResourcesSpec],

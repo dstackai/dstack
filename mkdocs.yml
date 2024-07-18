@@ -203,6 +203,7 @@ nav:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
               - task: docs/reference/dstack.yml/task.md
               - service: docs/reference/dstack.yml/service.md
+              - fleet: docs/reference/dstack.yml/fleet.md
               - gateway: docs/reference/dstack.yml/gateway.md
               - volume: docs/reference/dstack.yml/volume.md
           - profiles.yml: docs/reference/profiles.yml.md

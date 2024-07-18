@@ -170,12 +170,12 @@ Fleet my-gcp-fleet deleted
 
 </div>
 
-Any fleet can also be deleted with `dstack fleet rm` command:
+Any fleet can also be deleted with `dstack fleet delete` command:
 
 <div class="termy">
 
 ```shell
-$ dstack fleet rm my-gcp-fleet
+$ dstack fleet delete my-gcp-fleet
 Delete the fleet my-gcp-fleet? [y/n]: 
 Fleet my-gcp-fleet deleted
 ```
@@ -183,14 +183,14 @@ Fleet my-gcp-fleet deleted
 </div>
 
 Deleting a fleet will terminate all instances in the fleet.
-To terminate and delete only specific instances from the fleet, pass `-i INSTANCE_NUM` to `dstack fleet rm`:
+To terminate and delete only specific instances from the fleet, pass `-i INSTANCE_NUM` to `dstack fleet delete`:
 
 To remove an instance from the pool manually, use the `dstack pool rm` command. 
 
 <div class="termy">
 
 ```shell
-$ dstack fleet rm my-gcp-fleet -i 3       
+$ dstack fleet delete my-gcp-fleet -i 3       
 Delete the fleet my-gcp-fleet instances [3]? [y/n]: y
 Fleet my-gcp-fleet instances deleted
 ```

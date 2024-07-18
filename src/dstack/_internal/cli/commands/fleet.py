@@ -23,14 +23,16 @@ class FleetCommand(APIBaseCommand):
         )
         list_parser.set_defaults(subfunc=self._list)
 
-        rm_parser = subparsers.add_parser(
-            "rm", help="Delete fleets and instances", formatter_class=self._parser.formatter_class
+        delete_parser = subparsers.add_parser(
+            "delete",
+            help="Delete fleets and instances",
+            formatter_class=self._parser.formatter_class,
         )
-        rm_parser.add_argument(
+        delete_parser.add_argument(
             "name",
             help="The name of the fleet",
         )
-        rm_parser.add_argument(
+        delete_parser.add_argument(
             "-i",
             "--instance",
             action="append",
@@ -39,10 +41,10 @@ class FleetCommand(APIBaseCommand):
             help="The instances to delete",
             type=int,
         )
-        rm_parser.add_argument(
+        delete_parser.add_argument(
             "-y", "--yes", help="Don't ask for confirmation", action="store_true"
         )
-        rm_parser.set_defaults(subfunc=self._rm)
+        delete_parser.set_defaults(subfunc=self._delete)
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
@@ -52,7 +54,7 @@ class FleetCommand(APIBaseCommand):
         fleets = self.api.client.fleets.list(self.api.project)
         print_fleets_table(fleets, verbose=getattr(args, "verbose", False))
 
-    def _rm(self, args: argparse.Namespace):
+    def _delete(self, args: argparse.Namespace):
         try:
             self.api.client.fleets.get(project_name=self.api.project, name=args.name)
         except ResourceNotExistsError:
