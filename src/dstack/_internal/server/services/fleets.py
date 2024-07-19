@@ -258,7 +258,7 @@ async def delete_fleets(
         fleet_models = res.scalars().unique().all()
         for fleet_model in fleet_models:
             await _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
-        # TERMINATING fleets are deleted by process_fleets after intsances are terminated
+        # TERMINATING fleets are deleted by process_fleets after instances are terminated
         fleet_model.status = FleetStatus.TERMINATING
         await session.commit()
     finally:

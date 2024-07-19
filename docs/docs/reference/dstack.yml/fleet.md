@@ -57,7 +57,7 @@ ssh:
       show_root_heading: false
 
 
-## `hosts[n]`
+## `ssh.hosts[n]`
 
 #SCHEMA# dstack._internal.core.models.fleets.SSHHostParams
     overrides:

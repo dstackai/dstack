@@ -50,7 +50,7 @@ Soon `dstack` will provision all instances in the fleet:
 <div class="termy">
 
 ```shell
-dstack fleet
+$ dstack fleet
  FLEET         INSTANCE  BACKEND       RESOURCES     PRICE    STATUS  CREATED    
  my-gcp-fleet  0         gcp           2xCPU, 13GB,  $0.1051  idle    3 mins ago 
                          (europe-wes…  1xT4 (16GB),                              
@@ -76,7 +76,7 @@ Once instances become `idle`, they can be used by `dstack run`.
 
 The `fleet` configuration allows specifying resource requirements, along with the spot policy, idle duration, max
 price, retry policy, and other policies.
-You can also specify the policies via [`.dstack/profiles.yml`](../reference/profiles.yml.md) instead of passing them as arguments. 
+You can also specify the policies via [`.dstack/profiles.yml`](../reference/profiles.yml.md) instead of the `fleet` configuration. 
 For more details on policies and their defaults, refer to [`.dstack/profiles.yml`](../reference/profiles.yml.md).
 
 ??? info "Limitations"
@@ -107,7 +107,7 @@ Then apply the configuration by running `dstack apply`:
 <div class="termy">
 
 ```shell
-✗ dstack apply -f my-ssh-fleet.dstack.yml
+$ dstack apply -f my-ssh-fleet.dstack.yml
 Fleet my-ssh-fleet does not exist yet. Create the fleet? [y/n]: y
  FLEET         INSTANCE  BACKEND       RESOURCES  PRICE  STATUS   CREATED 
  my-ssh-fleet  0         ssh (remote)             $0.0   pending  now     
@@ -122,7 +122,7 @@ Soon `dstack` will set up all instances in the fleet:
 <div class="termy">
 
 ```shell
-✗ dstack fleet                                 
+$ dstack fleet
  FLEET         INSTANCE  BACKEND       RESOURCES                         PRICE  STATUS  CREATED   
  my-ssh-fleet  0         ssh (remote)  4xCPU, 15GB, 16.8GB (disk), SPOT  $0.0   idle    1 min ago 
                1         ssh (remote)  4xCPU, 15GB, 16.8GB (disk), SPOT  $0.0   idle    1 min ago 
@@ -184,8 +184,6 @@ Fleet my-gcp-fleet deleted
 
 Deleting a fleet will terminate all instances in the fleet.
 To terminate and delete only specific instances from the fleet, pass `-i INSTANCE_NUM` to `dstack fleet delete`:
-
-To remove an instance from the pool manually, use the `dstack pool rm` command. 
 
 <div class="termy">
 

@@ -340,7 +340,7 @@ The `dstack pool list` command lists all existing pools.
 <div class="termy">
 
 ```shell
-$ dstack pool delete --help
+$ dstack pool list --help
 #GENERATE#
 ```
 
