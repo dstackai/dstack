@@ -112,6 +112,8 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
         await session.commit()
         return
 
+    logger.info("Added new volume %s", volume_model.name)
+
     # Provisioned volumes marked as active since they become available almost immediately in AWS
     # TODO: Consider checking volume state
     volume_model.volume_provisioning_data = vpd.json()

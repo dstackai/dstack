@@ -40,6 +40,9 @@ class VolumeProvisioningData(CoreModel):
     availability_zone: Optional[str] = None
     # price per month
     price: Optional[float] = None
+    # should be manually attached/detached
+    attachable: bool = True
+    detachable: bool = True
     backend_data: Optional[str] = None  # backend-specific data in json
 
 

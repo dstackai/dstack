@@ -4,7 +4,8 @@ Volumes allow you to persist data between runs. `dstack` simplifies managing vol
 directory when working with dev environments, tasks, and services.
 
 !!! info "Experimental"
-    Volumes are currently experimental and only work with the `aws` backend. Support for other backends is coming soon.
+    Volumes are currently experimental and only work with the `aws` and `runpod` backends.
+    Support for other backends is coming soon.
 
 ## Configuration
 
@@ -99,9 +100,13 @@ The [`dstack volume list`](../reference/cli/index.md#dstack-gateway-list) comman
 
 ??? info "Using volumes across backends"
     Since volumes are backed up by cloud network disks, you can only use them within the same cloud. If you need to access
-    data across different backends, you should either use object storage (or replicate the data across multiple volumes).
+    data across different backends, you should either use object storage or replicate the data across multiple volumes.
 
 ??? info "Using volumes across regions"
-    Typically, network volumes are associated with specific regions, so you can't use them in other regions. Sometimes,
-    volumes are also linked to availability zones, but some systems allow volumes that can be used across different
+    Typically, network volumes are associated with specific regions, so you can't use them in other regions. Often,
+    volumes are also linked to availability zones, but some providers support volumes that can be used across different
     availability zones within the same region.
+
+??? info "Attaching volumes to multiple runs and instances"
+    You can mount a volume in multiple runs.
+    This feature is currently supported only by the `runpod` backend.
