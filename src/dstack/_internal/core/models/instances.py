@@ -2,8 +2,7 @@ from enum import Enum
 from typing import List, Optional
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.core.models.common import CoreModel, RegistryAuth
 from dstack._internal.server.services.docker import DockerImage
 from dstack._internal.utils.common import pretty_resources
 
@@ -25,7 +24,7 @@ class Resources(CoreModel):
     disk: Disk = Disk(size_mib=102400)  # the default value (100GB) for backward compatibility
     description: str = ""
 
-    def pretty_format(self) -> str:
+    def pretty_format(self, include_spot: bool = False) -> str:
         resources = {}
         if self.cpus > 0:
             resources["cpus"] = self.cpus
@@ -39,7 +38,10 @@ class Resources(CoreModel):
             resources["gpu_count"] = len(self.gpus)
             if gpu.memory_mib > 0:
                 resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
-        return pretty_resources(**resources)
+        output = pretty_resources(**resources)
+        if include_spot and self.spot:
+            output += ", SPOT"
+        return output
 
 
 class InstanceType(CoreModel):
@@ -114,3 +116,18 @@ class InstanceOffer(CoreModel):
 class InstanceOfferWithAvailability(InstanceOffer):
     availability: InstanceAvailability
     instance_runtime: InstanceRuntime = InstanceRuntime.SHIM
+
+
+class InstanceStatus(str, Enum):
+    PENDING = "pending"
+    PROVISIONING = "provisioning"
+    IDLE = "idle"
+    BUSY = "busy"
+    TERMINATING = "terminating"
+    TERMINATED = "terminated"
+
+    def is_available(self) -> bool:
+        return self in (
+            self.IDLE,
+            self.BUSY,
+        )

@@ -9,8 +9,7 @@ from pydantic import Field, ValidationError, validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.errors import DockerRegistryError
-from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.core.models.common import CoreModel, RegistryAuth
 from dstack._internal.server.utils.common import join_byte_stream_checked
 
 DEFAULT_PLATFORM = "linux/amd64"

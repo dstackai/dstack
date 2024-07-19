@@ -4,8 +4,7 @@ from uuid import UUID
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
-from dstack._internal.core.models.instances import InstanceType
-from dstack._internal.core.models.runs import InstanceStatus, JobStatus
+from dstack._internal.core.models.instances import InstanceStatus, InstanceType
 
 
 class Pool(CoreModel):
@@ -22,9 +21,9 @@ class Instance(CoreModel):
     backend: Optional[BackendType] = None
     instance_type: Optional[InstanceType] = None
     name: str
+    instance_num: int
     pool_name: Optional[str] = None
     job_name: Optional[str] = None
-    job_status: Optional[JobStatus] = None
     hostname: Optional[str] = None
     status: InstanceStatus
     unreachable: bool = False

@@ -209,7 +209,7 @@ volumes:
 
 </div>
 
-Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the development
+Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the dev
 environment, and its contents will persist across runs.
 
 !!! info "Limitations"

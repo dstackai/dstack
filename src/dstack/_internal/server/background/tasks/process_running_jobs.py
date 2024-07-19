@@ -9,12 +9,11 @@ from sqlalchemy.orm import joinedload
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import RegistryAuth
-from dstack._internal.core.models.instances import RemoteConnectionInfo
+from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
     ClusterInfo,
-    InstanceStatus,
     Job,
     JobSpec,
     JobStatus,

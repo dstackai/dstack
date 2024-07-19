@@ -130,7 +130,8 @@ class ProfileParams(CoreModel):
         ),
     ]
     max_price: Annotated[
-        Optional[float], Field(description="The maximum price per hour, in dollars", gt=0.0)
+        Optional[float],
+        Field(description="The maximum instance price per hour, in dollars", gt=0.0),
     ]
     pool_name: Annotated[
         Optional[str],
@@ -145,9 +146,7 @@ class ProfileParams(CoreModel):
     ]
     termination_policy: Annotated[
         Optional[TerminationPolicy],
-        Field(
-            description="The policy for termination instances. Defaults to `destroy-after-idle`"
-        ),
+        Field(description="The policy for instance termination. Defaults to `destroy-after-idle`"),
     ]
     termination_idle_time: Annotated[
         Optional[Union[str, int]],

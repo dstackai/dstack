@@ -7,7 +7,7 @@ from requests.adapters import HTTPAdapter, Retry
 
 import dstack._internal.server.services.docker as docker
 from dstack._internal.core.errors import NoCapacityError
-from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.core.models.common import RegistryAuth
 
 
 class VastAIAPIClient:

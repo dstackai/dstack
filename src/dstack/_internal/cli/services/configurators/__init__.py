@@ -4,6 +4,7 @@ from typing import Dict, Optional, Type
 import yaml
 
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
+from dstack._internal.cli.services.configurators.fleet import FleetConfigurator
 from dstack._internal.cli.services.configurators.gateway import GatewayConfigurator
 from dstack._internal.cli.services.configurators.volume import VolumeConfigurator
 from dstack._internal.core.errors import ConfigurationError
@@ -14,7 +15,7 @@ from dstack._internal.core.models.configurations import (
 )
 
 apply_configurators_mapping: Dict[ApplyConfigurationType, Type[BaseApplyConfigurator]] = {
-    cls.TYPE: cls for cls in [GatewayConfigurator, VolumeConfigurator]
+    cls.TYPE: cls for cls in [FleetConfigurator, GatewayConfigurator, VolumeConfigurator]
 }
 
 

@@ -7,10 +7,10 @@ from cachetools import TTLCache, cached
 
 import dstack.version as version
 from dstack._internal.core.errors import DockerRegistryError, ServerClientError
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     PortMapping,
     PythonVersion,
-    RegistryAuth,
     RunConfigurationType,
 )
 from dstack._internal.core.models.profiles import SpotPolicy

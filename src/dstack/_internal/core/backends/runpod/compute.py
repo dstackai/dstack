@@ -14,7 +14,7 @@ from dstack._internal.core.errors import (
     BackendError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,

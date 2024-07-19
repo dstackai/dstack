@@ -5,9 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.pools as services_pools
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import InstanceType, Resources
+from dstack._internal.core.models.instances import InstanceStatus, InstanceType, Resources
 from dstack._internal.core.models.pools import Instance
-from dstack._internal.core.models.runs import InstanceStatus
 from dstack._internal.server.models import InstanceModel
 from dstack._internal.server.testing.common import create_project, create_user
 from dstack._internal.utils.common import get_current_datetime
@@ -59,6 +58,7 @@ class TestInstanceModelToInstance:
                 name="instance", resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[])
             ),
             name="test_instance",
+            instance_num=0,
             hostname="hostname_test",
             status=InstanceStatus.PENDING,
             created=created,
@@ -69,6 +69,7 @@ class TestInstanceModelToInstance:
             id=instance_id,
             created_at=created,
             name="test_instance",
+            instance_num=0,
             status=InstanceStatus.PENDING,
             unreachable=False,
             project=project,

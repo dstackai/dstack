@@ -272,6 +272,8 @@ def _print_finished_message(run: Run):
 
 
 def _get_run_termination_reason(run: Run) -> Tuple[Optional[JobTerminationReason], Optional[str]]:
+    if len(run._run.jobs) == 0:
+        return None, None
     job = run._run.jobs[0]
     if len(job.job_submissions) == 0:
         return None, None

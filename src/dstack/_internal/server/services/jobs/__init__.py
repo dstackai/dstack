@@ -10,12 +10,11 @@ import sqlalchemy.orm as sa_orm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.gateways as gateways
-from dstack._internal.core.errors import BackendError, ComputeResourceNotFoundError, SSHError
+from dstack._internal.core.errors import BackendError, ResourceNotExistsError, SSHError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import RunConfigurationType
-from dstack._internal.core.models.instances import RemoteConnectionInfo
+from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     Job,
     JobProvisioningData,
     JobSpec,
@@ -47,8 +46,8 @@ SUBMITTED_PROCESSING_JOBS_IDS = set()
 RUNNING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 RUNNING_PROCESSING_JOBS_IDS = set()
 
-PROCESSING_POOL_LOCK = asyncio.Lock()
-PROCESSING_POOL_IDS = set()
+PROCESSING_INSTANCES_LOCK = asyncio.Lock()
+PROCESSING_INSTANCES_IDS = set()
 
 TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
 TERMINATING_PROCESSING_JOBS_IDS = set()
@@ -104,7 +103,7 @@ def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
     for job in jobs:
         if job.job_spec.replica_num == replica_num and job.job_spec.job_num == job_num:
             return job
-    raise ComputeResourceNotFoundError(
+    raise ResourceNotExistsError(
         f"Job with replica_num={replica_num} and job_num={job_num} not found"
     )
 
@@ -205,22 +204,31 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
         return
 
     res = await session.execute(
-        sa.select(InstanceModel)
-        .where(
+        sa.select(InstanceModel).where(
             InstanceModel.project_id == job_model.project_id,
             InstanceModel.job_id == job_model.id,
-        )
-        .options(
-            sa_orm.joinedload(InstanceModel.project),
-            sa_orm.joinedload(InstanceModel.volumes),
         )
     )
     instance: Optional[InstanceModel] = res.scalar()
 
     if instance is not None:
-        await wait_to_lock(PROCESSING_POOL_LOCK, PROCESSING_POOL_IDS, instance.id)
+        await wait_to_lock(PROCESSING_INSTANCES_LOCK, PROCESSING_INSTANCES_IDS, instance.id)
         try:
-            await session.refresh(instance)
+            # Refresh after lock
+            instance = (
+                (
+                    await session.execute(
+                        sa.select(InstanceModel)
+                        .where(InstanceModel.id == instance.id)
+                        .options(
+                            sa_orm.joinedload(InstanceModel.project),
+                            sa_orm.joinedload(InstanceModel.volumes),
+                        )
+                    )
+                )
+                .unique()
+                .scalar_one()
+            )
             # there is an associated instance to empty
             jpd = None
             if job_model.job_provisioning_data is not None:
@@ -267,7 +275,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             )  # TODO(egor-s) ensure always runs
 
         finally:
-            PROCESSING_POOL_IDS.remove(instance.id)
+            PROCESSING_INSTANCES_IDS.remove(instance.id)
 
     if job_model.termination_reason is not None:
         job_model.status = job_model.termination_reason.to_status()

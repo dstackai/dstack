@@ -152,10 +152,118 @@ $ dstack config --help
 
 </div>
 
+### dstack fleet
+
+Fleets enable efficient provisioning and management of clusters and instances.
+
+##### dstack fleet list
+
+The `dstack fleet list` command displays fleets and instances.
+
+<div class="termy">
+
+```shell
+$ dstack fleet list --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack fleet delete
+
+The `dstack fleet delete` deletes fleets and instances.
+Cloud instances are terminated upon deletion.
+
+<div class="termy">
+
+```shell
+$ dstack fleet delete --help
+#GENERATE#
+```
+
+</div>
+
+### dstack gateway
+
+A gateway is required for running services. It handles ingress traffic, authorization, domain mapping, model mapping
+for the OpenAI-compatible endpoint, and so on.
+
+##### dstack gateway list
+
+The `dstack gateway list` command displays the names and addresses of the gateways configured in the project.
+
+<div class="termy">
+
+```shell
+$ dstack gateway list --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack gateway create
+
+The `dstack gateway create` command creates a new gateway instance in the project.
+
+<div class="termy">
+
+```shell
+$ dstack gateway create --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack gateway delete
+
+The `dstack gateway delete` command deletes the specified gateway.
+
+<div class="termy">
+
+```shell
+$ dstack gateway delete --help
+#GENERATE#
+```
+
+</div>
+
+##### dstack gateway update
+
+The `dstack gateway update` command updates the specified gateway.
+
+<div class="termy">
+
+```shell
+$ dstack gateway update --help
+#GENERATE#
+```
+
+</div>
+
+### dstack volume
+
+The volumes commands.
+
+##### dstack volume list
+
+The `dstack volume list` command lists volumes.
+
+<div class="termy">
+
+```shell
+$ dstack volume list --help
+#GENERATE#
+```
+
+</div>
+
 ### dstack pool
 
 Pools allow for managing the lifecycle of instances and reusing them across runs. 
 The default pool is created automatically.
+
+!!! warning "Deprecation"
+    Pools are deprecated in favor of fleets and will be removed in 0.19.0.
 
 ##### dstack pool add
 
@@ -232,7 +340,7 @@ The `dstack pool list` command lists all existing pools.
 <div class="termy">
 
 ```shell
-$ dstack pool delete --help
+$ dstack pool list --help
 #GENERATE#
 ```
 
@@ -259,80 +367,6 @@ The `dstack pool delete` command deletes a specified pool.
 
 ```shell
 $ dstack pool delete --help
-#GENERATE#
-```
-
-</div>
-
-### dstack gateway
-
-A gateway is required for running services. It handles ingress traffic, authorization, domain mapping, model mapping
-for the OpenAI-compatible endpoint, and so on.
-
-##### dstack gateway list
-
-The `dstack gateway list` command displays the names and addresses of the gateways configured in the project.
-
-<div class="termy">
-
-```shell
-$ dstack gateway list --help
-#GENERATE#
-```
-
-</div>
-
-##### dstack gateway create
-
-The `dstack gateway create` command creates a new gateway instance in the project.
-
-<div class="termy">
-
-```shell
-$ dstack gateway create --help
-#GENERATE#
-```
-
-</div>
-
-##### dstack gateway delete
-
-The `dstack gateway delete` command deletes the specified gateway.
-
-<div class="termy">
-
-```shell
-$ dstack gateway delete --help
-#GENERATE#
-```
-
-</div>
-
-##### dstack gateway update
-
-The `dstack gateway update` command updates the specified gateway.
-
-<div class="termy">
-
-```shell
-$ dstack gateway update --help
-#GENERATE#
-```
-
-</div>
-
-### dstack volume
-
-The volumes commands.
-
-##### dstack volume list
-
-The `dstack volume list` command lists volumes.
-
-<div class="termy">
-
-```shell
-$ dstack volume list --help
 #GENERATE#
 ```
 

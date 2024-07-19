@@ -3,7 +3,8 @@ from typing import Any, Optional
 import pytest
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.configurations import RegistryAuth, parse_run_configuration
+from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.configurations import parse_run_configuration
 from dstack._internal.core.models.resources import Range
 
 
