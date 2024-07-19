@@ -505,14 +505,16 @@ async def _attach_volumes(
     await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
     try:
         for volume_model in volume_models:
+            volume = volume_model_to_volume(volume_model)
             try:
-                await _attach_volume(
-                    session=session,
-                    backend=backend,
-                    volume_model=volume_model,
-                    instance=instance,
-                    instance_id=job_provisioning_data.instance_id,
-                )
+                if volume.provisioning_data is not None and volume.provisioning_data.attachable:
+                    await _attach_volume(
+                        session=session,
+                        backend=backend,
+                        volume_model=volume_model,
+                        instance=instance,
+                        instance_id=job_provisioning_data.instance_id,
+                    )
             except (ServerClientError, BackendError) as e:
                 logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
                 job_model.status = JobStatus.TERMINATING

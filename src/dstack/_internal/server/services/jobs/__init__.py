@@ -355,11 +355,12 @@ async def detach_volumes_from_instance(
     for volume_model in instance.volumes:
         volume = volume_model_to_volume(volume_model)
         try:
-            await run_async(
-                backend.compute().detach_volume,
-                volume=volume,
-                instance_id=jpd.instance_id,
-            )
+            if volume.provisioning_data is not None and volume.provisioning_data.detachable:
+                await run_async(
+                    backend.compute().detach_volume,
+                    volume=volume,
+                    instance_id=jpd.instance_id,
+                )
             detached_volumes.append(volume_model)
         except BackendError as e:
             logger.error(
