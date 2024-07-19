@@ -39,7 +39,7 @@ class Resources(CoreModel):
             if gpu.memory_mib > 0:
                 resources["gpu_memory"] = f"{gpu.memory_mib / 1024:.0f}GB"
         output = pretty_resources(**resources)
-        if include_spot:
+        if include_spot and self.spot:
             output += ", SPOT"
         return output
 

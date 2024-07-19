@@ -127,7 +127,8 @@ class InstanceGroupParams(CoreModel):
         Field(description="The policy for provisioning retry. Defaults to `false`"),
     ] = None
     max_price: Annotated[
-        Optional[float], Field(description="The maximum price per hour, in dollars", gt=0.0)
+        Optional[float],
+        Field(description="The maximum instance price per hour, in dollars", gt=0.0),
     ] = None
     termination_policy: Annotated[
         Optional[TerminationPolicy],

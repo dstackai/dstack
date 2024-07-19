@@ -117,5 +117,5 @@ def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:
         return SSHKey(public=pub_key, private=private_key)
     except OSError as e:
         logger.debug("Got OSError: %s", repr(e))
-        console.print("[error]Unable to read the SSH key.[/]")
+        console.print(f"[error]Unable to read the SSH key at {ssh_key_path}[/]")
         exit()

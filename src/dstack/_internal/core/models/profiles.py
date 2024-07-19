@@ -130,7 +130,8 @@ class ProfileParams(CoreModel):
         ),
     ]
     max_price: Annotated[
-        Optional[float], Field(description="The maximum price per hour, in dollars", gt=0.0)
+        Optional[float],
+        Field(description="The maximum instance price per hour, in dollars", gt=0.0),
     ]
     pool_name: Annotated[
         Optional[str],
