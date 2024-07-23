@@ -51,16 +51,16 @@ jobs:
         python: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
     steps:
      - name: Checkout repository
-       uses: actions/checkout@v3
+       uses: actions/checkout@v4
      - name: Set up Docker Buildx
-       uses: docker/setup-buildx-action@v2
+       uses: docker/setup-buildx-action@v3
      - name: Login to DockerHub
-       uses: docker/login-action@v2
+       uses: docker/login-action@v3
        with:
          username: ${{ secrets.DOCKERHUB_USERNAME }}
          password: ${{ secrets.DOCKERHUB_TOKEN }}
      - name: Set up QEMU
-       uses: docker/setup-qemu-action@v2
+       uses: docker/setup-qemu-action@v3
      - name: Build and upload to DockerHub
        run: |
          docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1 -f base/Dockerfile .
@@ -79,7 +79,7 @@ jobs:
       matrix:
         variant: [ "", "-cuda" ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Download packer
         run: |
           wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
@@ -108,8 +108,8 @@ jobs:
       matrix:
         variant: [ "", "-cuda", "-grid" ]
     steps:
-      - uses: actions/checkout@v3
-      - uses: Azure/login@v1
+      - uses: actions/checkout@v4
+      - uses: Azure/login@v2
         name: Log in to az
         with:
           creds: '{"clientId":"${{ secrets.AZURE_CLIENT_ID }}","clientSecret":"${{ secrets.AZURE_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AZURE_TENANT_ID }}"}'
@@ -142,15 +142,15 @@ jobs:
       contents: 'read'
       id-token: 'write'
     steps:
-      - uses: actions/checkout@v3
-      - name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v1'
+      - uses: actions/checkout@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: 'projects/531508670106/locations/global/workloadIdentityPools/github-identity-pool/providers/github-id-provider'
           service_account: 'github-actions@dstack.iam.gserviceaccount.com'
           create_credentials_file: true
-      - name: 'Set up Cloud SDK'
-        uses: 'google-github-actions/setup-gcloud@v1'
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
       - name: Download packer
         run: |
           wget https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
@@ -179,7 +179,7 @@ jobs:
       matrix:
         variant: [ "", "-cuda" ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup OCI config
         run: |
           mkdir ~/.oci
@@ -246,7 +246,7 @@ jobs:
         working-directory: scripts/packer
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Get Nebius CLI
         run: |
           echo "CLI_VERSION=$CLI_VERSION"
@@ -255,7 +255,7 @@ jobs:
         env:
           CLI_VERSION: 0.113.0+Nebius-AI
       - name: Write Nebius credentials
-        uses: jsdaniell/create-json@v1.2.2
+        uses: jsdaniell/create-json@v1.2.3
         with:
           name: "service_account.json"
           json: ${{ secrets.NEBIUS_SERVICE_ACCOUNT }}

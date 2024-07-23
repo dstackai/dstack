@@ -76,7 +76,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
@@ -115,7 +116,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
@@ -127,9 +129,9 @@ jobs:
           go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
           go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
           echo $VERSION
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: dstack-runner
+          name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
             runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
             runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -143,9 +145,10 @@ jobs:
       - name: Install AWS
         run: pip install awscli
       - name: Download Runner
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: dstack-runner
+          pattern: dstack-runner-*
+          merge-multiple: true
           path: runner
       - name: Upload to S3
         working-directory: runner
@@ -165,8 +168,8 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install AWS

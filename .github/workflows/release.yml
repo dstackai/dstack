@@ -49,16 +49,17 @@ jobs:
         working-directory: runner
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.21.1
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.51.2
-          args: --issues-exit-code=0 --timeout=20m
+          version: v1.58
+          args: --timeout=20m
           working-directory: runner
       - name: Test
         run: |
@@ -84,7 +85,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
@@ -95,9 +97,9 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           go build -ldflags "-X '$REPO_NAME/runner/cmd/runner/version.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
           go build -ldflags "-X '$REPO_NAME/runner/cmd/shim/version.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: dstack-runner
+          name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
             runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
             runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -109,9 +111,10 @@ jobs:
       - name: Install AWS
         run: pip install awscli
       - name: Download Runner
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: dstack-runner
+          pattern: dstack-runner-*
+          merge-multiple: true
           path: runner
       - name: Upload to S3
         working-directory: runner
@@ -130,9 +133,9 @@ jobs:
       LATEST: ${{ steps.set_latest.outputs.LATEST }}
       name: Set latest variable
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Python 3.9
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.9
       - name: Install dependencies
@@ -177,16 +180,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       - name: Login to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Build and upload to DockerHub
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
@@ -213,8 +216,8 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Install AWS
