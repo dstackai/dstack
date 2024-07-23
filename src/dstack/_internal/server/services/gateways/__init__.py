@@ -448,9 +448,9 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
-        .options(sa_orm.joinedload(RunModel.project))
+        .options(sa_orm.joinedload(RunModel.project).joinedload(ProjectModel.backends))
     )
-    run_model = res.scalar()
+    run_model = res.unique().scalar()
     if run_model.gateway_id is None:
         return
 

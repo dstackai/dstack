@@ -193,12 +193,16 @@ def deploy_instance(
 async def add_remote(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
 
         logger.debug("Adding remote instance %s...", instance.name)
 
@@ -351,7 +355,7 @@ async def create_instance(instance_id: UUID) -> None:
                 await session.scalars(
                     select(InstanceModel)
                     .where(InstanceModel.id == instance_id)
-                    .options(joinedload(InstanceModel.project))
+                    .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
                     .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
                 )
             )
@@ -525,12 +529,16 @@ async def create_instance(instance_id: UUID) -> None:
 async def check_instance(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
 
         job_provisioning_data = JobProvisioningData.__response__.parse_raw(
             instance.job_provisioning_data
@@ -704,12 +712,16 @@ def instance_healthcheck(*, ports: Dict[int, int]) -> HealthStatus:
 async def terminate(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
 
         jpd = get_instance_provisioning_data(instance)
         if jpd is not None:
@@ -761,12 +773,16 @@ async def terminate(instance_id: UUID) -> None:
 async def terminate_idle_instance(instance_id: UUID):
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
         current_time = get_current_datetime()
         idle_duration = _get_instance_idle_duration(instance)
         idle_seconds = instance.termination_idle_time

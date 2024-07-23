@@ -22,7 +22,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -94,12 +94,12 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
             sa.select(RunModel)
             .where(RunModel.id == run_id)
             .execution_options(populate_existing=True)
-            .options(joinedload(RunModel.project))
+            .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
             .options(joinedload(RunModel.user))
             .options(joinedload(RunModel.repo))
             .options(selectinload(RunModel.jobs).joinedload(JobModel.instance))
         )
-        run = res.scalar()
+        run = res.unique().scalar()
         if run is None:
             logger.error(f"Run {run_id} not found")
             return run_id

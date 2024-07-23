@@ -106,21 +106,17 @@ class ProjectModel(BaseModel):
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     owner: Mapped[UserModel] = relationship(lazy="joined")
-    members: Mapped[List["MemberModel"]] = relationship(back_populates="project", lazy="selectin")
+    members: Mapped[List["MemberModel"]] = relationship(back_populates="project")
 
     ssh_private_key: Mapped[str] = mapped_column(Text)
     ssh_public_key: Mapped[str] = mapped_column(Text)
 
-    backends: Mapped[List["BackendModel"]] = relationship(
-        back_populates="project", lazy="selectin"
-    )
+    backends: Mapped[List["BackendModel"]] = relationship(back_populates="project")
 
     default_gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateways.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )
-    default_gateway: Mapped["GatewayModel"] = relationship(
-        foreign_keys=[default_gateway_id], lazy="selectin"
-    )
+    default_gateway: Mapped["GatewayModel"] = relationship(foreign_keys=[default_gateway_id])
 
     default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
         ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"), nullable=True
