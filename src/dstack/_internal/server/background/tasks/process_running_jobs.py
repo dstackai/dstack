@@ -93,11 +93,11 @@ async def _process_job(job_id: UUID):
         res = await session.execute(
             select(RunModel)
             .where(RunModel.id == job_model.run_id)
-            .options(joinedload(RunModel.project))
+            .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
             .options(joinedload(RunModel.user))
             .options(joinedload(RunModel.repo))
         )
-        run_model = res.scalar_one()
+        run_model = res.unique().scalar_one()
         repo_model = run_model.repo
         project = run_model.project
         run = run_model_to_run(run_model)

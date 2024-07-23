@@ -108,10 +108,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
-        .options(joinedload(RunModel.project))
+        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(RunModel.user))
     )
-    run_model = res.scalar_one()
+    run_model = res.unique().scalar_one()
     project_model = run_model.project
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
     profile = run_spec.merged_profile

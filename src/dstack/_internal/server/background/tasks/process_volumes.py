@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.errors import BackendError, BackendNotAvailable
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import VolumeModel
+from dstack._internal.server.models import ProjectModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.volumes import (
@@ -50,9 +50,9 @@ async def _process_volume(volume_id: UUID):
         res = await session.execute(
             select(VolumeModel)
             .where(VolumeModel.id == volume_id)
-            .options(joinedload(VolumeModel.project))
+            .options(joinedload(VolumeModel.project).joinedload(ProjectModel.backends))
         )
-        volume_model = res.scalar_one()
+        volume_model = res.unique().scalar_one()
         await _process_submitted_volume(
             session=session,
             volume_model=volume_model,

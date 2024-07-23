@@ -220,7 +220,23 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
     if instance is not None:
         await wait_to_lock(PROCESSING_POOL_LOCK, PROCESSING_POOL_IDS, instance.id)
         try:
-            await session.refresh(instance)
+            # Refresh after lock
+            instance = (
+                (
+                    await session.execute(
+                        sa.select(InstanceModel)
+                        .where(InstanceModel.id == instance.id)
+                        .options(
+                            sa_orm.joinedload(InstanceModel.project).joinedload(
+                                ProjectModel.backends
+                            ),
+                            sa_orm.joinedload(InstanceModel.volumes),
+                        )
+                    )
+                )
+                .unique()
+                .scalar_one()
+            )
             # there is an associated instance to empty
             jpd = None
             if job_model.job_provisioning_data is not None:

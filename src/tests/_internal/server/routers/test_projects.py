@@ -1,4 +1,3 @@
-import json
 from unittest.mock import patch
 from uuid import UUID
 
@@ -40,7 +39,7 @@ class TestListProjects:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        backend = await create_backend(
+        await create_backend(
             session=session,
             project_id=project.id,
         )
@@ -56,30 +55,8 @@ class TestListProjects:
                     "global_role": user.global_role,
                     "email": None,
                 },
-                "backends": [
-                    {
-                        "name": backend.type,
-                        "config": {
-                            "type": backend.type,
-                            "regions": json.loads(backend.config)["regions"],
-                            "vpc_name": None,
-                            "vpc_ids": None,
-                            "default_vpcs": None,
-                            "public_ips": None,
-                        },
-                    }
-                ],
-                "members": [
-                    {
-                        "user": {
-                            "id": str(user.id),
-                            "username": user.name,
-                            "global_role": user.global_role,
-                            "email": None,
-                        },
-                        "project_role": ProjectRole.ADMIN,
-                    }
-                ],
+                "backends": [],
+                "members": [],
             }
         ]
 
