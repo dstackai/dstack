@@ -259,7 +259,8 @@ async def delete_fleets(
         for fleet_model in fleet_models:
             await _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
         # TERMINATING fleets are deleted by process_fleets after instances are terminated
-        fleet_model.status = FleetStatus.TERMINATING
+        if instance_nums is None:
+            fleet_model.status = FleetStatus.TERMINATING
         await session.commit()
     finally:
         PROCESSING_FLEETS_IDS.difference_update(fleets_ids)
@@ -299,14 +300,13 @@ async def generate_fleet_name(session: AsyncSession, project: ProjectModel) -> s
             return name
 
 
-def is_fleet_in_use(
-    fleet_model: FleetModel, ignore_instance_nums: Optional[List[int]] = None
-) -> bool:
+def is_fleet_in_use(fleet_model: FleetModel, instance_nums: Optional[List[int]] = None) -> bool:
     instances_in_use = [i for i in fleet_model.instances if i.job_id is not None]
-    if ignore_instance_nums is not None:
-        instances_in_use = [i for i in instances_in_use if i not in ignore_instance_nums]
+    selected_instance_in_use = instances_in_use
+    if instance_nums is not None:
+        selected_instance_in_use = [i for i in instances_in_use if i.instance_num in instance_nums]
     active_runs = [r for r in fleet_model.runs if not r.status.is_finished()]
-    return len(instances_in_use) > 0 or len(active_runs) > 0
+    return len(selected_instance_in_use) > 0 or len(instances_in_use) == 0 and len(active_runs) > 0
 
 
 def is_fleet_empty(fleet_model: FleetModel) -> bool:
@@ -346,7 +346,11 @@ def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:
 
 
 async def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):
-    if is_fleet_in_use(fleet_model, ignore_instance_nums=instance_nums):
+    if is_fleet_in_use(fleet_model, instance_nums=instance_nums):
+        if instance_nums is not None:
+            raise ServerClientError(
+                f"Failed to delete fleet {fleet_model.name} instances {instance_nums}. Fleet instances are in use."
+            )
         raise ServerClientError(f"Failed to delete fleet {fleet_model.name}. Fleet is in use.")
     instances_ids = sorted([i.id for i in fleet_model.instances])
     await wait_to_lock_many(PROCESSING_INSTANCES_LOCK, PROCESSING_INSTANCES_IDS, instances_ids)

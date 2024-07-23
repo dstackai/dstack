@@ -9,7 +9,7 @@ from freezegun import freeze_time
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.models.fleets import FleetConfiguration, SSHParams
+from dstack._internal.core.models.fleets import FleetConfiguration, FleetStatus, SSHParams
 from dstack._internal.core.models.instances import InstanceStatus, SSHKey
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
@@ -447,3 +447,49 @@ class TestDeleteFleetInstances:
 
         assert instance1.status == InstanceStatus.TERMINATING
         assert instance2.status != InstanceStatus.TERMINATING
+        assert fleet.status != FleetStatus.TERMINATING
+
+    @pytest.mark.asyncio
+    async def test_returns_400_when_deleting_busy_instances(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        pool = await create_pool(session=session, project=project)
+        fleet = await create_fleet(session=session, project=project)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            instance_num=1,
+            status=InstanceStatus.BUSY,
+            job=job,
+        )
+        fleet.instances.append(instance)
+        await session.commit()
+        response = client.post(
+            f"/api/project/{project.name}/fleets/delete_instances",
+            headers=get_auth_headers(user.token),
+            json={"name": fleet.name, "instance_nums": [1]},
+        )
+        assert response.status_code == 400
+        await session.refresh(fleet)
+        await session.refresh(instance)
+
+        assert instance.status != InstanceStatus.TERMINATING
+        assert fleet.status != FleetStatus.TERMINATING
