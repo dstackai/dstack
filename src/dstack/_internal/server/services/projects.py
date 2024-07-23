@@ -240,6 +240,7 @@ async def get_project_model_by_name(
         .where(*filters)
         .options(joinedload(ProjectModel.backends))
         .options(joinedload(ProjectModel.members))
+        .options(joinedload(ProjectModel.default_gateway))
     )
     return res.unique().scalar()
 
@@ -256,6 +257,7 @@ async def get_project_model_by_name_or_error(
         )
         .options(joinedload(ProjectModel.backends))
         .options(joinedload(ProjectModel.members))
+        .options(joinedload(ProjectModel.default_gateway))
     )
     return res.unique().scalar_one()
 
@@ -272,6 +274,7 @@ async def get_project_model_by_id_or_error(
         )
         .options(joinedload(ProjectModel.backends))
         .options(joinedload(ProjectModel.members))
+        .options(joinedload(ProjectModel.default_gateway))
     )
     return res.unique().scalar_one()
 
