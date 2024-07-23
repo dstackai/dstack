@@ -99,6 +99,7 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
     for hook in _CREATE_PROJECT_HOOKS:
         await hook(session, project_model)
     # a hook may change project
+    session.expire(project_model)
     project_model = await get_project_model_by_name_or_error(
         session=session, project_name=project_name
     )
