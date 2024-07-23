@@ -120,7 +120,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
-        .options(joinedload(RunModel.project))
+        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(RunModel.user))
         .options(joinedload(RunModel.fleet).joinedload(FleetModel.instances))
     )

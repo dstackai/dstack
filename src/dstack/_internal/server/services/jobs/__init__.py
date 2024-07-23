@@ -221,7 +221,9 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                         sa.select(InstanceModel)
                         .where(InstanceModel.id == instance.id)
                         .options(
-                            sa_orm.joinedload(InstanceModel.project),
+                            sa_orm.joinedload(InstanceModel.project).joinedload(
+                                ProjectModel.backends
+                            ),
                             sa_orm.joinedload(InstanceModel.volumes),
                         )
                     )

@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload
 from dstack._internal.core.errors import BackendError, BackendNotAvailable, SSHError
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import GatewayModel
+from dstack._internal.server.models import GatewayModel, ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
@@ -67,9 +67,9 @@ async def _process_gateway(gateway_id: UUID):
         res = await session.execute(
             select(GatewayModel)
             .where(GatewayModel.id == gateway_id)
-            .options(joinedload(GatewayModel.project))
+            .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
         )
-        gateway_model = res.scalar_one()
+        gateway_model = res.unique().scalar_one()
         await _process_submitted_gateway(
             session=session,
             gateway_model=gateway_model,
