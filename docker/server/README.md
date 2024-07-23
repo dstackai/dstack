@@ -39,7 +39,7 @@ the project name.
 To configure this, use the `dstack config` command:
 
 ```shell
-dstack config --project main --server http://0.0.0.0:3000 --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
+dstack config --project main --url http://127.0.0.1:3000 --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
 ```
 
 This will update `~/.dstack/config.yml` allowing the CLI and API to connect to the server by default.
