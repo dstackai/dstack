@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
+from pydantic import Field
+
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import Profile
@@ -15,7 +17,7 @@ class ListRunsRequest(CoreModel):
     only_active: bool = False
     prev_submitted_at: Optional[datetime]
     prev_run_id: Optional[UUID]
-    limit: int = 1000
+    limit: int = Field(100, ge=0, le=100)
     ascending: bool = False
 
 
