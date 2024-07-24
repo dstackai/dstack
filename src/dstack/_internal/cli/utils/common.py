@@ -21,6 +21,10 @@ _colors = {
 console = Console(theme=Theme(_colors))
 
 
+LIVE_TABLE_REFRESH_RATE_PER_SEC = 1
+LIVE_TABLE_PROVISION_INTERVAL_SECS = 2
+
+
 def cli_error(e: DstackError) -> CLIError:
     return CLIError(*e.args)
 

@@ -5,10 +5,11 @@ from rich.live import Live
 
 import dstack._internal.cli.utils.run as run_utils
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.utils.common import console
-
-REFRESH_RATE_PER_SEC = 3
-LIVE_PROVISION_INTERVAL_SECS = 2
+from dstack._internal.cli.utils.common import (
+    LIVE_TABLE_PROVISION_INTERVAL_SECS,
+    LIVE_TABLE_REFRESH_RATE_PER_SEC,
+    console,
+)
 
 
 class PsCommand(APIBaseCommand):
@@ -40,14 +41,14 @@ class PsCommand(APIBaseCommand):
         super()._command(args)
         runs = self.api.runs.list(all=args.all)
         if not args.watch:
-            console.print(run_utils.generate_runs_table(runs, verbose=args.verbose))
+            console.print(run_utils.get_runs_table(runs, verbose=args.verbose))
             return
 
         try:
-            with Live(console=console, refresh_per_second=REFRESH_RATE_PER_SEC) as live:
+            with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
                 while True:
-                    live.update(run_utils.generate_runs_table(runs, verbose=args.verbose))
-                    time.sleep(LIVE_PROVISION_INTERVAL_SECS)
+                    live.update(run_utils.get_runs_table(runs, verbose=args.verbose))
+                    time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
                     runs = self.api.runs.list(all=args.all)
         except KeyboardInterrupt:
             pass

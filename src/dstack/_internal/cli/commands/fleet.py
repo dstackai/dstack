@@ -1,8 +1,16 @@
 import argparse
+import time
+
+from rich.live import Live
 
 from dstack._internal.cli.commands import APIBaseCommand
-from dstack._internal.cli.utils.common import confirm_ask, console
-from dstack._internal.cli.utils.fleet import print_fleets_table
+from dstack._internal.cli.utils.common import (
+    LIVE_TABLE_PROVISION_INTERVAL_SECS,
+    LIVE_TABLE_REFRESH_RATE_PER_SEC,
+    confirm_ask,
+    console,
+)
+from dstack._internal.cli.utils.fleet import get_fleets_table, print_fleets_table
 from dstack._internal.core.errors import ResourceNotExistsError
 
 
@@ -18,10 +26,18 @@ class FleetCommand(APIBaseCommand):
         list_parser = subparsers.add_parser(
             "list", help="List fleets", formatter_class=self._parser.formatter_class
         )
-        list_parser.add_argument(
-            "-v", "--verbose", action="store_true", help="Show more information"
-        )
         list_parser.set_defaults(subfunc=self._list)
+
+        for parser in [self._parser, list_parser]:
+            parser.add_argument(
+                "-w",
+                "--watch",
+                help="Update listing in realtime",
+                action="store_true",
+            )
+            parser.add_argument(
+                "-v", "--verbose", action="store_true", help="Show more information"
+            )
 
         delete_parser = subparsers.add_parser(
             "delete",
@@ -52,7 +68,18 @@ class FleetCommand(APIBaseCommand):
 
     def _list(self, args: argparse.Namespace):
         fleets = self.api.client.fleets.list(self.api.project)
-        print_fleets_table(fleets, verbose=getattr(args, "verbose", False))
+        if not args.watch:
+            print_fleets_table(fleets, verbose=args.verbose)
+            return
+
+        try:
+            with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
+                while True:
+                    live.update(get_fleets_table(fleets, verbose=args.verbose))
+                    time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
+                    fleets = self.api.client.fleets.list(self.api.project)
+        except KeyboardInterrupt:
+            pass
 
     def _delete(self, args: argparse.Namespace):
         try:
