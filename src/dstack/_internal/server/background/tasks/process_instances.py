@@ -554,6 +554,9 @@ async def check_instance(instance_id: UUID) -> None:
             return
 
         if not job_provisioning_data.dockerized:
+            if instance.status == InstanceStatus.PROVISIONING:
+                instance.status = InstanceStatus.BUSY
+                await session.commit()
             return
 
         ssh_private_key = instance.project.ssh_private_key
