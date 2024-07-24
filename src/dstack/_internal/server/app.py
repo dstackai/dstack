@@ -59,6 +59,7 @@ def create_app() -> FastAPI:
             environment=settings.SERVER_ENVIRONMENT,
             enable_tracing=True,
             traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
         )
 
     app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
