@@ -97,10 +97,10 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-### Add on-prem clusters
+### Add on-prem servers
     
-If you'd like to use `dstack` to run workloads on your on-prem clusters,
-check out the [dstack pool add-ssh](../concepts/pools.md#adding-on-prem-clusters) command.
+> If you'd like to use `dstack` to run workloads on your on-prem servers,
+see [on-prem fleets](../concepts/fleets.md#__tabbed_1_2) command.
 
 ## dstack Sky
 

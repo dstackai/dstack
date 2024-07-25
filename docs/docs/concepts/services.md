@@ -79,9 +79,18 @@ Service is published at https://yellow-cat-1.example.com
 
 When deploying the service, `dstack run` mounts the current folder's contents.
 
-!!! info ".gitignore"
+[//]: # (TODO: Fleets and idle duration)
+
+??? info ".gitignore"
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
+
+??? info "Fleets"
+    By default, `dstack run` reuses `idle` instances from one of the existing [fleets](fleets.md). 
+    If no `idle` instances meet the requirements, it creates a new fleet.
+    To have the fleet deleted after a certain idle time automatically, set
+    [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time).
+    By default, it's set to `5min`.
 
 !!! info "Reference"
     See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
@@ -121,13 +130,13 @@ to access the model at `https://gateway.<gateway domain>` via the OpenAI-compati
 
 ## Managing runs
 
-**Stopping runs**
-
-When you use [`dstack stop`](../reference/cli/index.md#dstack-stop), the service and its cloud resources are deleted.
-
-**Listing runs**
+### Listing runs
 
 The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
+
+### Stopping runs
+
+When you use [`dstack stop`](../reference/cli/index.md#dstack-stop), the service and its cloud resources are deleted.
 
 ## What's next?
 
@@ -135,3 +144,4 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 2. Check the [`.dstack.yml` reference](../reference/dstack.yml/service.md) for more details and examples
 3. See [gateways](gateways.md) on how to set up a gateway
 4. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
+5. See [fleets](fleets.md) on how to manage fleets

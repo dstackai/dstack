@@ -33,14 +33,15 @@ type: fleet
 name: my-ssh-fleet
 ssh_config:
   user: ubuntu
-  identity_file: ~/.ssh/key.pem
+  identity_file: ~/.ssh/id_rsa
   hosts:
-    - "3.255.177.51"
-    - "3.255.177.52"
+    - 3.255.177.51
+    - 3.255.177.52
 ```
 
 </div>
 
+[//]: # (TODO: a cluster, individual user and identity file, etc)
 
 ## Root reference
 

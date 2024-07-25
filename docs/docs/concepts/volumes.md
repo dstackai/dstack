@@ -79,9 +79,19 @@ and its contents will persist across runs.
     to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
     attach volumes to `/workflow` or any of its subdirectories.
 
-## Managing gateways
+## Managing volumes
 
-**Deleting gateways**
+### Listing volumes
+
+The [`dstack volume list`](../reference/cli/index.md#dstack-gateway-list) command lists created and registered volumes:
+
+```
+$ dstack volume list
+NAME            BACKEND  REGION        STATUS  CREATED
+ my-new-volume  aws      eu-central-1  active  3 weeks ago
+```
+
+### Deleting volumes
 
 When the volume isn't attached to any active dev environment, task, or service, you can delete it using `dstack delete`:
 
@@ -91,10 +101,6 @@ $ dstack delete -f vol.dstack.yaml
 
 If the volume was created using `dstack`, it will be physically destroyed along with the data.
 If you've registered an existing volume, it will be de-registered with `dstack` but will keep the data.
-
-**Listing volumes**
-
-The [`dstack volume list`](../reference/cli/index.md#dstack-gateway-list) command lists created and registered volumes.
 
 ## FAQ
 

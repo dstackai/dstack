@@ -59,7 +59,11 @@ This will allow you to access runs and models using this domain.
 
 ## Managing gateways
 
-**Deleting gateways**
+### Listing gateways
+
+The [`dstack gateway list`](../reference/cli/index.md#dstack-gateway-list) command lists existing gateways and their status.
+
+### Deleting gateways
 
 To delete a gateway, pass gateway configuration to [`dstack delete`](../reference/cli/index.md#dstack-delete):
 
@@ -70,10 +74,6 @@ $ dstack delete . -f examples/deployment/gateway.dstack.yml
 ```
 
 </div>
-
-**Listing gateways**
-
-The [`dstack gateway list`](../reference/cli/index.md#dstack-gateway-list) command lists existing gateways and their status.
 
 [//]: # (TODO: Ellaborate on default`)
 

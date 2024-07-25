@@ -102,14 +102,10 @@ backend, handles authorization, and provides an OpenAI-compatible interface if n
 
 <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="650"/>
 
-### Pools
+### Fleets
 
-Pools simplify managing the lifecycle of cloud instances and enable their efficient reuse across runs.
-
-You can have instances provisioned in the cloud automatically, or add them manually, configuring the required resources,
-idle duration, etc.
-
-<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-pool.gif" width="650"/>
+Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem. Once a
+fleet is created, it can be reused by dev environments, tasks, and services.
 
 ## Examples
 

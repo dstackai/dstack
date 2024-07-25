@@ -32,14 +32,12 @@ Configuration can be defined as YAML files within your repo.
 
 Run any defined configuration either via `dstack` CLI or API.
    
-`dstack` automatically provisions compute resources (whether from the cloud or on-premises), executes commands, handles interruptions, port-forwarding, auto-scaling, network, volumes, run failures, out-of-capacity errors, and more.
+`dstack` automatically handles provisioning, interruptions, port-forwarding, auto-scaling, network, volumes, 
+run failures, out-of-capacity errors, and more.
 
-#### 3. Manage pools
+#### 3. Manage fleets
 
-Use [pools](concepts/pools.md) to manage the lifecycle of cloud instances and add/remove on-prem clusters.
-   
-You can manually add or remove cloud instances from the pool, or have them provisioned on-demand and configure how long they remain idle before automatic termination.
-
+Use [fleets](concepts/pools.md) to provision and manage clusters and instances, both in the cloud and on-prem.
 
 ## Where do I start?
 
