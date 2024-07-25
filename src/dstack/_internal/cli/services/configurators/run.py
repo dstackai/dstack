@@ -61,7 +61,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
                 max_duration=profile.max_duration,
                 max_price=profile.max_price,
                 working_dir=conf.working_dir,
-                run_name=configurator_args.run_name,
+                run_name=conf.name,
                 pool_name=profile.pool_name,
                 instance_name=profile.instance_name,
                 creation_policy=profile.creation_policy,
@@ -74,10 +74,10 @@ class BaseRunConfigurator(BaseApplyConfigurator):
             console.print("\nExiting...")
             return
 
-        if configurator_args.run_name:
-            old_run = self.api.runs.get(run_name=configurator_args.run_name)
+        if conf.name:
+            old_run = self.api.runs.get(run_name=conf.name)
             if old_run is not None:
-                if not configurator_args.yes and not confirm_ask(
+                if not command_args.yes and not confirm_ask(
                     f"Run [code]{configurator_args.run_name}[/] already exists. Override the run?"
                 ):
                     console.print("\nExiting...")
@@ -232,6 +232,8 @@ class BaseRunConfigurator(BaseApplyConfigurator):
 
     def apply_args(self, conf: BaseRunConfiguration, args: argparse.Namespace, unknown: List[str]):
         apply_profile_args(args, conf)
+        if args.run_name:
+            conf.name = args.run_name
         if args.envs:
             for k, v in args.envs:
                 conf.env[k] = v
