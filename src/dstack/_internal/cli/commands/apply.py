@@ -6,14 +6,29 @@ from dstack._internal.cli.services.configurators import (
     get_apply_configurator_class,
     load_apply_configuration,
 )
+from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
+from dstack._internal.core.models.configurations import ApplyConfigurationType
+
+NOTSET = object()
 
 
 class ApplyCommand(APIBaseCommand):
     NAME = "apply"
     DESCRIPTION = "Apply dstack configuration"
+    DEFAULT_HELP = False
 
     def _register(self):
         super()._register()
+        self._parser.add_argument(
+            "-h",
+            "--help",
+            nargs="?",
+            type=ApplyConfigurationType,
+            default=NOTSET,
+            help="Show this help message and exit.",
+            dest="help",
+            metavar="TYPE",
+        )
         self._parser.add_argument(
             "-f",
             "--file",
@@ -35,6 +50,17 @@ class ApplyCommand(APIBaseCommand):
         )
 
     def _command(self, args: argparse.Namespace):
+        if args.help is not NOTSET:
+            if args.help is not None:
+                configurator_class = get_apply_configurator_class(
+                    ApplyConfigurationType(args.help)
+                )
+            else:
+                configurator_class = BaseApplyConfigurator
+            configurator_class.register_args(self._parser)
+            self._parser.print_help()
+            return
+
         super()._command(args)
         configuration_path, configuration = load_apply_configuration(args.configuration_file)
         configurator_class = get_apply_configurator_class(configuration.type)
