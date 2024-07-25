@@ -15,6 +15,7 @@ class VolumeConfigurator(BaseApplyConfigurator):
     def apply_configuration(
         self,
         conf: VolumeConfiguration,
+        configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
@@ -64,7 +65,12 @@ class VolumeConfigurator(BaseApplyConfigurator):
             )
         print_volumes_table([volume])
 
-    def delete_configuration(self, conf: VolumeConfiguration, command_args: argparse.Namespace):
+    def delete_configuration(
+        self,
+        conf: VolumeConfiguration,
+        configuration_path: str,
+        command_args: argparse.Namespace,
+    ):
         if conf.name is None:
             console.print("[error]Configuration specifies no volume to delete[/]")
             return

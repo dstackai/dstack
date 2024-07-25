@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Optional, Type
+from typing import Dict, Optional, Tuple, Type
 
 import yaml
 
@@ -51,7 +51,9 @@ def get_run_configurator_class(configurator_type: str) -> Type[BaseRunConfigurat
     return run_configurators_mapping[ApplyConfigurationType(configurator_type)]
 
 
-def load_apply_configuration(configuration_file: Optional[str]) -> AnyApplyConfiguration:
+def load_apply_configuration(
+    configuration_file: Optional[str],
+) -> Tuple[str, AnyApplyConfiguration]:
     if configuration_file is None:
         configuration_path = Path.cwd() / ".dstack.yml"
         if not configuration_path.exists():
@@ -69,4 +71,4 @@ def load_apply_configuration(configuration_file: Optional[str]) -> AnyApplyConfi
             conf = parse_apply_configuration(yaml.safe_load(f))
     except OSError:
         raise ConfigurationError(f"Failed to load configuration from {configuration_path}")
-    return conf
+    return str(configuration_path.relative_to(Path.cwd())), conf

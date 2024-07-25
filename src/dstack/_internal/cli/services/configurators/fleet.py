@@ -22,6 +22,7 @@ class FleetConfigurator(BaseApplyConfigurator):
     def apply_configuration(
         self,
         conf: FleetConfiguration,
+        configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
@@ -77,6 +78,7 @@ class FleetConfigurator(BaseApplyConfigurator):
     def delete_configuration(
         self,
         conf: FleetConfiguration,
+        configuration_path: str,
         command_args: argparse.Namespace,
     ):
         if conf.name is None:

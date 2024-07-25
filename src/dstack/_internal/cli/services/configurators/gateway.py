@@ -15,6 +15,7 @@ class GatewayConfigurator(BaseApplyConfigurator):
     def apply_configuration(
         self,
         conf: GatewayConfiguration,
+        configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
@@ -64,7 +65,12 @@ class GatewayConfigurator(BaseApplyConfigurator):
             )
         print_gateways_table([gateway])
 
-    def delete_configuration(self, conf: GatewayConfiguration, command_args: argparse.Namespace):
+    def delete_configuration(
+        self,
+        conf: GatewayConfiguration,
+        configuration_path: str,
+        command_args: argparse.Namespace,
+    ):
         if conf.name is None:
             console.print("[error]Configuration specifies no gateway to delete[/]")
             return

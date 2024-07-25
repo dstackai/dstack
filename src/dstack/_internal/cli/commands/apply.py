@@ -36,13 +36,14 @@ class ApplyCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        configuration = load_apply_configuration(args.configuration_file)
+        configuration_path, configuration = load_apply_configuration(args.configuration_file)
         configurator_class = get_apply_configurator_class(configuration.type)
         configurator = configurator_class(api_client=self.api)
         configurator_parser = configurator.get_parser()
         known, unknown = configurator_parser.parse_known_args(args.unknown)
         configurator.apply_configuration(
             conf=configuration,
+            configuration_path=configuration_path,
             command_args=args,
             configurator_args=known,
             unknown_args=unknown,

@@ -39,6 +39,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
     def apply_configuration(
         self,
         conf: BaseRunConfiguration,
+        configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
@@ -51,7 +52,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
             run_plan = self.api.runs.get_plan(
                 configuration=conf,
                 repo=repo,
-                configuration_path=command_args.configuration_file,
+                configuration_path=configuration_path,
                 backends=profile.backends,
                 regions=profile.regions,
                 instance_types=profile.instance_types,
@@ -178,6 +179,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
     def delete_configuration(
         self,
         conf: AnyRunConfiguration,
+        configuration_path: str,
         command_args: argparse.Namespace,
     ):
         pass

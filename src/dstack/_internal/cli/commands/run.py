@@ -45,7 +45,7 @@ class RunCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        _, configuration = load_configuration(
+        configuration_path, configuration = load_configuration(
             Path.cwd(), configuration_file=args.configuration_file
         )
         configurator_class = get_run_configurator_class(configuration.type)
@@ -54,6 +54,7 @@ class RunCommand(APIBaseCommand):
         known, unknown = configurator_parser.parse_known_args(args.unknown)
         configurator.apply_configuration(
             conf=configuration,
+            configuration_path=configuration_path,
             command_args=args,
             configurator_args=known,
             unknown_args=unknown,

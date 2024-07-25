@@ -19,6 +19,7 @@ class BaseApplyConfigurator(ABC):
     def apply_configuration(
         self,
         conf: AnyApplyConfiguration,
+        configuration_path: str,
         command_args: argparse.Namespace,
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
@@ -29,6 +30,7 @@ class BaseApplyConfigurator(ABC):
     def delete_configuration(
         self,
         conf: AnyApplyConfiguration,
+        configuration_path: str,
         command_args: argparse.Namespace,
     ):
         pass
