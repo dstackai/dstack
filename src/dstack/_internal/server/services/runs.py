@@ -309,8 +309,8 @@ async def get_run_plan(
         job_offers: List[InstanceOfferWithAvailability] = []
         job_offers.extend(pool_offers)
         job_offers.extend(offer for _, offer in offers)
+        job_offers.sort(key=lambda offer: not offer.availability.is_available())
 
-        # TODO(egor-s): merge job_offers and pool_offers based on (availability, use/create, price)
         job_plan = JobPlan(
             job_spec=job.job_spec,
             offers=job_offers[:50],
