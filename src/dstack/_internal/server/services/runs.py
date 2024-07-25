@@ -37,7 +37,6 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
-    SpotPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
@@ -55,7 +54,6 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
     ServiceSpec,
-    get_policy_map,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume, VolumeStatus
@@ -746,16 +744,10 @@ def _get_pool_offers(
     job: Job,
     volumes: List[Volume],
 ) -> List[InstanceOfferWithAvailability]:
-    profile = run_spec.merged_profile
-    requirements = Requirements(
-        resources=run_spec.configuration.resources,
-        max_price=profile.max_price,
-        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.AUTO),
-    )
     pool_filtered_instances = filter_pool_instances(
         pool_instances=get_pool_instances(pool),
-        profile=profile,
-        requirements=requirements,
+        profile=run_spec.merged_profile,
+        requirements=job.job_spec.requirements,
         multinode=job.job_spec.jobs_per_replica > 1,
         volumes=volumes,
     )

@@ -27,7 +27,6 @@ from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobStatus,
     JobTerminationReason,
-    Requirements,
     Run,
     RunSpec,
 )
@@ -276,16 +275,10 @@ async def _run_job_on_pool_instance(
 ) -> Optional[InstanceModel]:
     profile = run_spec.merged_profile
     async with PROCESSING_INSTANCES_LOCK:
-        pool_instances = get_pool_instances(pool)
-        requirements = Requirements(
-            resources=run_spec.configuration.resources,
-            max_price=profile.max_price,
-            spot=job.job_spec.requirements.spot,
-        )
         relevant_instances = filter_pool_instances(
-            pool_instances=pool_instances,
+            pool_instances=get_pool_instances(pool),
             profile=profile,
-            requirements=requirements,
+            requirements=job.job_spec.requirements,
             status=InstanceStatus.IDLE,
             fleet_model=fleet_model,
             multinode=job.job_spec.jobs_per_replica > 1,
