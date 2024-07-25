@@ -134,13 +134,13 @@ async def create_fleet(
         instances=[],
     )
     session.add(fleet_model)
-    if spec.configuration.ssh is not None:
-        for i, host in enumerate(spec.configuration.ssh.hosts):
+    if spec.configuration.ssh_config is not None:
+        for i, host in enumerate(spec.configuration.ssh_config.hosts):
             instances_model = await create_fleet_ssh_instance_model(
                 project=project,
                 pool=pool,
                 spec=spec,
-                ssh_params=spec.configuration.ssh,
+                ssh_params=spec.configuration.ssh_config,
                 instance_num=i,
                 host=host,
             )
@@ -315,9 +315,9 @@ def is_fleet_empty(fleet_model: FleetModel) -> bool:
 
 
 def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
-    if spec.configuration.ssh is not None:
-        spec.configuration.ssh.ssh_key = None
-        for host in spec.configuration.ssh.hosts:
+    if spec.configuration.ssh_config is not None:
+        spec.configuration.ssh_config.ssh_key = None
+        for host in spec.configuration.ssh_config.hosts:
             if not isinstance(host, str):
                 host.ssh_key = None
 
@@ -325,17 +325,17 @@ def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
 def _validate_fleet_spec(spec: FleetSpec):
     if spec.configuration.name is not None:
         validate_dstack_resource_name(spec.configuration.name)
-    if spec.configuration.ssh is not None:
-        for host in spec.configuration.ssh.hosts:
+    if spec.configuration.ssh_config is not None:
+        for host in spec.configuration.ssh_config.hosts:
             if isinstance(host, str):
-                if spec.configuration.ssh.ssh_key is None:
+                if spec.configuration.ssh_config.ssh_key is None:
                     raise ServerClientError(f"No ssh key specified for host {host}")
-                if spec.configuration.ssh.user is None:
+                if spec.configuration.ssh_config.user is None:
                     raise ServerClientError(f"No ssh user specified for host {host}")
             else:
-                if spec.configuration.ssh.ssh_key is None and host.ssh_key is None:
+                if spec.configuration.ssh_config.ssh_key is None and host.ssh_key is None:
                     raise ServerClientError(f"No ssh key specified for host {host.hostname}")
-                if spec.configuration.ssh.user is None and host.user is None:
+                if spec.configuration.ssh_config.user is None and host.user is None:
                     raise ServerClientError(f"No ssh user specified for host {host.hostname}")
 
 

@@ -31,9 +31,9 @@ resources:
 ```yaml
 type: fleet
 name: my-ssh-fleet
-ssh:
+ssh_config:
   user: ubuntu
-  ssh_key_path: ~/.ssh/key.pem
+  identity_file: ~/.ssh/key.pem
   hosts:
     - "3.255.177.51"
     - "3.255.177.52"

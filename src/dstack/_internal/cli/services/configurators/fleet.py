@@ -97,11 +97,13 @@ class FleetConfigurator(BaseApplyConfigurator):
 
 
 def _preprocess_spec(spec: FleetSpec):
-    if spec.configuration.ssh is not None:
-        spec.configuration.ssh.ssh_key = _resolve_ssh_key(spec.configuration.ssh.ssh_key_path)
-        for host in spec.configuration.ssh.hosts:
+    if spec.configuration.ssh_config is not None:
+        spec.configuration.ssh_config.ssh_key = _resolve_ssh_key(
+            spec.configuration.ssh_config.identity_file
+        )
+        for host in spec.configuration.ssh_config.hosts:
             if not isinstance(host, str):
-                host.ssh_key = _resolve_ssh_key(host.ssh_key_path)
+                host.ssh_key = _resolve_ssh_key(host.identity_file)
 
 
 def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:

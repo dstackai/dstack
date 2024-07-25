@@ -45,7 +45,7 @@ class SSHHostParams(CoreModel):
     user: Annotated[Optional[str], Field(description="The user to log in with for this host")] = (
         None
     )
-    ssh_key_path: Annotated[
+    identity_file: Annotated[
         Optional[str], Field(description="The private key to use for this host")
     ] = None
     ssh_key: Optional[SSHKey] = None
@@ -56,7 +56,7 @@ class SSHParams(CoreModel):
         None
     )
     port: Annotated[Optional[int], Field(description="The SSH port to connect to")] = None
-    ssh_key_path: Annotated[
+    identity_file: Annotated[
         Optional[str], Field(description="The private key to use for all hosts")
     ] = None
     ssh_key: Optional[SSHKey] = None
@@ -85,7 +85,7 @@ class SSHParams(CoreModel):
 
 
 class InstanceGroupParams(CoreModel):
-    ssh: Annotated[
+    ssh_config: Annotated[
         Optional[SSHParams],
         Field(description="The parameters for adding instances via SSH"),
     ] = None
