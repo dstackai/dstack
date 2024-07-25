@@ -831,7 +831,7 @@ def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
     fleet = fleet_model_to_fleet(instance.fleet)
     return (
         fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-        and fleet.spec.configuration.ssh is None
+        and fleet.spec.configuration.ssh_config is None
     )
 
 

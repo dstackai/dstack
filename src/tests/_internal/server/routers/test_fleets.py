@@ -147,7 +147,7 @@ class TestCreateFleet:
                 "configuration": {
                     "nodes": {"min": 1, "max": 1},
                     "placement": None,
-                    "ssh": None,
+                    "ssh_config": None,
                     "resources": {
                         "cpu": {"min": 2, "max": None},
                         "memory": {"min": 8.0, "max": None},
@@ -223,7 +223,7 @@ class TestCreateFleet:
         spec = get_fleet_spec(
             conf=FleetConfiguration(
                 name="test-ssh-fleet",
-                ssh=SSHParams(
+                ssh_config=SSHParams(
                     user="ubuntu",
                     ssh_key=SSHKey(public="", private="123"),
                     hosts=["1.1.1.1"],
@@ -243,10 +243,10 @@ class TestCreateFleet:
             "project_name": project.name,
             "spec": {
                 "configuration": {
-                    "ssh": {
+                    "ssh_config": {
                         "user": "ubuntu",
                         "port": None,
-                        "ssh_key_path": None,
+                        "identity_file": None,
                         "ssh_key": None,  # should not return ssh_key
                         "hosts": ["1.1.1.1"],
                         "network": None,
