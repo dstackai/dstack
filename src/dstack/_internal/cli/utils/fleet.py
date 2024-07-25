@@ -4,7 +4,7 @@ from rich.table import Table
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.fleets import Fleet
+from dstack._internal.core.models.fleets import Fleet, FleetStatus
 from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.utils.common import pretty_date
 
@@ -57,7 +57,7 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
             ]
             table.add_row(*row)
 
-        if len(fleet.instances) == 0:
+        if len(fleet.instances) == 0 and fleet.status != FleetStatus.TERMINATING:
             row = [
                 fleet.name,
                 "-",
