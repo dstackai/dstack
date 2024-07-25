@@ -6,8 +6,6 @@ from dstack._internal.cli.services.configurators import (
     get_apply_configurator_class,
     load_apply_configuration,
 )
-from dstack._internal.cli.utils.common import cli_error
-from dstack._internal.core.errors import ConfigurationError
 
 
 class DeleteCommand(APIBaseCommand):
@@ -34,10 +32,7 @@ class DeleteCommand(APIBaseCommand):
 
     def _command(self, args: argparse.Namespace):
         super()._command(args)
-        try:
-            configuration = load_apply_configuration(args.configuration_file)
-        except ConfigurationError as e:
-            raise cli_error(e)
+        configuration = load_apply_configuration(args.configuration_file)
         configurator_class = get_apply_configurator_class(configuration.type)
         configurator = configurator_class(api_client=self.api)
-        configurator.delete_configuration(conf=configuration, args=args)
+        configurator.delete_configuration(conf=configuration, command_args=args)

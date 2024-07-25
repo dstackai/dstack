@@ -6,6 +6,12 @@ import yaml
 from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
 from dstack._internal.cli.services.configurators.fleet import FleetConfigurator
 from dstack._internal.cli.services.configurators.gateway import GatewayConfigurator
+from dstack._internal.cli.services.configurators.run import (
+    BaseRunConfigurator,
+    DevEnvironmentConfigurator,
+    ServiceConfigurator,
+    TaskConfigurator,
+)
 from dstack._internal.cli.services.configurators.volume import VolumeConfigurator
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import (
@@ -15,12 +21,34 @@ from dstack._internal.core.models.configurations import (
 )
 
 apply_configurators_mapping: Dict[ApplyConfigurationType, Type[BaseApplyConfigurator]] = {
-    cls.TYPE: cls for cls in [FleetConfigurator, GatewayConfigurator, VolumeConfigurator]
+    cls.TYPE: cls
+    for cls in [
+        DevEnvironmentConfigurator,
+        TaskConfigurator,
+        ServiceConfigurator,
+        FleetConfigurator,
+        GatewayConfigurator,
+        VolumeConfigurator,
+    ]
+}
+
+
+run_configurators_mapping: Dict[ApplyConfigurationType, Type[BaseRunConfigurator]] = {
+    cls.TYPE: cls
+    for cls in [
+        DevEnvironmentConfigurator,
+        TaskConfigurator,
+        ServiceConfigurator,
+    ]
 }
 
 
 def get_apply_configurator_class(configurator_type: str) -> Type[BaseApplyConfigurator]:
     return apply_configurators_mapping[ApplyConfigurationType(configurator_type)]
+
+
+def get_run_configurator_class(configurator_type: str) -> Type[BaseRunConfigurator]:
+    return run_configurators_mapping[ApplyConfigurationType(configurator_type)]
 
 
 def load_apply_configuration(configuration_file: Optional[str]) -> AnyApplyConfiguration:

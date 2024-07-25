@@ -13,20 +13,26 @@ class BaseApplyConfigurator(ABC):
     TYPE: ApplyConfigurationType
 
     def __init__(self, api_client: Client):
-        self.api_client = api_client
+        self.api = api_client
 
     @abstractmethod
-    def apply_configuration(self, conf: AnyApplyConfiguration, args: argparse.Namespace):
-        pass
-
-    @abstractmethod
-    def delete_configuration(self, conf: AnyApplyConfiguration, args: argparse.Namespace):
-        pass
-
-    def register_args(self, parser: argparse.ArgumentParser):
-        pass
-
-    def apply_args(
-        self, args: argparse.Namespace, unknown: List[str], conf: AnyApplyConfiguration
+    def apply_configuration(
+        self,
+        conf: AnyApplyConfiguration,
+        command_args: argparse.Namespace,
+        configurator_args: argparse.Namespace,
+        unknown_args: List[str],
     ):
         pass
+
+    @abstractmethod
+    def delete_configuration(
+        self,
+        conf: AnyApplyConfiguration,
+        command_args: argparse.Namespace,
+    ):
+        pass
+
+    @classmethod
+    def get_parser(cls) -> argparse.ArgumentParser:
+        return argparse.ArgumentParser()
