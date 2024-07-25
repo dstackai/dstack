@@ -60,7 +60,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
                 retry_policy=profile.retry_policy,
                 max_duration=profile.max_duration,
                 max_price=profile.max_price,
-                working_dir=None,
+                working_dir=conf.working_dir,
                 run_name=configurator_args.run_name,
                 pool_name=profile.pool_name,
                 instance_name=profile.instance_name,

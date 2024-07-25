@@ -98,8 +98,21 @@ class BaseRunConfiguration(CoreModel):
     type: Literal["none"]
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
+    working_dir: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the working directory inside the container."
+                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                ' Defaults to `"."` '
+            )
+        ),
+    ] = None
     home_dir: Annotated[
-        str, Field(description="The absolute path to the home directory inside the container")
+        str,
+        Field(
+            description="The absolute path to the home directory inside the container. Defaults to `/root`"
+        ),
     ] = "/root"
     registry_auth: Annotated[
         Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")

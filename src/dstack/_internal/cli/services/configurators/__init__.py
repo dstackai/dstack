@@ -71,4 +71,4 @@ def load_apply_configuration(
             conf = parse_apply_configuration(yaml.safe_load(f))
     except OSError:
         raise ConfigurationError(f"Failed to load configuration from {configuration_path}")
-    return str(configuration_path.relative_to(Path.cwd())), conf
+    return str(configuration_path.absolute().relative_to(Path.cwd())), conf
