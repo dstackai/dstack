@@ -2,7 +2,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from gpuhunt import KNOWN_GPUS
 from kubernetes import client
@@ -115,23 +115,24 @@ class KubernetesCompute(Compute):
                     "Failed to acquire an IP for jump pod automatically. "
                     "Specify ssh_host for Kubernetes backend."
                 )
-        jump_pod_port = _create_jump_pod_service_if_not_exists(
+        jump_pod_port, created = _create_jump_pod_service_if_not_exists(
             api=self.api,
             project_name=run.project_name,
-            project_ssh_public_key=project_ssh_public_key.strip(),
+            ssh_public_keys=[project_ssh_public_key.strip(), run.run_spec.ssh_key_pub.strip()],
             jump_pod_port=self.config.networking.ssh_port,
         )
-        threading.Thread(
-            target=_continue_setup_jump_pod,
-            kwargs={
-                "api": self.api,
-                "project_name": run.project_name,
-                "project_ssh_private_key": project_ssh_private_key.strip(),
-                "user_ssh_public_key": run.run_spec.ssh_key_pub.strip(),
-                "jump_pod_host": jump_pod_hostname,
-                "jump_pod_port": jump_pod_port,
-            },
-        ).start()
+        if not created:
+            threading.Thread(
+                target=_continue_setup_jump_pod,
+                kwargs={
+                    "api": self.api,
+                    "project_name": run.project_name,
+                    "project_ssh_private_key": project_ssh_private_key.strip(),
+                    "user_ssh_public_key": run.run_spec.ssh_key_pub.strip(),
+                    "jump_pod_host": jump_pod_hostname,
+                    "jump_pod_port": jump_pod_port,
+                },
+            ).start()
         self.api.create_namespaced_pod(
             namespace=DEFAULT_NAMESPACE,
             body=client.V1Pod(
@@ -361,9 +362,10 @@ def _continue_setup_jump_pod(
 def _create_jump_pod_service_if_not_exists(
     api: client.CoreV1Api,
     project_name: str,
-    project_ssh_public_key: str,
+    ssh_public_keys: List[str],
     jump_pod_port: Optional[int],
-) -> int:
+) -> Tuple[int, bool]:
+    created = False
     try:
         service = api.read_namespaced_service(
             name=_get_jump_pod_service_name(project_name),
@@ -374,22 +376,23 @@ def _create_jump_pod_service_if_not_exists(
             service = _create_jump_pod_service(
                 api=api,
                 project_name=project_name,
-                project_ssh_public_key=project_ssh_public_key,
+                ssh_public_keys=ssh_public_keys,
                 jump_pod_port=jump_pod_port,
             )
+            created = True
         else:
             raise
-    return service.spec.ports[0].node_port
+    return service.spec.ports[0].node_port, created
 
 
 def _create_jump_pod_service(
     api: client.CoreV1Api,
     project_name: str,
-    project_ssh_public_key: str,
+    ssh_public_keys: List[str],
     jump_pod_port: Optional[int],
 ) -> client.V1Service:
     # TODO use restricted ssh-forwarding-only user for jump pod instead of root.
-    commands = _get_jump_pod_commands(authorized_keys=[project_ssh_public_key])
+    commands = _get_jump_pod_commands(authorized_keys=ssh_public_keys)
     pod_name = _get_jump_pod_name(project_name)
     api.create_namespaced_pod(
         namespace=DEFAULT_NAMESPACE,
