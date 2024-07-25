@@ -770,6 +770,7 @@ def _get_pool_offers(
         if instance.unreachable:
             offer.availability = InstanceAvailability.NOT_AVAILABLE
         pool_offers.append(offer)
+    pool_offers.sort(key=lambda offer: offer.price)
     return pool_offers
 
 
