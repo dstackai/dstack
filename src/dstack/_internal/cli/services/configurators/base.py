@@ -36,5 +36,11 @@ class BaseApplyConfigurator(ABC):
         pass
 
     @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        pass
+
+    @classmethod
     def get_parser(cls) -> argparse.ArgumentParser:
-        return argparse.ArgumentParser()
+        parser = argparse.ArgumentParser()
+        cls.register_args(parser)
+        return parser

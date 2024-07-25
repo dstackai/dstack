@@ -185,12 +185,6 @@ class BaseRunConfigurator(BaseApplyConfigurator):
         pass
 
     @classmethod
-    def get_parser(cls) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser()
-        cls.register_args(parser)
-        return parser
-
-    @classmethod
     def register_args(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
             "-n",
