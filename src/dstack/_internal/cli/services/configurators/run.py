@@ -263,9 +263,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
             for k, v in args.envs:
                 conf.env[k] = v
         if args.gpu_spec:
-            gpu = (conf.resources.gpu or resources.GPUSpec()).dict()
-            gpu.update(args.gpu_spec)
-            conf.resources.gpu = resources.GPUSpec.parse_obj(gpu)
+            conf.resources.gpu = resources.GPUSpec.parse_obj(args.gpu_spec)
         if args.disk_spec:
             conf.resources.disk = args.disk_spec
 
