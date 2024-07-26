@@ -108,6 +108,10 @@ plugins:
         'changelog/0.16.1.md': 'https://github.com/dstackai/dstack/releases/0.16.1'
         'changelog/0.17.0.md': 'https://github.com/dstackai/dstack/releases/0.17.0'
         'changelog/0.18.0.md': 'https://github.com/dstackai/dstack/releases/0.18.0'
+        'docs/concepts/dev-environments.md': 'docs/dev-environments.md'
+        'docs/concepts/tasks.md': 'docs/tasks.md'
+        'docs/concepts/services.md': 'docs/services.md'
+        'docs/protips.md': 'docs/guides/protips.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -188,15 +192,17 @@ nav:
       - Getting started:
           - Overview: docs/index.md
           - Installation: docs/installation/index.md
-          - Quickstart: docs/quickstart.md
-          - Protips: docs/protips.md
-      - Concepts:
-          - Dev environments: docs/concepts/dev-environments.md
-          - Tasks: docs/concepts/tasks.md
-          - Services: docs/concepts/services.md
-          - Fleets: docs/concepts/fleets.md
-          - Gateways: docs/concepts/gateways.md
-          - Volumes: docs/concepts/volumes.md
+      - Basics:
+          - Dev environments: docs/dev-environments.md
+          - Tasks: docs/tasks.md
+          - Services: docs/services.md
+          - Fleets: docs/fleets.md
+      - Learn:
+          - Concepts:
+              - Gateways: docs/concepts/gateways.md
+              - Volumes: docs/concepts/volumes.md
+          - Guides:
+              - Protips: docs/guides/protips.md
       - Reference:
           - server/config.yml: docs/reference/server/config.yml.md
           - .dstack.yml:

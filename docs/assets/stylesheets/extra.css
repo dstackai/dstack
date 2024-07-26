@@ -936,7 +936,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     line-height: 1.2 !important;
     -webkit-font-smoothing: auto !important;
     z-index: 1000 !important;
-    color: rgba(0,0,0,.63)
+    color: rgba(0,0,0,.63) !important;
+    background: none;
 }
 
 .md-typeset .tabbed-labels--linked>label>a {

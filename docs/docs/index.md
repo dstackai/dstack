@@ -1,28 +1,30 @@
 # What is dstack?
 
 `dstack` is an open-source container orchestration engine for running AI workloads across diverse cloud providers
-and on-premises data centers. It simplifies provisioning compute resources, managing dev environments, executing tasks on clusters, and deploying services.
+and on-prem data centers. It simplifies provisioning compute resources, managing dev environments, executing tasks on clusters, and deploying services.
 
-!!! info "Cloud and on-premises"
-    `dstack` allows workload orchestration on both cloud and on-premises clusters.
-    Supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
+#### Cloud and on-prem
 
-!!! info "Accelerators"
-    `dstack` supports NVIDIA GPUs and Google Cloud TPUs out of the box.
+`dstack` allows workload orchestration on both cloud and on-prem servers.
+Supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
+For on-prem servers, see [fleets](fleets.md#__tabbed_1_2).
+
+#### Accelerators
+
+`dstack` supports NVIDIA GPUs and Google Cloud TPUs out of the box.
 
 ## How does it work?
 
-!!! info "Installation"
-    Before using `dstack`, [install](installation/index.md) the `dstack` server and configure credentials
-    and other settings for each cloud account that you intend to use.
+> Before using `dstack`, [install](installation/index.md) the server and configure cloud credentials
+and other settings for each backend that you intend to use.
 
 #### 1. Define configurations
 
 `dstack` supports three types of run configurations:
    
-* [`dev environment`](concepts/dev-environments.md) &mdash; for interactive development using a desktop IDE
-* [`task`](concepts/tasks.md) &mdash; for any kind of batch jobs or web applications (supports distributed jobs)
-* [`service`](concepts/services.md)&mdash; for production-grade deployment (supports auto-scaling and authorization)
+* [Dev environments](dev-environments.md) &mdash; for interactive development using a desktop IDE
+* [Tasks](tasks.md) &mdash; for any kind of batch jobs or web applications (supports distributed jobs)
+* [Services](services.md)&mdash; for production-grade deployment (supports auto-scaling and authorization)
 
 Each type of run configuration allows you to specify commands for execution, required compute resources, retry policies, auto-scaling rules, authorization settings, and more.
 
@@ -37,7 +39,7 @@ run failures, out-of-capacity errors, and more.
 
 #### 3. Manage fleets
 
-Use [fleets](concepts/pools.md) to provision and manage clusters and instances, both in the cloud and on-prem.
+Use [fleets](fleets.md) to provision and manage clusters and instances, both in the cloud and on-prem.
 
 ## Where do I start?
 

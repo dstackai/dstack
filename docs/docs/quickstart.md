@@ -128,7 +128,7 @@ To exclude any files from uploading, use `.gitignore`.
 
 ## What's next?
 
-1. Read about [dev environments](concepts/dev-environments.md), [tasks](concepts/tasks.md), 
-    [services](concepts/services.md), and [pools](concepts/pools.md) 
+1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), 
+    [services](services.md), and [fleets](fleets.md) 
 2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
 3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

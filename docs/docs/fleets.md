@@ -63,12 +63,12 @@ are both acceptable).
     You can specify the [`network`](../reference/dstack.yml/fleet.md#network) parameter manually.
 
 !!! info "Reference"
-    See the [.dstack.yml reference](../reference/dstack.yml/fleet.md)
+    See the [.dstack.yml reference](reference/dstack.yml/fleet.md)
     for all supported configuration options and multiple examples.
 
 ## Creating and updating fleets
 
-To create or update the fleet, simply call the [`dstack apply`](../reference/cli/index.md#dstack-apply) command:
+To create or update the fleet, simply call the [`dstack apply`](reference/cli/index.md#dstack-apply) command:
 
 <div class="termy">
 
@@ -94,7 +94,7 @@ To avoid creating new fleet, specify pass `--reuse` to `dstack run`.
 
 ### Listing fleets
 
-The [`dstack fleet`](../reference/cli/index.md#dstack-gateway-list) command lists fleet instances and theri status:
+The [`dstack fleet`](reference/cli/index.md#dstack-gateway-list) command lists fleet instances and theri status:
 
 <div class="termy">
 
@@ -127,4 +127,4 @@ To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 
 ??? info "Idle duration"
     If you want a fleet to be automatically deleted after a certain idle time, you can set the 
-    you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
+    you can set the [`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time) property.

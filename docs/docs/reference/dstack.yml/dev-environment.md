@@ -1,6 +1,6 @@
 # dev-environment
 
-The `dev-environment` configuration type allows running [dev environments](../../concepts/dev-environments.md).
+The `dev-environment` configuration type allows running [dev environments](../../dev-environments.md).
 
 > Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
 > and can be located in the project's root directory or any nested folder.

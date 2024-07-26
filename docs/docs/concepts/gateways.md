@@ -81,5 +81,5 @@ $ dstack delete . -f examples/deployment/gateway.dstack.yml
 
 ## What's next?
 
-1. See [services](services.md) on how to run services
+1. See [services](../services.md) on how to run services
 2. Check the [`.dstack.yml` reference](../reference/dstack.yml/gateway.md) for more details and examples

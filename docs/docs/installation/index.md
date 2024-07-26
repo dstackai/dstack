@@ -100,7 +100,7 @@ This configuration is stored in `~/.dstack/config.yml`.
 ### Add on-prem servers
     
 > If you'd like to use `dstack` to run workloads on your on-prem servers,
-see [on-prem fleets](../concepts/fleets.md#__tabbed_1_2) command.
+see [on-prem fleets](../fleets.md#__tabbed_1_2) command.
 
 ## dstack Sky
 

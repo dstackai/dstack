@@ -1,6 +1,6 @@
 # service
 
-The `service` configuration type allows running [services](../../concepts/services.md).
+The `service` configuration type allows running [services](../../services.md).
 
 > Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
 > and can be located in the project's root directory or any nested folder.

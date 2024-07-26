@@ -20,7 +20,7 @@ dstack run . -f examples/llms/llama3/ollama-70b.dstack.yml
 
 See the configuration at [ollama-70b.dstack.yml](ollama-70b.dstack.yml).
 
-For more details, refer to [services](https://dstack.ai/docs/concepts/services).
+For more details, refer to [services](https://dstack.ai/docs/services).
 
 ## Run Chat UI
 

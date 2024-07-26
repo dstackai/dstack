@@ -1,6 +1,6 @@
 # task
 
-The `task` configuration type allows running [tasks](../../concepts/tasks.md).
+The `task` configuration type allows running [tasks](../../tasks.md).
 
 > Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
 > and can be located in the project's root directory or any nested folder.
@@ -56,7 +56,8 @@ ports:
 </div>
 
 When running it, `dstack run` forwards `6000` port to `localhost:6000`, enabling secure access.
-See [tasks](../../concepts/tasks.md#configure-ports) for more detail.
+
+[//]: # (See [tasks]&#40;../../tasks.md#configure-ports&#41; for more detail.)
 
 ### Docker image
 
@@ -225,7 +226,7 @@ is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, 
 
 ??? info "Backends"
     Running on multiple nodes is supported only with `aws`, `gcp`, `azure`, `oci`, and instances added via
-    [`dstack pool add-ssh`](../../concepts/pools.md#adding-on-prem-clusters).
+    [`dstack pool add-ssh`](../../fleets.md#__tabbed_1_2).
 
 ### Arguments
 
