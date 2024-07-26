@@ -1,12 +1,13 @@
 import argparse
 from typing import List, Tuple
+from unittest.mock import Mock
 
 import pytest
 
-from dstack._internal.cli.services.configurators.run import run_configurators_mapping
+from dstack._internal.cli.services.configurators import get_run_configurator_class
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.configurations import (
-    BaseConfiguration,
+    BaseRunConfiguration,
     PortMapping,
     TaskConfiguration,
 )
@@ -61,12 +62,13 @@ class TestRunConfigurator:
 
 
 def apply_args(
-    conf: BaseConfiguration, args: List[str]
-) -> Tuple[BaseConfiguration, argparse.Namespace]:
+    conf: BaseRunConfiguration, args: List[str]
+) -> Tuple[BaseRunConfiguration, argparse.Namespace]:
     parser = argparse.ArgumentParser()
-    configurator = run_configurators_mapping[conf.type]
-    configurator.register(parser)
+    configurator_class = get_run_configurator_class(conf.type)
+    configurator = configurator_class(Mock())
+    configurator.register_args(parser)
     conf = conf.copy(deep=True)  # to avoid modifying the original configuration
-    args, unknown = parser.parse_known_args(args)
-    configurator.apply(args, unknown, conf)
-    return conf, args
+    known, unknown = parser.parse_known_args(args)
+    configurator.apply_args(conf, known, unknown)
+    return conf, known

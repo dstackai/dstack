@@ -146,7 +146,7 @@ class RepoCollection:
                     pass  # use default
             self.init(repo, git_identity_file, oauth_token)
             config.save_repo_config(
-                repo.repo_dir,
+                repo.get_repo_dir_or_error(),
                 repo.repo_id,
                 RepoType(repo.run_repo_data.repo_type),
                 get_ssh_keypair(None, config.dstack_key_path),

@@ -94,12 +94,26 @@ class EnvSentinel(CoreModel):
         return f"EnvSentinel({self.key})"
 
 
-class BaseConfiguration(CoreModel):
+class BaseRunConfiguration(CoreModel):
     type: Literal["none"]
+    name: Annotated[Optional[str], Field(description="The run name")] = None
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
+    working_dir: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the working directory inside the container."
+                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                ' Defaults to `"."` '
+            )
+        ),
+    ] = None
     home_dir: Annotated[
-        str, Field(description="The absolute path to the home directory inside the container")
+        str,
+        Field(
+            description="The absolute path to the home directory inside the container. Defaults to `/root`"
+        ),
     ] = "/root"
     registry_auth: Annotated[
         Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")
@@ -156,7 +170,7 @@ class BaseConfiguration(CoreModel):
         return VirtualRepo(repo_id="none")
 
 
-class BaseConfigurationWithPorts(BaseConfiguration):
+class BaseRunConfigurationWithPorts(BaseRunConfiguration):
     ports: Annotated[
         List[Union[ValidPort, constr(regex=r"^(?:[0-9]+|\*):[0-9]+$"), PortMapping]],
         Field(description="Port numbers/mapping to expose"),
@@ -171,7 +185,7 @@ class BaseConfigurationWithPorts(BaseConfiguration):
         return v
 
 
-class BaseConfigurationWithCommands(BaseConfiguration):
+class BaseRunConfigurationWithCommands(BaseRunConfiguration):
     commands: Annotated[CommandsList, Field(description="The bash commands to run")] = []
 
     @root_validator
@@ -188,7 +202,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
 
 
 class DevEnvironmentConfiguration(
-    ProfileParams, BaseConfigurationWithPorts, DevEnvironmentConfigurationParams
+    ProfileParams, BaseRunConfigurationWithPorts, DevEnvironmentConfigurationParams
 ):
     type: Literal["dev-environment"] = "dev-environment"
 
@@ -199,8 +213,8 @@ class TaskConfigurationParams(CoreModel):
 
 class TaskConfiguration(
     ProfileParams,
-    BaseConfigurationWithCommands,
-    BaseConfigurationWithPorts,
+    BaseRunConfigurationWithCommands,
+    BaseRunConfigurationWithPorts,
     TaskConfigurationParams,
 ):
     type: Literal["task"] = "task"
@@ -266,7 +280,7 @@ class ServiceConfigurationParams(CoreModel):
 
 
 class ServiceConfiguration(
-    ProfileParams, BaseConfigurationWithCommands, ServiceConfigurationParams
+    ProfileParams, BaseRunConfigurationWithCommands, ServiceConfigurationParams
 ):
     type: Literal["service"] = "service"
 
@@ -290,12 +304,16 @@ def parse_run_configuration(data: dict) -> AnyRunConfiguration:
 
 
 class ApplyConfigurationType(str, Enum):
+    DEV_ENVIRONMENT = "dev-environment"
+    TASK = "task"
+    SERVICE = "service"
     FLEET = "fleet"
     GATEWAY = "gateway"
     VOLUME = "volume"
 
 
 AnyApplyConfiguration = Union[
+    AnyRunConfiguration,
     FleetConfiguration,
     GatewayConfiguration,
     VolumeConfiguration,
@@ -317,7 +335,7 @@ def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
     return conf
 
 
-AnyDstackConfiguration = Union[AnyRunConfiguration, GatewayConfiguration]
+AnyDstackConfiguration = AnyApplyConfiguration
 
 
 class DstackConfiguration(CoreModel):

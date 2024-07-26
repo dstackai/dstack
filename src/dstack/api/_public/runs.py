@@ -18,7 +18,6 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
-    DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
     ProfileRetryPolicy,
@@ -410,7 +409,7 @@ class RunCollection:
         instance_name: Optional[str] = None,
         creation_policy: Optional[CreationPolicy] = None,
         termination_policy: Optional[TerminationPolicy] = None,
-        termination_policy_idle: int = DEFAULT_RUN_TERMINATION_IDLE_TIME,
+        termination_policy_idle: Optional[Union[str, int]] = None,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`

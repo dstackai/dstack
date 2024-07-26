@@ -18,7 +18,7 @@ from dstack._internal.cli.commands.stop import StopCommand
 from dstack._internal.cli.commands.volume import VolumeCommand
 from dstack._internal.cli.utils.common import _colors, console
 from dstack._internal.cli.utils.updates import check_for_updates
-from dstack._internal.core.errors import ClientError, CLIError
+from dstack._internal.core.errors import ClientError, CLIError, ConfigurationError
 from dstack._internal.utils.logging import get_logger
 from dstack.version import __version__ as version
 
@@ -73,7 +73,7 @@ def main():
     try:
         check_for_updates()
         args.func(args)
-    except (ClientError, CLIError) as e:
+    except (ClientError, CLIError, ConfigurationError) as e:
         console.print(f"[error]{escape(str(e))}[/]")
         logger.debug(e, exc_info=True)
         exit(1)
