@@ -12,7 +12,12 @@ from dstack._internal.cli.services.configurators.base import BaseApplyConfigurat
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
-from dstack._internal.core.errors import CLIError, ConfigurationError, ServerClientError
+from dstack._internal.core.errors import (
+    CLIError,
+    ConfigurationError,
+    ResourceNotExistsError,
+    ServerClientError,
+)
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
@@ -46,7 +51,8 @@ class BaseRunConfigurator(BaseApplyConfigurator):
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         repo = self.api.repos.load(Path.cwd())
-        self.api.ssh_identity_file = ConfigManager().get_repo_config(repo.repo_dir).ssh_key_path
+        repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
+        self.api.ssh_identity_file = repo_config.ssh_key_path
         profile = load_profile(Path.cwd(), configurator_args.profile)
         with console.status("Getting run plan..."):
             run_plan = self.api.runs.get_plan(
@@ -182,7 +188,26 @@ class BaseRunConfigurator(BaseApplyConfigurator):
         configuration_path: str,
         command_args: argparse.Namespace,
     ):
-        pass
+        if conf.name is None:
+            console.print("[error]Configuration specifies no run to delete[/]")
+            return
+        try:
+            self.api.client.runs.get(
+                project_name=self.api.project,
+                run_name=conf.name,
+            )
+        except ResourceNotExistsError:
+            console.print(f"Run [code]{conf.name}[/] does not exist")
+            return
+        if not command_args.yes and not confirm_ask(f"Delete the run [code]{conf.name}[/]?"):
+            console.print("\nExiting...")
+            return
+        with console.status("Deleting run..."):
+            self.api.client.runs.delete(
+                project_name=self.api.project,
+                runs_names=[conf.name],
+            )
+        console.print(f"Run [code]{conf.name}[/] deleted")
 
     @classmethod
     def register_args(cls, parser: argparse.ArgumentParser):

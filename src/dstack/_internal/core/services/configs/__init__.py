@@ -8,6 +8,7 @@ import yaml
 from pydantic import ValidationError
 
 from dstack._internal.cli.utils.common import confirm_ask
+from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.config import GlobalConfig, ProjectConfig, RepoConfig
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.utils.common import get_dstack_dir
@@ -99,6 +100,12 @@ class ConfigManager:
             if repo.path == repo_path:
                 return repo
         return None
+
+    def get_repo_config_or_error(self, repo_path: PathLike) -> RepoConfig:
+        repo_config = self.get_repo_config(repo_path)
+        if repo_config is not None:
+            return repo_config
+        raise DstackError("No repo config found")
 
     @property
     def dstack_ssh_dir(self) -> Path:

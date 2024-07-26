@@ -61,7 +61,7 @@ class InitCommand(BaseCommand):
         )
         if args.ssh_identity_file:
             ConfigManager().save_repo_config(
-                repo.repo_dir,
+                repo.get_repo_dir_or_error(),
                 repo.repo_id,
                 RepoType(repo.run_repo_data.repo_type),
                 args.ssh_identity_file,
