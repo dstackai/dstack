@@ -19,7 +19,7 @@ $ dstack server --help
 
 ### dstack init
 
-This command must be called inside a folder before you can use `dstack run` or `dstack apply`.
+This command must be called inside a folder before you can run `dstack apply`.
 
 **Git credentials**
 
@@ -41,24 +41,6 @@ $ dstack init --help
 By default, `dstack` uses its own SSH key to access instances (`~/.dstack/ssh/id_rsa`). 
 It is possible to override this key via the `--ssh-identity` argument.
 
-### dstack run
-
-This command runs a given configuration.
-
-<div class="termy">
-
-```shell
-$ dstack run . --help
-#GENERATE#
-```
-
-</div>
-
-??? info ".gitignore"
-    When running anything via CLI, `dstack` uses the exact version of code from your project directory.
-
-    If there are large files, consider creating a `.gitignore` file to exclude them for better performance.
-
 ### dstack apply
 
 This command applies a given configuration. If a resource does not exist, `dstack apply` creates the resource.
@@ -72,10 +54,6 @@ $ dstack apply --help
 ```
 
 </div>
-
-!!! info "NOTE:"
-    The `dstack apply` command currently supports only `gateway` and `volume` configurations.
-    Support for other configuration types is coming soon.
 
 ### dstack delete
 
@@ -256,6 +234,41 @@ $ dstack volume list --help
 ```
 
 </div>
+
+##### dstack volume delete
+
+The `dstack volume delete` command deletes volumes.
+
+<div class="termy">
+
+```shell
+$ dstack volume delete --help
+#GENERATE#
+```
+
+</div>
+
+### dstack run
+
+This command runs a given configuration.
+
+!!! warning "Deprecation"
+    `dstack run` is deprecated in favor of `dstack apply`.
+
+<div class="termy">
+
+```shell
+$ dstack run . --help
+#GENERATE#
+```
+
+</div>
+
+??? info ".gitignore"
+    When running anything via CLI, `dstack` uses the exact version of code from your project directory.
+
+    If there are large files, consider creating a `.gitignore` file to exclude them for better performance.
+
 
 ### dstack pool
 

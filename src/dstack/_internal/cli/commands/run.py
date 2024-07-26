@@ -56,6 +56,9 @@ class RunCommand(APIBaseCommand):
             return
 
         super()._command(args)
+
+        logger.warning("[code]dstack run[/] is deprecated in favor of [code]dstack apply[/].")
+
         configuration_path, configuration = load_configuration(
             Path.cwd(), configuration_file=args.configuration_file
         )
