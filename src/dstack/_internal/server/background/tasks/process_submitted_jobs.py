@@ -287,7 +287,7 @@ async def _run_job_on_pool_instance(
         )
         if len(relevant_instances) == 0:
             return None
-        sorted_instances = sorted(relevant_instances, key=lambda instance: instance.name)
+        sorted_instances = sorted(relevant_instances, key=lambda instance: instance.price)
         instance = sorted_instances[0]
         # Reload InstanceModel with volumes
         res = await session.execute(
