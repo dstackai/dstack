@@ -50,7 +50,7 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 !!! info "Reference"
     See the [.dstack.yml reference](reference/dstack.yml/service.md)
-    for all supported configuration options and multiple examples.
+    for all supported configuration options and examples.
 
 ## Running
 
@@ -87,7 +87,8 @@ When deploying the service, `dstack run` mounts the current folder's contents.
 
 ??? info "Fleets"
     By default, `dstack run` reuses `idle` instances from one of the existing [fleets](fleets.md). 
-    If no `idle` instances meet the requirements, it creates a new fleet.
+    If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
+    
     To have the fleet deleted after a certain idle time automatically, set
     [`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time).
     By default, it's set to `5min`.

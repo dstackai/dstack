@@ -1,9 +1,7 @@
 # Quickstart
 
-!!! info "Installation"
-    Before using `dstack`, either set up the open-source server, or sign up
-    with `dstack Sky`.
-    See [Installation](installation/index.md) for more details.
+> Before using `dstack`, [install](installation/index.md) the server and configure 
+backends.
     
 ## Initialize a repo
 
@@ -124,7 +122,10 @@ Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
 </div>
 
 The `dstack run` command automatically uploads your code, including any local uncommitted changes. 
-To exclude any files from uploading, use `.gitignore`.
+
+!!! info "Fleets"
+    By default, `dstack run` reuses `idle` instances from one of the existing [fleets](fleets.md). 
+    If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
 
 ## What's next?
 

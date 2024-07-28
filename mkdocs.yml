@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source orchestration platform for development, training, and deployment of AI models in any cloud or data center.
+  dstack is an open-source AI container orchestration engine working with any cloud or data center.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -92,6 +92,7 @@ plugins:
         'blog/2023/07/14/lambda-cloud-ga-and-docker-support.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
         'blog/2023/05/22/azure-support-better-ui-and-more.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
         'blog/2023/03/13/gcp-support-just-landed.md': 'https://github.com/dstackai/dstack/releases/0.2'
+        'blog/dstack-research.md': 'https://dstack.ai/#get-started'
         'changelog/0.2.md': 'https://github.com/dstackai/dstack/releases/0.2'
         'changelog/0.9.1.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
         'changelog/0.10.5.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
@@ -192,6 +193,7 @@ nav:
       - Getting started:
           - Overview: docs/index.md
           - Installation: docs/installation/index.md
+          - Quickstart: docs/quickstart.md
       - Basics:
           - Dev environments: docs/dev-environments.md
           - Tasks: docs/tasks.md

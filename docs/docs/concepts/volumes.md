@@ -32,7 +32,7 @@ If you use this configuration, `dstack` will create a new volume based on the sp
 
 !!! info "Reference"
     See the [.dstack.yml reference](../reference/dstack.yml/dev-environment.md)
-    for all supported configuration options and multiple examples.
+    for all supported configuration options and examples.
 
 ## Creating and registering volumes
 

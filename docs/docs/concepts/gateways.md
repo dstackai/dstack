@@ -4,9 +4,8 @@ Gateways handle the ingress traffic of running services.
 They provide [services](services.md) with HTTPS domains, handle authentication, distribute load, and perform auto-scaling.
 In order to run a service, you need to have at least one gateway set up.
 
-!!! info "dstack Sky"
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-    the gateway is already set up for you.
+> If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+the gateway is already set up for you.
 
 ## Configuration
 

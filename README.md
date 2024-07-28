@@ -14,18 +14,18 @@
 
 </div>
 
-`dstack` is an open-source container orchestration engine designed for running AI workloads across any cloud or data
-center. It simplifies dev environments, running tasks on clusters, and deployment.
+`dstack` is an open-source container orchestration engine for AI. 
+It accelerates the development, training, and deployment of AI models, and simplifies the management of clusters.
 
 #### Cloud and on-prem
 
-`dstack` allows workload orchestration on both cloud and on-prem servers.
+`dstack` is easy to use with any cloud or on-prem servers.
 Supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
-For on-prem servers, see [fleets](https://dstack.ai/docs/fleets#__tabbed_1_2).
+For using `dstack` with on-prem servers, see [fleets](fleets.md#__tabbed_1_2).
 
 #### Accelerators
 
-`dstack` supports NVIDIA GPUs and Google Cloud TPUs out of the box.
+`dstack` supports `NVIDIA GPU` and `Google Cloud TPU` out of the box.
  
 ## Major news ✨
 
@@ -83,7 +83,7 @@ see [on-prem fleets](https://dstack.ai/docs/fleets#__tabbed_1_2) command.
 
 ## How does it work?
 
-### 1. Define configurations
+### 1. Define run configurations
 
 `dstack` supports three types of run configurations:
    

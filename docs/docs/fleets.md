@@ -3,8 +3,7 @@
 Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem. Once a
 fleet is created, it can be reused by dev environments, tasks, and services.
 
-!!! info "Experimental"
-    Fleets is an experimental feature. To use it, you have to install the `0.18.6rc1` version.
+> Fleets is an experimental feature. To use it, you have to install the `0.18.6rc1` version.
 
 ## Configuration
 
@@ -31,8 +30,8 @@ are both acceptable).
 
     Set `placement` to `cluster` if the nodes should be interconnected (e.g. if you'd like to use them for multi-node tasks). 
     In that case, `dstack` will provision all nodes in the same backend and region.
-
-    > Fleets aren't supported yet for the `kubernetes`, `vastai`, and `runpod` backends.
+    
+    Defining fleets with YAML isn't supported yet for the `kubernetes`, `vastai`, and `runpod` backends.
 
 === "On-prem fleets"
 
@@ -64,7 +63,7 @@ are both acceptable).
 
 !!! info "Reference"
     See the [.dstack.yml reference](reference/dstack.yml/fleet.md)
-    for all supported configuration options and multiple examples.
+    for all supported configuration options and examples.
 
 ## Creating and updating fleets
 
@@ -84,11 +83,16 @@ Fleet my-fleet does not exist yet. Create the fleet? [y/n]: y
 
 Once the status of instances change to `idle`, they can be used by `dstack run`.
 
-## Automatic fleet creation
+## Creation policy
 
 > By default, `dstack run` tries to reuse `idle` instances from existing fleets. 
 If no `idle` instances meet the requirements, `dstack run` creates a new fleet automatically.
 To avoid creating new fleet, specify pass `--reuse` to `dstack run`.
+
+## Termination policy
+
+> If you want a fleet to be automatically deleted after a certain idle time, you can set the 
+you can set the [`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time) property.
 
 ## Managing fleets
 
@@ -124,7 +128,3 @@ Fleet my-gcp-fleet deleted
 You can pass either the path to the configuration file or the fleet name directly.
 
 To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
-
-??? info "Idle duration"
-    If you want a fleet to be automatically deleted after a certain idle time, you can set the 
-    you can set the [`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time) property.

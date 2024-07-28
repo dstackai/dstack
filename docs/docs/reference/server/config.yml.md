@@ -1,7 +1,7 @@
 # ~/.dstack/server/config.yml
 
 The `~/.dstack/server/config.yml` file is used by the `dstack` server
-to [configure](../../installation/index.md#configure-backends) cloud accounts.
+to [configure](../../installation/index.md#1-configure-backends) cloud accounts.
 
 > The `dstack` server allows you to configure backends for multiple projects.
 > If you don't need multiple projects, use only the `main` project.

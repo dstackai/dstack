@@ -6,3 +6,5 @@ name: vscode
 python: "3.11"
 
 ide: vscode
+
+spot_policy: auto
