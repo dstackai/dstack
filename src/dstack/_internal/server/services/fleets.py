@@ -325,6 +325,8 @@ def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
 def _validate_fleet_spec(spec: FleetSpec):
     if spec.configuration.name is not None:
         validate_dstack_resource_name(spec.configuration.name)
+    if spec.configuration.ssh_config is None and spec.configuration.nodes is None:
+        raise ServerClientError("No ssh_config or nodes specified")
     if spec.configuration.ssh_config is not None:
         for host in spec.configuration.ssh_config.hosts:
             if isinstance(host, str):
