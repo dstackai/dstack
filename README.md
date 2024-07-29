@@ -21,7 +21,7 @@ It accelerates the development, training, and deployment of AI models, and simpl
 
 `dstack` is easy to use with any cloud or on-prem servers.
 Supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
-For using `dstack` with on-prem servers, see [fleets](fleets.md#__tabbed_1_2).
+For using `dstack` with on-prem servers, see [fleets](https://dstack.ai/docs/fleets#__tabbed_1_2).
 
 #### Accelerators
 
@@ -29,7 +29,7 @@ For using `dstack` with on-prem servers, see [fleets](fleets.md#__tabbed_1_2).
  
 ## Major news ✨
 
-- [2024/07] [dstack 0.18.7rc1: Fleets](https://github.com/dstackai/dstack/releases/tag/0.18.7) (Release)
+- [2024/07] [dstack 0.18.7: Fleets, RunPod Volumes, dstack apply, and more](https://github.com/dstackai/dstack/releases/tag/0.18.7) (Release)
 - [2024/05] [dstack 0.18.4: Google Cloud TPU, and more](https://github.com/dstackai/dstack/releases/tag/0.18.4) (Release)
 - [2024/05] [dstack 0.18.3: OCI, and more](https://github.com/dstackai/dstack/releases/tag/0.18.3) (Release)
 - [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
@@ -78,7 +78,7 @@ The server is running at http://127.0.0.1:3000/
 
 ### Add on-prem servers
     
-> If you'd like to use `dstack` to run workloads on your on-prem servers,
+If you'd like to use `dstack` to run workloads on your on-prem servers,
 see [on-prem fleets](https://dstack.ai/docs/fleets#__tabbed_1_2) command.
 
 ## How does it work?

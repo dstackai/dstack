@@ -2,7 +2,6 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
     window.$crisp = [];
     window.CRISP_WEBSITE_ID = "ce56e3b2-a23e-4d3f-9e80-e08c61a2b3cb";
@@ -15,92 +14,93 @@
         $crisp.push(["do", "chat:hide"]);
     })();
 </script>
+<script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
-/*
-    var typed = new Typed('#typed', {
-      strings: ['AWS', 'GCP', 'Azure', 'Lambda', 'TensorDock', 'Vast.ai', 'any cloud'],
-      backDelay: 5000,
-      typeSpeed: 150,
-      backSpeed: 100,
-      loop: true,
-    });
-*/
-  </script>
+    /*
+        var typed = new Typed('#typed', {
+          strings: ['AWS', 'GCP', 'Azure', 'Lambda', 'TensorDock', 'Vast.ai', 'any cloud'],
+          backDelay: 5000,
+          typeSpeed: 150,
+          backSpeed: 100,
+          loop: true,
+        });
+    */
+</script>
 <script type="text/javascript">
-/*
-    new Termynal('#tx-landing__major_feature_training_terminal',
-        {
-            lineData: [
-                {type: 'input', value: 'dstack run . -f llama-2/train.dstack.yml --gpu 40GB -y'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
-                    class: 'newline'
-                },
-                {
-                    delay: 0,
-                    value: 'wet-mangust-7  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 1000, value: 'Provisioning...', class: 'newline'},
-                {type: 'progress', progressPercent: 100, typeDelay: 200},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 5000,
-                    value: 'Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
-                    class: 'newline'
-                },
-                {
-                    delay: 5000,
-                    value: 'Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
-                    class: 'newline'
-                },
-                {
-                    delay: 5000,
-                    value: 'Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-            ]
-        }
-    );
-*/
-    new Termynal('#tx-landing__major_feature_inference_terminal',
-        {
-            lineData: [
-                {type: 'input', value: 'dstack run . -f llama-2/serve.dstack.yml --gpu 40GB -y'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
-                    class: 'newline'
-                },
-                {
-                    delay: 0,
-                    value: 'wet-mangust-8  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 1000, value: 'Provisioning...', class: 'newline'},
-                {type: 'progress', progressPercent: 100, typeDelay: 200},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'Serving HTTP on https://wet-mangust-8.mydomain.com',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'To exit, press Ctrl+C.',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-            ]
-        }
-    );
+    /*
+        new Termynal('#tx-landing__major_feature_training_terminal',
+            {
+                lineData: [
+                    {type: 'input', value: 'dstack run . -f llama-2/train.dstack.yml --gpu 40GB -y'},
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 0,
+                        value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
+                        class: 'newline'
+                    },
+                    {
+                        delay: 0,
+                        value: 'wet-mangust-7  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {delay: 1000, value: 'Provisioning...', class: 'newline'},
+                    {type: 'progress', progressPercent: 100, typeDelay: 200},
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 5000,
+                        value: 'Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
+                        class: 'newline'
+                    },
+                    {
+                        delay: 5000,
+                        value: 'Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
+                        class: 'newline'
+                    },
+                    {
+                        delay: 5000,
+                        value: 'Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                ]
+            }
+        );
+        new Termynal('#tx-landing__major_feature_inference_terminal',
+            {
+                lineData: [
+                    {type: 'input', value: 'dstack run . -f llama-2/serve.dstack.yml --gpu 40GB -y'},
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 0,
+                        value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
+                        class: 'newline'
+                    },
+                    {
+                        delay: 0,
+                        value: 'wet-mangust-8  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {delay: 1000, value: 'Provisioning...', class: 'newline'},
+                    {type: 'progress', progressPercent: 100, typeDelay: 200},
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 0,
+                        value: 'Serving HTTP on https://wet-mangust-8.mydomain.com',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 0,
+                        value: 'To exit, press Ctrl+C.',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                ]
+            }
+        );
+    */
 </script>
 {% endblock %}
 
@@ -127,10 +127,12 @@
                         Get support and learn from <br>the community
                     </div>-->
 
-                    <a href="javascript:void(0)" onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});" class="md-button md-button--primary"
+                    <a href="javascript:void(0)"
+                       onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});"
+                       class="md-button md-button--primary"
                        style="min-width: 225px; margin-right: 10px">
                         <span>Get started</span>
-                            <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
+                        <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
                     </a>
 
                     <a href="/docs" class="md-button md-button-secondary"
@@ -204,13 +206,14 @@
                     </p>
 
                     <p>
-                        <a href="/docs/concepts/dev-environments" target="_blank"
+                        <a href="/docs/dev-environments" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
 
                 <div class="block large">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif" width="800" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif"
+                         width="800" style="border-radius: 10px">
                 </div>
             </div>
         </div>
@@ -218,7 +221,8 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="800" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif"
+                         width="800" style="border-radius: 10px">
                 </div>
 
                 <div class="block">
@@ -230,7 +234,7 @@
                     <p>You can run tasks on a single machine or on a cluster of nodes.</p>
 
                     <p>
-                        <a href="/docs/concepts/tasks" target="_blank"
+                        <a href="/docs/tasks" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
@@ -248,36 +252,39 @@
                     </p>
 
                     <p>
-                        <a href="/docs/concepts/services" target="_blank"
+                        <a href="/docs/services" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
 
                 <div class="block large">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="800" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif"
+                         width="800" style="border-radius: 10px">
                 </div>
             </div>
         </div>
 
-        <!--<div class="tx-landing__major_feature">
+        <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-pool.gif" width="800" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-cloud-ssh-fleet-1.gif"
+                         width="800" style="border-radius: 10px">
                 </div>
 
                 <div class="block">
-                    <h2>Pools</h2>
+                    <h2>Fleets</h2>
 
-                    <p>Pools enable the efficient reuse of cloud instances and on-premises servers across runs,
-                        simplifying their management.</p>
+                    <p>Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem.</p>
+
+                    <p>Once a fleet is created, it can be reused by dev environments, tasks, and services.</p>
 
                     <p>
-                        <a href="/docs/concepts/pools" target="_blank"
+                        <a href="/docs/fleets" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
             </div>
-        </div>-->
+        </div>
 
         <div class="tx-landing__highlights">
             <div class="tx-landing__highlights_text">
@@ -288,7 +295,8 @@
             </div>
 
             <div class="tx-landing__highlights_grid">
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/llms/llama3" target="_blank" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/llms/llama3" target="_blank"
+                   class="feature-cell">
                     <h3>
                         Llama 3
                     </h3>
@@ -303,7 +311,8 @@
                     </div>
                 </a>
 
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook" target="_blank" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook"
+                   target="_blank" class="feature-cell">
                     <h3>
                         Alignment Handbook
                     </h3>
@@ -318,7 +327,8 @@
                     </div>
                 </a>
 
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm" target="_blank" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm" target="_blank"
+                   class="feature-cell">
                     <h3>
                         vLLM
                     </h3>
@@ -333,7 +343,8 @@
                     </div>
                 </a>
 
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl" target="_blank" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl" target="_blank"
+                   class="feature-cell">
                     <h3>
                         Axolotl
                     </h3>
@@ -348,7 +359,8 @@
                     </div>
                 </a>
 
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi" target="_blank" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi" target="_blank"
+                   class="feature-cell">
                     <h3>
                         TGI
                     </h3>
@@ -363,7 +375,8 @@
                     </div>
                 </a>
 
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/ollama" target="_blank" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/ollama" target="_blank"
+                   class="feature-cell">
                     <h3>
                         Ollama
                     </h3>
@@ -378,7 +391,8 @@
                     </div>
                 </a>
 
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/lorax" target="_blank" class="feature-cell">
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/lorax" target="_blank"
+                   class="feature-cell">
                     <h3>
                         LoRaX
                     </h3>
@@ -425,7 +439,8 @@
 
                         <p>
                             Thanks to <strong>@dstack</strong>, I get the convenience of having a personal Slurm cluster
-                            and using budget-friendly cloud GPUs, without paying the super-high premiums charged by the big three.
+                            and using budget-friendly cloud GPUs, without paying the super-high premiums charged by the
+                            big three.
                         </p>
                     </div>
 
@@ -438,7 +453,8 @@
                         <h4>ML Engineer at Argilla</h4>
 
                         <p>
-                            With <strong>@dstack</strong> it's incredibly easy to define a configuration within a repository
+                            With <strong>@dstack</strong> it's incredibly easy to define a configuration within a
+                            repository
                             and run it without worrying about GPU availability. It lets you focus on
                             data and your research.
                         </p>
@@ -453,7 +469,8 @@
                         <h4>ML Researcher at ETRI</h4>
 
                         <p>
-                            Thanks to <strong>@dstack</strong>, I can effortlessly access the top GPU options across different clouds,
+                            Thanks to <strong>@dstack</strong>, I can effortlessly access the top GPU options across
+                            different clouds,
                             saving me time and money while pushing my AI work forward.
                         </p>
                     </div>
@@ -527,7 +544,8 @@
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="25" height="24" src="/assets/images/oci-logo.svg" title="Oracle Cloud Infrastructure">
+                            <img width="25" height="24" src="/assets/images/oci-logo.svg"
+                                 title="Oracle Cloud Infrastructure">
                             <div class="plans_card__service-name">OCI</div>
                         </div>
 
@@ -573,8 +591,8 @@
 
                         <a href="/docs/installation"
                            class="md-button md-button--primary">Install open-source</a>
-                            <div class="plans_card__buttons_subtitle">Always free.</div>
-                        </div>
+                        <div class="plans_card__buttons_subtitle">Always free.</div>
+                    </div>
                 </div>
 
                 <!--<div class="plans_card enterprise">
@@ -646,7 +664,8 @@
 
                     <div class="plans_card__services">
                         <div class="plans_card__service-item">
-                            <img width="25" height="24" src="/assets/images/dstack-logo-notext.svg" title="GPU marketplace">
+                            <img width="25" height="24" src="/assets/images/dstack-logo-notext.svg"
+                                 title="GPU marketplace">
                             <div class="plans_card__service-name">Marketplace</div>
                         </div>
 
@@ -734,7 +753,8 @@
 
                     <div class="tx-faq__item-body">
                         <p>
-                            dstack is an open-source orchestration engine that simplifies developing, training, and deploying AI
+                            dstack is an open-source orchestration engine that simplifies developing, training, and
+                            deploying AI
                             models, as well as managing clusters on any cloud or data center.
                             It provides a unified interface to manage AI model development at any scale,
                             whether in the cloud or on-premises.
@@ -805,7 +825,8 @@
 
                     <div class="tx-faq__item-body">
                         <p>
-                            If you don't want to host the dstack server yourself or would like to access GPU from the dstack's marketplace, sign up with
+                            If you don't want to host the dstack server yourself or would like to access GPU from the
+                            dstack's marketplace, sign up with
                             <a href="https://sky.dstack.ai" target="_blank">dstack Sky</a>.
                         </p>
                         <p>
