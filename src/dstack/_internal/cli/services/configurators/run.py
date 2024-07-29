@@ -76,18 +76,18 @@ class BaseRunConfigurator(BaseApplyConfigurator):
             )
 
         print_run_plan(run_plan, offers_limit=configurator_args.max_offers)
-        if not command_args.yes and not confirm_ask("Continue?"):
-            console.print("\nExiting...")
-            return
 
+        confirm_message = "Submit a new run?"
         if conf.name:
             old_run = self.api.runs.get(run_name=conf.name)
             if old_run is not None:
-                if not command_args.yes and not confirm_ask(
-                    f"Run [code]{configurator_args.run_name}[/] already exists. Override the run?"
-                ):
-                    console.print("\nExiting...")
-                    return
+                confirm_message = f"Run [code]{conf.name}[/] already exists. Override the run?"
+            else:
+                confirm_message = f"Submit the run [code]{conf.name}[/]?"
+
+        if not command_args.yes and not confirm_ask(confirm_message):
+            console.print("\nExiting...")
+            return
 
         try:
             with console.status("Submitting run..."):

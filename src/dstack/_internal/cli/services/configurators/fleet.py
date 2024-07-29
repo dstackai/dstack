@@ -74,9 +74,12 @@ class FleetConfigurator(BaseApplyConfigurator):
                         else:
                             time.sleep(1)
         if not confirmed and not command_args.yes:
-            if not confirm_ask(
-                f"Fleet [code]{conf.name}[/] does not exist yet. Create the fleet?"
-            ):
+            confirm_message = "Configuration does not specify the fleet name. Create a new fleet?"
+            if conf.name is not None:
+                confirm_message = (
+                    f"Fleet [code]{conf.name}[/] does not exist yet. Create the fleet?"
+                )
+            if not confirm_ask(confirm_message):
                 console.print("\nExiting...")
                 return
         with console.status("Creating fleet..."):
