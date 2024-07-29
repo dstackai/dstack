@@ -3,7 +3,7 @@
 Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem. Once a
 fleet is created, it can be reused by dev environments, tasks, and services.
 
-> Fleets is a new feature. To use it, ensure you've installed version `0.18.6` or higher.
+> Fleets is a new feature. To use it, ensure you've installed version `0.18.7` or higher.
 
 ## Configuration
 
