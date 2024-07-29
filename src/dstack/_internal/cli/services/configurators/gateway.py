@@ -53,9 +53,14 @@ class GatewayConfigurator(BaseApplyConfigurator):
                         project_name=self.api.project, gateways_names=[conf.name]
                     )
         if not confirmed and not command_args.yes:
-            if not confirm_ask(
-                f"Gateway [code]{conf.name}[/] does not exist yet. Create the gateway?"
-            ):
+            confirm_message = (
+                "Configuration does not specify the gateway name. Create a new gateway?"
+            )
+            if conf.name is not None:
+                confirm_message = (
+                    f"Gateway [code]{conf.name}[/] does not exist yet. Create the gateway?"
+                )
+            if not confirm_ask(confirm_message):
                 console.print("\nExiting...")
                 return
         with console.status("Creating gateway..."):

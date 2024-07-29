@@ -53,9 +53,14 @@ class VolumeConfigurator(BaseApplyConfigurator):
                         project_name=self.api.project, names=[conf.name]
                     )
         if not confirmed and not command_args.yes:
-            if not confirm_ask(
-                f"Volume [code]{conf.name}[/] does not exist yet. Create the volume?"
-            ):
+            confirm_message = (
+                "Configuration does not specify the volume name. Create a new volume?"
+            )
+            if conf.name is not None:
+                confirm_message = (
+                    f"Volume [code]{conf.name}[/] does not exist yet. Create the volume?"
+                )
+            if not confirm_ask(confirm_message):
                 console.print("\nExiting...")
                 return
         with console.status("Creating volume..."):

@@ -1,4 +1,5 @@
 import argparse
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -62,10 +63,23 @@ class FleetConfigurator(BaseApplyConfigurator):
                 confirmed = True
                 with console.status("Deleting fleet..."):
                     self.api.client.fleets.delete(project_name=self.api.project, names=[conf.name])
+                    # Fleet deletion is async. Wait for fleet to be deleted.
+                    while True:
+                        try:
+                            self.api.client.fleets.get(
+                                project_name=self.api.project, name=conf.name
+                            )
+                        except ResourceNotExistsError:
+                            break
+                        else:
+                            time.sleep(1)
         if not confirmed and not command_args.yes:
-            if not confirm_ask(
-                f"Fleet [code]{conf.name}[/] does not exist yet. Create the fleet?"
-            ):
+            confirm_message = "Configuration does not specify the fleet name. Create a new fleet?"
+            if conf.name is not None:
+                confirm_message = (
+                    f"Fleet [code]{conf.name}[/] does not exist yet. Create the fleet?"
+                )
+            if not confirm_ask(confirm_message):
                 console.print("\nExiting...")
                 return
         with console.status("Creating fleet..."):
@@ -100,6 +114,14 @@ class FleetConfigurator(BaseApplyConfigurator):
 
         with console.status("Deleting fleet..."):
             self.api.client.fleets.delete(project_name=self.api.project, names=[conf.name])
+            # Fleet deletion is async. Wait for fleet to be deleted.
+            while True:
+                try:
+                    self.api.client.fleets.get(project_name=self.api.project, name=conf.name)
+                except ResourceNotExistsError:
+                    break
+                else:
+                    time.sleep(1)
 
         console.print(f"Fleet [code]{conf.name}[/] deleted")
 
