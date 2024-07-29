@@ -39,16 +39,16 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 !!! info "Distributed tasks"
     By default, tasks run on a single instance. However, you can specify
-    the [number of nodes](../reference/dstack.yml/task.md#_nodes).
+    the [number of nodes](reference/dstack.yml/task.md#_nodes).
     In this case, `dstack` provisions a cluster of instances.
 
 !!! info "Reference"
-    See the [.dstack.yml reference](../reference/dstack.yml/task.md)
+    See the [.dstack.yml reference](reference/dstack.yml/task.md)
     for all supported configuration options and examples.
 
 ## Running
 
-To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
+To run a configuration, use the [`dstack run`](reference/cli/index.md#dstack-run) command followed by the working directory path, 
 configuration file path, and other options.
 
 <div class="termy">
@@ -95,19 +95,19 @@ When running the task, `dstack run` mounts the current folder's contents.
     By default, it's set to `5min`.
 
 !!! info "Reference"
-    See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+    See the [CLI reference](reference/cli/index.md#dstack-run) for more details
     on how `dstack run` works.
 
 ## Managing runs
 
 ### Listing runs
 
-The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
+The [`dstack ps`](reference/cli/index.md#dstack-ps) command lists all running runs and their status.
 
 ### Stopping runs
 
-Once you use [`dstack stop`](../reference/cli/index.md#dstack-stop) (or when the run exceeds the
-`max_duration`), the instances return to the [pool](pools.md).
+Once you use [`dstack stop`](reference/cli/index.md#dstack-stop) (or when the run exceeds the
+`max_duration`), the instances return to the [fleet](fleets.md).
 
 [//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
 
