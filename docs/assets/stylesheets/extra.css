@@ -1058,6 +1058,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 @media screen and (max-width: 76.25em) {
+    .md-typeset .tabbed-block p {
+        margin: 1em .8rem;
+    }
+
     .md-tabs {
         display: none;
     }
@@ -1298,8 +1302,20 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 @media screen and (max-width: 44.9375em) {
+    .md-typeset .tabbed-set pre > code, [data-termynal] {
+        border-radius: 0 !important;
+    }
+
+    .md-typeset .termy{
+        margin: 0 -.8rem 0 -0.8rem;
+    }
+
     .md-typeset .tabbed-set {
-        margin: 0 -.8rem
+        margin: 0 -.8rem 0 -0.8rem;
+    }
+
+    [dir=ltr] .md-typeset blockquote, [dir=ltr] .md-typeset :is(.admonition,details) {
+        margin: 0 -.8rem 0 -0.8rem;
     }
 
     [dir=ltr] .md-content__inner>.tabbed-set .tabbed-labels {

@@ -15,13 +15,17 @@ are both acceptable).
     To provision a fleet in the cloud using the configured backends, specify the required resources, number of nodes, 
     and other optional parameters.
     
-    <div editor-title="cluster.dstack.yml">
+    <div editor-title="examples/fleets/cluster.dstack.yml">
     
     ```yaml
     type: fleet
     name: my-fleet
-    placement: cluster
+    
     nodes: 2
+    placement: cluster
+    
+    backends: [aws]
+    
     resources:
       gpu: 24GB
     ```
@@ -37,12 +41,14 @@ are both acceptable).
 
     To create a fleet from on-prem servers, specify their hosts along with the user, port, and SSH key for connection via SSH.
 
-    <div editor-title="cluster-ssh.dstack.yml"> 
+    <div editor-title="examples/fleets/cluster.dstack.yml"> 
     
     ```yaml
     type: fleet
     name: my-fleet
+
     placement: cluster
+
     ssh_config:
       user: ubuntu
       identity_file: ~/.ssh/id_rsa
@@ -72,7 +78,7 @@ To create or update the fleet, simply call the [`dstack apply`](reference/cli/in
 <div class="termy">
 
 ```shell
-$ dstack apply -f my-gcp-fleet.dstack.yml
+$ dstack apply -f examples/fleets/cluster.dstack.yml
 Fleet my-fleet does not exist yet. Create the fleet? [y/n]: y
  FLEET     INSTANCE  BACKEND  RESOURCES  PRICE  STATUS   CREATED 
  my-fleet  0                                    pending  now     
