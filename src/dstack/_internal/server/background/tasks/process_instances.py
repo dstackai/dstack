@@ -23,6 +23,7 @@ from dstack._internal.core.backends.remote.provisioning import (
     get_paramiko_connection,
     get_shim_healthcheck,
     host_info_to_instance_type,
+    remove_host_info_if_exists,
     run_pre_start_commands,
     run_shim_as_systemd_service,
     upload_envs,
@@ -168,6 +169,9 @@ def deploy_instance(
         )
         upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
         logger.debug("The dstack-shim environment variables have been installed")
+
+        # Ensure host info file does not exist
+        remove_host_info_if_exists(client, DSTACK_WORKING_DIR)
 
         # Run dstack-shim as a systemd service
         run_shim_as_systemd_service(
