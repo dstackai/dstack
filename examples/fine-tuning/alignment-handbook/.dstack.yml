@@ -1,0 +1,28 @@
+type: dev-environment
+name: ah-vscode
+
+# If `image` is not specified, dstack uses its default image
+python: "3.10"
+
+# Required environment variables
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - ACCELERATE_LOG_LEVEL=info
+  - WANDB_API_KEY
+
+# Uncomment if you want the environment to be pre-installed
+#init:
+#  - conda install cuda
+#  - git clone https://github.com/huggingface/alignment-handbook.git
+#  - cd alignment-handbook
+#  - pip install .
+#  - pip install flash-attn --no-build-isolation
+#  - pip install wandb
+
+ide: vscode
+
+spot_policy: auto
+
+resources:
+  # Minimum 24GB, one or more GPU
+  gpu: 24GB..:1..
