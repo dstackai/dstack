@@ -1,7 +1,7 @@
 import concurrent.futures
 import json
 from collections import defaultdict
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Literal, Optional
 
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
@@ -25,6 +25,7 @@ from dstack._internal.core.errors import (
     ProvisioningError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
     GatewayProvisioningData,
@@ -39,10 +40,20 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.volumes import (
+    Volume,
+    VolumeAttachmentData,
+    VolumeProvisioningData,
+)
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+class GCPVolumeDiskBackendData(CoreModel):
+    type: Literal["disk"] = "disk"
+    disk_type: str
 
 
 class GCPCompute(Compute):
@@ -55,6 +66,7 @@ class GCPCompute(Compute):
         self.subnetworks_client = compute_v1.SubnetworksClient(credentials=self.credentials)
         self.routers_client = compute_v1.RoutersClient(credentials=self.credentials)
         self.tpu_client = tpu_v2.TpuClient(credentials=self.credentials)
+        self.disk_client = compute_v1.DisksClient(credentials=self.credentials)
 
     def get_offers(
         self, requirements: Optional[Requirements] = None
@@ -101,14 +113,14 @@ class GCPCompute(Compute):
             is_tpu = backend_data_dict.get("is_tpu", False)
         try:
             if is_tpu:
-                name = f"projects/{self.project_id}/locations/{zone}/nodes/{instance_id}"
-                delete_request = tpu_v2.DeleteNodeRequest(
-                    name=name,
-                )
+                name = f"projects/{self.config.project_id}/locations/{zone}/nodes/{instance_id}"
+                delete_request = tpu_v2.DeleteNodeRequest(name=name)
                 self.tpu_client.delete_node(request=delete_request)
             else:
                 self.instances_client.delete(
-                    project=self.config.project_id, zone=zone, instance=instance_id
+                    project=self.config.project_id,
+                    zone=zone,
+                    instance=instance_id,
                 )
         except google.api_core.exceptions.NotFound:
             pass
@@ -129,8 +141,11 @@ class GCPCompute(Compute):
                 instance_config.instance_name,
                 instance_name,
             )
-
         authorized_keys = instance_config.get_public_keys()
+
+        zones = _get_instance_zones(instance_offer)
+        if instance_config.availability_zone:
+            zones = [z for z in zones if z == instance_config.availability_zone]
 
         # If a shared VPC is not used, we can create firewall rules for user
         if self.config.vpc_project_id is None:
@@ -161,7 +176,7 @@ class GCPCompute(Compute):
         if tpu:
             instance_id = f"tpu-{instance_config.instance_name}"
             startup_script = _get_tpu_startup_script(authorized_keys)
-            for zone in _get_instance_zones(instance_offer):
+            for zone in zones:
                 tpu_node = gcp_resources.create_tpu_node_struct(
                     instance_name=instance_offer.instance.name,
                     startup_script=startup_script,
@@ -220,7 +235,7 @@ class GCPCompute(Compute):
                 f"Project ID: {self.config.vpc_project_id or self.config.project_id}."
             )
 
-        for zone in _get_instance_zones(instance_offer):
+        for zone in zones:
             request = compute_v1.InsertInstanceRequest()
             request.zone = zone
             request.project = self.config.project_id
@@ -355,6 +370,13 @@ class GCPCompute(Compute):
             job_docker_config=None,
             user=run.user,
         )
+        if len(volumes) > 0:
+            volume = volumes[0]
+            if (
+                volume.provisioning_data is not None
+                and volume.provisioning_data.availability_zone is not None
+            ):
+                instance_config.availability_zone = volume.provisioning_data.availability_zone
         return self.create_instance(instance_offer, instance_config)
 
     def create_gateway(
@@ -428,6 +450,136 @@ class GCPCompute(Compute):
             region=configuration.region,
             backend_data=backend_data,
         )
+
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        logger.debug("Requesting persistent disk %s", volume.configuration.volume_id)
+        zones = gcp_resources.get_availability_zones(
+            regions_client=self.regions_client,
+            project_id=self.config.project_id,
+            region=volume.configuration.region,
+        )
+        for zone in zones:
+            try:
+                disk = self.disk_client.get(
+                    project=self.config.project_id,
+                    zone=zone,
+                    disk=volume.configuration.volume_id,
+                )
+            except google.api_core.exceptions.NotFound:
+                pass
+            else:
+                logger.debug("Found persistent disk %s", volume.configuration.volume_id)
+                return VolumeProvisioningData(
+                    backend=BackendType.GCP,
+                    volume_id=disk.name,
+                    size_gb=disk.size_gb,
+                    availability_zone=zone,
+                    attachable=True,
+                    detachable=True,
+                    backend_data=GCPVolumeDiskBackendData(
+                        disk_type=gcp_resources.full_resource_name_to_name(disk.type_),
+                    ).json(),
+                )
+        raise ComputeError("Persistent disk %s not found", volume.configuration.volume_id)
+
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        zone = gcp_resources.get_availability_zone(
+            regions_client=self.regions_client,
+            project_id=self.config.project_id,
+            region=volume.configuration.region,
+        )
+        if zone is None:
+            raise ComputeError(
+                f"Failed to find availability zone in region {volume.configuration.region}"
+            )
+
+        disk = compute_v1.Disk()
+        disk.name = volume.name
+        disk.size_gb = volume.configuration.size_gb
+        disk.type_ = f"zones/{zone}/diskTypes/pd-balanced"
+
+        logger.debug("Creating persistent disk for volume %s", volume.name)
+        try:
+            operation = self.disk_client.insert(
+                project=self.config.project_id,
+                zone=zone,
+                disk_resource=disk,
+            )
+            gcp_resources.wait_for_extended_operation(operation, "persistent disk creation")
+        except google.api_core.exceptions.Conflict:
+            raise ComputeError(f"Volume {volume.name} already exists")
+        created_disk = self.disk_client.get(
+            project=self.config.project_id,
+            zone=zone,
+            disk=volume.name,
+        )
+        logger.debug("Created persistent disk for volume %s", volume.name)
+        return VolumeProvisioningData(
+            backend=BackendType.GCP,
+            volume_id=created_disk.name,
+            size_gb=created_disk.size_gb,
+            availability_zone=zone,
+            price=_get_volume_price(created_disk.size_gb),
+            attachable=True,
+            detachable=True,
+            backend_data=GCPVolumeDiskBackendData(
+                disk_type=gcp_resources.full_resource_name_to_name(disk.type_),
+            ).json(),
+        )
+
+    def delete_volume(self, volume: Volume):
+        logger.debug("Deleting persistent disk for volume %s", volume.name)
+        try:
+            operation = self.disk_client.delete(
+                project=self.config.project_id,
+                zone=get_or_error(volume.provisioning_data).availability_zone,
+                disk=volume.name,
+            )
+            gcp_resources.wait_for_extended_operation(operation, "persistent disk deletion")
+        except google.api_core.exceptions.NotFound:
+            logger.debug("Failed to find persistent disk for volume %s", volume.name)
+            pass
+        logger.debug("Deleted persistent disk for volume %s", volume.name)
+
+    def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
+        zone = get_or_error(volume.provisioning_data).availability_zone
+        disk = self.disk_client.get(
+            project=self.config.project_id,
+            zone=zone,
+            disk=volume.volume_id,
+        )
+        disk_url = disk.self_link
+
+        attached_disk = compute_v1.AttachedDisk()
+        attached_disk.source = disk_url
+        attached_disk.auto_delete = False
+        attached_disk.device_name = f"pd-{volume.volume_id}"
+
+        logger.debug(
+            "Attaching persistent disk for volume %s to instance %s", volume.volume_id, instance_id
+        )
+        operation = self.instances_client.attach_disk(
+            project=self.config.project_id,
+            zone=zone,
+            instance=instance_id,
+            attached_disk_resource=attached_disk,
+        )
+        gcp_resources.wait_for_extended_operation(operation, "persistent disk attachment")
+        logger.debug(
+            "Attached persistent disk for volume %s to instance %s", volume.volume_id, instance_id
+        )
+        return VolumeAttachmentData(
+            device_name=attached_disk.device_name,
+        )
+
+    def detach_volume(self, volume: Volume, instance_id: str):
+        operation = self.instances_client.detach_disk(
+            project=self.config.project_id,
+            zone=get_or_error(volume.provisioning_data).availability_zone,
+            instance=instance_id,
+            device_name=get_or_error(volume.attachment_data).device_name,
+        )
+        gcp_resources.wait_for_extended_operation(operation, "persistent disk detachment")
 
 
 def _get_vpc_subnet(
@@ -549,3 +701,9 @@ def _is_pod(instance_name: str) -> bool:
         return True
     else:
         raise ValueError(f"Unknown TPU version: {version}")
+
+
+def _get_volume_price(size: int) -> float:
+    # https://cloud.google.com/compute/disks-image-pricing#persistentdisk
+    # The price is different in different regions. Take max across supported regions.
+    return size * 0.12

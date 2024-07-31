@@ -441,7 +441,7 @@ class AWSCompute(Compute):
 
         logger.debug("Creating EBS volume %s", volume.configuration.name)
         response = ec2_client.create_volume(
-            Size=int(volume.configuration.size),
+            Size=volume.configuration.size_gb,
             AvailabilityZone=zone,
             VolumeType=volume_type,
             TagSpecifications=[

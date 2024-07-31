@@ -31,6 +31,30 @@ supported_accelerators = [
 ]
 
 
+def get_availability_zone(
+    regions_client: compute_v1.RegionsClient,
+    project_id: str,
+    region: str,
+) -> Optional[str]:
+    zones = get_availability_zones(
+        regions_client=regions_client,
+        project_id=project_id,
+        region=region,
+    )
+    if len(zones) == 0:
+        return None
+    return zones[0]
+
+
+def get_availability_zones(
+    regions_client: compute_v1.RegionsClient,
+    project_id: str,
+    region: str,
+) -> List[str]:
+    region_info = regions_client.get(project=project_id, region=region)
+    return [full_resource_name_to_name(z) for z in region_info.zones]
+
+
 def check_vpc(
     network_client: compute_v1.NetworksClient,
     routers_client: compute_v1.RoutersClient,
@@ -367,3 +391,7 @@ def wait_for_operation(operation: Operation, verbose_name: str = "operation", ti
         logger.debug("Error during %s: %s", verbose_name, e)
         raise operation.exception() or e
     return result
+
+
+def full_resource_name_to_name(full_resource_name: str) -> str:
+    return full_resource_name.split("/")[-1]

@@ -87,7 +87,7 @@ class LocalCompute(Compute):
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
         return VolumeProvisioningData(
             volume_id=volume.name,
-            size_gb=int(volume.configuration.size),
+            size_gb=volume.configuration.size_gb,
         )
 
     def delete_volume(self, volume: Volume):

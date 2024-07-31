@@ -17,6 +17,7 @@ from dstack._internal.server.schemas.runner import (
     SubmitBody,
     TaskConfigBody,
 )
+from dstack._internal.utils.common import get_or_error
 
 REMOTE_SHIM_PORT = 10998
 REMOTE_RUNNER_PORT = 10999
@@ -177,7 +178,8 @@ def health_response_to_health_status(data: HealthcheckResponse) -> HealthStatus:
 
 def _volume_to_shim_volume_info(volume: Volume) -> ShimVolumeInfo:
     return ShimVolumeInfo(
+        backend=volume.configuration.backend.value,
         name=volume.name,
-        volume_id=volume.volume_id,
+        volume_id=get_or_error(volume.volume_id),
         init_fs=not volume.external,
     )

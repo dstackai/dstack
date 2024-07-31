@@ -9,6 +9,7 @@ from typing_extensions import Annotated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.resources import Memory
+from dstack._internal.utils.common import get_or_error
 
 
 class VolumeStatus(str, Enum):
@@ -31,6 +32,10 @@ class VolumeConfiguration(CoreModel):
         Optional[str],
         Field(description="The volume ID. Must be specified when registering external volumes"),
     ] = None
+
+    @property
+    def size_gb(self) -> int:
+        return int(get_or_error(self.size))
 
 
 class VolumeProvisioningData(CoreModel):

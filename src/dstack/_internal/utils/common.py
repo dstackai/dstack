@@ -218,3 +218,12 @@ def parse_memory(memory: str, as_untis: str = "M") -> float:
     value_in_bytes = value * MEMORY_UNITS[units.upper()]
     result = value_in_bytes / MEMORY_UNITS[as_untis.upper()]
     return result
+
+
+def get_or_error(v: Optional[T]) -> T:
+    """
+    Unpacks an optional value. Used to denote that None is not possible in the current context.
+    """
+    if v is None:
+        raise ValueError("Optional value is None")
+    return v
