@@ -8,39 +8,26 @@ appropriate script.
 This example shows how use Alignment Handbook to fine-tune Gemma 7B on your SFT dataset 
 with Alignment Handbook and `dstack`. 
 
-## Prerequisites
+!!! info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo and run `dstack init`
 
-Before following this tutorial, ensure you've [installed](https://dstack.ai/docs/installation) `dstack`.
+    ```shell
+    git clone https://github.com/dstackai/dstack
+    cd dstack
+    dstack init
+    ```
 
-### Fleets
+## Training configuration recipe
 
-The example folder includes two cloud fleet configurations: [fleet.dstack.yml](fleet.dstack.yml) (a single node with a `24GB` GPU),
-and a [fleet-distrib.dstack.yml](fleet-distrib.dstack.yml) (a cluster of two nodes eah with a `24GB` GPU).
-
-You can update the fleet configurations to change the vRAM size, GPU model, number of GPUs per node, or number of nodes. 
-
-A fleet can be provisioned with `dstack apply`:
-
-```shell
-dstack apply -f examples/fine-tuning/alignment-handbook/fleet.dstack.yml
-```
-
-Once provisioned, the fleet can run dev environments and fine-tuning tasks.
-To delete the fleet, use `dstack fleet delete`.
-
-### Training configuration recipe
-
-Alignment Handbook's training script reads the training configuration recipe  
-from a YAML file. It includes the model, LoRA, and dataset arguments, as well
-as trainer configuration.
-
-This file can be found at [config.yaml](config.yaml).
+Alignment Handbook's training script reads the model, LoRA, and dataset arguments, as well
+as trainer configuration from a YAML file.
+This file can be found at [`examples/fine-tuning/alignment-handbook/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml).
 You can modify it as needed.
 
 ## Single-node training
 
 The easiest way to run a training script with `dstack` is by creating a task configuration file.
-This file can be found at [train.dstack.yml](train.dstack.yml). Below is its content: 
+This file can be found at [`examples/fine-tuning/alignment-handbook/train.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/train.dstack.yml). Below is its content: 
 
 ```yaml
 type: task
@@ -92,19 +79,15 @@ WANDB_API_KEY=...
 dstack apply -f examples/fine-tuning/alignment-handbook/train.dstack.yml
 ```
 
-To ensure the task never creates a new fleet,
-pass `--reuse` to `dstack apply` (or set `creation_policy` to `reuse` in the task configuration).
-The default policy is `reuse_or_create`.
-
-If you list `tensorbord` via `report_to` in [config.yaml](config.yaml),
+If you list `tensorbord` via `report_to` in [`examples/fine-tuning/alignment-handbook/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml),
 you'll be able to access experiment metrics via `http://localhost:6006` (while the task is running).
 
 ## Multi-node training
 
-The multi-node training task configuration file can be found at [train-distrib.dstack.yml](train-distrib.dstack.yml).
+The multi-node training task configuration file can be found at [`examples/fine-tuning/alignment-handbook/train-distrib.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/train-distrib.dstack.yml).
 Below is its content:
 
-```
+```yaml
 type: task
 name: ah-train-distrib
 
@@ -152,10 +135,33 @@ Here's how the multi-node task is different from the single-node one:
 1. The `nodes` property is specified with a number of required nodes (should match the fleet's nodes number).
 2. Under `resoruces`, `shm_size` is specified with the shared memory size used for the communication of parallel
    processes within a node (in case multiple GPUs per node are used).
-3. Instead of `recipes/accelerate_configs/multi_gpu.yaml`, we use [fsdp_qlora_full_shard.yaml](fsdp_qlora_full_shard.yaml) as an accelerate config.
+3. Instead of Alignment Handbook's [`recipes/accelerate_configs/multi_gpu.yaml`](https://github.com/huggingface/alignment-handbook/blob/main/recipes/accelerate_configs/multi_gpu.yaml), we use [`examples/fine-tuning/alignment-handbook/fsdp_qlora_full_shard.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/fsdp_qlora_full_shard.yaml) as an accelerate config.
 4. We use `DSTACK_MASTER_NODE_IP`, `DSTACK_NODE_RANK`, `DSTACK_GPUS_NUM`, and `DSTACK_NODES_NUM` environment variables to
    configure `accelerate`. The environment variables are automatically passed
    to the container for each node based on the task configuration.
+
+## Fleets
+
+> By default, `dstack run` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/fleets). 
+If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
+
+The example folder includes two cloud fleet configurations: [`examples/fine-tuning/alignment-handbook/fleet.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/fleet.dstack.yml) (a single node with a `24GB` GPU),
+and a [`examples/fine-tuning/alignment-handbook/fleet-distrib.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/fleet-distrib.dstack.yml) (a cluster of two nodes each with a `24GB` GPU).
+
+You can update the fleet configurations to change the vRAM size, GPU model, number of GPUs per node, or number of nodes. 
+
+A fleet can be provisioned with `dstack apply`:
+
+```shell
+dstack apply -f examples/fine-tuning/alignment-handbook/fleet.dstack.yml
+```
+
+Once provisioned, the fleet can run dev environments and fine-tuning tasks.
+To delete the fleet, use `dstack fleet delete`.
+
+> To ensure `dstack apply` always reuses an existing fleet,
+pass `--reuse` to `dstack apply` (or set `creation_policy` to `reuse` in the task configuration).
+The default policy is `reuse_or_create`.
 
 ## Dev environment
 
@@ -171,4 +177,4 @@ dstack apply -f examples/fine-tuning/alignment-handbook/.dstack.yaml
 1. Browse [Alignment Handbook](https://github.com/huggingface/alignment-handbook).
 2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).
-3. See other [examples](../..).
+3. See other [examples](https://github.com/dstackai/dstack/blob/master/examples/).
