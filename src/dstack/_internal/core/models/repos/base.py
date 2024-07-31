@@ -3,6 +3,7 @@ from enum import Enum
 from typing import BinaryIO, Optional
 
 import dstack._internal.core.models.repos as repos
+from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.common import CoreModel
 
 
@@ -33,3 +34,8 @@ class Repo(ABC):
     @abstractmethod
     def get_repo_info(self) -> "repos.AnyRepoInfo":
         pass
+
+    def get_repo_dir_or_error(self) -> str:
+        if self.repo_dir is not None:
+            return self.repo_dir
+        raise DstackError("repo_dir is None")

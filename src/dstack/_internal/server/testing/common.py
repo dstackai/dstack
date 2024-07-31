@@ -11,8 +11,14 @@ from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     DevEnvironmentConfiguration,
 )
+from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec, FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
-from dstack._internal.core.models.instances import InstanceConfiguration, InstanceType, Resources
+from dstack._internal.core.models.instances import (
+    InstanceConfiguration,
+    InstanceStatus,
+    InstanceType,
+    Resources,
+)
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
@@ -20,9 +26,8 @@ from dstack._internal.core.models.profiles import (
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.repos.local import LocalRunRepoData
-from dstack._internal.core.models.resources import Memory, ResourcesSpec
+from dstack._internal.core.models.resources import Memory, Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     JobProvisioningData,
     JobStatus,
     JobTerminationReason,
@@ -38,6 +43,7 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.server.models import (
     BackendModel,
+    FleetModel,
     GatewayComputeModel,
     GatewayModel,
     InstanceModel,
@@ -335,6 +341,52 @@ async def create_pool(
     return pool
 
 
+async def create_fleet(
+    session: AsyncSession,
+    project: ProjectModel,
+    created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    spec: Optional[FleetSpec] = None,
+    fleet_id: Optional[UUID] = None,
+    status: FleetStatus = FleetStatus.ACTIVE,
+) -> FleetModel:
+    if fleet_id is None:
+        fleet_id = uuid.uuid4()
+    if spec is None:
+        spec = get_fleet_spec()
+    fm = FleetModel(
+        id=fleet_id,
+        project=project,
+        name=spec.configuration.name,
+        status=status,
+        created_at=created_at,
+        spec=spec.json(),
+        instances=[],
+        runs=[],
+    )
+    session.add(fm)
+    await session.commit()
+    return fm
+
+
+def get_fleet_spec(conf: Optional[FleetConfiguration] = None) -> FleetSpec:
+    if conf is None:
+        conf = get_fleet_configuration()
+    return FleetSpec(
+        configuration=conf,
+        profile=Profile(name=""),
+    )
+
+
+def get_fleet_configuration(
+    name: str = "test-fleet",
+    nodes: Range[int] = Range(min=1, max=1),
+) -> FleetConfiguration:
+    return FleetConfiguration(
+        name=name,
+        nodes=nodes,
+    )
+
+
 async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
@@ -347,6 +399,8 @@ async def create_instance(
     requirements: Optional[Requirements] = None,
     instance_configuration: Optional[InstanceConfiguration] = None,
     instance_id: Optional[UUID] = None,
+    job: Optional[JobModel] = None,
+    instance_num: int = 0,
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -410,6 +464,7 @@ async def create_instance(
     im = InstanceModel(
         id=instance_id,
         name="test_instance",
+        instance_num=instance_num,
         pool=pool,
         project=project,
         status=status,
@@ -426,6 +481,7 @@ async def create_instance(
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=instance_configuration.json(),
+        job=job,
     )
     session.add(im)
     await session.commit()

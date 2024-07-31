@@ -23,11 +23,13 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
     DockerConfig,
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
+    InstanceStatus,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance
@@ -35,11 +37,9 @@ from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
-    SpotPolicy,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     Job,
     JobPlan,
     JobProvisioningData,
@@ -54,12 +54,12 @@ from dstack._internal.core.models.runs import (
     RunStatus,
     RunTerminationReason,
     ServiceSpec,
-    get_policy_map,
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume, VolumeStatus
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.models import (
+    FleetModel,
     InstanceModel,
     JobModel,
     PoolModel,
@@ -74,6 +74,7 @@ from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target, parse_image_name
+from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -306,8 +307,8 @@ async def get_run_plan(
         job_offers: List[InstanceOfferWithAvailability] = []
         job_offers.extend(pool_offers)
         job_offers.extend(offer for _, offer in offers)
+        job_offers.sort(key=lambda offer: not offer.availability.is_available())
 
-        # TODO(egor-s): merge job_offers and pool_offers based on (availability, use/create, price)
         job_plan = JobPlan(
             job_spec=job.job_spec,
             offers=job_offers[:50],
@@ -367,7 +368,7 @@ async def get_offers_by_requirements(
         if not regions:
             regions = [master_job_provisioning_data.region]
         backend_types = [b for b in backend_types if b == master_job_provisioning_data.backend]
-        regions = [b for b in backend_types if b == master_job_provisioning_data.region]
+        regions = [r for r in regions if r == master_job_provisioning_data.region]
 
     if backend_types is not None:
         backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
@@ -563,12 +564,26 @@ async def get_create_instance_offers(
     profile: Profile,
     requirements: Requirements,
     exclude_not_available=False,
+    fleet_model: Optional[FleetModel] = None,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+    multinode = False
+    master_job_provisioning_data = None
+    if fleet_model is not None:
+        fleet = fleet_model_to_fleet(fleet_model)
+        multinode = fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        for instance in fleet_model.instances:
+            jpd = pools_services.get_instance_provisioning_data(instance)
+            if jpd is not None:
+                master_job_provisioning_data = jpd
+                break
+
     offers = await get_offers_by_requirements(
         project=project,
         profile=profile,
         requirements=requirements,
         exclude_not_available=exclude_not_available,
+        multinode=multinode,
+        master_job_provisioning_data=master_job_provisioning_data,
     )
     offers = [
         (backend, offer)
@@ -603,11 +618,6 @@ async def create_instance(
             f"Backends {backends} do not support create_instance. Try to select other backends."
         )
 
-    if not offers:
-        raise ServerClientError(
-            "Failed to find offers to create the instance."
-        )  # TODO(sergeyme): ComputeError?
-
     pool = await pools_services.get_or_create_pool_by_name(session, project, profile.pool_name)
     instance_name = await generate_instance_name(
         session=session, project=project, pool_name=pool.name
@@ -621,6 +631,7 @@ async def create_instance(
     instance = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
+        instance_num=0,
         project=project,
         pool=pool,
         created_at=common_utils.get_current_datetime(),
@@ -733,16 +744,10 @@ def _get_pool_offers(
     job: Job,
     volumes: List[Volume],
 ) -> List[InstanceOfferWithAvailability]:
-    profile = run_spec.merged_profile
-    requirements = Requirements(
-        resources=run_spec.configuration.resources,
-        max_price=profile.max_price,
-        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.AUTO),
-    )
     pool_filtered_instances = filter_pool_instances(
         pool_instances=get_pool_instances(pool),
-        profile=profile,
-        requirements=requirements,
+        profile=run_spec.merged_profile,
+        requirements=job.job_spec.requirements,
         multinode=job.job_spec.jobs_per_replica > 1,
         volumes=volumes,
     )
@@ -757,6 +762,7 @@ def _get_pool_offers(
         if instance.unreachable:
             offer.availability = InstanceAvailability.NOT_AVAILABLE
         pool_offers.append(offer)
+    pool_offers.sort(key=lambda offer: offer.price)
     return pool_offers
 
 

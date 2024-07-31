@@ -21,22 +21,40 @@ from dstack._internal.core.errors import (
 )
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
+    DockerConfig,
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
+    InstanceStatus,
     InstanceType,
     RemoteConnectionInfo,
     Resources,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance, Pool, PoolInstances
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, TerminationPolicy
-from dstack._internal.core.models.runs import InstanceStatus, JobProvisioningData, Requirements
+from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_NAME,
+    Profile,
+    TerminationPolicy,
+)
+from dstack._internal.core.models.runs import JobProvisioningData, Requirements
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.server import settings
-from dstack._internal.server.models import InstanceModel, PoolModel, ProjectModel, UserModel
-from dstack._internal.server.services.jobs import PROCESSING_POOL_LOCK
+from dstack._internal.server.models import (
+    FleetModel,
+    InstanceModel,
+    PoolModel,
+    ProjectModel,
+    UserModel,
+)
+from dstack._internal.server.services.docker import parse_image_name
+from dstack._internal.server.services.jobs import PROCESSING_INSTANCES_LOCK
+from dstack._internal.server.services.jobs.configurators.base import (
+    get_default_image,
+    get_default_python_verison,
+)
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
@@ -170,7 +188,7 @@ async def remove_instance(
     pool = await get_pool(session, project, pool_name)
     if pool is None:
         raise ResourceNotExistsError("Pool not found")
-    async with PROCESSING_POOL_LOCK:
+    async with PROCESSING_INSTANCES_LOCK:
         terminated = False
         for instance in pool.instances:
             if instance.name == instance_name:
@@ -208,6 +226,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         id=instance_model.id,
         project_name=instance_model.project.name,
         name=instance_model.name,
+        instance_num=instance_model.instance_num,
         status=instance_model.status,
         unreachable=instance_model.unreachable,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
@@ -226,10 +245,6 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
 
     if instance_model.job is not None:
         instance.job_name = instance_model.job.job_name
-        instance.job_status = instance_model.job.status
-
-    if instance_model.pool is not None:
-        instance.pool_name = instance_model.pool.name
 
     return instance
 
@@ -338,6 +353,7 @@ async def add_remote(
     im = InstanceModel(
         id=uuid.uuid4(),
         name=instance_name,
+        instance_num=0,
         project=project,
         pool=pool_model,
         backend=BackendType.REMOTE,
@@ -366,6 +382,7 @@ def filter_pool_instances(
     requirements: Requirements,
     *,
     status: Optional[InstanceStatus] = None,
+    fleet_model: Optional[FleetModel] = None,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[Volume]] = None,
@@ -397,9 +414,11 @@ def filter_pool_instances(
         backend_types = [b for b in backend_types if b == master_job_provisioning_data.backend]
         if not regions:
             regions = [master_job_provisioning_data.region]
-        regions = [b for b in backend_types if b == master_job_provisioning_data.region]
+        regions = [r for r in regions if r == master_job_provisioning_data.region]
 
     for instance in pool_instances:
+        if fleet_model is not None and instance.fleet_id != fleet_model.id:
+            continue
         if instance.unreachable:
             continue
         if profile.instance_name is not None and instance.name != profile.instance_name:
@@ -549,3 +568,118 @@ async def list_user_pool_instances(
     for instance in instance_models:
         instances.append(instance_model_to_instance(instance))
     return instances
+
+
+async def create_instance_model(
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    pool: PoolModel,
+    profile: Profile,
+    requirements: Requirements,
+    instance_name: str,
+    instance_num: int,
+) -> InstanceModel:
+    instance = InstanceModel(
+        id=uuid.uuid4(),
+        name=instance_name,
+        instance_num=instance_num,
+        project=project,
+        pool=pool,
+        created_at=common_utils.get_current_datetime(),
+        status=InstanceStatus.PENDING,
+        unreachable=False,
+        profile=profile.json(),
+        requirements=requirements.json(),
+        instance_configuration=None,
+        termination_policy=profile.termination_policy,
+        termination_idle_time=profile.termination_idle_time,
+    )
+    session.add(instance)
+    await session.flush()
+    project_ssh_key = SSHKey(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
+    instance_config = InstanceConfiguration(
+        project_name=project.name,
+        instance_name=instance_name,
+        instance_id=str(instance.id),
+        ssh_keys=[project_ssh_key],
+        job_docker_config=DockerConfig(
+            image=dstack_default_image,
+            registry_auth=None,
+        ),
+        user=user.name,
+    )
+    instance.instance_configuration = instance_config.json()
+    return instance
+
+
+async def create_ssh_instance_model(
+    project: ProjectModel,
+    pool: PoolModel,
+    instance_name: str,
+    instance_num: int,
+    instance_network: Optional[str],
+    region: Optional[str],
+    host: str,
+    port: int,
+    ssh_user: str,
+    ssh_keys: List[SSHKey],
+) -> InstanceModel:
+    # TODO: doc - will overwrite after remote connected
+    instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
+    instance_type = InstanceType(name="ssh", resources=instance_resource)
+
+    host_region = region if region is not None else "remote"
+
+    remote = JobProvisioningData(
+        backend=BackendType.REMOTE,
+        instance_type=instance_type,
+        instance_id=instance_name,
+        hostname=host,
+        region=host_region,
+        internal_ip=None,
+        instance_network=instance_network,
+        price=0,
+        username=ssh_user,
+        ssh_port=port,
+        dockerized=True,
+        backend_data="",
+        ssh_proxy=None,
+    )
+    offer = InstanceOfferWithAvailability(
+        backend=BackendType.REMOTE,
+        instance=instance_type,
+        region=host_region,
+        price=0.0,
+        availability=InstanceAvailability.AVAILABLE,
+    )
+    ssh_connection_info = RemoteConnectionInfo(
+        host=host,
+        port=port,
+        ssh_user=ssh_user,
+        ssh_keys=ssh_keys,
+    )
+    im = InstanceModel(
+        id=uuid.uuid4(),
+        name=instance_name,
+        instance_num=instance_num,
+        project=project,
+        pool=pool,
+        backend=BackendType.REMOTE,
+        created_at=common_utils.get_current_datetime(),
+        started_at=common_utils.get_current_datetime(),
+        status=InstanceStatus.PENDING,
+        unreachable=False,
+        job_provisioning_data=remote.json(),
+        remote_connection_info=ssh_connection_info.json(),
+        offer=offer.json(),
+        region=offer.region,
+        price=offer.price,
+        termination_policy=TerminationPolicy.DONT_DESTROY,
+        termination_idle_time=0,
+    )
+    return im

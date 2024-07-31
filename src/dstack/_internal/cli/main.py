@@ -6,6 +6,7 @@ from rich_argparse import RichHelpFormatter
 from dstack._internal.cli.commands.apply import ApplyCommand
 from dstack._internal.cli.commands.config import ConfigCommand
 from dstack._internal.cli.commands.delete import DeleteCommand
+from dstack._internal.cli.commands.fleet import FleetCommand
 from dstack._internal.cli.commands.gateway import GatewayCommand
 from dstack._internal.cli.commands.init import InitCommand
 from dstack._internal.cli.commands.logs import LogsCommand
@@ -17,7 +18,7 @@ from dstack._internal.cli.commands.stop import StopCommand
 from dstack._internal.cli.commands.volume import VolumeCommand
 from dstack._internal.cli.utils.common import _colors, console
 from dstack._internal.cli.utils.updates import check_for_updates
-from dstack._internal.core.errors import ClientError, CLIError
+from dstack._internal.core.errors import ClientError, CLIError, ConfigurationError
 from dstack._internal.utils.logging import get_logger
 from dstack.version import __version__ as version
 
@@ -56,6 +57,7 @@ def main():
     ApplyCommand.register(subparsers)
     ConfigCommand.register(subparsers)
     DeleteCommand.register(subparsers)
+    FleetCommand.register(subparsers)
     GatewayCommand.register(subparsers)
     PoolCommand.register(subparsers)
     InitCommand.register(subparsers)
@@ -71,7 +73,7 @@ def main():
     try:
         check_for_updates()
         args.func(args)
-    except (ClientError, CLIError) as e:
+    except (ClientError, CLIError, ConfigurationError) as e:
         console.print(f"[error]{escape(str(e))}[/]")
         logger.debug(e, exc_info=True)
         exit(1)

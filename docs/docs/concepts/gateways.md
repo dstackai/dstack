@@ -4,9 +4,8 @@ Gateways handle the ingress traffic of running services.
 They provide [services](services.md) with HTTPS domains, handle authentication, distribute load, and perform auto-scaling.
 In order to run a service, you need to have at least one gateway set up.
 
-!!! info "dstack Sky"
-    If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-    the gateway is already set up for you.
+> If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+the gateway is already set up for you.
 
 ## Configuration
 
@@ -59,7 +58,11 @@ This will allow you to access runs and models using this domain.
 
 ## Managing gateways
 
-**Deleting gateways**
+### Listing gateways
+
+The [`dstack gateway list`](../reference/cli/index.md#dstack-gateway-list) command lists existing gateways and their status.
+
+### Deleting gateways
 
 To delete a gateway, pass gateway configuration to [`dstack delete`](../reference/cli/index.md#dstack-delete):
 
@@ -71,15 +74,11 @@ $ dstack delete . -f examples/deployment/gateway.dstack.yml
 
 </div>
 
-**Listing gateways**
-
-The [`dstack gateway list`](../reference/cli/index.md#dstack-gateway-list) command lists existing gateways and their status.
-
 [//]: # (TODO: Ellaborate on default`)
 
 [//]: # (TODO: ## Accessing endpoints)
 
 ## What's next?
 
-1. See [services](services.md) on how to run services
+1. See [services](../services.md) on how to run services
 2. Check the [`.dstack.yml` reference](../reference/dstack.yml/gateway.md) for more details and examples

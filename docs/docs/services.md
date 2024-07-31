@@ -1,11 +1,11 @@
 # Services
 
 Services make it easy to deploy models and web applications as public,
-secure, and scalable endpoints. They are provisioned behind a [gateway](gateways.md) that
+secure, and scalable endpoints. They are provisioned behind a [gateway](concepts/gateways.md) that
 automatically provides an HTTPS domain, handles authentication, distributes load, and performs auto-scaling.
 
 ??? info "Gateways"
-    If you're using the open-source server, you must set up a [gateway](gateways.md) before you can run a service.
+    If you're using the open-source server, you must set up a [gateway](concepts/gateways.md) before you can run a service.
 
     If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
     the gateway is already set up for you.
@@ -45,16 +45,16 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 !!! info "Auto-scaling"
     By default, the service is deployed to a single instance. However, you can specify the
-    [number of replicas and scaling policy](../reference/dstack.yml/service.md#replicas-and-auto-scaling).
+    [number of replicas and scaling policy](reference/dstack.yml/service.md#replicas-and-auto-scaling).
     In this case, `dstack` auto-scales it based on the load.
 
 !!! info "Reference"
-    See the [.dstack.yml reference](../reference/dstack.yml/service.md)
-    for all supported configuration options and multiple examples.
+    See the [.dstack.yml reference](reference/dstack.yml/service.md)
+    for all supported configuration options and examples.
 
 ## Running
 
-To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
+To run a configuration, use the [`dstack run`](reference/cli/index.md#dstack-run) command followed by the working directory path, 
 configuration file path, and any other options.
 
 <div class="termy">
@@ -79,12 +79,22 @@ Service is published at https://yellow-cat-1.example.com
 
 When deploying the service, `dstack run` mounts the current folder's contents.
 
-!!! info ".gitignore"
+[//]: # (TODO: Fleets and idle duration)
+
+??? info ".gitignore"
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
+??? info "Fleets"
+    By default, `dstack run` reuses `idle` instances from one of the existing [fleets](fleets.md). 
+    If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
+    
+    To have the fleet deleted after a certain idle time automatically, set
+    [`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time).
+    By default, it's set to `5min`.
+
 !!! info "Reference"
-    See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+    See the [CLI reference](reference/cli/index.md#dstack-run) for more details
     on how `dstack run` works.
 
 ## Service endpoint
@@ -116,22 +126,23 @@ Authorization can be disabled by setting `auth` to `false` in the service config
 
 ### Model endpoint
 
-In case the service has the [model mapping](../reference/dstack.yml/service.md#model-mapping) configured, you will also be able
+In case the service has the [model mapping](reference/dstack.yml/service.md#model-mapping) configured, you will also be able
 to access the model at `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
 
 ## Managing runs
 
-**Stopping runs**
+### Listing runs
 
-When you use [`dstack stop`](../reference/cli/index.md#dstack-stop), the service and its cloud resources are deleted.
+The [`dstack ps`](reference/cli/index.md#dstack-ps) command lists all running runs and their status.
 
-**Listing runs**
+### Stopping runs
 
-The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
+When you use [`dstack stop`](reference/cli/index.md#dstack-stop), the service and its cloud resources are deleted.
 
 ## What's next?
 
 1. Check the [Text Generation Inference :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md){:target="_blank"} examples
-2. Check the [`.dstack.yml` reference](../reference/dstack.yml/service.md) for more details and examples
-3. See [gateways](gateways.md) on how to set up a gateway
+2. Check the [`.dstack.yml` reference](reference/dstack.yml/service.md) for more details and examples
+3. See [gateways](concepts/gateways.md) on how to set up a gateway
 4. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
+5. See [fleets](fleets.md) on how to manage fleets

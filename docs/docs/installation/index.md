@@ -1,39 +1,22 @@
 # Installation
 
-To use the open-source version of `dstack` (which is self-hosted to use your own cloud accounts or data centers), 
-go ahead and [set up the server](#set-up-the-server). 
+[//]: # (??? info "dstack Sky")
+[//]: # (    If you don't want to host the `dstack` server yourself or would like to access GPU from the `dstack` marketplace, you can use)
+[//]: # (    `dstack`'s hosted version, proceed to [dstack Sky]&#40;#dstack-sky&#41;.)
 
-To use [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}
-(a managed service that allows you to use either GPUs via marketplace, or connect to your own cloud accounts or data centers), 
-proceed to [dstack Sky](#dstack-sky).
+To use the open-source version of `dstack` with your own cloud accounts or on-prem servers, 
+you have to set up the server. 
 
 ## Set up the server
 
-### Configure backends
+Follow the steps below to set up the server.
 
-Before starting the `dstack` server, create `~/.dstack/server/config.yml` and
-configure a backend for each cloud account that you'd like to use.
+### 1. Configure backends
 
-<div editor-title="~/.dstack/server/config.yml">
+> If you want the `dstack` server to run containers or manage clusters in your cloud accounts (or use Kubernetes),
+create the [~/.dstack/server/config.yml](../reference/server/config.yml.md) file and configure backends.
 
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: aws
-        creds:
-          type: access_key
-          access_key: AIZKISCVKUKO5AAKLAEH
-          secret_key: QSbmpqJIUBn1V5U3pyM9S6lwwiu8/fOJ2dgfwFdW
-```
-
-</div>
-
-> Go to the [server/config.yml reference](../reference/server/config.yml.md#examples)
-> for details on how to configure backends for AWS, GCP, Azure, OCI, Lambda, 
-> TensorDock, Vast.ai, RunPod, CUDO, Kubernetes, etc.
-
-### Start the server
+### 2. Start the server
 
 Once the `~/.dstack/server/config.yml` file is configured, proceed to start the server:
 
@@ -72,12 +55,13 @@ Once the `~/.dstack/server/config.yml` file is configured, proceed to start the 
 
     > For more details on how to deploy `dstack` using Docker, check its [Docker repo](https://hub.docker.com/r/dstackai/dstack).
 
-> By default, `dstack` stores its state in `~/.dstack/server/data` using SQLite.
+> By default, the `dstack` server stores its state in `~/.dstack/server/data` using SQLite.
 > To use a database, set the [`DSTACK_DATABASE_URL`](../reference/cli/index.md#environment-variables) environment variable.
 
-Once the `dstack` server is up, feel free to use the CLI or API to work with it.
+The server can be set up anywhere: on your laptop, a dedicated server, or in the cloud.
+Once the `dstack` server is up, you can use the CLI or API.
 
-### Set up the CLI
+### 3. Set up the CLI
 
 To point the CLI to the `dstack` server, configure it
 with the server address, user token and project name:
@@ -97,17 +81,21 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-### Add on-prem clusters
+### 4. Add on-prem servers
     
-If you'd like to use `dstack` to run workloads on your on-prem clusters,
-check out the [dstack pool add-ssh](../concepts/pools.md#adding-on-prem-clusters) command.
+!!! info "Fleets"
+    If you want the `dstack` server to run containers on your on-prem servers,
+    use [fleets](../fleets.md#__tabbed_1_2).
 
 ## dstack Sky
 
+If you don't want to host the `dstack` server yourself or would like to access GPU from the `dstack` marketplace, sign up with
+[dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+
 ### Set up the CLI
 
-If you've signed up with [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
-open the project settings, and copy the `dstack config` command to point the CLI to the project.
+If you've signed up,
+open your project settings, and copy the `dstack config` command to point the CLI to the project.
 
 ![](https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-sky-project-config.png){ width=800 }
 
@@ -126,7 +114,7 @@ Configuration is updated at ~/.dstack/config.yml
 
 </div>
 
-### Configure backends
+### Configure clouds
 
 By default, [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"} 
 uses the GPU from its marketplace, which requires a credit card to be attached in your account

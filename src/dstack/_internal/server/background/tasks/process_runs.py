@@ -6,7 +6,7 @@ from typing import List, Optional, Set, Tuple
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.server.services.gateways.autoscalers as autoscalers
@@ -22,7 +22,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import JobModel, RunModel
+from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.jobs import (
     RUNNING_PROCESSING_JOBS_IDS,
     RUNNING_PROCESSING_JOBS_LOCK,
@@ -94,11 +94,12 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
             sa.select(RunModel)
             .where(RunModel.id == run_id)
             .execution_options(populate_existing=True)
-            .options(joinedload(RunModel.project))
+            .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
             .options(joinedload(RunModel.user))
             .options(joinedload(RunModel.repo))
+            .options(selectinload(RunModel.jobs).joinedload(JobModel.instance))
         )
-        run = res.scalar()
+        run = res.unique().scalar()
         if run is None:
             logger.error(f"Run {run_id} not found")
             return run_id
@@ -128,13 +129,11 @@ async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uui
 async def process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
     run = run_model_to_run(run_model)
-    if run.latest_job_submission is None:
-        logger.error("%s: failed to retry: pending run has no job submissions.")
-        run_model.status = RunStatus.FAILED
-        run_model.termination_reason = RunTerminationReason.SERVER_ERROR
-        return
-
-    if common.get_current_datetime() - run.latest_job_submission.last_processed_at < RETRY_DELAY:
+    if (
+        run.latest_job_submission is not None
+        and common.get_current_datetime() - run.latest_job_submission.last_processed_at
+        < RETRY_DELAY
+    ):
         logger.debug("%s: pending run is not yet ready for resubmission", fmt(run_model))
         return
 
@@ -204,6 +203,12 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
         replica_active = True
         for job_model in job_models:
             job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+            if (
+                run_model.fleet_id is None
+                and job_model.instance is not None
+                and job_model.instance.fleet_id is not None
+            ):
+                run_model.fleet_id = job_model.instance.fleet_id
             if job_model.status == JobStatus.DONE or (
                 job_model.status == JobStatus.TERMINATING
                 and job_model.termination_reason == JobTerminationReason.DONE_BY_RUNNER

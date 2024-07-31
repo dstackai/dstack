@@ -6,7 +6,8 @@ from pydantic import Field, ValidationError, conint, constr, root_validator, val
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
-from dstack._internal.core.models.common import CoreModel, Duration
+from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
+from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import AnyModel, GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
@@ -32,22 +33,6 @@ class PythonVersion(str, Enum):
     PY312 = "3.12"
 
 
-class RegistryAuth(CoreModel):
-    """
-    Credentials for pulling a private Docker image.
-
-    Attributes:
-        username (str): The username
-        password (str): The password or access token
-    """
-
-    class Config:
-        frozen = True
-
-    username: Annotated[str, Field(description="The username")]
-    password: Annotated[str, Field(description="The password or access token")]
-
-
 class PortMapping(CoreModel):
     local_port: Optional[ValidPort] = None
     container_port: ValidPort
@@ -71,18 +56,6 @@ class PortMapping(CoreModel):
         else:
             local_port = int(local_port)
         return PortMapping(local_port=local_port, container_port=int(container_port))
-
-
-class Artifact(CoreModel):
-    path: Annotated[
-        str, Field(description="The path to the folder that must be stored as an output artifact")
-    ]
-    mount: Annotated[
-        bool,
-        Field(
-            description="Must be set to `true` if the artifact files must be saved in real-time"
-        ),
-    ] = False
 
 
 class ScalingSpec(CoreModel):
@@ -121,12 +94,26 @@ class EnvSentinel(CoreModel):
         return f"EnvSentinel({self.key})"
 
 
-class BaseConfiguration(CoreModel):
+class BaseRunConfiguration(CoreModel):
     type: Literal["none"]
+    name: Annotated[Optional[str], Field(description="The run name")] = None
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
+    working_dir: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The path to the working directory inside the container."
+                " It's specified relative to the repository directory (`/workflow`) and should be inside it."
+                ' Defaults to `"."` '
+            )
+        ),
+    ] = None
     home_dir: Annotated[
-        str, Field(description="The absolute path to the home directory inside the container")
+        str,
+        Field(
+            description="The absolute path to the home directory inside the container. Defaults to `/root`"
+        ),
     ] = "/root"
     registry_auth: Annotated[
         Optional[RegistryAuth], Field(description="Credentials for pulling a private Docker image")
@@ -183,7 +170,7 @@ class BaseConfiguration(CoreModel):
         return VirtualRepo(repo_id="none")
 
 
-class BaseConfigurationWithPorts(BaseConfiguration):
+class BaseRunConfigurationWithPorts(BaseRunConfiguration):
     ports: Annotated[
         List[Union[ValidPort, constr(regex=r"^(?:[0-9]+|\*):[0-9]+$"), PortMapping]],
         Field(description="Port numbers/mapping to expose"),
@@ -198,7 +185,7 @@ class BaseConfigurationWithPorts(BaseConfiguration):
         return v
 
 
-class BaseConfigurationWithCommands(BaseConfiguration):
+class BaseRunConfigurationWithCommands(BaseRunConfiguration):
     commands: Annotated[CommandsList, Field(description="The bash commands to run")] = []
 
     @root_validator
@@ -215,7 +202,7 @@ class DevEnvironmentConfigurationParams(CoreModel):
 
 
 class DevEnvironmentConfiguration(
-    ProfileParams, BaseConfigurationWithPorts, DevEnvironmentConfigurationParams
+    ProfileParams, BaseRunConfigurationWithPorts, DevEnvironmentConfigurationParams
 ):
     type: Literal["dev-environment"] = "dev-environment"
 
@@ -226,8 +213,8 @@ class TaskConfigurationParams(CoreModel):
 
 class TaskConfiguration(
     ProfileParams,
-    BaseConfigurationWithCommands,
-    BaseConfigurationWithPorts,
+    BaseRunConfigurationWithCommands,
+    BaseRunConfigurationWithPorts,
     TaskConfigurationParams,
 ):
     type: Literal["task"] = "task"
@@ -293,7 +280,7 @@ class ServiceConfigurationParams(CoreModel):
 
 
 class ServiceConfiguration(
-    ProfileParams, BaseConfigurationWithCommands, ServiceConfigurationParams
+    ProfileParams, BaseRunConfigurationWithCommands, ServiceConfigurationParams
 ):
     type: Literal["service"] = "service"
 
@@ -317,11 +304,20 @@ def parse_run_configuration(data: dict) -> AnyRunConfiguration:
 
 
 class ApplyConfigurationType(str, Enum):
+    DEV_ENVIRONMENT = "dev-environment"
+    TASK = "task"
+    SERVICE = "service"
+    FLEET = "fleet"
     GATEWAY = "gateway"
     VOLUME = "volume"
 
 
-AnyApplyConfiguration = Union[GatewayConfiguration, VolumeConfiguration]
+AnyApplyConfiguration = Union[
+    AnyRunConfiguration,
+    FleetConfiguration,
+    GatewayConfiguration,
+    VolumeConfiguration,
+]
 
 
 class ApplyConfiguration(CoreModel):
@@ -339,7 +335,7 @@ def parse_apply_configuration(data: dict) -> AnyApplyConfiguration:
     return conf
 
 
-AnyDstackConfiguration = Union[AnyRunConfiguration, GatewayConfiguration]
+AnyDstackConfiguration = AnyApplyConfiguration
 
 
 class DstackConfiguration(CoreModel):

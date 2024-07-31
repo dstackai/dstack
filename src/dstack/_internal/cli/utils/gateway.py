@@ -9,6 +9,12 @@ from dstack._internal.utils.common import pretty_date
 
 
 def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
+    table = get_gateways_table(gateways, verbose=verbose)
+    console.print(table)
+    console.print()
+
+
+def get_gateways_table(gateways: List[Gateway], verbose: bool = False) -> Table:
     table = Table(box=None)
     table.add_column("BACKEND")
     table.add_column("REGION")
@@ -39,5 +45,4 @@ def print_gateways_table(gateways: List[Gateway], verbose: bool = False):
                 renderables.append(pretty_date(gateway.created_at))
                 renderables.append(gateway.instance_id)
             table.add_row(*renderables)
-    console.print(table)
-    console.print()
+    return table

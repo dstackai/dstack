@@ -1,4 +1,4 @@
-# dstack-shim an dstack-runner
+# dstack-shim and dstack-runner
 
 For overview of `dstack-shim` and `dstack-runner`, see [/contributing/RUNNER-AND-SHIM.md](../contributing/RUNNER-AND-SHIM.md).
 

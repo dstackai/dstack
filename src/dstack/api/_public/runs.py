@@ -18,7 +18,6 @@ from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
-    DEFAULT_RUN_TERMINATION_IDLE_TIME,
     CreationPolicy,
     Profile,
     ProfileRetryPolicy,
@@ -189,6 +188,7 @@ class Run(ABC):
                         start_time=next_start_time,
                         end_time=None,
                         descending=False,
+                        limit=100,
                         diagnose=diagnose,
                     ),
                 )
@@ -409,7 +409,7 @@ class RunCollection:
         instance_name: Optional[str] = None,
         creation_policy: Optional[CreationPolicy] = None,
         termination_policy: Optional[TerminationPolicy] = None,
-        termination_policy_idle: int = DEFAULT_RUN_TERMINATION_IDLE_TIME,
+        termination_policy_idle: Optional[Union[str, int]] = None,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`
@@ -438,6 +438,7 @@ class RunCollection:
             regions=regions,
             instance_types=instance_types,
             spot_policy=spot_policy,
+            retry=None,
             retry_policy=retry_policy,
             max_duration=max_duration,
             max_price=max_price,
@@ -503,13 +504,19 @@ class RunCollection:
         Returns:
             list of runs
         """
-        runs = self._api_client.runs.list(project_name=self._project, repo_id=None)
-        if not all:
-            active = [run for run in runs if not run.status.is_finished()]
-            if active:
-                runs = active
-            else:
-                runs = runs[:1]  # the most recent finished run
+        # Return only one page of latest runs (<=100). Returning all the pages may be costly.
+        # TODO: Consider introducing `since` filter with a reasonable default.
+        only_active = not all
+        runs = self._api_client.runs.list(
+            project_name=self._project,
+            repo_id=None,
+            only_active=only_active,
+        )
+        if only_active and len(runs) == 0:
+            runs = self._api_client.runs.list(
+                project_name=self._project,
+                repo_id=None,
+            )[:1]
         return [self._model_to_run(run) for run in runs]
 
     def get(self, run_name: str) -> Optional[Run]:

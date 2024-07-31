@@ -1,4 +1,6 @@
+from datetime import datetime
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import parse_obj_as
 
@@ -25,8 +27,27 @@ from dstack.api.server._group import APIClientGroup
 
 
 class RunsAPIClient(APIClientGroup):
-    def list(self, project_name: Optional[str], repo_id: Optional[str]) -> List[Run]:
-        body = ListRunsRequest(project_name=project_name, repo_id=repo_id)
+    def list(
+        self,
+        project_name: Optional[str],
+        repo_id: Optional[str],
+        username: Optional[str] = None,
+        only_active: bool = False,
+        prev_submitted_at: Optional[datetime] = None,
+        prev_run_id: Optional[UUID] = None,
+        limit: int = 100,
+        ascending: bool = False,
+    ) -> List[Run]:
+        body = ListRunsRequest(
+            project_name=project_name,
+            repo_id=repo_id,
+            username=username,
+            only_active=only_active,
+            prev_submitted_at=prev_submitted_at,
+            prev_run_id=prev_run_id,
+            limit=limit,
+            ascending=ascending,
+        )
         resp = self._request("/api/runs/list", body=body.json())
         return parse_obj_as(List[Run.__response__], resp.json())
 

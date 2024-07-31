@@ -6,7 +6,6 @@ from typing import List, Optional
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.utils.common import configure_logging
-from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack.api import Client
 
 
@@ -66,7 +65,4 @@ class APIBaseCommand(BaseCommand):
 
     def _command(self, args: argparse.Namespace):
         configure_logging()
-        try:
-            self.api = Client.from_config(project_name=args.project)
-        except ConfigurationError as e:
-            raise CLIError(str(e))
+        self.api = Client.from_config(project_name=args.project)

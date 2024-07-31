@@ -10,11 +10,13 @@ from dstack._internal.core.backends.base.compute import (
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.runpod.api_client import RunpodApiClient
+from dstack._internal.core.backends.runpod.config import RunpodConfig
 from dstack._internal.core.errors import (
     BackendError,
+    ComputeError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
@@ -22,7 +24,7 @@ from dstack._internal.core.models.instances import (
     SSHKey,
 )
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.volumes import Volume, VolumeProvisioningData
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -34,7 +36,7 @@ CONTAINER_REGISTRY_AUTH_CLEANUP_INTERVAL = 60 * 60 * 24  # 24 hour
 class RunpodCompute(Compute):
     _last_cleanup_time = None
 
-    def __init__(self, config):
+    def __init__(self, config: RunpodConfig):
         self.config = config
         self.api_client = RunpodApiClient(config.creds.api_key)
 
@@ -43,6 +45,7 @@ class RunpodCompute(Compute):
     ) -> List[InstanceOfferWithAvailability]:
         offers = get_catalog_offers(
             backend=BackendType.RUNPOD,
+            locations=self.config.regions,
             requirements=requirements,
         )
         offers = [
@@ -76,6 +79,15 @@ class RunpodCompute(Compute):
         authorized_keys = instance_config.get_public_keys()
         memory_size = round(instance_offer.instance.resources.memory_mib / 1024)
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+
+        network_volume_id = None
+        volume_mount_path = None
+        if len(volumes) > 1:
+            raise ComputeError("Mounting more than one network volume is not supported in runpod")
+        if len(volumes) == 1:
+            network_volume_id = volumes[0].volume_id
+            volume_mount_path = run.run_spec.configuration.volumes[0].path
+
         container_registry_auth_id = self._generate_container_registry_auth_id(
             job.job_spec.registry_auth
         )
@@ -84,14 +96,17 @@ class RunpodCompute(Compute):
             image_name=job.job_spec.image_name,
             gpu_type_id=instance_offer.instance.name,
             cloud_type="ALL",  # ["ALL", "COMMUNITY", "SECURE"]:
+            data_center_id=instance_offer.region,
             gpu_count=len(instance_offer.instance.resources.gpus),
             container_disk_in_gb=disk_size,
             min_vcpu_count=instance_offer.instance.resources.cpus,
             min_memory_in_gb=memory_size,
             support_public_ip=True,
-            docker_args=get_docker_args(authorized_keys),
+            docker_args=_get_docker_args(authorized_keys),
             ports="10022/tcp",
             bid_per_gpu=instance_offer.price if instance_offer.instance.resources.spot else None,
+            network_volume_id=network_volume_id,
+            volume_mount_path=volume_mount_path,
         )
 
         instance_id = resp["id"]
@@ -160,6 +175,40 @@ class RunpodCompute(Compute):
                 provisioning_data.hostname = port["ip"]
                 provisioning_data.ssh_port = port["publicPort"]
 
+    def register_volume(self, volume: Volume) -> VolumeProvisioningData:
+        volume_data = self.api_client.get_network_volume(volume_id=volume.configuration.volume_id)
+        if volume_data is None:
+            raise ComputeError(f"Volume {volume.configuration.volume_id} not found")
+        size_gb = volume_data["size"]
+        return VolumeProvisioningData(
+            backend=BackendType.RUNPOD,
+            volume_id=volume_data["id"],
+            size_gb=size_gb,
+            price=_get_volume_price(size_gb),
+            attachable=False,
+            detachable=False,
+        )
+
+    def create_volume(self, volume: Volume) -> VolumeProvisioningData:
+        size_gb = int(volume.configuration.size)
+        volume_id = self.api_client.create_network_volume(
+            name=volume.name,
+            region=volume.configuration.region,
+            size=size_gb,
+        )
+        return VolumeProvisioningData(
+            backend=BackendType.RUNPOD,
+            volume_id=volume_id,
+            size_gb=size_gb,
+            price=_get_volume_price(size_gb),
+            attachable=False,
+            detachable=False,
+        )
+
+    def delete_volume(self, volume: Volume):
+        if volume.volume_id is not None:
+            self.api_client.delete_network_volume(volume_id=volume.volume_id)
+
     def _generate_container_registry_auth_id(
         self, registry_auth: Optional[RegistryAuth]
     ) -> Optional[str]:
@@ -182,9 +231,15 @@ class RunpodCompute(Compute):
                 break
 
 
-def get_docker_args(authorized_keys: List[str]) -> str:
+def _get_docker_args(authorized_keys: List[str]) -> str:
     commands = get_docker_commands(authorized_keys, False)
     command = " && ".join(commands)
     docker_args = {"cmd": [command], "entrypoint": ["/bin/sh", "-c"]}
     docker_args_escaped = json.dumps(json.dumps(docker_args)).strip('"')
     return docker_args_escaped
+
+
+def _get_volume_price(size: int) -> float:
+    if size < 1000:
+        return 0.07 * size
+    return 0.05 * size

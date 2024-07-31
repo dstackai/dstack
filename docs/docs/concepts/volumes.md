@@ -4,7 +4,8 @@ Volumes allow you to persist data between runs. `dstack` simplifies managing vol
 directory when working with dev environments, tasks, and services.
 
 !!! info "Experimental"
-    Volumes are currently experimental and only work with the `aws` backend. Support for other backends is coming soon.
+    Volumes are currently experimental and only work with the `aws` and `runpod` backends.
+    Support for other backends is coming soon.
 
 ## Configuration
 
@@ -27,12 +28,11 @@ If you use this configuration, `dstack` will create a new volume based on the sp
 
 !!! info "Registering existing volumes"
     If you prefer not to create a new volume but to reuse an existing one (e.g., created manually), you can 
-    [specify its ID via `volume_id`](../reference/dstack.yml/volume.md#register-volume). In this case, `dstack` will register the specified volume so that you can use it with development
-    environments, tasks, and services.
+    [specify its ID via `volume_id`](../reference/dstack.yml/volume.md#register-volume). In this case, `dstack` will register the specified volume so that you can use it with dev environments, tasks, and services.
 
 !!! info "Reference"
     See the [.dstack.yml reference](../reference/dstack.yml/dev-environment.md)
-    for all supported configuration options and multiple examples.
+    for all supported configuration options and examples.
 
 ## Creating and registering volumes
 
@@ -79,9 +79,19 @@ and its contents will persist across runs.
     to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
     attach volumes to `/workflow` or any of its subdirectories.
 
-## Managing gateways
+## Managing volumes
 
-**Deleting gateways**
+### Listing volumes
+
+The [`dstack volume list`](../reference/cli/index.md#dstack-gateway-list) command lists created and registered volumes:
+
+```
+$ dstack volume list
+NAME            BACKEND  REGION        STATUS  CREATED
+ my-new-volume  aws      eu-central-1  active  3 weeks ago
+```
+
+### Deleting volumes
 
 When the volume isn't attached to any active dev environment, task, or service, you can delete it using `dstack delete`:
 
@@ -92,17 +102,17 @@ $ dstack delete -f vol.dstack.yaml
 If the volume was created using `dstack`, it will be physically destroyed along with the data.
 If you've registered an existing volume, it will be de-registered with `dstack` but will keep the data.
 
-**Listing volumes**
-
-The [`dstack volume list`](../reference/cli/index.md#dstack-gateway-list) command lists created and registered volumes.
-
 ## FAQ
 
 ??? info "Using volumes across backends"
     Since volumes are backed up by cloud network disks, you can only use them within the same cloud. If you need to access
-    data across different backends, you should either use object storage (or replicate the data across multiple volumes).
+    data across different backends, you should either use object storage or replicate the data across multiple volumes.
 
 ??? info "Using volumes across regions"
-    Typically, network volumes are associated with specific regions, so you can't use them in other regions. Sometimes,
-    volumes are also linked to availability zones, but some systems allow volumes that can be used across different
+    Typically, network volumes are associated with specific regions, so you can't use them in other regions. Often,
+    volumes are also linked to availability zones, but some providers support volumes that can be used across different
     availability zones within the same region.
+
+??? info "Attaching volumes to multiple runs and instances"
+    You can mount a volume in multiple runs.
+    This feature is currently supported only by the `runpod` backend.

@@ -7,9 +7,11 @@ Create Date: 2024-07-15 23:09:40.150763
 """
 
 import json
+import uuid
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy_utils import UUIDType
 
 # revision identifiers, used by Alembic.
 revision = "3cf77fb8bcf1"
@@ -17,9 +19,17 @@ down_revision = "91ac5e543037"
 branch_labels = None
 depends_on = None
 
+repos_table = sa.Table(
+    "repos",
+    sa.MetaData(),
+    # partial description - only columns affected by this migration
+    sa.Column("id", UUIDType(binary=False), primary_key=True, default=uuid.uuid4),
+    sa.Column("info", sa.String(2000), nullable=False),
+    sa.Column("creds", sa.String(5000), nullable=True),
+)
+
 
 def upgrade() -> None:
-    repos_table = sa.Table("repos", sa.MetaData(), autoload_with=op.get_bind().engine)
     select_stmt = sa.select(repos_table.c.id, repos_table.c.info, repos_table.c.creds).where(
         repos_table.c.creds.isnot(None)
     )
@@ -55,7 +65,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    repos_table = sa.Table("repos", sa.MetaData(), autoload_with=op.get_bind().engine)
     select_stmt = sa.select(repos_table.c.id, repos_table.c.creds).where(
         repos_table.c.creds.isnot(None)
     )

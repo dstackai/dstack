@@ -25,14 +25,15 @@ from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
+from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
     TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     JobStatus,
     JobTerminationReason,
     RunStatus,
@@ -105,21 +106,17 @@ class ProjectModel(BaseModel):
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     owner: Mapped[UserModel] = relationship(lazy="joined")
-    members: Mapped[List["MemberModel"]] = relationship(back_populates="project", lazy="selectin")
+    members: Mapped[List["MemberModel"]] = relationship(back_populates="project")
 
     ssh_private_key: Mapped[str] = mapped_column(Text)
     ssh_public_key: Mapped[str] = mapped_column(Text)
 
-    backends: Mapped[List["BackendModel"]] = relationship(
-        back_populates="project", lazy="selectin"
-    )
+    backends: Mapped[List["BackendModel"]] = relationship(back_populates="project")
 
     default_gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateways.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )
-    default_gateway: Mapped["GatewayModel"] = relationship(
-        foreign_keys=[default_gateway_id], lazy="selectin"
-    )
+    default_gateway: Mapped["GatewayModel"] = relationship(foreign_keys=[default_gateway_id])
 
     default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
         ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"), nullable=True
@@ -193,12 +190,21 @@ class RunModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship()
-    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
-    repo: Mapped["RepoModel"] = relationship()
+
     user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped["UserModel"] = relationship()
+
+    repo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"))
+    repo: Mapped["RepoModel"] = relationship()
+
+    # Runs reference fleets so that fleets cannot be deleted while they are used.
+    # A fleet can have no busy instances but still be used by a run (e.g. a service with 0 replicas).
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="runs")
+
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     run_name: Mapped[str] = mapped_column(String(100))
     status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
@@ -323,6 +329,33 @@ class PoolModel(BaseModel):
     instances: Mapped[List["InstanceModel"]] = relationship(back_populates="pool", lazy="selectin")
 
 
+class FleetModel(BaseModel):
+    __tablename__ = "fleets"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100))
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
+    status: Mapped[FleetStatus] = mapped_column(Enum(FleetStatus))
+    status_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    spec: Mapped[str] = mapped_column(Text)
+
+    runs: Mapped[List["RunModel"]] = relationship(back_populates="fleet")
+    instances: Mapped[List["InstanceModel"]] = relationship(back_populates="fleet")
+
+
 class InstanceModel(BaseModel):
     __tablename__ = "instances"
 
@@ -330,6 +363,8 @@ class InstanceModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50))
+
+    instance_num: Mapped[int] = mapped_column(Integer, default=0)
 
     # instance
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
@@ -341,6 +376,9 @@ class InstanceModel(BaseModel):
 
     pool_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("pools.id"))
     pool: Mapped["PoolModel"] = relationship(back_populates="instances")
+
+    fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="instances")
 
     status: Mapped[InstanceStatus] = mapped_column(Enum(InstanceStatus))
     unreachable: Mapped[bool] = mapped_column(Boolean)

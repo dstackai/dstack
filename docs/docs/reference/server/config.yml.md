@@ -1,7 +1,7 @@
 # ~/.dstack/server/config.yml
 
 The `~/.dstack/server/config.yml` file is used by the `dstack` server
-to [configure](../../installation/index.md#configure-backends) cloud accounts.
+to [configure](../../installation/index.md#1-configure-backends) cloud accounts.
 
 > The `dstack` server allows you to configure backends for multiple projects.
 > If you don't need multiple projects, use only the `main` project.
@@ -685,9 +685,8 @@ In case of a self-managed cluster, also specify the IP address of any node in th
     The port specified to `ssh_port` must be accessible outside of the cluster.
 
     ??? info "Kind"
-        For example, if you are using Kind, make sure to add it via `extraPortMappings`:
-    
-        <div editor-title="installation/kind-config.yml">
+        If you are using [Kind](https://kind.sigs.k8s.io/), make sure to make 
+        to set up `ssh_port` via `extraPortMappings` for proxying SSH traffic:
     
         ```yaml
         kind: Cluster
@@ -695,11 +694,15 @@ In case of a self-managed cluster, also specify the IP address of any node in th
         nodes:
           - role: control-plane
             extraPortMappings:
-          - containerPort: 32000 # Must be same as `ssh_port`
-            hostPort: 32000 # Must be same as `ssh_port`
+              - containerPort: 32000 # Must be same as `ssh_port`
+                hostPort: 32000 # Must be same as `ssh_port`
         ```
     
-        </div>
+        Go ahead and create the cluster like this: 
+
+        ```shell
+        kind create cluster --config examples/misc/kubernetes/kind-config.yml
+        ```
 
 [//]: # (TODO: Elaborate on the Kind's IP address on Linux)
 

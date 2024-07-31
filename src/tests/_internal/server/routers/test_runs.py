@@ -63,6 +63,7 @@ def get_dev_env_run_plan_dict(
             "configuration": {
                 "entrypoint": None,
                 "env": {},
+                "working_dir": None,
                 "home_dir": "/root",
                 "ide": "vscode",
                 "version": None,
@@ -73,6 +74,7 @@ def get_dev_env_run_plan_dict(
                 "registry_auth": None,
                 "setup": [],
                 "type": "dev-environment",
+                "name": None,
                 "resources": {
                     "cpu": {"min": 2, "max": None},
                     "memory": {"min": 8.0, "max": None},
@@ -197,6 +199,7 @@ def get_dev_env_run_dict(
                 "entrypoint": None,
                 "env": {},
                 "home_dir": "/root",
+                "working_dir": None,
                 "ide": "vscode",
                 "version": None,
                 "image": None,
@@ -205,6 +208,7 @@ def get_dev_env_run_dict(
                 "python": "3.8",
                 "registry_auth": None,
                 "setup": [],
+                "name": None,
                 "type": "dev-environment",
                 "resources": {
                     "cpu": {"min": 2, "max": None},
@@ -964,13 +968,13 @@ class TestCreateInstance:
                 "backend": None,
                 "instance_type": None,
                 "name": result["name"],
+                "instance_num": 0,
                 "job_name": None,
-                "job_status": None,
                 "hostname": None,
                 "status": "pending",
                 "unreachable": False,
                 "created": result["created"],
-                "pool_name": "default-pool",
+                "pool_name": None,
                 "region": None,
                 "price": None,
             }

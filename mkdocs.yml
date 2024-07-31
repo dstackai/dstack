@@ -3,7 +3,7 @@ site_name: dstack
 site_url: https://dstack.ai
 site_author: dstack GmbH
 site_description: >-
-  dstack is an open-source orchestration platform for development, training, and deployment of AI models in any cloud or data center.
+  dstack is an open-source AI container orchestration engine working with any cloud or data center.
 
 # Repository
 repo_url: https://github.com/dstackai/dstack
@@ -92,6 +92,7 @@ plugins:
         'blog/2023/07/14/lambda-cloud-ga-and-docker-support.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
         'blog/2023/05/22/azure-support-better-ui-and-more.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
         'blog/2023/03/13/gcp-support-just-landed.md': 'https://github.com/dstackai/dstack/releases/0.2'
+        'blog/dstack-research.md': 'https://dstack.ai/#get-started'
         'changelog/0.2.md': 'https://github.com/dstackai/dstack/releases/0.2'
         'changelog/0.9.1.md': 'https://github.com/dstackai/dstack/releases/0.9.1'
         'changelog/0.10.5.md': 'https://github.com/dstackai/dstack/releases/0.10.5'
@@ -108,6 +109,10 @@ plugins:
         'changelog/0.16.1.md': 'https://github.com/dstackai/dstack/releases/0.16.1'
         'changelog/0.17.0.md': 'https://github.com/dstackai/dstack/releases/0.17.0'
         'changelog/0.18.0.md': 'https://github.com/dstackai/dstack/releases/0.18.0'
+        'docs/concepts/dev-environments.md': 'docs/dev-environments.md'
+        'docs/concepts/tasks.md': 'docs/tasks.md'
+        'docs/concepts/services.md': 'docs/services.md'
+        'docs/protips.md': 'docs/guides/protips.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -189,20 +194,24 @@ nav:
           - Overview: docs/index.md
           - Installation: docs/installation/index.md
           - Quickstart: docs/quickstart.md
-          - Protips: docs/protips.md
-      - Concepts:
-          - Dev environments: docs/concepts/dev-environments.md
-          - Tasks: docs/concepts/tasks.md
-          - Services: docs/concepts/services.md
-          - Gateways: docs/concepts/gateways.md
-          - Pools: docs/concepts/pools.md
-          - Volumes: docs/concepts/volumes.md
+      - Basics:
+          - Dev environments: docs/dev-environments.md
+          - Tasks: docs/tasks.md
+          - Services: docs/services.md
+          - Fleets: docs/fleets.md
+      - Learn:
+          - Concepts:
+              - Gateways: docs/concepts/gateways.md
+              - Volumes: docs/concepts/volumes.md
+          - Guides:
+              - Protips: docs/guides/protips.md
       - Reference:
           - server/config.yml: docs/reference/server/config.yml.md
           - .dstack.yml:
               - dev-environment: docs/reference/dstack.yml/dev-environment.md
               - task: docs/reference/dstack.yml/task.md
               - service: docs/reference/dstack.yml/service.md
+              - fleet: docs/reference/dstack.yml/fleet.md
               - gateway: docs/reference/dstack.yml/gateway.md
               - volume: docs/reference/dstack.yml/volume.md
           - profiles.yml: docs/reference/profiles.yml.md

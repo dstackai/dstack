@@ -43,7 +43,7 @@ class RunpodApiClient:
         min_memory_in_gb: int = 1,
         docker_args: str = "",
         ports: Optional[str] = None,
-        volume_mount_path: str = "/runpod-volume",
+        volume_mount_path: Optional[str] = None,
         env: Optional[Dict[str, Any]] = None,
         template_id: Optional[str] = None,
         network_volume_id: Optional[str] = None,
@@ -87,7 +87,7 @@ class RunpodApiClient:
         container_disk_in_gb: int,
         container_registry_auth_id: str,
         volume_in_gb: int = 0,
-    ) -> int:
+    ) -> str:
         resp = self._make_request(
             {
                 "query": f"""
@@ -134,7 +134,7 @@ class RunpodApiClient:
         )
         return resp.json()["data"]["myself"]["containerRegistryCreds"]
 
-    def add_container_registry_auth(self, name: str, username: str, password: str) -> int:
+    def add_container_registry_auth(self, name: str, username: str, password: str) -> str:
         resp = self._make_request(
             {
                 "query": f"""
@@ -161,6 +161,67 @@ class RunpodApiClient:
                 mutation {{
                     deleteRegistryAuth(
                         registryAuthId: "{auth_id}"
+                    )
+                }}
+                """
+            }
+        )
+
+    def get_network_volume(self, volume_id: str) -> Optional[Dict]:
+        response = self._make_request(
+            {
+                "query": """
+                query getMyVolumes {
+                    myself {
+                        networkVolumes {
+                            id,
+                            name,
+                            size,
+                            dataCenter {
+                              id
+                              name
+                            }
+                        }
+                    }
+                }
+                """
+            }
+        )
+        network_volumes = response.json()["data"]["myself"]["networkVolumes"]
+        for vol in network_volumes:
+            if vol["id"] == volume_id:
+                return vol
+        return None
+
+    def create_network_volume(self, name: str, region: str, size: int) -> str:
+        response = self._make_request(
+            {
+                "query": f"""
+                mutation {{
+                    createNetworkVolume(
+                        input: {{
+                            name: "{name}",
+                            size: {size},
+                            dataCenterId: "{region}"
+                        }}
+                    ) {{
+                       id
+                    }}
+                }}
+                """
+            }
+        )
+        return response.json()["data"]["createNetworkVolume"]["id"]
+
+    def delete_network_volume(self, volume_id: str):
+        self._make_request(
+            {
+                "query": f"""
+                mutation {{
+                    deleteNetworkVolume(
+                        input: {{
+                            id: "{volume_id}"
+                        }}
                     )
                 }}
                 """

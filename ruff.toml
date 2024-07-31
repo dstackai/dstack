@@ -3,7 +3,7 @@ line-length = 99
 
 [lint]
 select = ['E', 'F', 'I' ,'Q', 'W', 'PGH', 'FLY', 'S113']
-ignore =[
+ignore = [
   'E501',
   'E712',
 ]

@@ -14,21 +14,26 @@
 
 </div>
 
-`dstack` is an open-source container orchestration engine designed for running AI workloads across any cloud or data
-center. It simplifies dev environments, running tasks on clusters, and deployment.
+`dstack` is an open-source container orchestration engine for AI. 
+It accelerates the development, training, and deployment of AI models, and simplifies the management of clusters.
 
-The supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
-You can also use `dstack` to run workloads on on-prem clusters.
+#### Cloud and on-prem
 
-`dstack` natively supports NVIDIA GPU, and Google Cloud TPU accelerator chips.
+`dstack` is easy to use with any cloud or on-prem servers.
+Supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
+For using `dstack` with on-prem servers, see [fleets](https://dstack.ai/docs/fleets#__tabbed_1_2).
+
+#### Accelerators
+
+`dstack` supports `NVIDIA GPU` and `Google Cloud TPU` out of the box.
  
-## Latest news ✨
+## Major news ✨
 
+- [2024/07] [dstack 0.18.7: Fleets, RunPod Volumes, dstack apply, and more](https://github.com/dstackai/dstack/releases/tag/0.18.7) (Release)
 - [2024/05] [dstack 0.18.4: Google Cloud TPU, and more](https://github.com/dstackai/dstack/releases/tag/0.18.4) (Release)
 - [2024/05] [dstack 0.18.3: OCI, and more](https://github.com/dstackai/dstack/releases/tag/0.18.3) (Release)
 - [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
 - [2024/04] [dstack 0.18.0: RunPod, multi-node tasks, and more](https://github.com/dstackai/dstack/releases/tag/0.18.0) (Release)
-- [2024/03] [dstack 0.17.0: Auto-scaling, and other improvements](https://github.com/dstackai/dstack/releases/tag/0.17.0) (Release)
 
 ## Installation
 
@@ -71,71 +76,49 @@ The server is running at http://127.0.0.1:3000/
 > **Note**
 > It's also possible to run the server via [Docker](https://hub.docker.com/r/dstackai/dstack).
 
-### CLI & API
+### Add on-prem servers
+    
+If you'd like to use `dstack` to run workloads on your on-prem servers,
+see [on-prem fleets](https://dstack.ai/docs/fleets#__tabbed_1_2) command.
 
-Once the server is up, you can use either `dstack`'s CLI or API to run workloads.
-Below is a live demo of how it works with the CLI.
+## How does it work?
 
-### Dev environments
+### 1. Define run configurations
 
-You specify the required environment and resources, then run it. `dstack` provisions the dev
-environment in the cloud and enables access via your desktop IDE.
+`dstack` supports three types of run configurations:
+   
+* [Dev environments](https://dstack.ai/docs/dev-environments.md) &mdash; for interactive development using a desktop IDE
+* [Tasks](https://dstack.ai/docs/tasks.md) &mdash; for any kind of batch jobs or web applications (supports distributed jobs)
+* [Services](https://dstack.ai/docs/services.md)&mdash; for production-grade deployment (supports auto-scaling and authorization)
 
-<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif" width="650"/>
+Each type of run configuration allows you to specify commands for execution, required compute resources, retry policies, auto-scaling rules, authorization settings, and more.
 
-### Tasks
+Configuration can be defined as YAML files within your repo.
 
-Tasks allow for convenient scheduling of any kind of batch jobs, such as training, fine-tuning,
-or data processing, as well as running web applications.
+### 2. Run configurations
 
-Specify the environment and resources, then run it. `dstack` executes the task in the
-cloud, enabling port forwarding to your local machine for convenient access.
+Run any defined configuration either via `dstack` CLI or API.
+   
+`dstack` automatically handles provisioning, interruptions, port-forwarding, auto-scaling, network, volumes, 
+run failures, out-of-capacity errors, and more.
 
-<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="650"/>
+### 3. Manage fleets
 
-### Services
-
-Services make it very easy to deploy any kind of model or web application as public endpoints.
-
-Use any serving frameworks and specify required resources. `dstack` deploys it in the configured
-backend, handles authorization, and provides an OpenAI-compatible interface if needed.
-
-<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif" width="650"/>
-
-### Pools
-
-Pools simplify managing the lifecycle of cloud instances and enable their efficient reuse across runs.
-
-You can have instances provisioned in the cloud automatically, or add them manually, configuring the required resources,
-idle duration, etc.
-
-<img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-pool.gif" width="650"/>
-
-## Examples
-
-Here are some featured examples:
-
-- [Llama 3](examples/llms/llama3)
-- [Alignment Handbook](examples/fine-tuning/alignment-handbook)
-- [vLLM](examples/deployment/vllm)
-- [Axolotl](examples/fine-tuning/axolotl)
-- [TGI](examples/deployment/tgi)
-- [Ollama](examples/deployment/ollama)
-- [LoRaX](examples/deployment/lorax)
-
-Browse [examples](examples) for more examples.
+Use [fleets](https://dstack.ai/docs/fleets.md) to provision and manage clusters and instances, both in the cloud and on-prem.
 
 ## More information
 
 For additional information and examples, see the following links:
 
-- [Docs](https://dstack.ai/docs)
-- [Discord](https://discord.gg/u8SmfwPpMd)
+* [Docs](https://dstack.ai/docs)
+* [Examples](examples)
+* [Changelog](https://github.com/dstackai/dstack/releases)
+* [Discord](https://discord.gg/u8SmfwPpMd)
 
 ## Contributing
 
-We welcome contributions to `dstack`!
-To learn more about getting involved in the project, please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
+You're very welcome to contribute to `dstack`. 
+Learn more about how to contribute to the project at [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

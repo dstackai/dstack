@@ -39,16 +39,16 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 !!! info "Distributed tasks"
     By default, tasks run on a single instance. However, you can specify
-    the [number of nodes](../reference/dstack.yml/task.md#_nodes).
+    the [number of nodes](reference/dstack.yml/task.md#_nodes).
     In this case, `dstack` provisions a cluster of instances.
 
 !!! info "Reference"
-    See the [.dstack.yml reference](../reference/dstack.yml/task.md)
-    for all supported configuration options and multiple examples.
+    See the [.dstack.yml reference](reference/dstack.yml/task.md)
+    for all supported configuration options and examples.
 
 ## Running
 
-To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
+To run a configuration, use the [`dstack run`](reference/cli/index.md#dstack-run) command followed by the working directory path, 
 configuration file path, and other options.
 
 <div class="termy">
@@ -80,24 +80,34 @@ convenient and secure access.
 
 When running the task, `dstack run` mounts the current folder's contents.
 
-!!! info ".gitignore"
+[//]: # (TODO: Fleets and idle duration)
+
+??? info ".gitignore"
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
+??? info "Fleets"
+    By default, `dstack run` reuses `idle` instances from one of the existing [fleets](fleets.md). 
+    If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
+
+    To have the fleet deleted after a certain idle time automatically, set
+    [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time).
+    By default, it's set to `5min`.
+
 !!! info "Reference"
-    See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+    See the [CLI reference](reference/cli/index.md#dstack-run) for more details
     on how `dstack run` works.
 
 ## Managing runs
 
-**Stoping runs**
+### Listing runs
 
-Once you use [`dstack stop`](../reference/cli/index.md#dstack-stop) (or when the run exceeds the
-`max_duration`), the instances return to the [pool](pools.md).
+The [`dstack ps`](reference/cli/index.md#dstack-ps) command lists all running runs and their status.
 
-**Listing runs**
+### Stopping runs
 
-The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
+Once you use [`dstack stop`](reference/cli/index.md#dstack-stop) (or when the run exceeds the
+`max_duration`), the instances return to the [fleet](fleets.md).
 
 [//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
 
@@ -106,3 +116,4 @@ The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running
 1. Check the [QLoRA :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/qlora/README.md){:target="_blank"} example
 2. Check the [`.dstack.yml` reference](../reference/dstack.yml/task.md) for more details and examples
 3. Browse [all examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
+4. See [fleets](fleets.md) on how to manage fleets

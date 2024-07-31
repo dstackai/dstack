@@ -1,7 +1,7 @@
 # ruff: noqa: F401
 from dstack._internal.core.errors import ClientError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import RegistryAuth
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import ScalingSpec as Scaling
 from dstack._internal.core.models.configurations import (
     ServiceConfiguration as _ServiceConfiguration,

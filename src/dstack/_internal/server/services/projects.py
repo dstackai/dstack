@@ -4,6 +4,7 @@ from typing import Awaitable, Callable, List, Optional, Tuple
 from sqlalchemy import delete, select, update
 from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import ForbiddenError, ResourceExistsError, ServerClientError
 from dstack._internal.core.models.backends import BackendInfo
@@ -50,12 +51,18 @@ async def list_user_projects(
         projects = await list_project_models(session=session)
     else:
         projects = await list_user_project_models(session=session, user=user)
-    return [project_model_to_project(p) for p in projects]
+    return [
+        project_model_to_project(p, include_backends=False, include_members=False)
+        for p in projects
+    ]
 
 
 async def list_projects(session: AsyncSession) -> List[Project]:
     projects = await list_project_models(session=session)
-    return [project_model_to_project(p) for p in projects]
+    return [
+        project_model_to_project(p, include_backends=False, include_members=False)
+        for p in projects
+    ]
 
 
 async def get_project_by_name(
@@ -91,7 +98,11 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
     )
     for hook in _CREATE_PROJECT_HOOKS:
         await hook(session, project_model)
-    await session.refresh(project_model)  # a hook may change project
+    # a hook may change project
+    session.expire(project_model)
+    project_model = await get_project_model_by_name_or_error(
+        session=session, project_name=project_name
+    )
     return project_model_to_project(project_model)
 
 
@@ -101,7 +112,9 @@ async def delete_projects(
     projects_names: List[str],
 ):
     if user.global_role != GlobalRole.ADMIN:
-        user_projects = await list_user_project_models(session=session, user=user)
+        user_projects = await list_user_project_models(
+            session=session, user=user, include_members=True
+        )
         user_project_names = [p.name for p in user_projects]
         for project_name in projects_names:
             if project_name not in user_project_names:
@@ -176,15 +189,21 @@ async def clear_project_members(
 async def list_user_project_models(
     session: AsyncSession,
     user: UserModel,
+    include_members: bool = False,
 ) -> List[ProjectModel]:
+    options = []
+    if include_members:
+        options.append(joinedload(ProjectModel.members))
     res = await session.execute(
-        select(ProjectModel).where(
+        select(ProjectModel)
+        .where(
             MemberModel.project_id == ProjectModel.id,
             MemberModel.user_id == user.id,
             ProjectModel.deleted == False,
         )
+        .options(*options)
     )
-    return list(res.scalars().all())
+    return list(res.scalars().unique().all())
 
 
 async def list_user_owned_project_models(
@@ -217,8 +236,14 @@ async def get_project_model_by_name(
         filters.append(safunc.lower(ProjectModel.name) == safunc.lower(project_name))
     else:
         filters.append(ProjectModel.name == project_name)
-    res = await session.execute(select(ProjectModel).where(*filters))
-    return res.scalar()
+    res = await session.execute(
+        select(ProjectModel)
+        .where(*filters)
+        .options(joinedload(ProjectModel.backends))
+        .options(joinedload(ProjectModel.members))
+        .options(joinedload(ProjectModel.default_gateway))
+    )
+    return res.unique().scalar()
 
 
 async def get_project_model_by_name_or_error(
@@ -226,12 +251,16 @@ async def get_project_model_by_name_or_error(
     project_name: str,
 ) -> ProjectModel:
     res = await session.execute(
-        select(ProjectModel).where(
+        select(ProjectModel)
+        .where(
             ProjectModel.name == project_name,
             ProjectModel.deleted == False,
         )
+        .options(joinedload(ProjectModel.backends))
+        .options(joinedload(ProjectModel.members))
+        .options(joinedload(ProjectModel.default_gateway))
     )
-    return res.scalar_one()
+    return res.unique().scalar_one()
 
 
 async def get_project_model_by_id_or_error(
@@ -239,12 +268,16 @@ async def get_project_model_by_id_or_error(
     project_id: uuid.UUID,
 ) -> ProjectModel:
     res = await session.execute(
-        select(ProjectModel).where(
+        select(ProjectModel)
+        .where(
             ProjectModel.id == project_id,
             ProjectModel.deleted == False,
         )
+        .options(joinedload(ProjectModel.backends))
+        .options(joinedload(ProjectModel.members))
+        .options(joinedload(ProjectModel.default_gateway))
     )
-    return res.scalar_one()
+    return res.unique().scalar_one()
 
 
 async def create_project_model(
@@ -265,36 +298,43 @@ async def create_project_model(
     return project
 
 
-def project_model_to_project(project_model: ProjectModel) -> Project:
+def project_model_to_project(
+    project_model: ProjectModel,
+    include_backends: bool = True,
+    include_members: bool = True,
+) -> Project:
     members = []
-    for m in project_model.members:
-        members.append(
-            Member(
-                user=users.user_model_to_user(m.user),
-                project_role=m.project_role,
+    if include_members:
+        for m in project_model.members:
+            members.append(
+                Member(
+                    user=users.user_model_to_user(m.user),
+                    project_role=m.project_role,
+                )
             )
-        )
     backends = []
-    for b in project_model.backends:
-        configurator = get_configurator(b.type)
-        if configurator is None:
-            logger.warning("Configurator for backend %s not found", b.type)
-            continue
-        config_info = configurator.get_config_info(model=b, include_creds=False)
-        if is_core_model_instance(config_info, DstackConfigInfo):
-            for backend_type in config_info.base_backends:
+    if include_backends:
+        for b in project_model.backends:
+            configurator = get_configurator(b.type)
+            if configurator is None:
+                logger.warning("Configurator for backend %s not found", b.type)
+                continue
+            config_info = configurator.get_config_info(model=b, include_creds=False)
+            if is_core_model_instance(config_info, DstackConfigInfo):
+                for backend_type in config_info.base_backends:
+                    backends.append(
+                        BackendInfo(
+                            name=backend_type,
+                            config=DstackBaseBackendConfigInfo(type=backend_type),
+                        )
+                    )
+            else:
                 backends.append(
                     BackendInfo(
-                        name=backend_type, config=DstackBaseBackendConfigInfo(type=backend_type)
+                        name=b.type,
+                        config=config_info,
                     )
                 )
-        else:
-            backends.append(
-                BackendInfo(
-                    name=b.type,
-                    config=config_info,
-                )
-            )
     return Project(
         project_id=project_model.id,
         project_name=project_model.name,

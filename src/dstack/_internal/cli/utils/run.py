@@ -114,7 +114,7 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
         console.print()
 
 
-def generate_runs_table(
+def get_runs_table(
     runs: List[Run], include_configuration: bool = False, verbose: bool = False
 ) -> Table:
     table = Table(box=None)

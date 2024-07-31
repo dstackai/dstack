@@ -31,7 +31,7 @@ Once the commands work, go ahead and run them as a task or a service.
     
     ```
 
-## Tasks vs Services for web applications
+## Tasks vs services for web applications
 
 Tasks can be used not only for batch jobs but also for web applications.
 
@@ -82,7 +82,7 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     
     This will forward the remote `8501` port to `localhost:3000`.
 
-[Services](concepts/services.md) require a gateway but they also provide additional features for
+[Services](../services.md) require a gateway but they also provide additional features for
 production-grade service deployment not offered by tasks, such as HTTPS domains and auto-scaling.
 If you run a web app as a task and it works, go ahead and run it as a service.
 
@@ -131,7 +131,7 @@ dstack run . -f .dstack.yml -e HUGGING_FACE_HUB_TOKEN=...
 
 ## Data and models
 
-`dstack` has support for [volumes](concepts/volumes.md)
+`dstack` has support for [volumes](../concepts/volumes.md)
 to persist data across different runs and instance interruptions.
 Volumes are ideal for storing intermediate work and data that should be quickly accessible.
 
@@ -153,7 +153,7 @@ An idle instance can be destroyed at any time via `dstack pool rm INSTANCE_NAME`
 
 ## Profiles
 
-If you don't want to specify the same parameters for each configuration, you can define them once via [profiles](reference/profiles.yml.md)
+If you don't want to specify the same parameters for each configuration, you can define them once via [profiles](../reference/profiles.yml.md)
 and reuse them across configurations.
 
 This can be handy, for example, for configuring parameters such as `max_duration`, `max_price`, `termination_idle_duration`,

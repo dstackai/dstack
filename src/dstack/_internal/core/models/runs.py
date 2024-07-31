@@ -6,10 +6,9 @@ from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.common import CoreModel, RegistryAuth
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
-    RegistryAuth,
     RunConfiguration,
 )
 from dstack._internal.core.models.instances import (
@@ -364,21 +363,6 @@ class RunPlan(CoreModel):
 class PoolInstanceOffers(CoreModel):
     pool_name: str
     instances: List[InstanceOfferWithAvailability]
-
-
-class InstanceStatus(str, Enum):
-    PENDING = "pending"
-    PROVISIONING = "provisioning"
-    IDLE = "idle"
-    BUSY = "busy"
-    TERMINATING = "terminating"
-    TERMINATED = "terminated"
-
-    def is_available(self) -> bool:
-        return self in (
-            self.IDLE,
-            self.BUSY,
-        )
 
 
 def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Optional[bool]:

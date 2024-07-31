@@ -15,6 +15,7 @@ from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_session_ctx, migrate
 from dstack._internal.server.routers import (
     backends,
+    fleets,
     gateways,
     logs,
     pools,
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
             environment=settings.SERVER_ENVIRONMENT,
             enable_tracing=True,
             traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
         )
 
     app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
@@ -149,10 +151,11 @@ def add_no_api_version_check_routes(paths: List[str]):
 def register_routes(app: FastAPI):
     app.include_router(users.router)
     app.include_router(projects.router)
-    app.include_router(pools.root_router)
-    app.include_router(pools.router)
     app.include_router(backends.root_router)
     app.include_router(backends.project_router)
+    app.include_router(pools.root_router)
+    app.include_router(pools.router)
+    app.include_router(fleets.router)
     app.include_router(repos.router)
     app.include_router(runs.root_router)
     app.include_router(runs.project_router)

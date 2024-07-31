@@ -22,6 +22,10 @@ async def list_projects(
     session: AsyncSession = Depends(get_session),
     user: UserModel = Depends(Authenticated()),
 ) -> List[Project]:
+    """
+    Returns all projects visible to user.
+    `members` and `backends` are always empty - call `/api/projects/{project_name}/get` to retrieve them.
+    """
     return await projects.list_user_projects(session=session, user=user)
 
 

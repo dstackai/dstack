@@ -256,7 +256,6 @@ class DiskSpecSchema(CoreModel):
         MemoryRangeLike,
         Field(
             description="The disk size. Can be a string (e.g., `100GB` or `100GB..`) or an object"
-            "; see [examples](#examples)"
         ),
     ]
 
@@ -280,7 +279,7 @@ class ResourcesSpecSchema(CoreModel):
     gpu: Annotated[
         Optional[GPULike],
         Field(
-            description="The GPU requirements. Can be set to a number, a string (e.g. `A100`, `80GB:2`, etc.), or an object; see [examples](#examples)"
+            description="The GPU requirements. Can be set to a number, a string (e.g. `A100`, `80GB:2`, etc.), or an object"
         ),
     ] = None
     disk: Annotated[Optional[DiskLike], Field(description="The disk resources")] = DEFAULT_DISK

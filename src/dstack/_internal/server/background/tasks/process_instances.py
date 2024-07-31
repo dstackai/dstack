@@ -29,11 +29,13 @@ from dstack._internal.core.backends.remote.provisioning import (
 )
 from dstack._internal.core.errors import BackendError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceRuntime,
+    InstanceStatus,
     RemoteConnectionInfo,
 )
 from dstack._internal.core.models.profiles import (
@@ -42,19 +44,19 @@ from dstack._internal.core.models.profiles import (
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
-    InstanceStatus,
     JobProvisioningData,
     Requirements,
     Retry,
 )
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, ProjectModel
+from dstack._internal.server.models import FleetModel, InstanceModel, ProjectModel
 from dstack._internal.server.schemas.runner import HealthcheckResponse
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.jobs import (
-    PROCESSING_POOL_IDS,
-    PROCESSING_POOL_LOCK,
+    PROCESSING_INSTANCES_IDS,
+    PROCESSING_INSTANCES_LOCK,
     terminate_job_provisioning_data_instance,
 )
 from dstack._internal.server.services.pools import get_instance_provisioning_data
@@ -82,7 +84,7 @@ logger = get_logger(__name__)
 
 async def process_instances() -> None:
     async with get_session_ctx() as session:
-        async with PROCESSING_POOL_LOCK:
+        async with PROCESSING_INSTANCES_LOCK:
             res = await session.scalars(
                 select(InstanceModel).where(
                     InstanceModel.status.in_(
@@ -94,7 +96,7 @@ async def process_instances() -> None:
                             InstanceStatus.TERMINATING,
                         ]
                     ),
-                    InstanceModel.id.not_in(PROCESSING_POOL_IDS),
+                    InstanceModel.id.not_in(PROCESSING_INSTANCES_IDS),
                 )
             )
             instances = res.all()
@@ -102,16 +104,16 @@ async def process_instances() -> None:
                 return
 
             unprocessed_instances_ids = set(i.id for i in instances)
-            PROCESSING_POOL_IDS.update(unprocessed_instances_ids)
+            PROCESSING_INSTANCES_IDS.update(unprocessed_instances_ids)
 
     try:
         futures = [process_instance(i) for i in instances]
         for future in asyncio.as_completed(futures):
             instance_id = await future
-            PROCESSING_POOL_IDS.remove(instance_id)
+            PROCESSING_INSTANCES_IDS.remove(instance_id)
             unprocessed_instances_ids.remove(instance_id)
     finally:
-        PROCESSING_POOL_IDS.difference_update(unprocessed_instances_ids)
+        PROCESSING_INSTANCES_IDS.difference_update(unprocessed_instances_ids)
 
 
 async def process_instance(instance: InstanceModel) -> UUID:
@@ -191,12 +193,16 @@ def deploy_instance(
 async def add_remote(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
 
         logger.debug("Adding remote instance %s...", instance.name)
 
@@ -345,12 +351,17 @@ async def add_remote(instance_id: UUID) -> None:
 async def create_instance(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+                    .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
 
         if instance.last_retry_at is not None:
             last_retry = instance.last_retry_at.replace(tzinfo=datetime.timezone.utc)
@@ -376,6 +387,10 @@ async def create_instance(instance_id: UUID) -> None:
                     "instance_status": InstanceStatus.TERMINATED.value,
                 },
             )
+            return
+
+        if _need_to_wait_fleet_provisioning(instance):
+            logger.debug("Waiting for the first instance in the fleet to be provisioned")
             return
 
         try:
@@ -429,6 +444,7 @@ async def create_instance(instance_id: UUID) -> None:
             profile=profile,
             requirements=requirements,
             exclude_not_available=True,
+            fleet_model=instance.fleet,
         )
 
         if not offers and should_retry:
@@ -513,12 +529,16 @@ async def create_instance(instance_id: UUID) -> None:
 async def check_instance(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
 
         job_provisioning_data = JobProvisioningData.__response__.parse_raw(
             instance.job_provisioning_data
@@ -534,6 +554,9 @@ async def check_instance(instance_id: UUID) -> None:
             return
 
         if not job_provisioning_data.dockerized:
+            if instance.status == InstanceStatus.PROVISIONING:
+                instance.status = InstanceStatus.BUSY
+                await session.commit()
             return
 
         ssh_private_key = instance.project.ssh_private_key
@@ -692,12 +715,16 @@ def instance_healthcheck(*, ports: Dict[int, int]) -> HealthStatus:
 async def terminate(instance_id: UUID) -> None:
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
 
         jpd = get_instance_provisioning_data(instance)
         if jpd is not None:
@@ -749,12 +776,16 @@ async def terminate(instance_id: UUID) -> None:
 async def terminate_idle_instance(instance_id: UUID):
     async with get_session_ctx() as session:
         instance = (
-            await session.scalars(
-                select(InstanceModel)
-                .where(InstanceModel.id == instance_id)
-                .options(joinedload(InstanceModel.project))
+            (
+                await session.scalars(
+                    select(InstanceModel)
+                    .where(InstanceModel.id == instance_id)
+                    .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
+                )
             )
-        ).one()
+            .unique()
+            .one()
+        )
         current_time = get_current_datetime()
         idle_duration = _get_instance_idle_duration(instance)
         idle_seconds = instance.termination_idle_time
@@ -785,6 +816,23 @@ async def terminate_idle_instance(instance_id: UUID):
                 },
             )
         await session.commit()
+
+
+def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
+    # Cluster cloud instances should wait for the first fleet instance to be provisioned
+    # so that they are provisioned in the same backend/region
+    if instance.fleet is None:
+        return False
+    if (
+        instance.id == instance.fleet.instances[0].id
+        or instance.fleet.instances[0].job_provisioning_data is not None
+    ):
+        return False
+    fleet = fleet_model_to_fleet(instance.fleet)
+    return (
+        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        and fleet.spec.configuration.ssh_config is None
+    )
 
 
 def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:

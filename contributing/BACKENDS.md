@@ -9,7 +9,7 @@ The guide below explains the steps required to extend `dstack` with support for 
 
 ## 1. Add a cloud provider to dstackai/gpuhunt
 
-The [gpuhunt](https://https://github.com/dstackai/gpuhunt) project is a utility that `dstack` uses to collect information
+The [gpuhunt](https://github.com/dstackai/gpuhunt) project is a utility that `dstack` uses to collect information
 about cloud providers, their supported machine configurations, pricing, etc. This information is later used by `dstack`
 for provisioning machines.
 

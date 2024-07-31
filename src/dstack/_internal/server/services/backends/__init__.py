@@ -177,7 +177,7 @@ async def create_backend(
     backend = await run_async(configurator.create_backend, project=project, config=config)
     session.add(backend)
     await session.commit()
-    clear_backend_cache(project.id)
+    await clear_backend_cache(project.id)
     return config
 
 
@@ -208,7 +208,7 @@ async def update_backend(
             auth=backend.auth,
         )
     )
-    clear_backend_cache(project.id)
+    await clear_backend_cache(project.id)
     return config
 
 
@@ -238,40 +238,48 @@ async def delete_backends(
             BackendModel.project_id == project.id,
         )
     )
-    clear_backend_cache(project.id)
+    await clear_backend_cache(project.id)
 
 
+_BACKENDS_CACHE_LOCKS = {}
 _BACKENDS_CACHE = {}
+
+
+def _get_project_cache_lock(project_id: UUID) -> asyncio.Lock:
+    return _BACKENDS_CACHE_LOCKS.setdefault(project_id, asyncio.Lock())
+
 
 BackendTuple = Tuple[BackendModel, Backend]
 
 
 async def get_project_backends_with_models(project: ProjectModel) -> List[BackendTuple]:
-    key = project.id
-    backends = _BACKENDS_CACHE.get(key)
-    if backends is not None:
-        return backends
+    async with _get_project_cache_lock(project.id):
+        key = project.id
+        backends = _BACKENDS_CACHE.get(key)
+        if backends is not None:
+            return backends
 
-    backends = []
-    for backend_model in project.backends:
-        configurator = get_configurator(backend_model.type)
-        if configurator is None:
-            logger.warning(
-                "Missing dependencies for %s backend. Backend will be ignored.", backend_model.type
-            )
-            continue
-        try:
-            backend = await run_async(configurator.get_backend, backend_model)
-        except BackendInvalidCredentialsError:
-            logger.warning(
-                "Credentials for %s backend are invalid. Backend will be ignored.",
-                backend_model.type,
-            )
-            continue
-        backends.append((backend_model, backend))
+        backends = []
+        for backend_model in project.backends:
+            configurator = get_configurator(backend_model.type)
+            if configurator is None:
+                logger.warning(
+                    "Missing dependencies for %s backend. Backend will be ignored.",
+                    backend_model.type,
+                )
+                continue
+            try:
+                backend = await run_async(configurator.get_backend, backend_model)
+            except BackendInvalidCredentialsError:
+                logger.warning(
+                    "Credentials for %s backend are invalid. Backend will be ignored.",
+                    backend_model.type,
+                )
+                continue
+            backends.append((backend_model, backend))
 
-    _BACKENDS_CACHE[key] = backends
-    return _BACKENDS_CACHE[key]
+        _BACKENDS_CACHE[key] = backends
+        return _BACKENDS_CACHE[key]
 
 
 _get_project_backend_with_model_by_type = None
@@ -357,9 +365,10 @@ async def get_project_backend_by_type_or_error(
     return backend
 
 
-def clear_backend_cache(project_id: UUID):
-    if project_id in _BACKENDS_CACHE:
-        del _BACKENDS_CACHE[project_id]
+async def clear_backend_cache(project_id: UUID):
+    async with _get_project_cache_lock(project_id):
+        if project_id in _BACKENDS_CACHE:
+            del _BACKENDS_CACHE[project_id]
 
 
 async def get_project_backend_model_by_type(
@@ -388,6 +397,7 @@ async def get_instance_offers(
     """
     Returns list of instances satisfying minimal resource requirements sorted by price
     """
+    logger.info("Requesting instance offers from backends: %s", [b.TYPE.value for b in backends])
     tasks = [run_async(backend.compute().get_offers, requirements) for backend in backends]
     offers_by_backend = []
     for backend, result in zip(backends, await asyncio.gather(*tasks, return_exceptions=True)):

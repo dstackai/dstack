@@ -30,12 +30,12 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 (pre-configured with Python, Conda, and essential CUDA drivers).
 
 !!! info "Reference"
-    See the [.dstack.yml reference](../reference/dstack.yml/dev-environment.md)
-    for all supported configuration options and multiple examples.
+    See the [.dstack.yml reference](reference/dstack.yml/dev-environment.md)
+    for all supported configuration options and examples.
 
 ## Running
 
-To run a configuration, use the [`dstack run`](../reference/cli/index.md#dstack-run) command followed by the working directory path, 
+To run a configuration, use the [`dstack run`](reference/cli/index.md#dstack-run) command followed by the working directory path, 
 configuration file path, and other options.
 
 <div class="termy">
@@ -61,12 +61,20 @@ To open in VS Code Desktop, use this link:
 
 When `dstack` provisions the dev environment, it mounts the project folder contents.
 
-!!! info ".gitignore"
+??? info ".gitignore"
     If there are large files or folders you'd like to avoid uploading, 
     you can list them in `.gitignore`.
 
+??? info "Fleets"
+    By default, `dstack run` reuses `idle` instances from one of the existing [fleets](fleets.md). 
+    If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
+   
+    To have the fleet deleted after a certain idle time automatically, set
+    [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time).
+    By default, it's set to `5min`.
+
 !!! info "Reference"
-    See the [CLI reference](../reference/cli/index.md#dstack-run) for more details
+    See the [CLI reference](reference/cli/index.md#dstack-run) for more details
     on how `dstack run` works.
 
 ### VS Code
@@ -74,7 +82,7 @@ When `dstack` provisions the dev environment, it mounts the project folder conte
 To open the dev environment in your desktop IDE, use the link from the output 
 (such as `vscode://vscode-remote/ssh-remote+fast-moth-1/workflow`).
 
-![](../../assets/images/dstack-vscode-jupyter.png){ width=800 }
+![](../assets/images/dstack-vscode-jupyter.png){ width=800 }
 
 ### SSH
 
@@ -90,18 +98,19 @@ $ ssh fast-moth-1
 
 ## Managing runs
 
-**Stopping runs**
+### Listing runs
+
+The [`dstack ps`](reference/cli/index.md#dstack-ps) command lists all running runs and their status.
+
+### Stopping runs
 
 Once the run exceeds the max duration,
-or when you use [`dstack stop`](../reference/cli/index.md#dstack-stop), 
+or when you use [`dstack stop`](reference/cli/index.md#dstack-stop), 
 the dev environment and its cloud resources are deleted.
-
-**Listing runs**
-
-The [`dstack ps`](../reference/cli/index.md#dstack-ps) command lists all running runs and their status.
 
 [//]: # (TODO: Mention `dstack logs` and `dstack logs -d`)
 
 ## What's next?
 
-1. Check the [`.dstack.yml` reference](../reference/dstack.yml/dev-environment.md) for more details and examples
+1. Check the [`.dstack.yml` reference](reference/dstack.yml/dev-environment.md) for more details and examples
+2. See [fleets](fleets.md) on how to manage fleets
