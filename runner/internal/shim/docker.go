@@ -24,6 +24,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/icza/backscanner"
 	bytesize "github.com/inhies/go-bytesize"
 	"github.com/ztrue/tracerr"
@@ -217,6 +218,16 @@ func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus, string, JobResu
 	return d.state, d.containerStatus, d.executorError, d.jobResult
 }
 
+func getBackend(backendType string) (backends.Backend, error) {
+	switch backendType {
+	case "aws":
+		return backends.NewAWSBackend(), nil
+	case "gcp":
+		return backends.NewGCPBackend(), nil
+	}
+	return nil, fmt.Errorf("unknown backend: %q", backendType)
+}
+
 func prepareVolumes(taskConfig TaskConfig) error {
 	for _, volume := range taskConfig.Volumes {
 		err := formatAndMountVolume(volume)
@@ -228,7 +239,11 @@ func prepareVolumes(taskConfig TaskConfig) error {
 }
 
 func formatAndMountVolume(volume VolumeInfo) error {
-	deviceName, err := getRealDeviceName(volume.VolumeId)
+	backend, err := getBackend(volume.Backend)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+	deviceName, err := backend.GetRealDeviceName(volume.VolumeId)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -246,34 +261,6 @@ func formatAndMountVolume(volume VolumeInfo) error {
 func getVolumeMountPoint(volumeName string) string {
 	// Put volumes in data-specific dir to avoid clashes with host dirs
 	return fmt.Sprintf("/dstack-volumes/%s", volumeName)
-}
-
-// getRealDeviceName returns the device name for the given EBS volume ID.
-// The device name on instance can be different from device name specified in block-device mapping
-// (e.g. NVMe block devices built on the Nitro System).
-func getRealDeviceName(volumeID string) (string, error) {
-	// Run the lsblk command to get block device information
-	// TODO: On AWS SERIAL contains volume id. This may not be true for other clouds.
-	cmd := exec.Command("lsblk", "-o", "NAME,SERIAL")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to list block devices: %v", err)
-	}
-
-	// Parse the output to find the device that matches the volume ID
-	lines := strings.Split(out.String(), "\n")
-	for _, line := range lines {
-		fields := strings.Fields(line)
-		if len(fields) == 2 && strings.HasPrefix(fields[1], "vol") {
-			serial := strings.TrimPrefix(fields[1], "vol")
-			if "vol-"+serial == volumeID {
-				return "/dev/" + fields[0], nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("volume %s not found among block devices", volumeID)
 }
 
 // initFileSystem creates an ext4 file system on a disk only if the disk is not already has a file system.

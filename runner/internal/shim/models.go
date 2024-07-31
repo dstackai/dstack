@@ -51,6 +51,7 @@ type MountPoint struct {
 }
 
 type VolumeInfo struct {
+	Backend  string `json:"backend"`
 	Name     string `json:"name"`
 	VolumeId string `json:"volume_id"`
 	InitFs   bool   `json:"init_fs"`

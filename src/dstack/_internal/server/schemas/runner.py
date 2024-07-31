@@ -73,6 +73,7 @@ class HealthcheckResponse(CoreModel):
 
 
 class ShimVolumeInfo(CoreModel):
+    backend: str
     name: str
     volume_id: str
     init_fs: bool
