@@ -8,14 +8,15 @@ appropriate script.
 This example shows how use Alignment Handbook to fine-tune Gemma 7B on your SFT dataset 
 with Alignment Handbook and `dstack`. 
 
-!!! info "Prerequisites"
-    Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo and run `dstack init`
+## Prerequisites
 
-    ```shell
-    git clone https://github.com/dstackai/dstack
-    cd dstack
-    dstack init
-    ```
+Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo and run `dstack init`
+
+```shell
+git clone https://github.com/dstackai/dstack
+cd dstack
+dstack init
+```
 
 ## Training configuration recipe
 
@@ -171,6 +172,14 @@ If you'd like to play with the example using a dev environment, run
 ```shell
 dstack apply -f examples/fine-tuning/alignment-handbook/.dstack.yaml 
 ```
+
+## Source code
+
+The source-code of this example can be found in  [`https://github.com/dstackai/dstack/examples/fine-tuning/alignment-handbook`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook).
+
+## Contributing
+
+Find a mistake or can't find an important example? Raise an [issue](https://github.com/dstackai/dstack/issues) or send a [pull request](https://github.com/dstackai/dstack/tree/master/examples)!
 
 ## What's next?
 
