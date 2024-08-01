@@ -23,6 +23,8 @@ SSH_CONNECT_TIMEOUT = 10
 
 DSTACK_SHIM_ENV_FILE = "dstack-shim.env"
 
+HOST_INFO_FILE = "host_info.json"
+
 
 def sftp_upload(client: paramiko.SSHClient, path: str, body: str) -> None:
     try:
@@ -139,6 +141,19 @@ def check_dstack_shim_service(client: paramiko.SSHClient):
             raise ProvisioningError(f"The dstack-shim service doesn't start: {line.strip()}")
 
 
+def remove_host_info_if_exists(client: paramiko.SSHClient, working_dir: str) -> None:
+    file_path = f"{working_dir}/{HOST_INFO_FILE}"
+    try:
+        _, _, stderr = client.exec_command(
+            f"sudo test -e {file_path} && sudo rm {file_path}", timeout=10
+        )
+        err = stderr.read().decode().strip()
+        if err:
+            logger.debug(f"{HOST_INFO_FILE} hasn't been removed: %s", err)
+    except (paramiko.SSHException, OSError) as e:
+        raise ProvisioningError(f"remove_host_info_if_exists failed: {e}")
+
+
 def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any]:
     # wait host_info
     retries = 60
@@ -146,7 +161,7 @@ def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any
     for _ in range(retries):
         try:
             _, stdout, stderr = client.exec_command(
-                f"sudo cat {working_dir}/host_info.json", timeout=10
+                f"sudo cat {working_dir}/{HOST_INFO_FILE}", timeout=10
             )
             err = stderr.read().decode().strip()
             if err:
@@ -154,7 +169,7 @@ def get_host_info(client: paramiko.SSHClient, working_dir: str) -> Dict[str, Any
                 time.sleep(iter_delay)
                 continue
         except (paramiko.SSHException, OSError) as e:
-            logger.debug("Cannot run `cat host_info.json` in the remote instance: %s", e)
+            logger.debug(f"Cannot run `cat {HOST_INFO_FILE}` in the remote instance: %s", e)
         else:
             try:
                 host_info_json = stdout.read()
