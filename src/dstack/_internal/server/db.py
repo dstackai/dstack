@@ -28,7 +28,7 @@ class Database:
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA journal_mode=WAL;")
                 cursor.execute("PRAGMA foreign_keys=ON;")
-                cursor.execute("PRAGMA busy_timeout=5000;")
+                cursor.execute("PRAGMA busy_timeout=10000;")
                 cursor.close()
 
     def get_dialect_name(self) -> str:
