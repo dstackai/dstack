@@ -89,7 +89,7 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
     shim_service = f"""\
     [Unit]
     Description=dstack-shim
-    After=network.target
+    After=network-online.target
 
     [Service]
     Type=simple
