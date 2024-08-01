@@ -85,9 +85,9 @@ async def update_user(
 async def refresh_token(
     body: RefreshTokenRequest,
     session: AsyncSession = Depends(get_session),
-    user: UserModel = Depends(GlobalAdmin()),
+    user: UserModel = Depends(Authenticated()),
 ) -> UserWithCreds:
-    res = await users.refresh_user_token(session=session, username=body.username)
+    res = await users.refresh_user_token(session=session, user=user, username=body.username)
     if res is None:
         raise ResourceNotExistsError()
     return users.user_model_to_user_with_creds(res)

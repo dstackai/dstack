@@ -172,3 +172,51 @@ class TestDeleteUsers:
         assert response.status_code == 200
         res = await session.execute(select(UserModel).where(UserModel.name == user.name))
         assert len(res.scalars().all()) == 0
+
+
+class TestRefreshToken:
+    def test_returns_40x_if_not_authenticated(self):
+        response = client.post("/api/users/refresh_token")
+        assert response.status_code in [401, 403]
+
+    @pytest.mark.asyncio
+    async def test_refreshes_token(self, test_db, session: AsyncSession):
+        user1 = await create_user(name="user1", session=session)
+        old_token = user1.token
+        response = client.post(
+            "/api/users/refresh_token",
+            headers=get_auth_headers(user1.token),
+            json={"username": user1.name},
+        )
+        assert response.status_code == 200
+        assert response.json()["creds"]["token"] != old_token
+        await session.refresh(user1)
+        assert user1.token != old_token
+
+    @pytest.mark.asyncio
+    async def test_returns_403_if_non_admin_refreshes_for_other_user(
+        self, test_db, session: AsyncSession
+    ):
+        user1 = await create_user(name="user1", session=session, global_role=GlobalRole.USER)
+        user2 = await create_user(name="user2", session=session)
+        response = client.post(
+            "/api/users/refresh_token",
+            headers=get_auth_headers(user1.token),
+            json={"username": user2.name},
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_global_admin_refreshes_token(self, test_db, session: AsyncSession):
+        user1 = await create_user(name="user1", session=session, global_role=GlobalRole.ADMIN)
+        user2 = await create_user(name="user2", session=session)
+        old_token = user2.token
+        response = client.post(
+            "/api/users/refresh_token",
+            headers=get_auth_headers(user1.token),
+            json={"username": user2.name},
+        )
+        assert response.status_code == 200
+        assert response.json()["creds"]["token"] != old_token
+        await session.refresh(user2)
+        assert user2.token != old_token
