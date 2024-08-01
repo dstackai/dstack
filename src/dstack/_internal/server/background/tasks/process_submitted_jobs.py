@@ -424,13 +424,17 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
     await wait_to_lock(PROCESSING_FLEETS_LOCK, PROCESSING_FLEETS_IDS, fleet_model.id)
     try:
         fleet_model = (
-            await session.execute(
-                select(FleetModel)
-                .where(FleetModel.id == fleet_model.id)
-                .options(joinedload(FleetModel.instances))
-                .execution_options(populate_existing=True)
+            (
+                await session.execute(
+                    select(FleetModel)
+                    .where(FleetModel.id == fleet_model.id)
+                    .options(joinedload(FleetModel.instances))
+                    .execution_options(populate_existing=True)
+                )
             )
-        ).scalar_one()
+            .unique()
+            .scalar_one()
+        )
         return len(fleet_model.instances)
     finally:
         PROCESSING_FLEETS_IDS.difference_update([fleet_model.id])

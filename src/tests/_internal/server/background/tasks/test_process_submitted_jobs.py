@@ -26,8 +26,10 @@ from dstack._internal.server.services.pools import (
     get_or_create_pool_by_name,
 )
 from dstack._internal.server.testing.common import (
+    create_fleet,
     create_instance,
     create_job,
+    create_pool,
     create_project,
     create_repo,
     create_run,
@@ -210,3 +212,73 @@ class TestProcessSubmittedJobs:
         job = res.scalar_one()
         assert job.status == JobStatus.PROVISIONING
         assert job.instance is not None and job.instance.id == instance.id
+
+    @pytest.mark.asyncio
+    async def test_creates_new_instance_in_existing_fleet(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        repo = await create_repo(session=session, project_id=project.id)
+        pool = await create_pool(session=session, project=project)
+        fleet = await create_fleet(session=session, project=project)
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            instance_num=0,
+            status=InstanceStatus.BUSY,
+        )
+        fleet.instances.append(instance)
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+        )
+        run.fleet = fleet
+        job = await create_job(
+            session=session,
+            run=run,
+        )
+        await session.commit()
+
+        offer = InstanceOfferWithAvailability(
+            backend=BackendType.AWS,
+            instance=InstanceType(
+                name="instance",
+                resources=Resources(cpus=4, memory_mib=8192, spot=False, gpus=[]),
+            ),
+            region="us",
+            price=1.0,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = [offer]
+            backend_mock.compute.return_value.run_job.return_value = JobProvisioningData(
+                backend=offer.backend,
+                instance_type=offer.instance,
+                instance_id="instance_id",
+                hostname="1.1.1.1",
+                internal_ip=None,
+                region=offer.region,
+                price=offer.price,
+                username="ubuntu",
+                ssh_port=22,
+                ssh_proxy=None,
+                dockerized=True,
+                backend_data=None,
+            )
+            await process_submitted_jobs()
+            m.assert_called_once()
+            backend_mock.compute.return_value.get_offers.assert_called_once()
+            backend_mock.compute.return_value.run_job.assert_called_once()
+
+        await session.refresh(job)
+        res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
+        job = res.scalar_one()
+        assert job.status == JobStatus.PROVISIONING
+        assert job.instance is not None
+        assert job.instance.instance_num == 1
+        assert job.instance.fleet_id == fleet.id
