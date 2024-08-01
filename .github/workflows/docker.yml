@@ -64,6 +64,7 @@ jobs:
      - name: Build and upload to DockerHub
        run: |
          docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1 -f base/Dockerfile .
+         docker buildx build --platform linux/amd64 --build-arg PYTHON=${{ matrix.python }} --build-arg VERSION=${{ inputs.image_version }} --push --provenance=false --tag dstackai/base:py${{ matrix.python }}-${{ inputs.image_version }}-cuda-12.1-devel -f base/devel.Dockerfile .
 
   build-aws-images:
     needs: build-docker
