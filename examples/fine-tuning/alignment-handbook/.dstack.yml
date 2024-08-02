@@ -21,6 +21,7 @@ env:
 
 ide: vscode
 
+# Use either spot or on-demand instances
 spot_policy: auto
 
 resources:

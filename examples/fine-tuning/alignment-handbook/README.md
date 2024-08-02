@@ -5,12 +5,12 @@ scripts for fine-tuning LLMs. It includes all the code needed to run CPT, SFT, D
 libraries like `transformers`, `peft`, `accelerate`, and `trl`. You just need to modify the recipes and run the 
 appropriate script.
 
-This example shows how use Alignment Handbook to fine-tune Gemma 7B on your SFT dataset 
-with Alignment Handbook and `dstack`. 
+> This example shows how use Alignment Handbook with `dstack` to fine-tune Gemma 7B on your 
+> SFT dataset using one node or multiple nodes. 
 
 ## Prerequisites
 
-Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo and run `dstack init`
+Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo and run `dstack init`:
 
 ```shell
 git clone https://github.com/dstackai/dstack
@@ -24,6 +24,9 @@ Alignment Handbook's training script reads the model, LoRA, and dataset argument
 as trainer configuration from a YAML file.
 This file can be found at [`examples/fine-tuning/alignment-handbook/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml).
 You can modify it as needed.
+
+> Before you proceed with training, make sure to update the `hub_model_id` in [`examples/fine-tuning/alignment-handbook/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml)
+> with your HuggingFace username.
 
 ## Single-node training
 
@@ -55,9 +58,9 @@ commands:
     --num_processes=$DSTACK_GPUS_NUM
     scripts/run_sft.py
     ../examples/fine-tuning/alignment-handbook/config.yaml
-# Expose 6006 to access TensorBoard
-ports:
-  - 6006
+# Uncomment to access TensorBoard
+#ports:
+#  - 6006
   
 resources:
   # Required resources
@@ -74,7 +77,6 @@ To run the task, use `dstack apply`:
 
 ```shell
 HUGGING_FACE_HUB_TOKEN=...
-ACCELERATE_LOG_LEVEL=...
 WANDB_API_KEY=...
 
 dstack apply -f examples/fine-tuning/alignment-handbook/train.dstack.yml
@@ -167,7 +169,7 @@ The default policy is `reuse_or_create`.
 ## Dev environment
 
 If you'd like to play with the example using a dev environment, run
-[.dstack.yml](.dstack.yml) via `dstack apply`:
+[.dstack.yml](https://github.com/dstackai/dstack/examples/fine-tuning/alignment-handbook/.dstack.yml) via `dstack apply`:
 
 ```shell
 dstack apply -f examples/fine-tuning/alignment-handbook/.dstack.yaml 
