@@ -1,85 +1,119 @@
 # Axolotl
 
-[`axolotl`](https://github.com/OpenAccess-AI-Collective/axolotl) streamlines the fine-tuning of AI models, offering support for multiple configurations and architectures.
+[Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl) streamlines the fine-tuning of AI models It not only
+supports multiple configurations and architectures but also provides many
+ready-to-use [recipes](https://github.com/axolotl-ai-cloud/axolotl/tree/main/examples). You just need to pick a suitable
+recipe and adjust it for your use case.
 
-Furthermore, `axolotl` provides a set of [`yaml` examples](https://github.com/OpenAccess-AI-Collective/axolotl/tree/main/examples) for almost all kinds of LLMs such as LLaMA2 family, Gemma family, LLaMA3 family, Jamba, and so on. It's recommended to navigate through the examples to get a sense about the role of each parameters, and adjust them for your specific use cases. Also, it is worth checking out all configs/parameters options with a brief description from [this doc](https://github.com/OpenAccess-AI-Collective/axolotl/blob/main/docs/config.qmd).
+> This example shows how use Axolotl with `dstack` to fine-tune Llama3 8B using FSDP and QLoRA
+> on one node.
 
-The example below replicates the [FSDP+QLoRA on LLaMA3 70B](https://github.com/OpenAccess-AI-Collective/axolotl/blob/main/examples/llama-3/qlora-fsdp-70b.yaml), except that here we use Llama3 8B. You can see the [`config.yaml`](config.yaml).
+## Prerequisites
 
-## Running with `dstack`
-
-Running `axolotl` with `dstack` is very straightforward.
-
-First, define the [`train.dstack.yaml`](train.dstack.yaml) task configuration file as follows:
-
-```yaml
-type: task
-
-image: winglian/axolotl-cloud:main-20240429-py3.11-cu121-2.2.1
-
-env:
-  - HUGGING_FACE_HUB_TOKEN
-  - WANDB_API_KEY
-
-commands:
-  - accelerate launch -m axolotl.cli.train config.yaml
-
-ports:
-  - 6006
-
-resources:
-  gpu:
-    memory: 24GB..
-    count: 2
-```
-
-> [!NOTE]
-> Feel free to adjust `resources` to specify the required resources.
-
-We are using the official Docker image provided by Axolotl team (`winglian/axolotl-cloud:main-20240429-py3.11-cu121-2.2.1`). If you want to see other images, their official [repo](https://hub.docker.com/r/winglian/axolotl-cloud/tags). Note, `dstack` requires the CUDA driver to be 12.1+.
-
-To run the task, use the following command:
+Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo and run `dstack init`:
 
 ```shell
-HUGGING_FACE_HUB_TOKEN=<...> \
-WANDB_API_KEY=<...> \
-dstack run . -f examples/fine-tuning/axolotl/train.dstack.yaml
+git clone https://github.com/dstackai/dstack
+cd dstack
+dstack init
 ```
 
-To push the final fine-tuned model to Hugging Face Hub, set `hub_model_id` in [`config.yaml`](config.yaml).
+## Training configuration recipe
 
-### Building `axolotl` from sources
+Axolotl reads the model, LoRA, and dataset arguments, as well as trainer configuration from a YAML file. This file can
+be found at [`examples/fine-tuning/axolotl/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/config.yaml).
+You can modify it as needed.
 
-If you'd like to build `axolot` from sources (e.g. if you intend to modify its source code), follow its [installation guide](https://github.com/OpenAccess-AI-Collective/axolotl?tab=readme-ov-file#condapip-venv).
+> Before you proceed with training, make sure to update the `hub_model_id` in [`examples/fine-tuning/axolotl/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml)
+> with your HuggingFace username.
 
-Example:
+## Single-node training
+
+The easiest way to run a training script with `dstack` is by creating a task configuration file.
+This file can be found at [`examples/fine-tuning/axolotl/train.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/train.dstack.yml). Below is its content: 
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: axolotl-train
 
-python: 3.11
+# Using the official Axolotl's Docker image
+image: winglian/axolotl-cloud:main-20240429-py3.11-cu121-2.2.1
 
+# Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
   - WANDB_API_KEY
-
+# Commands of the task
 commands:
-  - conda install cuda
-  - pip3 install torch torchvision torchaudio
-
-  - git clone https://github.com/OpenAccess-AI-Collective/axolotl.git
-  - cd axolotl
-
-  - pip3 install packaging
-  - pip3 install -e '.[flash-attn,deepspeed]'
-    
-  - accelerate launch -m axolotl.cli.train ../config.yaml
-
+  - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
+# Expose 6006 to access TensorBoard
 ports:
   - 6006
 
 resources:
-  gpu:
-    memory: 24GB..
-    count: 2
+  # Two or more 24GB GPUs (required by FSDP)
+  gpu: 24GB:2..
 ```
+
+The task uses Axolotl's Docker image, where Axolotl is already pre-installed.
+
+To run the task, use `dstack apply`:
+
+```shell
+HUGGING_FACE_HUB_TOKEN=...
+WANDB_API_KEY=...
+
+dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
+```
+
+If you list `tensorbord` via `report_to` in [`examples/fine-tuning/axolotl/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/config.yaml),
+you'll be able to access experiment metrics via `http://localhost:6006` (while the task is running).
+
+## Fleets
+
+> By default, `dstack run` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/fleets).
+> If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
+
+The example folder includes a fleet configuration: 
+[ `examples/fine-tuning/axolotl/fleet.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/fleet.dstack.yml) 
+( a single node with a `24GB` GPU).
+
+You can update the fleet configuration to change the vRAM size, GPU model, number of GPUs per node, or number of nodes. 
+
+A fleet can be provisioned with `dstack apply`:
+
+```shell
+dstack apply -f examples/fine-tuning/axolotl/fleet.dstack.yml
+```
+
+Once provisioned, the fleet can run dev environments and fine-tuning tasks.
+To delete the fleet, use `dstack fleet delete`.
+
+> To ensure `dstack apply` always reuses an existing fleet,
+> pass `--reuse` to `dstack apply` (or set `creation_policy` to `reuse` in the task configuration).
+> The default policy is `reuse_or_create`.
+
+## Dev environment
+
+If you'd like to play with the example using a dev environment, run
+[.dstack.yml](https://github.com/dstackai/dstack/examples/fine-tuning/axolotl/.dstack.yml) via `dstack apply`:
+
+```shell
+dstack apply -f examples/fine-tuning/axolotl/.dstack.yaml 
+```
+
+## Source code
+
+The source-code of this example can be found in  [`https://github.com/dstackai/dstack/examples/fine-tuning/axolotl`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl).
+
+## Contributing
+
+Find a mistake or can't find an important example? Raise an [issue](https://github.com/dstackai/dstack/issues) or send a [pull request](https://github.com/dstackai/dstack/tree/master/examples)!
+
+## What's next?
+
+1. Browse [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl).
+2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+   [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).
+3. See other [examples](https://github.com/dstackai/dstack/blob/master/examples/).

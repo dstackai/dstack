@@ -1,6 +1,5 @@
-type: task
-# The name is optional, if not specified, generated randomly
-name: axolotl-train
+type: dev-environment
+name: axolotl-vscode
 
 # Using the official Axolotl's Docker image
 image: winglian/axolotl-cloud:main-20240429-py3.11-cu121-2.2.1
@@ -9,12 +8,11 @@ image: winglian/axolotl-cloud:main-20240429-py3.11-cu121-2.2.1
 env:
   - HUGGING_FACE_HUB_TOKEN
   - WANDB_API_KEY
-# Commands of the task
-commands:
-  - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
-# Uncomment to access TensorBoard
-#ports:
-#  - 6006
+
+ide: vscode
+
+# Use either spot or on-demand instances
+spot_policy: auto
 
 resources:
   # Two or more 24GB GPUs (required by FSDP)

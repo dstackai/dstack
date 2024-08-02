@@ -1,4 +1,5 @@
 type: task
+# The name is optional, if not specified, generated randomly
 name: ah-train
 
 # If `image` is not specified, dstack uses its default image
@@ -22,9 +23,9 @@ commands:
     --num_processes=$DSTACK_GPUS_NUM
     scripts/run_sft.py
     ../examples/fine-tuning/alignment-handbook/config.yaml
-# Expose 6006 to access TensorBoard
-ports:
-  - 6006
+# Uncomment to access TensorBoard
+#ports:
+#  - 6006
 
 resources:
   # Required resources

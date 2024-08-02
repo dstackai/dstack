@@ -1,4 +1,5 @@
 type: task
+# The name is optional, if not specified, generated randomly
 name: ah-train-distrib
 
 # If `image` is not specified, dstack uses its default image
