@@ -122,6 +122,12 @@ class BaseRunConfiguration(CoreModel):
         Optional[PythonVersion],
         Field(description="The major version of Python. Mutually exclusive with `image`"),
     ]
+    nvcc: Annotated[
+        Optional[bool],
+        Field(
+            description="Use image with NVIDIA CUDA Compiler (NVCC) included. Mutually exclusive with `image`"
+        ),
+    ]
     env: Annotated[
         Union[
             List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*(=.*$|$)")],
