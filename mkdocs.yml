@@ -204,6 +204,7 @@ nav:
           - Concepts:
               - Gateways: docs/concepts/gateways.md
               - Volumes: docs/concepts/volumes.md
+              - Projects: docs/concepts/projects.md
           - Guides:
               - Protips: docs/guides/protips.md
           - Examples: docs/examples
