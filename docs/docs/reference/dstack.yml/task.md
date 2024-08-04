@@ -186,7 +186,7 @@ The following environment variables are available in any run and are passed by `
 | `DSTACK_NODE_RANK`      | The rank of the node                    |
 | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node |
 
-### Distributed tasks { #_nodes }
+### Distributed tasks
 
 By default, the task runs on a single node. However, you can run it on a cluster of nodes.
 
@@ -227,34 +227,6 @@ is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, 
 ??? info "Backends"
     Running on multiple nodes is supported only with `aws`, `gcp`, `azure`, `oci`, and instances added via
     [`dstack pool add-ssh`](../../fleets.md#__tabbed_1_2).
-
-### Arguments
-
-You can parameterize tasks with user arguments using `${{ run.args }}` in the configuration.
-
-<div editor-title="train.dstack.yml"> 
-
-```yaml
-type: task
-
-python: "3.11"
-
-commands:
-  - pip install -r fine-tuning/qlora/requirements.txt
-  - python fine-tuning/qlora/train.py ${{ run.args }}
-```
-
-</div>
-
-Now, you can pass your arguments to the `dstack run` command:
-
-<div class="termy">
-
-```shell
-$ dstack run . -f train.dstack.yml --train_batch_size=1 --num_train_epochs=100
-```
-
-</div>
 
 ### Web applications
 
@@ -297,6 +269,31 @@ spot_policy: auto
 </div>
 
 The `spot_policy` accepts `spot`, `on-demand`, and `auto`. The default for tasks is `auto`.
+
+### Queueing tasks { #queueing-tasks }
+
+By default, if `dstack apply` cannot find capacity, the task fails. 
+
+To queue the task and wait for capacity, specify the [`retry`](#retry) 
+property:
+
+<div editor-title="train.dstack.yml">
+
+```yaml
+type: task
+
+commands:
+  - pip install -r fine-tuning/qlora/requirements.txt
+  - python fine-tuning/qlora/train.py
+
+retry:
+  # Retry on no-capacity errors
+  on_events: [no-capacity]
+  # Retry within 1 day
+  duration: 1d
+```
+
+</div>
 
 ### Backends
 
@@ -374,6 +371,15 @@ The `task` configuration type supports many other options. See below.
       show_root_heading: false
       type:
         required: true
+
+## `retry`
+
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+      item_id_prefix: retry-
 
 ## `resources`
 

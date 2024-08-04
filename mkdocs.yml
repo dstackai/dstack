@@ -206,6 +206,7 @@ nav:
               - Volumes: docs/concepts/volumes.md
           - Guides:
               - Protips: docs/guides/protips.md
+              - dstack Sky: docs/guides/dstack-sky.md
           - Examples: docs/examples
       - Reference:
           - server/config.yml: docs/reference/server/config.yml.md

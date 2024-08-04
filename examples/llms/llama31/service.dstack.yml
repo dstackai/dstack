@@ -1,0 +1,30 @@
+type: service
+# The name is optional, if not specified, generated randomly
+name: llama31-service
+
+# If `image` is not specified, dstack uses its default image
+python: "3.10"
+
+# Required environment variables
+env:
+  - HUGGING_FACE_HUB_TOKEN
+commands:
+  - install vllm==0.5.3.post1
+  - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
+# Expose the vllm server port
+port: 8000
+
+# Use either spot or on-demand instances
+spot_policy: auto
+# Uncomment to ensure it doesn't create a new fleet
+#creation_policy: reuse
+
+resources:
+  # Change to what is required
+  gpu: 24GB
+
+# Comment if you don't to access the model via https://gateway.<gateway domain>
+model:
+  type: chat
+  name: meta-llama/Meta-Llama-3.1-8B-Instruct
+  format: openai

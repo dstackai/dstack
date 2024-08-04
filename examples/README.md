@@ -10,7 +10,9 @@ cd dstack
 dstack init
 ```
 
-Now you are ready to run examples! Select any example from the left-hand sidebar.
+Now you are ready to run examples! 
+
+> Browse the examples using the menu on the left.
 
 ## Source code
 

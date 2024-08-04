@@ -47,13 +47,13 @@ env:
 # Commands of the task
 commands:
   - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
-# Expose 6006 to access TensorBoard
-ports:
-  - 6006
 
 resources:
-  # Two or more 24GB GPUs (required by FSDP)
-  gpu: 24GB:2..
+  gpu:
+    # 24GB or more vRAM
+    memory: 24GB..
+    # Two or more GPU
+    count: 2..
 ```
 
 The task uses Axolotl's Docker image, where Axolotl is already pre-installed.
@@ -66,9 +66,6 @@ WANDB_API_KEY=...
 
 dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
 ```
-
-If you list `tensorbord` via `report_to` in [`examples/fine-tuning/axolotl/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/config.yaml),
-you'll be able to access experiment metrics via `http://localhost:6006` (while the task is running).
 
 ## Fleets
 

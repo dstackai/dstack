@@ -12,10 +12,10 @@ env:
 # Commands of the task
 commands:
   - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
-# Uncomment to access TensorBoard
-#ports:
-#  - 6006
 
 resources:
-  # Two or more 24GB GPUs (required by FSDP)
-  gpu: 24GB:2..
+  gpu:
+    # 24GB or more vRAM
+    memory: 24GB..
+    # Two or more GPU (required by FSDP)
+    count: 2..

@@ -1,23 +1,20 @@
 type: dev-environment
 # The name is optional, if not specified, generated randomly
-name: axolotl-vscode
+name: llama31-vscode
 
-# Using the official Axolotl's Docker image
-image: winglian/axolotl-cloud:main-20240429-py3.11-cu121-2.2.1
+# If `image` is not specified, dstack uses its default image
+python: "3.10"
 
 # Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
-  - WANDB_API_KEY
-
 ide: vscode
 
 # Use either spot or on-demand instances
 spot_policy: auto
+# Uncomment to ensure it doesn't create a new fleet
+#creation_policy: reuse
 
 resources:
-  gpu:
-    # 24GB or more vRAM
-    memory: 24GB..
-    # Two or more GPU
-    count: 2..
+  # Required resources
+  gpu: 24GB
