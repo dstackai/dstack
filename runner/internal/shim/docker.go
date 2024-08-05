@@ -361,6 +361,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 		Id             string         `json:"id"`
 		Status         string         `json:"status"`
 		ProgressDetail ProgressDetail `json:"progressDetail"` //nolint:tagliatelle
+		Error          string         `json:"error"`
 	}
 
 	var status bool
@@ -378,6 +379,9 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 		}
 		if progressRow.Status == "Download complete" {
 			current[progressRow.Id] = total[progressRow.Id]
+		}
+		if progressRow.Error != "" {
+			log.Printf("Error pulling %s: %s", taskConfig.ImageName, progressRow.Error)
 		}
 		if strings.HasPrefix(progressRow.Status, "Status:") {
 			status = true
