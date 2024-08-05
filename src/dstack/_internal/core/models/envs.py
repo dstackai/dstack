@@ -51,6 +51,7 @@ class Env(BaseModel):
     NB: this is *NOT* a CoreModel, pydantic-duality, which is used as a base
     for the CoreModel, doesn't play well with custom root models.
     """
+
     __root__: Union[
         List[Annotated[str, Field(regex=_ENV_STRING_REGEX)]],
         Dict[str, Union[str, EnvSentinel]],

@@ -78,7 +78,6 @@ class BaseApplyConfigurator(ABC):
 
 
 class ApplyEnvVarsConfiguratorMixin(BaseApplyConfigurator):
-
     @classmethod
     def register_args(cls, parser: argparse.ArgumentParser):
         super().register_args(parser)

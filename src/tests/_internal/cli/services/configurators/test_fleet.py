@@ -19,7 +19,7 @@ class TestFleetConfigurator:
 
     def test_env_override(self):
         conf = create_conf()
-        conf.env=Env.parse_obj({"A": "0"})
+        conf.env = Env.parse_obj({"A": "0"})
         modified, args = apply_args(conf, ["-e", "A=1", "--env", "B=2"])
         conf.env = Env.parse_obj({"A": "1", "B": "2"})
         assert modified.dict() == conf.dict()
@@ -27,7 +27,7 @@ class TestFleetConfigurator:
     def test_env_value_from_environ(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("FROM_ENV", "2")
         conf = create_conf()
-        conf.env=Env.parse_obj({"FROM_CONF": "1"})
+        conf.env = Env.parse_obj({"FROM_CONF": "1"})
         modified, args = apply_args(conf, ["--env", "FROM_ENV"])
         conf.env = Env.parse_obj({"FROM_CONF": "1", "FROM_ENV": "2"})
         assert modified.dict() == conf.dict()
