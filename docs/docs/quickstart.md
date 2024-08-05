@@ -151,7 +151,7 @@ Your folder can be a regular local folder or a Git repo.
     A service allows you to deploy a web app or a model as a scalable endpoint. It lets you configure
     dependencies, resources, authorizarion, auto-scaling rules, etc. 
 
-    ??? info "Prerequisites
+    ??? info "Prerequisites"
         If you're using the open-source server, you must set up a [gateway](concepts/gateways.md) before you can run a service.
 
         If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},

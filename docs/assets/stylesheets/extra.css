@@ -1069,8 +1069,16 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         margin: 1em .8rem;
     }
 
+    .md-typeset .tabbed-block :is(h1, h2, h3, h4, h5) {
+        margin-left: .8rem;
+    }
+
     .md-tabs {
         display: none;
+    }
+
+    [data-termynal]:before {
+        left: 25px;
     }
 }
 @media screen and (min-width: 76.1875em) {
@@ -1240,6 +1248,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     fill: none;
     margin-left: -0.1rem;
     margin-top: 0.61rem;
+}
+
+.md-source__facts:nth-child(2) {
+    display: none;
 }
 
 .md-source__facts {

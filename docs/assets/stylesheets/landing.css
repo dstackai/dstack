@@ -620,6 +620,10 @@
     .tx-footer__section {
         margin-bottom: 1.5rem;
     }
+
+    .md-header__buttons {
+        padding: 4px 0;
+    }
 }
 
 @media screen and (min-width: 76.1875em) {
