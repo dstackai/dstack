@@ -1,0 +1,11 @@
+type: task
+name: spark-cluster
+image: spark
+nodes: 2
+commands:
+  - export SPARK_MASTER_HOST=$DSTACK_MASTER_NODE_IP
+  - export SPARK_NO_DAEMONIZE=true
+  - if [ $DSTACK_NODE_RANK = 0 ]; then /opt/spark/sbin/start-master.sh; else /opt/spark/sbin/start-worker.sh spark://$DSTACK_MASTER_NODE_IP:7077; fi
+ports:
+  - 7077
+  - 8080
