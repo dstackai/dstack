@@ -439,7 +439,7 @@ h4.doc-heading {
 
 .md-typeset pre > code {
     background-color: rgb(21, 22, 29);
-    padding: 45px 30px 35px 40px;
+    padding: 65px 30px 35px 40px;
     border-radius: 4px;
     font-size: 15px;
 
@@ -448,9 +448,11 @@ h4.doc-heading {
     /*background-color: rgba(0,0,0,.87);*/
     /*padding: 15px 20px;*/
     /*font-size: .85em;*/
+    font-family: var(--md-code-font-family) !important;
+    margin-top: -35px;
 }
 
-.md-typeset div[editor-title] pre > code:before {
+.md-typeset .highlight pre > code:before, .md-typeset div[editor-title] pre > code:before {
      content: '';
     position: absolute;
     top: 15px;
@@ -468,7 +470,8 @@ h4.doc-heading {
 }
 
 .md-typeset div[editor-title] pre > code {
-    padding: 65px 25px 35px 45px;
+    padding: 65px 35px 35px 35px;
+    margin-top: -35px;
 }
 
 @media screen and (min-width: 60em) {
@@ -494,8 +497,8 @@ h4.doc-heading {
 }
 
 .md-code__nav {
-    top: 1em;
-    right: .25em;
+    top: 0.175em;
+    right: .15em;
     background: none;
 }
 
@@ -648,6 +651,10 @@ code .md-code__nav:hover .md-code__button {
 
 .highlight .na, .highlight .nv, .highlight .vc, .highlight .vg, .highlight .vi {
     color: #c6c052;
+}
+
+.md-typeset .highlight .md-clipboard:after {
+    display: none;
 }
 
 .md-typeset .highlight .hll {
@@ -931,18 +938,18 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 .md-typeset .tabbed-labels>label {
     padding: 18px 18px 16px !important;
-    font-weight: 800 !important;
     font-size: 16.5px !important;
     line-height: 1.2 !important;
     -webkit-font-smoothing: auto !important;
     z-index: 1000 !important;
-    color: rgba(0,0,0,.63) !important;
     background: none;
 }
 
-.md-typeset .tabbed-labels--linked>label>a {
+.md-typeset .tabbed-labels--linked>label a {
     /*MKDocs Insiders fix*/
     padding: initial;
+    font-weight: 700 !important;
+    color: rgba(0,0,0,0.83) !important;
 }
 
 .md-typeset .tabbed-labels--linked>label>a code {
@@ -1448,6 +1455,7 @@ div[editor-title] code .editor-title {
     left: 0;
     width: 100%;
     text-align: center;
+    font-family: var(--md-code-font-family) !important;
 }
 
 .md-status:after, .md-status:hover:after{

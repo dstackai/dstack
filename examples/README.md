@@ -16,7 +16,7 @@ Now you are ready to run examples!
 
 ## Source code
 
-The source-code of examples can be found in  [`https://github.com/dstackai/dstack/examples`](https://github.com/dstackai/dstack/tree/master/examples).
+The source-code of examples can be found in  [`https://github.com/dstackai/dstack`](https://github.com/dstackai/dstack/tree/master/examples).
 
 ## Contributing
 
