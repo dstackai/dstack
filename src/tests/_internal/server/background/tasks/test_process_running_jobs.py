@@ -231,6 +231,7 @@ class TestProcessRunningJobs:
                 password="",
                 image_name="dstackai/base:py3.11-0.4-cuda-12.1",
                 container_name="test-run-0-0",
+                container_user="root",
                 shm_size=None,
                 public_keys=[project_ssh_pub_key, "user_ssh_key"],
                 ssh_user="ubuntu",

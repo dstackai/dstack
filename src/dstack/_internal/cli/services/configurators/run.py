@@ -372,9 +372,9 @@ def _print_finished_message(run: Run):
         return
 
     termination_reason, termination_reason_message = _get_run_termination_reason(run)
-    message = "Run failed due to unknown reason. Check CLI and server logs."
+    message = "Run failed due to unknown reason. Check CLI, server, and run logs."
     if run.status == RunStatus.TERMINATED:
-        message = "Run terminated due to unknown reason. Check CLI and server logs."
+        message = "Run terminated due to unknown reason. Check CLI, server, and run logs."
 
     if termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         message = (
@@ -382,21 +382,14 @@ def _print_finished_message(run: Run):
             "This is likely due to cloud providers not having enough capacity. "
             "Check CLI and server logs for more details."
         )
-    elif termination_reason == JobTerminationReason.CREATING_CONTAINER_ERROR:
-        message = (
-            "Cannot create container.\n"
-            f"Error: {termination_reason_message}\n"
-            "Check CLI and server logs for more details."
-        )
-    elif termination_reason == JobTerminationReason.EXECUTOR_ERROR:
-        message = (
-            f"Error: {termination_reason_message}\nCheck CLI and server logs for more details."
-        )
     elif termination_reason is not None:
+        error_details = (
+            f"Error: {termination_reason_message}\n" if termination_reason_message else ""
+        )
         message = (
             f"Run failed with error code {termination_reason.name}.\n"
-            f"Error: {termination_reason_message}\n"
-            "Check CLI and server logs for more details."
+            f"{error_details}"
+            "Check CLI, server, and run logs for more details."
         )
     console.print(f"[error]{message}[/]")
 
