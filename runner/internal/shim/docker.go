@@ -177,6 +177,14 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		if d.containerStatus.OOMKilled {
 			errMessage = "Container killed by OOM"
 		}
+		if errMessage == "" {
+			lastLogs, err := getContainerLastLogs(d.client, containerID, 5)
+			if err == nil {
+				errMessage = strings.Join(lastLogs, "\n")
+			} else {
+				log.Printf("getContainerLastLogs error: %s\n", err.Error())
+			}
+		}
 		d.jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: errMessage}
 		return tracerr.Wrap(err)
 	}
@@ -471,7 +479,12 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 
 	waitCh, errorCh := client.ContainerWait(ctx, containerID, "")
 	select {
-	case <-waitCh:
+	case waitResp := <-waitCh:
+		{
+			if waitResp.StatusCode != 0 {
+				return fmt.Errorf("container exited with exit code %d", waitResp.StatusCode)
+			}
+		}
 	case err := <-errorCh:
 		return tracerr.Wrap(err)
 	}
@@ -555,6 +568,32 @@ func getVolumeMounts(mountPoints []MountPoint) ([]mount.Mount, error) {
 		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: source, Target: mountPoint.Path})
 	}
 	return mounts, nil
+}
+
+func getContainerLastLogs(client docker.APIClient, containerID string, n int) ([]string, error) {
+	options := container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       fmt.Sprintf("%d", n),
+	}
+
+	ctx := context.Background()
+	reader, err := client.ContainerLogs(ctx, containerID, options)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	return lines, nil
 }
 
 /* DockerParameters interface implementation for CLIArgs */
