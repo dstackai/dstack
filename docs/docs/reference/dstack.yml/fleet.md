@@ -2,35 +2,52 @@
 
 The `fleet` configuration type allows creating and updating fleets.
 
-> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `fleet.dstack.yml` are both acceptable)
-> and can be located in the project's root directory or any nested folder.
-> Any configuration can be applied via [`dstack apply`](../cli/index.md#dstack-apply).
+> Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
+> (e.g. `.dstack.yml` or `fleet.dstack.yml` are both acceptable).
+> Any configuration can be run via [`dstack apply`](../cli/index.md#dstack-apply).
 
 ## Examples
 
-### Creating a cloud fleet { #create-cloud-fleet }
+### Cloud fleet { #cloud-fleet }
 
-<div editor-title="gcp-fleet.dstack.yml"> 
+<div editor-title="fleet-distrib.dstack.yml"> 
 
 ```yaml
 type: fleet
-name: my-gcp-fleet
+# The name is optional, if not specified, generated randomly
+name: my-fleet
+
+# The number of instances
 nodes: 4
+# Ensure the instances are interconnected
 placement: cluster
-backends: [gcp]
+
+# Use either spot or on-demand instances
+spot_policy: auto
+
 resources:
-  gpu: 1
+  gpu:
+    # 24GB or more vRAM
+    memory: 24GB..
+    # One or more GPU
+    count: 1..
 ```
 
 </div>
 
-### Creating an on-prem fleet { #create-ssh-fleet }
+### On-prem fleet { #on-prem-fleet }
 
-<div editor-title="ssh-fleet.dstack.yml"> 
+<div editor-title="fleet-on-prem.dstack.yml"> 
     
 ```yaml
 type: fleet
-name: my-ssh-fleet
+# The name is optional, if not specified, generated randomly
+name: my-on-prem-fleet
+
+# Ensure instances are interconnected
+placement: cluster
+
+# The user, private SSH key, and hostnames of the on-prem servers
 ssh_config:
   user: ubuntu
   identity_file: ~/.ssh/id_rsa
@@ -42,6 +59,8 @@ ssh_config:
 </div>
 
 [//]: # (TODO: a cluster, individual user and identity file, etc)
+
+[//]: # (TODO: other examples, for all properties like in dev-environment/task/service)
 
 ## Root reference
 
@@ -56,7 +75,6 @@ ssh_config:
 #SCHEMA# dstack._internal.core.models.fleets.SSHParams
     overrides:
       show_root_heading: false
-
 
 ## `ssh.hosts[n]`
 

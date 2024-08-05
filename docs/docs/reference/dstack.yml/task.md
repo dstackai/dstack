@@ -2,9 +2,9 @@
 
 The `task` configuration type allows running [tasks](../../tasks.md).
 
-> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
-> and can be located in the project's root directory or any nested folder.
-> Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
+> Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
+> (e.g. `.dstack.yml` or `train.dstack.yml` are both acceptable).
+> Any configuration can be run via [`dstack apply`](../cli/index.md#dstack-apply).
 
 ## Examples
 
@@ -18,9 +18,13 @@ The `python` property determines which default Docker image is used.
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: train    
 
-python: "3.11"
+# If `image` is not specified, dstack uses its base image
+python: "3.10"
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
@@ -28,9 +32,24 @@ commands:
 
 </div>
 
-!!! info "nvcc"
+??? info "nvcc"
     Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
     To install it, use `conda install cuda`.
+
+
+    ```yaml
+    type: task
+    # The name is optional, if not specified, generated randomly
+    name: train    
+
+    python: "3.10"
+    
+    # Before other commands, install `nvcc` (via `conda install cuda`)
+    commands:
+      - conda install cuda
+      - pip install -r fine-tuning/qlora/requirements.txt
+      - python fine-tuning/qlora/train.py
+    ```
 
 ### Ports { #_ports }
 
@@ -41,14 +60,17 @@ will securely allow you to access this port from your local machine through port
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: train    
 
-python: "3.11"
+python: "3.10"
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - tensorboard --logdir results/runs &
   - python fine-tuning/qlora/train.py
-  
+# Expose the port to access TensorBoard
 ports:
   - 6000
 ```
@@ -65,9 +87,13 @@ When running it, `dstack run` forwards `6000` port to `localhost:6000`, enabling
 
 ```yaml
 type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: train    
 
-image: dstackai/base:py3.11-0.4-cuda-12.1
+# Any custom Docker image
+image: dstackai/base:py3.10-0.4-cuda-12.1
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
@@ -80,12 +106,17 @@ commands:
 
     ```yaml
     type: dev-environment
+    # The name is optional, if not specified, generated randomly
+    name: train
     
-    image: dstackai/base:py3.11-0.4-cuda-12.1
+    # Any private Docker image
+    image: dstackai/base:py3.10-0.4-cuda-12.1
+    # Credentials of the private Docker registry
     registry_auth:
       username: peterschmidt85
       password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
     
+    # Commands of the task
     commands:
       - pip install -r fine-tuning/qlora/requirements.txt
       - python fine-tuning/qlora/train.py
@@ -100,7 +131,10 @@ range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: train    
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
@@ -108,13 +142,11 @@ commands:
 resources:
   # 200GB or more RAM
   memory: 200GB..
-
   # 4 GPUs from 40GB to 80GB
   gpu: 40GB..80GB:4
-
-  # Shared memory
+  # Shared memory (required by multi-gpu)
   shm_size: 16GB
-
+  # Disk size
   disk: 500GB
 ```
 
@@ -130,9 +162,12 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
 
     ```yaml
     type: task
+    # The name is optional, if not specified, generated randomly
+    name: train
     
-    python: "3.11"
+    python: "3.10"
     
+    # Commands of the task
     commands:
       - pip install torch~=2.3.0 torch_xla[tpu]~=2.3.0 torchvision -f https://storage.googleapis.com/libtpu-releases/index.html
       - git clone --recursive https://github.com/pytorch/xla.git
@@ -155,12 +190,14 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
 ```yaml
 type: task
 
-python: "3.11"
+python: "3.10"
 
+# Environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
   - HF_HUB_ENABLE_HF_TRANSFER=1
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
@@ -168,12 +205,12 @@ commands:
 
 </div>
 
-If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
+> If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
 `dstack` will require the value to be passed via the CLI or set in the current process.
 
 For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
 
-##### Default environment variables
+##### System environment variables
 
 The following environment variables are available in any run and are passed by `dstack` by default:
 
@@ -194,13 +231,15 @@ By default, the task runs on a single node. However, you can run it on a cluster
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: train-distrib
 
 # The size of the cluster
 nodes: 2
 
-python: "3.11"
-env:
-  - HF_HUB_ENABLE_HF_TRANSFER=1
+python: "3.10"
+
+# Commands of the task
 commands:
   - pip install -r requirements.txt
   - torchrun
@@ -220,13 +259,13 @@ resources:
 If you run the task, `dstack` first provisions the master node and then runs the other nodes of the cluster.
 All nodes are provisioned in the same region.
 
-`dstack` is easy to use with `accelerate`, `torchrun`, and other distributed frameworks. All you need to do
+> `dstack` is easy to use with `accelerate`, `torchrun`, and other distributed frameworks. All you need to do
 is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, `DSTACK_NODES_NUM`,
-`DSTACK_MASTER_NODE_IP`, and `DSTACK_GPUS_NUM` (see [System environment variables](#default-environment-variables)).
+`DSTACK_MASTER_NODE_IP`, and `DSTACK_GPUS_NUM` (see [System environment variables](#system-environment-variables)).
 
 ??? info "Backends"
-    Running on multiple nodes is supported only with `aws`, `gcp`, `azure`, `oci`, and instances added via
-    [`dstack pool add-ssh`](../../fleets.md#__tabbed_1_2).
+    Running on multiple nodes is supported only with the `aws`, `gcp`, `azure`, `oci` backends, or
+    [on-prem fleets](../../fleets.md#__tabbed_1_2).
 
 ### Web applications
 
@@ -236,13 +275,16 @@ Here's an example of using `ports` to run web apps with `tasks`.
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: streamlit-hello
 
-python: "3.11"
+python: "3.10"
 
+# Commands of the task
 commands:
   - pip3 install streamlit
   - streamlit hello
-
+# Expose the port to access the web app
 ports: 
   - 8501
 
@@ -258,11 +300,15 @@ You can choose whether to use spot instances, on-demand instances, or any availa
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: train    
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
+# Use either spot or on-demand instances
 spot_policy: auto
 ```
 
@@ -281,7 +327,10 @@ property:
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: train
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
@@ -303,11 +352,15 @@ By default, `dstack` provisions instances in all configured backends. However, y
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: train
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
+# Use only listed backends
 backends: [aws, gcp]
 ```
 
@@ -321,11 +374,15 @@ By default, `dstack` uses all configured regions. However, you can specify the l
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: train
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
+# Use only listed regions
 regions: [eu-west-1, eu-west-2]
 ```
 
@@ -340,13 +397,17 @@ To attach a volume, simply specify its name using the `volumes` property and spe
 
 ```yaml
 type: task
+# The name is optional, if not specified, generated randomly
+name: vscode    
 
-python: "3.11"
+python: "3.10"
 
+# Commands of the task
 commands:
   - pip install -r fine-tuning/qlora/requirements.txt
   - python fine-tuning/qlora/train.py
 
+# Map the name of the volume to any path
 volumes:
   - name: my-new-volume
     path: /volume_data

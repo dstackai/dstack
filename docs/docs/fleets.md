@@ -15,7 +15,7 @@ are both acceptable).
     To provision a fleet in the cloud using the configured backends, specify the required resources, number of nodes, 
     and other optional parameters.
     
-    <div editor-title="examples/fine-tuning/alignment-handbook/fleet-distributed.dstack.yml">
+    <div editor-title="examples/fine-tuning/alignment-handbook/fleet-distrib.dstack.yml">
     
     ```yaml
     type: fleet
@@ -49,7 +49,7 @@ are both acceptable).
 
     To create a fleet from on-prem servers, specify their hosts along with the user, port, and SSH key for connection via SSH.
 
-    <div editor-title="on-prem-fleet.dstack.yml"> 
+    <div editor-title="fleet-on-prem.dstack.yml"> 
     
     ```yaml
     type: fleet
