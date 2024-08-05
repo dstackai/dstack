@@ -394,16 +394,23 @@ gcloud projects list --format="json(projectId)"
 
     ```
     compute.disks.create
+    compute.disks.delete
+    compute.disks.get
+    compute.disks.list
+    compute.disks.use
     compute.firewalls.create
     compute.images.useReadOnly
+    compute.instances.attachDisk
     compute.instances.create
     compute.instances.delete
+    compute.instances.detachDisk
     compute.instances.get
     compute.instances.setLabels
     compute.instances.setMetadata
     compute.instances.setTags
     compute.networks.get
     compute.networks.updatePolicy
+    compute.regions.get
     compute.regions.list
     compute.subnetworks.list
     compute.subnetworks.use
