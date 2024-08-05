@@ -1,0 +1,5 @@
+type: fleet
+name: spark-fleet
+nodes: 3
+placement: cluster
+backends: [gcp]

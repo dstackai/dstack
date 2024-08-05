@@ -1,0 +1,8 @@
+type: task
+name: spark-task
+image: spark
+env:
+  - SPARK_CLUSTER_IP
+commands:
+  - pip install pyspark
+  - python3 tasks/words.py
