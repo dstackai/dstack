@@ -55,7 +55,7 @@ class TensorDockAPIClient:
             % max(hostnode["networking"]["ports"]),  # it's safer to use a higher port
             "internal_ports": "{22}",
             "hostnode": instance.name,
-            "storage": 100,  # TODO(egor-s): take from instance.resources
+            "storage": round(instance.resources.disk.size_mib / 1024),
             "operating_system": "Ubuntu 22.04 LTS",
             "cloudinit_script": yaml.dump(cloudinit).replace("\n", "\\n"),
         }
