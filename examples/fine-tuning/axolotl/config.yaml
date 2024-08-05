@@ -79,4 +79,4 @@ fsdp_config:
 special_tokens:
   pad_token: <|end_of_text|>
 
-hub_model_id: chansung/axolotl_llama3_8b_fsdp_qlora
+hub_model_id: peterschmidt85/axolotl_llama3_8b_fsdp_qlora

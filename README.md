@@ -14,14 +14,13 @@
 
 </div>
 
-`dstack` is an open-source container orchestration engine for AI. 
-It accelerates the development, training, and deployment of AI models, and simplifies the management of clusters.
+`dstack` is a lightweight alternative to Kubernetes, designed specifically for managing the development, training, and
+deployment of AI models at any scale.
 
-#### Cloud and on-prem
+`dstack` is easy to use with any cloud provider (AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, etc.) or
+any on-prem clusters.
 
-`dstack` is easy to use with any cloud or on-prem servers.
-Supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
-For using `dstack` with on-prem servers, see [fleets](https://dstack.ai/docs/fleets#__tabbed_1_2).
+If you already use Kubernetes, `dstack` can be used with it.
 
 #### Accelerators
 
@@ -29,40 +28,29 @@ For using `dstack` with on-prem servers, see [fleets](https://dstack.ai/docs/fle
  
 ## Major news ✨
 
-- [2024/07] [dstack 0.18.7: Fleets, RunPod Volumes, dstack apply, and more](https://github.com/dstackai/dstack/releases/tag/0.18.7) (Release)
+- [2024/07] [dstack 0.18.8: GCP volumes](https://github.com/dstackai/dstack/releases/tag/0.18.8) (Release)
+- [2024/07] [dstack 0.18.7: Fleets, RunPod volumes, dstack apply, and more](https://github.com/dstackai/dstack/releases/tag/0.18.7) (Release)
 - [2024/05] [dstack 0.18.4: Google Cloud TPU, and more](https://github.com/dstackai/dstack/releases/tag/0.18.4) (Release)
 - [2024/05] [dstack 0.18.3: OCI, and more](https://github.com/dstackai/dstack/releases/tag/0.18.3) (Release)
 - [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
-- [2024/04] [dstack 0.18.0: RunPod, multi-node tasks, and more](https://github.com/dstackai/dstack/releases/tag/0.18.0) (Release)
 
 ## Installation
 
 Before using `dstack` through CLI or API, set up a `dstack` server.
 
-### Install the server
-    
-The easiest way to install the server, is via `pip`:
+### 1. Configure backends
 
-```shell
-pip install "dstack[all]" -U
-```
+If you want the `dstack` server to run containers or manage clusters in your cloud accounts (or use Kubernetes),
+create the [~/.dstack/server/config.yml](https://dstack.ai/docs/reference/server/config.yml.md) file and configure backends.
 
-### Configure backends
+### 2. Start the server
 
-If you have default AWS, GCP, Azure, or OCI credentials on your machine, the `dstack` server will pick them up automatically.
-
-Otherwise, you need to manually specify the cloud credentials in `~/.dstack/server/config.yml`.
-
-See the [server/config.yml reference](https://dstack.ai/docs/reference/server/config.yml.md#examples)
-for details on how to configure backends for all supported cloud providers.
-
-### Start the server
-
-To start the server, use the `dstack server` command:
+Once the `~/.dstack/server/config.yml` file is configured, proceed to start the server:
 
 <div class="termy">
 
 ```shell
+$ pip install "dstack[all]" -U
 $ dstack server
 
 Applying ~/.dstack/server/config.yml...
@@ -76,42 +64,58 @@ The server is running at http://127.0.0.1:3000/
 > **Note**
 > It's also possible to run the server via [Docker](https://hub.docker.com/r/dstackai/dstack).
 
-### Add on-prem servers
+The `dstack` server can run anywhere: on your laptop, a dedicated server, or in the cloud. Once it's up, you
+can use either the CLI or the API.
+
+### 3. Set up the CLI
+
+To point the CLI to the `dstack` server, configure it
+with the server address, user token, and project name:
+
+```shell
+$ pip install dstack
+$ dstack config --url http://127.0.0.1:3000 \
+    --project main \
+    --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
     
-If you'd like to use `dstack` to run workloads on your on-prem servers,
-see [on-prem fleets](https://dstack.ai/docs/fleets#__tabbed_1_2) command.
+Configuration is updated at ~/.dstack/config.yml
+```
+
+### 4. Create on-prem fleets
+    
+> If you want the `dstack` server to run containers on your on-prem servers,
+use [fleets](../fleets.md#__tabbed_1_2).
 
 ## How does it work?
 
-### 1. Define run configurations
+> Before using `dstack`, [install](https://dstack.ai/docs/installation/index.md) the server and configure backends.
 
-`dstack` supports three types of run configurations:
+### 1. Define configurations
+
+`dstack` supports the following configurations:
    
 * [Dev environments](https://dstack.ai/docs/dev-environments.md) &mdash; for interactive development using a desktop IDE
-* [Tasks](https://dstack.ai/docs/tasks.md) &mdash; for any kind of batch jobs or web applications (supports distributed jobs)
-* [Services](https://dstack.ai/docs/services.md)&mdash; for production-grade deployment (supports auto-scaling and authorization)
-
-Each type of run configuration allows you to specify commands for execution, required compute resources, retry policies, auto-scaling rules, authorization settings, and more.
+* [Tasks](https://dstack.ai/docs/tasks.md) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
+* [Services](https://dstack.ai/docs/services.md) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
+* [Fleets](https://dstack.ai/docs/fleets.md) &mdash; for managing cloud and on-prem clusters
+* [Volumes](https://dstack.ai/docs/concepts/volumes.md) &mdash; for managing persisted volumes
+* [Gateways](https://dstack.ai/docs/concepts/volumes.md) &mdash; for configuring the ingress traffic and public endpoints
 
 Configuration can be defined as YAML files within your repo.
 
-### 2. Run configurations
+### 2. Apply configurations
 
-Run any defined configuration either via `dstack` CLI or API.
-   
-`dstack` automatically handles provisioning, interruptions, port-forwarding, auto-scaling, network, volumes, 
-run failures, out-of-capacity errors, and more.
+Apply the configuration either via the `dstack apply` CLI command or through a programmatic API.
 
-### 3. Manage fleets
-
-Use [fleets](https://dstack.ai/docs/fleets.md) to provision and manage clusters and instances, both in the cloud and on-prem.
+`dstack` automatically manages provisioning, job queuing, auto-scaling, networking, volumes, run failures,
+out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-prem clusters.
 
 ## More information
 
 For additional information and examples, see the following links:
 
 * [Docs](https://dstack.ai/docs)
-* [Examples](examples)
+* [Examples](https://dstack.ai/docs/examples)
 * [Changelog](https://github.com/dstackai/dstack/releases)
 * [Discord](https://discord.gg/u8SmfwPpMd)
 

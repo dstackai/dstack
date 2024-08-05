@@ -2,25 +2,32 @@
 
 The `gateway` configuration type allows creating and updating [gateways](../../services.md).
 
-> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `gateway.dstack.yml` are both acceptable)
-> and can be located in the project's root directory or any nested folder.
-> Any configuration can be applied via [`dstack apply`](../cli/index.md#dstack-apply).
+> Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
+> (e.g. `.dstack.yml` or `gateway.dstack.yml` are both acceptable).
+> Any configuration can be run via [`dstack apply`](../cli/index.md#dstack-apply).
 
 ## Examples
+
+### Creating a new gateway { #new-gateway }
 
 <div editor-title="gateway.dstack.yml"> 
 
 ```yaml
 type: gateway
+# A name of the gateway
 name: example-gateway
 
+# Gateways are bound to a specific backend and region
 backend: aws
 region: eu-west-1
+
+# This domain will be used to access the endpoint
 domain: example.com
 ```
 
 </div>
 
+[//]: # (TODO: other examples, e.g. private gateways)
 
 ## Root reference
 

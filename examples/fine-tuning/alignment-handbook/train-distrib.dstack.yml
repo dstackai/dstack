@@ -25,17 +25,20 @@ commands:
     --machine_rank=$DSTACK_NODE_RANK
     --num_processes=$DSTACK_GPUS_NUM
     --num_machines=$DSTACK_NODES_NUM
-    scripts/run_sft.py 
+    scripts/run_sft.py
     ../examples/fine-tuning/alignment-handbook/config.yaml
 # Expose 6006 to access TensorBoard
 ports:
   - 6006
 
-# The number of interconnected instances required
+# Number of instances in cluster
 nodes: 2
 
 resources:
-  # Required resources
-  gpu: 24GB
-  # Shared memory size for inter-process communication
+  gpu:
+    # 24GB or more vRAM
+    memory: 24GB..
+    # One or more GPU
+    count: 1..
+  # Shared memory (for multi-gpu)
   shm_size: 24GB

@@ -1,8 +1,8 @@
 type: fleet
 # The name is optional, if not specified, generated randomly
-name: axolotl-fleet
+name: llama31-fleet
 
-# Number of instances in fleet
+# Need one instance only
 nodes: 1
 
 # Use either spot or on-demand instances
@@ -11,7 +11,5 @@ spot_policy: auto
 termination_idle_time: 1h
 
 resources:
-  # 24GB or more vRAM
-  memory: 24GB..
-  # Two or more GPU (required by FSDP)
-  count: 2..
+  # Required resources
+  gpu: 24GB

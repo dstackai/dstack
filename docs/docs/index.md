@@ -1,13 +1,12 @@
 # What is dstack?
 
-`dstack` is an open-source container orchestration engine for AI. 
-It accelerates the development, training, and deployment of AI models, and simplifies the management of clusters.
+`dstack` is a lightweight alternative to Kubernetes, designed specifically for managing the development, training, and
+deployment of AI models at any scale.
 
-#### Cloud and on-prem
+`dstack` is easy to use with any cloud provider (AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, etc.) or
+any on-prem clusters.
 
-`dstack` is easy to use with any cloud or on-prem servers.
-Supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
-For using `dstack` with on-prem servers, see [fleets](fleets.md#__tabbed_1_2).
+If you already use Kubernetes, `dstack` can be used with it.
 
 #### Accelerators
 
@@ -15,35 +14,31 @@ For using `dstack` with on-prem servers, see [fleets](fleets.md#__tabbed_1_2).
 
 ## How does it work?
 
-> Before using `dstack`, [install](installation/index.md) the server and configure 
-backends for each cloud account (or Kubernetes cluster) that you intend to use.
+> Before using `dstack`, [install](installation/index.md) the server and configure backends.
 
-#### 1. Define run configurations
+#### 1. Define configurations
 
-`dstack` supports three types of run configurations:
+`dstack` supports the following configurations:
    
 * [Dev environments](dev-environments.md) &mdash; for interactive development using a desktop IDE
-* [Tasks](tasks.md) &mdash; for any kind of batch jobs or web applications (supports distributed jobs)
-* [Services](services.md)&mdash; for production-grade deployment (supports auto-scaling and authorization)
-
-Each type of run configuration allows you to specify commands for execution, required compute resources, retry policies, auto-scaling rules, authorization settings, and more.
+* [Tasks](tasks.md) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
+* [Services](services.md) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
+* [Fleets](fleets.md) &mdash; for managing cloud and on-prem clusters
+* [Volumes](concepts/volumes.md) &mdash; for managing persisted volumes
+* [Gateways](concepts/volumes.md) &mdash; for configuring the ingress traffic and public endpoints
 
 Configuration can be defined as YAML files within your repo.
 
-#### 2. Run configurations
+#### 2. Apply configurations
 
-Run any defined configuration either via `dstack` CLI or API.
-   
-`dstack` automatically handles provisioning, interruptions, port-forwarding, auto-scaling, network, volumes, 
-run failures, out-of-capacity errors, and more.
+Apply the configuration either via the `dstack apply` CLI command or through a programmatic API.
 
-#### 3. Manage fleets
-
-Use [fleets](fleets.md) to provision and manage clusters and instances, both in the cloud and on-prem.
+`dstack` automatically manages provisioning, job queuing, auto-scaling, networking, volumes, run failures,
+out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-prem clusters.
 
 ## Where do I start?
 
 1. Proceed to [installation](installation/index.md)
 2. See [quickstart](quickstart.md)
-3. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
+3. Browse [examples](/docs/examples)
 4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}

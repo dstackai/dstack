@@ -13,7 +13,7 @@ Follow the steps below to set up the server.
 
 ### 1. Configure backends
 
-> If you want the `dstack` server to run containers or manage clusters in your cloud accounts (or use Kubernetes),
+If you want the `dstack` server to run containers or manage clusters in your cloud accounts (or use Kubernetes),
 create the [~/.dstack/server/config.yml](../reference/server/config.yml.md) file and configure backends.
 
 ### 2. Start the server
@@ -55,16 +55,16 @@ Once the `~/.dstack/server/config.yml` file is configured, proceed to start the 
 
     > For more details on how to deploy `dstack` using Docker, check its [Docker repo](https://hub.docker.com/r/dstackai/dstack).
 
-> By default, the `dstack` server stores its state in `~/.dstack/server/data` using SQLite.
-> To use a database, set the [`DSTACK_DATABASE_URL`](../reference/cli/index.md#environment-variables) environment variable.
+By default, the `dstack` server stores its state in `~/.dstack/server/data` using SQLite.
+To use a database, set the [`DSTACK_DATABASE_URL`](../reference/cli/index.md#environment-variables) environment variable.
 
-The server can be set up anywhere: on your laptop, a dedicated server, or in the cloud.
-Once the `dstack` server is up, you can use the CLI or API.
+The `dstack` server can run anywhere: on your laptop, a dedicated server, or in the cloud. Once it's up, you
+can use either the CLI or the API.
 
 ### 3. Set up the CLI
 
 To point the CLI to the `dstack` server, configure it
-with the server address, user token and project name:
+with the server address, user token, and project name:
 
 <div class="termy">
 
@@ -81,51 +81,10 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-### 4. Add on-prem servers
+### 4. Create on-prem fleets
     
-!!! info "Fleets"
-    If you want the `dstack` server to run containers on your on-prem servers,
-    use [fleets](../fleets.md#__tabbed_1_2).
-
-## dstack Sky
-
-If you don't want to host the `dstack` server yourself or would like to access GPU from the `dstack` marketplace, sign up with
-[dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
-
-### Set up the CLI
-
-If you've signed up,
-open your project settings, and copy the `dstack config` command to point the CLI to the project.
-
-![](https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-sky-project-config.png){ width=800 }
-
-Then, install the CLI on your machine and use the copied command.
-
-<div class="termy">
-
-```shell
-$ pip install dstack
-$ dstack config --url https://sky.dstack.ai \
-    --project peterschmidt85 \
-    --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
-    
-Configuration is updated at ~/.dstack/config.yml
-```
-
-</div>
-
-### Configure clouds
-
-By default, [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"} 
-uses the GPU from its marketplace, which requires a credit card to be attached in your account
-settings.
-
-To use your own cloud accounts, click the settings icon of the corresponding backend and specify credentials:
-
-![](https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-sky-edit-backend-config.png){ width=800 }
-
-[//]: # (The `dstack server` command automatically updates `~/.dstack/config.yml`)
-[//]: # (with the `main` project.)
+If you want the `dstack` server to run containers on your on-prem servers,
+use [fleets](../fleets.md#__tabbed_1_2).
 
 ## What's next?
 
@@ -133,3 +92,7 @@ To use your own cloud accounts, click the settings icon of the corresponding bac
 2. Follow [quickstart](../quickstart.md)
 3. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples)
 4. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
+
+!!! info "dstack Sky"
+    If you don't want to host the `dstack` server or would like to access GPU from the `dstack` marketplace, 
+    check [dstack Sky](../guides/dstack-sky.md).

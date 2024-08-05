@@ -28,5 +28,8 @@ commands:
 #  - 6006
 
 resources:
-  # Required resources
-  gpu: 24GB
+  gpu:
+    # 24GB or more vRAM
+    memory: 24GB..
+    # One or more GPU
+    count: 1..

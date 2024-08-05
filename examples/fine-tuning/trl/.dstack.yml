@@ -1,6 +1,6 @@
 type: dev-environment
 # The name is optional, if not specified, generated randomly
-name: ah-vscode
+name: trl-vscode
 
 # If `image` is not specified, dstack uses its default image
 python: "3.10"
@@ -10,15 +10,17 @@ env:
   - HUGGING_FACE_HUB_TOKEN
   - ACCELERATE_LOG_LEVEL=info
   - WANDB_API_KEY
-
 # Uncomment if you want the environment to be pre-installed
 #init:
 #  - conda install cuda
-#  - git clone https://github.com/huggingface/alignment-handbook.git
-#  - cd alignment-handbook
-#  - pip install .
 #  - pip install flash-attn --no-build-isolation
+#  - pip install "transformers>=4.43.2"
+#  - pip install bitsandbytes
+#  - pip install peft
 #  - pip install wandb
+#  - git clone https://github.com/huggingface/trl
+#  - cd trl
+#  - pip install .
 
 ide: vscode
 
