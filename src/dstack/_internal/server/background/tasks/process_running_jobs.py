@@ -395,6 +395,8 @@ def _process_provisioning_with_shim(
         password=password,
         image_name=job_spec.image_name,
         container_name=job_model.job_name,
+        # Images may use non-root users but dstack requires root, so force it.
+        container_user="root",
         shm_size=job_spec.requirements.resources.shm_size,
         public_keys=public_keys,
         ssh_user=ssh_user,

@@ -84,6 +84,7 @@ class TaskConfigBody(CoreModel):
     password: str
     image_name: str
     container_name: str
+    container_user: Optional[str]
     shm_size: int
     public_keys: List[str]
     ssh_user: str

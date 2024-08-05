@@ -451,6 +451,9 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
 		Env:          envVars,
 	}
+	if taskConfig.ContainerUser != "" {
+		containerConfig.User = taskConfig.ContainerUser
+	}
 	hostConfig := &container.HostConfig{
 		Privileged:      dockerParams.DockerPrivileged(),
 		NetworkMode:     getNetworkMode(),
