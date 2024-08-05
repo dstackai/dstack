@@ -20,6 +20,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import (
     DockerConfig,
     InstanceAvailability,
@@ -628,6 +629,7 @@ async def create_ssh_instance_model(
     port: int,
     ssh_user: str,
     ssh_keys: List[SSHKey],
+    env: Env,
 ) -> InstanceModel:
     # TODO: doc - will overwrite after remote connected
     instance_resource = Resources(cpus=2, memory_mib=8, gpus=[], spot=False)
@@ -657,11 +659,12 @@ async def create_ssh_instance_model(
         price=0.0,
         availability=InstanceAvailability.AVAILABLE,
     )
-    ssh_connection_info = RemoteConnectionInfo(
+    remote_connection_info = RemoteConnectionInfo(
         host=host,
         port=port,
         ssh_user=ssh_user,
         ssh_keys=ssh_keys,
+        env=env,
     )
     im = InstanceModel(
         id=uuid.uuid4(),
@@ -675,7 +678,7 @@ async def create_ssh_instance_model(
         status=InstanceStatus.PENDING,
         unreachable=False,
         job_provisioning_data=remote.json(),
-        remote_connection_info=ssh_connection_info.json(),
+        remote_connection_info=remote_connection_info.json(),
         offer=offer.json(),
         region=offer.region,
         price=offer.price,

@@ -167,6 +167,11 @@ def deploy_instance(
         shim_envs = get_shim_env(
             runner_build, authorized_keys=[sk.public for sk in remote_details.ssh_keys]
         )
+        try:
+            fleet_configuration_envs = remote_details.env.as_dict()
+        except ValueError as e:
+            raise ProvisioningError(f"Invalid Env: {e}") from e
+        shim_envs.update(fleet_configuration_envs)
         upload_envs(client, DSTACK_WORKING_DIR, shim_envs)
         logger.debug("The dstack-shim environment variables have been installed")
 

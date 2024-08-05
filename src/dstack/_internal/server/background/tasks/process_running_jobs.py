@@ -551,12 +551,19 @@ def _submit_job_to_runner(
         fmt(job_model),
         None if repo_credentials is None else repo_credentials.clone_url,
     )
+    instance = job_model.instance
+    if instance is not None and instance.remote_connection_info is not None:
+        remote_info = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
+        instance_env = remote_info.env
+    else:
+        instance_env = None
     runner_client.submit_job(
         run_spec=run.run_spec,
         job_spec=job.job_spec,
         cluster_info=cluster_info,
         secrets=secrets,
         repo_credentials=repo_credentials,
+        instance_env=instance_env,
     )
     logger.debug("%s: uploading code", fmt(job_model))
     runner_client.upload_code(code)

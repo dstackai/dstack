@@ -8,6 +8,7 @@ from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
@@ -85,6 +86,10 @@ class SSHParams(CoreModel):
 
 
 class InstanceGroupParams(CoreModel):
+    env: Annotated[
+        Env,
+        Field(description="The mapping or the list of environment variables"),
+    ] = Env()
     ssh_config: Annotated[
         Optional[SSHParams],
         Field(description="The parameters for adding instances via SSH"),

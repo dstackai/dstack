@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, RegistryAuth
+from dstack._internal.core.models.envs import Env
 from dstack._internal.server.services.docker import DockerImage
 from dstack._internal.utils.common import pretty_resources
 
@@ -65,6 +66,7 @@ class RemoteConnectionInfo(CoreModel):
     port: int
     ssh_user: str
     ssh_keys: List[SSHKey]
+    env: Env = Env()
 
 
 class DockerConfig(CoreModel):

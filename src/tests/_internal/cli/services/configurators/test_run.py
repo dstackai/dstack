@@ -11,13 +11,14 @@ from dstack._internal.core.models.configurations import (
     PortMapping,
     TaskConfiguration,
 )
+from dstack._internal.core.models.envs import Env
 
 
 class TestRunConfigurator:
     def test_env(self):
         conf = TaskConfiguration(commands=["whoami"])
         modified, args = apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = {"A": "1", "B": "2"}
+        conf.env = Env.parse_obj({"A": "1", "B": "2"})
         assert modified.dict() == conf.dict()
 
     def test_ports(self):
@@ -35,9 +36,9 @@ class TestRunConfigurator:
             apply_args(conf, ["-p", "8000:80", "--port", "8001:80"])
 
     def test_env_override(self):
-        conf = TaskConfiguration(commands=["whoami"], env={"A": "0"})
+        conf = TaskConfiguration(commands=["whoami"], env=Env.parse_obj({"A": "0"}))
         modified, args = apply_args(conf, ["-e", "A=1", "--env", "B=2"])
-        conf.env = {"A": "1", "B": "2"}
+        conf.env = Env.parse_obj({"A": "1", "B": "2"})
         assert modified.dict() == conf.dict()
 
     def test_ports_override(self):

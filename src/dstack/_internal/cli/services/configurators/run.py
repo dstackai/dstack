@@ -1,5 +1,4 @@
 import argparse
-import os
 import subprocess
 import sys
 import time
@@ -7,8 +6,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import dstack._internal.core.models.resources as resources
-from dstack._internal.cli.services.args import disk_spec, env_var, gpu_spec, port_mapping
-from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
+from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
+from dstack._internal.cli.services.configurators.base import (
+    ApplyEnvVarsConfiguratorMixin,
+    BaseApplyConfigurator,
+)
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
@@ -18,14 +20,12 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     ApplyConfigurationType,
     BaseRunConfiguration,
     BaseRunConfigurationWithPorts,
     DevEnvironmentConfiguration,
-    EnvSentinel,
     PortMapping,
     RunConfigurationType,
     ServiceConfiguration,
@@ -38,7 +38,7 @@ from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
 
 
-class BaseRunConfigurator(BaseApplyConfigurator):
+class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     TYPE: ApplyConfigurationType
 
     def apply_configuration(
@@ -230,15 +230,6 @@ class BaseRunConfigurator(BaseApplyConfigurator):
             default=3,
         )
         parser.add_argument(
-            "-e",
-            "--env",
-            type=env_var,
-            action="append",
-            help="Environment variables",
-            dest="envs",
-            metavar="KEY=VALUE",
-        )
-        parser.add_argument(
             "--gpu",
             type=gpu_spec,
             help="Request GPU for the run. "
@@ -253,26 +244,19 @@ class BaseRunConfigurator(BaseApplyConfigurator):
             metavar="RANGE",
             dest="disk_spec",
         )
+        super().register_args(parser)
         register_profile_args(parser)
 
     def apply_args(self, conf: BaseRunConfiguration, args: argparse.Namespace, unknown: List[str]):
         apply_profile_args(args, conf)
         if args.run_name:
             conf.name = args.run_name
-        if args.envs:
-            for k, v in args.envs:
-                conf.env[k] = v
         if args.gpu_spec:
             conf.resources.gpu = resources.GPUSpec.parse_obj(args.gpu_spec)
         if args.disk_spec:
             conf.resources.disk = args.disk_spec
 
-        for k, v in conf.env.items():
-            if is_core_model_instance(v, EnvSentinel):
-                try:
-                    conf.env[k] = v.from_env(os.environ)
-                except ValueError as e:
-                    raise ConfigurationError(*e.args)
+        self.apply_env_vars(conf.env, args)
 
         self.interpolate_run_args(conf.setup, unknown)
 

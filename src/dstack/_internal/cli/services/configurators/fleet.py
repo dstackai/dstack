@@ -3,10 +3,13 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
+from dstack._internal.cli.services.configurators.base import (
+    ApplyEnvVarsConfiguratorMixin,
+    BaseApplyConfigurator,
+)
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.fleet import print_fleets_table
-from dstack._internal.core.errors import ResourceNotExistsError
+from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec
 from dstack._internal.core.models.instances import SSHKey
@@ -17,7 +20,7 @@ from dstack.api.utils import load_profile
 logger = get_logger(__name__)
 
 
-class FleetConfigurator(BaseApplyConfigurator):
+class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     TYPE: ApplyConfigurationType = ApplyConfigurationType.FLEET
 
     def apply_configuration(
@@ -28,6 +31,7 @@ class FleetConfigurator(BaseApplyConfigurator):
         configurator_args: argparse.Namespace,
         unknown_args: List[str],
     ):
+        self.apply_args(conf, configurator_args, unknown_args)
         profile = load_profile(Path.cwd(), None)
         spec = FleetSpec(
             configuration=conf,
@@ -124,6 +128,11 @@ class FleetConfigurator(BaseApplyConfigurator):
                     time.sleep(1)
 
         console.print(f"Fleet [code]{conf.name}[/] deleted")
+
+    def apply_args(self, conf: FleetConfiguration, args: argparse.Namespace, unknown: List[str]):
+        self.apply_env_vars(conf.env, args)
+        if conf.ssh_config is None and conf.env:
+            raise ConfigurationError("`env` is currently supported for on-prem fleets only")
 
 
 def _preprocess_spec(spec: FleetSpec):
