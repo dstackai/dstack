@@ -245,7 +245,6 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             metavar="RANGE",
             dest="disk_spec",
         )
-        super().register_args(parser)
         register_profile_args(parser)
 
     def apply_args(self, conf: BaseRunConfiguration, args: argparse.Namespace, unknown: List[str]):
