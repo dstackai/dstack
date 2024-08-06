@@ -130,3 +130,24 @@ class TestGPU:
         assert parse_obj_as(GPUSpec, "16GB..32") == parse_obj_as(
             GPUSpec, {"memory": {"min": 16, "max": 32}}
         )
+
+
+@pytest.mark.parametrize(
+    ("r1", "r2", "intersection"),
+    [
+        (Range[int](min=1, max=2), Range[int](min=3, max=4), None),
+        (Range[int](min=1, max=2), Range[int](min=2, max=3), Range[int](min=2, max=2)),
+        (Range[int](min=1, max=2), Range[int](min=1, max=2), Range[int](min=1, max=2)),
+        (Range[int](min=1, max=3), Range[int](min=2, max=4), Range[int](min=2, max=3)),
+        (Range[int](min=1, max=4), Range[int](min=2, max=3), Range[int](min=2, max=3)),
+        (Range[int](min=None, max=1), Range[int](min=2, max=None), None),
+        (Range[int](min=None, max=1), Range[int](min=1, max=None), Range[int](min=1, max=1)),
+        (Range[int](min=None, max=2), Range[int](min=1, max=None), Range[int](min=1, max=2)),
+        (Range[int](min=None, max=1), Range[int](min=None, max=2), Range[int](min=None, max=1)),
+        (Range[int](min=1, max=None), Range[int](min=2, max=None), Range[int](min=2, max=None)),
+        (Range[int](min=1, max=None), Range[int](min=None, max=2), Range[int](min=1, max=2)),
+    ],
+)
+def test_intersect_ranges(r1: Range[int], r2: Range[int], intersection: Range[int]) -> None:
+    assert r1.intersect(r2) == intersection
+    assert r2.intersect(r1) == intersection
