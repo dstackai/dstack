@@ -545,8 +545,7 @@ projects:
 
 ### TensorDock
 
-Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
-section to create a new authorization key.
+Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
 
 Then, go ahead and configure the backend:
 
