@@ -77,10 +77,9 @@ class BaseApplyConfigurator(ABC):
         pass
 
 
-class ApplyEnvVarsConfiguratorMixin(BaseApplyConfigurator):
+class ApplyEnvVarsConfiguratorMixin:
     @classmethod
-    def register_args(cls, parser: argparse.ArgumentParser):
-        super().register_args(parser)
+    def register_env_args(cls, parser: argparse.ArgumentParser):
         parser.add_argument(
             "-e",
             "--env",

@@ -229,6 +229,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             type=int,
             default=3,
         )
+        cls.register_env_args(parser)
         parser.add_argument(
             "--gpu",
             type=gpu_spec,

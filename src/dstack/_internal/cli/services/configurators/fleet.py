@@ -23,6 +23,10 @@ logger = get_logger(__name__)
 class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     TYPE: ApplyConfigurationType = ApplyConfigurationType.FLEET
 
+    @classmethod
+    def register_args(cls, parser: argparse.ArgumentParser):
+        cls.register_env_args(parser)
+
     def apply_configuration(
         self,
         conf: FleetConfiguration,
