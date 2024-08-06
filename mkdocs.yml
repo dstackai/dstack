@@ -224,6 +224,8 @@ nav:
               - REST API: docs/reference/api/rest/index.md
   - Examples:
       - docs/examples/index.md
+      - LLMs:
+          - Llama 3.1: docs/examples/llms/llama31/index.md
       - Fine-tuning:
           - Alignment Handbook: docs/examples/fine-tuning/alignment-handbook/index.md
           - Axolotl: docs/examples/fine-tuning/axolotl/index.md

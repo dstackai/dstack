@@ -19,3 +19,5 @@ resources:
     memory: 24GB..
     # Two or more GPU (required by FSDP)
     count: 2..
+  # Shared memory size for inter-process communication
+  shm_size: 24GB

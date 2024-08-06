@@ -102,7 +102,7 @@ dstack apply -f examples/fine-tuning/axolotl/.dstack.yaml
 
 ## Source code
 
-The source-code of this example can be found in  [`https://github.com/dstackai/dstack/examples/fine-tuning/axolotl`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl).
+The source-code of this example can be found in  [examples/fine-tuning/axolotl](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl).
 
 ## Contributing
 
@@ -110,7 +110,6 @@ Find a mistake or can't find an important example? Raise an [issue](https://gith
 
 ## What's next?
 
-1. Browse [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl).
+1. Browse [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl).
 2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).
-3. See other [examples](https://github.com/dstackai/dstack/blob/master/examples/).

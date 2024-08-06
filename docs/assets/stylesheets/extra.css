@@ -138,6 +138,15 @@
     padding-left: 32px;
 }
 
+.md-typeset__scrollwrap {
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.md-typeset__table {
+    margin-bottom: 0;
+}
+
 .admonition-title, details > summary {
     border: none !important;
     background-color: transparent !important;
@@ -974,9 +983,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
    border-radius: 0;
 }
 
-.md-typeset .tabbed-block>.highlight:first-child>pre>code, .md-typeset .tabbed-block>pre:first-child>code,
-.md-typeset .tabbed-block>.termy {
-    margin-top: 17px;
+.md-typeset .tabbed-block>.highlight, .md-typeset .tabbed-block>.termy {
+    margin-top: 20px;
 }
 
 @media screen and (min-width: 76.1875em) {

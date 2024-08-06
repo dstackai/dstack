@@ -15,10 +15,10 @@ handles authentication, distributes load, and performs auto-scaling.
 ## Define a configuration
 
 First, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or
-`serve.dstack.yml`
+`service.dstack.yml`
 are both acceptable).
 
-<div editor-title="serve.dstack.yml"> 
+<div editor-title="service.dstack.yml"> 
 
 ```yaml
 type: service
@@ -32,7 +32,7 @@ python: "3.10"
 env:
   - HUGGING_FACE_HUB_TOKEN
 commands:
-  - install vllm==0.5.3.post1
+  - install vllm
   - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
 # Expose the vllm server port
 port: 8000
@@ -74,7 +74,7 @@ To run a configuration, use the [`dstack apply`](reference/cli/index.md#dstack-a
 ```shell
 $ HUGGING_FACE_HUB_TOKEN=...
 
-$ dstack run . -f serve.dstack.yml
+$ dstack apply -f service.dstack.yml
 
  #  BACKEND  REGION    RESOURCES                    SPOT  PRICE
  1  runpod   CA-MTL-1  18xCPU, 100GB, A5000:24GB:2  yes   $0.22

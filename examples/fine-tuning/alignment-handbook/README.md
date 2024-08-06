@@ -177,7 +177,7 @@ dstack apply -f examples/fine-tuning/alignment-handbook/.dstack.yaml
 
 ## Source code
 
-The source-code of this example can be found in  [`https://github.com/dstackai/dstack/examples/fine-tuning/alignment-handbook`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook).
+The source-code of this example can be found in [examples/fine-tuning/alignment-handbook](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook).
 
 ## Contributing
 

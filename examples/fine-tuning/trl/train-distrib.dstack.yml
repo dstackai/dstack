@@ -2,6 +2,9 @@ type: task
 # The name is optional, if not specified, generated randomly
 name: trl-train-distrib
 
+# Size of the cluster
+nodes: 2
+
 python: "3.10"
 
 # Required environment variables
@@ -48,9 +51,6 @@ commands:
     --hub_model_id peterschmidt85/FineLlama-3.1-8B
     --torch_dtype bfloat16
     --use_bnb_nested_quant
-
-# Size of the cluster
-nodes: 2
 
 resources:
   gpu:

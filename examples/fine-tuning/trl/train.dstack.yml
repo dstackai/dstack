@@ -49,3 +49,5 @@ resources:
     memory: 24GB..
     # One or more GPU
     count: 1..
+  # Shared memory (for multi-gpu)
+  shm_size: 24GB
