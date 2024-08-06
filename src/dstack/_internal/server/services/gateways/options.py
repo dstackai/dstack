@@ -48,6 +48,6 @@ def get_tokenizer_config(model_id: str, hf_token: Optional[str] = None) -> dict:
 def get_service_options(conf: ServiceConfiguration) -> dict:
     options = {}
     if conf.model is not None:
-        complete_service_model(conf.model, env=conf.env)
+        complete_service_model(conf.model, env=conf.env.as_dict())
         options["openai"] = {"model": conf.model.dict()}
     return options

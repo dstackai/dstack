@@ -4,6 +4,7 @@ from typing import BinaryIO, Dict, List, Optional, Union
 import requests
 import requests.exceptions
 
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
@@ -58,7 +59,18 @@ class RunnerClient:
         cluster_info: ClusterInfo,
         secrets: Dict[str, str],
         repo_credentials: Optional[RemoteRepoCreds],
+        instance_env: Optional[Union[Env, Dict[str, str]]] = None,
     ):
+        # XXX: This is a quick-and-dirty hack to deliver InstanceModel-specific environment
+        # variables to the runner without runner API modification.
+        if instance_env is not None:
+            if isinstance(instance_env, Env):
+                merged_env = instance_env.as_dict()
+            else:
+                merged_env = instance_env.copy()
+            merged_env.update(job_spec.env)
+            job_spec = job_spec.copy(deep=True)
+            job_spec.env = merged_env
         body = SubmitBody(
             run_spec=run_spec,
             job_spec=job_spec,

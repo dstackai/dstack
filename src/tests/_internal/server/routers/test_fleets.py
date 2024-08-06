@@ -147,6 +147,7 @@ class TestCreateFleet:
                 "configuration": {
                     "nodes": {"min": 1, "max": 1},
                     "placement": None,
+                    "env": {},
                     "ssh_config": None,
                     "resources": {
                         "cpu": {"min": 2, "max": None},
@@ -243,6 +244,7 @@ class TestCreateFleet:
             "project_name": project.name,
             "spec": {
                 "configuration": {
+                    "env": {},
                     "ssh_config": {
                         "user": "ubuntu",
                         "port": None,

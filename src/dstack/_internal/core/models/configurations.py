@@ -1,12 +1,13 @@
 import re
 from enum import Enum
-from typing import Any, Dict, List, Mapping, Optional, Union
+from typing import Any, List, Optional, Union
 
 from pydantic import Field, ValidationError, conint, constr, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetConfiguration
 from dstack._internal.core.models.gateways import AnyModel, GatewayConfiguration
 from dstack._internal.core.models.profiles import ProfileParams
@@ -82,18 +83,6 @@ class ScalingSpec(CoreModel):
     ] = Duration.parse("10m")
 
 
-class EnvSentinel(CoreModel):
-    key: str
-
-    def from_env(self, env: Mapping[str, str]) -> str:
-        if self.key in env:
-            return env[self.key]
-        raise ValueError(f"Environment variable {self.key} is not set")
-
-    def __str__(self):
-        return f"EnvSentinel({self.key})"
-
-
 class BaseRunConfiguration(CoreModel):
     type: Literal["none"]
     name: Annotated[Optional[str], Field(description="The run name")] = None
@@ -129,12 +118,9 @@ class BaseRunConfiguration(CoreModel):
         ),
     ]
     env: Annotated[
-        Union[
-            List[constr(regex=r"^[a-zA-Z_][a-zA-Z0-9_]*(=.*$|$)")],
-            Dict[str, Union[str, EnvSentinel]],
-        ],
+        Env,
         Field(description="The mapping or the list of environment variables"),
-    ] = {}
+    ] = Env()
     setup: Annotated[CommandsList, Field(description="The bash commands to run on the boot")] = []
     resources: Annotated[
         ResourcesSpec, Field(description="The resources requirements to run the configuration")
@@ -151,25 +137,6 @@ class BaseRunConfiguration(CoreModel):
                 v = "3.10"
         if isinstance(v, str):
             return PythonVersion(v)
-        return v
-
-    @validator("env")
-    def convert_env(cls, v) -> Dict[str, str]:
-        if isinstance(v, list):
-            d = {}
-            for var in v:
-                if "=" not in var:
-                    if var not in d:
-                        d[var] = EnvSentinel(key=var)
-                    else:
-                        raise ValueError(f"Duplicate environment variable: {var}")
-                else:
-                    k, val = var.split("=", maxsplit=1)
-                    if k not in d:
-                        d[k] = val
-                    else:
-                        raise ValueError(f"Duplicate environment variable: {var}")
-            return d
         return v
 
     def get_repo(self) -> Repo:

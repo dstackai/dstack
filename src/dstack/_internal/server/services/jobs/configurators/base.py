@@ -137,7 +137,7 @@ class JobConfigurator(ABC):
         return specs
 
     def _env(self) -> Dict[str, str]:
-        return self.run_spec.configuration.env
+        return self.run_spec.configuration.env.as_dict()
 
     def _home_dir(self) -> Optional[str]:
         return self.run_spec.configuration.home_dir

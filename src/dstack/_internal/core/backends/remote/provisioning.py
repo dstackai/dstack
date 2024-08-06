@@ -40,7 +40,7 @@ def sftp_upload(client: paramiko.SSHClient, path: str, body: str) -> None:
 
 def upload_envs(client: paramiko.SSHClient, working_dir: str, envs: Dict[str, str]) -> None:
     envs["DSTACK_SERVICE_MODE"] = "1"  # make host_info.json on start
-    dot_env = "\n".join(f'{key.upper()}="{value.strip()}"' for key, value in envs.items())
+    dot_env = "\n".join(f'{key}="{value.strip()}"' for key, value in envs.items())
     tmp_file_path = f"/tmp/{DSTACK_SHIM_ENV_FILE}"
     sftp_upload(client, tmp_file_path, dot_env)
     try:
