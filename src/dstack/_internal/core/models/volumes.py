@@ -64,6 +64,7 @@ class Volume(CoreModel):
     created_at: datetime
     status: VolumeStatus
     status_message: Optional[str] = None
+    deleted: bool
     volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
     attachment_data: Optional[VolumeAttachmentData] = None

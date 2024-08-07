@@ -258,6 +258,7 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         created_at=volume_model.created_at.replace(tzinfo=timezone.utc),
         status=volume_model.status,
         status_message=volume_model.status_message,
+        deleted=volume_model.deleted,
         volume_id=vpd.volume_id if vpd is not None else None,
         provisioning_data=vpd,
         attachment_data=vad,
