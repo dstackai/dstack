@@ -12,14 +12,34 @@ from dstack._internal.server.schemas.volumes import (
     CreateVolumeRequest,
     DeleteVolumesRequest,
     GetVolumeRequest,
+    ListVolumesRequest,
 )
-from dstack._internal.server.security.permissions import ProjectMember
+from dstack._internal.server.security.permissions import Authenticated, ProjectMember
 
-router = APIRouter(prefix="/api/project/{project_name}/volumes", tags=["volumes"])
+root_router = APIRouter(prefix="/api/volumes", tags=["volumes"])
+project_router = APIRouter(prefix="/api/project/{project_name}/volumes", tags=["volumes"])
 
 
-@router.post("/list")
+@root_router.post("/list")
 async def list_volumes(
+    body: ListVolumesRequest,
+    session: AsyncSession = Depends(get_session),
+    user: UserModel = Depends(Authenticated()),
+) -> List[Volume]:
+    return await volumes_services.list_volumes(
+        session=session,
+        user=user,
+        project_name=body.project_name,
+        only_active=body.only_active,
+        prev_created_at=body.prev_created_at,
+        prev_id=body.prev_id,
+        limit=body.limit,
+        ascending=body.ascending,
+    )
+
+
+@project_router.post("/list")
+async def list_project_volumes(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> List[Volume]:
@@ -27,7 +47,7 @@ async def list_volumes(
     return await volumes_services.list_project_volumes(session=session, project=project)
 
 
-@router.post("/get")
+@project_router.post("/get")
 async def get_volume(
     body: GetVolumeRequest,
     session: AsyncSession = Depends(get_session),
@@ -42,7 +62,7 @@ async def get_volume(
     return volume
 
 
-@router.post("/create")
+@project_router.post("/create")
 async def create_volume(
     body: CreateVolumeRequest,
     session: AsyncSession = Depends(get_session),
@@ -56,7 +76,7 @@ async def create_volume(
     )
 
 
-@router.post("/delete")
+@project_router.post("/delete")
 async def delete_volumes(
     body: DeleteVolumesRequest,
     session: AsyncSession = Depends(get_session),

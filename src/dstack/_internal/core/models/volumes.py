@@ -56,6 +56,7 @@ class VolumeAttachmentData(CoreModel):
 
 
 class Volume(CoreModel):
+    id: uuid.UUID
     name: str
     project_name: str
     configuration: VolumeConfiguration
@@ -66,7 +67,6 @@ class Volume(CoreModel):
     volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
     attachment_data: Optional[VolumeAttachmentData] = None
-    volume_model_id: uuid.UUID  # uuid of VolumeModel
 
 
 class VolumeMountPoint(CoreModel):

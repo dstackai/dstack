@@ -162,7 +162,8 @@ def register_routes(app: FastAPI):
     app.include_router(logs.router)
     app.include_router(secrets.router)
     app.include_router(gateways.router)
-    app.include_router(volumes.router)
+    app.include_router(volumes.root_router)
+    app.include_router(volumes.project_router)
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):

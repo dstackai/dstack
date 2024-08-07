@@ -1,9 +1,9 @@
 import asyncio
 import uuid
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -13,6 +13,7 @@ from dstack._internal.core.errors import (
     ResourceExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
     Volume,
     VolumeAttachmentData,
@@ -21,8 +22,9 @@ from dstack._internal.core.models.volumes import (
     VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
-from dstack._internal.server.models import ProjectModel, VolumeModel
+from dstack._internal.server.models import ProjectModel, UserModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.utils.common import run_async, wait_to_lock_many
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
@@ -32,6 +34,78 @@ logger = get_logger(__name__)
 
 PROCESSING_VOLUMES_LOCK = asyncio.Lock()
 PROCESSING_VOLUMES_IDS = set()
+
+
+async def list_volumes(
+    session: AsyncSession,
+    user: UserModel,
+    project_name: Optional[str],
+    only_active: bool,
+    prev_created_at: Optional[datetime],
+    prev_id: Optional[uuid.UUID],
+    limit: int,
+    ascending: bool,
+) -> List[Volume]:
+    if user.global_role == GlobalRole.ADMIN:
+        projects = await list_project_models(session=session)
+    else:
+        projects = await list_user_project_models(session=session, user=user)
+    if project_name is not None:
+        projects = [p for p in projects if p.name == project_name]
+    volume_models = await list_projects_volume_models(
+        session=session,
+        projects=projects,
+        only_active=only_active,
+        prev_created_at=prev_created_at,
+        prev_id=prev_id,
+        limit=limit,
+        ascending=ascending,
+    )
+    return [volume_model_to_volume(v) for v in volume_models]
+
+
+async def list_projects_volume_models(
+    session: AsyncSession,
+    projects: List[ProjectModel],
+    only_active: bool,
+    prev_created_at: Optional[datetime],
+    prev_id: Optional[uuid.UUID],
+    limit: int,
+    ascending: bool,
+) -> List[VolumeModel]:
+    filters = []
+    filters.append(VolumeModel.project_id.in_(p.id for p in projects))
+    if only_active:
+        filters.append(VolumeModel.deleted == False)
+    if prev_created_at is not None:
+        if ascending:
+            if prev_id is None:
+                filters.append(VolumeModel.created_at > prev_created_at)
+            else:
+                filters.append(
+                    or_(
+                        VolumeModel.created_at > prev_created_at,
+                        and_(VolumeModel.created_at == prev_created_at, VolumeModel.id < prev_id),
+                    )
+                )
+        else:
+            if prev_id is None:
+                filters.append(VolumeModel.created_at < prev_created_at)
+            else:
+                filters.append(
+                    or_(
+                        VolumeModel.created_at < prev_created_at,
+                        and_(VolumeModel.created_at == prev_created_at, VolumeModel.id > prev_id),
+                    )
+                )
+    order_by = (VolumeModel.created_at.desc(), VolumeModel.id)
+    if ascending:
+        order_by = (VolumeModel.created_at.asc(), VolumeModel.id.desc())
+    res = await session.execute(
+        select(VolumeModel).where(*filters).order_by(*order_by).limit(limit)
+    )
+    volume_models = list(res.scalars().all())
+    return volume_models
 
 
 async def list_project_volumes(
@@ -187,7 +261,7 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
         volume_id=vpd.volume_id if vpd is not None else None,
         provisioning_data=vpd,
         attachment_data=vad,
-        volume_model_id=volume_model.id,
+        id=volume_model.id,
     )
 
 
