@@ -35,7 +35,7 @@ build {
   }
 
   provisioner "shell" {
-    script = "provisioners/install-nvidia-docker.sh"
+    script = "provisioners/install-nvidia-container-toolkit.sh"
   }
 
   provisioner "shell" {
