@@ -127,10 +127,12 @@ class Run(ABC):
         secure = False
         if self._run.service is not None:
             url = urlparse(self._run.service.url)
+            service_port = url.port
+            if service_port is None:
+                service_port = 443 if self._run.run_spec.configuration.https else 80
             ports = {
                 **ports,
-                # we support only default https port
-                self._run.run_spec.configuration.port.container_port: url.port or 443,
+                self._run.run_spec.configuration.port.container_port: service_port,
             }
             hostname = url.hostname
             secure = url.scheme == "https"
