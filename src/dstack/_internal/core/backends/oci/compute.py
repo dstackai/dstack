@@ -18,6 +18,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     SSHKey,
 )
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 
@@ -37,6 +38,7 @@ SUPPORTED_SHAPE_FAMILIES = [
     "VM.GPU.A10.",
     "BM.GPU.A10.",
 ]
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.parse("32TB"))
 
 
 class OCICompute(Compute):
@@ -55,6 +57,7 @@ class OCICompute(Compute):
             backend=BackendType.OCI,
             locations=self.config.regions,
             requirements=requirements,
+            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
 

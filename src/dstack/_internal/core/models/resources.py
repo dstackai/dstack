@@ -1,3 +1,4 @@
+import math
 from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from pydantic import Field, root_validator, validator
@@ -48,6 +49,22 @@ class Range(GenericModel, Generic[T]):
         if min == max:
             return str(min)
         return f"{min}..{max}"
+
+    def intersect(self, other: "Range") -> Optional["Range"]:
+        start = max(
+            self.min if self.min is not None else -math.inf,
+            other.min if other.min is not None else -math.inf,
+        )
+        end = min(
+            self.max if self.max is not None else math.inf,
+            other.max if other.max is not None else math.inf,
+        )
+        if start > end:
+            return None
+        return Range(
+            min=start if abs(start) != math.inf else None,
+            max=end if abs(end) != math.inf else None,
+        )
 
 
 class Memory(float):
@@ -165,9 +182,6 @@ class GPUSpec(CoreModel):
         return v
 
 
-MIN_DISK_SIZE = 50
-
-
 class DiskSpec(CoreModel):
     size: Annotated[Range[Memory], Field(description="Disk size")]
 
@@ -181,14 +195,6 @@ class DiskSpec(CoreModel):
         if isinstance(v, (str, int, float)):
             return {"size": v}
         return v
-
-    @validator("size")
-    def validate_size(cls, size):
-        if size.min is not None and size.min < MIN_DISK_SIZE:
-            raise ValueError(f"Min disk size should be >= {MIN_DISK_SIZE}GB")
-        if size.max is not None and size.max < MIN_DISK_SIZE:
-            raise ValueError(f"Max disk size should be >= {MIN_DISK_SIZE}GB")
-        return size
 
 
 DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))

@@ -39,6 +39,7 @@ from dstack._internal.core.models.instances import (
     Resources,
     SSHKey,
 )
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -49,6 +50,10 @@ from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# pd-balanced disks can be 10GB-64TB, but dstack images are 20GB and cannot grow larger
+# than 32TB because of filesystem settings
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("20GB"), max=Memory.parse("32TB"))
 
 
 class GCPVolumeDiskBackendData(CoreModel):
@@ -74,6 +79,7 @@ class GCPCompute(Compute):
         offers = get_catalog_offers(
             backend=BackendType.GCP,
             requirements=requirements,
+            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances_and_zones(self.config.regions),
         )
         quotas: Dict[str, Dict[str, float]] = defaultdict(dict)

@@ -55,11 +55,14 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     SSHKey,
 )
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+# OS disks can be 1GB-4095GB, dstack images are 30GB
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.parse("4095GB"))
 
 
 class AzureCompute(Compute):
@@ -80,6 +83,7 @@ class AzureCompute(Compute):
             backend=BackendType.AZURE,
             locations=self.config.locations,
             requirements=requirements,
+            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
         offers_with_availability = _get_offers_with_availability(

@@ -71,7 +71,7 @@ class DataCrunchAPIClient:
                 location=location,
                 os_volume={"name": "OS volume", "size": disk_size},
             )
-        except APIException:
-            raise NoCapacityError()
+        except APIException as e:
+            raise NoCapacityError(f"DataCrunch API error: {e.message}")
 
         return instance
