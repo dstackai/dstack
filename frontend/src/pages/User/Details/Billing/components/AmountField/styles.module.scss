@@ -1,0 +1,12 @@
+.amountInput {
+    .prefix {
+        position: absolute;
+        z-index: 1;
+        transform: translate(8px, 6px);
+        pointer-events: none;
+    }
+
+    input {
+        padding-left: 18px !important;
+    }
+}

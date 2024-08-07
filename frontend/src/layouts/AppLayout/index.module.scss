@@ -1,0 +1,28 @@
+.appHeader {
+    height: 48px;
+    @media (screen and min-width: 913px) {
+        height: 56px;
+    }
+    .userAvatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+    }
+    [data-class="user-menu"] {
+        [class^="awsui_dropdown-trigger"] {
+            [class^="awsui_text"] {
+                margin-right: 0!important;
+            }
+            [class*="awsui_icon"] {
+                display: none !important;
+            }
+        }
+    }
+    & > * {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+    }
+}

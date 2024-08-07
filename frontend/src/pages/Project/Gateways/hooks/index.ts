@@ -1,0 +1,1 @@
+export { useGatewaysTable } from './useGatewaysTable';

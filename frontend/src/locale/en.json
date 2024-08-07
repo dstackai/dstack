@@ -1,0 +1,532 @@
+{
+  "dstack": "Dstack",
+  "common": {
+    "loading": "Loading",
+    "add": "Add",
+    "yes": "Yes",
+    "no": "No",
+    "create": "Create {{text}}",
+    "edit": "Edit",
+    "delete": "Delete",
+    "remove": "Remove",
+    "apply": "Apply",
+    "settings": "Settings",
+    "match_count_with_value_one": "{{count}} match",
+    "match_count_with_value_other": "{{count}} matches",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match.",
+    "sign_out": "Sign out",
+    "cancel": "Cancel",
+    "save": "Save",
+    "send" : "Send",
+    "profile": "Profile",
+    "copied": "Copied",
+    "copy": "Copy",
+    "info": "Info",
+    "stop": "Stop",
+    "abort": "Abort",
+    "clearFilter": "Clear filter",
+    "server_error": "Server error: {{error}}",
+    "login": "Sign in",
+    "login_github": "Sign in with GitHub",
+    "general": "General",
+    "test": "Test",
+    "local_storage_unavailable": "Local Storage is unavailable",
+    "local_storage_unavailable_message": "Your browser doesn't support local storage",
+    "object": "Object",
+    "objects_other": "Objects",
+    "continue": "Continue",
+    "select_visible_columns": "Select visible columns",
+    "tutorial": "Tutorials",
+    "tutorial_other": "Tour",
+    "docs": "Docs",
+    "discord": "Discord",
+    "danger_zone": "Danger Zone"
+  },
+
+  "auth": {
+    "invalid_token": "Invalid token",
+    "you_are_not_logged_in": "You are not logged in",
+    "contact_to_administrator": "For getting the authorization token, contact to the administrator",
+    "sign_in_to_dstack": "Welcome to dstack Sky",
+    "sign_in_to_dstack_enterprise": "Welcome to dstack Enterprise",
+    "authorization_failed": "Authorization is failed",
+    "try_again": "Please try again"
+  },
+
+  "navigation": {
+    "settings": "Settings",
+    "runs": "Runs",
+    "models": "Models",
+    "fleets": "Fleets",
+    "project": "Project",
+    "project_other": "Projects",
+    "administration": "Administration",
+    "users": "Users",
+    "user_settings": "User settings",
+    "account": "Account",
+    "billing": "Billing"
+  },
+
+  "backend": {
+    "page_title_one": "Backend",
+    "page_title_other": "Backends",
+    "add_backend": "Add backend",
+    "edit_backend": "Edit backend",
+    "empty_message_title": "No backends",
+    "empty_message_text": "No backends to display.",
+    "type": {
+      "aws": "AWS",
+      "aws_description": "Run workflows and store data in Amazon Web Services ",
+      "gcp": "GCP",
+      "gcp_description": "Run workflows and store data in Google Cloud Platform",
+      "azure": "Azure",
+      "azure_description": "Run workflows and store data in Microsoft Azure",
+      "lambda": "Lambda",
+      "lambda_description": "Run workflows and store data in Lambda",
+      "local": "Local",
+      "local_description": "Run workflows and store data locally via Docker"
+    },
+
+    "table": {
+      "region": "Region",
+      "bucket": "Storage"
+    },
+
+    "edit": {
+      "success_notification": "Project updating is successful",
+      "delete_backend_confirm_title": "Delete backend",
+      "delete_backend_confirm_message": "Are you sure you want to delete this backend?",
+      "delete_backends_confirm_title": "Delete backends",
+      "delete_backends_confirm_message": "Are you sure you want to delete these backends?"
+    },
+
+    "create": {
+      "success_notification": "Backend is created"
+    }
+  },
+
+  "gateway": {
+    "page_title_one": "Gateway",
+    "page_title_other": "Gateways",
+    "add_gateway": "Add gateway",
+    "edit_gateway": "Edit gateway",
+    "empty_message_title": "No gateways",
+    "empty_message_text": "No gateways to display.",
+
+    "edit": {
+      "backend": "Backend",
+      "backend_description": "Select a backend",
+      "region": "Region",
+      "region_description": "Select a region",
+      "default": "Default",
+      "default_checkbox": "Turn on default",
+      "external_ip": "External IP",
+      "wildcard_domain": "Wildcard domain",
+      "wildcard_domain_description": "Specify the wildcard domain mapped to the external IP.",
+      "wildcard_domain_placeholder": "*.mydomain.com",
+      "delete_gateway_confirm_title": "Delete gateway",
+      "delete_gateway_confirm_message": "Are you sure you want to delete this gateway?",
+      "delete_gateways_confirm_title": "Delete gateways",
+      "delete_gateways_confirm_message": "Are you sure you want to delete these gateways?",
+
+      "validation": {
+        "wildcard_domain_format": "Should use next format: {{pattern}}"
+      }
+    },
+
+    "create": {
+      "success_notification": "Gateway is created",
+      "creating_notification": "The gateway is creating. It may take some time"
+    },
+
+    "update": {
+      "success_notification": "Gateway is updated"
+    },
+
+    "test_domain": {
+      "success_notification": "Domain is valid"
+    }
+  },
+
+  "projects": {
+    "page_title": "Projects",
+    "search_placeholder": "Find projects",
+    "empty_message_title": "No projects",
+    "empty_message_text": "No projects to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match.",
+    "nomatch_message_button_label": "Clear filter",
+    "repositories": "Repositories",
+    "runs": "Runs",
+    "tags": "Tags",
+    "settings": "Settings",
+    "card": {
+      "backend": "Backend",
+      "settings": "Settings"
+    },
+    "edit": {
+      "general": "General",
+      "project_name": "Project name",
+      "owner": "Owner",
+      "project_name_description": "Only latin characters, dashes, underscores, and digits",
+      "backend": "Backend",
+      "backend_config": "Backend config",
+      "backend_config_description": "Specify the backend config in the YAML format. Click Info for examples.",
+      "backend_type": "Type",
+      "backend_type_description": "Select a backend type",
+      "members_empty_message_title": "No members",
+      "members_empty_message_text": "Select project's members",
+      "update_members_success": "Members are updated",
+      "delete_project_confirm_title": "Delete project",
+      "delete_project_confirm_message": "Are you sure you want to delete this project?",
+      "delete_projects_confirm_title": "Delete projects",
+      "delete_projects_confirm_message": "Are you sure you want to delete these projects?",
+      "delete_this_project": "Delete this project",
+      "cli": "CLI",
+      "aws": {
+        "authorization": "Authorization",
+        "authorization_default": "Default credentials",
+        "authorization_access_key": "Access key",
+        "access_key": "Access key",
+        "access_key_id": "Access key ID",
+        "access_key_id_description": "Specify the AWS access key ID",
+        "secret_key": "Secret key",
+        "secret_key_id": "Secret access key",
+        "secret_key_id_description": "Specify the AWS secret access key",
+        "regions": "Regions",
+        "regions_description":  "Select regions to run workflows and store artifacts",
+        "regions_placeholder": "Select regions",
+        "s3_bucket_name": "Bucket",
+        "s3_bucket_name_description": "Select an S3 bucket to store artifacts",
+        "ec2_subnet_id": "Subnet",
+        "ec2_subnet_id_description": "Select a subnet to run workflows in",
+        "ec2_subnet_id_placeholder":  "Not selected",
+        "vpc_name": "VPC",
+        "vpc_name_description": "Enter a vpc"
+      },
+      "azure" : {
+        "authorization": "Authorization",
+        "authorization_default": "Default credentials",
+        "authorization_client": "Client secret",
+        "tenant_id": "Tenant ID",
+        "tenant_id_description": "Specify an Azure tenant ID",
+        "tenant_id_placeholder": "Not selected",
+        "client_id": "Client ID",
+        "client_id_description": "Specify an Azure client (application) ID",
+        "client_secret": "Client secret",
+        "client_secret_description": "Specify an Azure client (application) secret",
+        "subscription_id": "Subscription ID",
+        "subscription_id_description": "Select an Azure subscription ID",
+        "subscription_id_placeholder": "Not selected",
+        "locations": "Locations",
+        "locations_description": "Select locations to run workflows",
+        "locations_placeholder":  "Select locations",
+        "storage_account":  "Storage account",
+        "storage_account_description":  "Select an Azure storage account to store artifacts",
+        "storage_account_placeholder":  "Not selected"
+
+      },
+      "gcp": {
+        "authorization": "Authorization",
+        "authorization_default": "Default credentials",
+        "service_account": "Service account key",
+        "credentials_description": "Credentials description",
+        "credentials_placeholder": "Credentials placeholder",
+        "regions": "Regions",
+        "regions_description": "Select regions to run workflows and store artifacts",
+        "regions_placeholder": "Select regions",
+        "project_id": "Project Id",
+        "project_id_description": "Select a project id",
+        "project_id_placeholder": "Select a project Id"
+      },
+      "lambda": {
+        "api_key": "API key",
+        "api_key_description": "Specify the Lambda API key",
+        "regions": "Regions",
+        "regions_description": "Select regions to run workflows",
+        "regions_placeholder": "Select regions",
+        "storage_backend": {
+          "type": "Storage",
+          "type_description": "Select backend storage",
+          "type_placeholder": "Select type",
+          "credentials": {
+            "access_key_id": "Access key ID",
+            "access_key_id_description": "Specify the AWS access key ID",
+            "secret_key_id": "Secret access key",
+            "secret_key_id_description": "Specify the AWS secret access key"
+          },
+          "s3_bucket_name": "Bucket",
+          "s3_bucket_name_description": "Select an S3 bucket to store artifacts"
+        }
+      },
+      "local": {
+        "path": "Files path"
+      },
+      "members": {
+        "section_title": "Members",
+        "name": "User name",
+        "role": "Project role"
+      },
+      "error_notification": "Update project error",
+      "validation": {
+        "user_name_format": "Only letters, numbers, - or _"
+      }
+    },
+    "create": {
+      "page_title": "Create project",
+      "error_notification": "Create project error",
+      "success_notification": "Project is created"
+    },
+    "repo": {
+      "search_placeholder": "Find repositories",
+      "empty_message_title": "No repositories",
+      "empty_message_text": "No repositories to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match.",
+      "card": {
+        "owner": "Owner",
+        "last_run": "Last run",
+        "tags_count": "Tags count",
+        "directory": "Directory"
+      },
+      "secrets": {
+        "table_title": "Secrets",
+        "add_modal_title": "Add secret",
+        "update_modal_title": "Update secret",
+        "name": "Secret name",
+        "name_description": "Secret name",
+        "value": "Secret value",
+        "value_description": "Secret value",
+        "search_placeholder": "Find secrets",
+        "empty_message_title": "No secrets",
+        "empty_message_text": "No secrets to display."
+      }
+    },
+    "run": {
+      "list_page_title": "Runs",
+      "search_placeholder": "Find runs",
+      "empty_message_title": "No runs",
+      "empty_message_text": "No runs to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match. Try to change project or clear filter",
+      "project": "Project",
+      "project_placeholder": "Filtering by project",
+      "repo": "Repository",
+      "repo_placeholder": "Filtering by repository",
+      "user": "User",
+      "user_placeholder": "Filtering by user",
+      "active_only": "Active runs",
+      "log": "Logs",
+      "log_empty_message_title": "No logs",
+      "log_empty_message_text": "No logs to display.",
+      "run_name": "Name",
+      "workflow_name": "Workflow",
+      "configuration": "Configuration",
+      "instance": "Instance",
+      "provider_name": "Provider",
+      "status": "Status",
+      "submitted_at": "Submitted",
+      "cost": "Cost",
+      "backend": "Backend",
+      "region": "Region",
+      "instance_id": "Instance ID",
+      "resources": "Resources",
+      "spot": "Spot",
+      "price": "Price",
+      "error": "Error",
+      "artifacts": "Artifacts",
+      "artifacts_count": "Artifacts",
+      "hub_user_name": "User",
+      "statuses": {
+        "pending": "Pending",
+        "submitted": "Submitted",
+        "provisioning": "Provisioning",
+        "pulling": "Pulling",
+        "downloading":  "Downloading",
+        "running": "Running",
+        "uploading":  "Uploading",
+        "stopping": "Stopping",
+        "stopped":  "Stopped",
+        "terminating": "Terminating",
+        "terminated":  "Terminated",
+        "aborting": "Aborting",
+        "aborted":  "Aborted",
+        "failed": "Failed",
+        "done":  "Done",
+        "building":  "Building"
+      }
+    },
+    "tag": {
+      "list_page_title": "Artifacts",
+      "search_placeholder": "Find tags",
+      "empty_message_title": "No tags",
+      "empty_message_text": "No tags to display.",
+      "tag_name": "Tag",
+      "run_name": "Run",
+      "artifacts": "Files"
+    },
+    "artifact": {
+      "list_page_title": "Artifacts",
+      "search_placeholder": "Find objects",
+      "empty_message_title": "No objects",
+      "empty_message_text": "No objects to display.",
+      "nomatch_message_title": "No matches",
+      "nomatch_message_text": "We can't find a match.",
+      "name": "Name",
+      "type": "Type",
+      "size": "Size"
+    }
+  },
+
+  "models": {
+    "model_name": "Name",
+    "gateway": "Gateway",
+    "type": "Type",
+    "run": "Run",
+    "resources": "Resources",
+    "price": "Price",
+    "submitted_at": "Submitted",
+    "user": "User",
+    "repository": "Repository",
+    "backend": "Backend",
+    "empty_message_title": "No models",
+    "empty_message_text": "No models to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match.",
+    "nomatch_message_button_label": "Clear filter",
+
+    "details": {
+      "instructions": "System",
+      "instructions_description": "Specify system",
+      "message_placeholder": "Enter your question",
+      "chat_empty_title": "No messages yet",
+      "chat_empty_message": "Please start a chat",
+      "run_name": "Run name"
+    }
+  },
+
+  "fleets": {
+    "fleet": "Fleet",
+    "fleet_name": "Fleet name",
+    "total_instances": "Number of instances",
+    "default": "Default pool",
+    "empty_message_title": "No fleets",
+    "empty_message_text": "No fleets to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match.",
+    "nomatch_message_button_label": "Clear filter",
+    "active_only": "Active Fleets",
+    "instances": {
+      "title": "Instances",
+      "empty_message_title": "No instances",
+      "empty_message_text": "No instances to display.",
+      "instance_name": "Instance",
+      "created": "Created",
+      "status": "Status",
+      "project": "Project",
+      "statuses": {
+        "pending": "Pending",
+        "provisioning": "Provisioning",
+        "idle": "Idle",
+        "busy": "Busy",
+        "terminating": "Terminating",
+        "terminated": "Terminated"
+      },
+      "resources": "Resources",
+      "backend": "Backend",
+      "region": "Region",
+      "spot": "Spot",
+      "started": "Started",
+      "price": "Price"
+    }
+  },
+
+  "users": {
+    "page_title": "Users",
+    "search_placeholder": "Find members",
+    "empty_message_title": "No members",
+    "empty_message_text": "No members to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match.",
+    "user_name": "User name",
+    "user_name_description": "Only latin characters, dashes, underscores, and digits",
+    "global_role_description": "Whether the user is an administrator or not",
+    "token": "Token",
+    "token_description": "Specify use your personal access token",
+    "global_role": "Global role",
+    "email": "Email",
+    "account": "Account",
+    "account_settings": "Account settings",
+    "settings": "Settings",
+    "create": {
+      "page_title": "Create user",
+      "error_notification": "Create user error",
+      "success_notification": "User is created"
+    },
+    "edit": {
+      "error_notification": "Update user error",
+      "success_notification": "User updating is successful",
+      "refresh_token_success_notification": "Token rotating is successful",
+      "refresh_token_error_notification": "Token rotating error",
+      "refresh_token_confirm_title": "Rotate token",
+      "refresh_token_confirm_message": "Are you sure you want to rotate token?",
+      "refresh_token_button_label": "Rotate",
+      "validation": {
+        "user_name_format": "Only letters, numbers, - or _"
+      }
+    },
+
+    "manual_payments": {
+      "title": "Credits history",
+      "add_payment": "Add payment",
+      "empty_message_title": "No payments",
+      "empty_message_text": "No payments to display.",
+
+      "create": {
+        "success_notification": "Payment creating is successful"
+      },
+
+      "edit": {
+        "value": "Amount",
+        "value_description": "Enter amount here",
+        "description": "Description",
+        "description_description": "Describe payment here",
+        "created_at": "Created at"
+      }
+    },
+
+    "token_copied": "Token copied"
+  },
+  "billing": {
+    "title": "Billing",
+    "balance": "Balance",
+    "billing_history": "Billing history",
+    "payment_method": "Payment method",
+    "no_payment_method": "No payment method attached",
+    "top_up_balance": "Top up balance",
+    "edit_payment_method": "Edit payment method",
+    "payment_amount": "Payment amount",
+    "amount_description": "Minimum: ${{value}}",
+    "make_payment": "Make a payment",
+    "min_amount_error_message": "The amount is allowed to be more than {{value}}",
+    "payment_success_message": "Payment succeeded. There can be a short delay before the balance is updated."
+  },
+  "validation": {
+    "required": "This is required field"
+  },
+  "users_autosuggest": {
+    "placeholder": "Add member",
+    "loading": "Loading users",
+    "no_match": "No matches found"
+  },
+  "roles": {
+    "admin": "Admin",
+    "user": "User"
+  },
+  "confirm_dialog": {
+    "title": "Confirm delete",
+    "message": "Are you sure you want to delete?"
+  }
+}
+

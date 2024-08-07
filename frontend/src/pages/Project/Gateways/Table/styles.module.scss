@@ -1,0 +1,16 @@
+.cell {
+    display: flex;
+    align-items: center;
+}
+
+.contextMenu {
+    margin-left: auto;
+    padding-left: 20px;
+}
+
+.ellipsisCell {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 450px;
+}

@@ -1,0 +1,10 @@
+node_modules
+build
+server.js
+src/locale
+src/types
+src/setupProxy.js
+webpack/**
+public
+staticServer.js
+webpack.config.js
