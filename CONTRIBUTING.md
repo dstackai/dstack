@@ -1,58 +1,42 @@
-# dstack contributing guide
+# Contributing to `dstack`
 
-## Development setup
+We appreciate your interest in contributing to `dstack`! This document will help you get up to speed with `dstack` codebase and guide you through the contribution process.
 
-1. Clone the repo:
-    ```
-    git clone https://github.com/dstackai/dstack && cd dstack
-    ```
-2. (Recommended) Create a virtual environment:
-    ```
-    python3 -m venv venv
-    ```
-    ```
-    source venv/bin/activate
-    ```
-3. Install `dstack` in editable mode:
-    ```
-    pip install -e '.[all]'
-    ```
-4. Install dev dependencies:
-    ```
-    pip install -r requirements_dev.txt
-    ```
-5. (Optional) Build the frontend:
-    ```
-    ./scripts/build_frontend.sh
-    ```
-5. (Recommended) Install pre-commits:
-    ```
-    pre-commit install
-    ```
+## Set up your development environment
 
-For more information on frontend development, see [hub/README.md](hub/README.md).
+Follow [contributing/DEVELOPMENT.md](contributing/DEVELOPMENT.md).
 
-## Contributing process
+## Learn dstack internals
 
-1. Look for an existing issue or create a new one.
+If you make a non-trivial change to `dstack`, we recommend you learn about `dstack` internals. A good place to start is [contributing/ARCHITECTURE.md](contributing/ARCHITECTURE.md).
+
+## Make a PR
+
+1. Look for an [existing issue](https://github.com/dstackai/dstack/issues) or create a [new one](https://github.com/dstackai/dstack/issues/new/choose).
 2. Fork the repo.
 3. Commit your changes.
-4. Open a PR. [Link the PR to the issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue) if you are solving one.
+4. Open a PR. [Link the PR to the issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue) (if you are solving one).
 
-## Making changes
+### Accepted changes
 
-We use [`black`](https://github.com/psf/black) to format Python code and [`isort`](https://pycqa.github.io/isort/index.html) to sort Python imports. Before committing your changes, run:
+* Bug fixes that address a clearly defined bug. Include steps to reproduce in the linked issue or the PR.
+* New features. Before submitting a feature PR, create an issue with a proposal to discuss it with the core team and other interested parties.
+* Minor fixes such as typos.
+* [Examples](examples/README.md).
 
-1. `isort --settings-file pyconfig.toml cli `
-2. `black --config pyconfig.toml cli`
+### Before pushing your changes
 
+We use [`ruff`](https://docs.astral.sh/ruff/) to format Python code and to sort Python imports. Before committing your changes, run:
 
-There are also helper pre-commits installed for [`black`](https://black.readthedocs.io/en/stable/integrations/source_version_control.html) and [`isort`](https://pycqa.github.io/isort/docs/configuration/pre-commit.html) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
+1. `ruff check --fix`
+2. `ruff format`
 
-## Adding a new backend
+> There are also helper pre-commits installed for [`ruff`](https://docs.astral.sh/ruff/integrations/#pre-commit) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
 
-Visit [How to add a backend](https://github.com/dstackai/dstack/wiki/How-to-add-a-backend) wiki page to learn how to add a new backend.
+## Add a new backend
 
-## P.S.
+If you'd like to integrate a new cloud provider to `dstack`, follow [contributing/BACKENDS.md](contributing/BACKENDS.md).
 
-Feel free to open an issue if you have difficulties contributing to `dstack`.
+## Get help
+
+If you have any questions, you can always get help in our [Discord](https://discord.gg/u8SmfwPpMd) community.

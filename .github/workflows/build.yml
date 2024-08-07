@@ -11,30 +11,28 @@ on:
     branches:
       - 'master'
   workflow_dispatch:
+    inputs:
+      intergation-tests:
+        type: boolean
+        required: true
+        default: false
 
 env:
   BUILD_INCREMENT: 150
+  PIP_DISABLE_PIP_VERSION_CHECK: on
+  PIP_DEFAULT_TIMEOUT: 10
+  PIP_PROGRESS_BAR: off
 
 jobs:
   python-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.11
-      - name: Run isort
-        uses: isort/isort-action@master
-        with:
-          isort-version: 5.12.0
-          configuration: "--settings-file pyconfig.toml --check-only --diff"
-          sort-paths: "src"
-      - name: Run black
-        uses: psf/black@stable
-        with:
-          options: "--config pyconfig.toml --check --verbose"
-          src: "./src"
-          version: "~= 22.0"
+      - run: python -m pip install pre-commit
+      - run: pre-commit run -a --show-diff-on-failure
 
   python-test:
     needs: [ python-lint ]
@@ -42,23 +40,20 @@ jobs:
     strategy:
       matrix:
         os: [ macos-latest, ubuntu-latest]
-        python-version: [ 3.8, 3.9, "3.10", 3.11 ]
+        python-version: [ "3.8", "3.9", "3.10", "3.11" ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install '.[all]'
-          pip install -r requirements_dev.txt
+        run: pip install -U '.[all]' -r requirements_dev.txt
       - name: Run pytest
-        run: |
-          pytest src/tests
+        run: pytest src/tests
 
   update-get-dstack:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [ python-test ]
     runs-on: ubuntu-latest
     env:
@@ -77,26 +72,35 @@ jobs:
         working-directory: runner
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.21.1
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v1.51.2
-          args: --issues-exit-code=0 --timeout=20m
+          version: v1.58
+          args: --timeout=20m
           working-directory: runner
       - name: Test
+        # Do not run slow integration tests automatically.
+        # Slow tests can be run manually via workflow_dispatch when required.
         run: |
+          SHORT="-short"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.intergation-tests }}" == "true" ]]; then
+              SHORT=""
+            fi
+          fi
           go version
           go fmt $(go list ./... | grep -v /vendor/)
           go vet $(go list ./... | grep -v /vendor/)
-          go test -race $(go list ./... | grep -v /vendor/)
+          go test $SHORT -race $(go list ./... | grep -v /vendor/)
 
   runner-compile:
-    needs: [ runner-test ]
+    needs: [runner-test]
     defaults:
       run:
         working-directory: runner
@@ -105,14 +109,15 @@ jobs:
     strategy:
       matrix:
         include:
-          - {goos: "linux", goarch: "amd64", runson: "ubuntu-latest"}
+          - { goos: "linux", goarch: "amd64", runson: "ubuntu-latest" }
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.21.1
+          go-version-file: runner/go.mod
+          cache-dependency-path: runner/go.sum
       - name: build
         env:
           GOOS: ${{ matrix.goos }}
@@ -121,26 +126,29 @@ jobs:
           CGO_ENABLED: 0
         run: |
           VERSION=$((${{ github.run_number }} + ${{ env.BUILD_INCREMENT }}))
-          go build -ldflags "-X '$REPO_NAME/runner/cmd/runner/version.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
-          go build -ldflags "-X '$REPO_NAME/runner/cmd/shim/version.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
-      - uses: actions/upload-artifact@v3
+          go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
+          go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
+          echo $VERSION
+      - uses: actions/upload-artifact@v4
         with:
-          name: dstack-runner
+          name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
             runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
             runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
           retention-days: 1
 
   runner-upload:
-    needs: [ runner-compile ]
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: [runner-compile]
     runs-on: ubuntu-latest
     steps:
       - name: Install AWS
-        run:  pip install awscli
+        run: pip install awscli
       - name: Download Runner
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: dstack-runner
+          pattern: dstack-runner-*
+          merge-multiple: true
           path: runner
       - name: Upload to S3
         working-directory: runner
@@ -153,20 +161,24 @@ jobs:
           aws s3 cp . "s3://dstack-runner-downloads-stgn/latest/binaries/" --recursive --exclude "*" --include "dstack-*" --acl public-read
 
   generate-json-schema:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [ python-test ]
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
       - name: Install AWS
         run: pip install awscli
       - name: Install dstack
         run: pip install .
       - name: Generate json schema
         run: |
-          python -c "from dstack._internal.core.models.configurations import RunConfiguration; print(RunConfiguration.schema_json(indent=2))" > configuration.json
+          python -c "from dstack._internal.core.models.configurations import DstackConfiguration; print(DstackConfiguration.schema_json(indent=2))" > configuration.json
           python -c "from dstack._internal.core.models.profiles import ProfilesConfig; print(ProfilesConfig.schema_json(indent=2))" > profiles.json
       - name: Upload json schema to S3
         run: |
@@ -177,6 +189,7 @@ jobs:
           aws s3 cp profiles.json "s3://dstack-runner-downloads-stgn/latest/schemas/profiles.json" --acl public-read
 
   gateway-build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -204,3 +217,4 @@ jobs:
         run: |
           WHEEL=dstack_gateway-${{ env.VERSION }}-py3-none-any.whl
           aws s3 cp dist/$WHEEL "s3://dstack-gateway-downloads/stgn/$WHEEL"
+          echo "${{ env.VERSION }}" | aws s3 cp - "s3://dstack-gateway-downloads/stgn/latest-version"

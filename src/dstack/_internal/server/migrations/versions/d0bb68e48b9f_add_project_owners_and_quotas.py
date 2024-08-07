@@ -5,6 +5,7 @@ Revises: fe72c4de8376
 Create Date: 2023-11-01 10:19:30.459707
 
 """
+
 import sqlalchemy as sa
 import sqlalchemy_utils
 from alembic import op
@@ -63,7 +64,7 @@ def upgrade() -> None:
     # ### end Alembic commands ###
 
     op.execute(
-        "UPDATE projects SET owner_id = (SELECT id FROM users WHERE name == 'admin') WHERE owner_id IS NULL"
+        "UPDATE projects SET owner_id = (SELECT id FROM users WHERE name = 'admin') WHERE owner_id IS NULL"
     )
     op.execute("UPDATE users SET projects_quota = 3 WHERE projects_quota IS NULL")
 

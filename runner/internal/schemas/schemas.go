@@ -1,6 +1,6 @@
 package schemas
 
-import "fmt"
+import "strings"
 
 type JobStateEvent struct {
 	State     string `json:"state"`
@@ -15,6 +15,7 @@ type LogEvent struct {
 type SubmitBody struct {
 	RunSpec         RunSpec           `json:"run_spec"`
 	JobSpec         JobSpec           `json:"job_spec"`
+	ClusterInfo     ClusterInfo       `json:"cluster_info"`
 	Secrets         map[string]string `json:"secrets"`
 	RepoCredentials *RepoCredentials  `json:"repo_credentials"`
 }
@@ -37,26 +38,30 @@ type RunSpec struct {
 }
 
 type JobSpec struct {
-	Commands    []string          `json:"commands"`
-	Entrypoint  []string          `json:"entrypoint"`
-	Env         map[string]string `json:"env"`
-	Gateway     *Gateway          `json:"gateway"`
-	MaxDuration int               `json:"max_duration"`
-	WorkingDir  string            `json:"working_dir"`
+	ReplicaNum     int               `json:"replica_num"`
+	JobNum         int               `json:"job_num"`
+	JobsPerReplica int               `json:"jobs_per_replica"`
+	Commands       []string          `json:"commands"`
+	Entrypoint     []string          `json:"entrypoint"`
+	Env            map[string]string `json:"env"`
+	Gateway        *Gateway          `json:"gateway"`
+	MaxDuration    int               `json:"max_duration"`
+	WorkingDir     *string           `json:"working_dir"`
+}
+
+type ClusterInfo struct {
+	MasterJobIP string `json:"master_job_ip"`
+	GPUSPerJob  int    `json:"gpus_per_job"`
 }
 
 type RepoCredentials struct {
-	Protocol   string  `json:"protocol"`
+	CloneURL   string  `json:"clone_url"`
 	PrivateKey *string `json:"private_key"`
 	OAuthToken *string `json:"oauth_token"`
 }
 
 type RepoData struct {
-	RepoType     string `json:"repo_type"`
-	RepoHostName string `json:"repo_host_name"`
-	RepoPort     int    `json:"repo_port"`
-	RepoUserName string `json:"repo_user_name"`
-	RepoName     string `json:"repo_name"`
+	RepoType string `json:"repo_type"`
 
 	RepoBranch string `json:"repo_branch"`
 	RepoHash   string `json:"repo_hash"`
@@ -81,14 +86,11 @@ type Gateway struct {
 
 type HealthcheckResponse struct {
 	Service string `json:"service"`
+	Version string `json:"version"`
 }
 
-func (d *RepoData) FormatURL(format string) string {
-	host := d.RepoHostName
-	if d.RepoPort != 0 {
-		host = fmt.Sprintf("%s:%d", d.RepoHostName, d.RepoPort)
-	}
-	return fmt.Sprintf(format, host, d.RepoUserName, d.RepoName)
+func (c *RepoCredentials) GetProtocol() string {
+	return strings.SplitN(c.CloneURL, "://", 2)[0]
 }
 
 func (e JobStateEvent) GetTimestamp() int64 {

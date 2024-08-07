@@ -1,6 +1,7 @@
 import base64
+import enum
 import re
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceExistsError
@@ -42,17 +43,26 @@ from dstack._internal.core.backends.base.compute import (
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.gateways import (
+    GatewayComputeConfiguration,
+    GatewayProvisioningData,
+)
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
+    InstanceConfiguration,
     InstanceOffer,
     InstanceOfferWithAvailability,
-    LaunchedGatewayInfo,
-    LaunchedInstanceInfo,
+    InstanceType,
+    SSHKey,
 )
-from dstack._internal.core.models.runs import Job, Requirements, Run
+from dstack._internal.core.models.resources import Memory, Range
+from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
+from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+# OS disks can be 1GB-4095GB, dstack images are 30GB
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("30GB"), max=Memory.parse("4095GB"))
 
 
 class AzureCompute(Compute):
@@ -73,6 +83,7 @@ class AzureCompute(Compute):
             backend=BackendType.AZURE,
             locations=self.config.locations,
             requirements=requirements,
+            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
         offers_with_availability = _get_offers_with_availability(
@@ -82,14 +93,11 @@ class AzureCompute(Compute):
         )
         return offers_with_availability
 
-    def run_job(
+    def create_instance(
         self,
-        run: Run,
-        job: Job,
         instance_offer: InstanceOfferWithAvailability,
-        project_ssh_public_key: str,
-        project_ssh_private_key: str,
-    ) -> LaunchedInstanceInfo:
+        instance_config: InstanceConfiguration,
+    ) -> JobProvisioningData:
         location = instance_offer.region
         logger.info(
             "Requesting %s %s instance in %s...",
@@ -97,71 +105,81 @@ class AzureCompute(Compute):
             "spot" if instance_offer.instance.resources.spot else "",
             location,
         )
-        ssh_pub_keys = [
-            run.run_spec.ssh_key_pub.strip(),
-            project_ssh_public_key.strip(),
-        ]
-        try:
-            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-            vm = _launch_instance(
-                compute_client=self._compute_client,
-                subscription_id=self.config.subscription_id,
+        ssh_pub_keys = instance_config.get_public_keys()
+        disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+        vm = _launch_instance(
+            compute_client=self._compute_client,
+            subscription_id=self.config.subscription_id,
+            location=location,
+            resource_group=self.config.resource_group,
+            network_security_group=azure_utils.get_default_network_security_group_name(
+                resource_group=self.config.resource_group,
                 location=location,
+            ),
+            network=azure_utils.get_default_network_name(
                 resource_group=self.config.resource_group,
-                network_security_group=azure_utils.get_default_network_security_group_name(
-                    resource_group=self.config.resource_group,
-                    location=location,
-                ),
-                network=azure_utils.get_default_network_name(
-                    resource_group=self.config.resource_group,
-                    location=location,
-                ),
-                subnet=azure_utils.get_default_subnet_name(
-                    resource_group=self.config.resource_group,
-                    location=location,
-                ),
-                managed_identity=azure_utils.get_runner_managed_identity_name(
-                    resource_group=self.config.resource_group
-                ),
-                image_reference=_get_image_ref(
-                    compute_client=self._compute_client,
-                    location=location,
-                    cuda=len(instance_offer.instance.resources.gpus) > 0,
-                ),
-                vm_size=instance_offer.instance.name,
-                # instance_name includes region because Azure may create an instance resource
-                # even when provisioning fails.
-                instance_name=f"{get_instance_name(run, job)}-{instance_offer.region}",
-                user_data=get_user_data(
-                    backend=BackendType.AZURE,
-                    image_name=job.job_spec.image_name,
-                    authorized_keys=ssh_pub_keys,
-                    registry_auth_required=job.job_spec.registry_auth is not None,
-                ),
-                ssh_pub_keys=ssh_pub_keys,
-                spot=instance_offer.instance.resources.spot,
-                disk_size=disk_size,
-                computer_name="runnervm",
-            )
-            logger.info("Request succeeded")
-            public_ip = _get_vm_public_ip(
-                network_client=self._network_client,
+                location=location,
+            ),
+            subnet=azure_utils.get_default_subnet_name(
                 resource_group=self.config.resource_group,
-                vm=vm,
-            )
-            return LaunchedInstanceInfo(
-                instance_id=vm.name,
-                ip_address=public_ip,
-                region=location,
-                username="ubuntu",
-                ssh_port=22,
-                dockerized=True,
-                backend_data=None,
-            )
-        except NoCapacityError:
-            logger.info("Failed to request instance in %s", location)
-        logger.info("Failed to request instance")
-        raise NoCapacityError()
+                location=location,
+            ),
+            managed_identity=None,
+            image_reference=_get_image_ref(
+                compute_client=self._compute_client,
+                location=location,
+                variant=VMImageVariant.from_instance_type(instance_offer.instance),
+            ),
+            vm_size=instance_offer.instance.name,
+            # instance_name includes region because Azure may create an instance resource
+            # even when provisioning fails.
+            instance_name=f"{instance_config.instance_name}-{instance_offer.region}",
+            user_data=get_user_data(authorized_keys=ssh_pub_keys),
+            ssh_pub_keys=ssh_pub_keys,
+            spot=instance_offer.instance.resources.spot,
+            disk_size=disk_size,
+            computer_name="runnervm",
+        )
+        logger.info("Request succeeded")
+        public_ip, private_ip = _get_vm_public_private_ips(
+            network_client=self._network_client,
+            resource_group=self.config.resource_group,
+            vm=vm,
+        )
+        return JobProvisioningData(
+            backend=instance_offer.backend,
+            instance_type=instance_offer.instance,
+            instance_id=vm.name,
+            hostname=public_ip,
+            internal_ip=private_ip,
+            region=location,
+            price=instance_offer.price,
+            username="ubuntu",
+            ssh_port=22,
+            dockerized=True,
+            ssh_proxy=None,
+            backend_data=None,
+        )
+
+    def run_job(
+        self,
+        run: Run,
+        job: Job,
+        instance_offer: InstanceOfferWithAvailability,
+        project_ssh_public_key: str,
+        project_ssh_private_key: str,
+        volumes: List[Volume],
+    ) -> JobProvisioningData:
+        instance_config = InstanceConfiguration(
+            project_name=run.project_name,
+            instance_name=get_instance_name(run, job),  # TODO: generate name
+            ssh_keys=[
+                SSHKey(public=project_ssh_public_key.strip()),
+            ],
+            job_docker_config=None,
+            user=run.user,
+        )
+        return self.create_instance(instance_offer, instance_config)
 
     def terminate_instance(
         self, instance_id: str, region: str, backend_data: Optional[str] = None
@@ -174,50 +192,87 @@ class AzureCompute(Compute):
 
     def create_gateway(
         self,
-        instance_name: str,
-        ssh_key_pub: str,
-        region: str,
-        project_id: str,
-    ) -> LaunchedGatewayInfo:
-        logger.info("Launching %s gateway instance in %s...", instance_name, region)
+        configuration: GatewayComputeConfiguration,
+    ) -> GatewayProvisioningData:
+        logger.info(
+            "Launching %s gateway instance in %s...",
+            configuration.instance_name,
+            configuration.region,
+        )
         vm = _launch_instance(
             compute_client=self._compute_client,
             subscription_id=self.config.subscription_id,
-            location=region,
+            location=configuration.region,
             resource_group=self.config.resource_group,
             network_security_group=azure_utils.get_gateway_network_security_group_name(
                 resource_group=self.config.resource_group,
-                location=region,
+                location=configuration.region,
             ),
             network=azure_utils.get_default_network_name(
                 resource_group=self.config.resource_group,
-                location=region,
+                location=configuration.region,
             ),
             subnet=azure_utils.get_default_subnet_name(
                 resource_group=self.config.resource_group,
-                location=region,
+                location=configuration.region,
             ),
             managed_identity=None,
             image_reference=_get_gateway_image_ref(),
             vm_size="Standard_B1s",
-            instance_name=instance_name,
-            user_data=get_gateway_user_data(ssh_key_pub),
-            ssh_pub_keys=[ssh_key_pub],
+            instance_name=configuration.instance_name,
+            user_data=get_gateway_user_data(configuration.ssh_key_pub),
+            ssh_pub_keys=[configuration.ssh_key_pub],
             spot=False,
             disk_size=30,
             computer_name="gatewayvm",
         )
         logger.info("Request succeeded")
-        public_ip = _get_vm_public_ip(
+        public_ip, _ = _get_vm_public_private_ips(
             network_client=self._network_client,
             resource_group=self.config.resource_group,
             vm=vm,
         )
-        return LaunchedGatewayInfo(
+        return GatewayProvisioningData(
             instance_id=vm.name,
             ip_address=public_ip,
-            region=region,
+            region=configuration.region,
         )
+
+    def terminate_gateway(
+        self,
+        instance_id: str,
+        configuration: GatewayComputeConfiguration,
+        backend_data: Optional[str] = None,
+    ):
+        self.terminate_instance(
+            instance_id=instance_id,
+            region=configuration.region,
+            backend_data=backend_data,
+        )
+
+
+class VMImageVariant(enum.Enum):
+    GRID = enum.auto()
+    CUDA = enum.auto()
+    STANDARD = enum.auto()
+
+    @classmethod
+    def from_instance_type(cls, instance: InstanceType) -> "VMImageVariant":
+        if "_A10_v5" in instance.name:
+            return cls.GRID
+        elif len(instance.resources.gpus) > 0:
+            return cls.CUDA
+        else:
+            return cls.STANDARD
+
+    def get_image_name(self) -> str:
+        name = "dstack-"
+        if self is self.GRID:
+            name += "grid-"
+        elif self is self.CUDA:
+            name += "cuda-"
+        name += version.base_image
+        return name
 
 
 _SUPPORTED_VM_SERIES_PATTERNS = [
@@ -283,16 +338,12 @@ def _vm_type_available(vm_resource: ResourceSku) -> bool:
 def _get_image_ref(
     compute_client: compute_mgmt.ComputeManagementClient,
     location: str,
-    cuda: bool,
+    variant: VMImageVariant,
 ) -> ImageReference:
-    image_name = "dstack-"
-    if cuda:
-        image_name += "cuda-"
-    image_name += version.base_image
     image = compute_client.community_gallery_images.get(
         location=location,
         public_gallery_name="dstack-ebac134d-04b9-4c2b-8b6c-ad3e73904aa7",  # Gen2
-        gallery_image_name=image_name,
+        gallery_image_name=variant.get_image_name(),
     )
     return ImageReference(community_gallery_image_id=image.unique_id)
 
@@ -405,18 +456,19 @@ def _launch_instance(
         )
     except ResourceExistsError as e:
         # May occur if no quota or quota exceeded
-        if e.error.code in ["SkuNotAvailable", "OperationNotAllowed"]:
-            raise NoCapacityError()
+        if e.error is not None and e.error.code in ["SkuNotAvailable", "OperationNotAllowed"]:
+            message = e.error.message if e.error.message is not None else ""
+            raise NoCapacityError(message)
         raise e
     vm = poller.result()
     return vm
 
 
-def _get_vm_public_ip(
+def _get_vm_public_private_ips(
     network_client: network_mgmt.NetworkManagementClient,
     resource_group: str,
     vm: VirtualMachine,
-) -> str:
+) -> Tuple[str, str]:
     nic_id = vm.network_profile.network_interfaces[0].id
     nic_name = azure_utils.get_resource_name_from_resource_id(nic_id)
     nic = network_client.network_interfaces.get(
@@ -426,7 +478,9 @@ def _get_vm_public_ip(
     public_ip_id = nic.ip_configurations[0].public_ip_address.id
     public_ip_name = azure_utils.get_resource_name_from_resource_id(public_ip_id)
     public_ip = network_client.public_ip_addresses.get(resource_group, public_ip_name)
-    return public_ip.ip_address
+
+    private_ip = nic.ip_configurations[0].private_ip_address
+    return public_ip.ip_address, private_ip
 
 
 def _terminate_instance(

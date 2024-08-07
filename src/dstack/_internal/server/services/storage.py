@@ -1,14 +1,13 @@
 from typing import Optional
 
-BOTO_AVAILABLE = True
+from dstack._internal.server import settings
 
+BOTO_AVAILABLE = True
 try:
     import botocore.exceptions
     from boto3 import Session
 except ImportError:
     BOTO_AVAILABLE = False
-
-from dstack._internal.server import settings
 
 
 class S3Storage:

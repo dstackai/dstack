@@ -37,7 +37,6 @@ BASE_DEPS = [
     "gitpython",
     "jsonschema",
     "paramiko",
-    "git-url-parse",
     "cursor",
     "rich",
     "rich-argparse",
@@ -47,10 +46,11 @@ BASE_DEPS = [
     "starlette>=0.26.0",
     "uvicorn",
     "pydantic>=1.10.10,<2.0.0",
+    "pydantic-duality>=1.2.0",
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
     "alembic>=1.10.2",
-    "apscheduler",
+    "apscheduler<4",
     "aiosqlite",
     "aiohttp",
     "websocket-client",
@@ -58,10 +58,17 @@ BASE_DEPS = [
     "python-multipart",
     "filelock",
     "docker>=6.0.0",
+    "python-dxf>=11.0.0",
+    "cachetools",
     "dnspython",
     "grpcio>=1.50",  # indirect
-    "gpuhunt==0.0.3",
+    "gpuhunt>=0.0.12",
     "sentry-sdk[fastapi]",
+    "httpx",
+    "aiorwlock",
+    "python-json-logger",
+    "alembic-postgresql-enum",
+    "asyncpg",
 ]
 
 AWS_DEPS = [
@@ -71,37 +78,32 @@ AWS_DEPS = [
 
 AZURE_DEPS = [
     "azure-identity>=1.12.0",
-    "azure-keyvault-secrets>=4.6.0",
-    "azure-storage-blob>=12.15.0",
-    "azure-monitor-query>=1.2.0",
     "azure-mgmt-subscription>=3.1.1",
     "azure-mgmt-compute>=29.1.0",
-    "azure-mgmt-network==23.0.0b2",
+    "azure-mgmt-network>=23.0.0",
     "azure-mgmt-resource>=22.0.0",
     "azure-mgmt-authorization>=3.0.0",
-    "azure-mgmt-storage>=21.0.0",
-    "azure-mgmt-keyvault>=10.1.0",
-    "azure-mgmt-loganalytics==13.0.0b6",
-    "azure-mgmt-msi",
-    "azure-mgmt-monitor",
-    "azure-graphrbac",
 ]
 
 GCP_DEPS = [
     "google-auth>=2.3.0",  # indirect
     "google-cloud-storage>=2.0.0",
     "google-cloud-compute>=1.5.0",
-    "google-cloud-secret-manager>=2.0.0",
     "google-cloud-logging>=2.0.0",
     "google-api-python-client>=2.80.0",
     "google-cloud-billing>=1.11.0",
+    "google-cloud-tpu>=1.18.3",
 ]
 
 DATACRUNCH_DEPS = ["datacrunch"]
 
+KUBERNETES_DEPS = ["kubernetes"]
+
 LAMBDA_DEPS = AWS_DEPS
 
-ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS
+OCI_DEPS = ["oci"]
+
+ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS + OCI_DEPS
 
 
 setup(
@@ -123,7 +125,7 @@ setup(
     project_urls={
         "Source": "https://github.com/dstackai/dstack",
     },
-    description="dstack is an open-source toolkit for running GPU workloads on any cloud.",
+    description="dstack is an open-source orchestration engine for running AI workloads on any cloud or on-premises.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     python_requires=">=3.8",
@@ -134,7 +136,9 @@ setup(
         "azure": AZURE_DEPS,
         "datacrunch": DATACRUNCH_DEPS,
         "gcp": GCP_DEPS,
+        "kubernetes": KUBERNETES_DEPS,
         "lambda": LAMBDA_DEPS,
+        "oci": OCI_DEPS,
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

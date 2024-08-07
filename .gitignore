@@ -12,3 +12,8 @@ dist/
 
 /runner/cmd/shim/shim
 /runner/cmd/runner/runner
+
+build/
+.DS_Store
+.fleet
+.env

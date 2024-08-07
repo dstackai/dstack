@@ -2,7 +2,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional, Tuple, Union
+from typing import Any, Iterable, List, Optional, TypeVar, Union
 
 
 def get_dstack_dir() -> Path:
@@ -58,51 +58,51 @@ def pretty_date(time: Union[datetime, int] = False) -> str:
 
 
 def pretty_resources(
-    cpus: Optional[int] = None,
-    memory: Optional[int] = None,
-    gpu_count: Optional[int] = None,
-    gpu_name: Optional[str] = None,
-    gpu_memory: Optional[int] = None,
-    total_gpu_memory: Optional[float] = None,
-    compute_capability: Optional[Tuple[int, int]] = None,
-    disk_size: Optional[int] = None,
+    cpus: Optional[Any] = None,
+    memory: Optional[Any] = None,
+    gpu_count: Optional[Any] = None,
+    gpu_name: Optional[Any] = None,
+    gpu_memory: Optional[Any] = None,
+    total_gpu_memory: Optional[Any] = None,
+    compute_capability: Optional[Any] = None,
+    disk_size: Optional[Any] = None,
 ) -> str:
     """
-    >>> pretty_resources(4, 16*1024)
+    >>> pretty_resources(cpus=4, memory="16GB")
     '4xCPU, 16GB'
-    >>> pretty_resources(4, 16*1024, 1)
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1)
     '4xCPU, 16GB, 1xGPU'
-    >>> pretty_resources(4, 16*1024, 1, 'A100')
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_name='A100')
     '4xCPU, 16GB, 1xA100'
-    >>> pretty_resources(4, 16*1024, 1, 'A100', 40*1024)
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1, gpu_name='A100', gpu_memory="40GB")
     '4xCPU, 16GB, 1xA100 (40GB)'
-    >>> pretty_resources(4, 16*1024, 1, total_gpu_memory=80*1024)
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=1, total_gpu_memory="80GB")
     '4xCPU, 16GB, 1xGPU (total 80GB)'
-    >>> pretty_resources(4, 16*1024, 2, 'A100', 40*1024, 80*1024)
+    >>> pretty_resources(cpus=4, memory="16GB", gpu_count=2, gpu_name='A100', gpu_memory="40GB", total_gpu_memory="80GB")
     '4xCPU, 16GB, 2xA100 (40GB, total 80GB)'
-    >>> pretty_resources(gpu_count=1, compute_capability=(8, 0))
+    >>> pretty_resources(gpu_count=1, compute_capability="8.0")
     '1xGPU (8.0)'
     """
     parts = []
     if cpus is not None:
         parts.append(f"{cpus}xCPU")
     if memory is not None:
-        parts.append(f"{memory / 1024:g}GB")
+        parts.append(f"{memory}")
     if gpu_count:
         gpu_parts = []
-        if gpu_memory:
-            gpu_parts.append(f"{gpu_memory / 1024:g}GB")
-        if total_gpu_memory:
-            gpu_parts.append(f"total {total_gpu_memory / 1024:g}GB")
-        if compute_capability:
-            gpu_parts.append(f"%d.%d" % compute_capability)
+        if gpu_memory is not None:
+            gpu_parts.append(f"{gpu_memory}")
+        if total_gpu_memory is not None:
+            gpu_parts.append(f"total {total_gpu_memory}")
+        if compute_capability is not None:
+            gpu_parts.append(f"{compute_capability}")
 
         gpu = f"{gpu_count}x{gpu_name or 'GPU'}"
         if gpu_parts:
             gpu += f" ({', '.join(gpu_parts)})"
         parts.append(gpu)
     if disk_size:
-        parts.append(f"{disk_size / 1024:g}GB (disk)")
+        parts.append(f"{disk_size} (disk)")
     return ", ".join(parts)
 
 
@@ -138,6 +138,22 @@ def parse_pretty_duration(duration: str) -> int:
     return amount * multiplier
 
 
+def format_pretty_duration(seconds: int) -> str:
+    if seconds < 0:
+        raise ValueError("Seconds cannot be negative")
+    units = [
+        ("w", 7 * 24 * 3600),
+        ("d", 24 * 3600),
+        ("h", 3600),
+        ("m", 60),
+        ("s", 1),
+    ]
+    for unit, multiplier in units:
+        if seconds % multiplier == 0:
+            return f"{seconds // multiplier}{unit}"
+    return f"{seconds}s"  # Fallback to seconds if no larger unit fits perfectly
+
+
 def sizeof_fmt(num, suffix="B"):
     for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
         if abs(num) < 1024.0:
@@ -150,3 +166,64 @@ def remove_prefix(text: str, prefix: str) -> str:
     if text.startswith(prefix):
         return text[len(prefix) :]
     return text
+
+
+T = TypeVar("T")
+
+
+def split_chunks(iterable: Iterable[T], chunk_size: int) -> Iterable[List[T]]:
+    """
+    Splits an iterable into chunks of at most `chunk_size` items.
+
+    >>> list(split_chunks([1, 2, 3, 4, 5], 2))
+    [[1, 2], [3, 4], [5]]
+    """
+
+    if chunk_size < 1:
+        raise ValueError(f"chunk_size should be a positive integer, not {chunk_size}")
+
+    chunk = []
+    for item in iterable:
+        chunk.append(item)
+        if len(chunk) == chunk_size:
+            yield chunk
+            chunk = []
+    if chunk:
+        yield chunk
+
+
+MEMORY_UNITS = {
+    "B": 1,
+    "K": 2**10,
+    "M": 2**20,
+    "G": 2**30,
+    "T": 2**40,
+    "P": 2**50,
+}
+
+
+def parse_memory(memory: str, as_untis: str = "M") -> float:
+    """
+    Converts memory units to the units specified.
+    >>> parse_memory("512Ki", as_units="M")
+    0.5
+    >>> parse_memory("2Mi", as_units="K")
+    2048
+    """
+    m = re.fullmatch(r"(\d+) *([kmgtp])(i|b)", memory.strip().lower())
+    if not m:
+        raise ValueError(f"Invalid memory: {memory}")
+    value = int(m.group(1))
+    units = m.group(2)
+    value_in_bytes = value * MEMORY_UNITS[units.upper()]
+    result = value_in_bytes / MEMORY_UNITS[as_untis.upper()]
+    return result
+
+
+def get_or_error(v: Optional[T]) -> T:
+    """
+    Unpacks an optional value. Used to denote that None is not possible in the current context.
+    """
+    if v is None:
+        raise ValueError("Optional value is None")
+    return v

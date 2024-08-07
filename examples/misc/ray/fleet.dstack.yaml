@@ -1,0 +1,9 @@
+type: fleet
+name: ray-fleet
+nodes: 4
+placement: cluster
+backends: [gcp]
+resources: 
+  cpu: 8..
+  memory: 32GB..
+  gpu: 1

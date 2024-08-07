@@ -2,73 +2,41 @@ package backends
 
 import (
 	"bytes"
-	"context"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
-	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/dstackai/dstack/runner/internal/gerrors"
-	"io"
+	"fmt"
+	"os/exec"
+	"strings"
 )
 
-type AWSBackend struct {
-	region     string
-	instanceId string
-	spot       bool
+type AWSBackend struct{}
+
+func NewAWSBackend() *AWSBackend {
+	return &AWSBackend{}
 }
 
-func init() {
-	register("aws", NewAWSBackend)
-}
-
-func NewAWSBackend(ctx context.Context) (Backend, error) {
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return nil, gerrors.Wrap(err)
+// GetRealDeviceName returns the device name for the given EBS volume ID.
+// The device name on instance can be different from device name specified in block-device mapping
+// (e.g. NVMe block devices built on the Nitro System).
+func (e *AWSBackend) GetRealDeviceName(volumeID string) (string, error) {
+	// Run the lsblk command to get block device information
+	// On AWS, SERIAL contains volume id.
+	cmd := exec.Command("lsblk", "-o", "NAME,SERIAL")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("failed to list block devices: %v", err)
 	}
 
-	client := imds.NewFromConfig(cfg)
-	region, err := client.GetRegion(ctx, &imds.GetRegionInput{})
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	lifecycle, err := getAWSMetadata(ctx, client, "instance-life-cycle")
-	if err != nil {
-		return nil, gerrors.Wrap(err)
-	}
-	instanceId, err := getAWSMetadata(ctx, client, "instance-id")
-	if err != nil {
-		return nil, gerrors.Wrap(err)
+	// Parse the output to find the device that matches the volume ID
+	lines := strings.Split(out.String(), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && strings.HasPrefix(fields[1], "vol") {
+			serial := strings.TrimPrefix(fields[1], "vol")
+			if "vol-"+serial == volumeID {
+				return "/dev/" + fields[0], nil
+			}
+		}
 	}
 
-	return &AWSBackend{
-		region:     region.Region,
-		instanceId: instanceId,
-		spot:       lifecycle == "spot",
-	}, nil
-}
-
-func (b *AWSBackend) Terminate(ctx context.Context) error {
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(b.region))
-	if err != nil {
-		return gerrors.Wrap(err)
-	}
-	client := ec2.NewFromConfig(cfg)
-	_, err = client.TerminateInstances(ctx, &ec2.TerminateInstancesInput{
-		InstanceIds: []string{b.instanceId},
-	})
-	return gerrors.Wrap(err)
-}
-
-func getAWSMetadata(ctx context.Context, client *imds.Client, path string) (string, error) {
-	resp, err := client.GetMetadata(ctx, &imds.GetMetadataInput{
-		Path: path,
-	})
-	if err != nil {
-		return "", gerrors.Wrap(err)
-	}
-	var b bytes.Buffer
-	if _, err = io.Copy(&b, resp.Content); err != nil {
-		return "", err
-	}
-	return b.String(), nil
+	return "", fmt.Errorf("volume %s not found among block devices", volumeID)
 }

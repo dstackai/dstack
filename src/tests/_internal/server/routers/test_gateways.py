@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.instances import LaunchedGatewayInfo
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.services.gateways import (
@@ -29,7 +28,7 @@ client = TestClient(app)
 class TestListAndGetGateways:
     @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post(f"/api/project/main/gateways/list")
+        response = client.post("/api/project/main/gateways/list")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
@@ -60,11 +59,24 @@ class TestListAndGetGateways:
                 "backend": backend.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
+                "status": "submitted",
+                "status_message": None,
                 "instance_id": gateway_compute.instance_id,
                 "ip_address": gateway_compute.ip_address,
+                "hostname": gateway_compute.ip_address,
                 "name": gateway.name,
                 "region": gateway.region,
                 "wildcard_domain": gateway.wildcard_domain,
+                "configuration": {
+                    "type": "gateway",
+                    "name": gateway.name,
+                    "backend": backend.type.value,
+                    "region": gateway.region,
+                    "domain": gateway.wildcard_domain,
+                    "default": False,
+                    "public_ip": True,
+                    "certificate": {"type": "lets-encrypt"},
+                },
             }
         ]
 
@@ -96,11 +108,24 @@ class TestListAndGetGateways:
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": False,
+            "status": "submitted",
+            "status_message": None,
             "instance_id": gateway_compute.instance_id,
             "ip_address": gateway_compute.ip_address,
+            "hostname": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
+            "configuration": {
+                "type": "gateway",
+                "name": gateway.name,
+                "backend": backend.type.value,
+                "region": gateway.region,
+                "domain": gateway.wildcard_domain,
+                "default": False,
+                "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
+            },
         }
 
     @pytest.mark.asyncio
@@ -115,7 +140,7 @@ class TestListAndGetGateways:
             json={"name": "missing"},
             headers=get_auth_headers(user.token),
         )
-        assert response.status_code == 404
+        assert response.status_code == 400
 
 
 class TestCreateGateway:
@@ -139,35 +164,35 @@ class TestCreateGateway:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        backend = await create_backend(session, project.id)
-        with patch(
-            "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m:
-            aws = Mock()
-            m.return_value = [(backend, aws)]
-            aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
-                instance_id="i-1234567890",
-                ip_address="2.2.2.2",
-                region="us",
-            )
-
-            response = client.post(
-                f"/api/project/{project.name}/gateways/create",
-                json={"name": "test", "backend_type": "aws", "region": "us"},
-                headers=get_auth_headers(user.token),
-            )
-            m.assert_called_once()
-            aws.compute.return_value.create_gateway.assert_called_once()
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        response = client.post(
+            f"/api/project/{project.name}/gateways/create",
+            json={"name": "test", "backend_type": "aws", "region": "us"},
+            headers=get_auth_headers(user.token),
+        )
         assert response.status_code == 200
         assert response.json() == {
             "name": "test",
             "backend": "aws",
             "region": "us",
-            "instance_id": "i-1234567890",
-            "ip_address": "2.2.2.2",
+            "status": "submitted",
+            "status_message": None,
+            "instance_id": "",
+            "ip_address": "",
+            "hostname": "",
             "wildcard_domain": None,
             "default": True,
             "created_at": response.json()["created_at"],
+            "configuration": {
+                "type": "gateway",
+                "name": "test",
+                "backend": backend.type.value,
+                "region": "us",
+                "domain": None,
+                "default": True,
+                "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
+            },
         }
 
     @pytest.mark.asyncio
@@ -177,68 +202,39 @@ class TestCreateGateway:
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        backend = await create_backend(session, project.id)
-        with patch(
-            "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m, patch("dstack._internal.server.services.gateways.random_names.generate_name") as g:
+        backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
+        with patch("dstack._internal.server.services.gateways.random_names.generate_name") as g:
             g.return_value = "random-name"
-            aws = Mock()
-            m.return_value = [(backend, aws)]
-            aws.compute.return_value.create_gateway.return_value = LaunchedGatewayInfo(
-                instance_id="i-1234567890",
-                ip_address="2.2.2.2",
-                region="us",
-            )
-
             response = client.post(
                 f"/api/project/{project.name}/gateways/create",
                 json={"name": None, "backend_type": "aws", "region": "us"},
                 headers=get_auth_headers(user.token),
             )
             g.assert_called_once()
-            m.assert_called_once()
-            aws.compute.return_value.create_gateway.assert_called_once()
         assert response.status_code == 200
         assert response.json() == {
             "name": "random-name",
             "backend": "aws",
             "region": "us",
-            "instance_id": "i-1234567890",
-            "ip_address": "2.2.2.2",
+            "status": "submitted",
+            "status_message": None,
+            "instance_id": "",
+            "ip_address": "",
+            "hostname": "",
             "wildcard_domain": None,
             "default": True,
             "created_at": response.json()["created_at"],
+            "configuration": {
+                "type": "gateway",
+                "name": "random-name",
+                "backend": backend.type.value,
+                "region": "us",
+                "domain": None,
+                "default": True,
+                "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
+            },
         }
-
-    @pytest.mark.asyncio
-    async def test_rollback_gateway_on_fail(self, test_db, session: AsyncSession):
-        user = await create_user(session, global_role=GlobalRole.USER)
-        project = await create_project(session)
-        await add_project_member(
-            session=session, project=project, user=user, project_role=ProjectRole.ADMIN
-        )
-        backend = await create_backend(session, project.id)
-        with patch(
-            "dstack._internal.server.services.gateways.get_project_backends_with_models"
-        ) as m:
-            aws = Mock()
-            m.return_value = [(backend, aws)]
-            aws.compute.return_value.create_gateway.side_effect = DstackError()
-
-            with pytest.raises(DstackError):
-                client.post(
-                    f"/api/project/{project.name}/gateways/create",
-                    json={"name": "test", "backend_type": "aws", "region": "us"},
-                    headers=get_auth_headers(user.token),
-                )
-            m.assert_called_once()
-            aws.compute.return_value.create_gateway.assert_called_once()
-        response = client.post(
-            f"/api/project/{project.name}/gateways/list",
-            headers=get_auth_headers(user.token),
-        )
-        assert response.status_code == 200
-        assert response.json() == []
 
     @pytest.mark.asyncio
     async def test_create_gateway_missing_backend(self, test_db, session: AsyncSession):
@@ -273,7 +269,7 @@ class TestDefaultGateway:
     async def test_default_gateway_is_missing(self, test_db, session: AsyncSession):
         project = await create_project(session)
         backend = await create_backend(session, project.id)
-        gateway = await create_gateway(session, project.id, backend.id)
+        await create_gateway(session, project.id, backend.id)
 
         res = await get_project_default_gateway(session, project)
         assert res is None
@@ -329,11 +325,24 @@ class TestDefaultGateway:
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
             "default": True,
+            "status": "submitted",
+            "status_message": None,
             "instance_id": gateway_compute.instance_id,
             "ip_address": gateway_compute.ip_address,
+            "hostname": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": gateway.wildcard_domain,
+            "configuration": {
+                "type": "gateway",
+                "name": gateway.name,
+                "backend": backend.type.value,
+                "region": gateway.region,
+                "domain": gateway.wildcard_domain,
+                "default": True,
+                "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
+            },
         }
 
     @pytest.mark.asyncio
@@ -400,9 +409,9 @@ class TestDeleteGateway:
             "dstack._internal.server.services.gateways.get_project_backend_by_type_or_error"
         ) as m:
             aws = Mock()
-            aws.compute.return_value.terminate_instance.return_value = None  # success
+            aws.compute.return_value.terminate_gateway.return_value = None  # success
             gcp = Mock()
-            gcp.compute.return_value.terminate_instance.side_effect = DstackError()  # fail
+            gcp.compute.return_value.terminate_gateway.side_effect = DstackError()  # fail
 
             def get_backend(_, backend_type):
                 return {BackendType.AWS: aws, BackendType.GCP: gcp}[backend_type]
@@ -414,8 +423,8 @@ class TestDeleteGateway:
                 json={"names": [gateway_aws.name, gateway_gcp.name]},
                 headers=get_auth_headers(user.token),
             )
-            aws.compute.return_value.terminate_instance.assert_called_once()
-            gcp.compute.return_value.terminate_instance.assert_called_once()
+            aws.compute.return_value.terminate_gateway.assert_called_once()
+            gcp.compute.return_value.terminate_gateway.assert_called_once()
             assert response.status_code == 200
 
         response = client.post(
@@ -428,11 +437,24 @@ class TestDeleteGateway:
                 "backend": backend_gcp.type.value,
                 "created_at": response.json()[0]["created_at"],
                 "default": False,
+                "status": "submitted",
+                "status_message": None,
                 "instance_id": gateway_compute_gcp.instance_id,
                 "ip_address": gateway_compute_gcp.ip_address,
+                "hostname": gateway_compute_gcp.ip_address,
                 "name": gateway_gcp.name,
                 "region": gateway_gcp.region,
                 "wildcard_domain": gateway_gcp.wildcard_domain,
+                "configuration": {
+                    "type": "gateway",
+                    "name": gateway_gcp.name,
+                    "backend": backend_gcp.type.value,
+                    "region": gateway_gcp.region,
+                    "domain": gateway_gcp.wildcard_domain,
+                    "default": False,
+                    "public_ip": True,
+                    "certificate": {"type": "lets-encrypt"},
+                },
             }
         ]
 
@@ -478,12 +500,25 @@ class TestUpdateGateway:
         assert response.json() == {
             "backend": backend.type.value,
             "created_at": response.json()["created_at"],
+            "status": "submitted",
+            "status_message": None,
             "default": False,
             "instance_id": gateway_compute.instance_id,
             "ip_address": gateway_compute.ip_address,
+            "hostname": gateway_compute.ip_address,
             "name": gateway.name,
             "region": gateway.region,
             "wildcard_domain": "test.com",
+            "configuration": {
+                "type": "gateway",
+                "name": gateway.name,
+                "backend": backend.type.value,
+                "region": gateway.region,
+                "domain": "test.com",
+                "default": False,
+                "public_ip": True,
+                "certificate": {"type": "lets-encrypt"},
+            },
         }
 
     @pytest.mark.asyncio

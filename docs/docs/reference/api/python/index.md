@@ -1,4 +1,4 @@
-# API
+# Python API
 
 The Python API enables running tasks, services, and managing runs programmatically.
 
@@ -20,12 +20,12 @@ task = Task(
         "text-generation-launcher --trust-remote-code --quantize gptq",
     ],
     ports=["80"],
+    resources=Resources(gpu=GPU(memory="24GB")),
 )
 
 run = client.runs.submit(
     run_name="my-awesome-run",  # If not specified, a random name is assigned 
     configuration=task,
-    resources=Resources(gpu=GPU(memory="24GB")),
     repo=None, # Specify to mount additional files
 )
 
@@ -88,23 +88,28 @@ finally:
 
 ### `dstack.api.Task` { #dstack.api.Task data-toc-label="Task" }
 
-::: dstack.api._TaskConfiguration
-    options:
-      show_bases: false
+#SCHEMA# dstack.api.Task
+    overrides:
       show_root_heading: false
       show_root_toc_entry: false
       heading_level: 4
+      item_id_mapping:
+        registry_auth: dstack.api.RegistryAuth
+        resources: dstack.api.Resources
 
 ### `dstack.api.Service`  { #dstack.api.Service data-toc-label="Service" }
 
-::: dstack.api._ServiceConfiguration
-    options:
-      show_bases: false
+#SCHEMA# dstack.api.Service
+    overrides:
       show_root_heading: false
       show_root_toc_entry: false
       heading_level: 4
+      item_id_mapping:
+        scaling: dstack.api.Scaling
+        registry_auth: dstack.api.RegistryAuth
+        resources: dstack.api.Resources
 
-### `dstack.api.Run` { ##dstack.api.Run data-toc-label="Run" }
+### `dstack.api.Run` { #dstack.api.Run data-toc-label="Run" }
 
 ::: dstack.api.Run
     options:
@@ -113,34 +118,41 @@ finally:
       show_root_toc_entry: false
       heading_level: 4
 
-### `dstack.api.Resources` { ##dstack.api.Resources data-toc-label="Resources" }
+### `dstack.api.Resources` { #dstack.api.Resources data-toc-label="Resources" }
 
-::: dstack.api._ProfileResources
-    options:
-      show_bases: false
+#SCHEMA# dstack.api.Resources
+    overrides:
       show_root_heading: false
       show_root_toc_entry: false
       heading_level: 4
+      item_id_mapping:
+        gpu: dstack.api.GPU
+        memory: dstack.api.Memory
+        Range: dstack.api.Range
 
-### `dstack.api.GPU` { ##dstack.api.GPU data-toc-label="GPU" }
+### `dstack.api.GPU` { #dstack.api.GPU data-toc-label="GPU" }
 
-::: dstack.api._ProfileGPU
-    options:
-      show_bases: false
+#SCHEMA# dstack.api.GPU
+    overrides:
       show_root_heading: false
       show_root_toc_entry: false
       heading_level: 4
+      item_id_mapping:
+        memory: dstack.api.Memory
+        Range: dstack.api.Range
 
-### `dstack.api.Disk` { ##dstack.api.Disk data-toc-label="Disk" }
+### `dstack.api.Disk` { #dstack.api.Disk data-toc-label="Disk" }
 
-::: dstack.api._ProfileDisk
-    options:
-      show_bases: false
+#SCHEMA# dstack.api.Disk
+    overrides:
       show_root_heading: false
       show_root_toc_entry: false
       heading_level: 4
+      item_id_mapping:
+        memory: dstack.api.Memory
+        Range: dstack.api.Range
 
-### `dstack.api.LocalRepo` { ##dstack.api.LocalRepo data-toc-label="LocalRepo" }
+### `dstack.api.LocalRepo` { #dstack.api.LocalRepo data-toc-label="LocalRepo" }
 
 ::: dstack.api.LocalRepo
     options:
@@ -149,7 +161,7 @@ finally:
       show_root_toc_entry: false
       heading_level: 4
 
-### `dstack.api.RemoteRepo` { ##dstack.api.RemoteRepo data-toc-label="RemoteRepo" }
+### `dstack.api.RemoteRepo` { #dstack.api.RemoteRepo data-toc-label="RemoteRepo" }
 
 ::: dstack.api.RemoteRepo
     options:
@@ -158,7 +170,7 @@ finally:
       show_root_toc_entry: false
       heading_level: 4
 
-### `dstack.api.VirtualRepo` { ##dstack.api.VirtualRepo data-toc-label="VirtualRepo" }
+### `dstack.api.VirtualRepo` { #dstack.api.VirtualRepo data-toc-label="VirtualRepo" }
 
 ::: dstack.api.VirtualRepo
     options:
@@ -167,11 +179,18 @@ finally:
       show_root_toc_entry: false
       heading_level: 4
 
-### `dstack.api.RegistryAuth` { ##dstack.api.RegistryAuth data-toc-label="RegistryAuth" }
+### `dstack.api.RegistryAuth` { #dstack.api.RegistryAuth data-toc-label="RegistryAuth" }
 
-::: dstack.api.RegistryAuth
-    options:
-      show_bases: false
+#SCHEMA# dstack.api.RegistryAuth
+    overrides:
+      show_root_heading: false
+      show_root_toc_entry: false
+      heading_level: 4
+
+### `dstack.api.Scaling` { #dstack.api.Scaling data-toc-label="Scaling" }
+
+#SCHEMA# dstack.api.Scaling
+    overrides:
       show_root_heading: false
       show_root_toc_entry: false
       heading_level: 4

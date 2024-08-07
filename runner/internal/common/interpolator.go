@@ -3,9 +3,10 @@ package common
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
-	"strings"
 )
 
 const (

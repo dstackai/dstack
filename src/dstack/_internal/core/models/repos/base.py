@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import BinaryIO, Optional
 
-from pydantic import BaseModel
-
 import dstack._internal.core.models.repos as repos
+from dstack._internal.core.errors import DstackError
+from dstack._internal.core.models.common import CoreModel
 
 
 class RepoType(str, Enum):
@@ -18,7 +18,7 @@ class RepoProtocol(str, Enum):
     HTTPS = "https"
 
 
-class BaseRepoInfo(BaseModel):
+class BaseRepoInfo(CoreModel):
     repo_type: str
 
 
@@ -30,3 +30,12 @@ class Repo(ABC):
     @abstractmethod
     def write_code_file(self, fp: BinaryIO) -> str:
         pass
+
+    @abstractmethod
+    def get_repo_info(self) -> "repos.AnyRepoInfo":
+        pass
+
+    def get_repo_dir_or_error(self) -> str:
+        if self.repo_dir is not None:
+            return self.repo_dir
+        raise DstackError("repo_dir is None")

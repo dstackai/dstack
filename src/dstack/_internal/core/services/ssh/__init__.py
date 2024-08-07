@@ -8,14 +8,20 @@ from dstack._internal.core.errors import (
 
 
 def get_ssh_error(stderr: bytes) -> SSHError:
-    if b": Operation timed out" in stderr:
-        return SSHTimeoutError()
-    if b": Connection refused" in stderr:
-        return SSHConnectionRefusedError()
     if b": Permission denied (publickey)" in stderr:
         return SSHKeyError(stderr)
-    if b": Address already in use" in stderr:
-        return SSHPortInUseError()
+
+    for pattern, cls in [
+        (b": Operation timed out", SSHTimeoutError),
+        (b": Connection refused", SSHConnectionRefusedError),
+        (b": Address already in use", SSHPortInUseError),
+        (b" port forwarding failed", SSHPortInUseError),
+    ]:
+        if pattern in stderr:
+            return cls(
+                b"\n".join(line for line in stderr.split(b"\n") if pattern in line).decode()
+            )
+
     # TODO: kex_exchange_identification: read: Connection reset by peer
     # TODO: Connection timed out during banner exchange
     return SSHError(stderr.decode())

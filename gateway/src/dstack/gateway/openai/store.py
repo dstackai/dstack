@@ -1,28 +1,33 @@
 import asyncio
 import datetime
+import logging
 from functools import lru_cache
-from typing import Dict, List, Tuple
+from typing import ClassVar, Dict, List, Tuple
 
-from pydantic import BaseModel, ValidationError
+from pydantic import ValidationError
 
+from dstack.gateway.core.persistent import PersistentModel, get_persistent_state
+from dstack.gateway.core.store import Service, StoreSubscriber
 from dstack.gateway.errors import GatewayError, NotFoundError
 from dstack.gateway.openai.clients import ChatCompletionsClient
+from dstack.gateway.openai.clients.openai import OpenAIChatCompletions
 from dstack.gateway.openai.clients.tgi import TGIChatCompletions
 from dstack.gateway.openai.models import OpenAIOptions, ServiceModel
 from dstack.gateway.openai.schemas import Model
-from dstack.gateway.schemas import Service
-from dstack.gateway.services.persistent import get_persistent_state
-from dstack.gateway.services.store import StoreSubscriber
+
+logger = logging.getLogger(__name__)
 
 
-class OpenAIStore(BaseModel, StoreSubscriber):
+class OpenAIStore(PersistentModel, StoreSubscriber):
     """
     OpenAIStore keeps track of LLM models registered in the system and dispatches requests.
     Its internal state could be serialized to a file and restored from it using pydantic.
     """
 
+    persistent_key: ClassVar[str] = "openai"
+
     index: Dict[str, Dict[str, Dict[str, ServiceModel]]] = {}
-    domain_index: Dict[str, Tuple[str, str, str]] = {}
+    services_index: Dict[str, Tuple[str, str, str]] = {}
     _lock: asyncio.Lock = asyncio.Lock()
 
     async def on_register(self, project: str, service: Service):
@@ -40,18 +45,20 @@ class OpenAIStore(BaseModel, StoreSubscriber):
                 self.index[project][model.type] = {}
             self.index[project][model.type][model.name] = ServiceModel(
                 model=model,
-                domain=service.public_domain,
+                domain=service.domain,
                 created=int(datetime.datetime.utcnow().timestamp()),
             )
-            self.domain_index[service.public_domain] = (project, model.type, model.name)
+            self.services_index[service.id] = (project, model.type, model.name)
 
-    async def on_unregister(self, project: str, domain: str):
+    async def on_unregister(self, project: str, service_id: str):
         async with self._lock:
-            if domain not in self.domain_index or self.domain_index[domain][0] != project:
+            if (
+                service_id not in self.services_index
+                or self.services_index[service_id][0] != project
+            ):
                 return
-            project, model_type, model_name = self.domain_index[domain]
-            del self.domain_index[domain]
-            del self.index[project][model_type][model_name]
+            project, model_type, model_name = self.services_index.pop(service_id)
+            self.index[project][model_type].pop(model_name)
 
     async def list_models(self, project: str) -> List[Model]:
         models = []
@@ -81,10 +88,22 @@ class OpenAIStore(BaseModel, StoreSubscriber):
                     chat_template=service.model.chat_template,
                     eos_token=service.model.eos_token,
                 )
+            elif service.model.format == "openai":
+                return OpenAIChatCompletions(
+                    base_url=f"http://localhost/{service.model.prefix.lstrip('/')}",
+                    host=service.domain,
+                )
             else:
                 raise GatewayError(f"Unsupported model format: {service.model.format}")
 
 
 @lru_cache()
 def get_store() -> OpenAIStore:
-    return OpenAIStore.model_validate(get_persistent_state().get("openai", {}))
+    try:
+        store = OpenAIStore.model_validate(
+            get_persistent_state().get(OpenAIStore.persistent_key, {})
+        )
+    except ValidationError as e:
+        logger.warning("Failed to load openai store state: %s", e)
+        store = OpenAIStore()
+    return store

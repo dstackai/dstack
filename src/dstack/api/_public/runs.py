@@ -8,25 +8,33 @@ from copy import copy
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
+from urllib.parse import urlparse
 
-import requests
 from websocket import WebSocketApp
 
 import dstack.api as api
-from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
+from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
+    CreationPolicy,
     Profile,
-    ProfileResources,
     ProfileRetryPolicy,
     SpotPolicy,
+    TerminationPolicy,
 )
 from dstack._internal.core.models.repos.base import Repo
-from dstack._internal.core.models.runs import JobSpec
-from dstack._internal.core.models.runs import JobStatus as RunStatus
+from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.runs import (
+    JobSpec,
+    PoolInstanceOffers,
+    Requirements,
+    RunPlan,
+    RunSpec,
+    RunStatus,
+)
 from dstack._internal.core.models.runs import Run as RunModel
-from dstack._internal.core.models.runs import RunPlan, RunSpec
 from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
@@ -90,14 +98,7 @@ class Run(ABC):
     def service_url(self) -> str:
         if self._run.run_spec.configuration.type != "service":
             raise ValueError("The run is not a service")
-        gateway = self._run.jobs[0].job_spec.gateway
-        if gateway.secure:
-            url = f"https://{gateway.hostname}"
-        else:
-            url = f"http://{gateway.hostname}"
-            if gateway.public_port != 80:
-                url += f":{gateway.public_port}"
-        return url
+        return self._run.service.url
 
     def _attached_logs(
         self,
@@ -121,20 +122,23 @@ class Run(ABC):
         )
         threading.Thread(target=ws_thread).start()
 
-        job_spec = self._run.jobs[0].job_spec
         ports = self.ports
         hostname = "127.0.0.1"
         secure = False
-        if job_spec.gateway is not None:
+        if self._run.service is not None:
+            url = urlparse(self._run.service.url)
+            service_port = url.port
+            if service_port is None:
+                service_port = 443 if self._run.run_spec.configuration.https else 80
             ports = {
                 **ports,
-                job_spec.gateway.service_port: job_spec.gateway.public_port,
+                self._run.run_spec.configuration.port.container_port: service_port,
             }
-            hostname = job_spec.gateway.hostname
-            secure = job_spec.gateway.secure
+            hostname = url.hostname
+            secure = url.scheme == "https"
         replace_urls = URLReplacer(
             ports=ports,
-            app_specs=job_spec.app_specs,
+            app_specs=self._run.jobs[0].job_spec.app_specs,
             hostname=hostname,
             secure=secure,
             ip_address=self.hostname,
@@ -154,6 +158,8 @@ class Run(ABC):
         self,
         start_time: Optional[datetime] = None,
         diagnose: bool = False,
+        replica_num: int = 0,
+        job_num: int = 0,
     ) -> Iterable[bytes]:
         """
         Iterate through run's log messages
@@ -168,21 +174,28 @@ class Run(ABC):
         if diagnose is False and self._ssh_attach is not None:
             yield from self._attached_logs()
         else:
+            job = None
+            for j in self._run.jobs:
+                if j.job_spec.replica_num == replica_num and j.job_spec.job_num == job_num:
+                    job = j
+            if job is None:
+                return []
             next_start_time = start_time
             while True:
                 resp = self._api_client.logs.poll(
                     project_name=self._project,
                     body=PollLogsRequest(
                         run_name=self.name,
-                        job_submission_id=self._run.jobs[0].job_submissions[0].id,
+                        job_submission_id=job.job_submissions[-1].id,
                         start_time=next_start_time,
                         end_time=None,
                         descending=False,
+                        limit=100,
                         diagnose=diagnose,
                     ),
                 )
                 if len(resp.logs) == 0:
-                    return
+                    return []
                 for log in resp.logs:
                     yield base64.b64decode(log.message)
                 next_start_time = resp.logs[-1].timestamp
@@ -228,7 +241,6 @@ class Run(ABC):
                 RunStatus.SUBMITTED,
                 RunStatus.PENDING,
                 RunStatus.PROVISIONING,
-                RunStatus.PULLING,
             ):
                 time.sleep(5)
                 self.refresh()
@@ -236,7 +248,8 @@ class Run(ABC):
             if self.status.is_finished() and self.status != RunStatus.DONE:
                 return False
 
-            provisioning_data = self._run.jobs[0].job_submissions[-1].job_provisioning_data
+            job = self._run.jobs[0]  # TODO(egor-s): pull logs from all replicas?
+            provisioning_data = job.job_submissions[-1].job_provisioning_data
 
             control_sock_path_and_port_locks = SSHAttach.reuse_control_sock_path_and_port_locks(
                 run_name=self.name
@@ -244,8 +257,7 @@ class Run(ABC):
 
             if control_sock_path_and_port_locks is None:
                 if self._ports_lock is None:
-                    self._ports_lock = _reserve_ports(self._run.jobs[0].job_spec)
-
+                    self._ports_lock = _reserve_ports(job.job_spec)
                 logger.debug(
                     "Attaching to %s (%s: %s)",
                     self.name,
@@ -254,7 +266,6 @@ class Run(ABC):
                 )
             else:
                 self._ports_lock = control_sock_path_and_port_locks[1]
-
                 logger.debug(
                     "Reusing the existing tunnel to %s (%s: %s)",
                     self.name,
@@ -270,13 +281,16 @@ class Run(ABC):
                 ports_lock=self._ports_lock,
                 run_name=self.name,
                 dockerized=provisioning_data.dockerized,
+                ssh_proxy=provisioning_data.ssh_proxy,
                 control_sock_path=control_sock_path_and_port_locks[0]
                 if control_sock_path_and_port_locks
                 else None,
+                local_backend=provisioning_data.backend == BackendType.LOCAL,
             )
             if not control_sock_path_and_port_locks:
                 self._ssh_attach.attach()
             self._ports_lock = None
+
         return True
 
     def detach(self):
@@ -316,7 +330,9 @@ class RunCollection:
         configuration_path: Optional[str] = None,
         repo: Optional[Repo] = None,
         backends: Optional[List[BackendType]] = None,
-        resources: Optional[ProfileResources] = None,
+        regions: Optional[List[str]] = None,
+        instance_types: Optional[List[str]] = None,
+        resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
         max_duration: Optional[Union[int, str]] = None,
@@ -333,7 +349,8 @@ class RunCollection:
             configuration_path: The path to the configuration file, relative to the root directory of the repo.
             repo (Union[LocalRepo, RemoteRepo, VirtualRepo]): A repo to mount to the run.
             backends: A list of allowed backend for provisioning.
-            resources (Resources): The minimal required resources for provisioning.
+            regions: A list of cloud regions for provisioning.
+            resources: The requirements to run the configuration. Overrides the configuration's resources.
             spot_policy: A spot policy for provisioning.
             retry_policy (RetryPolicy): A retry policy.
             max_duration: The max instance running duration in seconds.
@@ -357,6 +374,8 @@ class RunCollection:
             repo=repo,
             configuration_path=configuration_path,
             backends=backends,
+            regions=regions,
+            instance_types=instance_types,
             resources=resources,
             spot_policy=spot_policy,
             retry_policy=retry_policy,
@@ -367,19 +386,32 @@ class RunCollection:
         )
         return self.exec_plan(run_plan, repo, reserve_ports=reserve_ports)
 
+    def get_offers(self, profile: Profile, requirements: Requirements) -> PoolInstanceOffers:
+        return self._api_client.runs.get_offers(self._project, profile, requirements)
+
+    def create_instance(self, profile: Profile, requirements: Requirements) -> Instance:
+        return self._api_client.runs.create_instance(self._project, profile, requirements)
+
     def get_plan(
         self,
         configuration: AnyRunConfiguration,
         repo: Repo,
         configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
-        resources: Optional[ProfileResources] = None,
+        regions: Optional[List[str]] = None,
+        instance_types: Optional[List[str]] = None,
+        resources: Optional[ResourcesSpec] = None,
         spot_policy: Optional[SpotPolicy] = None,
         retry_policy: Optional[ProfileRetryPolicy] = None,
         max_duration: Optional[Union[int, str]] = None,
         max_price: Optional[float] = None,
         working_dir: Optional[str] = None,
         run_name: Optional[str] = None,
+        pool_name: Optional[str] = None,
+        instance_name: Optional[str] = None,
+        creation_policy: Optional[CreationPolicy] = None,
+        termination_policy: Optional[TerminationPolicy] = None,
+        termination_policy_idle: Optional[Union[str, int]] = None,
     ) -> RunPlan:
         # """
         # Get run plan. Same arguments as `submit`
@@ -390,22 +422,33 @@ class RunCollection:
         if working_dir is None:
             working_dir = "."
         elif repo.repo_dir is not None:
-            working_dir = Path(repo.repo_dir) / working_dir
-            if not path_in_dir(working_dir, repo.repo_dir):
+            working_dir_path = Path(repo.repo_dir) / working_dir
+            if not path_in_dir(working_dir_path, repo.repo_dir):
                 raise ConfigurationError("Working directory is outside of the repo")
-            working_dir = working_dir.relative_to(repo.repo_dir).as_posix()
+            working_dir = working_dir_path.relative_to(repo.repo_dir).as_posix()
 
         if configuration_path is None:
             configuration_path = "(python)"
 
+        if resources is not None:
+            configuration = configuration.copy(deep=True)
+            configuration.resources = resources
+
         profile = Profile(
             name="(python)",
             backends=backends,
-            resources=resources or ProfileResources(),
+            regions=regions,
+            instance_types=instance_types,
             spot_policy=spot_policy,
+            retry=None,
             retry_policy=retry_policy,
             max_duration=max_duration,
             max_price=max_price,
+            pool_name=pool_name,
+            instance_name=instance_name,
+            creation_policy=creation_policy,
+            termination_policy=termination_policy,
+            termination_idle_time=termination_policy_idle,
         )
         run_spec = RunSpec(
             run_name=run_name,
@@ -463,13 +506,19 @@ class RunCollection:
         Returns:
             list of runs
         """
-        runs = self._api_client.runs.list(project_name=self._project, repo_id=None)
-        if not all:
-            active = [run for run in runs if not run.status.is_finished()]
-            if active:
-                runs = active
-            else:
-                runs = runs[:1]  # the most recent finished run
+        # Return only one page of latest runs (<=100). Returning all the pages may be costly.
+        # TODO: Consider introducing `since` filter with a reasonable default.
+        only_active = not all
+        runs = self._api_client.runs.list(
+            project_name=self._project,
+            repo_id=None,
+            only_active=only_active,
+        )
+        if only_active and len(runs) == 0:
+            runs = self._api_client.runs.list(
+                project_name=self._project,
+                repo_id=None,
+            )[:1]
         return [self._model_to_run(run) for run in runs]
 
     def get(self, run_name: str) -> Optional[Run]:
@@ -485,10 +534,8 @@ class RunCollection:
         try:
             run = self._api_client.runs.get(self._project, run_name)
             return self._model_to_run(run)
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code != 404:
-                raise
-        return None
+        except ResourceNotExistsError:
+            return None
 
     def _model_to_run(self, run: RunModel) -> Run:
         return Run(

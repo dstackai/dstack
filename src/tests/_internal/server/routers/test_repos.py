@@ -77,7 +77,7 @@ class TestGetRepo:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_returns_404_if_repo_does_not_exist(self, test_db, session: AsyncSession):
+    async def test_returns_400_if_repo_does_not_exist(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -88,7 +88,7 @@ class TestGetRepo:
             headers=get_auth_headers(user.token),
             json={"repo_id": "some_repo", "include_creds": False},
         )
-        assert response.status_code == 404
+        assert response.status_code == 400
 
     @pytest.mark.asyncio
     async def test_returns_repo(self, test_db, session: AsyncSession):
@@ -153,13 +153,14 @@ class TestInitRepo:
             "repo_id": "test_repo",
             "repo_info": {
                 "repo_type": "remote",
-                "repo_host_name": "github.com",
+                "repo_host_name": "",
                 "repo_port": None,
-                "repo_user_name": "dstackai",
+                "repo_user_name": "",
                 "repo_name": "dstack",
             },
             "repo_creds": {
                 "protocol": "https",
+                "clone_url": "https://github.com/dstackai/dstack.git",
                 "private_key": None,
                 "oauth_token": "test_token",
             },
@@ -187,13 +188,14 @@ class TestInitRepo:
             "repo_id": "test_repo",
             "repo_info": {
                 "repo_type": "remote",
-                "repo_host_name": "github.com",
+                "repo_host_name": "",
                 "repo_port": None,
-                "repo_user_name": "dstackai",
+                "repo_user_name": "",
                 "repo_name": "dstack",
             },
             "repo_creds": {
                 "protocol": "https",
+                "clone_url": "https://github.com/dstackai/dstack.git",
                 "private_key": None,
                 "oauth_token": "test_token",
             },
@@ -208,13 +210,14 @@ class TestInitRepo:
             "repo_id": "test_repo",
             "repo_info": {
                 "repo_type": "remote",
-                "repo_host_name": "github.com",
+                "repo_host_name": "",
                 "repo_port": None,
-                "repo_user_name": "dstackai",
+                "repo_user_name": "",
                 "repo_name": "dstack",
             },
             "repo_creds": {
                 "protocol": "https",
+                "clone_url": "https://github.com/dstackai/dstack.git",
                 "private_key": None,
                 "oauth_token": "test_token_updated",
             },

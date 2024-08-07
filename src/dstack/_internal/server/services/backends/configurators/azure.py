@@ -1,16 +1,11 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional, Tuple
-from uuid import UUID, uuid5
 
 from azure.core.credentials import TokenCredential
-from azure.mgmt import authorization as autharization_mgmt
-from azure.mgmt import msi as msi_mgmt
 from azure.mgmt import network as network_mgmt
 from azure.mgmt import resource as resource_mgmt
 from azure.mgmt import subscription as subscription_mgmt
-from azure.mgmt.authorization.models import RoleAssignmentCreateParameters
-from azure.mgmt.msi.models import Identity
 from azure.mgmt.network.models import (
     AddressSpace,
     NetworkSecurityGroup,
@@ -44,6 +39,7 @@ from dstack._internal.core.models.backends.base import (
     ConfigElementValue,
     ConfigMultiElement,
 )
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
@@ -69,7 +65,7 @@ LOCATIONS = [
     ("(Asia Pacific) East Asia", "eastasia"),
     ("(South America) Brazil South", "brazilsouth"),
 ]
-LOCATION_VALUES = [l[1] for l in LOCATIONS]
+LOCATION_VALUES = [loc[1] for loc in LOCATIONS]
 DEFAULT_LOCATIONS = LOCATION_VALUES
 MAIN_LOCATION = "eastus"
 
@@ -107,14 +103,17 @@ class AzureConfigurator(Configurator):
         )
         if config.creds is None:
             return config_values
-        if isinstance(config.creds, AzureDefaultCreds) and not settings.DEFAULT_CREDS_ENABLED:
+        if (
+            is_core_model_instance(config.creds, AzureDefaultCreds)
+            and not settings.DEFAULT_CREDS_ENABLED
+        ):
             raise_invalid_credentials_error(fields=[["creds"]])
-        if isinstance(config.creds, AzureClientCreds):
+        if is_core_model_instance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         try:
             credential, creds_tenant_id = auth.authenticate(config.creds)
         except BackendAuthError:
-            if isinstance(config.creds, AzureClientCreds):
+            if is_core_model_instance(config.creds, AzureClientCreds):
                 raise_invalid_credentials_error(
                     fields=[
                         ["creds", "tenant_id"],
@@ -146,7 +145,7 @@ class AzureConfigurator(Configurator):
     ) -> BackendModel:
         if config.locations is None:
             config.locations = DEFAULT_LOCATIONS
-        if isinstance(config.creds, AzureClientCreds):
+        if is_core_model_instance(config.creds, AzureClientCreds):
             self._set_client_creds_tenant_id(config.creds, config.tenant_id)
         credential, _ = auth.authenticate(config.creds)
         resource_group = self._create_resource_group(
@@ -154,18 +153,6 @@ class AzureConfigurator(Configurator):
             subscription_id=config.subscription_id,
             location=MAIN_LOCATION,
             project_name=project.name,
-        )
-        runner_principal_id = self._create_runner_managed_identity(
-            credential=credential,
-            subscription_id=config.subscription_id,
-            resource_group=resource_group,
-            location=MAIN_LOCATION,
-        )
-        self._grant_roles_to_runner_managed_identity(
-            credential=credential,
-            subscription_id=config.subscription_id,
-            resource_group=resource_group,
-            runner_principal_id=runner_principal_id,
         )
         self._create_network_resources(
             credential=credential,
@@ -177,7 +164,7 @@ class AzureConfigurator(Configurator):
             project_id=project.id,
             type=self.TYPE.value,
             config=AzureStoredConfig(
-                **AzureConfigInfo.parse_obj(config).dict(),
+                **AzureConfigInfo.__response__.parse_obj(config).dict(),
                 resource_group=resource_group,
             ).json(),
             auth=AzureCreds.parse_obj(config.creds).__root__.json(),
@@ -186,15 +173,15 @@ class AzureConfigurator(Configurator):
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAzureConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return AzureConfigInfoWithCreds.parse_obj(config)
-        return AzureConfigInfo.parse_obj(config)
+            return AzureConfigInfoWithCreds.__response__.parse_obj(config)
+        return AzureConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> AzureBackend:
         config = self._get_backend_config(model)
         return AzureBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> AzureConfig:
-        return AzureConfig(
+        return AzureConfig.__response__(
             **json.loads(model.config),
             creds=AzureCreds.parse_raw(model.auth).__root__,
         )
@@ -269,8 +256,8 @@ class AzureConfigurator(Configurator):
 
     def _get_locations_element(self, selected: List[str]) -> ConfigMultiElement:
         element = ConfigMultiElement()
-        for l in LOCATION_VALUES:
-            element.values.append(ConfigElementValue(value=l, label=l))
+        for loc in LOCATION_VALUES:
+            element.values.append(ConfigElementValue(value=loc, label=loc))
         element.selected = selected
         return element
 
@@ -288,36 +275,6 @@ class AzureConfigurator(Configurator):
         return resource_manager.create_resource_group(
             name=_get_resource_group_name(project_name),
             location=location,
-        )
-
-    def _create_runner_managed_identity(
-        self,
-        credential: auth.AzureCredential,
-        subscription_id: str,
-        resource_group: str,
-        location: str,
-    ) -> str:
-        msi_manager = ManagedIdentityManager(
-            credential=credential,
-            subscription_id=subscription_id,
-        )
-        return msi_manager.create_managed_identity(
-            resource_group=resource_group,
-            location=location,
-            name=azure_utils.get_runner_managed_identity_name(resource_group),
-        )
-
-    def _grant_roles_to_runner_managed_identity(
-        self,
-        credential: auth.AzureCredential,
-        subscription_id: str,
-        resource_group: str,
-        runner_principal_id: str,
-    ):
-        roles_manager = RolesManager(credential=credential, subscription_id=subscription_id)
-        roles_manager.grant_vm_contributor_role(
-            resource_group=resource_group,
-            principal_id=runner_principal_id,
         )
 
     def _create_network_resources(
@@ -375,53 +332,6 @@ class ResourceManager:
 
 def _get_resource_group_name(project_name: str) -> str:
     return f"dstack-{project_name}"
-
-
-class ManagedIdentityManager:
-    def __init__(self, credential: TokenCredential, subscription_id: str):
-        self.msi_client = msi_mgmt.ManagedServiceIdentityClient(
-            credential=credential, subscription_id=subscription_id
-        )
-
-    def create_managed_identity(
-        self,
-        resource_group: str,
-        name: str,
-        location: str,
-    ) -> str:
-        identity: Identity = self.msi_client.user_assigned_identities.create_or_update(
-            resource_group_name=resource_group,
-            resource_name=name,
-            parameters=Identity(
-                location=location,
-            ),
-        )
-        return identity.principal_id
-
-
-class RolesManager:
-    def __init__(self, credential: TokenCredential, subscription_id: str):
-        self.subscription_id = subscription_id
-        self.authorization_client = autharization_mgmt.AuthorizationManagementClient(
-            credential=credential, subscription_id=subscription_id
-        )
-
-    def grant_vm_contributor_role(
-        self,
-        resource_group: str,
-        principal_id: str,
-        principal_type: str = "ServicePrincipal",
-    ):
-        self.authorization_client.role_assignments.create(
-            scope=azure_utils.get_resource_group_id(self.subscription_id, resource_group),
-            role_assignment_name=uuid5(UUID(principal_id), f"VM {resource_group} contributor"),
-            parameters=RoleAssignmentCreateParameters(
-                # https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#virtual-machine-contributor
-                role_definition_id=f"/subscriptions/{self.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/9980e02c-c2be-4d73-94e8-173b1dc7cf3c",
-                principal_id=principal_id,
-                principal_type=principal_type,
-            ),
-        )
 
 
 class NetworkManager:
@@ -498,7 +408,7 @@ class NetworkManager:
                         source_address_prefix="Internet",
                         source_port_range="*",
                         destination_address_prefix="*",
-                        destination_port_range="0-65535",
+                        destination_port_ranges=["22", "80", "443"],
                         access=SecurityRuleAccess.ALLOW,
                         priority=101,
                         direction=SecurityRuleDirection.INBOUND,

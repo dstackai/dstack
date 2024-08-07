@@ -4,9 +4,12 @@ from requests import HTTPError
 
 import dstack.api.server
 from dstack._internal.cli.commands import BaseCommand
-from dstack._internal.cli.utils.common import colors, confirm_ask, console
+from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.core.errors import CLIError
 from dstack._internal.core.services.configs import ConfigManager
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConfigCommand(BaseCommand):
@@ -40,7 +43,7 @@ class ConfigCommand(BaseCommand):
         if args.remove:
             config_manager.delete_project(args.project)
             config_manager.save()
-            console.print(f"[grey58]OK[/]")
+            console.print("[grey58]OK[/]")
             return
 
         if not args.url:
@@ -79,6 +82,6 @@ class ConfigCommand(BaseCommand):
                 name=args.project, url=args.url, token=args.token, default=set_it_as_default
             )
             config_manager.save()
-        console.print(
-            f"Configuration updated at [{colors['code']}]{config_manager.config_filepath}[/{colors['code']}]."
+        logger.info(
+            f"Configuration updated at {config_manager.config_filepath}", {"show_path": False}
         )

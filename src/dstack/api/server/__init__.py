@@ -1,4 +1,5 @@
 import os
+import pprint
 import time
 from typing import Dict, List, Optional, Type
 
@@ -8,13 +9,16 @@ from dstack import version
 from dstack._internal.core.errors import ClientError, ServerClientError
 from dstack._internal.utils.logging import get_logger
 from dstack.api.server._backends import BackendsAPIClient
+from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
+from dstack.api.server._pools import PoolAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
 from dstack.api.server._repos import ReposAPIClient
 from dstack.api.server._runs import RunsAPIClient
 from dstack.api.server._secrets import SecretsAPIClient
 from dstack.api.server._users import UsersAPIClient
+from dstack.api.server._volumes import VolumesAPIClient
 
 logger = get_logger(__name__)
 
@@ -34,6 +38,7 @@ class APIClient:
         runs: operations with runs
         logs: operations with logs
         gateways: operations with gateways
+        pools: operations with pools
     """
 
     def __init__(self, base_url: str, token: str):
@@ -82,8 +87,24 @@ class APIClient:
     def gateways(self) -> GatewaysAPIClient:
         return GatewaysAPIClient(self._request)
 
+    @property
+    def pool(self) -> PoolAPIClient:
+        return PoolAPIClient(self._request)
+
+    @property
+    def fleets(self) -> FleetsAPIClient:
+        return FleetsAPIClient(self._request)
+
+    @property
+    def volumes(self) -> VolumesAPIClient:
+        return VolumesAPIClient(self._request)
+
     def _request(
-        self, path: str, body: Optional[str] = None, raise_for_status: bool = True, **kwargs
+        self,
+        path: str,
+        body: Optional[str] = None,
+        raise_for_status: bool = True,
+        **kwargs,
     ) -> requests.Response:
         path = path.lstrip("/")
         if body is not None:
@@ -93,6 +114,7 @@ class APIClient:
         logger.debug("POST /%s", path)
         for _ in range(_MAX_RETRIES):
             try:
+                # TODO: set adequate timeout here or everywhere the method is used
                 resp = self._s.post(f"{self._base_url}/{path}", **kwargs)
                 break
             except requests.exceptions.ConnectionError as e:
@@ -110,6 +132,9 @@ class APIClient:
                     kwargs = detail[0]
                     code = kwargs.pop("code")
                     raise _server_client_errors[code](**kwargs)
+            if resp.status_code == 422:
+                formatted_error = pprint.pformat(resp.json())
+                raise ClientError(f"Server validation error: \n{formatted_error}")
             resp.raise_for_status()
         return resp
 

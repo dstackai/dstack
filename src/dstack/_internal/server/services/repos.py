@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import sqlalchemy.exc
 from fastapi import UploadFile
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import RepoDoesNotExistError, ServerClientError
@@ -201,14 +201,14 @@ def repo_model_to_repo_head(
     include_creds: bool = False,
 ) -> AnyRepoHead:
     if include_creds:
-        return RepoHeadWithCreds.parse_obj(
+        return RepoHeadWithCreds.__response__.parse_obj(
             {
                 "repo_id": repo_model.name,
                 "repo_info": json.loads(repo_model.info),
                 "repo_creds": json.loads(repo_model.creds) if repo_model.creds else None,
             }
         )
-    return RepoHead.parse_obj(
+    return RepoHead.__response__.parse_obj(
         {
             "repo_id": repo_model.name,
             "repo_info": json.loads(repo_model.info),

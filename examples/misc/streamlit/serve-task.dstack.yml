@@ -1,0 +1,9 @@
+type: task
+# This task runs a "Hello world" Streamlit app
+
+image: python:3.11
+commands:
+  - pip3 install streamlit
+  - streamlit hello
+ports:
+  - 8501

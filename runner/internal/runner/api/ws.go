@@ -2,10 +2,11 @@ package api
 
 import (
 	"context"
-	"github.com/dstackai/dstack/runner/internal/log"
-	"github.com/gorilla/websocket"
 	"net/http"
 	"time"
+
+	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{

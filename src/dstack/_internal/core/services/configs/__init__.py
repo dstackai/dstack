@@ -6,14 +6,16 @@ from typing import Optional
 import filelock
 import yaml
 from pydantic import ValidationError
-from rich import print
-from rich.prompt import Confirm
 
-from dstack._internal.cli.utils.common import colors, confirm_ask
+from dstack._internal.cli.utils.common import confirm_ask
+from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.config import GlobalConfig, ProjectConfig, RepoConfig
 from dstack._internal.core.models.repos.base import RepoType
 from dstack._internal.utils.common import get_dstack_dir
+from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
+
+logger = get_logger(__name__)
 
 
 class ConfigManager:
@@ -99,6 +101,12 @@ class ConfigManager:
                 return repo
         return None
 
+    def get_repo_config_or_error(self, repo_path: PathLike) -> RepoConfig:
+        repo_config = self.get_repo_config(repo_path)
+        if repo_config is not None:
+            return repo_config
+        raise DstackError("No repo config found")
+
     @property
     def dstack_ssh_dir(self) -> Path:
         return self.dstack_dir / "ssh"
@@ -129,7 +137,7 @@ def update_default_project(
                 default_project is None
                 or default
                 or confirm_ask(
-                    f"Update the default project in [{colors['code']}]{config_dir}[/{colors['code']}]?"
+                    f"Update the [code]{project_name}[/] project in [code]{config_dir}[/]?"
                 )
             )
             if not no_default
@@ -140,4 +148,6 @@ def update_default_project(
                 name=project_name, url=url, token=token, default=set_it_as_default
             )
             config_manager.save()
-            print(f"Configuration updated at [{colors['code']}]{config_dir}[/{colors['code']}].")
+            logger.info(
+                f"Configured the {project_name} project in {config_dir}", {"show_path": False}
+            )

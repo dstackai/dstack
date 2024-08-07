@@ -7,6 +7,8 @@ from dstack.gateway.openai.schemas import (
     ChatCompletionsResponse,
 )
 
+DEFAULT_TIMEOUT = 60
+
 
 class ChatCompletionsClient(ABC):
     @abstractmethod
@@ -15,4 +17,4 @@ class ChatCompletionsClient(ABC):
 
     @abstractmethod
     async def stream(self, request: ChatCompletionsRequest) -> AsyncIterator[ChatCompletionsChunk]:
-        pass
+        yield

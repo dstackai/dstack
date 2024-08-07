@@ -1,6 +1,6 @@
 ---
 template: pricing.html
-title: Orchestrate GPU workloads effortlessly on any cloud
+title: AI container orchestration engine for everyone
 hide:
    - navigation
    - toc

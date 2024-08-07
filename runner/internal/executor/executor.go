@@ -5,14 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/consts/states"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
@@ -26,6 +30,7 @@ type RunExecutor struct {
 
 	run             schemas.RunSpec
 	jobSpec         schemas.JobSpec
+	clusterInfo     schemas.ClusterInfo
 	secrets         map[string]string
 	repoCredentials *schemas.RepoCredentials
 	codePath        string
@@ -61,14 +66,14 @@ func NewRunExecutor(tempDir string, homeDir string, workingDir string) *RunExecu
 
 // Run must be called after SetJob and SetCodePath
 func (ex *RunExecutor) Run(ctx context.Context) (err error) {
-	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "runner.log"))
+	runnerLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerLogFileName))
 	if err != nil {
 		ex.SetJobState(ctx, states.Failed)
 		return gerrors.Wrap(err)
 	}
 	defer func() { _ = runnerLogFile.Close() }()
 
-	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, "job.log"))
+	jobLogFile, err := log.CreateAppendFile(filepath.Join(ex.tempDir, consts.RunnerJobLogFileName))
 	if err != nil {
 		ex.SetJobState(ctx, states.Failed)
 		return gerrors.Wrap(err)
@@ -89,7 +94,8 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	}()
 	defer func() {
 		if err != nil {
-			log.Error(ctx, "Executor failed", "err", err)
+			// TODO: refactor error handling and logs
+			log.Error(ctx, consts.ExecutorFailedSignature, "err", err)
 		}
 	}()
 
@@ -108,7 +114,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 	}
 	defer cleanupCredentials()
 
-	//var gatewayControl *gateway.SSHControl
+	// var gatewayControl *gateway.SSHControl
 	//if ex.run.Configuration.Type == "service" {
 	//	log.Info(ctx, "Forwarding service port to the gateway", "hostname", ex.jobSpec.Gateway.Hostname)
 	//	gatewayControl, err = gateway.NewSSHControl(ex.jobSpec.Gateway.Hostname, ex.jobSpec.Gateway.SSHKey)
@@ -161,6 +167,7 @@ func (ex *RunExecutor) Run(ctx context.Context) (err error) {
 func (ex *RunExecutor) SetJob(body schemas.SubmitBody) {
 	ex.run = body.RunSpec
 	ex.jobSpec = body.JobSpec
+	ex.clusterInfo = body.ClusterInfo
 	ex.secrets = body.Secrets
 	ex.repoCredentials = body.RepoCredentials
 	ex.state = WaitCode
@@ -183,23 +190,47 @@ func (ex *RunExecutor) SetRunnerState(state string) {
 }
 
 func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error {
+	node_rank := ex.jobSpec.JobNum
+	nodes_num := ex.jobSpec.JobsPerReplica
+	gpus_per_node_num := ex.clusterInfo.GPUSPerJob
+	gpus_num := nodes_num * gpus_per_node_num
+
 	jobEnvs := map[string]string{
-		"RUN_NAME": ex.run.RunName,
-		"REPO_ID":  ex.run.RepoId,
+		"RUN_NAME":              ex.run.RunName, // deprecated, remove in 0.19
+		"REPO_ID":               ex.run.RepoId,  // deprecated, remove in 0.19
+		"DSTACK_RUN_NAME":       ex.run.RunName,
+		"DSTACK_REPO_ID":        ex.run.RepoId,
+		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
+		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
+		"DSTACK_NODES_NUM":      strconv.Itoa(nodes_num),
+		"DSTACK_GPUS_PER_NODE":  strconv.Itoa(gpus_per_node_num),
+		"DSTACK_GPUS_NUM":       strconv.Itoa(gpus_num),
 	}
-	workingDir, err := joinRelPath(ex.workingDir, ex.jobSpec.WorkingDir)
+
+	// Call buildLDLibraryPathEnv and update jobEnvs if no error occurs
+	newLDPath, err := buildLDLibraryPathEnv()
 	if err != nil {
-		return gerrors.Wrap(err)
+		log.Info(ctx, "Continuing without updating LD_LIBRARY_PATH")
+	} else {
+		jobEnvs["LD_LIBRARY_PATH"] = newLDPath
+		log.Info(ctx, "New LD_LIBRARY_PATH set", newLDPath)
 	}
 
 	cmd := exec.CommandContext(ctx, ex.jobSpec.Commands[0], ex.jobSpec.Commands[1:]...)
 	cmd.Env = makeEnv(ex.homeDir, jobEnvs, ex.jobSpec.Env, ex.secrets)
-	cmd.Dir = workingDir
 	cmd.Cancel = func() error {
 		// returns error on Windows
 		return gerrors.Wrap(cmd.Process.Signal(os.Interrupt))
 	}
 	cmd.WaitDelay = ex.killDelay // kills the process if it doesn't exit in time
+
+	if ex.jobSpec.WorkingDir != nil {
+		workingDir, err := joinRelPath(ex.workingDir, *ex.jobSpec.WorkingDir)
+		if err != nil {
+			return gerrors.Wrap(err)
+		}
+		cmd.Dir = workingDir
+	}
 
 	log.Trace(ctx, "Starting exec", "cmd", cmd.String(), "working_dir", cmd.Dir, "env", cmd.Env)
 
@@ -222,7 +253,7 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 	if ex.repoCredentials == nil {
 		return func() {}, nil
 	}
-	switch ex.repoCredentials.Protocol {
+	switch ex.repoCredentials.GetProtocol() {
 	case "ssh":
 		if ex.repoCredentials.PrivateKey == nil {
 			return nil, gerrors.New("private key is missing")
@@ -254,7 +285,11 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 			return nil, gerrors.Wrap(err)
 		}
 		log.Info(ctx, "Writing OAuth token", "path", hostsPath)
-		ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", ex.run.RepoData.RepoHostName, *ex.repoCredentials.OAuthToken)
+		cloneURL, err := url.Parse(ex.repoCredentials.CloneURL)
+		if err != nil {
+			return nil, gerrors.Wrap(err)
+		}
+		ghHost := fmt.Sprintf("%s:\n  oauth_token: \"%s\"\n", cloneURL.Hostname(), *ex.repoCredentials.OAuthToken)
 		if err := os.WriteFile(hostsPath, []byte(ghHost), 0644); err != nil {
 			return nil, gerrors.Wrap(err)
 		}
@@ -263,11 +298,46 @@ func (ex *RunExecutor) setupCredentials(ctx context.Context) (func(), error) {
 			_ = os.Remove(hostsPath)
 		}, nil
 	}
-	return nil, gerrors.Newf("unknown protocol %s", ex.repoCredentials.Protocol)
+	return nil, gerrors.Newf("unknown protocol %s", ex.repoCredentials.GetProtocol())
 }
 
 func isPtyError(err error) bool {
 	/* read /dev/ptmx: input/output error */
 	var e *os.PathError
 	return errors.As(err, &e) && e.Err == syscall.EIO
+}
+
+func buildLDLibraryPathEnv() (string, error) {
+	// Execute shell command to get Python prefix
+	cmd := exec.Command("bash", "-i", "-c", "python3-config --prefix")
+	output, err := cmd.Output()
+
+	if err != nil {
+		return "", fmt.Errorf("error executing command: %v", err)
+	}
+
+	// Extract and trim the prefix path
+	prefixPath := strings.TrimSpace(string(output))
+
+	// Check if the prefix path exists
+	if _, err := os.Stat(prefixPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("python prefix path does not exist: %s", prefixPath)
+	}
+
+	// Construct the path to Python's shared libraries
+	sharedLibPath := fmt.Sprintf("%s/lib", prefixPath)
+
+	// Get current LD_LIBRARY_PATH
+	currentLDPath := os.Getenv("LD_LIBRARY_PATH")
+
+	// Append Python's shared library path if not already present
+	if !strings.Contains(currentLDPath, sharedLibPath) {
+		if currentLDPath == "" {
+			currentLDPath = sharedLibPath
+		} else {
+			currentLDPath = fmt.Sprintf("%s:%s", currentLDPath, sharedLibPath)
+		}
+	}
+
+	return currentLDPath, nil
 }

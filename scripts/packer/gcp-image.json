@@ -1,0 +1,55 @@
+{
+  "variables": {
+    "build_prefix": "",
+    "docker_version": "",
+    "image_version": ""
+  },
+  "builders": [
+    {
+      "type": "googlecompute",
+      "project_id": "dstack",
+      "source_image": "ubuntu-2204-jammy-v20230714",
+      "image_name": "{{user `build_prefix`}}dstack-{{user `image_version` | clean_resource_name}}",
+      "instance_name": "{{user `build_prefix`}}dstack-{{user `image_version` | clean_resource_name}}",
+      "ssh_username": "ubuntu",
+      "zone": "us-central1-a"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": ["cloud-init status --long --wait"]
+    },
+    {
+      "type": "shell",
+      "scripts": [
+        "provisioners/kernel/apt-upgrade.sh",
+        "provisioners/kernel/apt-daily.sh",
+        "provisioners/kernel/apt-packages.sh",
+        "provisioners/kernel/kernel-tuning.sh"
+      ]
+    },
+    {
+      "type": "file",
+      "source": "provisioners/install-docker.sh",
+      "destination": "/tmp/install-docker.sh"
+    },
+    {
+      "type": "file",
+      "source": "provisioners/run-docker",
+      "destination": "/tmp/run-docker"
+    },
+    {
+      "type": "shell",
+      "inline": [
+        "cd /tmp",
+        "chmod +x install-docker.sh",
+        "./install-docker.sh --version {{user `docker_version`}}"]
+    },
+    {
+      "type": "shell",
+      "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
+      "script": "provisioners/pull-docker-images.sh"
+    }
+  ]
+}

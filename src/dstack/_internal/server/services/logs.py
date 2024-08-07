@@ -44,16 +44,17 @@ def _write_logs(
     log_file_path: Path,
     log_events: List[RunnerLogEvent],
 ):
-    log_events_parsed = [_runner_log_event_to_log_event(l) for l in log_events]
+    log_events_parsed = [_runner_log_event_to_log_event(log) for log in log_events]
     log_file_path.parent.mkdir(exist_ok=True, parents=True)
     with open(log_file_path, "a") as f:
-        f.writelines(l.json() + "\n" for l in log_events_parsed)
+        f.writelines(log.json() + "\n" for log in log_events_parsed)
 
 
 def poll_logs(
     project: ProjectModel,
     request: PollLogsRequest,
 ) -> JobSubmissionLogs:
+    # TODO Respect request.limit to support pagination
     if request.diagnose:
         log_file_path = _get_runner_log_file_path(
             project_name=project.name,
@@ -70,7 +71,7 @@ def poll_logs(
     try:
         with open(log_file_path) as f:
             for line in f:
-                log_event = LogEvent.parse_raw(line)
+                log_event = LogEvent.__response__.parse_raw(line)
                 if request.start_time and log_event.timestamp <= request.start_time:
                     continue
                 if request.end_time is None or log_event.timestamp < request.end_time:
@@ -79,6 +80,8 @@ def poll_logs(
                     break
     except IOError:
         pass
+    if request.descending:
+        logs = list(reversed(logs))
     return JobSubmissionLogs(logs=logs)
 
 

@@ -3,10 +3,12 @@ import uuid
 import requests
 import yaml
 
+from dstack._internal.core.errors import BackendError
 from dstack._internal.core.models.instances import InstanceType
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+REQUEST_TIMEOUT = 12
 
 
 class TensorDockAPIClient:
@@ -18,14 +20,18 @@ class TensorDockAPIClient:
 
     def auth_test(self) -> bool:
         resp = self.s.post(
-            self._url("/auth/test"), data={"api_key": self.api_key, "api_token": self.api_token}
+            self._url("/auth/test"),
+            data={"api_key": self.api_key, "api_token": self.api_token},
+            timeout=REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
         return resp.json()["success"]
 
     def get_hostnode(self, hostnode_id: str) -> dict:
         logger.debug("Fetching hostnode %s", hostnode_id)
-        resp = self.s.get(self._url(f"/client/deploy/hostnodes/{hostnode_id}"))
+        resp = self.s.get(
+            self._url(f"/client/deploy/hostnodes/{hostnode_id}"), timeout=REQUEST_TIMEOUT
+        )
         resp.raise_for_status()
         data = resp.json()
         if not data["success"]:
@@ -54,7 +60,7 @@ class TensorDockAPIClient:
             % max(hostnode["networking"]["ports"]),  # it's safer to use a higher port
             "internal_ports": "{22}",
             "hostnode": instance.name,
-            "storage": 100,  # TODO(egor-s): take from instance.resources
+            "storage": round(instance.resources.disk.size_mib / 1024),
             "operating_system": "Ubuntu 22.04 LTS",
             "cloudinit_script": yaml.dump(cloudinit).replace("\n", "\\n"),
         }
@@ -66,7 +72,7 @@ class TensorDockAPIClient:
             form["gpu_count"],
             form["gpu_model"],
         )
-        resp = self.s.post(self._url("/client/deploy/single"), data=form)
+        resp = self.s.post(self._url("/client/deploy/single"), data=form, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
         if not data["success"]:
@@ -83,11 +89,15 @@ class TensorDockAPIClient:
                 "api_token": self.api_token,
                 "server": instance_id,
             },
+            timeout=REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
-        data = resp.json()
-        if not data["success"]:
-            raise requests.HTTPError(data)
+        try:
+            data = resp.json()
+            if not data["success"]:
+                raise BackendError(data)
+        except ValueError:  # json parsing error
+            raise BackendError(resp.text)
 
     def _url(self, path):
         return f"{self.api_url}/{path.lstrip('/')}"

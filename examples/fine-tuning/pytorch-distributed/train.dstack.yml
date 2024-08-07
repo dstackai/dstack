@@ -1,0 +1,24 @@
+type: task
+
+nodes: 2
+
+commands:
+  - git clone https://github.com/r4victor/pytorch-distributed-resnet.git
+  - cd pytorch-distributed-resnet
+  - mkdir -p data
+  - cd data
+  - wget -c --quiet https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
+  - tar -xvzf cifar-10-python.tar.gz
+  - cd ..
+  - pip3 install -r requirements.txt torch
+  - mkdir -p saved_models
+  - torchrun --nproc_per_node=$DSTACK_GPUS_PER_NODE 
+     --node_rank=$DSTACK_NODE_RANK 
+     --nnodes=$DSTACK_NODES_NUM
+     --master_addr=$DSTACK_MASTER_NODE_IP
+     --master_port=8008 resnet_ddp.py 
+     --num_epochs 20
+
+resources:
+  gpu: 1..2
+  shm_size: 16GB

@@ -1,54 +1,53 @@
 # profiles.yml
 
-Instead of configuring resources and other run options through[`dstack run`](cli/index.md#dstack-run), 
-you can do so via `.dstack/profiles.yml` in the root folder of the project. 
+Sometimes, you may want to reuse the same parameters across different [`.dstack.yml`](dstack.yml.md) configurations.
 
-## Example
+This can be achieved by defining those parameters in a profile.
+
+Profiles can be defined on the repository level (via the `.dstack/profiles.yml` file in the root directory of the
+repository) or on the global level (via the `~/.dstack/profiles.yml` file).
+
+Any profile can be marked as default so that it will be applied automatically for any run. Otherwise, you can refer to a specific profile
+via `--profile NAME` in `dstack run`.
+
+### Example
 
 <div editor-title=".dstack/profiles.yml"> 
 
 ```yaml
 profiles:
-  - name: large
+  - name: my-profile
 
-    resources:
-      memory: 24GB  # (Optional) The minimum amount of RAM memory
-      gpu:
-        name: A100 # (Optional) The name of the GPU
-        memory: 40GB # (Optional) The minimum amount of GPU memory 
-      shm_size: 8GB # (Optional) The size of shared memory
-    
-    spot_policy: auto # (Optional) The spot policy. Supports `spot`, `on-demand, and `auto`.
+    # The spot pololicy can be "spot", "on-demand", or "auto"
+    spot_policy: auto
 
-    max_price: 1.5 # (Optional) The maximum price per instance per hour
-    
-    max_duration: 1d # (Optional) The maximum duration of the run.
+    # Limit the maximum price of the instance per hour
+    max_price: 1.5
 
-    retry:
-      retry-limit: 3h # (Optional) To wait for capacity
-    
-    backends: [azure, lambda]  # (Optional) Use only listed backends 
+    # Stop any run if it runs longer that this duration
+    max_duration: 1d
 
-    default: true # (Optional) Activate the profile by default
+    # Use only these backends
+    backends: [azure, lambda]
+
+    # If set to true, this profile will be applied automatically
+    default: true
 ```
 
 </div>
 
-You can mark any profile as default or pass its name via `--profile` to `dstack run`.
+The profile configuration supports many properties. See below.
 
-## YAML reference
+### Root reference
 
 #SCHEMA# dstack._internal.core.models.profiles.Profile
     overrides:
+      show_root_heading: false
       max_price:
         type: 'Optional[float]'
 
+### `retry`
 
-#SCHEMA# dstack._internal.core.models.profiles.ProfileResources
+#SCHEMA# dstack._internal.core.models.profiles.ProfileRetry
     overrides:
-      memory:
-        default: 8GB
-
-#SCHEMA# dstack._internal.core.models.profiles.ProfileGPU
-
-#SCHEMA# dstack._internal.core.models.profiles.ProfileRetryPolicy
+      show_root_heading: false

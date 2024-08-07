@@ -4,12 +4,11 @@ from pathlib import Path
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.core.errors import CLIError
-from dstack._internal.core.services.ssh.ports import PortUsedError
 
 
 class LogsCommand(APIBaseCommand):
     NAME = "logs"
-    DESCRIPTION = "Show run logs"
+    DESCRIPTION = "Show logs"
 
     def _register(self):
         super()._register()
@@ -27,6 +26,18 @@ class LogsCommand(APIBaseCommand):
             type=Path,
             dest="ssh_identity_file",
         )
+        self._parser.add_argument(
+            "--replica",
+            help="The relica number. Defaults to 0.",
+            type=int,
+            default=0,
+        )
+        self._parser.add_argument(
+            "--job",
+            help="The job number inside the replica. Defaults to 0.",
+            type=int,
+            default=0,
+        )
         self._parser.add_argument("run_name")
 
     def _command(self, args: argparse.Namespace):
@@ -39,7 +50,11 @@ class LogsCommand(APIBaseCommand):
                 raise CLIError(f"Run {args.run_name} is finished")
             else:
                 run.attach(args.ssh_identity_file)
-        logs = run.logs(diagnose=args.diagnose)
+        logs = run.logs(
+            diagnose=args.diagnose,
+            replica_num=args.replica,
+            job_num=args.job,
+        )
         try:
             for log in logs:
                 sys.stdout.buffer.write(log)

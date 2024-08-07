@@ -1,11 +1,9 @@
 from pathlib import Path
 from typing import Optional, Union
 
-import giturlparse
-import requests
 from git import InvalidGitRepositoryError
 
-from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.repos import LocalRepo, RemoteRepo
 from dstack._internal.core.models.repos.base import Repo, RepoType
 from dstack._internal.core.services.configs import ConfigManager
@@ -72,14 +70,13 @@ class RepoCollection:
         if isinstance(repo, RemoteRepo):
             try:
                 creds = get_local_repo_credentials(
-                    repo_data=repo.run_repo_data,
+                    repo_url=repo.repo_url,
                     identity_file=git_identity_file,
                     oauth_token=oauth_token,
-                    original_hostname=giturlparse.parse(repo.repo_url).resource,
                 )
             except InvalidRepoCredentialsError as e:
                 raise ConfigurationError(*e.args)
-        self._api_client.repos.init(self._project, repo.repo_id, repo.run_repo_data, creds)
+        self._api_client.repos.init(self._project, repo.repo_id, repo.get_repo_info(), creds)
 
     def is_initialized(
         self,
@@ -97,10 +94,8 @@ class RepoCollection:
         try:
             self._api_client.repos.get(self._project, repo.repo_id, include_creds=False)
             return True
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 404:
-                return False
-            raise
+        except ResourceNotExistsError:
+            return False
 
     def load(
         self,
@@ -132,17 +127,15 @@ class RepoCollection:
             repo_config = config.get_repo_config(repo_dir)
             if repo_config is None:
                 raise ConfigurationError(
-                    f"The repo is not initialized. Run `dstack init` to initialize the repo."
+                    "The repo is not initialized. Run `dstack init` to initialize the repo."
                 )
             repo = load_repo(repo_config)
             try:
                 self._api_client.repos.get(self._project, repo.repo_id, include_creds=False)
-            except requests.HTTPError as e:
-                if "404" in e.args[0]:
-                    raise ConfigurationError(
-                        f"The repo is not initialized. Run `dstack init` to initialize the repo."
-                    )
-                raise
+            except ResourceNotExistsError:
+                raise ConfigurationError(
+                    "The repo is not initialized. Run `dstack init` to initialize the repo."
+                )
         else:
             logger.debug("Initializing repo")
             repo = LocalRepo(repo_dir=repo_dir)  # default
@@ -153,7 +146,7 @@ class RepoCollection:
                     pass  # use default
             self.init(repo, git_identity_file, oauth_token)
             config.save_repo_config(
-                repo.repo_dir,
+                repo.get_repo_dir_or_error(),
                 repo.repo_id,
                 RepoType(repo.run_repo_data.repo_type),
                 get_ssh_keypair(None, config.dstack_key_path),

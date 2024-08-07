@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.errors import ResourceNotExistsError
 from dstack._internal.core.models.users import User, UserWithCreds
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import UserModel
@@ -15,7 +16,6 @@ from dstack._internal.server.schemas.users import (
 )
 from dstack._internal.server.security.permissions import Authenticated, GlobalAdmin
 from dstack._internal.server.services import users
-from dstack._internal.server.utils.routers import error_not_found
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -45,7 +45,7 @@ async def get_user(
         session=session, current_user=user, username=body.username
     )
     if res is None:
-        raise error_not_found()
+        raise ResourceNotExistsError()
     return res
 
 
@@ -77,7 +77,7 @@ async def update_user(
         email=body.email,
     )
     if res is None:
-        raise error_not_found()
+        raise ResourceNotExistsError()
     return users.user_model_to_user(res)
 
 
@@ -85,11 +85,11 @@ async def update_user(
 async def refresh_token(
     body: RefreshTokenRequest,
     session: AsyncSession = Depends(get_session),
-    user: UserModel = Depends(GlobalAdmin()),
+    user: UserModel = Depends(Authenticated()),
 ) -> UserWithCreds:
-    res = await users.refresh_user_token(session=session, username=body.username)
+    res = await users.refresh_user_token(session=session, user=user, username=body.username)
     if res is None:
-        raise error_not_found()
+        raise ResourceNotExistsError()
     return users.user_model_to_user_with_creds(res)
 
 

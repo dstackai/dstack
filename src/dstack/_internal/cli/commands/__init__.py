@@ -1,21 +1,19 @@
 import argparse
 import os
 from abc import ABC, abstractmethod
-from pathlib import Path
+from typing import List, Optional
 
 from rich_argparse import RichHelpFormatter
 
-import dstack._internal.core.services.api_client as api_client_service
 from dstack._internal.cli.utils.common import configure_logging
-from dstack._internal.core.errors import CLIError, ConfigurationError
 from dstack.api import Client
-from dstack.api.server import APIClient
 
 
 class BaseCommand(ABC):
     NAME: str = "name the command"
     DESCRIPTION: str = "describe the command"
     DEFAULT_HELP: bool = True
+    ALIASES: Optional[List[str]] = None
 
     def __init__(self, parser: argparse.ArgumentParser):
         self._parser = parser
@@ -25,6 +23,8 @@ class BaseCommand(ABC):
         parser_kwargs = {}
         if cls.DESCRIPTION:
             parser_kwargs["help"] = cls.DESCRIPTION
+        if cls.ALIASES is not None:
+            parser_kwargs["aliases"] = cls.ALIASES
         parser: argparse.ArgumentParser = subparsers.add_parser(
             cls.NAME,
             add_help=False,
@@ -65,7 +65,4 @@ class APIBaseCommand(BaseCommand):
 
     def _command(self, args: argparse.Namespace):
         configure_logging()
-        try:
-            self.api = Client.from_config(project_name=args.project)
-        except ConfigurationError as e:
-            raise CLIError(str(e))
+        self.api = Client.from_config(project_name=args.project)

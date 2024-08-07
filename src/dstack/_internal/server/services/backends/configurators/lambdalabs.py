@@ -1,12 +1,8 @@
 import json
 from typing import List
 
-from requests import HTTPError
-
-from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.lambdalabs import LambdaBackend, api_client
 from dstack._internal.core.backends.lambdalabs.config import LambdaConfig
-from dstack._internal.core.errors import BackendInvalidCredentialsError
 from dstack._internal.core.models.backends.base import (
     BackendType,
     ConfigElementValue,
@@ -48,9 +44,6 @@ DEFAULT_REGION = "us-east-1"
 class LambdaConfigurator(Configurator):
     TYPE: BackendType = BackendType.LAMBDA
 
-    def get_default_configs(self) -> List[LambdaConfigInfoWithCreds]:
-        return []
-
     def get_config_values(self, config: LambdaConfigInfoWithCredsPartial) -> LambdaConfigValues:
         config_values = LambdaConfigValues()
         if config.creds is None:
@@ -69,22 +62,24 @@ class LambdaConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=LambdaStoredConfig(**LambdaConfigInfo.parse_obj(config).dict()).json(),
+            config=LambdaStoredConfig(
+                **LambdaConfigInfo.__response__.parse_obj(config).dict()
+            ).json(),
             auth=LambdaCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyLambdaConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return LambdaConfigInfoWithCreds.parse_obj(config)
-        return LambdaConfigInfo.parse_obj(config)
+            return LambdaConfigInfoWithCreds.__response__.parse_obj(config)
+        return LambdaConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> LambdaBackend:
         config = self._get_backend_config(model)
         return LambdaBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> LambdaConfig:
-        return LambdaConfig(
+        return LambdaConfig.__response__(
             **json.loads(model.config),
             creds=LambdaCreds.parse_raw(model.auth),
         )

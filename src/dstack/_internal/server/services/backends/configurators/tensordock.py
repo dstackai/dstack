@@ -30,9 +30,6 @@ REGIONS = []
 class TensorDockConfigurator(Configurator):
     TYPE: BackendType = BackendType.TENSORDOCK
 
-    def get_default_configs(self) -> List[TensorDockConfigInfoWithCreds]:
-        return []
-
     def get_config_values(
         self, config: TensorDockConfigInfoWithCredsPartial
     ) -> TensorDockConfigValues:
@@ -51,22 +48,24 @@ class TensorDockConfigurator(Configurator):
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
-            config=TensorDockStoredConfig(**TensorDockConfigInfo.parse_obj(config).dict()).json(),
+            config=TensorDockStoredConfig(
+                **TensorDockConfigInfo.__response__.parse_obj(config).dict()
+            ).json(),
             auth=TensorDockCreds.parse_obj(config.creds).json(),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyTensorDockConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return TensorDockConfigInfoWithCreds.parse_obj(config)
-        return TensorDockConfigInfo.parse_obj(config)
+            return TensorDockConfigInfoWithCreds.__response__.parse_obj(config)
+        return TensorDockConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> TensorDockBackend:
         config = self._get_backend_config(model)
         return TensorDockBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> TensorDockConfig:
-        return TensorDockConfig(
+        return TensorDockConfig.__response__(
             **json.loads(model.config),
             creds=TensorDockCreds.parse_raw(model.auth),
         )

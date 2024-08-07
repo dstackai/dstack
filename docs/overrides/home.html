@@ -2,7 +2,6 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
     window.$crisp = [];
     window.CRISP_WEBSITE_ID = "ce56e3b2-a23e-4d3f-9e80-e08c61a2b3cb";
@@ -15,92 +14,93 @@
         $crisp.push(["do", "chat:hide"]);
     })();
 </script>
+<script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
-/*
-    var typed = new Typed('#typed', {
-      strings: ['AWS', 'GCP', 'Azure', 'Lambda', 'TensorDock', 'Vast.ai', 'any cloud'],
-      backDelay: 5000,
-      typeSpeed: 150,
-      backSpeed: 100,
-      loop: true,
-    });
-*/
-  </script>
+    /*
+        var typed = new Typed('#typed', {
+          strings: ['AWS', 'GCP', 'Azure', 'Lambda', 'TensorDock', 'Vast.ai', 'any cloud'],
+          backDelay: 5000,
+          typeSpeed: 150,
+          backSpeed: 100,
+          loop: true,
+        });
+    */
+</script>
 <script type="text/javascript">
-/*
-    new Termynal('#tx-landing__major_feature_training_terminal',
-        {
-            lineData: [
-                {type: 'input', value: 'dstack run . -f llama-2/train.dstack.yml --gpu 40GB -y'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
-                    class: 'newline'
-                },
-                {
-                    delay: 0,
-                    value: 'wet-mangust-7  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 1000, value: 'Provisioning...', class: 'newline'},
-                {type: 'progress', progressPercent: 100, typeDelay: 200},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 5000,
-                    value: 'Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
-                    class: 'newline'
-                },
-                {
-                    delay: 5000,
-                    value: 'Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
-                    class: 'newline'
-                },
-                {
-                    delay: 5000,
-                    value: 'Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-            ]
-        }
-    );
-*/
-    new Termynal('#tx-landing__major_feature_inference_terminal',
-        {
-            lineData: [
-                {type: 'input', value: 'dstack run . -f llama-2/serve.dstack.yml --gpu 40GB -y'},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
-                    class: 'newline'
-                },
-                {
-                    delay: 0,
-                    value: 'wet-mangust-8  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-                {delay: 1000, value: 'Provisioning...', class: 'newline'},
-                {type: 'progress', progressPercent: 100, typeDelay: 200},
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'Serving HTTP on https://wet-mangust-8.mydomain.com',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-                {
-                    delay: 0,
-                    value: 'To exit, press Ctrl+C.',
-                    class: 'newline'
-                },
-                {delay: 0, value: ' ', class: 'newline'},
-            ]
-        }
-    );
+    /*
+        new Termynal('#tx-landing__major_feature_training_terminal',
+            {
+                lineData: [
+                    {type: 'input', value: 'dstack run . -f llama-2/train.dstack.yml --gpu 40GB -y'},
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 0,
+                        value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
+                        class: 'newline'
+                    },
+                    {
+                        delay: 0,
+                        value: 'wet-mangust-7  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {delay: 1000, value: 'Provisioning...', class: 'newline'},
+                    {type: 'progress', progressPercent: 100, typeDelay: 200},
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 5000,
+                        value: 'Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
+                        class: 'newline'
+                    },
+                    {
+                        delay: 5000,
+                        value: 'Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
+                        class: 'newline'
+                    },
+                    {
+                        delay: 5000,
+                        value: 'Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]\n',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                ]
+            }
+        );
+        new Termynal('#tx-landing__major_feature_inference_terminal',
+            {
+                lineData: [
+                    {type: 'input', value: 'dstack run . -f llama-2/serve.dstack.yml --gpu 40GB -y'},
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 0,
+                        value: 'RUN            BACKEND  RESOURCES                      SPOT PRICE',
+                        class: 'newline'
+                    },
+                    {
+                        delay: 0,
+                        value: 'wet-mangust-8  gcp      12xCPUs, 85GB, 1xA100 (40GB)   yes  $1.20582',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {delay: 1000, value: 'Provisioning...', class: 'newline'},
+                    {type: 'progress', progressPercent: 100, typeDelay: 200},
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 0,
+                        value: 'Serving HTTP on https://wet-mangust-8.mydomain.com',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                    {
+                        delay: 0,
+                        value: 'To exit, press Ctrl+C.',
+                        class: 'newline'
+                    },
+                    {delay: 0, value: ' ', class: 'newline'},
+                ]
+            }
+        );
+    */
 </script>
 {% endblock %}
 
@@ -109,19 +109,11 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>Orchestrate
-                    <span class="gradient">GPU</span> workloads effortlessly
-                    <!--efficiently-->
-                    on <span class="gradient">any cloud</span>
-                    <!--<span class="gradient" id="typed"></span>-->
-                </h1>
+                <h1>AI container orchestration engine for everyone</h1>
 
                 <p>
-                    dstack is an <strong style="font-weight: 500">open-source</strong> toolkit
-                    for running GPU workloads on any cloud. It
-                    simplifies <strong style="font-weight: 500">development</strong>,
-                    <strong style="font-weight: 500">training</strong>, and
-                    <strong style="font-weight: 500">deployment</strong> of gen AI models.
+                    dstack is a lightweight alternative to Kubernetes for AI. It simplifies container orchestration for
+                    AI on any cloud or on-premises, accelerating the development, training, and deployment.
                 </p>
             </div>
 
@@ -135,15 +127,22 @@
                         Get support and learn from <br>the community
                     </div>-->
 
-                    <a href="javascript:void(0)" onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});" class="md-button md-button--primary">
-<!--                       style="min-width: 250px">-->
+                    <a href="javascript:void(0)"
+                       onclick="document.querySelector('#get-started').scrollIntoView({behavior: 'smooth'});"
+                       class="md-button md-button--primary"
+                       style="min-width: 225px; margin-right: 10px">
                         <span>Get started</span>
-                        <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
+                        <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
                     </a>
 
-                    <div class="tx-landing__integrations">
+                    <a href="/docs" class="md-button md-button-secondary"
+                       style="min-width: 225px" target="_blank">
+                        Documentation
+                    </a>
+
+                    <!--<div class="tx-landing__integrations">
                         <div class="tx-landing__integrations_text">
-                            Works seamlessly with top cloud GPU providers
+                            Use with any cloud GPU providers
                         </div>
 
                         <div class="tx-landing__integrations_logos">
@@ -152,9 +151,9 @@
                             <img class="logo-large" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
                             <img class="logo-large" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
                             <img class="logo-large" src="/assets/images/tensordock-logo.svg" title="TensorDock">
-                            <img class="logo-large" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <img class="l2go-large" src="/assets/images/vastai-logo.svg" title="Vast.ai">
                         </div>
-                    </div>
+                    </div>-->
 
                 </div>
 
@@ -167,7 +166,7 @@
                             <img class="logo-large" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
                             <img class="logo-large" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
                             <img class="logo-large" src="/assets/images/tensordock-logo.svg" title="TensorDock">
-                            <img class="logo-large" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <img class="l2go-large" src="/assets/images/vastai-logo.svg" title="Vast.ai">
                         </div>
 
                         <div class="tx-landing__integrations_text">
@@ -198,18 +197,23 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>Development</h2>
-                    <p>Experiment interactively in your IDE, terminal, or Jupyter notebooks before submitting long tasks or deploying models.</p>
+                    <h2>Dev environments</h2>
+                    <p>Before scheduling a task or deploying a model, you may want to run code interactively.</p>
 
-                    <p>With dstack, a single command provisions the necessary cloud resources, code, and environment for your dev setup.</p>
                     <p>
-                        <a href="/docs/guides/dev-environments" target="_blank"
+                        Dev environments allow you to provision a remote machine set up with your code and favorite IDE
+                        with just one command.
+                    </p>
+
+                    <p>
+                        <a href="/docs/dev-environments" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
 
                 <div class="block large">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif" width="777" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-dev-environment.gif"
+                         width="800" style="border-radius: 10px">
                 </div>
             </div>
         </div>
@@ -217,19 +221,21 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block large margin">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif" width="777" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-task.gif"
+                         width="800" style="border-radius: 10px">
                 </div>
 
                 <div class="block">
-                    <h2>Training</h2>
+                    <h2>Tasks</h2>
 
-                    <p>With dstack, running tasks such as training or fine-tuning scripts, or any other batch jobs, is incredibly easy.</p>
+                    <p>A task allows you to schedule a job or run a web app. It lets you configure dependencies,
+                        resources, ports, and more. Tasks can be distributed and run on clusters.</p>
 
-                    <p>Simply provide the commands, ports, and choose the Python version or a Docker image. dstack will
-                        handle the execution on configured cloud GPU provider(s) with the necessary resources.</p>
+                    <p>Tasks are ideal for training and fine-tuning jobs or running apps
+                        for development purposes.</p>
 
                     <p>
-                        <a href="/docs/guides/tasks" target="_blank"
+                        <a href="/docs/tasks" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
@@ -239,149 +245,619 @@
         <div class="tx-landing__major_feature">
             <div class="section">
                 <div class="block margin">
-                    <h2>Deployment</h2>
-
-                    <p>With dstack, deploying models or any other web apps is straightforward.</p>
-
-                    <p>Just provide commands, port, and select Python version or Docker image. dstack handles deployment
-                        on configured cloud GPU provider(s), giving you a public HTTPS endpoint.</p>
+                    <h2>Services</h2>
 
                     <p>
-                        <a href="/docs/guides/services" target="_blank"
+                        A service allows you to deploy a web app or a model as a scalable endpoint. It lets you configure
+                        dependencies, resources, authorizarion, auto-scaling rules, etc.
+                    </p>
+
+                    <p>
+                        <a href="/docs/services" target="_blank"
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
 
                 <div class="block large">
-                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service.gif" width="777" style="border-radius: 10px">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-service-openai.gif"
+                         width="800" style="border-radius: 10px">
+                </div>
+            </div>
+        </div>
+
+        <div class="tx-landing__major_feature">
+            <div class="section">
+                <div class="block large margin">
+                    <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-cloud-ssh-fleet-1.gif"
+                         width="800" style="border-radius: 10px">
+                </div>
+
+                <div class="block">
+                    <h2>Fleets</h2>
+
+                    <p>Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem.</p>
+
+                    <p>Once a fleet is created, it can be reused by dev environments, tasks, and services.</p>
+
+                    <p>
+                        <a href="/docs/fleets" target="_blank"
+                           class="md-button md-button-secondary small">Learn more</a>
+                    </p>
                 </div>
             </div>
         </div>
 
         <div class="tx-landing__highlights">
             <div class="tx-landing__highlights_text">
-                <h2>Featured examples</h2>
+                <h2 id="examples">Examples</h2>
+                <!--<p class="tx-landing__bottom_cta_text">
+                    dstack is easy to use with any open-source frameworks and models.
+                </p>-->
             </div>
 
             <div class="tx-landing__highlights_grid">
-                <a href="/examples/mixtral" class="feature-cell">
-                    <h3>
-                        Mixtral 8x7B
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/llms/llama3" target="_blank"
+                   class="feature-cell">
+                    <h3 class="external">
+                        Llama 3
                     </h3>
 
                     <p>
-                        Deploy <strong>Mixtral 8x7B</strong> as a service using <strong>vLLM</strong>,
-                        an open-source serving library.
+                        Deploy Llama 3 as an endpoint using Ollama.
                     </p>
 
                     <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
                         <div class="feature-tag">LLMs</div>
                     </div>
                 </a>
 
-                <a href="/examples/tei" class="feature-cell">
+                <a href="/docs/examples/fine-tuning/alignment-handbook"
+                   target="_blank" class="feature-cell">
                     <h3>
-                        Text Embeddings Inference
+                        Alignment Handbook
                     </h3>
 
                     <p>
-                        Deploy text embeddings models using <strong>Services</strong> and <strong>TEI</strong>,
-                        an open-source text embeddings toolkit by Hugging Face.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
-                    </div>
-                </a>
-
-                <a href="/examples/llama-index" class="feature-cell">
-                    <h3>
-                        Llama Index
-                    </h3>
-
-                    <p>
-                        Use <strong>Llama Index</strong> and <strong>Weaviate</strong> to enhance the capabilities
-                        of LLMs with the context of your data.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">RAG</div>
-                    </div>
-                </a>
-
-                <a href="/examples/qlora" class="feature-cell">
-                    <h3>
-                        QLoRA
-                    </h3>
-
-                    <p>
-                        Fine-tune <strong>Llama 2</strong> on a custom dataset, with QLoRA
-                        and your own script, using <strong>Tasks</strong>.
+                        Fine-tune Gemma 7B on a custom dataset.
                     </p>
 
                     <div class="feature-tags">
                         <div class="feature-tag">Fine-tuning</div>
+                        <div class="feature-tag">LLMs</div>
                     </div>
                 </a>
 
-                <a href="/examples/tgi" class="feature-cell">
-                    <h3>
-                        Text Generation Inference
-                    </h3>
-
-                    <p>
-                        Deploy LLMs using <strong>Services</strong> and <strong>TGI</strong>, an
-                        open-source serving framework by Hugging Face.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
-                    </div>
-                </a>
-
-                <a href="/examples/vllm" class="feature-cell">
-                    <h3>
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm" target="_blank"
+                   class="feature-cell">
+                    <h3 class="external">
                         vLLM
                     </h3>
 
                     <p>
-                        Deploy LLMs with <strong>Services</strong> and <strong>vLLM</strong>,
-                        an open-source serving library.
-
-                        <br><br>
+                        Deploy LLMs as endpoints using vLLM.
                     </p>
 
                     <div class="feature-tags">
                         <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">LLMs</div>
+                    </div>
+                </a>
+
+                <a href="docs/fine-tuning/axolotl" target="_blank"
+                   class="feature-cell">
+                    <h3>
+                        Axolotl
+                    </h3>
+
+                    <p>
+                        Fine-tune Llama 3 on a custom dataset using Axolotl.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Fine-tuning</div>
+                        <div class="feature-tag">LLMs</div>
+                    </div>
+                </a>
+
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi" target="_blank"
+                   class="feature-cell">
+                    <h3 class="external">
+                        TGI
+                    </h3>
+
+                    <p>
+                        Deploy LLMs as endpoints using TGI.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">LLMs</div>
+                    </div>
+                </a>
+
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/ollama" target="_blank"
+                   class="feature-cell">
+                    <h3 class="external">
+                        Ollama
+                    </h3>
+
+                    <p>
+                        Deploy LLMs as endpoints using Ollama.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">LLMs</div>
+                    </div>
+                </a>
+
+                <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/lorax" target="_blank"
+                   class="feature-cell">
+                    <h3 class="external">
+                        LoRaX
+                    </h3>
+
+                    <p>
+                        Deploy thousands of models on a single endpoint using LoRaX.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">LLMs</div>
+                    </div>
+                </a>
+
+                <a href="https://github.com/dstackai/dstack/tree/master/examples" target="_blank" class="feature-cell">
+                    <h3 class="external">
+                        More
+                    </h3>
+
+                    <p>
+                        Find more examples on training and deploying models.
+                    </p>
+
+                    <div class="feature-tags">
+                        <div class="feature-tag">Deployment</div>
+                        <div class="feature-tag">Embeddings</div>
                     </div>
                 </a>
             </div>
+        </div>
 
-            <div class="tx-landing__highlights_cta">
-                <a href="/examples">Browse all examples →</a>
+        <div class="tx-landing__bottom_cta">
+            <div class="tx-landing__highlights_text">
+                <h2>Why ML engineers <span class="heart"></span> dstack</h2>
+
+                <div class="tx-landing__quotes_grid">
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/spott.jpg"/>
+                        </div>
+                        <h3>Andrew Spott</h3>
+
+                        <h4>ML Engineer at Stealth Startup</h4>
+
+                        <p>
+                            Thanks to <strong>@dstack</strong>, I get the convenience of having a personal Slurm cluster
+                            and using budget-friendly cloud GPUs, without paying the super-high premiums charged by the
+                            big three.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/alvarobartt.jpg"/>
+                        </div>
+                        <h3>Alvaro Bartolome</h3>
+
+                        <h4>ML Engineer at Argilla</h4>
+
+                        <p>
+                            With <strong>@dstack</strong> it's incredibly easy to define a configuration within a
+                            repository
+                            and run it without worrying about GPU availability. It lets you focus on
+                            data and your research.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/chansung.jpg"/>
+                        </div>
+                        <h3>Park Chansung</h3>
+
+                        <h4>ML Researcher at ETRI</h4>
+
+                        <p>
+                            Thanks to <strong>@dstack</strong>, I can effortlessly access the top GPU options across
+                            different clouds,
+                            saving me time and money while pushing my AI work forward.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/eckart.png"/>
+                        </div>
+                        <h3>Eckart Burgwedel</h3>
+
+                        <h4>CEO at Uberchord</h4>
+
+                        <p>
+                            With <strong>@dstack</strong>, running LLMs on a cloud GPU is as
+                            easy as running a local Docker container.
+                            It combines the ease of Docker with the auto-scaling capabilities of K8S.
+                        </p>
+                    </div>
+
+                    <div class="cell">
+                        <div class="photo">
+                            <img src="assets/images/quotes/cudopete.png"/>
+                        </div>
+                        <h3>Peter Hill</h3>
+
+                        <h4>Co-Founder at CUDO Compute</h4>
+
+                        <p>
+                            <strong>@dstack</strong> simplifies infrastructure provisioning and AI
+                            development.
+                            If your team is on the lookout for an AI platform, I
+                            wholeheartedly recommend <strong>@dstack</strong>.
+                        </p>
+                    </div>
+                </div>
             </div>
         </div>
 
         <span id="get-started"></span>
 
-        <div class="tx-landing__bottom_cta">
+        <div class="tx-landing__plans">
             <div class="tx-landing__highlights_text">
-                <h2><span class="gradient">Get started with dstack <br> in under a minute</span></h2>
-                <img src="https://raw.githubusercontent.com/dstackai/static-assets/main/static-assets/images/dstack-server.gif" width="777" style="border-radius: 10px">
-                <p class="tx-landing__bottom_cta_text">
-                    <a href="/docs/installation/">Install</a> the open-source version (and configure your cloud accounts),
-                    or <a href="#" data-tally-open="w7K17R">sign up</a> for the cloud version.
-                </p>
-
-                <a href="/docs" class="md-button md-button--primary">
-                    <span>Documentation</span>
-                    <span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>
-                </a>
-
-                <a href="#" class="md-button md-button-secondary discord">
-                    Community
-                </a>
+                <h2>Get started in a minute</h2>
             </div>
+
+            <div class="tx-landing__plans_cards">
+                <div class="plans_card open_source">
+                    <div class="plans_card__title">Open-source</div>
+                    <div class="plans_card__subtitle-2">
+                        Self-hosted
+                    </div>
+                    <div class="plans_card__subtitle">
+                        Use your own cloud accounts or data centers.
+                    </div>
+
+                    <div class="plans_card__services">
+                        <div class="plans_card__service-item">
+                            <img width="32" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                                 style="padding-top: 5px">
+                            <div class="plans_card__service-name">AWS</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="20" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <div class="plans_card__service-name">Azure</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">GCP</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/oci-logo.svg"
+                                 title="Oracle Cloud Infrastructure">
+                            <div class="plans_card__service-name">OCI</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="20" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
+                            <div class="plans_card__service-name">Lambda</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="20" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
+                            <div class="plans_card__service-name">TensorDock</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <div class="plans_card__service-name">Vast.ai</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/runpod-logo.svg" title="RunPod">
+                            <div class="plans_card__service-name">RunPod</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/cudo-logo.svg" title="CUDO">
+                            <div class="plans_card__service-name">CUDO</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/kubernetes-logo.svg" title="Kubernetes">
+                            <div class="plans_card__service-name">K8S</div>
+                        </div>
+                    </div>
+
+                    <div class="plans_card__buttons">
+                        <div class="plans_card__panel">
+                            <div class="plans_card__items">
+                                <div class="item">Your cloud accounts</div>
+                                <div class="item">Your data centers</div>
+                                <div class="item">CLI & API</div>
+                            </div>
+                        </div>
+
+                        <a href="/docs/installation"
+                           class="md-button md-button--primary">Install open-source</a>
+                        <div class="plans_card__buttons_subtitle">Always free.</div>
+                    </div>
+                </div>
+
+                <!--<div class="plans_card enterprise">
+                    <div class="plans_card__title">Enterprise</div>
+                    <div class="plans_card__subtitle-2">
+                        Self-hosted
+                    </div>
+                    <div class="plans_card__subtitle">
+                        Use your own cloud accounts or data centers with added security and compliance.
+                    </div>
+
+                    <div class="plans_card__services">
+                        <div class="plans_card__service-item">
+                            <img width="32" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                                style="padding-top: 5px">
+                            <div class="plans_card__service-name">AWS</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="20" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <div class="plans_card__service-name">Azure</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">GCP</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/oci-logo.svg" title="Oracle Cloud Infrastructure">
+                            <div class="plans_card__service-name">OCI</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/kubernetes-logo.svg" title="Kubernetes">
+                            <div class="plans_card__service-name">K8S</div>
+                        </div>
+                    </div>
+
+                    <div class="plans_card__buttons">
+                        <div class="plans_card__panel">
+                            <div class="plans_card__items">
+                                <div class="item crown">Web console</div>
+                                <div class="item crown">Single sign-on</div>
+                                <div class="item crown">Audit logs</div>
+                                <div class="item">Your cloud accounts</div>
+                                <div class="item">Your data centers</div>
+                                <div class="item">CLI & API</div>
+                            </div>
+                        </div>
+
+                        <a href="https://tally.so/r/3jBXP6" target="_blank"
+                           class="md-button md-button-secondary external">Request a trial</a>
+                        <div class="plans_card__buttons_subtitle">Get a free 60-day trial. Or <a
+                            href="https://calendly.com/dstackai/discovery-call" target="_blank">book a demo</a>.
+                        </div>
+                    </div>
+                </div>-->
+
+                <div class="plans_card dstack_sky">
+                    <div class="plans_card__title">dstack Sky</div>
+                    <div class="plans_card__subtitle-2">
+                        Hosted by dstack
+                    </div>
+
+                    <div class="plans_card__subtitle">
+                        Access GPUs at the best possible rate.
+                    </div>
+
+                    <div class="plans_card__services">
+                        <div class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/dstack-logo-notext.svg"
+                                 title="GPU marketplace">
+                            <div class="plans_card__service-name">Marketplace</div>
+                        </div>
+
+                        <!--<div class="plans_card__service-item">
+                            <img width="32" src="/assets/images/aws-logo.svg" title="Amazon Web Services"
+                                style="padding-top: 5px">
+                            <div class="plans_card__service-name">AWS</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="20" height="24" src="/assets/images/azure-logo.svg" title="Microsoft Azure">
+                            <div class="plans_card__service-name">Azure</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/gcp-logo.svg" title="Google Cloud Platform">
+                            <div class="plans_card__service-name">GCP</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/oci-logo.svg" title="Oracle Cloud Infrastructure">
+                            <div class="plans_card__service-name">OCI</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="20" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
+                            <div class="plans_card__service-name">Lambda</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="20" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
+                            <div class="plans_card__service-name">TensorDock</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <div class="plans_card__service-name">Vast.ai</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/runpod-logo.svg" title="RunPod">
+                            <div class="plans_card__service-name">RunPod</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/cudo-logo.svg" title="CUDO">
+                            <div class="plans_card__service-name">CUDO</div>
+                        </div>-->
+                    </div>
+
+                    <div class="plans_card__buttons">
+                        <div class="plans_card__panel">
+                            <div class="plans_card__items">
+                                <!--<div class="item crown">Web console</div>-->
+                                <div class="item crown">GPU marketplace</div>
+                                <div class="item">Your cloud accounts</div>
+                                <div class="item">Your data centers</div>
+                                <div class="item">CLI & API</div>
+                            </div>
+                        </div>
+
+                        <a href="https://sky.dstack.ai" target="_blank"
+                           class="md-button md-button--primary sky external">
+                            <span>Sign up now</span>
+                            <!--<span class="icon"><svg viewBox="0 0 13 10" xmlns="http://www.w3.org/2000/svg"><path d="M12.823 4.164L8.954.182a.592.592 0 0 0-.854 0 .635.635 0 0 0 0 .88l2.836 2.92H.604A.614.614 0 0 0 0 4.604c0 .344.27.622.604.622h10.332L8.1 8.146a.635.635 0 0 0 0 .88.594.594 0 0 0 .854 0l3.869-3.982a.635.635 0 0 0 0-.88z" fill-rule="nonzero" fill="currentColor" class="fill-main"></path></svg></span>-->
+                        </a>
+                        <div class="plans_card__buttons_subtitle">Pay per compute.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tx-faq">
+            <div class="tx-landing__highlights_text">
+                <h2>FAQ</h2>
+            </div>
+
+            <div class="tx-faq__list">
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        What is dstack?
+                        <div class="tx-faq__item-title-icon">
+                        </div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        <p>
+                            dstack is an open-source orchestration engine that simplifies developing, training, and
+                            deploying AI
+                            models, as well as managing clusters on any cloud or data center.
+                            It provides a unified interface to manage AI model development at any scale,
+                            whether in the cloud or on-premises.
+                        </p>
+                        <p>
+                            With dstack, you can utilize various cloud providers or on-prem infrastructure, along with
+                            any hardware, and leverage open-source frameworks and tools for both training and
+                            deployment.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        How does it compare to Kubernetes?
+                        <div class="tx-faq__item-title-icon">
+                        </div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        <p>
+                            Both dstack and Kubernetes are container orchestration engines that can be used with cloud
+                            and on-prem. The difference is that dstack is much more lightweight and tailored to simplify
+                            AI development.
+                        </p>
+                        <p>First of all, dstack offers an interface tailored for AI, allowing any AI engineer to use it
+                            out of the box for development, training, and deployment without needing additional tools or
+                            help from the Ops team.</p>
+                        <p>
+                            dstack, out of the box, supports multiple cloud providers and offers all the features of a
+                            managed version of Kubernetes. It's very easy to integrate dstack with new cloud providers.
+                        </p>
+                        <p>dstack is much easier to use for running containers on on-prem servers. If you have a cluster
+                            of on-prem servers, you just need to provide dstack with their hostnames and SSH
+                            credentials. dstack will automatically add them as a fleet that you can reuse to run
+                            containers.</p>
+                    </div>
+                </div>
+
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        Can I use dstack with Kubernetes?
+                        <div class="tx-faq__item-title-icon">
+                        </div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        <p>
+                            If you already use Kubernetes, you can set up the dstack server to run containers via
+                            Kubernetes. In that case, dstack provides your AI engineers with a simple interface for
+                            running dev environments, tasks, and services without involving your Ops team or using any
+                            other tools.
+                        </p>
+                        <p>
+                            Unless you're required to use Kubernetes, it's generally recommended to use dstack without
+                            Kubernetes and set up cloud accounts and on-prem servers directly via dstack's backends and
+                            fleets. In that case, the provisioning of instances will be more efficient and convenient.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="tx-faq__item">
+                    <div class="tx-faq__item-title">
+                        What is dstack Sky?
+                        <div class="tx-faq__item-title-icon">
+                        </div>
+                    </div>
+
+                    <div class="tx-faq__item-body">
+                        <p>
+                            If you don't want to host the dstack server yourself or would like to access GPU from the
+                            dstack's marketplace, sign up with
+                            <a href="https://sky.dstack.ai" target="_blank">dstack Sky</a>.
+                        </p>
+                        <p>
+                            Unlike the open-source dstack where you have to set up and manage the server yourself,
+                            dstack Sky takes care of hosting the server on your behalf.
+                            Most importantly, dstack Sky offers access to cloud GPUs through its marketplace,
+                            ensuring you get them at competitive rates.
+                        </p>
+                        <p>
+                            If needed, you can still configure dstack Sky to use your own cloud accounts or connect to
+                            your on-prem servers.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <p>
+                Have more questions, want a demo, or need help?
+                <br>
+                <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
+                   class="md-button md-button--primary sky small external">
+                    Talk to an expert
+                </a>
+                <a href="https://discord.gg/u8SmfwPpMd" target="_blank"
+                   class="md-button md-button-secondary small external discord">
+                    Join Discord
+                </a>
+            </p>
         </div>
     </div>
 </section>

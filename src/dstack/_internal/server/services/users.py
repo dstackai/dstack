@@ -2,11 +2,13 @@ import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import delete, select, update
+from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceExistsError
 from dstack._internal.core.models.users import GlobalRole, User, UserTokenCreds, UserWithCreds
 from dstack._internal.server.models import UserModel
+from dstack._internal.server.utils.routers import error_forbidden
 
 _ADMIN_USERNAME = "admin"
 
@@ -57,7 +59,7 @@ async def create_user(
     global_role: GlobalRole,
     email: Optional[str] = None,
 ) -> UserModel:
-    user_model = await get_user_model_by_name(session=session, username=username)
+    user_model = await get_user_model_by_name(session=session, username=username, ignore_case=True)
     if user_model is not None:
         raise ResourceExistsError()
     user = UserModel(
@@ -89,9 +91,15 @@ async def update_user(
     return await get_user_model_by_name_or_error(session=session, username=username)
 
 
-async def refresh_user_token(session: AsyncSession, username: str) -> Optional[UserModel]:
+async def refresh_user_token(
+    session: AsyncSession,
+    user: UserModel,
+    username: str,
+) -> Optional[UserModel]:
+    if user.global_role != GlobalRole.ADMIN and user.name != username:
+        raise error_forbidden()
     await session.execute(
-        update(UserModel).where(UserModel.name == username).values(token=uuid.uuid4())
+        update(UserModel).where(UserModel.name == username).values(token=str(uuid.uuid4()))
     )
     await session.commit()
     return await get_user_model_by_name(session=session, username=username)
@@ -106,8 +114,17 @@ async def delete_users(
     await session.commit()
 
 
-async def get_user_model_by_name(session: AsyncSession, username: str) -> Optional[UserModel]:
-    res = await session.execute(select(UserModel).where(UserModel.name == username))
+async def get_user_model_by_name(
+    session: AsyncSession,
+    username: str,
+    ignore_case: bool = False,
+) -> Optional[UserModel]:
+    filters = []
+    if ignore_case:
+        filters.append(safunc.lower(UserModel.name) == safunc.lower(username))
+    else:
+        filters.append(UserModel.name == username)
+    res = await session.execute(select(UserModel).where(*filters))
     return res.scalar()
 
 

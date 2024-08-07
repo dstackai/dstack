@@ -1,32 +1,35 @@
 from typing import List, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 from typing_extensions import Literal
 
 from dstack._internal.core.models.backends.base import ConfigElement, ConfigMultiElement
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel
 
 
-class GCPConfigInfo(BaseModel):
+class GCPConfigInfo(CoreModel):
     type: Literal["gcp"] = "gcp"
     project_id: str
     regions: Optional[List[str]] = None
+    vpc_name: Optional[str] = None
+    vpc_project_id: Optional[str] = None
+    public_ips: Optional[bool] = None
 
 
-class GCPServiceAccountCreds(ForbidExtra):
+class GCPServiceAccountCreds(CoreModel):
     type: Literal["service_account"] = "service_account"
     filename: str
     data: str
 
 
-class GCPDefaultCreds(ForbidExtra):
+class GCPDefaultCreds(CoreModel):
     type: Literal["default"] = "default"
 
 
 AnyGCPCreds = Union[GCPServiceAccountCreds, GCPDefaultCreds]
 
 
-class GCPCreds(BaseModel):
+class GCPCreds(CoreModel):
     __root__: AnyGCPCreds = Field(..., discriminator="type")
 
 
@@ -37,14 +40,17 @@ class GCPConfigInfoWithCreds(GCPConfigInfo):
 AnyGCPConfigInfo = Union[GCPConfigInfo, GCPConfigInfoWithCreds]
 
 
-class GCPConfigInfoWithCredsPartial(BaseModel):
+class GCPConfigInfoWithCredsPartial(CoreModel):
     type: Literal["gcp"] = "gcp"
     creds: Optional[AnyGCPCreds]
     project_id: Optional[str]
     regions: Optional[List[str]]
+    vpc_name: Optional[str] = None
+    vpc_project_id: Optional[str] = None
+    public_ips: Optional[bool]
 
 
-class GCPConfigValues(BaseModel):
+class GCPConfigValues(CoreModel):
     type: Literal["gcp"] = "gcp"
     default_creds: bool = False
     project_id: Optional[ConfigElement]
@@ -52,4 +58,4 @@ class GCPConfigValues(BaseModel):
 
 
 class GCPStoredConfig(GCPConfigInfo):
-    service_account_email: str
+    pass

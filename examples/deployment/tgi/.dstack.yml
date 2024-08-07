@@ -1,0 +1,9 @@
+type: dev-environment
+# Launches a dev environment to play with TGI
+
+image: ghcr.io/huggingface/text-generation-inference:latest
+
+ide: vscode
+
+resources: 
+  gpu: 24GB

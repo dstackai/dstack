@@ -1,10 +1,10 @@
-import time
 from typing import Optional
 
 from datacrunch import DataCrunchClient
 from datacrunch.exceptions import APIException
 from datacrunch.instances.instances import Instance
 
+from dstack._internal.core.errors import NoCapacityError
 from dstack._internal.utils.ssh import get_public_key_fingerprint
 
 
@@ -47,15 +47,6 @@ class DataCrunchAPIClient:
         except APIException:
             return None
 
-    def wait_for_instance(self, instance_id: str) -> Optional[Instance]:
-        WAIT_FOR_INSTANCE_ATTEMPTS = 60
-        WAIT_FOR_INSTANCE_INTERVAL = 10
-        for _ in range(WAIT_FOR_INSTANCE_ATTEMPTS):
-            instance = self.get_instance_by_id(instance_id)
-            if instance is not None and instance.status == "running":
-                return instance
-            time.sleep(WAIT_FOR_INSTANCE_INTERVAL)
-
     def deploy_instance(
         self,
         instance_type,
@@ -67,16 +58,20 @@ class DataCrunchAPIClient:
         disk_size,
         is_spot=True,
         location="FIN-01",
-    ):
-        instance = self.client.instances.create(
-            instance_type=instance_type,
-            image=image,
-            ssh_key_ids=ssh_key_ids,
-            hostname=hostname,
-            description=description,
-            startup_script_id=startup_script_id,
-            is_spot=is_spot,
-            location=location,
-            os_volume={"name": "OS volume", "size": disk_size},
-        )
+    ) -> Instance:
+        try:
+            instance = self.client.instances.create(
+                instance_type=instance_type,
+                image=image,
+                ssh_key_ids=ssh_key_ids,
+                hostname=hostname,
+                description=description,
+                startup_script_id=startup_script_id,
+                is_spot=is_spot,
+                location=location,
+                os_volume={"name": "OS volume", "size": disk_size},
+            )
+        except APIException as e:
+            raise NoCapacityError(f"DataCrunch API error: {e.message}")
+
         return instance

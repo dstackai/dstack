@@ -1,14 +1,19 @@
-import re
 from enum import Enum
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
-from pydantic import Field, confloat, root_validator, validator
+from pydantic import Field, root_validator, validator
 from typing_extensions import Annotated, Literal
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import ForbidExtra
+from dstack._internal.core.models.common import CoreModel, Duration
 
-DEFAULT_RETRY_LIMIT = 3600
+DEFAULT_RETRY_DURATION = 3600
+DEFAULT_POOL_NAME = "default-pool"
+
+DEFAULT_RUN_TERMINATION_IDLE_TIME = 5 * 60  # 5 minutes
+DEFAULT_POOL_TERMINATION_IDLE_TIME = 72 * 60 * 60  # 3 days
+
+DEFAULT_INSTANCE_RETRY_DURATION = 60 * 60 * 24  # 24h
 
 
 class SpotPolicy(str, Enum):
@@ -17,242 +22,174 @@ class SpotPolicy(str, Enum):
     AUTO = "auto"
 
 
-def parse_memory(v: Optional[Union[int, str]]) -> Optional[int]:
-    """
-    Converts human-readable sizes (MB and GB) to megabytes
-    >>> parse_memory("512MB")
-    512
-    >>> parse_memory("1 GB")
-    1024
-    """
-    if v is None:
-        return None
-    if isinstance(v, str):
-        m = re.fullmatch(r"(\d+) *([mg]b)?", v.strip().lower())
-        if not m:
-            raise ValueError(f"Invalid memory size: {v}")
-        v = int(m.group(1))
-        if m.group(2) == "gb":
-            v = v * 1024
-    return int(v)
+class CreationPolicy(str, Enum):
+    REUSE = "reuse"
+    REUSE_OR_CREATE = "reuse-or-create"
+
+
+class TerminationPolicy(str, Enum):
+    DONT_DESTROY = "dont-destroy"
+    DESTROY_AFTER_IDLE = "destroy-after-idle"
 
 
 def parse_duration(v: Optional[Union[int, str]]) -> Optional[int]:
     if v is None:
         return None
-    if isinstance(v, int):
-        return v
-    regex = re.compile(r"(?P<amount>\d+) *(?P<unit>[smhdw])$")
-    re_match = regex.match(v)
-    if not re_match:
-        raise ValueError(f"Cannot parse the duration {v}")
-    amount, unit = int(re_match.group("amount")), re_match.group("unit")
-    multiplier = {
-        "s": 1,
-        "m": 60,
-        "h": 3600,
-        "d": 24 * 3600,
-        "w": 7 * 24 * 3600,
-    }[unit]
-    return amount * multiplier
+    return Duration.parse(v)
 
 
-def parse_max_duration(v: Union[int, str]) -> int:
+def parse_max_duration(v: Optional[Union[int, str]]) -> Optional[Union[str, int]]:
     if v == "off":
         return v
     return parse_duration(v)
 
 
-class ProfileGPU(ForbidExtra):
-    """
-    The GPU spec
-
-    Attributes:
-        name (Optional[str]): The name of the GPU (e.g., `"A100"` or `"H100"`)
-        count (int): The minimum number of GPUs
-        memory (Optional[str]): The minimum size of a single GPU memory (e.g., `"16GB"`)
-        total_memory (Optional[str]): The minimum total size of all GPUs memory (e.g., `"32GB"`)
-        compute_capability (float): The minimum compute capability of the GPU (e.g., `7.5`)
-    """
-
-    name: Annotated[
-        Optional[str],
-        Field(description='The name of the GPU (e.g., "A100" or "H100")'),
-    ]
-    count: Annotated[
-        int,
-        Field(description="The minimum number of GPUs"),
-    ] = 1
-    memory: Annotated[
-        Optional[Union[int, str]],
-        Field(description='The minimum size of a single GPU memory (e.g., "16GB")'),
-    ]
-    total_memory: Annotated[
-        Optional[Union[int, str]],
-        Field(description='The minimum total size of all GPUs memory (e.g., "32GB")'),
-    ]
-    compute_capability: Annotated[
-        Optional[Union[float, str, Tuple[int, int]]],
-        Field(description="The minimum compute capability of the GPU (e.g., 7.5)"),
-    ]
-    _validate_mem = validator("memory", "total_memory", pre=True, allow_reuse=True)(parse_memory)
-
-    @validator("name")
-    def _validate_name(cls, name: Optional[str]) -> Optional[str]:
-        if name is None:
-            return None
-        return name.upper()
-
-    @validator("compute_capability", pre=True)
-    def _validate_cc(
-        cls, v: Optional[Union[float, str, Tuple[int, int]]]
-    ) -> Optional[Tuple[int, int]]:
-        if isinstance(v, float):
-            v = str(v)
-        if isinstance(v, str):
-            m = re.fullmatch(r"(\d+)\.(\d+)", v)
-            if not m:
-                raise ValueError(f"Invalid compute capability: {v}")
-            v = (int(m.group(1)), int(m.group(2)))
-        return v
-
-
-class ProfileDisk(ForbidExtra):
-    """
-    The disk spec
-
-    Attributes:
-        size (str): The minimum size of the disk (e.g., `"100GB"`)
-    """
-
-    size: Annotated[
-        Optional[Union[int, str]],
-        Field(description='The minimum size of the disk (e.g., "100GB")'),
-    ]
-    _validate_size = validator("size", pre=True, allow_reuse=True)(parse_memory)
-
-
-class ProfileResources(ForbidExtra):
-    """
-    The minimum resources requirements for the run.
-
-    Attributes:
-        cpu (Optional[int]): The minimum number of CPUs
-        memory (Optional[str]): The minimum size of RAM memory (e.g., `"16GB"`)
-        gpu (Optional[GPU]): The GPU spec
-        shm_size (Optional[str]): The size of shared memory (e.g., `"8GB"`). If you are using parallel communicating processes (e.g., dataloaders in PyTorch), you may need to configure this.
-        disk (Optional[Disk]): The disk spec
-    """
-
-    cpu: Annotated[Optional[int], Field(description="The minimum number of CPUs")] = 2
-    memory: Annotated[
-        Optional[Union[int, str]],
-        Field(description='The minimum size of RAM memory (e.g., "16GB")'),
-    ] = parse_memory("8GB")
-    gpu: Annotated[
-        Optional[Union[int, ProfileGPU]],
-        Field(description="The minimum number of GPUs or a GPU spec"),
-    ]
-    shm_size: Annotated[
-        Optional[Union[int, str]],
-        Field(
-            description='The size of shared memory (e.g., "8GB"). If you are using parallel communicating processes ('
-            "e.g., dataloaders in PyTorch), you may need to configure this."
-        ),
-    ]
-    disk: Annotated[
-        Optional[Union[int, str, ProfileDisk]],
-        Field(description="The minimum size of disk or a disk spec"),
-    ] = ProfileDisk(size=parse_memory("100GB"))
-    _validate_mem = validator("memory", "shm_size", pre=True, allow_reuse=True)(parse_memory)
-
-    @validator("gpu", pre=True)
-    def _validate_gpu(cls, v: Optional[Union[int, ProfileGPU]]) -> Optional[ProfileGPU]:
-        if isinstance(v, int):
-            v = ProfileGPU(count=v)
-        return v
-
-    @validator("disk", pre=True)
-    def _validate_disk(cls, v: Optional[Union[int, str, ProfileDisk]]) -> Optional[ProfileDisk]:
-        if isinstance(v, int):
-            v = ProfileDisk(size=v)
-        if isinstance(v, str):
-            v = ProfileDisk(size=parse_memory(v))
-        return v
-
-
-class ProfileRetryPolicy(ForbidExtra):
+class ProfileRetryPolicy(CoreModel):
     retry: Annotated[bool, Field(description="Whether to retry the run on failure or not")] = False
-    limit: Annotated[
+    duration: Annotated[
         Optional[Union[int, str]],
-        Field(description="The maximum period of retrying the run, e.g., 4h or 1d"),
+        Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
     ] = None
 
-    _validate_limit = validator("limit", pre=True, allow_reuse=True)(parse_duration)
+    _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
 
-    @root_validator()
-    @classmethod
-    def _validate_fields(cls, field_values):
-        if field_values["retry"] and "limit" not in field_values:
-            field_values["limit"] = DEFAULT_RETRY_LIMIT
-        if field_values.get("limit") is not None:
-            field_values["retry"] = True
-        return field_values
+    @root_validator
+    def _validate_fields(cls, values):
+        if values["retry"] and "duration" not in values:
+            values["duration"] = DEFAULT_RETRY_DURATION
+        if values.get("duration") is not None:
+            values["retry"] = True
+        return values
 
 
-class Profile(ForbidExtra):
+class RetryEvent(str, Enum):
+    NO_CAPACITY = "no-capacity"
+    INTERRUPTION = "interruption"
+    ERROR = "error"
+
+
+class ProfileRetry(CoreModel):
+    on_events: Annotated[
+        List[RetryEvent],
+        Field(
+            description=(
+                "The list of events that should be handled with retry."
+                " Supported events are `no-capacity`, `interruption`, and `error`"
+            )
+        ),
+    ]
+    duration: Annotated[
+        Optional[Union[int, str]],
+        Field(description="The maximum period of retrying the run, e.g., `4h` or `1d`"),
+    ] = None
+
+    _validate_duration = validator("duration", pre=True, allow_reuse=True)(parse_duration)
+
+    @root_validator
+    def _validate_fields(cls, values):
+        if "on_events" in values and len(values["on_events"]) == 0:
+            raise ValueError("`on_events` cannot be empty")
+        return values
+
+
+class ProfileParams(CoreModel):
+    backends: Annotated[
+        Optional[List[BackendType]],
+        Field(description="The backends to consider for provisioning (e.g., `[aws, gcp]`)"),
+    ]
+    regions: Annotated[
+        Optional[List[str]],
+        Field(
+            description="The regions to consider for provisioning (e.g., `[eu-west-1, us-west4, westeurope]`)"
+        ),
+    ]
+    instance_types: Annotated[
+        Optional[List[str]],
+        Field(
+            description="The cloud-specific instance types to consider for provisioning (e.g., `[p3.8xlarge, n1-standard-4]`)"
+        ),
+    ]
+    spot_policy: Annotated[
+        Optional[SpotPolicy],
+        Field(
+            description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`"
+        ),
+    ]
+    retry: Annotated[
+        Optional[Union[ProfileRetry, bool]],
+        Field(description="The policy for resubmitting the run. Defaults to `false`"),
+    ]
+    retry_policy: Annotated[
+        Optional[ProfileRetryPolicy],
+        Field(description="The policy for resubmitting the run. Deprecated in favor of `retry`"),
+    ]
+    max_duration: Annotated[
+        Optional[Union[Literal["off"], str, int]],
+        Field(
+            description="The maximum duration of a run (e.g., `2h`, `1d`, etc). After it elapses, the run is forced to stop. Defaults to `off`"
+        ),
+    ]
+    max_price: Annotated[
+        Optional[float],
+        Field(description="The maximum instance price per hour, in dollars", gt=0.0),
+    ]
+    pool_name: Annotated[
+        Optional[str],
+        Field(description="The name of the pool. If not set, dstack will use the default name"),
+    ]
+    instance_name: Annotated[Optional[str], Field(description="The name of the instance")]
+    creation_policy: Annotated[
+        Optional[CreationPolicy],
+        Field(
+            description="The policy for using instances from the pool. Defaults to `reuse-or-create`"
+        ),
+    ]
+    termination_policy: Annotated[
+        Optional[TerminationPolicy],
+        Field(description="The policy for instance termination. Defaults to `destroy-after-idle`"),
+    ]
+    termination_idle_time: Annotated[
+        Optional[Union[str, int]],
+        Field(
+            description="Time to wait before destroying the idle instance. Defaults to `5m` for `dstack run` and to `3d` for `dstack pool add`"
+        ),
+    ]
+
+    _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
+        parse_max_duration
+    )
+    _validate_termination_idle_time = validator(
+        "termination_idle_time", pre=True, allow_reuse=True
+    )(parse_duration)
+
+
+class ProfileProps(CoreModel):
     name: Annotated[
         str,
         Field(
             description="The name of the profile that can be passed as `--profile` to `dstack run`"
         ),
     ]
-    backends: Annotated[
-        Optional[List[BackendType]],
-        Field(description='The backends to consider for provisionig (e.g., "[aws, gcp]")'),
-    ]
-    resources: Annotated[
-        ProfileResources,
-        Field(description="The minimum resources of the instance to be provisioned"),
-    ] = ProfileResources()
-    spot_policy: Annotated[
-        Optional[SpotPolicy],
-        Field(
-            description="The policy for provisioning spot or on-demand instances: spot, on-demand, or auto"
-        ),
-    ]
-    retry_policy: Annotated[
-        Optional[ProfileRetryPolicy], Field(description="The policy for re-submitting the run")
-    ]
-    max_duration: Annotated[
-        Optional[Union[Literal["off"], str, int]],
-        Field(
-            description="The maximum duration of a run (e.g., 2h, 1d, etc). After it elapses, the run is forced to stop."
-        ),
-    ]
-    max_price: Annotated[
-        Optional[confloat(gt=0.0)], Field(description="The maximum price per hour, in dollars")
-    ]
     default: Annotated[
         bool, Field(description="If set to true, `dstack run` will use this profile by default.")
     ] = False
 
-    _validate_max_duration = validator("max_duration", pre=True, allow_reuse=True)(
-        parse_max_duration
-    )
+
+class Profile(ProfileProps, ProfileParams):
+    pass
 
 
-class ProfilesConfig(ForbidExtra):
+class ProfilesConfig(CoreModel):
     profiles: List[Profile]
 
     class Config:
         schema_extra = {"$schema": "http://json-schema.org/draft-07/schema#"}
 
-    def default(self) -> Profile:
+    def default(self) -> Optional[Profile]:
         for p in self.profiles:
             if p.default:
                 return p
-        return Profile(name="default")
+        return None
 
     def get(self, name: str) -> Profile:
         for p in self.profiles:

@@ -1,17 +1,22 @@
 """
 Generates schema reference for dstack models.
 """
+
 import importlib
+import inspect
 import logging
 import re
 from fnmatch import fnmatch
-from typing import Annotated, Any, Dict, Literal, Type, Union, get_args, get_origin
 
 import mkdocs_gen_files
 import yaml
 from mkdocs.structure.files import File
+from pydantic.main import BaseModel
+from typing_extensions import Annotated, Any, Dict, Literal, Type, Union, get_args, get_origin
 
-FILE_PATTERN = "docs/reference/*.md"
+from dstack._internal.core.models.resources import Range
+
+FILE_PATTERN = "docs/reference/**.md"
 logger = logging.getLogger("mkdocs.plugins.dstack.schema")
 
 
@@ -36,7 +41,10 @@ def get_type(annotation: Type) -> str:
 
 
 def generate_schema_reference(
-    model_path: str, *, overrides: Dict[str, Dict[str, Any]] = None
+    model_path: str,
+    *,
+    overrides: Dict[str, Dict[str, Any]] = None,
+    prefix: str = "",
 ) -> str:
     module, model_name = model_path.rsplit(".", maxsplit=1)
     cls = getattr(importlib.import_module(module), model_name)
@@ -48,49 +56,96 @@ def generate_schema_reference(
     ):
         rows.extend(
             [
-                f"### {cls.__name__}",
+                prefix + f"### {cls.__name__}",
                 "",
             ]
         )
-    rows.extend(
-        [
-            "| Property | Description | Type | Default value |",
-            "| --- | --- | --- | --- |",
-        ]
-    )
     for name, field in cls.__fields__.items():
         values = dict(
             name=name,
             description=field.field_info.description,
             type=get_type(field.annotation),
-            default=str(field.default),
+            default=field.default,
             required=field.required,
         )
-        if overrides and name in overrides:
-            values.update(overrides[name])
-        rows.append(
-            "| %s | "
-            % " | ".join(
-                [
-                    f"`{values['name']}`",
-                    (values["description"] or "").replace("\n", "<br>"),
-                    f"`{values['type']}`",
-                    "*required*" if values["required"] else f"`{values['default']}`",
-                ]
+        # TODO: If the field doesn't have description (e.g. BaseConfiguration.type), we could fallback to docstring
+        if values["description"]:
+            if overrides and name in overrides:
+                values.update(overrides[name])
+            field_type = next(iter(get_args(field.annotation)), None)
+            # TODO: This is a dirty workaround
+            if field_type:
+                if field.annotation.__name__ == "Annotated":
+                    if field_type.__name__ == "Optional":
+                        field_type = get_args(get_args(field.annotation)[0])[0]
+                    if field_type.__name__ == "List":
+                        field_type = get_args(get_args(field.annotation)[0])[0]
+                    if field_type.__name__ == "Union":
+                        field_type = get_args(get_args(field.annotation)[0])[0]
+                base_model = (
+                    inspect.isclass(field_type)
+                    and issubclass(field_type, BaseModel)
+                    and not issubclass(field_type, Range)
+                )
+            else:
+                base_model = False
+            _defaults = (
+                f"Defaults to `{values['default']}`."
+                if not base_model and values.get("default")
+                else ""
             )
-        )
+            _must_be = (
+                f"Must be `{values['default']}`."
+                if not base_model and values.get("default")
+                else ""
+            )
+            if overrides and "item_id_prefix" in overrides:
+                item_id_prefix = overrides["item_id_prefix"]
+            else:
+                item_id_prefix = ""
+            if hasattr(field_type, "__name__") and overrides and "item_id_mapping" in overrides:
+                link_name = overrides["item_id_mapping"].get(values["name"]) or values["name"]
+            else:
+                link_name = values["name"]
+            item_header = (
+                f"`{values['name']}`"
+                if not base_model
+                else f"[`{values['name']}`](#{item_id_prefix}{link_name})"
+            )
+            item_optional_marker = "(Optional)" if not values["required"] else ""
+            item_description = (values["description"]).replace("\n", "<br>") + "."
+            item_default = _defaults if not values["required"] else _must_be
+            item_id = f"#{values['name']}" if not base_model else f"#_{values['name']}"
+            item_toc_label = f"data-toc-label='{values['name']}'"
+            item_css_cass = "class='reference-item'"
+            rows.append(
+                prefix
+                + " ".join(
+                    [
+                        f"#### {item_header}",
+                        "-",
+                        item_optional_marker,
+                        item_description,
+                        item_default,
+                        "{",
+                        item_id,
+                        item_toc_label,
+                        item_css_cass,
+                        "}",
+                    ]
+                )
+            )
     return "\n".join(rows)
 
 
 def sub_schema_reference(match: re.Match) -> str:
-    logger.info("Generating schema reference for `%s`", match.group(1))
-    try:
-        options = yaml.safe_load("\n".join(row[4:] for row in match.group(2).split("\n")))
-        logger.debug("Options: %s", options)
-        return generate_schema_reference(match.group(1), **(options or {})) + "\n\n"
-    except Exception as e:
-        logger.error("Failed to generate schema reference for `%s`: %s", match.group(1), e)
-        return match.group(0)
+    logger.info("Generating schema reference for `%s`", match.group(2))
+    options = yaml.safe_load("\n".join(row[4:] for row in match.group(3).split("\n")))
+    logger.debug("Options: %s", options)
+    return (
+        generate_schema_reference(match.group(2), **(options or {}), prefix=match.group(1))
+        + "\n\n"
+    )
 
 
 file: File
@@ -106,7 +161,9 @@ for file in mkdocs_gen_files.files:
     #       name:
     #         required: true
     text = re.sub(
-        r"#SCHEMA#\s+(dstack\.[.a-z_0-9A-Z]+)\s*((?:\n {4}[^\n]+)*)\n", sub_schema_reference, text
+        r"( *)#SCHEMA#\s+(dstack\.[.a-z_0-9A-Z]+)\s*((?:\n {4}[^\n]+)*)\n",
+        sub_schema_reference,
+        text,
     )
     with mkdocs_gen_files.open(file.src_uri, "w") as f:
         f.write(text)

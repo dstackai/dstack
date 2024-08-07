@@ -1,0 +1,11 @@
+type: dev-environment
+# Launches a dev environment to play with vllm
+
+image: vllm/vllm-openai:latest
+env:
+  - PYTHONPATH=/workspace
+
+ide: vscode
+
+resources:
+  gpu: 24GB

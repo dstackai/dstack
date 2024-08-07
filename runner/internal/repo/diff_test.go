@@ -10,7 +10,6 @@ import (
 )
 
 func TestApplyDiff(t *testing.T) {
-
 	cases := []struct {
 		name    string
 		diff    string

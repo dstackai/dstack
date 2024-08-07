@@ -3,7 +3,7 @@ from typing import List, Tuple
 from fastapi import APIRouter, Depends, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.errors import ResourceNotExistsError, ServerClientError
 from dstack._internal.core.models.repos import RepoHead, RepoHeadWithCreds
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
@@ -14,7 +14,7 @@ from dstack._internal.server.schemas.repos import (
 )
 from dstack._internal.server.security.permissions import ProjectMember
 from dstack._internal.server.services import repos
-from dstack._internal.server.utils.routers import error_not_found, request_size_exceeded
+from dstack._internal.server.utils.routers import request_size_exceeded
 
 router = APIRouter(prefix="/api/project/{project_name}/repos", tags=["repos"])
 
@@ -42,7 +42,7 @@ async def get_repo(
         include_creds=body.include_creds,
     )
     if repo is None:
-        raise error_not_found()
+        raise ResourceNotExistsError()
     return repo
 
 
@@ -53,12 +53,13 @@ async def init_repo(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
     _, project = user_project
+    repo_creds = body.repo_creds.to_remote_repo_creds(body.repo_info) if body.repo_creds else None
     await repos.init_repo(
         session=session,
         project=project,
         repo_id=body.repo_id,
         repo_info=body.repo_info,
-        repo_creds=body.repo_creds,
+        repo_creds=repo_creds,
     )
 
 

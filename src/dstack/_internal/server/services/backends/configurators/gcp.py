@@ -1,14 +1,11 @@
 import json
-from typing import Dict, List
+from typing import List
 
-import googleapiclient.discovery
-import googleapiclient.errors
-from google.auth.credentials import Credentials
+import google.cloud.compute_v1 as compute_v1
 
-from dstack._internal.core.backends.gcp import GCPBackend, auth
-from dstack._internal.core.backends.gcp import utils as gcp_utils
+from dstack._internal.core.backends.gcp import GCPBackend, auth, resources
 from dstack._internal.core.backends.gcp.config import GCPConfig
-from dstack._internal.core.errors import BackendAuthError, ServerClientError
+from dstack._internal.core.errors import BackendAuthError, ComputeError, ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
     ConfigElement,
@@ -26,6 +23,7 @@ from dstack._internal.core.models.backends.gcp import (
     GCPServiceAccountCreds,
     GCPStoredConfig,
 )
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
@@ -112,7 +110,7 @@ LOCATIONS = [
         "default_zone": "australia-southeast1-c",
     },
 ]
-REGIONS = [r for l in LOCATIONS for r in l["regions"]]
+REGIONS = [r for loc in LOCATIONS for r in loc["regions"]]
 DEFAULT_REGIONS = REGIONS
 MAIN_REGION = "us-east1"
 
@@ -146,12 +144,15 @@ class GCPConfigurator(Configurator):
         )
         if config.creds is None:
             return config_values
-        if isinstance(config.creds, GCPDefaultCreds) and not settings.DEFAULT_CREDS_ENABLED:
+        if (
+            is_core_model_instance(config.creds, GCPDefaultCreds)
+            and not settings.DEFAULT_CREDS_ENABLED
+        ):
             raise_invalid_credentials_error(fields=[["creds"]])
         try:
-            _, project_id = auth.authenticate(creds=config.creds)
+            credentials, project_id = auth.authenticate(creds=config.creds)
         except BackendAuthError:
-            if isinstance(config.creds, GCPServiceAccountCreds):
+            if is_core_model_instance(config.creds, GCPServiceAccountCreds):
                 raise_invalid_credentials_error(fields=[["creds", "data"]])
             else:
                 raise_invalid_credentials_error(fields=[["creds"]])
@@ -162,10 +163,17 @@ class GCPConfigurator(Configurator):
         ):
             raise ServerClientError(msg="Wrong project_id", fields=[["project_id"]])
         config_values.project_id = self._get_project_id_element(selected=project_id)
-        if config.project_id is None:
-            return config_values
         config_values.regions = self._get_regions_element(
             selected=config.regions or DEFAULT_REGIONS
+        )
+        if config.project_id is None:
+            return config_values
+        network_client = compute_v1.NetworksClient(credentials=credentials)
+        routers_client = compute_v1.RoutersClient(credentials=credentials)
+        self._check_vpc_config(
+            network_client=network_client,
+            routers_client=routers_client,
+            config=config,
         )
         return config_values
 
@@ -174,25 +182,11 @@ class GCPConfigurator(Configurator):
     ) -> BackendModel:
         if config.regions is None:
             config.regions = DEFAULT_REGIONS
-        credentials, _ = auth.authenticate(creds=config.creds)
-        service_account_email = getattr(credentials, "service_account_email", None)
-        if service_account_email is None:
-            service_account_email = self._get_or_create_service_account(
-                credentials=credentials,
-                project_id=config.project_id,
-                name=gcp_utils.get_service_account_name(project.name),
-            )
-            self._grant_roles_to_service_account(
-                credentials=credentials,
-                project_id=config.project_id,
-                service_account_email=service_account_email,
-            )
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
             config=GCPStoredConfig(
-                **GCPConfigInfo.parse_obj(config).dict(),
-                service_account_email=service_account_email,
+                **GCPConfigInfo.__response__.parse_obj(config).dict(),
             ).json(),
             auth=GCPCreds.parse_obj(config.creds).json(),
         )
@@ -200,15 +194,15 @@ class GCPConfigurator(Configurator):
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyGCPConfigInfo:
         config = self._get_backend_config(model)
         if include_creds:
-            return GCPConfigInfoWithCreds.parse_obj(config)
-        return GCPConfigInfo.parse_obj(config)
+            return GCPConfigInfoWithCreds.__response__.parse_obj(config)
+        return GCPConfigInfo.__response__.parse_obj(config)
 
     def get_backend(self, model: BackendModel) -> GCPBackend:
         config = self._get_backend_config(model)
         return GCPBackend(config=config)
 
     def _get_backend_config(self, model: BackendModel) -> GCPConfig:
-        return GCPConfig(
+        return GCPConfig.__response__(
             **json.loads(model.config),
             creds=GCPCreds.parse_raw(model.auth).__root__,
         )
@@ -230,63 +224,22 @@ class GCPConfigurator(Configurator):
             element.values.append(ConfigElementValue(value=region_name, label=region_name))
         return element
 
-    def _get_or_create_service_account(
-        self, credentials: Credentials, project_id: str, name: str
-    ) -> str:
-        iam_service = googleapiclient.discovery.build("iam", "v1", credentials=credentials)
-        try:
-            service_account = (
-                iam_service.projects()
-                .serviceAccounts()
-                .create(
-                    name="projects/" + project_id,
-                    body={
-                        "accountId": name,
-                        "serviceAccount": {
-                            "displayName": name,
-                        },
-                    },
-                )
-                .execute()
-            )
-            return service_account["email"]
-        except googleapiclient.errors.HttpError as e:
-            if e.status_code == 409:
-                return gcp_utils.get_service_account_email(project_id, name)
-            elif e.status_code == 403:
-                raise ServerClientError(
-                    "Not enough permissions. Default credentials must have Service Account Admin role.",
-                )
-            raise e
-
-    def _grant_roles_to_service_account(
-        self, credentials: Credentials, project_id: str, service_account_email: str
+    def _check_vpc_config(
+        self,
+        network_client: compute_v1.NetworksClient,
+        routers_client: compute_v1.RoutersClient,
+        config: GCPConfigInfoWithCredsPartial,
     ):
-        service = googleapiclient.discovery.build(
-            "cloudresourcemanager", "v1", credentials=credentials
-        )
+        allocate_public_ip = config.public_ips if config.public_ips is not None else True
         try:
-            policy = service.projects().getIamPolicy(resource=project_id).execute()
-            self._add_roles_to_policy(
-                policy=policy,
-                service_account_email=service_account_email,
-                roles=self._get_service_account_roles(),
+            resources.check_vpc(
+                network_client=network_client,
+                routers_client=routers_client,
+                project_id=config.project_id,
+                regions=config.regions or DEFAULT_REGIONS,
+                vpc_name=config.vpc_name,
+                shared_vpc_project_id=config.vpc_project_id,
+                allocate_public_ip=allocate_public_ip,
             )
-            service.projects().setIamPolicy(resource=project_id, body={"policy": policy}).execute()
-        except googleapiclient.errors.HttpError as e:
-            if e.status_code == 403:
-                raise ServerClientError(
-                    "Not enough permissions. Default credentials must have Security Admin role.",
-                )
-            raise e
-
-    def _get_service_account_roles(self) -> List[str]:
-        return [
-            "roles/compute.admin",
-            "roles/iam.serviceAccountUser",
-        ]
-
-    def _add_roles_to_policy(self, policy: Dict, service_account_email: str, roles: List[str]):
-        member = f"serviceAccount:{service_account_email}"
-        for role in roles:
-            policy["bindings"].append({"role": role, "members": [member]})
+        except ComputeError as e:
+            raise ServerClientError(e.args[0])

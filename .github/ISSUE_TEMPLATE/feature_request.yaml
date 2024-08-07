@@ -1,44 +1,29 @@
 name: Feature request
-description: Suggest a feature, improvement, or integration with another tool
+description: Suggest a feature or an enhancement
 title: "[Feature]: "
 labels: ["feature"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thank you for taking the time to suggest this feature. Before submitting it, please ensure that there is no existing feature request and that you have discussed it with the team via [Slack](https://discord.gg/u8SmfwPpMd).
   - type: textarea
     id: problem
     attributes:
       label: Problem
-      description: Is this feature related to a problem? Please describe it.
+      description: Is this feature related to a problem? Please provide more context.
     validations:
       required: true
   - type: textarea
     id: solution
     attributes:
       label: Solution
-      description: What's the proposed solution for this feature?
-    validations:
-      required: true
-  - type: textarea
-    id: benefit
-    attributes:
-      label: Benefit
-      description: What's the benefit of adding this feature to the project?
-    validations:
-      required: true
+      description: What solution or enhancement would you propose to solve the problem?
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives
-      description: Are there other alternatives? Please describe them.
-    validations:
-      required: true
+      label: Workaround
+      description: Are there any workarounds currently available to solve the problem?
   - type: dropdown
-    id: contribute
+    id: contributing
     attributes:
-      label: Would you like to help contributing this feature?
+      label: Would you like to help us implement this feature by sending a PR?
       options:
         - 'Yes'
         - 'No'

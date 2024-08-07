@@ -1,4 +1,3 @@
-import shlex
 import threading
 import time
 from typing import List, Optional, Union
@@ -8,16 +7,14 @@ from requests.adapters import HTTPAdapter, Retry
 
 import dstack._internal.server.services.docker as docker
 from dstack._internal.core.errors import NoCapacityError
-from dstack._internal.core.models.configurations import RegistryAuth
-
-DISK_SIZE = 80  # TODO(egor-s): use requirements instead
+from dstack._internal.core.models.common import RegistryAuth
 
 
 class VastAIAPIClient:
     def __init__(self, api_key: str):
         self.api_url = "https://console.vast.ai/api/v0".rstrip("/")
         self.api_key = api_key
-        self.s = requests.Session()
+        self.s = requests.Session()  # TODO: set adequate timeout everywhere the session is used
         retries = Retry(
             total=5,
             backoff_factor=1,
@@ -29,7 +26,7 @@ class VastAIAPIClient:
         self.instances_cache: List[dict] = []
 
     def get_bundle(self, bundle_id: Union[str, int]) -> Optional[dict]:
-        resp = self.s.post(self._url(f"/bundles/"), json={"id": {"eq": bundle_id}})
+        resp = self.s.post(self._url("/bundles/"), json={"id": {"eq": bundle_id}})
         resp.raise_for_status()
         data = resp.json()
         offers = data["offers"]
@@ -41,6 +38,7 @@ class VastAIAPIClient:
         bundle_id: Union[str, int],
         image_name: str,
         onstart: str,
+        disk_size: int,
         registry_auth: Optional[RegistryAuth] = None,
     ) -> dict:
         """
@@ -64,7 +62,7 @@ class VastAIAPIClient:
         payload = {
             "client_id": "me",
             "image": image_name,
-            "disk": DISK_SIZE,
+            "disk": disk_size,
             "label": instance_name,
             "env": {
                 "-p 10022:10022": "1",
@@ -103,7 +101,7 @@ class VastAIAPIClient:
     def get_instances(self, cache_ttl: float = 3.0) -> List[dict]:
         with self.lock:
             if time.time() - self.instances_cache_ts > cache_ttl:
-                resp = self.s.get(self._url(f"/instances/"))
+                resp = self.s.get(self._url("/instances/"))
                 resp.raise_for_status()
                 data = resp.json()
                 self.instances_cache_ts = time.time()

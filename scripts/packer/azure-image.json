@@ -1,0 +1,77 @@
+{
+  "min_packer_version": "1.8",
+  "variables": {
+    "azure_client_id": "{{env `AZURE_CLIENT_ID`}}",
+    "azure_client_secret": "{{env `AZURE_CLIENT_SECRET`}}",
+    "azure_tenant_id": "{{env `AZURE_TENANT_ID`}}",
+    "azure_subscription_id": "{{env `AZURE_SUBSCRIPTION_ID`}}",
+    "azure_location": "westeurope",
+    "azure_vm_size": "Standard_DS1_v2",
+    "build_prefix": "",
+    "docker_version": "",
+    "image_version": ""
+  },
+  "builders": [{
+    "type": "azure-arm",
+    "client_id": "{{user `azure_client_id`}}",
+    "client_secret": "{{user `azure_client_secret`}}",
+    "tenant_id": "{{user `azure_tenant_id`}}",
+    "subscription_id": "{{user `azure_subscription_id`}}",
+    "managed_image_resource_group_name": "dstack-resources-westeurope",
+    "managed_image_name": "{{user `build_prefix`}}dstack-{{user `image_version` | clean_resource_name}}",
+    "os_type": "Linux",
+    "image_publisher": "canonical",
+    "image_offer": "0001-com-ubuntu-server-jammy",
+    "image_sku": "22_04-lts-gen2",
+    "azure_tags": {
+        "Name": "DSTACK"
+    },
+    "location": "{{user `azure_location`}}",
+    "vm_size": "{{user `azure_vm_size`}}"
+  }],
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": ["cloud-init status --long --wait"]
+    },
+    {
+      "type": "shell",
+      "scripts": [
+        "provisioners/kernel/apt-upgrade.sh",
+        "provisioners/kernel/apt-daily.sh",
+        "provisioners/kernel/apt-packages.sh",
+        "provisioners/kernel/kernel-tuning.sh"
+      ]
+    },
+    {
+      "type": "file",
+      "source": "provisioners/install-docker.sh",
+      "destination": "/tmp/install-docker.sh"
+    },
+    {
+      "type": "file",
+      "source": "provisioners/run-docker",
+      "destination": "/tmp/run-docker"
+    },
+    {
+      "type": "shell",
+      "inline_shebang": "/bin/sh -x",
+      "inline": [
+        "cd /tmp",
+        "chmod +x install-docker.sh",
+        "./install-docker.sh --version {{user `docker_version`}}"
+      ]
+    },
+    {
+      "type": "shell",
+      "environment_vars": ["IMAGE_VERSION={{user `image_version`}}"],
+      "script": "provisioners/pull-docker-images.sh"
+    },
+    {
+      "type": "shell",
+      "execute_command": "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'",
+      "inline_shebang": "/bin/sh -x",
+      "inline": ["/usr/sbin/waagent -force -deprovision+user && export HISTSIZE=0 && sync"]
+    }
+  ]
+}
