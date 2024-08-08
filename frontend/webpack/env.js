@@ -17,7 +17,7 @@ const apiUrl = process.env.API_URL || apiURLs;
 const publicUrl = process.env.PUBLIC_URL || publicURLs;
 const uiVersion = process.env.UI_VERSION === 'sky' ? 'sky' : 'enterprise';
 
-const title = uiVersion === 'enterprise' ? "dstack Enterprise" : "dstack Sky";
+const title = uiVersion === 'enterprise' ? "dstack" : "dstack Sky";
 const description = "Get GPUs at the best prices and availability from a wide range of providers. No cloud " +
     "account of your own is required.\n";
 
