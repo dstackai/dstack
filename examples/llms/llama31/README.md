@@ -221,12 +221,13 @@ type: task
 name: trl-train
 
 python: "3.10"
+# Ensure nvcc is installed (req. for Flash Attention) 
+nvcc: true
 
 env:
   - HUGGING_FACE_HUB_TOKEN
   - WANDB_API_KEY
 commands:
-  - conda install cuda
   - pip install "transformers>=4.43.2"
   - pip install bitsandbytes
   - pip install flash-attn --no-build-isolation
@@ -291,6 +292,8 @@ name: trl-train-distrib
 
 # Size of the cluster
 nodes: 2
+# Ensure nvcc is installed (req. for Flash Attention) 
+nvcc: true
 
 python: "3.10"
 
@@ -298,7 +301,6 @@ env:
   - HUGGING_FACE_HUB_TOKEN
   - WANDB_API_KEY
 commands:
-  - conda install cuda
   - pip install "transformers>=4.43.2"
   - pip install bitsandbytes
   - pip install flash-attn --no-build-isolation

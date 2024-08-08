@@ -10,7 +10,7 @@ The `dev-environment` configuration type allows running [dev environments](../..
 
 ### Python version
 
-If you don't specify `image`, `dstack` uses the default Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
 `python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
 The `python` property determines which default Docker image is used.
 
@@ -30,22 +30,20 @@ ide: vscode
 </div>
 
 ??? info "nvcc"
-    Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
-    To install it, use `conda install cuda`.
-
+    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+    If you need `nvcc`, set the corresponding property to true.
 
     ```yaml
     type: dev-environment
     # The name is optional, if not specified, generated randomly
     name: vscode    
-
-    python: "3.10"
     
-    ide: vscode
+    # If `image` is not specified, dstack uses its base image
+    python: "3.10"
+    # Ensure nvcc is installed (req. for Flash Attention) 
+    nvcc: true
 
-    # Run this command on start
-    init:
-      - conda install cuda
+    ide: vscode
     ```
 
 ### Docker image
