@@ -10,7 +10,7 @@ The `task` configuration type allows running [tasks](../../tasks.md).
 
 ### Python version
 
-If you don't specify `image`, `dstack` uses the default Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
 `python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
 The `python` property determines which default Docker image is used.
 
@@ -33,8 +33,8 @@ commands:
 </div>
 
 ??? info "nvcc"
-    Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
-    To install it, use `conda install cuda`.
+    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+    If you need `nvcc`, set the corresponding property to true.
 
 
     ```yaml
@@ -42,11 +42,12 @@ commands:
     # The name is optional, if not specified, generated randomly
     name: train    
 
+    # If `image` is not specified, dstack uses its base image
     python: "3.10"
+    # Ensure nvcc is installed (req. for Flash Attention) 
+    nvcc: true
     
-    # Before other commands, install `nvcc` (via `conda install cuda`)
     commands:
-      - conda install cuda
       - pip install -r fine-tuning/qlora/requirements.txt
       - python fine-tuning/qlora/train.py
     ```

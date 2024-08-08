@@ -39,6 +39,8 @@ name: ah-train
 
 # If `image` is not specified, dstack uses its default image
 python: "3.10"
+# Ensure nvcc is installed (req. for Flash Attention) 
+nvcc: true
 
 # Required environment variables
 env:
@@ -47,7 +49,6 @@ env:
   - WANDB_API_KEY
 # Commands of the task
 commands:
-  - conda install cuda
   - git clone https://github.com/huggingface/alignment-handbook.git
   - cd alignment-handbook
   - pip install .
@@ -96,6 +97,8 @@ name: ah-train-distrib
 
 # If `image` is not specified, dstack uses its default image
 python: "3.10"
+# Ensure nvcc is installed (req. for Flash Attention) 
+nvcc: true
 
 # Required environment variables
 env:
@@ -104,7 +107,6 @@ env:
   - WANDB_API_KEY
 # Commands of the task (dstack runs it on each node)
 commands:
-  - conda install cuda
   - git clone https://github.com/huggingface/alignment-handbook.git
   - cd alignment-handbook
   - pip install .

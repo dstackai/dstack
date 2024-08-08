@@ -10,7 +10,7 @@ The `service` configuration type allows running [services](../../services.md).
 
 ### Python version
 
-If you don't specify `image`, `dstack` uses the default Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
 `python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
 The `python` property determines which default Docker image is used.
 
@@ -33,9 +33,30 @@ port: 8000
 
 </div>
 
-!!! info "nvcc"
-    Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
-    To install it, use `conda install cuda` as the first command.
+??? info "nvcc"
+    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+    If you need `nvcc`, set the corresponding property to true.
+
+    <div editor-title="service.dstack.yml"> 
+
+    ```yaml
+    type: service
+    # The name is optional, if not specified, generated randomly
+    name: http-server-service    
+    
+    # If `image` is not specified, dstack uses its base image
+    python: "3.10"
+    # Ensure nvcc is installed (req. for Flash Attention) 
+    nvcc: true
+
+     # Commands of the service
+    commands:
+      - python3 -m http.server
+    # The port of the service
+    port: 8000
+    ```
+    
+    </div>
 
 ### Docker image
 
