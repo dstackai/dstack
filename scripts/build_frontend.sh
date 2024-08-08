@@ -3,7 +3,9 @@
 script_path="$(realpath $0)"
 root_dir="$(dirname $(dirname $script_path))"
 
-cd hub
+cd $root_dir
+cd frontend
+npm install
 npm run build
-rm -rf ../cli/dstack/_internal/hub/statics
-cp -r build ../cli/dstack/_internal/hub/statics
+rm -rf ../src/dstack/_internal/server/statics
+cp -a build ../src/dstack/_internal/server/statics

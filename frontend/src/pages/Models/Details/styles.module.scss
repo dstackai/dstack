@@ -1,0 +1,64 @@
+.modelDetailsLayout {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 159px);
+    margin-bottom: -40px;
+}
+
+.general {
+    flex-shrink: 0;
+}
+
+.modelForm {
+    position: relative;
+    flex-grow: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    grid-template-rows: 1fr auto;
+    grid-template-areas: "sidebar chat"
+                          "sidebar form";
+}
+
+.side {
+    grid-area: sidebar;
+    border-right: 1px solid #b6bec9;
+    padding-right: 20px;
+    padding-top: 20px;
+}
+
+.chat {
+    overflow-y: auto;
+    grid-area: chat;
+    padding: 40px 40px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+
+    .message {
+        p {
+            white-space: pre-wrap;
+        }
+    }
+}
+
+.clear {
+    z-index: 1;
+    position: absolute;
+    top: 24px;
+    right: 0;
+}
+
+.messageForm {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 20px;
+    grid-area: form;
+    border-top: 1px solid #b6bec9;
+    margin-right: -20px;
+    padding: 20px;
+
+    .buttons {
+        align-self: flex-end;
+    }
+}

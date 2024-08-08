@@ -1,0 +1,9 @@
+.dangerSectionGrid {
+    display: grid;
+    gap: 20px 40px;
+    grid-template-columns: minmax(auto, 300px) 1fr;
+}
+
+.dangerSectionField {
+    width: 300px;
+}

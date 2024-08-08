@@ -34,8 +34,29 @@ jobs:
       - run: python -m pip install pre-commit
       - run: pre-commit run -a --show-diff-on-failure
 
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install packages
+        run: npm install
+      - name: Build dist
+        run: npm run build
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+
   python-test:
-    needs: [ python-lint ]
+    needs: [ python-lint, frontend-build ]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -49,8 +70,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: pip install -U '.[all]' -r requirements_dev.txt
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: src/dstack/_internal/server/statics
       - name: Run pytest
-        run: pytest src/tests
+        run: |
+          pytest src/tests --runui
 
   update-get-dstack:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository

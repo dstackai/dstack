@@ -1,11 +1,14 @@
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Awaitable, Callable, List
 
+import pkg_resources
 import sentry_sdk
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
@@ -148,7 +151,7 @@ def add_no_api_version_check_routes(paths: List[str]):
     _NO_API_VERSION_CHECK_ROUTES.extend(paths)
 
 
-def register_routes(app: FastAPI):
+def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(users.router)
     app.include_router(projects.router)
     app.include_router(backends.root_router)
@@ -179,6 +182,15 @@ def register_routes(app: FastAPI):
             content={"detail": get_server_client_error_details(exc)},
         )
 
+    @app.exception_handler(OSError)
+    async def os_error_handler(request, exc: OSError):
+        if exc.errno in [36, 63]:
+            return JSONResponse(
+                {"detail": "Filename too long"},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        raise exc
+
     @app.middleware("http")
     async def log_request(request: Request, call_next):
         start_time = time.time()
@@ -208,6 +220,22 @@ def register_routes(app: FastAPI):
     async def healthcheck():
         return JSONResponse(content={"status": "running"})
 
-    @app.get("/")
-    async def index():
-        return RedirectResponse("/api/docs")
+    if ui and Path(__file__).parent.joinpath("statics").exists():
+        app.mount(
+            "/", StaticFiles(packages=["dstack._internal.server"], html=True), name="statics"
+        )
+
+        @app.exception_handler(404)
+        async def custom_http_exception_handler(request, exc):
+            if request.url.path.startswith("/api"):
+                return JSONResponse(
+                    {"detail": exc.detail},
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+            else:
+                return HTMLResponse(pkg_resources.resource_string(__name__, "statics/index.html"))
+    else:
+
+        @app.get("/")
+        async def index():
+            return RedirectResponse("/api/docs")
