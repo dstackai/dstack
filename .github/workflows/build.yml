@@ -16,6 +16,10 @@ on:
         type: boolean
         required: true
         default: false
+      frontend-build:
+        type: boolean
+        required: true
+        default: false
 
 env:
   BUILD_INCREMENT: 150
@@ -34,6 +38,28 @@ jobs:
       - run: python -m pip install pre-commit
       - run: pre-commit run -a --show-diff-on-failure
 
+  frontend-build:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.frontend-build }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install packages
+        run: npm install
+      - name: Build dist
+        run: npm run build
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+
   python-test:
     needs: [ python-lint ]
     runs-on: ${{ matrix.os }}
@@ -49,8 +75,21 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: pip install -U '.[all]' -r requirements_dev.txt
+      - name: Download frontend build
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.frontend-build }}
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: src/dstack/_internal/server/statics
       - name: Run pytest
-        run: pytest src/tests
+        run: |
+          RUNUI=""
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.frontend-build }}" == "true" ]]; then
+              RUNUI="--runui"
+            fi
+          fi
+          pytest src/tests $RUNUI
 
   update-get-dstack:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository

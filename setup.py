@@ -114,6 +114,7 @@ setup(
     package_dir={"": "src"},
     packages=find_packages("src"),
     package_data={
+        "dstack._internal.server": ["statics/**/*"],
         "dstack.api._public.huggingface.finetuning.sft": ["requirements.txt"],
     },
     include_package_data=True,
