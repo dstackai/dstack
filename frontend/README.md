@@ -17,7 +17,7 @@ npm run build
 Then copy the build directory:
 
 ```shell
-cp -r build ../src/dstack_cloud/statics
+cp -r build ../src/dstack/_internal/server/statics
 ```
 
 ## Development

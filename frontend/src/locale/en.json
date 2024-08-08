@@ -49,7 +49,7 @@
     "you_are_not_logged_in": "You are not logged in",
     "contact_to_administrator": "For getting the authorization token, contact to the administrator",
     "sign_in_to_dstack": "Welcome to dstack Sky",
-    "sign_in_to_dstack_enterprise": "Welcome to dstack Enterprise",
+    "sign_in_to_dstack_enterprise": "Welcome to dstack",
     "authorization_failed": "Authorization is failed",
     "try_again": "Please try again"
   },
