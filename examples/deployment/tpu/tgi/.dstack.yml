@@ -1,0 +1,9 @@
+type: dev-environment
+# Launches a dev environment to play with TGI
+
+image: huggingface/optimum-tpu:latest
+
+ide: vscode
+
+resources:
+  gpu: tpu-v5litepod-8

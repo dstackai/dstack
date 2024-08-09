@@ -1,0 +1,23 @@
+type: task
+
+python: "3.11"
+
+env:
+  - HUGGING_FACE_HUB_TOKEN
+
+commands:
+  - git clone https://github.com/huggingface/optimum-tpu.git
+  - mkdir -p optimum-tpu/examples/custom/
+  - cp examples/fine-tuning/tpu/train.py optimum-tpu/examples/custom/train.py
+  - cp examples/fine-tuning/tpu/config.yaml optimum-tpu/examples/custom/config.yaml
+  - cd optimum-tpu
+  - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
+  - pip install trl peft
+  - python examples/custom/train.py examples/custom/config.yaml
+
+
+ports:
+  - 6006
+
+resources:
+  gpu: tpu-v5litepod-8
