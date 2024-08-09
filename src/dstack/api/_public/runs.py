@@ -221,6 +221,7 @@ class Run(ABC):
     def attach(
         self,
         ssh_identity_file: Optional[PathLike] = None,
+        bind_address: Optional[str] = None,
     ) -> bool:
         """
         Establish an SSH tunnel to the instance and update SSH config
@@ -286,6 +287,7 @@ class Run(ABC):
                 if control_sock_path_and_port_locks
                 else None,
                 local_backend=provisioning_data.backend == BackendType.LOCAL,
+                bind_address=bind_address,
             )
             if not control_sock_path_and_port_locks:
                 self._ssh_attach.attach()
