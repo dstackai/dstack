@@ -1,4 +1,4 @@
-# Axolotl
+# Fine-tuning with Axolotl
 
 [Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl) streamlines the fine-tuning of AI models It not only
 supports multiple configurations and architectures but also provides many

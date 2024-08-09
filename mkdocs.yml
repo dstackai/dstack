@@ -227,8 +227,9 @@ nav:
       - LLMs:
           - Llama 3.1: docs/examples/llms/llama31/index.md
       - Fine-tuning:
-          - Alignment Handbook: docs/examples/fine-tuning/alignment-handbook/index.md
           - Axolotl: docs/examples/fine-tuning/axolotl/index.md
+          - Alignment Handbook: docs/examples/fine-tuning/alignment-handbook/index.md
+          - TRL: docs/examples/fine-tuning/trl/index.md
   - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
   - Blog:
       - blog/index.md

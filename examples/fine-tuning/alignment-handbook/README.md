@@ -1,4 +1,4 @@
-# Alignment Handbook
+# Fine-tuning with Alignment Handbook
 
 [Alignment Handbook](https://github.com/huggingface/alignment-handbook) by HuggingFace offers recipes, configs, and
 scripts for fine-tuning LLMs. It includes all the code needed to run CPT, SFT, DPO, and ORPO leveraging HuggingFace's
