@@ -116,7 +116,7 @@ class GatewayCommand(APIBaseCommand):
                 self.api.client.gateways.delete(self.api.project, [args.name])
             console.print("Gateway deleted")
         else:
-            console.print("Canceled")
+            console.print("Exiting...")
             return
 
     def _update(self, args: argparse.Namespace):

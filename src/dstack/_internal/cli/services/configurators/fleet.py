@@ -105,7 +105,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     ):
         if conf.name is None:
             console.print("[error]Configuration specifies no fleet to delete[/]")
-            return
+            exit(1)
 
         try:
             self.api.client.fleets.get(
@@ -114,7 +114,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             )
         except ResourceNotExistsError:
             console.print(f"Fleet [code]{conf.name}[/] does not exist")
-            return
+            exit(1)
 
         if not command_args.yes and not confirm_ask(f"Delete the fleet [code]{conf.name}[/]?"):
             console.print("\nExiting...")
