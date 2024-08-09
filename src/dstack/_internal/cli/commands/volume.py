@@ -77,7 +77,7 @@ class VolumeCommand(APIBaseCommand):
             self.api.client.volumes.get(project_name=self.api.project, name=args.name)
         except ResourceNotExistsError:
             console.print(f"Volume [code]{args.name}[/] does not exist")
-            return
+            exit(1)
 
         if not args.yes and not confirm_ask(f"Delete the volume [code]{args.name}[/]?"):
             console.print("\nExiting...")

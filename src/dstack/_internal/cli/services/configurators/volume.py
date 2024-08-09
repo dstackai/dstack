@@ -78,7 +78,7 @@ class VolumeConfigurator(BaseApplyConfigurator):
     ):
         if conf.name is None:
             console.print("[error]Configuration specifies no volume to delete[/]")
-            return
+            exit(1)
 
         try:
             self.api.client.volumes.get(
@@ -87,7 +87,7 @@ class VolumeConfigurator(BaseApplyConfigurator):
             )
         except ResourceNotExistsError:
             console.print(f"Volume [code]{conf.name}[/] does not exist")
-            return
+            exit(1)
 
         if not command_args.yes and not confirm_ask(f"Delete the volume [code]{conf.name}[/]?"):
             console.print("\nExiting...")

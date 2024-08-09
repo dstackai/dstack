@@ -137,7 +137,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                                 sys.stdout.buffer.flush()
                         else:
                             console.print("[error]Failed to attach, exiting...[/]")
-                            return
+                            exit(1)
                     finally:
                         run.detach()
 
@@ -152,14 +152,14 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         break
                     if run.status.is_finished():
                         _print_finished_message(run)
-                        return
+                        exit(_get_run_exit_code(run))
                     time.sleep(1)
                 if not reattach:
                     console.print(
                         "[error]Lost run connection. Timed out waiting for run final status."
                         " Check `dstack ps` to see if it's done or failed."
                     )
-                    return
+                    exit(1)
         except KeyboardInterrupt:
             try:
                 if not confirm_ask("\nStop the run before detaching?"):
@@ -190,7 +190,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     ):
         if conf.name is None:
             console.print("[error]Configuration specifies no run to delete[/]")
-            return
+            exit(1)
         try:
             self.api.client.runs.get(
                 project_name=self.api.project,
@@ -198,7 +198,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             )
         except ResourceNotExistsError:
             console.print(f"Run [code]{conf.name}[/] does not exist")
-            return
+            exit(1)
         if not command_args.yes and not confirm_ask(f"Delete the run [code]{conf.name}[/]?"):
             console.print("\nExiting...")
             return
@@ -376,6 +376,12 @@ def _print_finished_message(run: Run):
             "Check CLI, server, and run logs for more details."
         )
     console.print(f"[error]{message}[/]")
+
+
+def _get_run_exit_code(run: Run) -> int:
+    if run.status == RunStatus.DONE:
+        return 0
+    return 1
 
 
 def _get_run_termination_reason(run: Run) -> Tuple[Optional[JobTerminationReason], Optional[str]]:
