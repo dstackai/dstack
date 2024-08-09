@@ -100,6 +100,9 @@ python: "3.10"
 # Ensure nvcc is installed (req. for Flash Attention) 
 nvcc: true
 
+# The size of cluster
+nodes: 2
+
 # Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
@@ -124,9 +127,6 @@ commands:
 # Expose 6006 to access TensorBoard
 ports:
   - 6006
-
-# The number of interconnected instances required
-nodes: 2
 
 resources:
   # Required resources

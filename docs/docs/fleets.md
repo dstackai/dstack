@@ -3,8 +3,6 @@
 Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem. Once a
 fleet is created, it can be reused by dev environments, tasks, and services.
 
-> Fleets is a new feature. To use it, ensure you've installed version `0.18.7` or higher.
-
 ## Define a configuration
 
 To create a fleet, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.yml`
@@ -73,6 +71,32 @@ are both acceptable).
     !!! warning "Requirements"
         The on-prem servers should be pre-installed with CUDA 12.1 and NVIDIA Docker. 
         The user should have `sudo` access.
+
+    ??? info "Environment variables"
+        For on-prem fleets, it's possible to pre-configure environment variables. 
+        These variables will be used when installing the `dstack-shim` service on hosts 
+        and running containers.
+
+        For example, these variables can be used to configure a proxy:
+
+        ```yaml
+        type: fleet
+        name: my-fleet
+        
+        placement: cluster
+        
+        env:
+          - HTTP_PROXY=http://proxy.example.com:80
+          - HTTPS_PROXY=http://proxy.example.com:80
+          - NO_PROXY=localhost,127.0.0.1
+        
+        ssh_config:
+          user: ubuntu
+          identity_file: ~/.ssh/id_rsa
+          hosts:
+            - 3.255.177.51
+            - 3.255.177.52
+        ```
 
     Set `placement` to `cluster` if the nodes are interconnected (e.g. if you'd like to use them for multi-node tasks).
     In that case, by default, `dstack` will automatically detect the private network. 
