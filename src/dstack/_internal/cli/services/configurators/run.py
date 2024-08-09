@@ -37,6 +37,8 @@ from dstack._internal.utils.interpolator import VariablesInterpolator
 from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
 
+_BIND_ADDRESS_ARG = "bind_address"
+
 
 class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     TYPE: ApplyConfigurationType
@@ -130,8 +132,11 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         console.print(
                             f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
                         )
+                    bind_address: Optional[str] = getattr(
+                        configurator_args, _BIND_ADDRESS_ARG, None
+                    )
                     try:
-                        if run.attach():
+                        if run.attach(bind_address=bind_address):
                             for entry in run.logs():
                                 sys.stdout.buffer.write(entry)
                                 sys.stdout.buffer.flush()
@@ -279,6 +284,12 @@ class RunWithPortsConfigurator(BaseRunConfigurator):
             help="Exposed port or mapping",
             dest="ports",
             metavar="MAPPING",
+        )
+        parser.add_argument(
+            "--host",
+            help="Local address to bind. Defaults to [code]localhost[/]",
+            dest=_BIND_ADDRESS_ARG,
+            metavar="HOST",
         )
 
     def apply_args(

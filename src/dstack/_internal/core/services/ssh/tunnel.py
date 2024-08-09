@@ -21,9 +21,14 @@ class SSHTunnel:
         control_sock_path: PathLike,
         options: Dict[str, str],
         ssh_config_path: str = "none",
+        bind_address: Optional[str] = None,
     ):
         """
         :param ports: Mapping { remote port -> local port }
+        :param bind_address: A local address to bind as described in `ssh(1)`, a hostname or an IP.
+            If `None`, then the socket is bound in accordance with the `GatewayPorts` setting:
+            `no` (the default) means loopback only, `yes` means all interfaces, see `ssh_config(5)`
+            for details.
         """
         self.host = host
         self.id_rsa_path = id_rsa_path
@@ -31,6 +36,7 @@ class SSHTunnel:
         self.control_sock_path = control_sock_path
         self.options = options
         self.ssh_config_path = ssh_config_path
+        self.bind_address = bind_address
 
     def open(self):
         # ControlMaster and ControlPath are always set
@@ -48,8 +54,12 @@ class SSHTunnel:
         ]
         for k, v in self.options.items():
             command += ["-o", f"{k}={v}"]
+        if self.bind_address is not None:
+            host_local = f"{self.bind_address}:"
+        else:
+            host_local = ""
         for port_remote, port_local in self.ports.items():
-            command += ["-L", f"{port_local}:localhost:{port_remote}"]
+            command += ["-L", f"{host_local}{port_local}:localhost:{port_remote}"]
         command += [self.host]
         # Using stderr=subprocess.PIPE may block subprocess.run.
         # Redirect stderr to file to get ssh error message
@@ -154,6 +164,7 @@ class ClientTunnel(SSHTunnel):
         id_rsa_path: PathLike,
         ssh_config_path: str,
         control_sock_path: Optional[str] = None,
+        bind_address: Optional[str] = None,
     ):
         if control_sock_path is None:
             self.temp_dir = tempfile.TemporaryDirectory()
@@ -165,4 +176,5 @@ class ClientTunnel(SSHTunnel):
             control_sock_path=control_sock_path,
             options={},
             ssh_config_path=ssh_config_path,
+            bind_address=bind_address,
         )
