@@ -396,6 +396,7 @@ def _process_provisioning_with_shim(
         image_name=job_spec.image_name,
         container_name=job_model.job_name,
         # Images may use non-root users but dstack requires root, so force it.
+        # TODO(#1535): support non-root images properly
         container_user="root",
         shm_size=job_spec.requirements.resources.shm_size,
         public_keys=public_keys,
