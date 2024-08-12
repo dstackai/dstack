@@ -1,0 +1,13 @@
+type: service
+# This service deploys embeddings model and reranker model with Infinity. Learn more at https://dstack.ai/examples/infinity/
+
+image: michaelf34/infinity:latest
+env:
+  - INFINITY_MODEL_ID=BAAI/bge-small-en-v1.5;BAAI/bge-reranker-base;
+  - INFINITY_PORT=8000
+commands:
+  - infinity_emb v2
+port: 8000
+
+resources:
+  gpu: 16GB
