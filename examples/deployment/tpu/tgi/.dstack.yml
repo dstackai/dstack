@@ -2,7 +2,7 @@ type: dev-environment
 name: tpu-vscode
 # Launches a dev environment to play with TGI
 # Refer to Note section in README.md for more information about the image.
-image: sjbbihan/optimum-tpu:latest_beta
+image: sjbbihan/optimum-tpu:latest
 
 ide: vscode
 
