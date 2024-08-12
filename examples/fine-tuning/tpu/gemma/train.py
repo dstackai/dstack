@@ -89,7 +89,7 @@ def create_and_prepare_trainer(model, dataset, args):
 
     # Set up the trainer
     trainer = SFTTrainer(
-        model=args.model_name,
+        model=model,
         train_dataset=data,
         args=TrainingArguments(
             per_device_train_batch_size=args.per_device_train_batch_size,
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     model, tokenizer = create_and_prepare_model(args)
     trainer = create_and_prepare_trainer(model, dataset, args)
     trainer.train()
-    if args.push_to_hub is True:
+    if args.push_to_hub:
         kwargs = {
             "finetuned_from": args.model_name,
             "dataset": args.dataset_name,
