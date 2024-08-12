@@ -37,7 +37,7 @@ Your folder can be a regular local folder or a Git repo.
     
     python: "3.11"
     # Uncomment to use a custom Docker image
-    #image: dstackai/base:py3.10-0.4-cuda-12.1
+    #image: dstackai/base:py3.10-0.5-cuda-12.1
     
     ide: vscode
     
@@ -96,7 +96,7 @@ Your folder can be a regular local folder or a Git repo.
     
     python: "3.11"
     # Uncomment to use a custom Docker image
-    #image: dstackai/base:py3.10-0.4-cuda-12.1
+    #image: dstackai/base:py3.10-0.5-cuda-12.1
     
     # Commands of the task
     commands:
@@ -170,7 +170,7 @@ Your folder can be a regular local folder or a Git repo.
     
     python: "3.11"
     # Uncomment to use a custom Docker image
-    #image: dstackai/base:py3.10-0.4-cuda-12.1
+    #image: dstackai/base:py3.10-0.5-cuda-12.1
     
     # Commands of the service
     commands:

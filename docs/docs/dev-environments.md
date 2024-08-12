@@ -19,7 +19,7 @@ name: vscode
 
 python: "3.11"
 # Uncomment to use a custom Docker image
-#image: dstackai/base:py3.10-0.4-cuda-12.1
+#image: dstackai/base:py3.10-0.5-cuda-12.1
 
 ide: vscode
 
