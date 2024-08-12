@@ -501,6 +501,8 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 
 func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 	return []string{
+		// TODO(#1535): support non-root images properly
+		"mkdir -p /root && chown root:root /root && export HOME=/root",
 		// note: &> redirection doesn't work in /bin/sh
 		// check in sshd is here, install if not
 		"if ! command -v sshd >/dev/null 2>&1; then { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server; } || { yum -y install openssh-server; }; fi",

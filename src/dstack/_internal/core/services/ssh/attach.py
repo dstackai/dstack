@@ -83,7 +83,7 @@ class SSHAttach:
             self.container_config = {
                 "HostName": "localhost",
                 "Port": 10022,
-                "User": "root",
+                "User": "root",  # TODO(#1535): support non-root images properly
                 "IdentityFile": id_rsa_path,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
