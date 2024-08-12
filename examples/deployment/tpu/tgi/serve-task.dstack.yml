@@ -1,10 +1,11 @@
 type: task
-# This task runs Mistral-7B with TGI
-
-image: huggingface/optimum-tpu:latest
+name: tpu-task
+# This task runs Meta-Llama-3.1-8B with TGI
+# Refer to Note section in README.md for more information about the image.
+image: sjbbihan/optimum-tpu:latest
 env:
   - HUGGING_FACE_HUB_TOKEN
-  - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.2
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B
 commands:
   - text-generation-launcher --port 8000 --max-concurrent-requests 4 --max-input-tokens 128 --max-total-tokens 150 --max-batch-prefill-tokens 128
 ports:
