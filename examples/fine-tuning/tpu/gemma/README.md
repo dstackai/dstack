@@ -10,13 +10,13 @@ Before following this tutorial, ensure you've [installed](https://dstack.ai/docs
 ## Training configuration recipe
 
 `dstack`'s [training script](train.py) reads the model, LoRA and dataset arguments, as well as trainer configuration from YAML file.
-This file can be found at [examples/fine-tuning/tpu/config.yaml](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/tpu/config.yaml). 
+This file can be found at [examples/fine-tuning/tpu/gemma/config.yaml](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/tpu/gemma/config.yaml). 
 You can modify it as needed.
 
 ## Training
 
 The easiest way to run a training script with `dstack` is by creating a task configuration file.
-This file can be found at [examples/fine-tuning/tpu/train.dstack.yml](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/tpu/train.dstack.yml).
+This file can be found at [examples/fine-tuning/tpu/gemma/train.dstack.yml](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/tpu/gemma/train.dstack.yml).
 Below is its content:
 ```yaml
 type: task
@@ -29,8 +29,8 @@ env:
 commands:
   - git clone https://github.com/huggingface/optimum-tpu.git
   - mkdir -p optimum-tpu/examples/custom/
-  - cp examples/fine-tuning/tpu/train.py optimum-tpu/examples/custom/train.py
-  - cp examples/fine-tuning/tpu/config.yaml optimum-tpu/examples/custom/config.yaml
+  - cp examples/fine-tuning/tpu/gemma/train.py optimum-tpu/examples/custom/train.py
+  - cp examples/fine-tuning/tpu/gemma/config.yaml optimum-tpu/examples/custom/config.yaml
   - cd optimum-tpu
   - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
   - pip install trl peft
@@ -48,7 +48,7 @@ To run the task, use dstack apply:
 ```shell
 HUGGING_FACE_HUB_TOKEN=...
 
-dstack apply -f examples/fine-tuning/tpu/train.dstack.yml
+dstack apply -f examples/fine-tuning/tpu/gemma/train.dstack.yml
 ```
 ## Dev environment
 
@@ -58,12 +58,12 @@ If you'd like to play with the example using a dev environment, run
 ```shell
 HUGGING_FACE_HUB_TOKEN=...
 
-dstack apply -f examples/fine-tuning/tpu/.dstack.yml
+dstack apply -f examples/fine-tuning/tpu/gemma/.dstack.yml
 ```
 
 ## Source code
 
-The source-code of this example can be found in  [`https://github.com/dstackai/dstack/examples/fine-tuning/tpu`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/tpu).
+The source-code of this example can be found in  [`https://github.com/dstackai/dstack/examples/fine-tuning/tpu/gemma`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/tpu/gemma).
 
 ## Contributing
 
