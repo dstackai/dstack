@@ -1,4 +1,5 @@
 name: Build Docker & cloud images
+run-name: Build Docker & cloud images ${{ inputs.image_version }}${{ inputs.staging && ' (staging)' || '' }}
 
 on:
   workflow_dispatch:
