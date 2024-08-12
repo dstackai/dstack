@@ -23,15 +23,20 @@ Alignment Handbook provides all the code you need to run CPT, SFT, DPO, and ORPO
 such as `transformers`, `peft`, `accelerate`, `trl`. All you need to do is to modify recipes for accelerate and
 training, and run appropriate script.
 
-For instance, if you want to QLoRA fine-tune Gemma 7B model on your own SFT dataset hosted on Hugging Face Hub, you can
-prepare a `yaml` config file as [config.yaml](config.yaml). This config is based on the Zephyr-7B-Gemma recipe except
-the following modification:
+For instance, if you want to QLoRA fine-tune LLaMA3.1 8B model on your own SFT dataset hosted on Hugging Face Hub, you can
+prepare a `yaml` config file as [config.yaml](llama3.1_8b/config.yaml). This config is based on the Zephyr-7B-Gemma recipe 
+except the following modification:
 
+- `tokenizer_name_or_path` field to leverage the tokenizer used in LLaMA3.1 instruct models.
+- `chat_template` field to employ [OpenAI's ChatML template](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/chat-markup-language) instead of the official [LLaMA3.1 instruct prompt template](https://llama.meta.com/docs/model-cards-and-prompt-formats/llama3_1/).
 - `dataset_mixer` field to point which SFT dataset to be used.
 - `hub_model_id` and `output_dir` fields to point where the model and its checkpoints should be saved.
 - `LoRA arguments` related fields to indicate that this fine-tuning is based on QLoRA methodology.
 
-With the `config.yaml` file configured, you can run the following command to QLoRA fine-tune Gemma 7B model on 2
+> [!NOTE]
+> Feel free to use the official LLaMA3.1 instruct prompt template. As of writing this tutorial, ChatML template was chosen becuase I found it works much better on my experiments by observing train/loss metrics over time.
+
+With the `config.yaml` file configured, you can run the following command to QLoRA fine-tune an LLM model on 2
 GPUs:
 
 ```shell
@@ -49,7 +54,7 @@ alignment-handbook's [official repository](https://github.com/huggingface/alignm
 
 This example demonstrate how to run an Alignment Handbook recipe via `dstack`.
 
-First, define the [`train.dstack.yaml`](train.dstack.yaml) task configuration file as following:
+First, define the [`train.dstack.yaml`](llama3.1_8b/train.dstack.yaml) task configuration file as following:
 
 ```yaml
 type: task
@@ -62,9 +67,9 @@ env:
 
 commands:
   - conda install cuda
-  - git clone https://github.com/huggingface/alignment-handbook.git
+  - git clone https://github.com/deep-diver/alignment-handbook.git
   - mkdir -p alignment-handbook/recipes/custom/
-  - cp config.yaml alignment-handbook/recipes/custom/config.yaml
+  - cp llama3.1_8b/config.yaml alignment-handbook/recipes/custom/config.yaml
 
   - cd alignment-handbook
   - python -m pip install .
@@ -92,6 +97,9 @@ resources:
 > [!NOTE]
 > Feel free to adjust `resources` to specify the required resources.
 
+> [!NOTE]
+> This tutorial uses [the fork](https://github.com/deep-diver/alignment-handbook.git) of the official [Alignment Handbook repository](https://github.com/huggingface/alignment-handbook) which contains the fixes of a bug that blocks running SFT with the current version of `transformers`. This tutorial will be updated when the [PR of the fixes](https://github.com/huggingface/alignment-handbook/pull/191) gets merged into the main branch.
+
 The task clones the `huggingface/alignment-handbook` repo, and copies our local `config.yaml` to the recipies subfolder.
 Then, the task installs dependencies, and launches the recipe.
 
@@ -102,10 +110,11 @@ To run the task, use the following command:
 ```shell
 HUGGING_FACE_HUB_TOKEN=<...> \
 WANDB_API_KEY=<...> \
-dstack run . -f examples/fine-tuning/alignment-handbook/train.dstack.yaml
+dstack run . -f llama3.1_8b/train.dstack.yaml
 ```
 
-## Results
+## Resources
 
+- [gemma7b](gemma7b): Alignment Handbook recipe for fine-tuning Gemma 7B model and dstack's Task yaml file.
 - [merged_ds_coding](https://huggingface.co/datasets/chansung/merged_ds_coding): SFT dataset for solely coding task. It roughly contains 60k training dataset.
 - [chansung/coding_llamaduo_60k_v0.2](https://huggingface.co/chansung/coding_llamaduo_60k_v0.2): QLoRA adapter for Gemma 7B with the exactly the same configuration as in [`config.yaml`](./config.yaml). This adapter is fine-tuned on the `merged_ds_coding` dataset with 2xA6000 GPUs via `dstack` Sky.

@@ -1,0 +1,58 @@
+# Model arguments
+model_name_or_path: meta-llama/Meta-Llama-3-8B
+model_revision: main
+tokenizer_name_or_path: meta-llama/Meta-Llama-3-8B-Instruct
+torch_dtype: bfloat16
+attn_implementation: flash_attention_2
+
+chat_template: "{% if messages[0]['role'] == 'user' or messages[0]['role'] == 'system' %}{{ bos_token }}{% endif %}{% for message in messages %}{{ '<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n' }}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% elif messages[-1]['role'] == 'assistant' %}{{ eos_token }}{% endif %}"
+
+# LoRA arguments
+load_in_4bit: true
+use_peft: true
+lora_r: 32
+lora_alpha: 64
+lora_dropout: 0.05
+
+# Data training arguments
+dataset_mixer:
+  chansung/merged_ds_coding: 1.0
+dataset_splits:
+- train_sft
+- test_sft
+preprocessing_num_workers: 12
+
+# SFT trainer config
+bf16: true
+dataset_kwargs:
+  add_special_tokens: false  # We already wrap <bos> and <eos> in the chat template
+  append_concat_token: false # No need to add <eos> across samples
+do_eval: true
+evaluation_strategy: epoch
+gradient_accumulation_steps: 2
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+hub_model_id: llama3.1-8b-coding
+hub_strategy: every_save
+learning_rate: 2.0e-03
+log_level: info
+logging_steps: 5
+logging_strategy: steps
+lr_scheduler_type: cosine
+max_seq_length: 1024
+max_steps: -1
+num_train_epochs: 10
+output_dir: llama3.1-8b-coding
+overwrite_output_dir: true
+per_device_eval_batch_size: 4
+per_device_train_batch_size: 8
+push_to_hub: true
+report_to:
+- tensorboard
+- wandb
+save_strategy: "steps"
+save_steps: 100
+save_total_limit: 1
+seed: 42
+warmup_ratio: 0.1

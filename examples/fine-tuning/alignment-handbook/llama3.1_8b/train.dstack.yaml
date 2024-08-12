@@ -1,0 +1,33 @@
+type: task
+
+python: "3.11"
+
+env:
+  - FT_MODEL_CONFIG_PATH
+  - NUM_OF_ACCELERATORS
+
+  - HUGGING_FACE_HUB_TOKEN
+  - WANDB_API_KEY
+
+commands:
+  - conda install cuda
+  - git clone https://github.com/deep-diver/alignment-handbook.git
+  - mkdir -p alignment-handbook/recipes/custom/
+  - cp "$FT_MODEL_CONFIG_PATH" alignment-handbook/recipes/custom/config.yaml
+
+  - cd alignment-handbook
+  - python -m pip install .
+  - python -m pip install flash-attn --no-build-isolation
+
+  - pip install wandb
+  - wandb login $WANDB_API_KEY
+
+  - ACCELERATE_LOG_LEVEL=info accelerate launch --config_file recipes/accelerate_configs/multi_gpu.yaml --num_processes=$NUM_OF_ACCELERATORS scripts/run_sft.py recipes/custom/config.yaml
+ports:
+  - 6006
+  
+resources:
+  gpu:
+    memory: 40GB
+    name: A100
+    count: 2
