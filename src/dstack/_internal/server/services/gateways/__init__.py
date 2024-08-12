@@ -213,27 +213,29 @@ async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways
         backend = await get_project_backend_by_type_or_error(project, gateway.backend.type)
         tasks.append(_terminate_gateway(session=session, gateway=gateway, backend=backend))
         gateways.append(gateway)
+    gateways_ids = [g.id for g in gateways]
     logger.info("Deleting gateways: %s", [g.name for g in gateways])
-    # terminate in parallel
-    # FIXME: not safe to share session between tasks – sqlalchemy can error
-    terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
-    for gateway, error in zip(gateways, terminate_results):
-        if isinstance(error, Exception):
-            logger.exception(
-                "Error when deleting gateway compute for %s",
-                gateway.name,
-                exc_info=(type(error), error, error.__traceback__),
-            )
-            continue  # keep gateway
-        if gateway.gateway_compute is not None:
-            await gateway_connections_pool.remove(gateway.gateway_compute.ip_address)
-            gateway.gateway_compute.active = False
-            gateway.gateway_compute.deleted = True
-            session.add(gateway.gateway_compute)
-        await session.delete(gateway)
-    for gateway in gateways:
-        PROCESSING_GATEWAYS_IDS.remove(gateway.id)
-    await session.commit()
+    try:
+        # terminate in parallel
+        # FIXME: not safe to share session between tasks – sqlalchemy can error
+        terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
+        for gateway, error in zip(gateways, terminate_results):
+            if isinstance(error, Exception):
+                logger.exception(
+                    "Error when deleting gateway compute for %s",
+                    gateway.name,
+                    exc_info=(type(error), error, error.__traceback__),
+                )
+                continue  # keep gateway
+            if gateway.gateway_compute is not None:
+                await gateway_connections_pool.remove(gateway.gateway_compute.ip_address)
+                gateway.gateway_compute.active = False
+                gateway.gateway_compute.deleted = True
+                session.add(gateway.gateway_compute)
+            await session.delete(gateway)
+        await session.commit()
+    finally:
+        PROCESSING_GATEWAYS_IDS.difference_update(gateways_ids)
 
 
 async def _terminate_gateway(session: AsyncSession, gateway: GatewayModel, backend: Backend):

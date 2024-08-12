@@ -36,9 +36,10 @@ async def process_terminating_jobs():
                 return
             TERMINATING_PROCESSING_JOBS_IDS.add(job_model.id)
     try:
-        await _process_job(job_id=job_model.id)
+        job_model_id = job_model.id
+        await _process_job(job_id=job_model_id)
     finally:
-        TERMINATING_PROCESSING_JOBS_IDS.remove(job_model.id)
+        TERMINATING_PROCESSING_JOBS_IDS.remove(job_model_id)
 
 
 async def _process_job(job_id: uuid.UUID):
