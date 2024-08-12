@@ -509,8 +509,8 @@ async def stop_runs(
 
 
 async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
-    await wait_to_lock(PROCESSING_RUNS_LOCK, PROCESSING_RUNS_IDS, run.id)
-
+    run_id = run.id  # run.id won't load if transaction is rolled back
+    await wait_to_lock(PROCESSING_RUNS_LOCK, PROCESSING_RUNS_IDS, run_id)
     try:
         await session.refresh(run)
         if run.status.is_finished():
@@ -529,7 +529,7 @@ async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
         run.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
     finally:
-        PROCESSING_RUNS_IDS.remove(run.id)
+        PROCESSING_RUNS_IDS.remove(run_id)
 
 
 async def delete_runs(
