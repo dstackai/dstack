@@ -1,6 +1,6 @@
 import pytest
 
-from dstack._internal.utils.interpolator import VariablesInterpolator
+from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 
 
 def get_interpolator():
@@ -35,17 +35,17 @@ class TestVariablesInterpolator:
         assert ["env.name"] == missing
 
     def test_unclosed_pattern(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InterpolatorError):
             get_interpolator().interpolate("${{ secrets.password }")
 
     def test_illegal_name(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(InterpolatorError):
             get_interpolator().interpolate("${{ secrets.pass-word }}")
-        with pytest.raises(ValueError):
+        with pytest.raises(InterpolatorError):
             get_interpolator().interpolate("${{ .password }}")
-        with pytest.raises(ValueError):
+        with pytest.raises(InterpolatorError):
             get_interpolator().interpolate("${{ password. }}")
-        with pytest.raises(ValueError):
+        with pytest.raises(InterpolatorError):
             get_interpolator().interpolate("${{ secrets.password.hash }}")
-        with pytest.raises(ValueError):
+        with pytest.raises(InterpolatorError):
             get_interpolator().interpolate("${{ secrets.007 }}")

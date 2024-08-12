@@ -6,6 +6,7 @@ import pytest
 
 from dstack._internal.cli.services.configurators import get_run_configurator_class
 from dstack._internal.core.errors import ConfigurationError
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     BaseRunConfiguration,
     PortMapping,
@@ -60,6 +61,26 @@ class TestRunConfigurator:
         modified, args = apply_args(conf, ["-p", "*:8000"])
         conf.ports = [PortMapping(local_port=None, container_port=8000)]
         assert modified.dict() == conf.dict()
+
+    def test_interpolates_env(self):
+        conf = TaskConfiguration(
+            image="my_image",
+            registry_auth=RegistryAuth(
+                username="${{ env.REGISTRY_USERNAME }}",
+                password="${{ env.REGISTRY_PASSWORD }}",
+            ),
+            env=Env.parse_obj(
+                {
+                    "REGISTRY_USERNAME": "test_user",
+                    "REGISTRY_PASSWORD": "test_password",
+                }
+            ),
+        )
+        modified, args = apply_args(conf, [])
+        assert modified.registry_auth == RegistryAuth(
+            username="test_user",
+            password="test_password",
+        )
 
 
 def apply_args(
