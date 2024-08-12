@@ -4,6 +4,7 @@
     "aws_secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
     "region": "eu-west-1",
     "ssh_username": "ubuntu",
+    "ssh_clear_authorized_keys": true,
     "base_ami": "ami-0cffefff2d52e0a23",
     "instance_type": "c5.large",
     "subnet_id": "subnet-c39cb6a5",

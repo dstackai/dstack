@@ -18,7 +18,8 @@
       "base_image_ocid": "ocid1.image.oc1.eu-frankfurt-1.aaaaaaaaxroekfbow3kdrdjlwao6tsxxfcb23xmqrdjtjcay2ow52eijvzqa",
       "image_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version`}}",
       "instance_name": "packer-{{user `build_prefix`}}dstack-cuda-{{user `image_version`}}",
-      "ssh_username": "ubuntu"
+      "ssh_username": "ubuntu",
+      "ssh_clear_authorized_keys": true
     }
   ],
   "provisioners": [

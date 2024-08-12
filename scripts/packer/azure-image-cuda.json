@@ -24,6 +24,7 @@
     "image_publisher": "canonical",
     "image_offer": "0001-com-ubuntu-server-jammy",
     "image_sku": "22_04-lts-gen2",
+    "ssh_clear_authorized_keys": true,
     "azure_tags": {
         "Name": "DSTACK-CUDA"
     },

@@ -13,6 +13,7 @@
       "image_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
       "instance_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
       "ssh_username": "ubuntu",
+      "ssh_clear_authorized_keys": true,
       "zone": "us-central1-a"
     }
   ],

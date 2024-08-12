@@ -24,6 +24,7 @@
       "source_ami": "{{user `base_ami`}}",
       "instance_type": "{{user `instance_type`}}",
       "ssh_username": "{{user `ssh_username`}}",
+      "ssh_clear_authorized_keys": true,
       "ami_name": "{{user `build_prefix`}}dstack-cuda-{{user `image_version` | clean_resource_name}}",
       "associate_public_ip_address": true,
       "ami_regions": "{{user `ami_regions`}}",
