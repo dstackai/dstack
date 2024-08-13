@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Box, Button, Link } from 'components';
+import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { goToUrl } from 'libs';
 import { useGithubAuthorizeMutation } from 'services/auth';
@@ -24,30 +25,32 @@ export const LoginByGithub: React.FC = () => {
     };
 
     return (
-        <Box margin={{ vertical: 'xxxl' }} textAlign="center" color="inherit">
-            <div className={styles.signIn}>
-                <Box variant="h1">{t('auth.sign_in_to_dstack')}</Box>
+        <UnauthorizedLayout>
+            <Box margin={{ vertical: 'xxxl' }} textAlign="center" color="inherit">
+                <div className={styles.signIn}>
+                    <Box variant="h1">{t('auth.sign_in_to_dstack')}</Box>
 
-                <Button onClick={signInClick} disabled={isLoading} loading={isLoading} variant="primary">
-                    <span className={styles.loginButtonInner}>
-                        <GithubIcon />
-                        {t('common.login_github')}
-                    </span>
-                </Button>
+                    <Button onClick={signInClick} disabled={isLoading} loading={isLoading} variant="primary">
+                        <span className={styles.loginButtonInner}>
+                            <GithubIcon />
+                            {t('common.login_github')}
+                        </span>
+                    </Button>
 
-                <div className={styles.links}>
-                    <Box color="text-body-secondary">
-                        By clicking you agree to{' '}
-                        <Link href="https://dstack.ai/terms/" target="_blank">
-                            Terms of service
-                        </Link>{' '}
-                        and{' '}
-                        <Link href="https://dstack.ai/privacy/" target="_blank">
-                            Privacy policy
-                        </Link>
-                    </Box>
+                    <div className={styles.links}>
+                        <Box color="text-body-secondary">
+                            By clicking you agree to{' '}
+                            <Link href="https://dstack.ai/terms/" target="_blank">
+                                Terms of service
+                            </Link>{' '}
+                            and{' '}
+                            <Link href="https://dstack.ai/privacy/" target="_blank">
+                                Privacy policy
+                            </Link>
+                        </Box>
+                    </div>
                 </div>
-            </div>
-        </Box>
+            </Box>
+        </UnauthorizedLayout>
     );
 };
