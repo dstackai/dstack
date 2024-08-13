@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import cn from 'classnames';
 
 import { Box, Button, FormInput, SpaceBetween } from 'components';
+import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { useAppDispatch } from 'hooks';
 import { useCheckAuthTokenMutation } from 'services/user';
@@ -44,34 +45,36 @@ export const LoginByTokenForm: React.FC<Props> = ({ className }) => {
     };
 
     return (
-        <div className={cn(styles.form, className)}>
-            <SpaceBetween size="xl">
-                <Box variant="h1" textAlign="center">
-                    {t('auth.sign_in_to_dstack_enterprise')}
-                </Box>
+        <UnauthorizedLayout>
+            <div className={cn(styles.form, className)}>
+                <SpaceBetween size="xl">
+                    <Box variant="h1" textAlign="center">
+                        {t('auth.sign_in_to_dstack_enterprise')}
+                    </Box>
 
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    <div className={styles.token}>
-                        <div className={styles.fieldWrap}>
-                            <FormInput
-                                placeholder={t('users.token')}
-                                constraintText={t('users.token_description')}
-                                control={control}
-                                name="token"
-                                disabled={isLoading}
-                                rules={{ required: t('validation.required') }}
-                                autoComplete="off"
-                            />
-                        </div>
+                    <form onSubmit={handleSubmit(onSubmit)}>
+                        <div className={styles.token}>
+                            <div className={styles.fieldWrap}>
+                                <FormInput
+                                    placeholder={t('users.token')}
+                                    constraintText={t('users.token_description')}
+                                    control={control}
+                                    name="token"
+                                    disabled={isLoading}
+                                    rules={{ required: t('validation.required') }}
+                                    autoComplete="off"
+                                />
+                            </div>
 
-                        <div className={styles.buttonWrap}>
-                            <Button disabled={isLoading} loading={isLoading} variant="primary">
-                                {t('common.login')}
-                            </Button>
+                            <div className={styles.buttonWrap}>
+                                <Button disabled={isLoading} loading={isLoading} variant="primary">
+                                    {t('common.login')}
+                                </Button>
+                            </div>
                         </div>
-                    </div>
-                </form>
-            </SpaceBetween>
-        </div>
+                    </form>
+                </SpaceBetween>
+            </div>
+        </UnauthorizedLayout>
     );
 };

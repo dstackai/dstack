@@ -1,3 +1,5 @@
+@use '@cloudscape-design/design-tokens/index' as awsui;
+
 .signIn {
     display: flex;
     flex-direction: column;
@@ -10,6 +12,7 @@
         //max-width: 270px;
         background-color: rgb(0, 0, 0) !important;
         border-color: rgb(0, 0, 0) !important;
+        color: awsui.$color-text-interactive-inverted-hover !important;
 
         &:hover {
             background-color: rgba(0, 0, 0, .85) !important;

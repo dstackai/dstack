@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { NavigateLink } from 'components';
+import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { useAppDispatch } from 'hooks';
 import { ROUTES } from 'routes';
@@ -46,10 +47,16 @@ export const LoginByGithubCallback: React.FC = () => {
 
     if (isInvalidCode)
         return (
-            <AuthErrorMessage title={t('auth.authorization_failed')}>
-                <NavigateLink href={ROUTES.BASE}>{t('auth.try_again')}</NavigateLink>
-            </AuthErrorMessage>
+            <UnauthorizedLayout>
+                <AuthErrorMessage title={t('auth.authorization_failed')}>
+                    <NavigateLink href={ROUTES.BASE}>{t('auth.try_again')}</NavigateLink>
+                </AuthErrorMessage>
+            </UnauthorizedLayout>
         );
 
-    return <Loading />;
+    return (
+        <UnauthorizedLayout>
+            <Loading />;
+        </UnauthorizedLayout>
+    );
 };
