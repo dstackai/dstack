@@ -137,6 +137,5 @@ particularly useful for autoscalable services or distributed tasks.
 
 Using [volumes](../../docs/concepts/volumes.md) not only optimizes inference cold start times but also enhances the
 efficiency of data and model checkpoint loading during training and fine-tuning.
-
 Whether you're running [tasks](../../docs/tasks.md) or [dev environments](../../docs/dev-environments.md), leveraging
 volumes can significantly streamline your workflow and improve overall performance.
