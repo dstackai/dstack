@@ -132,11 +132,11 @@ model:
 In this case, `dstack` attaches the specified volume to each new replica. This ensures the model is downloaded only
 once, reducing cold start time in proportion to the model size.
 
-Using [volumes](../../docs/concepts/volumes.md) can optimize not only inference cold start times but also the loading of data and model checkpoints during
-training and fine-tuning, e.g., via [tasks](../../docs/tasks.md) or [dev environments](../../docs/dev-environments.md).
-
 RunPod, in turn, optimizes cold starts through aggressive caching of Docker images. Starting a new instance with RunPod,
 especially if you have used a specific Docker image before, is exceptionally fast.
 
-While RunPod offers affordable GPU prices and reliable service, `dstack` simplifies its use for all workloads, from
-development and training to model inference.
+Using [volumes](../../docs/concepts/volumes.md) can optimize not only inference cold start times but also the loading of data and model checkpoints during
+training and fine-tuning, e.g., via [tasks](../../docs/tasks.md) or [dev environments](../../docs/dev-environments.md).
+
+Also, a great feature of RunPod is that volumes can be attached to multiple containers simultaneously, making them
+useful for auto-scalable services or distributed tasks.
