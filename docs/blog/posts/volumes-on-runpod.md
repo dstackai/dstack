@@ -8,7 +8,10 @@ slug: volumes-on-runpod
 # Optimizing inference cold starts on RunPod with volumes
 
 Deploying custom models in the cloud often faces the challenge of cold start times, including the time to provision a
-new instance and download the model. Let's explore how `dstack` optimizes this process using volumes, with an example of
+new instance and download the model. This is especially relevant for services with autoscaling when new model replicas
+need to be provisioned quickly. 
+
+Let's explore how `dstack` optimizes this process using volumes, with an example of
 deploying a model on RunPod.
 
 <!-- more -->
@@ -49,7 +52,7 @@ model:
 
 </div>
 
-When you run `dstack apply`, it creates a public endpoint with one service replica. dstack will then automatically scale
+When you run `dstack apply`, it creates a public endpoint with one service replica. `dstack` will then automatically scale
 the service by adjusting the number of replicas based on traffic.
 
 When starting each replica, `text-generation-launcher` downloads the model to the `/data` folder. For Llama 3.1 8B, this
@@ -58,7 +61,7 @@ auto-scaling efficiency.
 
 Great news: RunPod supports network volumes, which we can use for caching models across multiple replicas.
 
-With dstack, you can create a RunPod volume using the following configuration:
+With `dstack`, you can create a RunPod volume using the following configuration:
 
 <div editor-title="examples/mist/volumes/runpod.dstack.yml">
 
