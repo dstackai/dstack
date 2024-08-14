@@ -1,3 +1,4 @@
+build~=1.2  # For building dstack-gateway wheels
 pre-commit
 httpx>=0.23
 pytest~=7.2
