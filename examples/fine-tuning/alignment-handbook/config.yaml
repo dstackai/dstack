@@ -40,13 +40,13 @@ log_level: info
 logging_steps: 5
 logging_strategy: steps
 lr_scheduler_type: cosine
-max_seq_length: 1024
+max_seq_length: 256
 max_steps: -1
 num_train_epochs: 10
 output_dir: llama3.1-8b-coding
 overwrite_output_dir: true
-per_device_eval_batch_size: 4
-per_device_train_batch_size: 8
+per_device_eval_batch_size: 2
+per_device_train_batch_size: 2
 push_to_hub: true
 report_to:
 - tensorboard

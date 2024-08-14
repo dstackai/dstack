@@ -110,7 +110,7 @@ To run the task, use the following command:
 ```shell
 HUGGING_FACE_HUB_TOKEN=<...> \
 WANDB_API_KEY=<...> \
-dstack run . -f llama3.1_8b/train.dstack.yaml
+dstack run . -f train.dstack.yaml
 ```
 
 ## Resources

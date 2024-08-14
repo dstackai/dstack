@@ -13,7 +13,7 @@ commands:
   - conda install cuda
   - git clone https://github.com/deep-diver/alignment-handbook.git
   - mkdir -p alignment-handbook/recipes/custom/
-  - cp "$FT_MODEL_CONFIG_PATH" alignment-handbook/recipes/custom/config.yaml
+  - cp config.yaml alignment-handbook/recipes/custom/config.yaml
 
   - cd alignment-handbook
   - python -m pip install .
@@ -28,6 +28,5 @@ ports:
   
 resources:
   gpu:
-    memory: 40GB
-    name: A100
-    count: 2
+    memory: 24GB..
+    count: 1
