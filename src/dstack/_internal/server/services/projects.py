@@ -319,6 +319,12 @@ def project_model_to_project(
             if configurator is None:
                 logger.warning("Configurator for backend %s not found", b.type)
                 continue
+            if not b.auth.decrypted:
+                logger.warning(
+                    "Failed to decrypt creds for %s backend. Backend will be ignored.",
+                    b.type.value,
+                )
+                continue
             config_info = configurator.get_config_info(model=b, include_creds=False)
             if is_core_model_instance(config_info, DstackConfigInfo):
                 for backend_type in config_info.base_backends:

@@ -81,7 +81,7 @@ class LambdaConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> LambdaConfig:
         return LambdaConfig.__response__(
             **json.loads(model.config),
-            creds=LambdaCreds.parse_raw(model.auth),
+            creds=LambdaCreds.parse_raw(model.auth.plaintext),
         )
 
     def _validate_lambda_api_key(self, api_key: str):

@@ -189,11 +189,8 @@ async def update_backend(
     configurator = get_configurator(config.type)
     if configurator is None:
         raise BackendNotAvailable()
-    config_info = await get_config_info(
-        project=project,
-        backend_type=configurator.TYPE,
-    )
-    if config_info is None:
+    backend_exists = any(configurator.TYPE == b.type for b in project.backends)
+    if not backend_exists:
         raise ServerClientError("Backend does not exist")
     await run_async(configurator.get_config_values, config)
     backend = await run_async(configurator.create_backend, project=project, config=config)
@@ -219,9 +216,15 @@ async def get_config_info(
     configurator = get_configurator(backend_type)
     if configurator is None:
         raise BackendNotAvailable()
-    for b in project.backends:
-        if b.type == backend_type:
-            return configurator.get_config_info(b, include_creds=True)
+    for backend_model in project.backends:
+        if not backend_model.auth.decrypted:
+            logger.warning(
+                "Failed to decrypt creds for %s backend. Backend will be ignored.",
+                backend_model.type,
+            )
+            continue
+        if backend_model.type == backend_type:
+            return configurator.get_config_info(backend_model, include_creds=True)
     return None
 
 
@@ -265,7 +268,13 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
             if configurator is None:
                 logger.warning(
                     "Missing dependencies for %s backend. Backend will be ignored.",
-                    backend_model.type,
+                    backend_model.type.value,
+                )
+                continue
+            if not backend_model.auth.decrypted:
+                logger.warning(
+                    "Failed to decrypt creds for %s backend. Backend will be ignored.",
+                    backend_model.type.value,
                 )
                 continue
             try:
@@ -273,7 +282,7 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
             except BackendInvalidCredentialsError:
                 logger.warning(
                     "Credentials for %s backend are invalid. Backend will be ignored.",
-                    backend_model.type,
+                    backend_model.type.value,
                 )
                 continue
             backends.append((backend_model, backend))

@@ -136,7 +136,7 @@ class OCIConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> OCIConfig:
         return OCIConfig.__response__(
             **json.loads(model.config),
-            creds=OCICreds.parse_raw(model.auth).__root__,
+            creds=OCICreds.parse_raw(model.auth.plaintext).__root__,
         )
 
     def _get_regions_element(

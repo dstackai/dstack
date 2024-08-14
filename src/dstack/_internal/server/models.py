@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import Callable, List, Optional, Union
 
 from sqlalchemy import (
     BigInteger,
@@ -25,6 +25,7 @@ from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
@@ -43,6 +44,9 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server import settings
 from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class NaiveDateTime(TypeDecorator):
@@ -63,6 +67,46 @@ class NaiveDateTime(TypeDecorator):
 
     def process_result_value(self, value, dialect):
         return value
+
+
+class DecryptedString(CoreModel):
+    plaintext: str
+    decrypted: bool = True
+
+
+_encrypt_func: Callable[[str], str]
+_decrypt_func: Callable[[str], str]
+
+
+def set_encrypt_func(encrypt_func: Callable[[str], str]):
+    global _encrypt_func
+    _encrypt_func = encrypt_func
+
+
+def set_decrypt_func(decrypt_func: Callable[[str], str]):
+    global _decrypt_func
+    _decrypt_func = decrypt_func
+
+
+class EncryptedString(TypeDecorator):
+    impl = String
+
+    cache_ok = True
+
+    def process_bind_param(self, value: Union[DecryptedString, str], dialect):
+        if isinstance(value, str):
+            plaintext = value
+        else:
+            plaintext = value.plaintext
+        return _encrypt_func(plaintext)
+
+    def process_result_value(self, value: str, dialect) -> DecryptedString:
+        try:
+            plaintext = _decrypt_func(value)
+            return DecryptedString(decrypted=True, plaintext=plaintext)
+        except Exception as e:
+            logger.warning("Failed to decrypt encrypted string: %s", repr(e))
+            return DecryptedString(decrypted=False, plaintext="")
 
 
 constraint_naming_convention = {
@@ -148,7 +192,7 @@ class BackendModel(BaseModel):
     type: Mapped[BackendType] = mapped_column(Enum(BackendType))
 
     config: Mapped[str] = mapped_column(String(20000))
-    auth: Mapped[str] = mapped_column(String(20000))
+    auth: Mapped[DecryptedString] = mapped_column(EncryptedString(20000))
 
     gateways: Mapped[List["GatewayModel"]] = relationship(back_populates="backend")
 

@@ -69,7 +69,7 @@ class NebiusConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> NebiusConfig:
         return NebiusConfig.__response__(
             **json.loads(model.config),
-            creds=NebiusCreds.parse_raw(model.auth),
+            creds=NebiusCreds.parse_raw(model.auth.plaintext),
         )
 
     def _validate_nebius_creds(self, creds: NebiusCreds):

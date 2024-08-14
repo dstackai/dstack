@@ -204,7 +204,7 @@ class GCPConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> GCPConfig:
         return GCPConfig.__response__(
             **json.loads(model.config),
-            creds=GCPCreds.parse_raw(model.auth).__root__,
+            creds=GCPCreds.parse_raw(model.auth.plaintext).__root__,
         )
 
     def _get_project_id_element(

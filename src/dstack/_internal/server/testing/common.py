@@ -43,6 +43,7 @@ from dstack._internal.core.models.volumes import (
 )
 from dstack._internal.server.models import (
     BackendModel,
+    DecryptedString,
     FleetModel,
     GatewayComputeModel,
     GatewayModel,
@@ -123,7 +124,7 @@ async def create_backend(
         project_id=project_id,
         type=backend_type,
         config=json.dumps(config),
-        auth=json.dumps(auth),
+        auth=DecryptedString(plaintext=json.dumps(auth)),
     )
     session.add(backend)
     await session.commit()

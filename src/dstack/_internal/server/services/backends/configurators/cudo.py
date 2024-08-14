@@ -78,7 +78,7 @@ class CudoConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> CudoConfig:
         return CudoConfig.__response__(
             **json.loads(model.config),
-            creds=CudoCreds.parse_raw(model.auth),
+            creds=CudoCreds.parse_raw(model.auth.plaintext),
         )
 
     def _validate_cudo_api_key(self, api_key: str):
