@@ -115,7 +115,7 @@ export const useProjectDropdown = () => {
     const paramProjectName = params.projectName;
     const { data } = useGetProjectsQuery();
     const [selectedProject, setSelectedProject] = useLocalStorageState('selected-project', data?.[0]?.project_name ?? null);
-    const { isEnterpriseAndAdmin } = useCheckAvailableProjectPermission();
+    const { isAvailableProjectManaging } = useCheckAvailableProjectPermission();
 
     const isAvailableProjectDropdown =
         ![ROUTES.PROJECT.LIST, ROUTES.ADMINISTRATION.RUNS.LIST].includes(pathname) && pathname.indexOf(ROUTES.USER.LIST) !== 0;
@@ -162,7 +162,7 @@ export const useProjectDropdown = () => {
             });
         }
 
-        if (isEnterpriseAndAdmin) {
+        if (isAvailableProjectManaging) {
             const addButton: ButtonDropdownProps.ItemOrGroup = {
                 text: t('common.create', { text: t('navigation.project') }),
                 href: ROUTES.PROJECT.ADD,
@@ -173,7 +173,7 @@ export const useProjectDropdown = () => {
         }
 
         return items;
-    }, [data, isEnterpriseAndAdmin]);
+    }, [data, isAvailableProjectManaging]);
 
     return { projectsDropdownList, selectedProject, isAvailableProjectDropdown, onFollowProject } as const;
 };
