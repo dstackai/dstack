@@ -26,3 +26,12 @@
         right: 0;
     }
 }
+
+.themeIcon {
+    stroke: none !important;
+    fill: currentColor !important;
+    transform: scale(1.5);
+    path {
+        stroke: none !important;
+    }
+}
