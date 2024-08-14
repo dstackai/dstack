@@ -41,20 +41,24 @@ import { TutorialPanel } from './TutorialPanel';
 
 import { ToolsTabs } from 'App/types';
 
+import { ReactComponent as DarkThemeIcon } from 'assets/icons/dark-theme.svg';
+import { ReactComponent as LightThemeIcon } from 'assets/icons/light-theme.svg';
+import { ReactComponent as SystemThemeIcon } from 'assets/icons/system-theme.svg';
 import logo from 'assets/images/logo.svg';
 import styles from './index.module.scss';
 
 type PortalProps = { children: React.ReactNode };
 
-const MODE_TITLES = {
-    [Mode.Dark]: 'Dark Mode',
-    [Mode.Light]: 'Light Mode',
-};
-
 const HeaderPortal = ({ children }: PortalProps) => {
     const domNode = document.querySelector('#header');
     if (domNode) return createPortal(children, domNode);
     return null;
+};
+
+const THEME_ICON_MAP: Record<Mode | 'system', React.ReactElement> = {
+    [Mode.Dark]: DarkThemeIcon,
+    [Mode.Light]: LightThemeIcon,
+    system: SystemThemeIcon,
 };
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -118,8 +122,20 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     const onChangeSystemModeToggle: SideNavigationProps['onFollow'] = (event) => {
         event.preventDefault();
-        dispatch(setSystemMode(event.detail.href as Mode));
+
+        switch (systemMode) {
+            case 'system':
+                dispatch(setSystemMode(Mode.Light));
+                return;
+            case Mode.Light:
+                dispatch(setSystemMode(Mode.Dark));
+                return;
+            default:
+                dispatch(setSystemMode(null));
+        }
     };
+
+    const ThemeIcon = THEME_ICON_MAP[systemMode];
 
     return (
         <AnnotationContext>
@@ -158,20 +174,9 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 onItemFollow: onFollowProject,
                             },
                             {
-                                type: 'menu-dropdown',
-                                text: MODE_TITLES[systemMode],
-                                items: [
-                                    {
-                                        text: MODE_TITLES[Mode.Light],
-                                        href: Mode.Light,
-                                    },
-                                    {
-                                        text: MODE_TITLES[Mode.Dark],
-                                        href: Mode.Dark,
-                                    },
-                                ],
-
-                                onItemFollow: onChangeSystemModeToggle,
+                                type: 'button',
+                                iconSvg: <ThemeIcon className={styles.themeIcon} />,
+                                onClick: onChangeSystemModeToggle,
                             },
 
                             {

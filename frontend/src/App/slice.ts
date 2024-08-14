@@ -3,13 +3,15 @@ import { applyMode, Mode } from '@cloudscape-design/global-styles';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 import { AUTH_DATA_STORAGE_KEY, MODE_STORAGE_KEY } from './constants';
+import { getThemeMode } from './helpers';
 
 import { IAppState, ToolsTabs } from './types';
 
 const getInitialState = (): IAppState => {
     let authData = null;
     let storageData = null;
-    let activeMode = window?.matchMedia('(prefers-color-scheme: dark)').matches ? Mode.Dark : Mode.Light;
+    let activeMode = getThemeMode();
+    let selectedMode: IAppState['systemMode'] = 'system';
 
     try {
         storageData = localStorage.getItem(AUTH_DATA_STORAGE_KEY);
@@ -22,6 +24,7 @@ const getInitialState = (): IAppState => {
 
         if (modeStorageData) {
             activeMode = modeStorageData as Mode;
+            selectedMode = modeStorageData as Mode;
         }
     } catch (e) {
         console.log(e);
@@ -35,7 +38,7 @@ const getInitialState = (): IAppState => {
         authData,
         userData: null,
         breadcrumbs: null,
-        systemMode: activeMode,
+        systemMode: selectedMode,
 
         toolsPanelState: {
             isOpen: false,
@@ -72,11 +75,17 @@ export const appSlice = createSlice({
             }
         },
 
-        setSystemMode: (state, action: PayloadAction<Mode>) => {
-            state.systemMode = action.payload;
-            applyMode(action.payload);
+        setSystemMode: (state, action: PayloadAction<Mode | null>) => {
+            state.systemMode = action.payload ?? 'system';
+
+            applyMode(action.payload ?? getThemeMode());
+
             try {
-                localStorage.setItem(MODE_STORAGE_KEY, action.payload);
+                if (action.payload) {
+                    localStorage.setItem(MODE_STORAGE_KEY, action.payload);
+                } else {
+                    localStorage.removeItem(MODE_STORAGE_KEY);
+                }
             } catch (e) {
                 console.log(e);
             }
