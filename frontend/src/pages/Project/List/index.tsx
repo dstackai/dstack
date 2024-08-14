@@ -28,7 +28,7 @@ export const ProjectList: React.FC = () => {
     const { t } = useTranslation();
 
     const { isLoading, data } = useGetProjectsQuery();
-    const { isAvailableDeletingPermission, isEnterpriseAndAdmin } = useCheckAvailableProjectPermission();
+    const { isAvailableDeletingPermission, isAvailableProjectManaging } = useCheckAvailableProjectPermission();
     const { deleteProject, deleteProjects, isDeleting } = useDeleteProject();
     const navigate = useNavigate();
 
@@ -46,7 +46,7 @@ export const ProjectList: React.FC = () => {
     const renderEmptyMessage = (): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('projects.empty_message_title')} message={t('projects.empty_message_text')}>
-                {isEnterpriseAndAdmin && <Button onClick={addProjectHandler}>{t('common.add')}</Button>}
+                {isAvailableProjectManaging && <Button onClick={addProjectHandler}>{t('common.add')}</Button>}
             </ListEmptyMessage>
         );
     };
@@ -92,7 +92,7 @@ export const ProjectList: React.FC = () => {
 
     const { columns } = useColumnsDefinitions({
         loading: isLoading,
-        onDeleteClick: isEnterpriseAndAdmin ? deleteProject : undefined,
+        onDeleteClick: isAvailableProjectManaging ? deleteProject : undefined,
     });
 
     const renderCounter = () => {
@@ -110,14 +110,14 @@ export const ProjectList: React.FC = () => {
                 items={items}
                 loading={isLoading}
                 loadingText={t('common.loading')}
-                selectionType={isEnterpriseAndAdmin ? 'multi' : undefined}
+                selectionType={isAvailableProjectManaging ? 'multi' : undefined}
                 stickyHeader={true}
                 header={
                     <Header
                         variant="awsui-h1-sticky"
                         counter={renderCounter()}
                         actions={
-                            isEnterpriseAndAdmin && (
+                            isAvailableProjectManaging && (
                                 <SpaceBetween size="xs" direction="horizontal">
                                     <ButtonWithConfirmation
                                         disabled={isDisabledDeleteSelected}
