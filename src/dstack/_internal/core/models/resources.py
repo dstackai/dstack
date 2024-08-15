@@ -1,6 +1,7 @@
 import math
 from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
+import gpuhunt
 from pydantic import Field, root_validator, validator
 from pydantic.generics import GenericModel
 from typing_extensions import Annotated
@@ -122,6 +123,9 @@ DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
 
 
 class GPUSpec(CoreModel):
+    vendor: Annotated[
+        Optional[gpuhunt.AcceleratorVendor], Field(description="The vendor of the GPU/accelerator")
+    ] = None
     name: Annotated[
         Optional[List[str]], Field(description="The name of the GPU (e.g., `A100` or `H100`)")
     ] = None
@@ -158,6 +162,14 @@ class GPUSpec(CoreModel):
             for token in tokens:
                 if not token:
                     raise ValueError(f"GPU spec contains empty token: {v}")
+                try:
+                    vendor = gpuhunt.AcceleratorVendor.cast(token)
+                except ValueError:
+                    vendor = None
+                if vendor:
+                    if "vendor" in spec:
+                        raise ValueError(f"GPU spec vendor conflict: {v}")
+                    spec["vendor"] = vendor
                 elif token[0].isalpha():  # GPU name is always starts with a letter
                     if "name" in spec:
                         raise ValueError(f"GPU spec name conflict: {v}")
@@ -180,6 +192,14 @@ class GPUSpec(CoreModel):
         if v is not None and not isinstance(v, list):
             return [v]
         return v
+
+    @validator("vendor", pre=True)
+    def _validate_vendor(
+        cls, v: Union[str, gpuhunt.AcceleratorVendor, None]
+    ) -> Optional[gpuhunt.AcceleratorVendor]:
+        if v is None:
+            return None
+        return gpuhunt.AcceleratorVendor.cast(v)
 
 
 class DiskSpec(CoreModel):

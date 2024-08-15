@@ -3,7 +3,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
+
+import gpuhunt
 
 import dstack._internal.core.models.resources as resources
 from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
@@ -38,6 +40,10 @@ from dstack._internal.utils.interpolator import InterpolatorError, VariablesInte
 from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
 
+_KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
+_KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
+_KNOWN_TPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}
+
 _BIND_ADDRESS_ARG = "bind_address"
 
 
@@ -53,6 +59,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         unknown_args: List[str],
     ):
         self.apply_args(conf, configurator_args, unknown_args)
+        self.validate_gpu_vendor_and_image(conf)
         repo = self.api.repos.load(Path.cwd())
         repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
         self.api.ssh_identity_file = repo_config.ssh_key_path
@@ -286,6 +293,54 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 )
         except InterpolatorError as e:
             raise ConfigurationError(e.args[0])
+
+    def validate_gpu_vendor_and_image(self, conf: BaseRunConfiguration) -> None:
+        """
+        Infers `resources.gpu.vendor` if not set, requires `image` if the vendor is AMD.
+        """
+        gpu_spec = conf.resources.gpu
+        if gpu_spec is None:
+            return
+        if gpu_spec.count.max == 0:
+            return
+        has_amd_gpu: bool
+        vendor = gpu_spec.vendor
+        if vendor is None:
+            names = gpu_spec.name
+            if names:
+                # None is a placeholder for an unknown vendor.
+                vendors: Set[Optional[gpuhunt.AcceleratorVendor]] = set()
+                for name in names:
+                    name = name.lower()
+                    if name in _KNOWN_NVIDIA_GPUS:
+                        vendors.add(gpuhunt.AcceleratorVendor.NVIDIA)
+                    elif name in _KNOWN_AMD_GPUS:
+                        vendors.add(gpuhunt.AcceleratorVendor.AMD)
+                    elif name in _KNOWN_TPUS:
+                        vendors.add(gpuhunt.AcceleratorVendor.GOOGLE)
+                    else:
+                        vendors.add(None)
+                if len(vendors) == 1:
+                    # Only one vendor or all names are not known.
+                    vendor = next(iter(vendors))
+                else:
+                    # More than one vendor or some names are not known; in either case, we
+                    # cannot set the vendor to a specific value, will use only names for matching.
+                    vendor = None
+                # If some names are unknown, let's assume they are _not_ AMD products, otherwise
+                # ConfigurationError message may be confusing. In worst-case scenario we'll try
+                # to execute a run on an instance with an AMD accelerator with a default
+                # CUDA image, not a big deal.
+                has_amd_gpu = gpuhunt.AcceleratorVendor.AMD in vendors
+            else:
+                # If neither gpu.vendor nor gpu.name is set, assume Nvidia.
+                vendor = gpuhunt.AcceleratorVendor.NVIDIA
+                has_amd_gpu = False
+            gpu_spec.vendor = vendor
+        else:
+            has_amd_gpu = vendor == gpuhunt.AcceleratorVendor.AMD
+        if has_amd_gpu and conf.image is None:
+            raise ConfigurationError("`image` is required if `resources.gpu.vendor` is AMD.")
 
 
 class RunWithPortsConfigurator(BaseRunConfigurator):
