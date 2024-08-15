@@ -6,6 +6,7 @@ from typing import Callable, Dict, List, Literal, Optional
 import google.api_core.exceptions
 import google.cloud.compute_v1 as compute_v1
 from google.cloud import tpu_v2
+from gpuhunt import KNOWN_TPUS
 
 import dstack._internal.core.backends.gcp.auth as auth
 import dstack._internal.core.backends.gcp.resources as gcp_resources
@@ -54,6 +55,9 @@ logger = get_logger(__name__)
 # pd-balanced disks can be 10GB-64TB, but dstack images are 20GB and cannot grow larger
 # than 32TB because of filesystem settings
 CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("20GB"), max=Memory.parse("32TB"))
+
+
+TPU_VERSIONS = [tpu.name for tpu in KNOWN_TPUS]
 
 
 class GCPVolumeDiskBackendData(CoreModel):
@@ -611,7 +615,7 @@ def _supported_instances_and_zones(
         if offer.region[:-2] not in regions:
             return False
         # remove TPU Pod for initial release
-        if _is_tpu(f"tpu-{offer.instance.name}") and _is_pod(offer.instance.name):
+        if _is_tpu(offer.instance.name) and _is_pod(offer.instance.name):
             return False
         for family in [
             "e2-medium",
@@ -682,12 +686,11 @@ def _get_tpu_startup_script(authorized_keys: List[str]) -> str:
 
 
 def _is_tpu(name: str) -> bool:
-    tpu_versions = ["tpu-v2", "tpu-v3", "tpu-v4", "tpu-v5p", "tpu-v5litepod"]
     parts = name.split("-")
-    if len(parts) == 3:
+    if len(parts) == 2:
         version = f"{parts[0]}-{parts[1]}"
-        cores = parts[2]
-        if version in tpu_versions and cores.isdigit():
+        version, cores = parts
+        if version in TPU_VERSIONS and cores.isdigit():
             return True
     return False
 

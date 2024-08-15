@@ -4,7 +4,7 @@ import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
-from gpuhunt import KNOWN_GPUS
+from gpuhunt import KNOWN_NVIDIA_GPUS, AcceleratorVendor
 from kubernetes import client
 
 from dstack._internal.core.backends.base.compute import (
@@ -48,8 +48,8 @@ RUNNER_SSH_PORT = 10022
 JUMP_POD_SSH_PORT = 22
 DEFAULT_NAMESPACE = "default"
 
-GPU_NAME_TO_GPU_INFO = {gpu.name: gpu for gpu in KNOWN_GPUS}
-GPU_NAMES = GPU_NAME_TO_GPU_INFO.keys()
+NVIDIA_GPU_NAME_TO_GPU_INFO = {gpu.name: gpu for gpu in KNOWN_NVIDIA_GPUS}
+NVIDIA_GPU_NAMES = NVIDIA_GPU_NAME_TO_GPU_INFO.keys()
 
 
 class KubernetesCompute(Compute):
@@ -330,18 +330,21 @@ def _get_gpus_from_node_labels(labels: Dict) -> List[Gpu]:
         return []
     gpu_count = int(gpu_count)
     gpu_name = None
-    for known_gpu_name in GPU_NAMES:
+    for known_gpu_name in NVIDIA_GPU_NAMES:
         if known_gpu_name.lower() in gpu_product.lower().split("-"):
             gpu_name = known_gpu_name
             break
     if gpu_name is None:
         return []
-    gpu_info = GPU_NAME_TO_GPU_INFO[gpu_name]
+    gpu_info = NVIDIA_GPU_NAME_TO_GPU_INFO[gpu_name]
     gpu_memory = gpu_info.memory * 1024
     # A100 may come in two variants
     if "40GB" in gpu_product:
         gpu_memory = 40 * 1024
-    return [Gpu(name=gpu_name, memory_mib=gpu_memory) for _ in range(gpu_count)]
+    return [
+        Gpu(vendor=AcceleratorVendor.NVIDIA, name=gpu_name, memory_mib=gpu_memory)
+        for _ in range(gpu_count)
+    ]
 
 
 def _continue_setup_jump_pod(

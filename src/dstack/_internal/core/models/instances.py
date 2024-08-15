@@ -1,6 +1,9 @@
 from enum import Enum
 from typing import List, Optional
 
+import gpuhunt
+from pydantic import root_validator
+
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, RegistryAuth
 from dstack._internal.core.models.envs import Env
@@ -11,6 +14,26 @@ from dstack._internal.utils.common import pretty_resources
 class Gpu(CoreModel):
     name: str
     memory_mib: int
+    # Although it's declared as Optional, in fact it always has a value set by the root validator,
+    # that is, `assert gpu.vendor is not None` should be a safe type narrowing.
+    vendor: Optional[gpuhunt.AcceleratorVendor] = None
+
+    @root_validator(pre=True)
+    def validate_name_and_vendor(cls, values):
+        is_tpu = False
+        name = values.get("name")
+        if name and name.startswith("tpu-"):
+            is_tpu = True
+            values["name"] = name[4:]
+        vendor = values.get("vendor")
+        if vendor is None:
+            if is_tpu:
+                values["vendor"] = gpuhunt.AcceleratorVendor.GOOGLE
+            else:
+                values["vendor"] = gpuhunt.AcceleratorVendor.NVIDIA
+        else:
+            values["vendor"] = gpuhunt.AcceleratorVendor.cast(vendor)
+        return values
 
 
 class Disk(CoreModel):
