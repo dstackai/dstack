@@ -1,15 +1,16 @@
 # ~/.dstack/server/config.yml
 
-The `~/.dstack/server/config.yml` file is used by the `dstack` server
-to [configure](../../installation/index.md#1-configure-backends) cloud accounts.
+The `~/.dstack/server/config.yml` file is used
+to [configure](../../installation/index.md#1-configure-backends) the `dstack` server cloud accounts
+and other sever-level settings such as encryption.
+
+## Backends
 
 > The `dstack` server allows you to configure backends for multiple projects.
 > If you don't need multiple projects, use only the `main` project.
 
 Each cloud account must be configured under the `backends` property of the respective project.
 See the examples below.
-
-## Examples
 
 ### AWS
 
@@ -744,6 +745,82 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 
 [//]: # (TODO: Should we automatically detect ~/.kube/config)
 
+## Encryption
+
+`dstack` support encryption at rest that allows
+encrypting sensitive data such as backend credentials before storing it in the DB.
+It's an additional application-level encryption layer on top of file-system and DB encryption.
+
+By default, the `dstack` server stores all data in plaintext.
+To enable encryption, specify one or more encryption keys:
+
+```yaml
+encryption:
+  keys:
+  - type: aes
+    secret: E5yzN6V3XvBq/f085ISWFCdgnOGED0kuFaAkASlmmO4=
+projects: ...
+```
+
+After that, subsequent DB writes will encrypt sensitive data.
+(This includes backend credentials and user tokens.)
+If several keys are specified, the first key is used for encryption and all are tried for decryption.
+This allows rotating encryption keys by specifying a new encryption key:
+
+```yaml
+encryption:
+  keys:
+  - type: aes
+    secret: cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=
+  - type: aes
+    secret: E5yzN6V3XvBq/f085ISWFCdgnOGED0kuFaAkASlmmO4=
+projects: ...
+```
+
+Old keys may be deleted once all existing records were updated to re-encrypt sensitive data.
+
+??? info "Supported encryption keys"
+    Currently, `dstack` supports only `aes` and `identity` (plaintext) encryption keys.
+    There are plans to support external encryption providers including HashiCorp Vault and AWS KMS.
+
+### `aes`
+
+The `aes` encryption key encrypts data using [AES-256](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) in GCM mode.
+To configure the `aes` encryption, generate a random 32-byte key:
+
+```shell
+$ head -c 32 /dev/urandom | base64
+
+opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
+```
+
+And specify it as `secret`:
+
+```yaml
+encryption:
+  keys:
+  - type: aes
+    secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
+projects: ...
+```
+
+### `identity`
+
+The `identity` encryption performs no encryption and stores data in plaintext.
+You can specify an `identity` encryption key explicitly if you want to decrypt the data:
+
+```yaml
+encryption:
+  keys:
+  - type: identity
+  - type: aes
+    secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
+projects: ...
+```
+
+With this configuration, the `aes` key will still be used to decrypt the old data,
+but new writes will store the data in plaintext.
+
 ## Root reference
 
 #SCHEMA# dstack._internal.server.services.config.ServerConfig
@@ -962,3 +1039,25 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 ##SCHEMA# dstack._internal.core.models.backends.kubernetes.KubernetesNetworkingConfig
     overrides:
         show_root_heading: false
+
+## `encryption` { #encryption data-toc-label="encryption" }
+
+#SCHEMA# dstack._internal.server.services.config.EncryptionConfig
+    overrides:
+        show_root_heading: false
+
+## `encryption.keys[n][type=identity]` { #encryption-keys-identity data-toc-label="encryption.keys.identity" }
+
+#SCHEMA# dstack._internal.server.services.encryption.keys.identity.IdentityEncryptionKeyConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `encryption.keys[n][type=aes]` { #encryption-keys-aes data-toc-label="encryption.keys.aes" }
+
+#SCHEMA# dstack._internal.server.services.encryption.keys.aes.AESEncryptionKeyConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true

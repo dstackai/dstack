@@ -12,7 +12,7 @@ from dstack._internal.server.services.encryption.keys.base import EncryptionKey
 
 
 class AESEncryptionKeyConfig(CoreModel):
-    type: Literal["aes"] = "aes"
+    type: Annotated[Literal["aes"], Field(description="The type of the key")] = "aes"
     secret: Annotated[str, Field(description="Base64-encoded AES-256 key")]
 
     @validator("secret")
