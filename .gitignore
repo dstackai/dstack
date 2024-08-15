@@ -3,7 +3,7 @@
 *.egg-info
 
 dist/
-/venv/
+venv/
 /.cache/
 .pytest_cache/
 .coverage
