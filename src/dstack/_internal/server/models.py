@@ -51,7 +51,7 @@ logger = get_logger(__name__)
 
 class NaiveDateTime(TypeDecorator):
     """
-    The custom type decorator that ensures datetime objects are offset-naive when stored in the database.
+    A custom type decorator that ensures datetime objects are offset-naive when stored in the database.
     This is needed because we use datetimes in UTC only and store them as offset-naive.
     Some databases (e.g. Postgres) throw an error if the timezone is set.
     """
@@ -69,6 +69,12 @@ class NaiveDateTime(TypeDecorator):
 
 
 class DecryptedString(CoreModel):
+    """
+    A type for representing plaintext strings encrypted with `EncryptedString`.
+    Besides the string, stores information if the decryption was successfull.
+    This is useful so that application code can have custom handling of failed decrypts (e.g. ignoring).
+    """
+
     plaintext: str
     decrypted: bool = True
     exc: Optional[Exception] = None
@@ -78,6 +84,10 @@ class DecryptedString(CoreModel):
 
 
 class EncryptedString(TypeDecorator):
+    """
+    A custom type decorator that encrypts and decrypts strings for storing in the db.
+    """
+
     impl = String
     cache_ok = True
 
@@ -100,7 +110,9 @@ class EncryptedString(TypeDecorator):
             return value
         return EncryptedString._encrypt_func(value.plaintext)
 
-    def process_result_value(self, value: str, dialect) -> DecryptedString:
+    def process_result_value(self, value: Optional[str], dialect) -> Optional[DecryptedString]:
+        if value is None:
+            return value
         try:
             plaintext = EncryptedString._decrypt_func(value)
             return DecryptedString(plaintext=plaintext, decrypted=True)

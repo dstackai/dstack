@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from typing import List, Tuple, Union
 
 from dstack._internal.core.errors import DstackError
@@ -45,11 +46,20 @@ def get_identity_encryption_key() -> IdentityEncryptionKey:
 _encryption_keys = [get_identity_encryption_key()]
 
 
-def set_encryption_keys(encryption_key_configs: List[AnyEncryptionKeyConfig]):
+def init_encryption_keys(encryption_key_configs: List[AnyEncryptionKeyConfig]):
     global _encryption_keys
     _encryption_keys = [get_encryption_key(c) for c in encryption_key_configs]
     if not any(isinstance(key, IdentityEncryptionKey) for key in _encryption_keys):
         _encryption_keys.append(get_identity_encryption_key())
+
+
+@contextmanager
+def encryption_keys_context(encryption_keys: List[EncryptionKey]):
+    global _encryption_keys
+    prev_encryption_keys = _encryption_keys
+    _encryption_keys = encryption_keys
+    yield
+    _encryption_keys = prev_encryption_keys
 
 
 def encrypt(plaintext: str) -> str:
