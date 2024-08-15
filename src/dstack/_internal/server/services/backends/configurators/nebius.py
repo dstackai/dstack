@@ -20,7 +20,7 @@ from dstack._internal.core.models.backends.nebius import (
     NebiusCreds,
     NebiusStoredConfig,
 )
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends import Configurator
 from dstack._internal.server.services.backends.configurators.base import (
     raise_invalid_credentials_error,
@@ -53,7 +53,7 @@ class NebiusConfigurator(Configurator):
             project_id=project.id,
             type=self.TYPE.value,
             config=NebiusStoredConfig.__response__.parse_obj(config).json(),
-            auth=NebiusCreds.parse_obj(config.creds).json(),
+            auth=DecryptedString(plaintext=NebiusCreds.parse_obj(config.creds).json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> NebiusConfigInfo:

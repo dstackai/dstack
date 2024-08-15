@@ -17,7 +17,7 @@ from dstack._internal.core.models.backends.tensordock import (
     TensorDockCreds,
     TensorDockStoredConfig,
 )
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
@@ -51,7 +51,7 @@ class TensorDockConfigurator(Configurator):
             config=TensorDockStoredConfig(
                 **TensorDockConfigInfo.__response__.parse_obj(config).dict()
             ).json(),
-            auth=TensorDockCreds.parse_obj(config.creds).json(),
+            auth=DecryptedString(plaintext=TensorDockCreds.parse_obj(config.creds).json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyTensorDockConfigInfo:

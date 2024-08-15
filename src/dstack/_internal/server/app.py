@@ -87,15 +87,19 @@ async def lifespan(app: FastAPI):
 ╰━━┻━━┻╯╱╰╯╰━━┻╯
 [/]"""
         )
-        admin, _ = await get_or_create_admin_user(session=session)
-        default_project, project_created = await get_or_create_default_project(
-            session=session, user=admin
-        )
         if not check_required_ssh_version():
             logger.warning("OpenSSH 8.4+ is required. The dstack server may not work properly")
         if settings.SERVER_CONFIG_ENABLED:
             server_config_manager = ServerConfigManager()
             config_loaded = server_config_manager.load_config()
+            # Encryption has to be configured before working with users and projects
+            await server_config_manager.apply_encryption()
+        admin, _ = await get_or_create_admin_user(session=session)
+        await get_or_create_default_project(
+            session=session,
+            user=admin,
+        )
+        if settings.SERVER_CONFIG_ENABLED:
             server_config_dir = str(SERVER_CONFIG_FILE_PATH).replace(
                 os.path.expanduser("~"), "~", 1
             )
@@ -111,7 +115,6 @@ async def lifespan(app: FastAPI):
                     f"Applying [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]...",
                     {"show_path": False},
                 )
-
                 await server_config_manager.apply_config(session=session, owner=admin)
         await init_gateways(session=session)
     update_default_project(

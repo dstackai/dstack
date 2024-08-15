@@ -377,6 +377,12 @@ class ServerConfigManager:
         # if self.config is not None:
         #     self._save_config(self.config)
 
+    async def apply_encryption(self):
+        if self.config is None:
+            raise ValueError("Config is not loaded")
+        if self.config.encryption is not None:
+            encryption_services.set_encryption_keys(self.config.encryption.keys)
+
     async def apply_config(self, session: AsyncSession, owner: UserModel):
         if self.config is None:
             raise ValueError("Config is not loaded")
@@ -384,8 +390,6 @@ class ServerConfigManager:
             await self._apply_project_config(
                 session=session, owner=owner, project_config=project_config
             )
-        if self.config.encryption is not None:
-            encryption_services.set_encryption_keys(self.config.encryption.keys)
 
     async def _apply_project_config(
         self,

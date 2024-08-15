@@ -12,7 +12,7 @@ from dstack._internal.core.models.backends.kubernetes import (
     KubernetesConfigValues,
     KubernetesStoredConfig,
 )
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
@@ -47,7 +47,7 @@ class KubernetesConfigurator(Configurator):
             project_id=project.id,
             type=self.TYPE.value,
             config=KubernetesStoredConfig.__response__.parse_obj(config).json(),
-            auth="",
+            auth=DecryptedString(plaintext=""),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyKubernetesConfigInfo:

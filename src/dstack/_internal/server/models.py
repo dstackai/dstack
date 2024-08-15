@@ -72,6 +72,10 @@ class NaiveDateTime(TypeDecorator):
 class DecryptedString(CoreModel):
     plaintext: str
     decrypted: bool = True
+    exc: Optional[Exception] = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 _encrypt_func: Callable[[str], str]
@@ -103,10 +107,10 @@ class EncryptedString(TypeDecorator):
     def process_result_value(self, value: str, dialect) -> DecryptedString:
         try:
             plaintext = _decrypt_func(value)
-            return DecryptedString(decrypted=True, plaintext=plaintext)
+            return DecryptedString(plaintext=plaintext, decrypted=True)
         except Exception as e:
-            logger.warning("Failed to decrypt encrypted string: %s", repr(e))
-            return DecryptedString(decrypted=False, plaintext="")
+            logger.debug("Failed to decrypt encrypted string: %s", repr(e))
+            return DecryptedString(plaintext="", decrypted=False, exc=e)
 
 
 constraint_naming_convention = {

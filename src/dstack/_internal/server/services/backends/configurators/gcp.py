@@ -25,7 +25,7 @@ from dstack._internal.core.models.backends.gcp import (
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
@@ -188,7 +188,7 @@ class GCPConfigurator(Configurator):
             config=GCPStoredConfig(
                 **GCPConfigInfo.__response__.parse_obj(config).dict(),
             ).json(),
-            auth=GCPCreds.parse_obj(config.creds).json(),
+            auth=DecryptedString(plaintext=GCPCreds.parse_obj(config.creds).json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyGCPConfigInfo:

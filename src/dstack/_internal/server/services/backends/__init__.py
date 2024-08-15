@@ -220,7 +220,7 @@ async def get_config_info(
         if not backend_model.auth.decrypted:
             logger.warning(
                 "Failed to decrypt creds for %s backend. Backend will be ignored.",
-                backend_model.type,
+                backend_model.type.value,
             )
             continue
         if backend_model.type == backend_type:
