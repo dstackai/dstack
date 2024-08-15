@@ -152,6 +152,11 @@ class KubernetesCompute(Compute):
                                     container_port=RUNNER_SSH_PORT,
                                 )
                             ],
+                            security_context=client.V1SecurityContext(
+                                # TODO(#1535): support non-root images properly
+                                run_as_user=0,
+                                run_as_group=0,
+                            ),
                             # TODO: Pass cpu, memory, gpu as requests.
                             # Beware that node capacity != allocatable, so
                             # if the node has 2xCPU – then cpu=2 request will probably fail.
