@@ -1,10 +1,15 @@
 declare type TUserRole = 'user' | 'admin';
+declare type TUserPermission =
+    | 'DSTACK_USER_CAN_CREATE_PROJECTS'
+    | 'DSTACK_USER_CAN_CREATE_GATEWAYS'
+    | 'DSTACK_USER_CAN_CREATE_ON_PREM_FLEETS'
 
 declare interface IUser {
     id: string,
     username: string;
     global_role: TUserRole
     email: string | null,
+    permissions: TUserPermission[],
 }
 
 declare interface IUserWithCreds extends IUser {
