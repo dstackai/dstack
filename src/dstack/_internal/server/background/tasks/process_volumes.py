@@ -40,9 +40,10 @@ async def process_submitted_volumes():
             PROCESSING_VOLUMES_IDS.add(volume_model.id)
 
     try:
-        await _process_volume(volume_id=volume_model.id)
+        volume_model_id = volume_model.id
+        await _process_volume(volume_id=volume_model_id)
     finally:
-        PROCESSING_VOLUMES_IDS.remove(volume_model.id)
+        PROCESSING_VOLUMES_IDS.remove(volume_model_id)
 
 
 async def _process_volume(volume_id: UUID):

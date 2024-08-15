@@ -20,6 +20,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     ApplyConfigurationType,
@@ -33,9 +34,11 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
-from dstack._internal.utils.interpolator import VariablesInterpolator
+from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
+
+_BIND_ADDRESS_ARG = "bind_address"
 
 
 class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
@@ -130,8 +133,11 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         console.print(
                             f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
                         )
+                    bind_address: Optional[str] = getattr(
+                        configurator_args, _BIND_ADDRESS_ARG, None
+                    )
                     try:
-                        if run.attach():
+                        if run.attach(bind_address=bind_address):
                             for entry in run.logs():
                                 sys.stdout.buffer.write(entry)
                                 sys.stdout.buffer.flush()
@@ -257,14 +263,29 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             conf.resources.disk = args.disk_spec
 
         self.apply_env_vars(conf.env, args)
-
+        self.interpolate_env(conf)
         self.interpolate_run_args(conf.setup, unknown)
 
     def interpolate_run_args(self, value: List[str], unknown):
         run_args = " ".join(unknown)
         interpolator = VariablesInterpolator({"run": {"args": run_args}}, skip=["secrets"])
-        for i in range(len(value)):
-            value[i] = interpolator.interpolate(value[i])
+        try:
+            for i in range(len(value)):
+                value[i] = interpolator.interpolate_or_error(value[i])
+        except InterpolatorError as e:
+            raise ConfigurationError(e.args[0])
+
+    def interpolate_env(self, conf: BaseRunConfiguration):
+        env_dict = conf.env.as_dict()
+        interpolator = VariablesInterpolator({"env": env_dict}, skip=["secrets"])
+        try:
+            if conf.registry_auth is not None:
+                conf.registry_auth = RegistryAuth(
+                    username=interpolator.interpolate_or_error(conf.registry_auth.username),
+                    password=interpolator.interpolate_or_error(conf.registry_auth.password),
+                )
+        except InterpolatorError as e:
+            raise ConfigurationError(e.args[0])
 
 
 class RunWithPortsConfigurator(BaseRunConfigurator):
@@ -279,6 +300,12 @@ class RunWithPortsConfigurator(BaseRunConfigurator):
             help="Exposed port or mapping",
             dest="ports",
             metavar="MAPPING",
+        )
+        parser.add_argument(
+            "--host",
+            help="Local address to bind. Defaults to [code]localhost[/]",
+            dest=_BIND_ADDRESS_ARG,
+            metavar="HOST",
         )
 
     def apply_args(

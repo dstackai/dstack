@@ -253,7 +253,7 @@ func getGpuInfo() [][]string {
 			"run",
 			"--rm",
 			"--gpus", "all",
-			"dstackai/base:py3.12-0.4-cuda-12.1",
+			"dstackai/base:py3.12-0.5-cuda-12.1",
 			"nvidia-smi", "--query-gpu=gpu_name,memory.total", "--format=csv",
 		},
 		StreamStdio: false,

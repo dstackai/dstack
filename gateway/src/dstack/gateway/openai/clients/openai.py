@@ -19,11 +19,15 @@ class OpenAIChatCompletions(ChatCompletionsClient):
         )
 
     async def generate(self, request: ChatCompletionsRequest) -> ChatCompletionsResponse:
-        resp = await self.client.post("/chat/completions", json=request.model_dump())
+        resp = await self.client.post(
+            "/chat/completions", json=request.model_dump(exclude_unset=True)
+        )
         if resp.status_code != 200:
             raise GatewayError(resp.text)
         return ChatCompletionsResponse.model_validate(resp.json())
 
     async def stream(self, request: ChatCompletionsRequest) -> AsyncIterator[ChatCompletionsChunk]:
-        async for data in self.client.stream_sse("/chat/completions", json=request.model_dump()):
+        async for data in self.client.stream_sse(
+            "/chat/completions", json=request.model_dump(exclude_unset=True)
+        ):
             yield ChatCompletionsChunk.model_validate(data)

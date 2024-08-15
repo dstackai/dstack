@@ -1,9 +1,9 @@
 # Llama 3.1
 
-This example walks you through how to use Llama 3.1 for inference and fine-tuning with `dstack`, whether in the cloud or
+This example walks you through how to use Llama 3.1 for deployment and fine-tuning with `dstack`, whether in the cloud or
 on-prem.
 
-## Inference
+## Deployment
 
 ### Memory requirements
 
@@ -280,7 +280,7 @@ For more memory-efficient use of multiple GPUs, consider using DeepSpeed and ZeR
 To do this, use the `examples/accelerate_configs/deepspeed_zero3.yaml` configuration file instead of 
 `examples/accelerate_configs/multi_gpu.yaml`.
 
-### Distributed training
+### Running on multiple nodes
 
 In case the model doesn't feet into a single GPU, consider running a `dstack` task on multiple nodes.
 
@@ -292,10 +292,10 @@ name: trl-train-distrib
 
 # Size of the cluster
 nodes: 2
-# Ensure nvcc is installed (req. for Flash Attention) 
-nvcc: true
 
 python: "3.10"
+# Ensure nvcc is installed (req. for Flash Attention) 
+nvcc: true
 
 env:
   - HUGGING_FACE_HUB_TOKEN

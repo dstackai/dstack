@@ -12,6 +12,10 @@ class Name:
     char = first_char | set(string.digits + ".")
 
 
+class InterpolatorError(ValueError):
+    pass
+
+
 class VariablesInterpolator:
     def __init__(
         self, namespaces: Dict[str, Dict[str, str]], *, skip: Optional[Iterable[str]] = None
@@ -42,11 +46,11 @@ class VariablesInterpolator:
             tokens.append(s[start:opening])
             closing = s.find(Pattern.closing, opening)
             if closing == -1:
-                raise ValueError(f"No pattern closing: {s[opening:]}")
+                raise InterpolatorError(f"No pattern closing: {s[opening:]}")
 
             name = s[opening + len(Pattern.opening) : closing].strip()
             if not self.validate_name(name):
-                raise ValueError(f"Illegal reference name: {name}")
+                raise InterpolatorError(f"Illegal reference name: {name}")
             if name.split(".")[0] in self.skip:
                 tokens.append(s[opening : closing + len(Pattern.closing)])
             elif name in self.variables:
@@ -56,6 +60,12 @@ class VariablesInterpolator:
             start = closing + len(Pattern.closing)
         s = "".join(tokens)
         return (s, missing) if return_missing else s
+
+    def interpolate_or_error(self, s: str) -> str:
+        res, missing = self.interpolate(s, return_missing=True)
+        if len(missing) == 0:
+            return res
+        raise InterpolatorError(f"Failed to interpolate due to missing vars: {missing}")
 
     @staticmethod
     def validate_name(s: str) -> bool:

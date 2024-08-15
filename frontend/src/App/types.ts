@@ -21,7 +21,7 @@ export interface IAppState {
     userData: IUser | null;
     authData: IUserAuthData | null;
     breadcrumbs: TBreadcrumb[] | null;
-    systemMode: Mode;
+    systemMode: Mode | 'system';
     toolsPanelState: {
         isOpen: boolean;
         tab: ToolsTabs;

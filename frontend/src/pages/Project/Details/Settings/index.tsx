@@ -42,7 +42,7 @@ export const ProjectSettings: React.FC = () => {
     const navigate = useNavigate();
     const paramProjectName = params.projectName ?? '';
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: paramProjectName });
-    const { isAvailableDeletingPermission, isProjectAdmin, isEnterpriseAndAdmin } = useCheckAvailableProjectPermission();
+    const { isAvailableDeletingPermission, isProjectAdmin, isAvailableProjectManaging } = useCheckAvailableProjectPermission();
 
     const [pushNotification] = useNotifications();
     const [updateProjectMembers] = useUpdateProjectMembersMutation();
@@ -185,7 +185,7 @@ export const ProjectSettings: React.FC = () => {
                     <Container header={<Header variant="h2">{t('common.danger_zone')}</Header>}>
                         <SpaceBetween size="l">
                             <div className={styles.dangerSectionGrid}>
-                                {isEnterpriseAndAdmin && (
+                                {isAvailableProjectManaging && (
                                     <>
                                         <Box variant="h5" color="text-body-secondary">
                                             {t('projects.edit.delete_this_project')}

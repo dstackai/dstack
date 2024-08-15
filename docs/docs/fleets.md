@@ -69,7 +69,9 @@ are both acceptable).
     </div>
 
     !!! warning "Requirements"
-        The on-prem servers should be pre-installed with CUDA 12.1 and NVIDIA Docker. 
+        On-prem servers should be pre-installed with Docker.
+        Systems with NVIDIA GPUs should also be pre-installed with CUDA 12.1 and
+        [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
         The user should have `sudo` access.
 
     ??? info "Environment variables"

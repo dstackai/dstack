@@ -24,7 +24,13 @@ export const useCheckAvailableProjectPermission = () => {
         return getProjectRoleByUserName(project, userName) === 'admin' || userGlobalRole === 'admin';
     };
 
-    const isEnterpriseAndAdmin = isGlobalAdmin && process.env.UI_VERSION === 'enterprise';
+    const isAvailableProjectManaging =
+        (isGlobalAdmin && process.env.UI_VERSION === 'enterprise') || process.env.UI_VERSION === 'sky';
 
-    return { isAvailableDeletingPermission, isAvailableAddProjectPermission, isProjectAdmin, isEnterpriseAndAdmin } as const;
+    return {
+        isAvailableDeletingPermission,
+        isAvailableAddProjectPermission,
+        isProjectAdmin,
+        isAvailableProjectManaging,
+    } as const;
 };

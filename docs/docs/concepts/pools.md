@@ -69,7 +69,10 @@ $ dstack pool add-ssh -i ~/.ssh/id_rsa ubuntu@54.73.155.119
 The command accepts the same arguments as the standard `ssh` command.
 
 !!! warning "Requirements"
-    The on-prem server should be pre-installed with CUDA 12.1 and NVIDIA Docker.
+    On-prem servers should be pre-installed with Docker.
+    Systems with NVIDIA GPUs should also be pre-installed with CUDA 12.1 and
+    [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+    The user should have `sudo` access.
 
 Once the instance is provisioned, you'll see it in the pool and will be able to run workloads on it.
 
