@@ -56,6 +56,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
 
     const roleSelectOptions: TRoleSelectOption[] = [
         { label: t('roles.admin'), value: 'admin' },
+        { label: t('roles.manager'), value: 'manager' },
         { label: t('roles.user'), value: 'user' },
     ];
 

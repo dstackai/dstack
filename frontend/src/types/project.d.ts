@@ -23,4 +23,4 @@ declare type TSetProjectMembersParams = {
     }>
 }
 
-declare type TProjectRole = TUserRole
+declare type TProjectRole = TUserRole | 'manager'

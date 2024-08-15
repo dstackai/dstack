@@ -1,1 +1,1 @@
-export type TRoleSelectOption = { label: string; value: TUserRole };
+export type TRoleSelectOption = { label: string; value: TProjectRole };
