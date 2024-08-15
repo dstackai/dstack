@@ -1,7 +1,7 @@
 from typing import List, Tuple, Union
 
 from dstack._internal.core.errors import DstackError
-from dstack._internal.server.models import set_decrypt_func, set_encrypt_func
+from dstack._internal.server.models import EncryptedString
 from dstack._internal.server.services.encryption.keys.aes import (
     AESEncryptionKey,
     AESEncryptionKeyConfig,
@@ -55,12 +55,12 @@ def set_encryption_keys(encryption_key_configs: List[AnyEncryptionKeyConfig]):
 def encrypt(plaintext: str) -> str:
     key = _encryption_keys[0]
     ciphertext = key.encrypt(plaintext)
-    packed_ciphertext = pack_ciphertext(ciphertext, key_type=key.TYPE)
+    packed_ciphertext = _pack_ciphertext(ciphertext, key_type=key.TYPE)
     return packed_ciphertext
 
 
 def decrypt(ciphertext: str) -> str:
-    key_type, ciphertext = unpack_ciphertext(ciphertext)
+    key_type, ciphertext = _unpack_ciphertext(ciphertext)
     for i, key in enumerate(_encryption_keys):
         if key.TYPE != key_type:
             continue
@@ -71,14 +71,16 @@ def decrypt(ciphertext: str) -> str:
     raise EncryptionError("Failed to decrypt ciphertext")
 
 
-def pack_ciphertext(ciphertext: str, key_type: str) -> str:
+def _pack_ciphertext(ciphertext: str, key_type: str) -> str:
     return f"enc:{key_type}:{ciphertext}"
 
 
-def unpack_ciphertext(packed_ciphertext: str) -> Tuple[str, str]:
+def _unpack_ciphertext(packed_ciphertext: str) -> Tuple[str, str]:
     _, key_type, ciphertext = packed_ciphertext.split(":", maxsplit=2)
     return key_type, ciphertext
 
 
-set_encrypt_func(encrypt)
-set_decrypt_func(decrypt)
+EncryptedString.set_encrypt_decrypt(
+    encrypt_func=encrypt,
+    decrypt_func=decrypt,
+)

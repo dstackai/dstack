@@ -350,14 +350,14 @@ EncryptionKeyConfig = Annotated[AnyEncryptionKeyConfig, Field(..., discriminator
 
 
 class EncryptionConfig(CoreModel):
-    keys: Annotated[List[EncryptionKeyConfig], Field()]
+    keys: Annotated[List[EncryptionKeyConfig], Field(description="The encryption keys")]
 
 
 class ServerConfig(CoreModel):
     projects: Annotated[List[ProjectConfig], Field(description="The list of projects")]
-    encryption: Annotated[Optional[EncryptionConfig], Field(description="Encryption config")] = (
-        None
-    )
+    encryption: Annotated[
+        Optional[EncryptionConfig], Field(description="The encryption config")
+    ] = None
 
 
 class ServerConfigManager:

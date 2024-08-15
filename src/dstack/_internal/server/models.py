@@ -57,7 +57,6 @@ class NaiveDateTime(TypeDecorator):
     """
 
     impl = DateTime
-
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
@@ -78,35 +77,32 @@ class DecryptedString(CoreModel):
         arbitrary_types_allowed = True
 
 
-_encrypt_func: Callable[[str], str]
-_decrypt_func: Callable[[str], str]
-
-
-def set_encrypt_func(encrypt_func: Callable[[str], str]):
-    global _encrypt_func
-    _encrypt_func = encrypt_func
-
-
-def set_decrypt_func(decrypt_func: Callable[[str], str]):
-    global _decrypt_func
-    _decrypt_func = decrypt_func
-
-
 class EncryptedString(TypeDecorator):
     impl = String
-
     cache_ok = True
+
+    _encrypt_func: Callable[[str], str]
+    _decrypt_func: Callable[[str], str]
+
+    @classmethod
+    def set_encrypt_decrypt(
+        cls,
+        encrypt_func: Callable[[str], str],
+        decrypt_func: Callable[[str], str],
+    ):
+        cls._encrypt_func = encrypt_func
+        cls._decrypt_func = decrypt_func
 
     def process_bind_param(self, value: Union[DecryptedString, str], dialect):
         if isinstance(value, str):
-            plaintext = value
-        else:
-            plaintext = value.plaintext
-        return _encrypt_func(plaintext)
+            # Passing string allows binding an encrypted value directly
+            # e.g. for comparisons
+            return value
+        return EncryptedString._encrypt_func(value.plaintext)
 
     def process_result_value(self, value: str, dialect) -> DecryptedString:
         try:
-            plaintext = _decrypt_func(value)
+            plaintext = EncryptedString._decrypt_func(value)
             return DecryptedString(plaintext=plaintext, decrypted=True)
         except Exception as e:
             logger.debug("Failed to decrypt encrypted string: %s", repr(e))
@@ -133,7 +129,9 @@ class UserModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
-    token: Mapped[str] = mapped_column(String(200), unique=True)
+    token: Mapped[DecryptedString] = mapped_column(EncryptedString(200), unique=True)
+    # token_hash is needed for fast search by token when stored token is encrypted
+    token_hash: Mapped[str] = mapped_column(String(2000), unique=True)
     global_role: Mapped[GlobalRole] = mapped_column(Enum(GlobalRole))
 
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)

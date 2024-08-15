@@ -1,7 +1,7 @@
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,9 +57,12 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services.jobs import get_job_specs_from_run_spec
+from dstack._internal.server.services.users import get_token_hash
 
 
-def get_auth_headers(token: str) -> Dict:
+def get_auth_headers(token: Union[DecryptedString, str]) -> Dict:
+    if isinstance(token, DecryptedString):
+        token = token.plaintext
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -75,7 +78,8 @@ async def create_user(
     user = UserModel(
         name=name,
         global_role=global_role,
-        token=token,
+        token=DecryptedString(plaintext=token),
+        token_hash=get_token_hash(token),
         email=email,
     )
     session.add(user)
