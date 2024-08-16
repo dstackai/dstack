@@ -137,6 +137,48 @@ async def delete_projects(
     await session.commit()
 
 
+async def set_project_members(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    members: List[MemberSetting],
+):
+    # reload with members
+    project = await get_project_model_by_name_or_error(
+        session=session,
+        project_name=project.name,
+    )
+    project_role = get_user_project_role(user=user, project=project)
+    if project_role == ProjectRole.MANAGER:
+        new_admins_members = {
+            (m.username, m.project_role) for m in members if m.project_role == ProjectRole.ADMIN
+        }
+        current_admins_members = {
+            (m.user.name, m.project_role)
+            for m in project.members
+            if m.project_role == ProjectRole.ADMIN
+        }
+        if new_admins_members != current_admins_members:
+            raise ForbiddenError("Access denied: changing project admins")
+    await clear_project_members(session=session, project=project)
+    usernames = [m.username for m in members]
+    res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))
+    users = res.scalars().all()
+    username_to_user = {user.name: user for user in users}
+    for member in members:
+        user_to_add = username_to_user.get(member.username)
+        if user_to_add is None:
+            continue
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user_to_add,
+            project_role=member.project_role,
+            commit=False,
+        )
+    await session.commit()
+
+
 async def add_project_member(
     session: AsyncSession,
     project: ProjectModel,
@@ -153,30 +195,6 @@ async def add_project_member(
     if commit:
         await session.commit()
     return member
-
-
-async def set_project_members(
-    session: AsyncSession,
-    project: ProjectModel,
-    members: List[MemberSetting],
-):
-    await clear_project_members(session=session, project=project)
-    usernames = [m.username for m in members]
-    res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))
-    users = res.scalars().all()
-    username_to_user = {user.name: user for user in users}
-    for member in members:
-        user = username_to_user.get(member.username)
-        if user is None:
-            continue
-        await add_project_member(
-            session=session,
-            project=project,
-            user=user,
-            project_role=member.project_role,
-            commit=False,
-        )
-    await session.commit()
 
 
 async def clear_project_members(
@@ -296,6 +314,13 @@ async def create_project_model(
     session.add(project)
     await session.commit()
     return project
+
+
+def get_user_project_role(user: UserModel, project: ProjectModel) -> Optional[ProjectRole]:
+    for member in project.members:
+        if member.user_id == user.id:
+            return member.project_role
+    return None
 
 
 def project_model_to_project(

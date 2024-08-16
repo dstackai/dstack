@@ -11,7 +11,11 @@ from dstack._internal.server.schemas.projects import (
     DeleteProjectsRequest,
     SetProjectMembersRequest,
 )
-from dstack._internal.server.security.permissions import Authenticated, ProjectAdmin, ProjectMember
+from dstack._internal.server.security.permissions import (
+    Authenticated,
+    ProjectManager,
+    ProjectMember,
+)
 from dstack._internal.server.services import projects
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -70,11 +74,12 @@ async def get_project(
 async def set_project_members(
     body: SetProjectMembersRequest,
     session: AsyncSession = Depends(get_session),
-    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectManager()),
 ) -> Project:
-    _, project = user_project
+    user, project = user_project
     await projects.set_project_members(
         session=session,
+        user=user,
         project=project,
         members=body.members,
     )

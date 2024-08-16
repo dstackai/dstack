@@ -8,6 +8,7 @@ from dstack._internal.core.models.common import CoreModel
 
 class ProjectRole(str, enum.Enum):
     ADMIN = "admin"
+    MANAGER = "manager"
     USER = "user"
 
 
