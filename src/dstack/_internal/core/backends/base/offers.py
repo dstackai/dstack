@@ -51,7 +51,10 @@ def catalog_item_to_offer(
 ) -> Optional[InstanceOffer]:
     gpus = []
     if item.gpu_count > 0:
-        gpus = [Gpu(name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024))] * item.gpu_count
+        gpu = Gpu(
+            vendor=item.gpu_vendor, name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024)
+        )
+        gpus = [gpu] * item.gpu_count
     disk_size_mib = choose_disk_size_mib(
         catalog_item_disk_size_gib=item.disk_size,
         requirements_disk_size=requirements.resources.disk.size
@@ -82,10 +85,12 @@ def catalog_item_to_offer(
 
 def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
     gpu_count = len(offer.instance.resources.gpus)
+    gpu_vendor = None
     gpu_name = None
     gpu_memory = None
     if gpu_count > 0:
         gpu = offer.instance.resources.gpus[0]
+        gpu_vendor = gpu.vendor
         gpu_name = gpu.name
         gpu_memory = gpu.memory_mib / 1024
     return gpuhunt.CatalogItem(
@@ -96,6 +101,7 @@ def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
         cpu=offer.instance.resources.cpus,
         memory=offer.instance.resources.memory_mib / 1024,
         gpu_count=gpu_count,
+        gpu_vendor=gpu_vendor,
         gpu_name=gpu_name,
         gpu_memory=gpu_memory,
         spot=offer.instance.resources.spot,
@@ -123,6 +129,7 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
         q.max_disk_size = res.disk.size.max
 
     if res.gpu:
+        q.gpu_vendor = res.gpu.vendor
         q.gpu_name = res.gpu.name
         if res.gpu.memory:
             q.min_gpu_memory = res.gpu.memory.min
