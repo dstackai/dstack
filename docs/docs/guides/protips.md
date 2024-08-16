@@ -184,26 +184,37 @@ To run in detached mode, use `-d` with `dstack apply`.
 
 ## GPU
 
-`dstack` natively supports NVIDIA GPU, and Google Cloud TPU accelerator chips.
+`dstack` natively supports NVIDIA GPU, AMD GPU, and Google Cloud TPU accelerator chips.
 
 The `gpu` property withing `resources` (or the `--gpu` option with `dstack apply`)
-allows specifying not only memory size but also GPU names, their memory, and quantity.
+allows specifying not only memory size but also GPU vendor, names, their memory, and quantity.
+
+The GPU vendor is indicated by one of the following case-insensitive values:
+
+- `nvidia` (NVIDIA GPUs)
+- `amd` (AMD GPUs)
+- `google` (Google TPUs)
 
 Examples:
 
 - `1` (any GPU)
+- `AMD:2` (two AMD GPUs)
 - `A100` (A100)
 - `24GB..` (any GPU starting from 24GB)
 - `24GB..40GB:2` (two GPUs between 24GB and 40GB)
 - `A10G,A100` (either A10G or A100)
 - `A100:80GB` (one A100 of 80GB)
 - `A100:2` (two A100)
+- `MI300X:4` (four MI300X)
 - `A100:40GB:2` (two A100 40GB)
-- `tpu-v2-8` (`v2` with 8 TPU cores)
+- `v2-8` (`v2` with 8 TPU cores)
 
 ??? info "Google Cloud TPU"
     Currently, you can't specify other than 8 TPU cores. This means only single host workloads are supported.
     Support for multiple hosts is coming soon.
+
+??? info "AMD GPU"
+    Currently, when an AMD GPU is specified, either by name or by vendor, the `image` property must be specified as well.
 
 ## Service quotas
 

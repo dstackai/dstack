@@ -10,7 +10,7 @@ If you already use Kubernetes, `dstack` can be used with it.
 
 #### Accelerators
 
-`dstack` supports `NVIDIA GPU` and `Google Cloud TPU` out of the box.
+`dstack` supports `NVIDIA GPU`, `AMD GPU`, and `Google Cloud TPU` out of the box.
 
 ## How does it work?
 
