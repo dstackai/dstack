@@ -1,9 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from typing_extensions import Annotated, AsyncIterator
 
-from dstack.gateway.core.auth import AuthProvider, get_auth
+from dstack.gateway.core.auth import access_to_project_required
 from dstack.gateway.openai.schemas import (
     ChatCompletionsChunk,
     ChatCompletionsRequest,
@@ -12,17 +11,7 @@ from dstack.gateway.openai.schemas import (
 )
 from dstack.gateway.openai.store import OpenAIStore, get_store
 
-
-async def auth_required(
-    project: str,
-    auth: AuthProvider = Depends(get_auth),
-    token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
-):
-    if not await auth.has_access(project, token.credentials):
-        raise HTTPException(status_code=403)
-
-
-router = APIRouter(dependencies=[Depends(auth_required)])
+router = APIRouter(dependencies=[Depends(access_to_project_required)])
 
 
 @router.get("/{project}/models")
