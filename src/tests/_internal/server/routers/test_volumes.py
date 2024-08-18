@@ -31,6 +31,139 @@ client = TestClient(app)
 class TestListVolumes:
     @pytest.mark.asyncio
     async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
+        response = client.post("/api/volumes/list")
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_lists_volumes_across_projects(self, test_db, session: AsyncSession):
+        user = await create_user(session, global_role=GlobalRole.ADMIN)
+        project1 = await create_project(session, name="project1", owner=user)
+        volume1 = await create_volume(
+            session=session,
+            project=project1,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            configuration=get_volume_configuration(name="volume1"),
+        )
+        project2 = await create_project(session, name="project2", owner=user)
+        volume2 = await create_volume(
+            session=session,
+            project=project2,
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            configuration=get_volume_configuration(name="volume2"),
+        )
+        response = client.post(
+            "/api/volumes/list",
+            headers=get_auth_headers(user.token),
+            json={},
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json() == [
+            {
+                "id": str(volume2.id),
+                "name": volume2.name,
+                "project_name": project2.name,
+                "configuration": json.loads(volume2.configuration),
+                "external": False,
+                "created_at": "2023-01-02T03:05:00+00:00",
+                "status": "submitted",
+                "status_message": None,
+                "deleted": False,
+                "volume_id": None,
+                "provisioning_data": None,
+                "attachment_data": None,
+            },
+            {
+                "id": str(volume1.id),
+                "name": volume1.name,
+                "project_name": project1.name,
+                "configuration": json.loads(volume1.configuration),
+                "external": False,
+                "created_at": "2023-01-02T03:04:00+00:00",
+                "status": "submitted",
+                "status_message": None,
+                "deleted": False,
+                "volume_id": None,
+                "provisioning_data": None,
+                "attachment_data": None,
+            },
+        ]
+        response = client.post(
+            "/api/volumes/list",
+            headers=get_auth_headers(user.token),
+            json={
+                "prev_created_at": "2023-01-02T03:05:00+00:00",
+                "prev_id": str(volume2.id),
+            },
+        )
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "id": str(volume1.id),
+                "name": volume1.name,
+                "project_name": project1.name,
+                "configuration": json.loads(volume1.configuration),
+                "external": False,
+                "created_at": "2023-01-02T03:04:00+00:00",
+                "status": "submitted",
+                "status_message": None,
+                "deleted": False,
+                "volume_id": None,
+                "provisioning_data": None,
+                "attachment_data": None,
+            },
+        ]
+
+    @pytest.mark.asyncio
+    async def test_non_admin_cannot_see_others_projects(self, test_db, session: AsyncSession):
+        user1 = await create_user(session, name="user1", global_role=GlobalRole.USER)
+        user2 = await create_user(session, name="user2", global_role=GlobalRole.USER)
+        project1 = await create_project(session, name="project1", owner=user1)
+        project2 = await create_project(session, name="project2", owner=user2)
+        await add_project_member(
+            session=session, project=project1, user=user1, project_role=ProjectRole.USER
+        )
+        await add_project_member(
+            session=session, project=project2, user=user2, project_role=ProjectRole.USER
+        )
+        volume1 = await create_volume(
+            session=session,
+            project=project1,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+            configuration=get_volume_configuration(name="volume1"),
+        )
+        await create_volume(
+            session=session,
+            project=project2,
+            created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
+            configuration=get_volume_configuration(name="volume2"),
+        )
+        response = client.post(
+            "/api/volumes/list",
+            headers=get_auth_headers(user1.token),
+            json={},
+        )
+        assert response.status_code == 200, response.json()
+        assert response.json() == [
+            {
+                "id": str(volume1.id),
+                "name": volume1.name,
+                "project_name": project1.name,
+                "configuration": json.loads(volume1.configuration),
+                "external": False,
+                "created_at": "2023-01-02T03:04:00+00:00",
+                "status": "submitted",
+                "status_message": None,
+                "deleted": False,
+                "volume_id": None,
+                "provisioning_data": None,
+                "attachment_data": None,
+            },
+        ]
+
+
+class TestListProjectVolumes:
+    @pytest.mark.asyncio
+    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
         response = client.post("/api/project/main/volumes/list")
         assert response.status_code == 403
 
@@ -53,6 +186,7 @@ class TestListVolumes:
         assert response.status_code == 200
         assert response.json() == [
             {
+                "id": str(volume.id),
                 "name": volume.name,
                 "project_name": project.name,
                 "configuration": json.loads(volume.configuration),
@@ -60,10 +194,10 @@ class TestListVolumes:
                 "created_at": "2023-01-02T03:04:00+00:00",
                 "status": "submitted",
                 "status_message": None,
+                "deleted": False,
                 "volume_id": None,
                 "provisioning_data": None,
                 "attachment_data": None,
-                "volume_model_id": str(volume.id),
             }
         ]
 
@@ -93,6 +227,7 @@ class TestGetVolume:
         )
         assert response.status_code == 200
         assert response.json() == {
+            "id": str(volume.id),
             "name": volume.name,
             "project_name": project.name,
             "configuration": json.loads(volume.configuration),
@@ -100,10 +235,10 @@ class TestGetVolume:
             "created_at": "2023-01-02T03:04:00+00:00",
             "status": "submitted",
             "status_message": None,
+            "deleted": False,
             "volume_id": None,
             "provisioning_data": None,
             "attachment_data": None,
-            "volume_model_id": str(volume.id),
         }
 
     @pytest.mark.asyncio
@@ -145,6 +280,7 @@ class TestCreateVolume:
             )
         assert response.status_code == 200
         assert response.json() == {
+            "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "name": configuration.name,
             "project_name": project.name,
             "configuration": configuration,
@@ -152,10 +288,10 @@ class TestCreateVolume:
             "created_at": "2023-01-02T03:04:00+00:00",
             "status": "submitted",
             "status_message": None,
+            "deleted": False,
             "volume_id": None,
             "provisioning_data": None,
             "attachment_data": None,
-            "volume_model_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
         }
         res = await session.execute(select(VolumeModel))
         assert res.scalar_one()

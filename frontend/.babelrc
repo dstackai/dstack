@@ -1,0 +1,35 @@
+{
+  "presets": [
+    [
+      "@babel/preset-env",
+      {
+        "targets": {
+          "browsers": "last 2 versions"
+        }
+      }
+    ],
+    "@babel/preset-typescript",
+    "@babel/preset-react"
+  ],
+  "plugins": [
+    "@babel/plugin-transform-runtime",
+    "@babel/plugin-proposal-class-properties"
+  ],
+  "env": {
+    "development": {
+      "plugins": ["react-refresh/babel"]
+    },
+    "production": {
+      "presets": [
+        [
+          "minify",
+          {
+            "builtIns": false,
+            "evaluate": false,
+            "mangle": false
+          }
+        ]
+      ]
+    }
+  }
+}

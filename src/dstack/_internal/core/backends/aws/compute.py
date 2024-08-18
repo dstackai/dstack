@@ -31,6 +31,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     SSHKey,
 )
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -40,6 +41,8 @@ from dstack._internal.core.models.volumes import (
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
+# gp2 volumes can be 1GB-16TB, dstack AMIs are 100GB
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("100GB"), max=Memory.parse("16TB"))
 
 
 class AWSGatewayBackendData(CoreModel):
@@ -71,6 +74,7 @@ class AWSCompute(Compute):
             backend=BackendType.AWS,
             locations=self.config.regions,
             requirements=requirements,
+            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
             extra_filter=_supported_instances,
         )
         regions = set(i.region for i in offers)
@@ -441,7 +445,7 @@ class AWSCompute(Compute):
 
         logger.debug("Creating EBS volume %s", volume.configuration.name)
         response = ec2_client.create_volume(
-            Size=int(volume.configuration.size),
+            Size=volume.configuration.size_gb,
             AvailabilityZone=zone,
             VolumeType=volume_type,
             TagSpecifications=[

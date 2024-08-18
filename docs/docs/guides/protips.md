@@ -2,6 +2,17 @@
 
 Below are tips and tricks to use `dstack` more efficiently.
 
+## Fleets
+
+By default, when running dev environments, tasks, or services, `dstack apply` reuses `idle` 
+instances from existing fleets. If no `idle` instances match the requirements, it creates a new fleet automatically.
+
+To avoid creating new fleet automatically, 
+set [ `creation_policy`](reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the configuration.
+
+> Use [fleets](../fleets.md) configurations to create fleets manually. This reduces startup time for dev environments,
+> tasks, and services, and is very convenient if you want to reuse fleets across runs.
+
 ## Dev environments
 
 Before running a task or service, it's recommended that you first start with a dev environment. Dev environments
@@ -31,7 +42,7 @@ Once the commands work, go ahead and run them as a task or a service.
     
     ```
 
-## Tasks vs services for web applications
+## Tasks vs. services
 
 Tasks can be used not only for batch jobs but also for web applications.
 
@@ -39,13 +50,13 @@ Tasks can be used not only for batch jobs but also for web applications.
 
 ```yaml
 type: task
+name: streamlit-task
 
-python: "3.11"
+python: "3.10"
 
 commands:
   - pip3 install streamlit
   - streamlit hello
-
 ports: 
   - 8501
 
@@ -53,12 +64,12 @@ ports:
 
 </div>
 
-While you run a task, `dstack` forwards the remote ports to `localhost`.
+While you run a task, `dstack apply` forwards the remote ports to `localhost`.
 
 <div class="termy">
 
 ```shell
-$ dstack run . -f app.dstack.yml
+$ dstack apply -f app.dstack.yml
 
   Welcome to Streamlit. Check out our demo in your browser.
 
@@ -75,7 +86,7 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
     <div class="termy">
     
     ```shell
-    $ dstack run . -f app.dstack.yml --port 3000:8501
+    $ dstack apply -f app.dstack.yml --port 3000:8501
     ```
     
     </div>
@@ -95,11 +106,12 @@ without assigning a value:
 
 ```yaml
 type: dev-environment
+name: vscode
+
+python: "3.10"
 
 env:
   - HUGGING_FACE_HUB_TOKEN
-
-python: "3.11"
 ide: vscode
 ```
 
@@ -108,13 +120,13 @@ ide: vscode
 Then, you can pass the environment variable either via the shell:
 
 ```shell
-HUGGING_FACE_HUB_TOKEN=... dstack run . -f .dstack.yml
+HUGGING_FACE_HUB_TOKEN=... dstack apply -f .dstack.yml
 ```
 
-Or via the `-e` option of the `dstack run` command:
+Or via the `-e` option of the `dstack apply` command:
 
 ```shell
-dstack run . -f .dstack.yml -e HUGGING_FACE_HUB_TOKEN=...
+dstack apply -f .dstack.yml -e HUGGING_FACE_HUB_TOKEN=...
 ```
 
 ??? info ".env"
@@ -125,7 +137,7 @@ dstack run . -f .dstack.yml -e HUGGING_FACE_HUB_TOKEN=...
     ```
     
     If you install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"},
-    it will automatically pass the environment variables from the `.env` file to the `dstack run` command.
+    it will automatically pass the environment variables from the `.env` file to the `dstack apply` command.
 
     Remember to add `.env` to `.gitignore` to avoid pushing it to the repo.    
 
@@ -140,41 +152,41 @@ For models, it's best to use services like HuggingFace Hub.
 `dstack` has no explicit support for object storage.
 You can load and save data directly from your code.
 
-## Idle instances
+## Idle duration
 
-By default, the `dstack` run command reuses an idle instance from the pool. If no instance matches the requirements, it creates a new one.
+If you run a dev environment, task, or service via `dstack apply`,
+and it creates a new fleet, it sets the idle duration to `5m`. If instances of the fleet are `idle`
+for this time, `dstack` terminates them.
 
-When the run finishes, the instance remains idle for the configured time (by default, `5m`) before it gets destroyed.
+If you create a fleet manually, the idle duration is not set.
 
-You can change the default idle duration by using ``--idle-duration DURATION`` with `dstack run`, or
-set `termination_idle_duration` in the configuration or profile.
+> You can override idle duration for fleets, dev environment, tasks, and services by
+> setting [`termination_idle_duration`](../reference/dstack.yml/dev-environment.md#termination_idle_duration) in the configuration file. 
 
-An idle instance can be destroyed at any time via `dstack pool rm INSTANCE_NAME`.
-
-## Profiles
-
-If you don't want to specify the same parameters for each configuration, you can define them once via [profiles](../reference/profiles.yml.md)
-and reuse them across configurations.
-
-This can be handy, for example, for configuring parameters such as `max_duration`, `max_price`, `termination_idle_duration`,
-`regions`, etc.
-
-Set `default` to `true` in your profile, and it will be applied automatically to any run.
+[//]: # (## Profiles)
+[//]: # ()
+[//]: # (If you don't want to specify the same parameters for each configuration, you can define them once via [profiles]&#40;../reference/profiles.yml.md&#41;)
+[//]: # (and reuse them across configurations.)
+[//]: # ()
+[//]: # (This can be handy, for example, for configuring parameters such as `max_duration`, `max_price`, `termination_idle_duration`,)
+[//]: # (`regions`, etc.)
+[//]: # ()
+[//]: # (Set `default` to `true` in your profile, and it will be applied automatically to any run.)
 
 ## Attached mode
 
-By default, `dstack run` runs in attached mode.
+By default, `dstack apply` runs in attached mode.
 This means it streams the logs as they come in and, in the case of a task, forwards its ports to `localhost`.
 
-If you detach the CLI, you can re-attach it using `dstack logs -a RUN_NAME`.
+To run in detached mode, use `-d` with `dstack apply`.
 
-To run in detached mode, use `-d` with `dstack run`.
+> If you detached the CLI, you can always re-attach to a run via `dstack logs -a RUN_NAME`.
 
 ## GPU
 
 `dstack` natively supports NVIDIA GPU, and Google Cloud TPU accelerator chips.
 
-The `gpu` property withing `resources` (or the `--gpu` option with `dstack run`)
+The `gpu` property withing `resources` (or the `--gpu` option with `dstack apply`)
 allows specifying not only memory size but also GPU names, their memory, and quantity.
 
 Examples:

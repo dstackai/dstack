@@ -23,11 +23,14 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     SSHKey,
 )
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 
 MEGABYTE = 1024**2
 INSTANCE_PULL_INTERVAL = 10
+# TODO: find out the actual lower bound considering dstack image size, 50GB is made up
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=Memory.parse("50GB"), max=Memory.parse("4TB"))
 
 
 class NebiusCompute(Compute):
@@ -42,6 +45,7 @@ class NebiusCompute(Compute):
             backend=BackendType.NEBIUS,
             locations=self.config.regions,
             requirements=requirements,
+            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
         # TODO(egor-s) quotas
         return [

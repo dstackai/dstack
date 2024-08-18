@@ -1,0 +1,35 @@
+type: task
+# The name is optional, if not specified, generated randomly
+name: ah-train
+
+# If `image` is not specified, dstack uses its default image
+python: "3.10"
+
+# Required environment variables
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - ACCELERATE_LOG_LEVEL=info
+  - WANDB_API_KEY
+# Commands of the task
+commands:
+  - conda install cuda
+  - git clone https://github.com/huggingface/alignment-handbook.git
+  - cd alignment-handbook
+  - pip install .
+  - pip install flash-attn --no-build-isolation
+  - pip install wandb
+  - accelerate launch
+    --config_file recipes/accelerate_configs/multi_gpu.yaml
+    --num_processes=$DSTACK_GPUS_NUM
+    scripts/run_sft.py
+    ../examples/fine-tuning/alignment-handbook/config.yaml
+# Uncomment to access TensorBoard
+#ports:
+#  - 6006
+
+resources:
+  gpu:
+    # 24GB or more vRAM
+    memory: 24GB..
+    # One or more GPU
+    count: 1..

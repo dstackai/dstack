@@ -2,35 +2,45 @@
 
 The `volume` configuration type allows creating, registering, and updating volumes.
 
-> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `vol.dstack.yml` are both acceptable)
-> and can be located in the project's root directory or any nested folder.
-> Any configuration can be applied via [`dstack apply`](../cli/index.md#dstack-apply).
+> Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
+> (e.g. `.dstack.yml` or `fleet.dstack.yml` are both acceptable).
+> Any configuration can be run via [`dstack apply`](../cli/index.md#dstack-apply).
 
 ## Examples
 
-### Creating a new volume { #create-volume }
+### Creating a new volume { #new-volume }
 
 <div editor-title="vol.dstack.yml"> 
 
 ```yaml
 type: volume
-name: my-aws-volume
+# The name of the volume
+name: my-new-volume
+
+# Volumes are bound to a specific backend and region
 backend: aws
 region: eu-central-1
+
+# The size of the volume
 size: 100GB
 ```
 
 </div>
 
-### Registering an existing volume { #register-volume }
+### Registering an existing volume { #existing-volume }
 
-<div editor-title="ext-vol.dstack.yml"> 
+<div editor-title="vol-exist.dstack.yml"> 
     
 ```yaml
 type: volume
-name: my-external-volume
+# The name of the volume
+name: my-existing-volume
+
+# Volumes are bound to a specific backend and region
 backend: aws
 region: eu-central-1
+
+# The ID of the volume in AWS
 volume_id: vol1235
 ```
 

@@ -3,7 +3,7 @@
 *.egg-info
 
 dist/
-/venv/
+venv/
 /.cache/
 .pytest_cache/
 .coverage
@@ -12,6 +12,8 @@ dist/
 
 /runner/cmd/shim/shim
 /runner/cmd/runner/runner
+
+/src/dstack/_internal/server/statics
 
 build/
 .DS_Store

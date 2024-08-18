@@ -27,10 +27,10 @@ class SSHAttach:
                 filter(lambda s: not s.startswith("grep"), output.decode().strip().split("\n"))
             )
             if commands:
-                port_pattern = r"-L (\d+):localhost:(\d+)"
+                port_pattern = r"-L (?:[\w.-]+:)?(\d+):localhost:(\d+)"
                 matches = re.findall(port_pattern, commands[0])
                 return control_sock_path, PortsLock(
-                    {int(local_port): int(target_port) for local_port, target_port in matches}
+                    {int(target_port): int(local_port) for local_port, target_port in matches}
                 )
         return None
 
@@ -46,6 +46,7 @@ class SSHAttach:
         ssh_proxy: Optional[SSHConnectionParams] = None,
         control_sock_path: Optional[str] = None,
         local_backend: bool = False,
+        bind_address: Optional[str] = None,
     ):
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
@@ -57,6 +58,7 @@ class SSHAttach:
             id_rsa_path=id_rsa_path,
             control_sock_path=control_sock_path,
             ssh_config_path=self.ssh_config_path,
+            bind_address=bind_address,
         )
         self.ssh_proxy = ssh_proxy
         if ssh_proxy is None:
@@ -83,7 +85,7 @@ class SSHAttach:
             self.container_config = {
                 "HostName": "localhost",
                 "Port": 10022,
-                "User": "root",
+                "User": "root",  # TODO(#1535): support non-root images properly
                 "IdentityFile": id_rsa_path,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",

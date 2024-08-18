@@ -4,6 +4,7 @@ from typing import BinaryIO, Dict, List, Optional, Union
 import requests
 import requests.exceptions
 
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
@@ -17,6 +18,7 @@ from dstack._internal.server.schemas.runner import (
     SubmitBody,
     TaskConfigBody,
 )
+from dstack._internal.utils.common import get_or_error
 
 REMOTE_SHIM_PORT = 10998
 REMOTE_RUNNER_PORT = 10999
@@ -57,7 +59,18 @@ class RunnerClient:
         cluster_info: ClusterInfo,
         secrets: Dict[str, str],
         repo_credentials: Optional[RemoteRepoCreds],
+        instance_env: Optional[Union[Env, Dict[str, str]]] = None,
     ):
+        # XXX: This is a quick-and-dirty hack to deliver InstanceModel-specific environment
+        # variables to the runner without runner API modification.
+        if instance_env is not None:
+            if isinstance(instance_env, Env):
+                merged_env = instance_env.as_dict()
+            else:
+                merged_env = instance_env.copy()
+            merged_env.update(job_spec.env)
+            job_spec = job_spec.copy(deep=True)
+            job_spec.env = merged_env
         body = SubmitBody(
             run_spec=run_spec,
             job_spec=job_spec,
@@ -123,6 +136,7 @@ class ShimClient:
         password: str,
         image_name: str,
         container_name: str,
+        container_user: Optional[str],
         shm_size: Optional[Memory],
         public_keys: List[str],
         ssh_user: str,
@@ -137,6 +151,7 @@ class ShimClient:
             password=password,
             image_name=image_name,
             container_name=container_name,
+            container_user=container_user,
             shm_size=_shm_size,
             public_keys=public_keys,
             ssh_user=ssh_user,
@@ -177,7 +192,8 @@ def health_response_to_health_status(data: HealthcheckResponse) -> HealthStatus:
 
 def _volume_to_shim_volume_info(volume: Volume) -> ShimVolumeInfo:
     return ShimVolumeInfo(
+        backend=volume.configuration.backend.value,
         name=volume.name,
-        volume_id=volume.volume_id,
+        volume_id=get_or_error(volume.volume_id),
         init_fs=not volume.external,
     )

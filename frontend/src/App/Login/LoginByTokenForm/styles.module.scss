@@ -1,0 +1,25 @@
+.form {
+    max-width: 440px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.token {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+.fieldWrap {
+    flex-grow: 1;
+    min-width: 0;
+}
+.buttonWrap {
+    display: flex;
+    flex-shrink: 0;
+    width: 104px;
+    margin-right: -20px;
+    margin-top: 4px;
+
+    button {
+        white-space: nowrap !important;
+    }
+}

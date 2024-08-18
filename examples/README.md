@@ -1,19 +1,8 @@
 # Examples
 
-This folder contains examples showing how to use `dstack`.
+## Prerequisites
 
-> [!IMPORTANT]
-> Feel free to contribute your examples or enhance the existing ones—your PRs are warmly welcomed in this repo!
-
-## Getting started
-
-### Prerequisites
-
-To use the open-source version, make sure to [install the server](https://dstack.ai/docs/installation/) and configure backends.
-
-### Run examples
-
-#### Init the repo
+Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo and run `dstack init`
 
 ```shell
 git clone https://github.com/dstackai/dstack
@@ -21,34 +10,14 @@ cd dstack
 dstack init
 ```
 
-#### Run a dev environment
+Now you are ready to run examples! 
 
-Here's how to run a dev environment with the current repo:
+> Browse the examples using the menu on the left.
 
-```shell
-dstack run . -f examples/.dstack.yml
-```
+## Source code
 
-#### Run other examples
+The source-code of examples can be found in  [`https://github.com/dstackai/dstack`](https://github.com/dstackai/dstack/tree/master/examples).
 
-Here's how to run other examples, e.g. [`deployment/vllm`](deployment/vllm/):
+## Contributing
 
-```shell
-dstack run . -f examples/deployment/vllm/serve.dstack.yml
-```
-
-## Featrued
-
-Here are some featured examples:
-
-- [Llama 3](llms/llama3)
-- [Alignment Handbook](fine-tuning/alignment-handbook)
-- [vLLM](deployment/vllm)
-- [Axolotl](fine-tuning/axolotl)
-- [TGI](deployment/tgi)
-- [Ollama](deployment/ollama)
-
-Browse [deployment](deployment), [fine-tuning](deployment), [llms](llms), and [misc](misc) for more.
-
-> [!IMPORTANT]
-> Feel free to contribute your examples or enhance the existing ones—your PRs are warmly welcomed in this repo!
+Can't find an important example? Raise an [issue](https://github.com/dstackai/dstack/issues) or send a [pull request](https://github.com/dstackai/dstack/tree/examples)!

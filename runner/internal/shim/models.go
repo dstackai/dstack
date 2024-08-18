@@ -51,6 +51,7 @@ type MountPoint struct {
 }
 
 type VolumeInfo struct {
+	Backend  string `json:"backend"`
 	Name     string `json:"name"`
 	VolumeId string `json:"volume_id"`
 	InitFs   bool   `json:"init_fs"`
@@ -61,6 +62,7 @@ type TaskConfig struct {
 	Password      string       `json:"password"`
 	ImageName     string       `json:"image_name"`
 	ContainerName string       `json:"container_name"`
+	ContainerUser string       `json:"container_user"`
 	ShmSize       int64        `json:"shm_size"`
 	PublicKeys    []string     `json:"public_keys"`
 	SshUser       string       `json:"ssh_user"`

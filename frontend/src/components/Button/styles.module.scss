@@ -1,0 +1,15 @@
+@use '@cloudscape-design/design-tokens/index' as awsui;
+
+.button {
+    &.danger-normal {
+        &:not([disabled]) {
+            color: awsui.$color-charts-red-600 !important;
+            border-color: awsui.$color-charts-red-600 !important;
+
+            &:hover {
+                color: awsui.$color-charts-red-500 !important;
+                border-color: awsui.$color-charts-red-500 !important;
+            }
+        }
+    }
+}

@@ -1,5 +1,4 @@
 type: task
-# This task fine-tunes Llama 2 with QLoRA. Learn more at https://dstack.ai/examples/qlora/
 
 python: "3.11"
 

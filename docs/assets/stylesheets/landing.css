@@ -429,15 +429,15 @@
 }
 
 .tx-landing__highlights_grid h3 {
-    font-size: 1.125em;
+    font-size: 1.2em;
     font-weight: 700;
     border-bottom: none;
-    padding-bottom: 0.2em;
+    padding-bottom: 0.3em;
     margin-top: 0;
     line-height: 32px;
 }
 
-.tx-landing__highlights_grid h3:after {
+.tx-landing__highlights_grid h3.external:after {
     content: url('data:image/svg+xml,<svg fill="black" xmlns="http://www.w3.org/2000/svg" width="22px" height="22px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
     margin-left: 2px;
     position: relative;
@@ -545,7 +545,7 @@
 }
 
 /*.tx-landing__bottom_cta*/ [data-termynal] {
-    font-size: 16px;
+    font-size: 15px;
 }
 
 .tx-landing__bottom_cta .termy {
@@ -619,6 +619,10 @@
 
     .tx-footer__section {
         margin-bottom: 1.5rem;
+    }
+
+    .md-header__buttons {
+        padding: 4px 0;
     }
 }
 

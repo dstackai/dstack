@@ -24,6 +24,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	"github.com/dstackai/dstack/runner/consts"
+	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/icza/backscanner"
 	bytesize "github.com/inhies/go-bytesize"
 	"github.com/ztrue/tracerr"
@@ -176,6 +177,14 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		if d.containerStatus.OOMKilled {
 			errMessage = "Container killed by OOM"
 		}
+		if errMessage == "" {
+			lastLogs, err := getContainerLastLogs(d.client, containerID, 5)
+			if err == nil {
+				errMessage = strings.Join(lastLogs, "\n")
+			} else {
+				log.Printf("getContainerLastLogs error: %s\n", err.Error())
+			}
+		}
 		d.jobResult = JobResult{Reason: "CONTAINER_EXITED_WITH_ERROR", ReasonMessage: errMessage}
 		return tracerr.Wrap(err)
 	}
@@ -217,6 +226,16 @@ func (d DockerRunner) GetState() (RunnerStatus, ContainerStatus, string, JobResu
 	return d.state, d.containerStatus, d.executorError, d.jobResult
 }
 
+func getBackend(backendType string) (backends.Backend, error) {
+	switch backendType {
+	case "aws":
+		return backends.NewAWSBackend(), nil
+	case "gcp":
+		return backends.NewGCPBackend(), nil
+	}
+	return nil, fmt.Errorf("unknown backend: %q", backendType)
+}
+
 func prepareVolumes(taskConfig TaskConfig) error {
 	for _, volume := range taskConfig.Volumes {
 		err := formatAndMountVolume(volume)
@@ -228,7 +247,11 @@ func prepareVolumes(taskConfig TaskConfig) error {
 }
 
 func formatAndMountVolume(volume VolumeInfo) error {
-	deviceName, err := getRealDeviceName(volume.VolumeId)
+	backend, err := getBackend(volume.Backend)
+	if err != nil {
+		return tracerr.Wrap(err)
+	}
+	deviceName, err := backend.GetRealDeviceName(volume.VolumeId)
 	if err != nil {
 		return tracerr.Wrap(err)
 	}
@@ -246,34 +269,6 @@ func formatAndMountVolume(volume VolumeInfo) error {
 func getVolumeMountPoint(volumeName string) string {
 	// Put volumes in data-specific dir to avoid clashes with host dirs
 	return fmt.Sprintf("/dstack-volumes/%s", volumeName)
-}
-
-// getRealDeviceName returns the device name for the given EBS volume ID.
-// The device name on instance can be different from device name specified in block-device mapping
-// (e.g. NVMe block devices built on the Nitro System).
-func getRealDeviceName(volumeID string) (string, error) {
-	// Run the lsblk command to get block device information
-	// TODO: On AWS SERIAL contains volume id. This may not be true for other clouds.
-	cmd := exec.Command("lsblk", "-o", "NAME,SERIAL")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to list block devices: %v", err)
-	}
-
-	// Parse the output to find the device that matches the volume ID
-	lines := strings.Split(out.String(), "\n")
-	for _, line := range lines {
-		fields := strings.Fields(line)
-		if len(fields) == 2 && strings.HasPrefix(fields[1], "vol") {
-			serial := strings.TrimPrefix(fields[1], "vol")
-			if "vol-"+serial == volumeID {
-				return "/dev/" + fields[0], nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("volume %s not found among block devices", volumeID)
 }
 
 // initFileSystem creates an ext4 file system on a disk only if the disk is not already has a file system.
@@ -366,6 +361,7 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 		Id             string         `json:"id"`
 		Status         string         `json:"status"`
 		ProgressDetail ProgressDetail `json:"progressDetail"` //nolint:tagliatelle
+		Error          string         `json:"error"`
 	}
 
 	var status bool
@@ -383,6 +379,9 @@ func pullImage(ctx context.Context, client docker.APIClient, taskConfig TaskConf
 		}
 		if progressRow.Status == "Download complete" {
 			current[progressRow.Id] = total[progressRow.Id]
+		}
+		if progressRow.Error != "" {
+			log.Printf("Error pulling %s: %s", taskConfig.ImageName, progressRow.Error)
 		}
 		if strings.HasPrefix(progressRow.Status, "Status:") {
 			status = true
@@ -456,6 +455,9 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
 		Env:          envVars,
 	}
+	if taskConfig.ContainerUser != "" {
+		containerConfig.User = taskConfig.ContainerUser
+	}
 	hostConfig := &container.HostConfig{
 		Privileged:      dockerParams.DockerPrivileged(),
 		NetworkMode:     getNetworkMode(),
@@ -484,7 +486,12 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 
 	waitCh, errorCh := client.ContainerWait(ctx, containerID, "")
 	select {
-	case <-waitCh:
+	case waitResp := <-waitCh:
+		{
+			if waitResp.StatusCode != 0 {
+				return fmt.Errorf("container exited with exit code %d", waitResp.StatusCode)
+			}
+		}
 	case err := <-errorCh:
 		return tracerr.Wrap(err)
 	}
@@ -494,6 +501,8 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 
 func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 	return []string{
+		// TODO(#1535): support non-root images properly
+		"mkdir -p /root && chown root:root /root && export HOME=/root",
 		// note: &> redirection doesn't work in /bin/sh
 		// check in sshd is here, install if not
 		"if ! command -v sshd >/dev/null 2>&1; then { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server; } || { yum -y install openssh-server; }; fi",
@@ -568,6 +577,32 @@ func getVolumeMounts(mountPoints []MountPoint) ([]mount.Mount, error) {
 		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: source, Target: mountPoint.Path})
 	}
 	return mounts, nil
+}
+
+func getContainerLastLogs(client docker.APIClient, containerID string, n int) ([]string, error) {
+	options := container.LogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       fmt.Sprintf("%d", n),
+	}
+
+	ctx := context.Background()
+	reader, err := client.ContainerLogs(ctx, containerID, options)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil && err != io.EOF {
+		return nil, err
+	}
+
+	return lines, nil
 }
 
 /* DockerParameters interface implementation for CLIArgs */

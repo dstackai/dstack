@@ -1,5 +1,7 @@
+import math
 from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
+import gpuhunt
 from pydantic import Field, root_validator, validator
 from pydantic.generics import GenericModel
 from typing_extensions import Annotated
@@ -48,6 +50,22 @@ class Range(GenericModel, Generic[T]):
         if min == max:
             return str(min)
         return f"{min}..{max}"
+
+    def intersect(self, other: "Range") -> Optional["Range"]:
+        start = max(
+            self.min if self.min is not None else -math.inf,
+            other.min if other.min is not None else -math.inf,
+        )
+        end = min(
+            self.max if self.max is not None else math.inf,
+            other.max if other.max is not None else math.inf,
+        )
+        if start > end:
+            return None
+        return Range(
+            min=start if abs(start) != math.inf else None,
+            max=end if abs(end) != math.inf else None,
+        )
 
 
 class Memory(float):
@@ -105,6 +123,9 @@ DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
 
 
 class GPUSpec(CoreModel):
+    vendor: Annotated[
+        Optional[gpuhunt.AcceleratorVendor], Field(description="The vendor of the GPU/accelerator")
+    ] = None
     name: Annotated[
         Optional[List[str]], Field(description="The name of the GPU (e.g., `A100` or `H100`)")
     ] = None
@@ -141,6 +162,14 @@ class GPUSpec(CoreModel):
             for token in tokens:
                 if not token:
                     raise ValueError(f"GPU spec contains empty token: {v}")
+                try:
+                    vendor = gpuhunt.AcceleratorVendor.cast(token)
+                except ValueError:
+                    vendor = None
+                if vendor:
+                    if "vendor" in spec:
+                        raise ValueError(f"GPU spec vendor conflict: {v}")
+                    spec["vendor"] = vendor
                 elif token[0].isalpha():  # GPU name is always starts with a letter
                     if "name" in spec:
                         raise ValueError(f"GPU spec name conflict: {v}")
@@ -164,8 +193,13 @@ class GPUSpec(CoreModel):
             return [v]
         return v
 
-
-MIN_DISK_SIZE = 50
+    @validator("vendor", pre=True)
+    def _validate_vendor(
+        cls, v: Union[str, gpuhunt.AcceleratorVendor, None]
+    ) -> Optional[gpuhunt.AcceleratorVendor]:
+        if v is None:
+            return None
+        return gpuhunt.AcceleratorVendor.cast(v)
 
 
 class DiskSpec(CoreModel):
@@ -181,14 +215,6 @@ class DiskSpec(CoreModel):
         if isinstance(v, (str, int, float)):
             return {"size": v}
         return v
-
-    @validator("size")
-    def validate_size(cls, size):
-        if size.min is not None and size.min < MIN_DISK_SIZE:
-            raise ValueError(f"Min disk size should be >= {MIN_DISK_SIZE}GB")
-        if size.max is not None and size.max < MIN_DISK_SIZE:
-            raise ValueError(f"Max disk size should be >= {MIN_DISK_SIZE}GB")
-        return size
 
 
 DEFAULT_DISK = DiskSpec(size=Range[Memory](min=Memory.parse("100GB"), max=None))

@@ -275,7 +275,6 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             await gateways.unregister_replica(
                 session, job_model
             )  # TODO(egor-s) ensure always runs
-
         finally:
             PROCESSING_INSTANCES_IDS.remove(instance.id)
 

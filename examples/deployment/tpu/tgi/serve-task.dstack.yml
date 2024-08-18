@@ -12,4 +12,4 @@ ports:
   - 8000
 
 resources:
-  gpu: tpu-v5litepod-8
+  gpu: v5litepod-8

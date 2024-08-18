@@ -127,10 +127,12 @@ class Run(ABC):
         secure = False
         if self._run.service is not None:
             url = urlparse(self._run.service.url)
+            service_port = url.port
+            if service_port is None:
+                service_port = 443 if self._run.run_spec.configuration.https else 80
             ports = {
                 **ports,
-                # we support only default https port
-                self._run.run_spec.configuration.port.container_port: url.port or 443,
+                self._run.run_spec.configuration.port.container_port: service_port,
             }
             hostname = url.hostname
             secure = url.scheme == "https"
@@ -219,6 +221,7 @@ class Run(ABC):
     def attach(
         self,
         ssh_identity_file: Optional[PathLike] = None,
+        bind_address: Optional[str] = None,
     ) -> bool:
         """
         Establish an SSH tunnel to the instance and update SSH config
@@ -284,6 +287,7 @@ class Run(ABC):
                 if control_sock_path_and_port_locks
                 else None,
                 local_backend=provisioning_data.backend == BackendType.LOCAL,
+                bind_address=bind_address,
             )
             if not control_sock_path_and_port_locks:
                 self._ssh_attach.attach()

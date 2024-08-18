@@ -190,7 +190,7 @@ class RunpodCompute(Compute):
         )
 
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
-        size_gb = int(volume.configuration.size)
+        size_gb = volume.configuration.size_gb
         volume_id = self.api_client.create_network_volume(
             name=volume.name,
             region=volume.configuration.region,

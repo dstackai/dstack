@@ -39,8 +39,11 @@ def get_default_python_verison() -> str:
         )
 
 
-def get_default_image(python_version: str) -> str:
-    return f"dstackai/base:py{python_version}-{version.base_image}-cuda-12.1"
+def get_default_image(python_version: str, nvcc: bool = False) -> str:
+    suffix = ""
+    if nvcc:
+        suffix = "-devel"
+    return f"dstackai/base:py{python_version}-{version.base_image}-cuda-12.1{suffix}"
 
 
 class JobConfigurator(ABC):
@@ -134,7 +137,7 @@ class JobConfigurator(ABC):
         return specs
 
     def _env(self) -> Dict[str, str]:
-        return self.run_spec.configuration.env
+        return self.run_spec.configuration.env.as_dict()
 
     def _home_dir(self) -> Optional[str]:
         return self.run_spec.configuration.home_dir
@@ -142,7 +145,7 @@ class JobConfigurator(ABC):
     def _image_name(self) -> str:
         if self.run_spec.configuration.image is not None:
             return self.run_spec.configuration.image
-        return get_default_image(self._python())
+        return get_default_image(self._python(), nvcc=bool(self.run_spec.configuration.nvcc))
 
     def _max_duration(self) -> Optional[int]:
         if self.run_spec.merged_profile.max_duration is None:

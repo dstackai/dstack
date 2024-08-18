@@ -78,9 +78,10 @@ async def process_running_jobs():
             RUNNING_PROCESSING_JOBS_IDS.add(job_model.id)
 
     try:
-        await _process_job(job_id=job_model.id)
+        job_model_id = job_model.id
+        await _process_job(job_id=job_model_id)
     finally:
-        RUNNING_PROCESSING_JOBS_IDS.remove(job_model.id)
+        RUNNING_PROCESSING_JOBS_IDS.remove(job_model_id)
 
 
 async def _process_job(job_id: UUID):
@@ -395,6 +396,9 @@ def _process_provisioning_with_shim(
         password=password,
         image_name=job_spec.image_name,
         container_name=job_model.job_name,
+        # Images may use non-root users but dstack requires root, so force it.
+        # TODO(#1535): support non-root images properly
+        container_user="root",
         shm_size=job_spec.requirements.resources.shm_size,
         public_keys=public_keys,
         ssh_user=ssh_user,
@@ -549,12 +553,19 @@ def _submit_job_to_runner(
         fmt(job_model),
         None if repo_credentials is None else repo_credentials.clone_url,
     )
+    instance = job_model.instance
+    if instance is not None and instance.remote_connection_info is not None:
+        remote_info = RemoteConnectionInfo.__response__.parse_raw(instance.remote_connection_info)
+        instance_env = remote_info.env
+    else:
+        instance_env = None
     runner_client.submit_job(
         run_spec=run.run_spec,
         job_spec=job.job_spec,
         cluster_info=cluster_info,
         secrets=secrets,
         repo_credentials=repo_credentials,
+        instance_env=instance_env,
     )
     logger.debug("%s: uploading code", fmt(job_model))
     runner_client.upload_code(code)

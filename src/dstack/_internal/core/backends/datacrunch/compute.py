@@ -15,11 +15,19 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     SSHKey,
 )
+from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger("datacrunch.compute")
+
+# Ubuntu 22.04 + CUDA 12.0 + Docker
+# from API https://datacrunch.stoplight.io/docs/datacrunch-public/c46ab45dbc508-get-all-image-types
+IMAGE_ID = "2088da25-bb0d-41cc-a191-dccae45d96fd"
+IMAGE_SIZE = Memory.parse("50GB")
+
+CONFIGURABLE_DISK_SIZE = Range[Memory](min=IMAGE_SIZE, max=None)
 
 
 class DataCrunchCompute(Compute):
@@ -34,6 +42,7 @@ class DataCrunchCompute(Compute):
             backend=BackendType.DATACRUNCH,
             locations=self.config.regions,
             requirements=requirements,
+            configurable_disk_size=CONFIGURABLE_DISK_SIZE,
         )
         offers_with_availability = self._get_offers_with_availability(offers)
         return offers_with_availability
@@ -90,10 +99,6 @@ class DataCrunchCompute(Compute):
             name=script_name, script=startup_script
         )
 
-        # Id of image "Ubuntu 22.04 + CUDA 12.0 + Docker"
-        # from API https://datacrunch.stoplight.io/docs/datacrunch-public/c46ab45dbc508-get-all-image-types
-        image_name = "2088da25-bb0d-41cc-a191-dccae45d96fd"
-
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
         instance = self.api_client.deploy_instance(
@@ -102,7 +107,7 @@ class DataCrunchCompute(Compute):
             startup_script_id=startup_script_ids,
             hostname=instance_config.instance_name,
             description=instance_config.instance_name,
-            image=image_name,
+            image=IMAGE_ID,
             disk_size=disk_size,
             location=instance_offer.region,
         )
@@ -115,7 +120,7 @@ class DataCrunchCompute(Compute):
                 "startup_script_id": startup_script_ids,
                 "hostname": instance_config.instance_name,
                 "description": instance_config.instance_name,
-                "image": image_name,
+                "image": IMAGE_ID,
                 "disk_size": disk_size,
                 "location": instance_offer.region,
             },

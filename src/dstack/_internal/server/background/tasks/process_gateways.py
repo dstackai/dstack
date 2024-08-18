@@ -49,9 +49,10 @@ async def process_submitted_gateways():
             PROCESSING_GATEWAYS_IDS.add(gateway_model.id)
 
     try:
-        await _process_gateway(gateway_id=gateway_model.id)
+        gateway_model_id = gateway_model.id
+        await _process_gateway(gateway_id=gateway_model_id)
     finally:
-        PROCESSING_GATEWAYS_IDS.remove(gateway_model.id)
+        PROCESSING_GATEWAYS_IDS.remove(gateway_model_id)
 
 
 async def _process_connection(conn: GatewayConnection):

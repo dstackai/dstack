@@ -1,0 +1,15 @@
+type: task
+name: ray-cluster
+nodes: 4
+commands:
+  - pip install -U "ray[default]"
+  - >
+    if [ $DSTACK_NODE_RANK = 0 ]; then 
+      ray start --head --port=6379;
+    else
+      ray start --address=$DSTACK_MASTER_NODE_IP:6379
+    fi
+ports:
+  - 8265 # ray dashboard port
+resources: 
+  shm_size: 8GB

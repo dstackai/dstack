@@ -1,9 +1,9 @@
 import re
-from typing import Any, Type, Union
+from typing import Any, Type, TypeVar, Union
 
 from pydantic import Field
 from pydantic_duality import DualBaseModel
-from typing_extensions import Annotated
+from typing_extensions import Annotated, TypeGuard
 
 
 # DualBaseModel creates two classes for the model:
@@ -65,7 +65,10 @@ class RegistryAuth(CoreModel):
     password: Annotated[str, Field(description="The password or access token")]
 
 
-def is_core_model_instance(instance: Any, class_: Type[CoreModel]) -> bool:
+_CM = TypeVar("_CM", bound=CoreModel)
+
+
+def is_core_model_instance(instance: Any, class_: Type[_CM]) -> TypeGuard[_CM]:
     """
     Implements isinstance check for CoreModel such that
     models parsed with MyModel.__response__ pass the check against MyModel.

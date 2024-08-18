@@ -11,6 +11,7 @@ from dstack._internal.core.errors import (
     ResourceExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     Fleet,
     FleetSpec,
@@ -141,6 +142,7 @@ async def create_fleet(
                 pool=pool,
                 spec=spec,
                 ssh_params=spec.configuration.ssh_config,
+                env=spec.configuration.env,
                 instance_num=i,
                 host=host,
             )
@@ -192,6 +194,7 @@ async def create_fleet_ssh_instance_model(
     pool: PoolModel,
     spec: FleetSpec,
     ssh_params: SSHParams,
+    env: Env,
     instance_num: int,
     host: Union[SSHHostParams, str],
 ) -> InstanceModel:
@@ -219,6 +222,7 @@ async def create_fleet_ssh_instance_model(
         host=hostname,
         ssh_user=ssh_user,
         ssh_keys=[ssh_key],
+        env=env,
         instance_network=ssh_params.network,
         port=port or 22,
     )

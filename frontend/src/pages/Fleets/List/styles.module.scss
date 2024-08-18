@@ -1,0 +1,10 @@
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 20px;
+
+    .activeOnly {
+        display: flex;
+        align-items: center;
+    }
+}

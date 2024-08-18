@@ -1,0 +1,24 @@
+@use '@cloudscape-design/design-tokens/index' as awsui;
+
+.bucketSelector {
+    &:global(.disabled) {
+        & * {
+            pointer-events: none!important;
+        }
+        & input {
+            background-color: awsui.$color-background-input-disabled !important;
+            border: 2px solid awsui.$color-background-input-disabled !important;
+            color: awsui.$color-text-input-disabled !important;
+            cursor: default !important;
+        }
+
+        & button {
+            background-color: awsui.$color-background-input-disabled !important;
+            border-color: awsui.$color-border-button-normal-disabled !important;
+            color: awsui.$color-text-interactive-disabled;
+            text-decoration: none !important;
+            pointer-events: none !important;
+            cursor: auto !important;
+        }
+    }
+}

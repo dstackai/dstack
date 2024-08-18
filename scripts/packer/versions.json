@@ -1,4 +1,4 @@
 {
-  "docker_version": "20.10.17",
+  "docker_version": "27.1.1",
   "cuda_drivers_version": "535.183.01-1"
 }

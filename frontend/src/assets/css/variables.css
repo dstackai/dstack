@@ -1,0 +1,8 @@
+@custom-media --mobile (width <= 640px);
+@custom-media --no-mobile (width > 640px);
+@custom-media --no-desktop (width < 980px);
+@custom-media --desktop (width >= 980px);
+
+:root {
+
+}

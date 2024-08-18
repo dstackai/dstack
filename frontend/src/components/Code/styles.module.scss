@@ -1,0 +1,7 @@
+@use '@cloudscape-design/design-tokens/index' as awsui;
+
+.code {
+    padding: 8px;
+    background-color: awsui.$color-background-input-disabled;
+    border-radius: 8px;
+}

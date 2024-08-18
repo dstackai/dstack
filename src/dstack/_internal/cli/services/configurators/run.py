@@ -1,14 +1,18 @@
 import argparse
-import os
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
+
+import gpuhunt
 
 import dstack._internal.core.models.resources as resources
-from dstack._internal.cli.services.args import disk_spec, env_var, gpu_spec, port_mapping
-from dstack._internal.cli.services.configurators.base import BaseApplyConfigurator
+from dstack._internal.cli.services.args import disk_spec, gpu_spec, port_mapping
+from dstack._internal.cli.services.configurators.base import (
+    ApplyEnvVarsConfiguratorMixin,
+    BaseApplyConfigurator,
+)
 from dstack._internal.cli.services.profile import apply_profile_args, register_profile_args
 from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.run import print_run_plan
@@ -18,14 +22,13 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import is_core_model_instance
+from dstack._internal.core.models.common import RegistryAuth
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     ApplyConfigurationType,
     BaseRunConfiguration,
     BaseRunConfigurationWithPorts,
     DevEnvironmentConfiguration,
-    EnvSentinel,
     PortMapping,
     RunConfigurationType,
     ServiceConfiguration,
@@ -33,12 +36,18 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
-from dstack._internal.utils.interpolator import VariablesInterpolator
+from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
 
+_KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
+_KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
+_KNOWN_TPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}
 
-class BaseRunConfigurator(BaseApplyConfigurator):
+_BIND_ADDRESS_ARG = "bind_address"
+
+
+class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     TYPE: ApplyConfigurationType
 
     def apply_configuration(
@@ -50,6 +59,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
         unknown_args: List[str],
     ):
         self.apply_args(conf, configurator_args, unknown_args)
+        self.validate_gpu_vendor_and_image(conf)
         repo = self.api.repos.load(Path.cwd())
         repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
         self.api.ssh_identity_file = repo_config.ssh_key_path
@@ -130,14 +140,17 @@ class BaseRunConfigurator(BaseApplyConfigurator):
                         console.print(
                             f"Service is published at [link={run.service_url}]{run.service_url}[/]\n"
                         )
+                    bind_address: Optional[str] = getattr(
+                        configurator_args, _BIND_ADDRESS_ARG, None
+                    )
                     try:
-                        if run.attach():
+                        if run.attach(bind_address=bind_address):
                             for entry in run.logs():
                                 sys.stdout.buffer.write(entry)
                                 sys.stdout.buffer.flush()
                         else:
                             console.print("[error]Failed to attach, exiting...[/]")
-                            return
+                            exit(1)
                     finally:
                         run.detach()
 
@@ -152,14 +165,14 @@ class BaseRunConfigurator(BaseApplyConfigurator):
                         break
                     if run.status.is_finished():
                         _print_finished_message(run)
-                        return
+                        exit(_get_run_exit_code(run))
                     time.sleep(1)
                 if not reattach:
                     console.print(
                         "[error]Lost run connection. Timed out waiting for run final status."
                         " Check `dstack ps` to see if it's done or failed."
                     )
-                    return
+                    exit(1)
         except KeyboardInterrupt:
             try:
                 if not confirm_ask("\nStop the run before detaching?"):
@@ -190,7 +203,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
     ):
         if conf.name is None:
             console.print("[error]Configuration specifies no run to delete[/]")
-            return
+            exit(1)
         try:
             self.api.client.runs.get(
                 project_name=self.api.project,
@@ -198,7 +211,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
             )
         except ResourceNotExistsError:
             console.print(f"Run [code]{conf.name}[/] does not exist")
-            return
+            exit(1)
         if not command_args.yes and not confirm_ask(f"Delete the run [code]{conf.name}[/]?"):
             console.print("\nExiting...")
             return
@@ -229,15 +242,7 @@ class BaseRunConfigurator(BaseApplyConfigurator):
             type=int,
             default=3,
         )
-        parser.add_argument(
-            "-e",
-            "--env",
-            type=env_var,
-            action="append",
-            help="Environment variables",
-            dest="envs",
-            metavar="KEY=VALUE",
-        )
+        cls.register_env_args(parser)
         parser.add_argument(
             "--gpu",
             type=gpu_spec,
@@ -259,28 +264,83 @@ class BaseRunConfigurator(BaseApplyConfigurator):
         apply_profile_args(args, conf)
         if args.run_name:
             conf.name = args.run_name
-        if args.envs:
-            for k, v in args.envs:
-                conf.env[k] = v
         if args.gpu_spec:
             conf.resources.gpu = resources.GPUSpec.parse_obj(args.gpu_spec)
         if args.disk_spec:
             conf.resources.disk = args.disk_spec
 
-        for k, v in conf.env.items():
-            if is_core_model_instance(v, EnvSentinel):
-                try:
-                    conf.env[k] = v.from_env(os.environ)
-                except ValueError as e:
-                    raise ConfigurationError(*e.args)
-
+        self.apply_env_vars(conf.env, args)
+        self.interpolate_env(conf)
         self.interpolate_run_args(conf.setup, unknown)
 
     def interpolate_run_args(self, value: List[str], unknown):
         run_args = " ".join(unknown)
         interpolator = VariablesInterpolator({"run": {"args": run_args}}, skip=["secrets"])
-        for i in range(len(value)):
-            value[i] = interpolator.interpolate(value[i])
+        try:
+            for i in range(len(value)):
+                value[i] = interpolator.interpolate_or_error(value[i])
+        except InterpolatorError as e:
+            raise ConfigurationError(e.args[0])
+
+    def interpolate_env(self, conf: BaseRunConfiguration):
+        env_dict = conf.env.as_dict()
+        interpolator = VariablesInterpolator({"env": env_dict}, skip=["secrets"])
+        try:
+            if conf.registry_auth is not None:
+                conf.registry_auth = RegistryAuth(
+                    username=interpolator.interpolate_or_error(conf.registry_auth.username),
+                    password=interpolator.interpolate_or_error(conf.registry_auth.password),
+                )
+        except InterpolatorError as e:
+            raise ConfigurationError(e.args[0])
+
+    def validate_gpu_vendor_and_image(self, conf: BaseRunConfiguration) -> None:
+        """
+        Infers `resources.gpu.vendor` if not set, requires `image` if the vendor is AMD.
+        """
+        gpu_spec = conf.resources.gpu
+        if gpu_spec is None:
+            return
+        if gpu_spec.count.max == 0:
+            return
+        has_amd_gpu: bool
+        vendor = gpu_spec.vendor
+        if vendor is None:
+            names = gpu_spec.name
+            if names:
+                # None is a placeholder for an unknown vendor.
+                vendors: Set[Optional[gpuhunt.AcceleratorVendor]] = set()
+                for name in names:
+                    name = name.lower()
+                    if name in _KNOWN_NVIDIA_GPUS:
+                        vendors.add(gpuhunt.AcceleratorVendor.NVIDIA)
+                    elif name in _KNOWN_AMD_GPUS:
+                        vendors.add(gpuhunt.AcceleratorVendor.AMD)
+                    elif name in _KNOWN_TPUS:
+                        vendors.add(gpuhunt.AcceleratorVendor.GOOGLE)
+                    else:
+                        vendors.add(None)
+                if len(vendors) == 1:
+                    # Only one vendor or all names are not known.
+                    vendor = next(iter(vendors))
+                else:
+                    # More than one vendor or some names are not known; in either case, we
+                    # cannot set the vendor to a specific value, will use only names for matching.
+                    vendor = None
+                # If some names are unknown, let's assume they are _not_ AMD products, otherwise
+                # ConfigurationError message may be confusing. In worst-case scenario we'll try
+                # to execute a run on an instance with an AMD accelerator with a default
+                # CUDA image, not a big deal.
+                has_amd_gpu = gpuhunt.AcceleratorVendor.AMD in vendors
+            else:
+                # If neither gpu.vendor nor gpu.name is set, assume Nvidia.
+                vendor = gpuhunt.AcceleratorVendor.NVIDIA
+                has_amd_gpu = False
+            gpu_spec.vendor = vendor
+        else:
+            has_amd_gpu = vendor == gpuhunt.AcceleratorVendor.AMD
+        if has_amd_gpu and conf.image is None:
+            raise ConfigurationError("`image` is required if `resources.gpu.vendor` is AMD.")
 
 
 class RunWithPortsConfigurator(BaseRunConfigurator):
@@ -295,6 +355,12 @@ class RunWithPortsConfigurator(BaseRunConfigurator):
             help="Exposed port or mapping",
             dest="ports",
             metavar="MAPPING",
+        )
+        parser.add_argument(
+            "--host",
+            help="Local address to bind. Defaults to [code]localhost[/]",
+            dest=_BIND_ADDRESS_ARG,
+            metavar="HOST",
         )
 
     def apply_args(
@@ -372,9 +438,9 @@ def _print_finished_message(run: Run):
         return
 
     termination_reason, termination_reason_message = _get_run_termination_reason(run)
-    message = "Run failed due to unknown reason. Check CLI and server logs."
+    message = "Run failed due to unknown reason. Check CLI, server, and run logs."
     if run.status == RunStatus.TERMINATED:
-        message = "Run terminated due to unknown reason. Check CLI and server logs."
+        message = "Run terminated due to unknown reason. Check CLI, server, and run logs."
 
     if termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY:
         message = (
@@ -382,23 +448,22 @@ def _print_finished_message(run: Run):
             "This is likely due to cloud providers not having enough capacity. "
             "Check CLI and server logs for more details."
         )
-    elif termination_reason == JobTerminationReason.CREATING_CONTAINER_ERROR:
-        message = (
-            "Cannot create container.\n"
-            f"Error: {termination_reason_message}\n"
-            "Check CLI and server logs for more details."
-        )
-    elif termination_reason == JobTerminationReason.EXECUTOR_ERROR:
-        message = (
-            f"Error: {termination_reason_message}\nCheck CLI and server logs for more details."
-        )
     elif termination_reason is not None:
+        error_details = (
+            f"Error: {termination_reason_message}\n" if termination_reason_message else ""
+        )
         message = (
             f"Run failed with error code {termination_reason.name}.\n"
-            f"Error: {termination_reason_message}\n"
-            "Check CLI and server logs for more details."
+            f"{error_details}"
+            "Check CLI, server, and run logs for more details."
         )
     console.print(f"[error]{message}[/]")
+
+
+def _get_run_exit_code(run: Run) -> int:
+    if run.status == RunStatus.DONE:
+        return 0
+    return 1
 
 
 def _get_run_termination_reason(run: Run) -> Tuple[Optional[JobTerminationReason], Optional[str]]:

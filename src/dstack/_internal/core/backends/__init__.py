@@ -25,4 +25,9 @@ BACKENDS_WITH_GATEWAY_SUPPORT = [
     BackendType.KUBERNETES,
 ]
 BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT = [BackendType.AWS]
-BACKENDS_WITH_VOLUMES_SUPPORT = [BackendType.AWS, BackendType.LOCAL, BackendType.RUNPOD]
+BACKENDS_WITH_VOLUMES_SUPPORT = [
+    BackendType.AWS,
+    BackendType.GCP,
+    BackendType.LOCAL,
+    BackendType.RUNPOD,
+]

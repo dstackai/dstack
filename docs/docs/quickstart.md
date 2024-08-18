@@ -1,7 +1,6 @@
 # Quickstart
 
-> Before using `dstack`, [install](installation/index.md) the server and configure 
-backends.
+> Before using `dstack`, [install](installation/index.md) the server.
     
 ## Initialize a repo
 
@@ -18,114 +17,212 @@ $ dstack init
 
 Your folder can be a regular local folder or a Git repo.
 
-## Define a configuration
-
-Define what you want to run as a YAML file. The filename must end with `.dstack.yml` (e.g., `.dstack.yml`
-or `train.dstack.yml` are both acceptable).
+## Run a configuration
 
 === "Dev environment"
 
-    Dev environments allow you to quickly provision a machine with a pre-configured environment, resources, IDE, code, etc.
+    A dev environment lets you provision a remote machine with your code, dependencies, and resources, and access it 
+    with your desktop IDE.
+
+    ##### Define a configuration
+
+    Create the following configuration file inside the repo:
 
     <div editor-title=".dstack.yml"> 
 
     ```yaml
     type: dev-environment
-
-    # Use either `python` or `image` to configure environment
+    # The name is optional, if not specified, generated randomly
+    name: vscode
+    
     python: "3.11"
-    # image: ghcr.io/huggingface/text-generation-inference:latest
+    # Uncomment to use a custom Docker image
+    #image: dstackai/base:py3.10-0.5-cuda-12.1
     
     ide: vscode
-
-    # (Optional) Configure `gpu`, `memory`, `disk`, etc
-    resources:
-      gpu: 24GB
+    
+    # Use either spot or on-demand instances
+    spot_policy: auto
+    
+    # Uncomment to request resources
+    #resources:
+    #  gpu: 24GB
     ```
 
     </div>
+
+    ##### Run the configuration
+
+    Run the configuration via [`dstack apply`](reference/cli/index.md#dstack-apply):
+
+    <div class="termy">
+
+    ```shell
+    $ dstack apply -f .dstack.yml
+    
+     #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
+     1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
+     2  azure    westeurope       2xCPU, 8GB, 100GB (disk)  yes   $0.0132
+     3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
+     
+    Submit the run vscode? [y/n]: y
+    
+    Launching `vscode`...
+    ---> 100%
+    
+    To open in VS Code Desktop, use this link:
+      vscode://vscode-remote/ssh-remote+vscode/workflow
+    ```
+    
+    </div>
+
+    Open the link to access the dev environment using your desktop IDE.
 
 === "Task"
 
-    Tasks make it very easy to run any scripts, be it for training, data processing, or web apps. They allow you to pre-configure the environment, resources, code, etc.
+    A task allows you to schedule a job or run a web app. It lets you configure 
+    dependencies, resources, ports, the number of nodes (if you want to run the task on a cluster), etc.
 
-    <div editor-title="train.dstack.yml"> 
+    ##### Define a configuration
+
+    Create the following configuration file inside the repo:
+
+    <div editor-title="streamlit.dstack.yml"> 
 
     ```yaml
     type: task
-
+    # The name is optional, if not specified, generated randomly
+    name: streamlit
+    
     python: "3.11"
-    env:
-      - HF_HUB_ENABLE_HF_TRANSFER=1
+    # Uncomment to use a custom Docker image
+    #image: dstackai/base:py3.10-0.5-cuda-12.1
+    
+    # Commands of the task
     commands:
-      - pip install -r fine-tuning/qlora/requirements.txt
-      - python fine-tuning/qlora/train.py
+      - pip install streamlit
+      - streamlit hello
+    # Ports to forward
+    ports:
+      - 8501
 
-    # (Optional) Configure `gpu`, `memory`, `disk`, etc
-    resources:
-      gpu: 24GB
+    # Use either spot or on-demand instances
+    spot_policy: auto
+    
+    # Uncomment to request resources
+    #resources:
+    #  gpu: 24GB
     ```
 
     </div>
 
-    Ensure `requirements.txt` and `train.py` are in your folder. You can take them from [`examples`](https://github.com/dstackai/dstack/tree/master/examples/fine-tuning/qlora).
+    ##### Run the configuration
+
+    Run the configuration via [`dstack apply`](reference/cli/index.md#dstack-apply):
+
+    <div class="termy">
+
+    ```shell
+    $ dstack apply -f streamlit.dstack.yml
+    
+     #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
+     1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
+     2  azure    westeurope       2xCPU, 8GB, 100GB (disk)  yes   $0.0132
+     3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
+     
+    Submit the run streamlit? [y/n]: y
+     
+    Continue? [y/n]: y
+    
+    Provisioning `streamlit`...
+    ---> 100%
+
+      Welcome to Streamlit. Check out our demo in your browser.
+
+      Local URL: http://localhost:8501
+    ```
+    
+    </div>
+
+    `dstack apply` automatically forwards the remote ports to `localhost` for convenient access.
 
 === "Service"
 
-    Services make it easy to deploy models and apps cost-effectively as public endpoints, allowing you to use any frameworks.
+    A service allows you to deploy a web app or a model as a scalable endpoint. It lets you configure
+    dependencies, resources, authorizarion, auto-scaling rules, etc. 
 
-    <div editor-title="serve.dstack.yml"> 
+    ??? info "Prerequisites"
+        If you're using the open-source server, you must set up a [gateway](concepts/gateways.md) before you can run a service.
+
+        If you're using [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"},
+        the gateway is already set up for you.
+
+    ##### Define a configuration
+
+    Create the following configuration file inside the repo:
+
+    <div editor-title="streamlit-service.dstack.yml"> 
 
     ```yaml
     type: service
-
-    image: ghcr.io/huggingface/text-generation-inference:latest
-    env:
-      - HUGGING_FACE_HUB_TOKEN # required to run gated models
-      - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
+    # The name is optional, if not specified, generated randomly
+    name: streamlit-service
+    
+    python: "3.11"
+    # Uncomment to use a custom Docker image
+    #image: dstackai/base:py3.10-0.5-cuda-12.1
+    
+    # Commands of the service
     commands:
-      - text-generation-launcher --port 8000 --trust-remote-code
-    port: 8000
+      - pip install streamlit
+      - streamlit hello
+    # Port of the service
+    port: 8501
 
-    # (Optional) Configure `gpu`, `memory`, `disk`, etc
-    resources:
-      gpu: 24GB
+    # Comment to enable authorizartion
+    auth: False
+
+    # Use either spot or on-demand instances
+    spot_policy: auto
+    
+    # Uncomment to request resources
+    #resources:
+    #  gpu: 24GB
     ```
 
     </div>
 
-## Run configuration
+    ##### Run the configuration
 
-Run a configuration using the [`dstack run`](reference/cli/index.md#dstack-run) command, followed by the working directory path (e.g., `.`), 
-and the path to the configuration file.
+    Run the configuration via [`dstack apply`](reference/cli/index.md#dstack-apply):
 
-<div class="termy">
+    <div class="termy">
 
-```shell
-$ dstack run . -f train.dstack.yml
+    ```shell
+    $ dstack apply -f streamlit.dstack.yml
+    
+     #  BACKEND  REGION           RESOURCES                 SPOT  PRICE
+     1  gcp      us-west4         2xCPU, 8GB, 100GB (disk)  yes   $0.010052
+     2  azure    westeurope       2xCPU, 8GB, 100GB (disk)  yes   $0.0132
+     3  gcp      europe-central2  2xCPU, 8GB, 100GB (disk)  yes   $0.013248
+     
+    Submit the run streamlit? [y/n]: y
+     
+    Continue? [y/n]: y
+    
+    Provisioning `streamlit`...
+    ---> 100%
 
- BACKEND     REGION         RESOURCES                     SPOT  PRICE
- tensordock  unitedkingdom  10xCPU, 80GB, 1xA100 (80GB)   no    $1.595
- azure       westus3        24xCPU, 220GB, 1xA100 (80GB)  no    $3.673
- azure       westus2        24xCPU, 220GB, 1xA100 (80GB)  no    $3.673
- 
-Continue? [y/n]: y
+      Welcome to Streamlit. Check out our demo in your browser.
 
-Provisioning...
----> 100%
+      Local URL: https://streamlit-service.example.com
+    ```
+    
+    </div>
 
-Epoch 0:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
-Epoch 1:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
-Epoch 2:  100% 1719/1719 [00:18<00:00, 92.32it/s, loss=0.0981, acc=0.969]
-```
+    One the service is up, its endpoint is accessible at `https://<run name>.<gateway domain>`.
 
-</div>
-
-The `dstack run` command automatically uploads your code, including any local uncommitted changes. 
-
-!!! info "Fleets"
-    By default, `dstack run` reuses `idle` instances from one of the existing [fleets](fleets.md). 
-    If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
+> `dstack apply` automatically uploads the code from the current repo, including your local uncommitted changes.
 
 ## What's next?
 
@@ -133,3 +230,7 @@ The `dstack run` command automatically uploads your code, including any local un
     [services](services.md), and [fleets](fleets.md) 
 2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}
 3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
+
+!!! info "Examples"
+    To see how dev environments, tasks, services, and fleets can be used for 
+    training and deploying AI models, check out the [examples](examples/index.md).

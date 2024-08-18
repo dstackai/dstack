@@ -11,6 +11,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.resources import DEFAULT_DISK, Memory, Range
 from dstack._internal.core.models.runs import Requirements
 
 
@@ -18,6 +19,7 @@ def get_catalog_offers(
     backend: BackendType,
     locations: Optional[List[str]] = None,
     requirements: Optional[Requirements] = None,
+    configurable_disk_size: Range[Memory] = Range[Memory](min=Memory.parse("1GB"), max=None),
     extra_filter: Optional[Callable[[InstanceOffer], bool]] = None,
     catalog: Optional[gpuhunt.Catalog] = None,
 ) -> List[InstanceOffer]:
@@ -32,7 +34,9 @@ def get_catalog_offers(
     for item in catalog.query(**asdict(q)):
         if locations is not None and item.location not in locations:
             continue
-        offer = catalog_item_to_offer(backend, item, requirements)
+        offer = catalog_item_to_offer(backend, item, requirements, configurable_disk_size)
+        if offer is None:
+            continue
         if extra_filter is not None and not extra_filter(offer):
             continue
         offers.append(offer)
@@ -40,18 +44,26 @@ def get_catalog_offers(
 
 
 def catalog_item_to_offer(
-    backend: BackendType, item: gpuhunt.CatalogItem, requirements: Optional[Requirements]
-) -> InstanceOffer:
+    backend: BackendType,
+    item: gpuhunt.CatalogItem,
+    requirements: Optional[Requirements],
+    configurable_disk_size: Range[Memory],
+) -> Optional[InstanceOffer]:
     gpus = []
     if item.gpu_count > 0:
-        gpus = [Gpu(name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024))] * item.gpu_count
-    disk_size_mib = round(
-        item.disk_size * 1024
-        if item.disk_size
-        else requirements.resources.disk.size.min * 1024
+        gpu = Gpu(
+            vendor=item.gpu_vendor, name=item.gpu_name, memory_mib=round(item.gpu_memory * 1024)
+        )
+        gpus = [gpu] * item.gpu_count
+    disk_size_mib = choose_disk_size_mib(
+        catalog_item_disk_size_gib=item.disk_size,
+        requirements_disk_size=requirements.resources.disk.size
         if requirements and requirements.resources.disk
-        else 102400  # TODO: Make requirements' fields required
+        else None,
+        configurable_disk_size=configurable_disk_size,
     )
+    if disk_size_mib is None:
+        return None
     resources = Resources(
         cpus=item.cpu,
         memory_mib=round(item.memory * 1024),
@@ -73,10 +85,12 @@ def catalog_item_to_offer(
 
 def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
     gpu_count = len(offer.instance.resources.gpus)
+    gpu_vendor = None
     gpu_name = None
     gpu_memory = None
     if gpu_count > 0:
         gpu = offer.instance.resources.gpus[0]
+        gpu_vendor = gpu.vendor
         gpu_name = gpu.name
         gpu_memory = gpu.memory_mib / 1024
     return gpuhunt.CatalogItem(
@@ -87,10 +101,11 @@ def offer_to_catalog_item(offer: InstanceOffer) -> gpuhunt.CatalogItem:
         cpu=offer.instance.resources.cpus,
         memory=offer.instance.resources.memory_mib / 1024,
         gpu_count=gpu_count,
+        gpu_vendor=gpu_vendor,
         gpu_name=gpu_name,
         gpu_memory=gpu_memory,
         spot=offer.instance.resources.spot,
-        disk_size=offer.instance.resources.disk.size_mib,
+        disk_size=offer.instance.resources.disk.size_mib / 1024,
     )
 
 
@@ -114,6 +129,7 @@ def requirements_to_query_filter(req: Optional[Requirements]) -> gpuhunt.QueryFi
         q.max_disk_size = res.disk.size.max
 
     if res.gpu:
+        q.gpu_vendor = res.gpu.vendor
         q.gpu_name = res.gpu.name
         if res.gpu.memory:
             q.min_gpu_memory = res.gpu.memory.min
@@ -140,3 +156,20 @@ def match_requirements(
         if gpuhunt.matches(catalog_item, q=query_filter):
             filtered_offers.append(offer)
     return filtered_offers
+
+
+def choose_disk_size_mib(
+    catalog_item_disk_size_gib: Optional[float],
+    requirements_disk_size: Optional[Range[Memory]],
+    configurable_disk_size: Range[Memory],
+) -> Optional[int]:
+    if catalog_item_disk_size_gib:
+        disk_size_gib = catalog_item_disk_size_gib
+    else:
+        disk_size_range = requirements_disk_size or DEFAULT_DISK.size
+        disk_size_range = disk_size_range.intersect(configurable_disk_size)
+        if disk_size_range is None:
+            return None
+        disk_size_gib = disk_size_range.min
+
+    return round(disk_size_gib * 1024)

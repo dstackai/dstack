@@ -9,6 +9,7 @@ from typing_extensions import Annotated
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.resources import Memory
+from dstack._internal.utils.common import get_or_error
 
 
 class VolumeStatus(str, Enum):
@@ -32,6 +33,10 @@ class VolumeConfiguration(CoreModel):
         Field(description="The volume ID. Must be specified when registering external volumes"),
     ] = None
 
+    @property
+    def size_gb(self) -> int:
+        return int(get_or_error(self.size))
+
 
 class VolumeProvisioningData(CoreModel):
     backend: Optional[BackendType] = None
@@ -51,6 +56,7 @@ class VolumeAttachmentData(CoreModel):
 
 
 class Volume(CoreModel):
+    id: uuid.UUID
     name: str
     project_name: str
     configuration: VolumeConfiguration
@@ -58,10 +64,10 @@ class Volume(CoreModel):
     created_at: datetime
     status: VolumeStatus
     status_message: Optional[str] = None
+    deleted: bool
     volume_id: Optional[str] = None  # id of the volume in the cloud
     provisioning_data: Optional[VolumeProvisioningData] = None
     attachment_data: Optional[VolumeAttachmentData] = None
-    volume_model_id: uuid.UUID  # uuid of VolumeModel
 
 
 class VolumeMountPoint(CoreModel):

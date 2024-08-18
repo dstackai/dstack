@@ -104,8 +104,59 @@ jobs:
             runner/dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
             runner/dstack-shim-${{ matrix.goos }}-${{ matrix.goarch }}
 
+  gateway-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gateway
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Install AWS
+        run: pip install awscli
+      - name: Install dependencies
+        run: pip install wheel build
+      - name: Store version
+        run: echo VERSION=${GITHUB_REF#refs/tags/} > $GITHUB_ENV
+      - name: Build package
+        run: |
+          echo "__version__ = \"${{ env.VERSION }}\"" > src/dstack/gateway/version.py
+          python -m build .
+      - name: Upload to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          WHEEL=dstack_gateway-${{ env.VERSION }}-py3-none-any.whl
+          aws s3 cp dist/$WHEEL "s3://dstack-gateway-downloads/release/$WHEEL"
+          echo "${{ env.VERSION }}" | aws s3 cp - "s3://dstack-gateway-downloads/release/latest-version"
+  
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install packages
+        run: npm install
+      - name: Build dist
+        run: npm run build
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build
+
   runner-upload:
-    needs: [gateway-build, runner-compile]
+    needs: [runner-compile, gateway-build, frontend-build]
     runs-on: ubuntu-latest
     steps:
       - name: Install AWS
@@ -134,10 +185,15 @@ jobs:
       name: Set latest variable
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python 3.9
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: 3.9
+          python-version: 3.11
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: src/dstack/_internal/server/statics
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -237,33 +293,3 @@ jobs:
             aws s3 cp configuration.json "s3://dstack-runner-downloads/latest/schemas/configuration.json" --acl public-read
             aws s3 cp profiles.json "s3://dstack-runner-downloads/latest/schemas/profiles.json" --acl public-read
           fi
-
-  gateway-build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: gateway
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.11
-      - name: Install AWS
-        run: pip install awscli
-      - name: Install dependencies
-        run: pip install wheel build
-      - name: Store version
-        run: echo VERSION=${GITHUB_REF#refs/tags/} > $GITHUB_ENV
-      - name: Build package
-        run: |
-          echo "__version__ = \"${{ env.VERSION }}\"" > src/dstack/gateway/version.py
-          python -m build .
-      - name: Upload to S3
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          WHEEL=dstack_gateway-${{ env.VERSION }}-py3-none-any.whl
-          aws s3 cp dist/$WHEEL "s3://dstack-gateway-downloads/release/$WHEEL"
-          echo "${{ env.VERSION }}" | aws s3 cp - "s3://dstack-gateway-downloads/release/latest-version"

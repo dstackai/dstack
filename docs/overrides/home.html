@@ -112,8 +112,8 @@
                 <h1>AI container orchestration engine for everyone</h1>
 
                 <p>
-                    dstack is an open-source orchestration engine that simplifies developing, training, and deploying AI
-                    models, as well as managing clusters on any cloud or data center.
+                    dstack is a lightweight alternative to Kubernetes for AI. It simplifies container orchestration for
+                    AI on any cloud or on-premises, accelerating the development, training, and deployment.
                 </p>
             </div>
 
@@ -228,10 +228,11 @@
                 <div class="block">
                     <h2>Tasks</h2>
 
-                    <p>Tasks allow for convenient scheduling of various batch jobs, such as training, fine-tuning, or
-                        data processing, as well as running web applications.</p>
+                    <p>A task allows you to schedule a job or run a web app. It lets you configure dependencies,
+                        resources, ports, and more. Tasks can be distributed and run on clusters.</p>
 
-                    <p>You can run tasks on a single machine or on a cluster of nodes.</p>
+                    <p>Tasks are ideal for training and fine-tuning jobs or running apps
+                        for development purposes.</p>
 
                     <p>
                         <a href="/docs/tasks" target="_blank"
@@ -247,8 +248,8 @@
                     <h2>Services</h2>
 
                     <p>
-                        Services make it very easy to deploy any kind of model as public,
-                        secure, and scalable endpoints.
+                        A service allows you to deploy a web app or a model as a scalable endpoint. It lets you configure
+                        dependencies, resources, authorizarion, auto-scaling rules, etc.
                     </p>
 
                     <p>
@@ -295,55 +296,29 @@
             </div>
 
             <div class="tx-landing__highlights_grid">
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/llms/llama3" target="_blank"
-                   class="feature-cell">
+                <a href="/docs/examples/llms/llama31" target="_blank"
+                   class="feature-cell sky">
                     <h3>
-                        Llama 3
+                        Llama 3.1
                     </h3>
 
                     <p>
-                        Deploy Llama 3 as an endpoint using Ollama.
+                        Learn how to deploy and fine-tune Llama 3.1.
                     </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
-                </a>
-
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook"
-                   target="_blank" class="feature-cell">
-                    <h3>
-                        Alignment Handbook
-                    </h3>
-
-                    <p>
-                        Fine-tune Gemma 7B on a custom dataset.
-                    </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Fine-tuning</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
                 </a>
 
                 <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm" target="_blank"
                    class="feature-cell">
-                    <h3>
+                    <h3 class="external">
                         vLLM
                     </h3>
 
                     <p>
                         Deploy LLMs as endpoints using vLLM.
                     </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
                 </a>
 
-                <a href="https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl" target="_blank"
+                <a href="docs/fine-tuning/axolotl" target="_blank"
                    class="feature-cell">
                     <h3>
                         Axolotl
@@ -352,62 +327,53 @@
                     <p>
                         Fine-tune Llama 3 on a custom dataset using Axolotl.
                     </p>
+                </a>
 
-                    <div class="feature-tags">
-                        <div class="feature-tag">Fine-tuning</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
+                <a href="/docs/examples/fine-tuning/alignment-handbook"
+                   target="_blank" class="feature-cell">
+                    <h3>
+                        Alignment Handbook
+                    </h3>
+
+                    <p>
+                        Fine-tune Gemma 7B on a custom dataset.
+                    </p>
                 </a>
 
                 <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi" target="_blank"
                    class="feature-cell">
-                    <h3>
+                    <h3 class="external">
                         TGI
                     </h3>
 
                     <p>
                         Deploy LLMs as endpoints using TGI.
                     </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
                 </a>
 
                 <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/ollama" target="_blank"
                    class="feature-cell">
-                    <h3>
+                    <h3 class="external">
                         Ollama
                     </h3>
 
                     <p>
                         Deploy LLMs as endpoints using Ollama.
                     </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
                 </a>
 
                 <a href="https://github.com/dstackai/dstack/blob/master/examples/deployment/lorax" target="_blank"
                    class="feature-cell">
-                    <h3>
+                    <h3 class="external">
                         LoRaX
                     </h3>
 
                     <p>
                         Deploy thousands of models on a single endpoint using LoRaX.
                     </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
-                        <div class="feature-tag">LLMs</div>
-                    </div>
                 </a>
 
-                <a href="https://github.com/dstackai/dstack/tree/master/examples" target="_blank" class="feature-cell">
+                <a href="/docs/examples" target="_blank" class="feature-cell sky">
                     <h3>
                         More
                     </h3>
@@ -415,11 +381,6 @@
                     <p>
                         Find more examples on training and deploying models.
                     </p>
-
-                    <div class="feature-tags">
-                        <div class="feature-tag">Deployment</div>
-                        <div class="feature-tag">Embeddings</div>
-                    </div>
                 </a>
             </div>
         </div>

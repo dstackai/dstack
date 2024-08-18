@@ -86,7 +86,7 @@ class FleetCommand(APIBaseCommand):
             self.api.client.fleets.get(project_name=self.api.project, name=args.name)
         except ResourceNotExistsError:
             console.print(f"Fleet [code]{args.name}[/] does not exist")
-            return
+            exit(1)
 
         if not args.instances:
             if not args.yes and not confirm_ask(f"Delete the fleet [code]{args.name}[/]?"):

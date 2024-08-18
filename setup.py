@@ -62,7 +62,7 @@ BASE_DEPS = [
     "cachetools",
     "dnspython",
     "grpcio>=1.50",  # indirect
-    "gpuhunt>=0.0.12",
+    "gpuhunt>=0.0.13",
     "sentry-sdk[fastapi]",
     "httpx",
     "aiorwlock",
@@ -114,7 +114,7 @@ setup(
     package_dir={"": "src"},
     packages=find_packages("src"),
     package_data={
-        "dstack.api._public.huggingface.finetuning.sft": ["requirements.txt"],
+        "dstack._internal.server": ["statics/**/*"],
     },
     include_package_data=True,
     scripts=[],

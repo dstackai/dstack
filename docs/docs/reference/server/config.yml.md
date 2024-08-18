@@ -394,16 +394,23 @@ gcloud projects list --format="json(projectId)"
 
     ```
     compute.disks.create
+    compute.disks.delete
+    compute.disks.get
+    compute.disks.list
+    compute.disks.use
     compute.firewalls.create
     compute.images.useReadOnly
+    compute.instances.attachDisk
     compute.instances.create
     compute.instances.delete
+    compute.instances.detachDisk
     compute.instances.get
     compute.instances.setLabels
     compute.instances.setMetadata
     compute.instances.setTags
     compute.networks.get
     compute.networks.updatePolicy
+    compute.regions.get
     compute.regions.list
     compute.subnetworks.list
     compute.subnetworks.use
@@ -538,8 +545,7 @@ projects:
 
 ### TensorDock
 
-Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://marketplace.tensordock.com/) account, click API in the sidebar, and use the `Create an Authorization`
-section to create a new authorization key.
+Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
 
 Then, go ahead and configure the backend:
 

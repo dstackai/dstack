@@ -1,0 +1,13 @@
+.role {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.roleFieldWrapper {
+    flex-grow: 1;
+    flex-basis: 0;
+    max-width: 200px;
+}
+.deleteMemberButtonWrapper {
+    margin-left: auto;
+}

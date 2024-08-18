@@ -35,7 +35,7 @@ ports:
   - 8000
 
 resources:
-  gpu: tpu-v5litepod-8
+  gpu: v5litepod-8
 ```
 The task runs a container with optimum-tpu image and then launches `meta-llama/Meta-Llama-3.1-8B` at port `8000`.
 
@@ -115,7 +115,7 @@ commands:
 port: 8000
 
 resources:
-  gpu: tpu-v5litepod-8
+  gpu: v5litepod-8
 
 # (Optional) Enable the OpenAI-compatible endpoint
 model:

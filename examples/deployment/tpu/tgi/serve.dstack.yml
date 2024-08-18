@@ -11,7 +11,7 @@ commands:
 port: 8000
 
 resources:
-  gpu: tpu-v5litepod-8
+  gpu: v5litepod-8
 
 # (Optional) Enable the OpenAI-compatible endpoint
 model:

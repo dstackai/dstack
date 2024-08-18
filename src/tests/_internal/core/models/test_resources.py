@@ -1,4 +1,5 @@
 import pytest
+from gpuhunt import AcceleratorVendor
 from pydantic import ValidationError, parse_obj_as
 
 from dstack._internal.core.models.resources import ComputeCapability, GPUSpec, Memory, Range
@@ -103,6 +104,42 @@ class TestGPU:
     def test_count(self):
         assert parse_obj_as(GPUSpec, "1") == parse_obj_as(GPUSpec, {"count": 1})
 
+    @pytest.mark.parametrize(
+        ["value", "expected"],
+        [
+            pytest.param(
+                "Nvidia", {"vendor": AcceleratorVendor.NVIDIA}, id="vendor-only-mixedcase"
+            ),
+            pytest.param(
+                "google:v3",
+                {"vendor": AcceleratorVendor.GOOGLE, "name": ["v3"]},
+                id="vendor-lowercase-and-name",
+            ),
+            pytest.param(
+                "MI300X:AMD",
+                {"vendor": AcceleratorVendor.AMD, "name": ["MI300X"]},
+                id="name-and-vendor-uppercase",
+            ),
+        ],
+    )
+    def test_vendor_in_string_form(self, value, expected):
+        assert parse_obj_as(GPUSpec, value) == parse_obj_as(GPUSpec, expected)
+
+    @pytest.mark.parametrize(
+        ["value", "expected"],
+        [
+            pytest.param(None, None, id="null"),
+            pytest.param("NVIDIA", AcceleratorVendor.NVIDIA, id="uppercase"),
+            pytest.param("amd", AcceleratorVendor.AMD, id="lowercase"),
+            pytest.param("Google", AcceleratorVendor.GOOGLE, id="mixedcase"),
+            pytest.param(AcceleratorVendor.GOOGLE, AcceleratorVendor.GOOGLE, id="enum-value"),
+        ],
+    )
+    def test_vendor_in_object_form(self, value, expected):
+        assert parse_obj_as(GPUSpec, {"vendor": value}) == parse_obj_as(
+            GPUSpec, {"vendor": expected}
+        )
+
     def test_name(self):
         assert parse_obj_as(GPUSpec, "A100") == parse_obj_as(GPUSpec, {"name": ["A100"]})
 
@@ -122,11 +159,36 @@ class TestGPU:
         with pytest.raises(ValidationError):
             parse_obj_as(GPUSpec, "A100:")
 
-    def test_conflict(self):
-        with pytest.raises(ValidationError):
+    def test_vendor_conflict(self):
+        with pytest.raises(ValidationError, match=r"vendor conflict"):
+            parse_obj_as(GPUSpec, "Nvidia:A100:2:AMD")
+
+    def test_count_conflict(self):
+        with pytest.raises(ValidationError, match=r"count conflict"):
             parse_obj_as(GPUSpec, "A100:2:3")
 
     def test_memory_range(self):
         assert parse_obj_as(GPUSpec, "16GB..32") == parse_obj_as(
             GPUSpec, {"memory": {"min": 16, "max": 32}}
         )
+
+
+@pytest.mark.parametrize(
+    ("r1", "r2", "intersection"),
+    [
+        (Range[int](min=1, max=2), Range[int](min=3, max=4), None),
+        (Range[int](min=1, max=2), Range[int](min=2, max=3), Range[int](min=2, max=2)),
+        (Range[int](min=1, max=2), Range[int](min=1, max=2), Range[int](min=1, max=2)),
+        (Range[int](min=1, max=3), Range[int](min=2, max=4), Range[int](min=2, max=3)),
+        (Range[int](min=1, max=4), Range[int](min=2, max=3), Range[int](min=2, max=3)),
+        (Range[int](min=None, max=1), Range[int](min=2, max=None), None),
+        (Range[int](min=None, max=1), Range[int](min=1, max=None), Range[int](min=1, max=1)),
+        (Range[int](min=None, max=2), Range[int](min=1, max=None), Range[int](min=1, max=2)),
+        (Range[int](min=None, max=1), Range[int](min=None, max=2), Range[int](min=None, max=1)),
+        (Range[int](min=1, max=None), Range[int](min=2, max=None), Range[int](min=2, max=None)),
+        (Range[int](min=1, max=None), Range[int](min=None, max=2), Range[int](min=1, max=2)),
+    ],
+)
+def test_intersect_ranges(r1: Range[int], r2: Range[int], intersection: Range[int]) -> None:
+    assert r1.intersect(r2) == intersection
+    assert r2.intersect(r1) == intersection

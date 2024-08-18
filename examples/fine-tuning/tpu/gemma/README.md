@@ -40,7 +40,7 @@ ports:
   - 6006
 
 resources:
-  gpu: tpu-v5litepod-8
+  gpu: v5litepod-8
 ```
 The task clones Optimum-tpu's repo, installs the dependencies, and runs the script.
 

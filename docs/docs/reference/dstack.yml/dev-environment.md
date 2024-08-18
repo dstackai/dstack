@@ -2,15 +2,15 @@
 
 The `dev-environment` configuration type allows running [dev environments](../../dev-environments.md).
 
-> Configuration files must have a name ending with `.dstack.yml` (e.g., `.dstack.yml` or `serve.dstack.yml` are both acceptable)
-> and can be located in the project's root directory or any nested folder.
-> Any configuration can be run via [`dstack run`](../cli/index.md#dstack-run).
+> Configuration files must be inside the project repo, and their names must end with `.dstack.yml` 
+> (e.g. `.dstack.yml` or `dev.dstack.yml` are both acceptable).
+> Any configuration can be run via [`dstack apply`](../cli/index.md#dstack-apply).
 
 ## Examples
 
 ### Python version
 
-If you don't specify `image`, `dstack` uses the default Docker image pre-configured with 
+If you don't specify `image`, `dstack` uses its base Docker image pre-configured with 
 `python`, `pip`, `conda` (Miniforge), and essential CUDA drivers. 
 The `python` property determines which default Docker image is used.
 
@@ -18,17 +18,33 @@ The `python` property determines which default Docker image is used.
 
 ```yaml
 type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
 
-python: "3.11"
+# If `image` is not specified, dstack uses its base image
+python: "3.10"
 
 ide: vscode
 ```
 
 </div>
 
-!!! info "nvcc"
-    Note that the default Docker image doesn't bundle `nvcc`, which is required for building custom CUDA kernels. 
-    To install it, use `conda install cuda`.
+??? info "nvcc"
+    By default, the base Docker image doesn’t include `nvcc`, which is required for building custom CUDA kernels. 
+    If you need `nvcc`, set the corresponding property to true.
+
+    ```yaml
+    type: dev-environment
+    # The name is optional, if not specified, generated randomly
+    name: vscode    
+    
+    # If `image` is not specified, dstack uses its base image
+    python: "3.10"
+    # Ensure nvcc is installed (req. for Flash Attention) 
+    nvcc: true
+
+    ide: vscode
+    ```
 
 ### Docker image
 
@@ -36,7 +52,10 @@ ide: vscode
 
 ```yaml
 type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
 
+# Any custom Docker image
 image: ghcr.io/huggingface/text-generation-inference:latest
 
 ide: vscode
@@ -50,8 +69,12 @@ ide: vscode
 
     ```yaml
     type: dev-environment
-    
+    # The name is optional, if not specified, generated randomly
+    name: vscode    
+
+    # Any private Docker image
     image: ghcr.io/huggingface/text-generation-inference:latest
+    # Credentials of the private Docker registry
     registry_auth:
       username: peterschmidt85
       password: ghp_e49HcZ9oYwBzUbcSk2080gXZOU2hiT9AeSR5
@@ -68,19 +91,19 @@ range (e.g. `24GB..`, or `24GB..80GB`, or `..80GB`).
 
 ```yaml
 type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
 
 ide: vscode
 
 resources:
   # 200GB or more RAM
   memory: 200GB..
-
   # 4 GPUs from 40GB to 80GB
   gpu: 40GB..80GB:4
-
-  # Shared memory
+  # Shared memory (required by multi-gpu)
   shm_size: 16GB
-
+  # Disk size
   disk: 500GB
 ```
 
@@ -96,6 +119,8 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
 
     ```yaml
     type: dev-environment
+    # The name is optional, if not specified, generated randomly
+    name: vscode    
     
     ide: vscode
     
@@ -115,7 +140,10 @@ and their quantity. Examples: `A100` (one A100), `A10G,A100` (either A10G or A10
 
 ```yaml
 type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
 
+# Environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
   - HF_HUB_ENABLE_HF_TRANSFER=1
@@ -125,12 +153,12 @@ ide: vscode
 
 </div>
 
-If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
+> If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
 `dstack` will require the value to be passed via the CLI or set in the current process.
 
 For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
 
-#### Default environment variables
+#### System environment variables
 
 The following environment variables are available in any run and are passed by `dstack` by default:
 
@@ -148,9 +176,12 @@ You can choose whether to use spot instances, on-demand instances, or any availa
 
 ```yaml
 type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
 
 ide: vscode
 
+# Use either spot or on-demand instances
 spot_policy: auto
 ```
 
@@ -166,9 +197,12 @@ By default, `dstack` provisions instances in all configured backends. However, y
 
 ```yaml
 type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
 
 ide: vscode
 
+# Use only listed backends
 backends: [aws, gcp]
 ```
 
@@ -182,9 +216,12 @@ By default, `dstack` uses all configured regions. However, you can specify the l
 
 ```yaml
 type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
 
 ide: vscode
 
+# Use only listed regions
 regions: [eu-west-1, eu-west-2]
 ```
 
@@ -199,9 +236,12 @@ To attach a volume, simply specify its name using the `volumes` property and spe
 
 ```yaml
 type: dev-environment
+# The name is optional, if not specified, generated randomly
+name: vscode    
 
 ide: vscode
 
+# Map the name of the volume to any path
 volumes:
   - name: my-new-volume
     path: /volume_data
@@ -212,7 +252,7 @@ volumes:
 Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the dev
 environment, and its contents will persist across runs.
 
-!!! info "Limitations"
+??? info "Limitations"
     When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
     to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
     attach volumes to `/workflow` or any of its subdirectories.

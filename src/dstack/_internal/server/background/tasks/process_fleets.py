@@ -39,9 +39,10 @@ async def process_fleets():
             PROCESSING_FLEETS_IDS.add(fleet_model.id)
 
     try:
-        await _process_fleet(fleet_id=fleet_model.id)
+        fleet_model_id = fleet_model.id
+        await _process_fleet(fleet_id=fleet_model_id)
     finally:
-        PROCESSING_FLEETS_IDS.remove(fleet_model.id)
+        PROCESSING_FLEETS_IDS.remove(fleet_model_id)
 
 
 async def _process_fleet(fleet_id: UUID):
