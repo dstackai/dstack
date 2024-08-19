@@ -22,6 +22,7 @@ class User(CoreModel):
     username: str
     global_role: GlobalRole
     email: Optional[str]
+    active: bool
 
 
 class UserTokenCreds(CoreModel):

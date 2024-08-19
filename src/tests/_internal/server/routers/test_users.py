@@ -30,6 +30,7 @@ class TestListUsers:
                 "username": user.name,
                 "global_role": user.global_role,
                 "email": None,
+                "active": True,
             }
         ]
 
@@ -40,7 +41,17 @@ class TestGetMyUser:
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
-    async def test_returns_logged_in_user(self, test_db, session):
+    async def test_returns_40x_if_deactivated(self, test_db, session: AsyncSession):
+        user = await create_user(session=session, active=False)
+        response = client.post("/api/users/get_my_user", headers=get_auth_headers(user.token))
+        assert response.status_code in [401, 403]
+        user.active = True
+        await session.commit()
+        response = client.post("/api/users/get_my_user", headers=get_auth_headers(user.token))
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_returns_logged_in_user(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         response = client.post("/api/users/get_my_user", headers=get_auth_headers(user.token))
         assert response.status_code == 200
@@ -49,6 +60,7 @@ class TestGetMyUser:
             "username": user.name,
             "global_role": user.global_role,
             "email": None,
+            "active": True,
         }
 
 
@@ -58,7 +70,7 @@ class TestGetUser:
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_not_global_admin(self, test_db, session):
+    async def test_returns_400_if_not_global_admin(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         other_user = await create_user(session=session, name="other_user", token="1234")
         response = client.post(
@@ -69,7 +81,7 @@ class TestGetUser:
         assert response.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_returns_logged_in_user(self, test_db, session):
+    async def test_returns_logged_in_user(self, test_db, session: AsyncSession):
         user = await create_user(session=session, global_role=GlobalRole.ADMIN)
         other_user = await create_user(session=session, name="other_user", token="1234")
         response = client.post(
@@ -84,6 +96,7 @@ class TestGetUser:
             "global_role": other_user.global_role,
             "email": None,
             "creds": {"token": "1234"},
+            "active": True,
         }
 
 
@@ -104,6 +117,7 @@ class TestCreateUser:
                     "username": "test",
                     "global_role": GlobalRole.USER,
                     "email": "test@example.com",
+                    "active": True,
                 },
             )
         assert response.status_code == 200
@@ -112,6 +126,7 @@ class TestCreateUser:
             "username": "test",
             "global_role": "user",
             "email": "test@example.com",
+            "active": True,
         }
         res = await session.execute(select(UserModel).where(UserModel.name == "test"))
         assert len(res.scalars().all()) == 1
@@ -135,6 +150,7 @@ class TestCreateUser:
             "username": "Test",
             "global_role": "user",
             "email": None,
+            "active": True,
         }
         # Username uniqueness check should be case insensitive
         for username in ["test", "Test", "TesT"]:

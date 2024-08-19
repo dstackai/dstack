@@ -62,6 +62,7 @@ async def create_user(
     username: str,
     global_role: GlobalRole,
     email: Optional[str] = None,
+    active: bool = True,
 ) -> UserModel:
     user_model = await get_user_model_by_name(session=session, username=username, ignore_case=True)
     if user_model is not None:
@@ -74,6 +75,7 @@ async def create_user(
         token=DecryptedString(plaintext=token),
         token_hash=get_token_hash(token),
         email=email,
+        active=active,
     )
     session.add(user)
     await session.commit()
@@ -87,11 +89,16 @@ async def update_user(
     username: str,
     global_role: GlobalRole,
     email: Optional[str] = None,
+    active: bool = True,
 ) -> UserModel:
     await session.execute(
         update(UserModel)
         .where(UserModel.name == username)
-        .values(global_role=global_role, email=email)
+        .values(
+            global_role=global_role,
+            email=email,
+            active=active,
+        )
     )
     await session.commit()
     return await get_user_model_by_name_or_error(session=session, username=username)
@@ -145,9 +152,14 @@ async def get_user_model_by_name_or_error(session: AsyncSession, username: str) 
     return res.scalar_one()
 
 
-async def get_user_model_by_token(session: AsyncSession, token: str) -> Optional[UserModel]:
+async def log_in_with_token(session: AsyncSession, token: str) -> Optional[UserModel]:
     token_hash = get_token_hash(token)
-    res = await session.execute(select(UserModel).where(UserModel.token_hash == token_hash))
+    res = await session.execute(
+        select(UserModel).where(
+            UserModel.token_hash == token_hash,
+            UserModel.active == True,
+        )
+    )
     user = res.scalar()
     if user is None:
         return None
@@ -167,6 +179,7 @@ def user_model_to_user(user_model: UserModel) -> User:
         username=user_model.name,
         global_role=user_model.global_role,
         email=user_model.email,
+        active=user_model.active,
     )
 
 
@@ -176,6 +189,7 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
         username=user_model.name,
         global_role=user_model.global_role,
         email=user_model.email,
+        active=user_model.active,
         creds=UserTokenCreds(token=user_model.token.get_plaintext_or_error()),
     )
 
