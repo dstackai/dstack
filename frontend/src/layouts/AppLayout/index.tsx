@@ -204,7 +204,14 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 splitPanelOpen
                 breadcrumbs={renderBreadcrumbs()}
                 notifications={<Notifications />}
-                navigation={<SideNavigation activeHref={activeHref} items={navLinks} onFollow={onFollowHandler} />}
+                navigation={
+                    <SideNavigation
+                        header={{ href: '#', text: t('common.control_plane') }}
+                        activeHref={activeHref}
+                        items={navLinks}
+                        onFollow={onFollowHandler}
+                    />
+                }
                 tools={
                     <>
                         <Tabs

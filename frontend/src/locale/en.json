@@ -41,7 +41,8 @@
     "tutorial_other": "Tour",
     "docs": "Docs",
     "discord": "Discord",
-    "danger_zone": "Danger Zone"
+    "danger_zone": "Danger Zone",
+    "control_plane": "Control plane"
   },
 
   "auth": {
