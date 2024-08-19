@@ -64,20 +64,23 @@ export const useSideNavigation = () => {
 
     const navLinks: SideNavigationProps['items'] = [
         projectsDropdownList.length && {
-            type: 'section',
-            text: t('navigation.project'),
+            type: 'section-group',
+            title: t('navigation.project'),
             items: projectLinks,
         },
+        projectsDropdownList.length && { type: 'divider' },
 
         isAvailableAdministrationLinks && {
-            type: 'section',
-            text: t('navigation.administration'),
+            type: 'section-group',
+            title: t('navigation.administration'),
             items: administrationLinks,
         },
 
+        isAvailableAdministrationLinks && { type: 'divider' },
+
         {
-            type: 'section',
-            text: t('navigation.account'),
+            type: 'section-group',
+            title: t('navigation.account'),
             items: userSettingsLinks,
         },
     ].filter(Boolean) as SideNavigationProps['items'];
