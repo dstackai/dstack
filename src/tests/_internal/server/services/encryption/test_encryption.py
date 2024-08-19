@@ -16,35 +16,40 @@ from dstack._internal.server.services.encryption.keys.aes import (
 class TestEncrypt:
     def test_encrypts_with_identity_when_no_keys_set(self):
         text = "some text"
-        assert encrypt(text) == f"enc:identity:{text}"
+        assert encrypt(text) == f"enc:identity:noname:{text}"
 
     def test_encrypts_with_first_key(self):
         text = "some text"
         with encryption_keys_context(
             [
                 AESEncryptionKey(
-                    AESEncryptionKeyConfig(secret="cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=")
+                    AESEncryptionKeyConfig(
+                        secret="cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=",
+                        name="key1",
+                    )
                 ),
                 get_identity_encryption_key(),
             ]
         ):
-            assert encrypt(plaintext=text).startswith("enc:aes:")
+            assert encrypt(plaintext=text).startswith("enc:aes:key1")
 
 
 class TestDecrypt:
     def test_tries_all_keys(self):
-        ciphertext = "enc:identity:encrypted text"
+        ciphertext = "enc:identity:noname:encrypted text"
         with pytest.raises(EncryptionError):
             with encryption_keys_context(
                 [
                     AESEncryptionKey(
                         AESEncryptionKeyConfig(
-                            secret="cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA="
+                            secret="cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=",
+                            name="key1",
                         )
                     ),
                     AESEncryptionKey(
                         AESEncryptionKeyConfig(
-                            secret="4nr0Hr4bck/xURGbpdDwnDwBP1iGnTtYZT752h/kWno="
+                            secret="4nr0Hr4bck/xURGbpdDwnDwBP1iGnTtYZT752h/kWno=",
+                            name="key2",
                         )
                     ),
                 ]
@@ -53,10 +58,16 @@ class TestDecrypt:
         with encryption_keys_context(
             [
                 AESEncryptionKey(
-                    AESEncryptionKeyConfig(secret="cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=")
+                    AESEncryptionKeyConfig(
+                        secret="cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=",
+                        name="key1",
+                    )
                 ),
                 AESEncryptionKey(
-                    AESEncryptionKeyConfig(secret="4nr0Hr4bck/xURGbpdDwnDwBP1iGnTtYZT752h/kWno=")
+                    AESEncryptionKeyConfig(
+                        secret="4nr0Hr4bck/xURGbpdDwnDwBP1iGnTtYZT752h/kWno=",
+                        name="key2",
+                    )
                 ),
                 get_identity_encryption_key(),
             ]

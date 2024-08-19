@@ -70,12 +70,13 @@ def encryption_keys_context(encryption_keys: List[EncryptionKey]):
 def encrypt(plaintext: str) -> str:
     key = _encryption_keys[0]
     ciphertext = key.encrypt(plaintext)
-    packed_ciphertext = _pack_ciphertext(ciphertext, key_type=key.TYPE)
+    packed_ciphertext = _pack_ciphertext(ciphertext, key_type=key.TYPE, key_name=key.name)
     return packed_ciphertext
 
 
 def decrypt(ciphertext: str) -> str:
-    key_type, ciphertext = _unpack_ciphertext(ciphertext)
+    key_type, _, ciphertext = _unpack_ciphertext(ciphertext)
+    # Ignore key_name when decrypting
     for i, key in enumerate(_encryption_keys):
         if key.TYPE != key_type:
             continue
@@ -86,13 +87,13 @@ def decrypt(ciphertext: str) -> str:
     raise EncryptionError("All keys failed to decrypt ciphertext")
 
 
-def _pack_ciphertext(ciphertext: str, key_type: str) -> str:
-    return f"enc:{key_type}:{ciphertext}"
+def _pack_ciphertext(ciphertext: str, key_type: str, key_name: str) -> str:
+    return f"enc:{key_type}:{key_name}:{ciphertext}"
 
 
-def _unpack_ciphertext(packed_ciphertext: str) -> Tuple[str, str]:
-    _, key_type, ciphertext = packed_ciphertext.split(":", maxsplit=2)
-    return key_type, ciphertext
+def _unpack_ciphertext(packed_ciphertext: str) -> Tuple[str, str, str]:
+    _, key_type, key_name, ciphertext = packed_ciphertext.split(":", maxsplit=3)
+    return key_type, key_name, ciphertext
 
 
 EncryptedString.set_encrypt_decrypt(

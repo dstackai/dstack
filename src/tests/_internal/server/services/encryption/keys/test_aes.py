@@ -10,7 +10,7 @@ def get_aes_secret() -> str:
 
 class TestAESEncryptionKey:
     def test_encrypts_decrypts(self):
-        key = AESEncryptionKey(AESEncryptionKeyConfig(secret=get_aes_secret()))
+        key = AESEncryptionKey(AESEncryptionKeyConfig(secret=get_aes_secret(), name="key1"))
         plaintext = "This is a test string."
         encrypted_text = key.encrypt(plaintext)
         assert encrypted_text != plaintext

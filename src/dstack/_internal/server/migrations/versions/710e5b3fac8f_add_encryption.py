@@ -18,7 +18,7 @@ branch_labels = None
 depends_on = None
 
 
-ENCODED_PREFIX = "enc:identity:"
+ENCODED_PREFIX = "enc:identity:noname:"
 
 
 def upgrade() -> None:

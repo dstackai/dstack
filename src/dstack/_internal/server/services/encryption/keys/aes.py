@@ -15,6 +15,12 @@ class AESEncryptionKeyConfig(CoreModel):
     name: Annotated[str, Field(description="The key name for key identification")]
     secret: Annotated[str, Field(description="Base64-encoded AES-256 key")]
 
+    @validator("name")
+    def validate_name(cls, v):
+        if not v.isalnum():
+            raise ValueError("Key name must be alphanumeric")
+        return v
+
     @validator("secret")
     def validate_secret(cls, v):
         try:
@@ -32,6 +38,10 @@ class AESEncryptionKey(EncryptionKey):
     def __init__(self, config: AESEncryptionKeyConfig) -> None:
         self.config = config
         self.key = b64decode(config.secret)
+
+    @property
+    def name(self) -> str:
+        return self.config.name
 
     def encrypt(self, plaintext: str) -> str:
         # Generate a random 12-byte (96-bit) nonce (recommended size for GCM)

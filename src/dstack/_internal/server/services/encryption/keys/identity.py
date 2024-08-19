@@ -17,6 +17,10 @@ class IdentityEncryptionKey(EncryptionKey):
     def __init__(self, config: IdentityEncryptionKeyConfig) -> None:
         pass
 
+    @property
+    def name(self) -> str:
+        return "noname"
+
     def encrypt(self, plaintext: str) -> str:
         return plaintext
 
