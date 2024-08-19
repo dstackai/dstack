@@ -168,4 +168,12 @@ export const selectToolsPanelState = (state: RootState) => state.app.toolsPanelS
 export const selectHelpPanelContent = (state: RootState) => state.app.helpPanel.content;
 export const selectTutorialPanel = (state: RootState) => state.app.tutorialPanel;
 export const selectSystemMode = (state: RootState) => state.app.systemMode;
+
+export const selectAppliedThemeMode = (state: RootState): Mode => {
+    if (state.app.systemMode === 'system') {
+        return getThemeMode();
+    }
+
+    return state.app.systemMode;
+};
 export default appSlice.reducer;
