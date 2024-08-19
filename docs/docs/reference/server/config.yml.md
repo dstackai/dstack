@@ -789,6 +789,7 @@ projects: ...
 </div>
 
 Old keys may be deleted once all existing records were updated to re-encrypt sensitive data.
+Encrypted values are prefixed with key names so that DB admins can identify keys used for encryption.
 
 ??? info "Supported encryption keys"
     Currently, `dstack` supports only `aes` and `identity` (plaintext) encryption keys.
