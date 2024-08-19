@@ -29,7 +29,8 @@ logger = get_logger(__name__)
 
 
 async def get_or_create_default_project(
-    session: AsyncSession, user: UserModel
+    session: AsyncSession,
+    user: UserModel,
 ) -> Tuple[Project, bool]:
     default_project = await get_project_by_name(
         session=session,
@@ -38,7 +39,9 @@ async def get_or_create_default_project(
     if default_project is not None:
         return default_project, False
     default_project = await create_project(
-        session=session, user=user, project_name=DEFAULT_PROJECT_NAME
+        session=session,
+        user=user,
+        project_name=DEFAULT_PROJECT_NAME,
     )
     return default_project, True
 
@@ -75,7 +78,11 @@ async def get_project_by_name(
     return project_model_to_project(project_model)
 
 
-async def create_project(session: AsyncSession, user: UserModel, project_name: str) -> Project:
+async def create_project(
+    session: AsyncSession,
+    user: UserModel,
+    project_name: str,
+) -> Project:
     project = await get_project_model_by_name(
         session=session, project_name=project_name, ignore_case=True
     )
@@ -343,6 +350,12 @@ def project_model_to_project(
             configurator = get_configurator(b.type)
             if configurator is None:
                 logger.warning("Configurator for backend %s not found", b.type)
+                continue
+            if not b.auth.decrypted:
+                logger.warning(
+                    "Failed to decrypt creds for %s backend. Backend will be ignored.",
+                    b.type.value,
+                )
                 continue
             config_info = configurator.get_config_info(model=b, include_creds=False)
             if is_core_model_instance(config_info, DstackConfigInfo):

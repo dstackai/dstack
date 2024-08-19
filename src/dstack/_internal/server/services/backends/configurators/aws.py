@@ -25,7 +25,7 @@ from dstack._internal.core.models.backends.base import (
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
@@ -108,7 +108,7 @@ class AWSConfigurator(Configurator):
             project_id=project.id,
             type=self.TYPE.value,
             config=AWSStoredConfig(**AWSConfigInfo.__response__.parse_obj(config).dict()).json(),
-            auth=AWSCreds.parse_obj(config.creds).json(),
+            auth=DecryptedString(plaintext=AWSCreds.parse_obj(config.creds).json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAWSConfigInfo:
@@ -124,7 +124,7 @@ class AWSConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> AWSConfig:
         return AWSConfig.__response__(
             **json.loads(model.config),
-            creds=AWSCreds.parse_raw(model.auth).__root__,
+            creds=AWSCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
         )
 
     def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:

@@ -17,7 +17,7 @@ from dstack._internal.core.models.backends.datacrunch import (
     DataCrunchCreds,
     DataCrunchStoredConfig,
 )
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import Configurator
 
 REGIONS = [
@@ -53,7 +53,7 @@ class DataCrunchConfigurator(Configurator):
             config=DataCrunchStoredConfig(
                 **DataCrunchConfigInfo.__response__.parse_obj(config).dict()
             ).json(),
-            auth=DataCrunchCreds.parse_obj(config.creds).json(),
+            auth=DecryptedString(plaintext=DataCrunchCreds.parse_obj(config.creds).json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyDataCrunchConfigInfo:
@@ -69,7 +69,7 @@ class DataCrunchConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> DataCrunchConfig:
         return DataCrunchConfig.__response__(
             **json.loads(model.config),
-            creds=DataCrunchCreds.parse_raw(model.auth),
+            creds=DataCrunchCreds.parse_raw(model.auth.get_plaintext_or_error()),
         )
 
     def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:

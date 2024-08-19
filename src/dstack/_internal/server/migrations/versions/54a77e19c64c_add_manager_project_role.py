@@ -1,7 +1,7 @@
 """Add Manager project role
 
 Revision ID: 54a77e19c64c
-Revises: c00090eaef21
+Revises: 710e5b3fac8f
 Create Date: 2024-08-16 14:25:52.125915
 
 """
@@ -11,7 +11,7 @@ from alembic_postgresql_enum import TableReference
 
 # revision identifiers, used by Alembic.
 revision = "54a77e19c64c"
-down_revision = "c00090eaef21"
+down_revision = "710e5b3fac8f"
 branch_labels = None
 depends_on = None
 

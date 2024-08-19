@@ -8,7 +8,7 @@ from typing import List, Optional, Set, Tuple
 import pydantic
 from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
@@ -232,7 +232,7 @@ async def list_projects_run_models(
         .where(*filters)
         .order_by(*order_by)
         .limit(limit)
-        .options(joinedload(RunModel.user))
+        .options(selectinload(RunModel.user))
     )
     run_models = list(res.scalars().all())
     return run_models

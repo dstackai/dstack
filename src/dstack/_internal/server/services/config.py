@@ -26,7 +26,9 @@ from dstack._internal.core.models.common import CoreModel
 from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services import encryption as encryption_services
 from dstack._internal.server.services import projects as projects_services
+from dstack._internal.server.services.encryption import AnyEncryptionKeyConfig
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -335,7 +337,7 @@ AnyBackendAPIConfig = Union[
 BackendAPIConfig = Annotated[AnyBackendAPIConfig, Field(..., discriminator="type")]
 
 
-class _BackendAPIConfig(BaseModel):
+class _BackendAPIConfig(CoreModel):
     __root__: BackendAPIConfig
 
 
@@ -344,8 +346,18 @@ class ProjectConfig(CoreModel):
     backends: Annotated[List[BackendConfig], Field(description="The list of backends")]
 
 
+EncryptionKeyConfig = Annotated[AnyEncryptionKeyConfig, Field(..., discriminator="type")]
+
+
+class EncryptionConfig(CoreModel):
+    keys: Annotated[List[EncryptionKeyConfig], Field(description="The encryption keys")]
+
+
 class ServerConfig(CoreModel):
     projects: Annotated[List[ProjectConfig], Field(description="The list of projects")]
+    encryption: Annotated[
+        Optional[EncryptionConfig], Field(description="The encryption config")
+    ] = None
 
 
 class ServerConfigManager:
@@ -365,49 +377,69 @@ class ServerConfigManager:
         # if self.config is not None:
         #     self._save_config(self.config)
 
+    async def apply_encryption(self):
+        if self.config is None:
+            raise ValueError("Config is not loaded")
+        if self.config.encryption is not None:
+            encryption_services.init_encryption_keys(self.config.encryption.keys)
+
     async def apply_config(self, session: AsyncSession, owner: UserModel):
         if self.config is None:
             raise ValueError("Config is not loaded")
         for project_config in self.config.projects:
-            project = await projects_services.get_project_model_by_name(
-                session=session,
-                project_name=project_config.name,
+            await self._apply_project_config(
+                session=session, owner=owner, project_config=project_config
             )
-            if not project:
-                await projects_services.create_project_model(
-                    session=session, owner=owner, project_name=project_config.name
-                )
-                project = await projects_services.get_project_model_by_name_or_error(
-                    session=session, project_name=project_config.name
-                )
-            backends_to_delete = backends_services.list_available_backend_types()
-            for backend_config in project_config.backends:
-                config_info = config_to_internal_config(backend_config)
-                backend_type = BackendType(config_info.type)
-                try:
-                    backends_to_delete.remove(backend_type)
-                except ValueError:
-                    continue
-                current_config_info = await backends_services.get_config_info(
-                    project=project,
-                    backend_type=backend_type,
-                )
-                if config_info == current_config_info:
-                    continue
-                try:
-                    if current_config_info is None:
-                        await backends_services.create_backend(
-                            session=session, project=project, config=config_info
-                        )
-                    else:
-                        await backends_services.update_backend(
-                            session=session, project=project, config=config_info
-                        )
-                except Exception as e:
-                    logger.warning("Failed to configure backend %s: %s", config_info.type, e)
-            await backends_services.delete_backends(
-                session=session, project=project, backends_types=backends_to_delete
+
+    async def _apply_project_config(
+        self,
+        session: AsyncSession,
+        owner: UserModel,
+        project_config: ProjectConfig,
+    ):
+        project = await projects_services.get_project_model_by_name(
+            session=session,
+            project_name=project_config.name,
+        )
+        if not project:
+            await projects_services.create_project_model(
+                session=session, owner=owner, project_name=project_config.name
             )
+            project = await projects_services.get_project_model_by_name_or_error(
+                session=session, project_name=project_config.name
+            )
+        backends_to_delete = backends_services.list_available_backend_types()
+        for backend_config in project_config.backends:
+            config_info = config_to_internal_config(backend_config)
+            backend_type = BackendType(config_info.type)
+            try:
+                backends_to_delete.remove(backend_type)
+            except ValueError:
+                continue
+            current_config_info = await backends_services.get_config_info(
+                project=project,
+                backend_type=backend_type,
+            )
+            if config_info == current_config_info:
+                continue
+            backend_exists = any(backend_type == b.type for b in project.backends)
+            try:
+                # current_config_info may be None if backend exists
+                # but it's config is invalid (e.g. cannot be decrypted).
+                # Update backend in this case.
+                if current_config_info is None and not backend_exists:
+                    await backends_services.create_backend(
+                        session=session, project=project, config=config_info
+                    )
+                else:
+                    await backends_services.update_backend(
+                        session=session, project=project, config=config_info
+                    )
+            except Exception as e:
+                logger.warning("Failed to configure backend %s: %s", config_info.type, e)
+        await backends_services.delete_backends(
+            session=session, project=project, backends_types=backends_to_delete
+        )
 
     async def _init_config(
         self, session: AsyncSession, init_backends: bool
@@ -430,12 +462,13 @@ class ServerConfigManager:
         if init_backends and len(backends) == 0:
             backends = await self._init_backends(session=session, project=project)
         return ServerConfig(
-            projects=[ProjectConfig(name=settings.DEFAULT_PROJECT_NAME, backends=backends)]
+            projects=[ProjectConfig(name=settings.DEFAULT_PROJECT_NAME, backends=backends)],
+            encryption=EncryptionConfig(keys=[]),
         )
 
     async def _init_backends(
         self, session: AsyncSession, project: ProjectModel
-    ) -> List[AnyConfigInfoWithCreds]:
+    ) -> List[BackendConfig]:
         backends = []
         for backend_type in backends_services.list_available_backend_types():
             configurator = backends_services.get_configurator(backend_type)
