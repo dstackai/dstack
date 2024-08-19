@@ -16,7 +16,7 @@ from dstack._internal.core.models.backends.runpod import (
     RunpodCreds,
     RunpodStoredConfig,
 )
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends import Configurator
 from dstack._internal.server.services.backends.configurators.base import (
     raise_invalid_credentials_error,
@@ -60,7 +60,7 @@ class RunpodConfigurator(Configurator):
             config=RunpodStoredConfig(
                 **RunpodConfigInfo.__response__.parse_obj(config).dict()
             ).json(),
-            auth=RunpodCreds.parse_obj(config.creds).json(),
+            auth=DecryptedString(plaintext=RunpodCreds.parse_obj(config.creds).json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> RunpodConfigInfo:
@@ -82,7 +82,7 @@ class RunpodConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> RunpodConfig:
         return RunpodConfig(
             **json.loads(model.config),
-            creds=RunpodCreds.parse_raw(model.auth),
+            creds=RunpodCreds.parse_raw(model.auth.get_plaintext_or_error()),
         )
 
     def _validate_runpod_api_key(self, api_key: str):
