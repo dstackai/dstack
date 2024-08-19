@@ -1,3 +1,13 @@
+@use '@cloudscape-design/design-tokens/index' as awsui;
+
+:global {
+    .b-page-header {
+        .awsui-context-top-navigation {
+            border-bottom: 1px solid awsui.$color-border-divider-default;
+        }
+    }
+}
+
 .appHeader {
     height: 48px;
     @media (screen and min-width: 913px) {
