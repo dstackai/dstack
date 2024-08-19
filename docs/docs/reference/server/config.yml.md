@@ -754,28 +754,39 @@ It's an additional application-level encryption layer on top of file-system and 
 By default, the `dstack` server stores all data in plaintext.
 To enable encryption, specify one or more encryption keys:
 
+<div editor-title="~/.dstack/server/config.yml">
+
 ```yaml
 encryption:
   keys:
   - type: aes
+    name: key1
     secret: E5yzN6V3XvBq/f085ISWFCdgnOGED0kuFaAkASlmmO4=
 projects: ...
 ```
+
+</div>
 
 After that, subsequent DB writes will encrypt sensitive data.
 (This includes backend credentials and user tokens.)
 If several keys are specified, the first key is used for encryption and all are tried for decryption.
 This allows rotating encryption keys by specifying a new encryption key:
 
+<div editor-title="~/.dstack/server/config.yml">
+
 ```yaml
 encryption:
   keys:
   - type: aes
+    name: key2
     secret: cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=
   - type: aes
+    name: key1
     secret: E5yzN6V3XvBq/f085ISWFCdgnOGED0kuFaAkASlmmO4=
 projects: ...
 ```
+
+</div>
 
 Old keys may be deleted once all existing records were updated to re-encrypt sensitive data.
 
@@ -796,27 +807,37 @@ opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
 
 And specify it as `secret`:
 
+<div editor-title="~/.dstack/server/config.yml">
+
 ```yaml
 encryption:
   keys:
   - type: aes
+    name: key1
     secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
 projects: ...
 ```
+
+</div>
 
 ### `identity`
 
 The `identity` encryption performs no encryption and stores data in plaintext.
 You can specify an `identity` encryption key explicitly if you want to decrypt the data:
 
+<div editor-title="~/.dstack/server/config.yml">
+
 ```yaml
 encryption:
   keys:
   - type: identity
   - type: aes
+    name: key1
     secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
 projects: ...
 ```
+
+</div>
 
 With this configuration, the `aes` key will still be used to decrypt the old data,
 but new writes will store the data in plaintext.
