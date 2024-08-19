@@ -42,7 +42,7 @@ export const ProjectSettings: React.FC = () => {
     const navigate = useNavigate();
     const paramProjectName = params.projectName ?? '';
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: paramProjectName });
-    const { isAvailableDeletingPermission, isProjectManager, isAvailableProjectManaging } =
+    const { isAvailableDeletingPermission, isProjectManager, isProjectAdmin, isAvailableProjectManaging } =
         useCheckAvailableProjectPermission();
 
     const [pushNotification] = useNotifications();
@@ -181,6 +181,7 @@ export const ProjectSettings: React.FC = () => {
                         onChange={debouncedMembersHandler}
                         members={data.members}
                         readonly={!isProjectManager(data)}
+                        isAdmin={isProjectAdmin(data)}
                     />
 
                     <Container header={<Header variant="h2">{t('common.danger_zone')}</Header>}>
