@@ -60,6 +60,7 @@ async def create_user(
         username=body.username,
         global_role=body.global_role,
         email=body.email,
+        active=body.active,
     )
     return users.user_model_to_user(res)
 
@@ -75,6 +76,7 @@ async def update_user(
         username=body.username,
         global_role=body.global_role,
         email=body.email,
+        active=body.active,
     )
     if res is None:
         raise ResourceNotExistsError()

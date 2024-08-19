@@ -12,6 +12,7 @@ class CreateUserRequest(CoreModel):
     username: str
     global_role: GlobalRole
     email: Optional[str]
+    active: bool = True
 
 
 UpdateUserRequest = CreateUserRequest

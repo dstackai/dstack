@@ -72,6 +72,7 @@ async def create_user(
     global_role: GlobalRole = GlobalRole.ADMIN,
     token: Optional[str] = None,
     email: Optional[str] = None,
+    active: bool = True,
 ) -> UserModel:
     if token is None:
         token = str(uuid.uuid4())
@@ -81,6 +82,7 @@ async def create_user(
         token=DecryptedString(plaintext=token),
         token_hash=get_token_hash(token),
         email=email,
+        active=active,
     )
     session.add(user)
     await session.commit()

@@ -156,6 +156,8 @@ class UserModel(BaseModel):
     # token_hash is needed for fast search by token when stored token is encrypted
     token_hash: Mapped[str] = mapped_column(String(2000), unique=True)
     global_role: Mapped[GlobalRole] = mapped_column(Enum(GlobalRole))
+    # deactivated users cannot access API
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
