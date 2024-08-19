@@ -17,7 +17,7 @@ export const useSideNavigation = () => {
     const { t } = useTranslation();
     const userName = useAppSelector(selectUserName) ?? '';
     const { pathname } = useLocation();
-    const { selectedProject } = useProjectDropdown();
+    const { selectedProject, projectsDropdownList } = useProjectDropdown();
     const [isAvailableAdministrationLinks] = usePermissionGuard({ allowedGlobalRoles: [GlobalUserRole.ADMIN] });
 
     const isPoolDetails = Boolean(useMatch(ROUTES.FLEETS.DETAILS.TEMPLATE));
@@ -63,7 +63,7 @@ export const useSideNavigation = () => {
     ].filter(Boolean);
 
     const navLinks: SideNavigationProps['items'] = [
-        {
+        projectsDropdownList.length && {
             type: 'section',
             text: t('navigation.project'),
             items: projectLinks,
@@ -110,15 +110,14 @@ export const useSideNavigation = () => {
 export const useProjectDropdown = () => {
     const { t } = useTranslation();
     const { pathname } = useLocation();
+    const userName = useAppSelector(selectUserName) ?? '';
     const navigate = useNavigate();
     const params = useParams();
     const paramProjectName = params.projectName;
-    const { data } = useGetProjectsQuery();
+    const { data, isLoading } = useGetProjectsQuery();
     const [selectedProject, setSelectedProject] = useLocalStorageState('selected-project', data?.[0]?.project_name ?? null);
     const { isAvailableProjectManaging } = useCheckAvailableProjectPermission();
 
-    const isAvailableProjectDropdown =
-        ![ROUTES.PROJECT.LIST, ROUTES.ADMINISTRATION.RUNS.LIST].includes(pathname) && pathname.indexOf(ROUTES.USER.LIST) !== 0;
     const onFollowProject: ButtonDropdownProps['onItemFollow'] = (event) => {
         event.preventDefault();
 
@@ -135,6 +134,13 @@ export const useProjectDropdown = () => {
             setSelectedProject(paramProjectName);
         }
     }, [paramProjectName]);
+
+    useEffect(() => {
+        if (!isLoading && data?.length === 0) {
+            navigate(ROUTES.USER.DETAILS.FORMAT(userName));
+            setSelectedProject(null);
+        }
+    }, [isLoading]);
 
     useEffect(() => {
         if (data?.length) {
@@ -174,6 +180,11 @@ export const useProjectDropdown = () => {
 
         return items;
     }, [data, isAvailableProjectManaging]);
+
+    const isAvailableProjectDropdown =
+        ![ROUTES.PROJECT.LIST, ROUTES.ADMINISTRATION.RUNS.LIST].includes(pathname) &&
+        pathname.indexOf(ROUTES.USER.LIST) !== 0 &&
+        projectsDropdownList.length;
 
     return { projectsDropdownList, selectedProject, isAvailableProjectDropdown, onFollowProject } as const;
 };
