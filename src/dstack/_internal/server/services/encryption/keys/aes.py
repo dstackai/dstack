@@ -2,8 +2,7 @@ import os
 from base64 import b64decode, b64encode
 from typing import Literal
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pydantic import Field, validator
 from typing_extensions import Annotated
 
@@ -13,6 +12,7 @@ from dstack._internal.server.services.encryption.keys.base import EncryptionKey
 
 class AESEncryptionKeyConfig(CoreModel):
     type: Annotated[Literal["aes"], Field(description="The type of the key")] = "aes"
+    name: Annotated[str, Field(description="The key name for key identification")]
     secret: Annotated[str, Field(description="Base64-encoded AES-256 key")]
 
     @validator("secret")
@@ -30,33 +30,29 @@ class AESEncryptionKey(EncryptionKey):
     TYPE = "aes"
 
     def __init__(self, config: AESEncryptionKeyConfig) -> None:
+        self.config = config
         self.key = b64decode(config.secret)
 
     def encrypt(self, plaintext: str) -> str:
-        # Generate a random 16-byte (128-bit) IV
-        iv = os.urandom(16)
+        # Generate a random 12-byte (96-bit) nonce (recommended size for GCM)
+        nonce = os.urandom(12)
 
-        # Create AES-GCM Cipher object and encrypt
-        cipher = Cipher(algorithms.AES(self.key), modes.GCM(iv), backend=default_backend())
-        encryptor = cipher.encryptor()
-        ciphertext = encryptor.update(plaintext.encode("utf-8")) + encryptor.finalize()
-        tag = encryptor.tag
+        # Create an AESGCM object and encrypt the plaintext
+        aesgcm = AESGCM(self.key)
+        ciphertext = aesgcm.encrypt(nonce, plaintext.encode("utf-8"), None)
 
-        # base64-encode the IV, ciphertext, and tag for storage
-        return b64encode(iv + ciphertext + tag).decode("utf-8")
+        # base64-encode the nonce and ciphertext for storage
+        return b64encode(nonce + ciphertext).decode("utf-8")
 
     def decrypt(self, ciphertext: str) -> str:
         data = b64decode(ciphertext)
 
-        # Extract the IV, ciphertext, and tag
-        iv = data[:16]
-        decoded_ciphertext = data[16:-16]
-        tag = data[-16:]
+        # Extract the nonce and ciphertext
+        nonce = data[:12]
+        decoded_ciphertext = data[12:]
 
-        # Create AES-GCM Cipher object for decryption
-        cipher = Cipher(algorithms.AES(self.key), modes.GCM(iv, tag), backend=default_backend())
-        decryptor = cipher.decryptor()
+        # Create an AESGCM object and decrypt the ciphertext
+        aesgcm = AESGCM(self.key)
+        plaintext = aesgcm.decrypt(nonce, decoded_ciphertext, None)
 
-        # Decrypt the ciphertext and return the plaintext
-        plaintext = decryptor.update(decoded_ciphertext) + decryptor.finalize()
         return plaintext.decode("utf-8")
