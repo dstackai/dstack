@@ -23,6 +23,8 @@ export const projectApi = createApi({
                 };
             },
 
+            transformResponse: () => [],
+
             providesTags: (result) =>
                 result
                     ? [...result.map(({ project_name }) => ({ type: 'Projects' as const, id: project_name })), 'Projects']
