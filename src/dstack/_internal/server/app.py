@@ -174,7 +174,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):
         msg = "Access denied"
-        if len(exc.args[0]) > 0:
+        if len(exc.args) > 0:
             msg = exc.args[0]
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
