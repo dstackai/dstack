@@ -69,7 +69,7 @@ class DataCrunchConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> DataCrunchConfig:
         return DataCrunchConfig.__response__(
             **json.loads(model.config),
-            creds=DataCrunchCreds.parse_raw(model.auth.plaintext),
+            creds=DataCrunchCreds.parse_raw(model.auth.get_plaintext_or_error()),
         )
 
     def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:

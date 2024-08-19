@@ -24,6 +24,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
+from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.fleets import FleetStatus
@@ -71,16 +72,26 @@ class NaiveDateTime(TypeDecorator):
 class DecryptedString(CoreModel):
     """
     A type for representing plaintext strings encrypted with `EncryptedString`.
-    Besides the string, stores information if the decryption was successfull.
+    Besides the string, stores information if the decryption was successful.
     This is useful so that application code can have custom handling of failed decrypts (e.g. ignoring).
     """
 
-    plaintext: str
+    # Do not read plaintext directly to avoid ignoring errors accidentally.
+    # Unpack with get_plaintext_or_error().
+    plaintext: Optional[str]
     decrypted: bool = True
     exc: Optional[Exception] = None
 
     class Config:
         arbitrary_types_allowed = True
+
+    def get_plaintext_or_error(self) -> str:
+        if self.decrypted and self.plaintext is not None:
+            return self.plaintext
+        exc = DstackError("Failed to access plaintext")
+        if self.exc is not None:
+            raise exc from self.exc
+        raise exc
 
 
 class EncryptedString(TypeDecorator):
@@ -108,7 +119,7 @@ class EncryptedString(TypeDecorator):
             # Passing string allows binding an encrypted value directly
             # e.g. for comparisons
             return value
-        return EncryptedString._encrypt_func(value.plaintext)
+        return EncryptedString._encrypt_func(value.get_plaintext_or_error())
 
     def process_result_value(self, value: Optional[str], dialect) -> Optional[DecryptedString]:
         if value is None:
@@ -118,7 +129,7 @@ class EncryptedString(TypeDecorator):
             return DecryptedString(plaintext=plaintext, decrypted=True)
         except Exception as e:
             logger.debug("Failed to decrypt encrypted string: %s", repr(e))
-            return DecryptedString(plaintext="", decrypted=False, exc=e)
+            return DecryptedString(plaintext=None, decrypted=False, exc=e)
 
 
 constraint_naming_convention = {

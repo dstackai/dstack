@@ -67,7 +67,7 @@ class TensorDockConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> TensorDockConfig:
         return TensorDockConfig.__response__(
             **json.loads(model.config),
-            creds=TensorDockCreds.parse_raw(model.auth.plaintext),
+            creds=TensorDockCreds.parse_raw(model.auth.get_plaintext_or_error()),
         )
 
     def _validate_tensordock_creds(self, api_key: str, api_token: str):

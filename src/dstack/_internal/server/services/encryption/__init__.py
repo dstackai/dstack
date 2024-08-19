@@ -55,11 +55,16 @@ def init_encryption_keys(encryption_key_configs: List[AnyEncryptionKeyConfig]):
 
 @contextmanager
 def encryption_keys_context(encryption_keys: List[EncryptionKey]):
+    """
+    A helper context manager to be used in tests. It's not concurrency-safe.
+    """
     global _encryption_keys
     prev_encryption_keys = _encryption_keys
     _encryption_keys = encryption_keys
-    yield
-    _encryption_keys = prev_encryption_keys
+    try:
+        yield
+    finally:
+        _encryption_keys = prev_encryption_keys
 
 
 def encrypt(plaintext: str) -> str:
@@ -78,7 +83,7 @@ def decrypt(ciphertext: str) -> str:
             return key.decrypt(ciphertext)
         except Exception:
             logger.debug(f"Attempt to decrypt ciphertext with key #{i} failed")
-    raise EncryptionError("Failed to decrypt ciphertext")
+    raise EncryptionError("All keys failed to decrypt ciphertext")
 
 
 def _pack_ciphertext(ciphertext: str, key_type: str) -> str:

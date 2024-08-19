@@ -120,7 +120,7 @@ async def lifespan(app: FastAPI):
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
-        token=admin.token.plaintext,
+        token=admin.token.get_plaintext_or_error(),
         default=UPDATE_DEFAULT_PROJECT,
         no_default=DO_NOT_UPDATE_DEFAULT_PROJECT,
     )
@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
-    logger.info(f"The admin token is {admin.token.plaintext}", {"show_path": False})
+    logger.info(f"The admin token is {admin.token.get_plaintext_or_error()}", {"show_path": False})
     logger.info(
         f"The dstack server {dstack_version} is running at {SERVER_URL}",
         {"show_path": False},

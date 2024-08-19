@@ -183,7 +183,7 @@ class AzureConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> AzureConfig:
         return AzureConfig.__response__(
             **json.loads(model.config),
-            creds=AzureCreds.parse_raw(model.auth.plaintext).__root__,
+            creds=AzureCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
         )
 
     def _set_client_creds_tenant_id(

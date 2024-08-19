@@ -124,7 +124,7 @@ class AWSConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> AWSConfig:
         return AWSConfig.__response__(
             **json.loads(model.config),
-            creds=AWSCreds.parse_raw(model.auth.plaintext).__root__,
+            creds=AWSCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
         )
 
     def _get_regions_element(self, selected: List[str]) -> ConfigMultiElement:

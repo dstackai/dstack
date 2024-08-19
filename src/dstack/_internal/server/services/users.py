@@ -10,6 +10,9 @@ from dstack._internal.core.errors import ResourceExistsError
 from dstack._internal.core.models.users import GlobalRole, User, UserTokenCreds, UserWithCreds
 from dstack._internal.server.models import DecryptedString, UserModel
 from dstack._internal.server.utils.routers import error_forbidden
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 _ADMIN_USERNAME = "admin"
 
@@ -146,7 +149,14 @@ async def get_user_model_by_token(session: AsyncSession, token: str) -> Optional
     token_hash = get_token_hash(token)
     res = await session.execute(select(UserModel).where(UserModel.token_hash == token_hash))
     user = res.scalar()
-    if user is None or user.token.plaintext != token:
+    if user is None:
+        return None
+    if not user.token.decrypted:
+        logger.error(
+            "Failed to get user by token. Token cannot be decrypted: %s", repr(user.token.exc)
+        )
+        return None
+    if user.token.get_plaintext_or_error() != token:
         return None
     return user
 
@@ -166,7 +176,7 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
         username=user_model.name,
         global_role=user_model.global_role,
         email=user_model.email,
-        creds=UserTokenCreds(token=user_model.token.plaintext),
+        creds=UserTokenCreds(token=user_model.token.get_plaintext_or_error()),
     )
 
 

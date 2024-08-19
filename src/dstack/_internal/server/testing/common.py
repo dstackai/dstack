@@ -62,7 +62,7 @@ from dstack._internal.server.services.users import get_token_hash
 
 def get_auth_headers(token: Union[DecryptedString, str]) -> Dict:
     if isinstance(token, DecryptedString):
-        token = token.plaintext
+        token = token.get_plaintext_or_error()
     return {"Authorization": f"Bearer {token}"}
 
 
