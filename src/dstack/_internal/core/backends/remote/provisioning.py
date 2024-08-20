@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from typing import Any, Dict, Generator, List
 
 import paramiko
+from gpuhunt import correct_gpu_memory_gib
 
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.instances import (
@@ -210,8 +211,9 @@ def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
 def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
     gpu_name = convert_gpu_name(host_info["gpu_name"])
     if host_info.get("gpu_count", 0):
-        gpu_memory = int(host_info["gpu_memory"].lower().replace("mib", "").strip())
-        gpus = [Gpu(name=gpu_name, memory_mib=gpu_memory)] * host_info["gpu_count"]
+        gpu_memory_mib = float(host_info["gpu_memory"].lower().replace("mib", "").strip())
+        gpu_memory_mib = correct_gpu_memory_gib(gpu_name, gpu_memory_mib) * 1024
+        gpus = [Gpu(name=gpu_name, memory_mib=gpu_memory_mib)] * host_info["gpu_count"]
     else:
         gpus = []
     instance_type = InstanceType(
