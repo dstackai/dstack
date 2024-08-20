@@ -1,10 +1,10 @@
+import importlib.resources
 import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Awaitable, Callable, List
 
-import pkg_resources
 import sentry_sdk
 from fastapi import FastAPI, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -239,7 +239,11 @@ def register_routes(app: FastAPI, ui: bool = True):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             else:
-                return HTMLResponse(pkg_resources.resource_string(__name__, "statics/index.html"))
+                return HTMLResponse(
+                    importlib.resources.files("dstack._internal.server")
+                    .joinpath("statics/index.html")
+                    .read_text()
+                )
     else:
 
         @app.get("/")
