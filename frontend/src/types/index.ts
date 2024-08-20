@@ -24,9 +24,11 @@ export enum ProjectUserRole {
 }
 
 export enum UserPermission {
-    DSTACK_USER_CAN_CREATE_PROJECTS = 'DSTACK_USER_CAN_CREATE_PROJECTS',
-    DSTACK_USER_CAN_CREATE_GATEWAYS = 'DSTACK_USER_CAN_CREATE_GATEWAYS',
-    DSTACK_USER_CAN_CREATE_ON_PREM_FLEETS = 'DSTACK_USER_CAN_CREATE_ON_PREM_FLEETS'
+    CAN_CREATE_PROJECTS = 'CAN_CREATE_PROJECTS',
+}
+
+export const userPermissionMap: Record<TUserPermissionKeys, UserPermission> = {
+    'can_create_projects': UserPermission.CAN_CREATE_PROJECTS
 }
 
 

@@ -10,7 +10,7 @@ export const useCheckAvailableProjectPermission = () => {
     const userName = userData?.username ?? '';
     const userGlobalRole = userData?.global_role ?? '';
     const [hasPermissionForProjectManaging] = usePermissionGuard({
-        allowedPermissions: [UserPermission.DSTACK_USER_CAN_CREATE_PROJECTS],
+        allowedPermissions: [UserPermission.CAN_CREATE_PROJECTS],
     });
 
     const isAvailableDeletingPermission = (project: IProject) => {

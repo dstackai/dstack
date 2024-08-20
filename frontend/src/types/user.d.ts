@@ -1,8 +1,14 @@
 declare type TUserRole = 'user' | 'admin';
-declare type TUserPermission =
-    | 'DSTACK_USER_CAN_CREATE_PROJECTS'
-    | 'DSTACK_USER_CAN_CREATE_GATEWAYS'
-    | 'DSTACK_USER_CAN_CREATE_ON_PREM_FLEETS'
+declare type TUserPermission = 'CAN_CREATE_PROJECTS'
+declare type TUserPermissionKeys = 'can_create_projects'
+
+declare interface IUserResponseData {
+    id: string,
+    username: string;
+    global_role: TUserRole
+    email: string | null,
+    permissions: Record<TUserPermissionKeys, boolean>
+}
 
 declare interface IUser {
     id: string,
