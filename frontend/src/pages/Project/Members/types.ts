@@ -3,6 +3,7 @@ export interface IProps {
     loading?: boolean;
     onChange: (users: IProjectMember[]) => void;
     readonly?: boolean;
+    isAdmin?: boolean;
 }
 
 export type TProjectMemberWithIndex = IProjectMember & { index: number };

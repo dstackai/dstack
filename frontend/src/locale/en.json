@@ -523,6 +523,7 @@
   },
   "roles": {
     "admin": "Admin",
+    "manager": "Manager",
     "user": "User"
   },
   "confirm_dialog": {
