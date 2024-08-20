@@ -125,11 +125,18 @@ class TestValidateGPUVendorAndImage:
         self.validate(conf)
         assert conf.resources.gpu.vendor is None
 
-    @pytest.mark.parametrize("gpu_spec", ["nvidia", "google"])
-    def test_non_amd_vendor_declared(self, gpu_spec):
+    @pytest.mark.parametrize(
+        ["gpu_spec", "expected_vendor"],
+        [
+            ["nvidia", AcceleratorVendor.NVIDIA],
+            ["tpu", AcceleratorVendor.GOOGLE],
+            ["google", AcceleratorVendor.GOOGLE],
+        ],
+    )
+    def test_non_amd_vendor_declared(self, gpu_spec, expected_vendor):
         conf = self.prepare_conf(gpu_spec=gpu_spec)
         self.validate(conf)
-        assert conf.resources.gpu.vendor == AcceleratorVendor.cast(gpu_spec)
+        assert conf.resources.gpu.vendor == expected_vendor
 
     def test_amd_vendor_declared_with_image(self):
         conf = self.prepare_conf(image="tgi:rocm", gpu_spec="AMD")
@@ -140,7 +147,7 @@ class TestValidateGPUVendorAndImage:
         ["gpu_spec", "expected_vendor"],
         [
             ["a40,l40", AcceleratorVendor.NVIDIA],  # lowercase
-            ["V4", AcceleratorVendor.GOOGLE],  # uppercase
+            ["V3-64", AcceleratorVendor.GOOGLE],  # uppercase
         ],
     )
     def test_one_non_amd_vendor_inferred(self, gpu_spec, expected_vendor):
@@ -164,7 +171,7 @@ class TestValidateGPUVendorAndImage:
         "gpu_spec",
         [
             "A1000,v4",  # Nvidia and Google
-            "v3,foo",  # Google and unknown
+            "v3-64,foo",  # Google and unknown
         ],
     )
     def test_two_non_amd_vendors_inferred(self, gpu_spec):
@@ -176,7 +183,7 @@ class TestValidateGPUVendorAndImage:
         "gpu_spec",
         [
             "A1000,mi300x",  # Nvidia and AMD (lowercase)
-            "MI300x,v3",  # AMD (mixedcase) and Google
+            "MI300x,v3-64",  # AMD (mixedcase) and Google
             "foo,MI300X",  # unknown and AMD (uppercase)
         ],
     )
@@ -200,7 +207,7 @@ class TestValidateGPUVendorAndImage:
         "gpu_spec",
         [
             "A1000,mi300x",  # Nvidia and AMD (lowercase)
-            "MI300x,v3",  # AMD (mixedcase) and Google
+            "MI300x,v3-64",  # AMD (mixedcase) and Google
             "foo,MI300X",  # unknown and AMD (uppercase)
         ],
     )

@@ -111,9 +111,19 @@ class TestGPU:
                 "Nvidia", {"vendor": AcceleratorVendor.NVIDIA}, id="vendor-only-mixedcase"
             ),
             pytest.param(
-                "google:v3",
-                {"vendor": AcceleratorVendor.GOOGLE, "name": ["v3"]},
+                "google:v3-64",
+                {"vendor": AcceleratorVendor.GOOGLE, "name": ["v3-64"]},
                 id="vendor-lowercase-and-name",
+            ),
+            pytest.param(
+                "tpu:v5p-1024",
+                {"vendor": AcceleratorVendor.GOOGLE, "name": ["v5p-1024"]},
+                id="tpu-lowercase-and-name",
+            ),
+            pytest.param(
+                "v5litepod-64:TPU",
+                {"vendor": AcceleratorVendor.GOOGLE, "name": ["v5litepod-64"]},
+                id="name-and-tpu-uppercase",
             ),
             pytest.param(
                 "MI300X:AMD",
@@ -132,6 +142,8 @@ class TestGPU:
             pytest.param("NVIDIA", AcceleratorVendor.NVIDIA, id="uppercase"),
             pytest.param("amd", AcceleratorVendor.AMD, id="lowercase"),
             pytest.param("Google", AcceleratorVendor.GOOGLE, id="mixedcase"),
+            pytest.param("tpu", AcceleratorVendor.GOOGLE, id="tpu-lowercase"),
+            pytest.param("TPU", AcceleratorVendor.GOOGLE, id="tpu-uppercase"),
             pytest.param(AcceleratorVendor.GOOGLE, AcceleratorVendor.GOOGLE, id="enum-value"),
         ],
     )
@@ -142,6 +154,10 @@ class TestGPU:
 
     def test_name(self):
         assert parse_obj_as(GPUSpec, "A100") == parse_obj_as(GPUSpec, {"name": ["A100"]})
+
+    def test_name_with_tpu_prefix(self):
+        spec = parse_obj_as(GPUSpec, "tpu-v3-2048")
+        assert spec.name == ["v3-2048"]
 
     def test_memory(self):
         assert parse_obj_as(GPUSpec, "16GB") == parse_obj_as(GPUSpec, {"memory": "16GB"})
