@@ -41,7 +41,7 @@ Before using `dstack` through CLI or API, set up a `dstack` server.
 ### 1. Configure backends
 
 If you want the `dstack` server to run containers or manage clusters in your cloud accounts (or use Kubernetes),
-create the [~/.dstack/server/config.yml](https://dstack.ai/docs/reference/server/config.yml.md) file and configure backends.
+create the [`~/.dstack/server/config.yml`](https://dstack.ai/docs/reference/server/config.yml.md) file and configure backends.
 
 ### 2. Start the server
 

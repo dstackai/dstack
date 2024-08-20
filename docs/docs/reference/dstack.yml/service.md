@@ -120,7 +120,7 @@ python: "3.10"
 
 # Commands of the service
 commands:
-  - install vllm
+  - pip install vllm
   - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
 # Expose the port of the service
 port: 8000
@@ -197,7 +197,7 @@ python: "3.10"
 
 # Commands of the service
 commands:
-  - install vllm
+  - pip install vllm
   - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
 # Expose the port of the service
 port: 8000

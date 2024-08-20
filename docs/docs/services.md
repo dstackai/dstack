@@ -32,7 +32,7 @@ python: "3.10"
 env:
   - HUGGING_FACE_HUB_TOKEN
 commands:
-  - install vllm
+  - pip install vllm
   - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
 # Expose the vllm server port
 port: 8000
@@ -86,7 +86,7 @@ Submit the run llama31-service? [y/n]: y
 Provisioning...
 ---> 100%
 
-Service is published at https://yellow-cat-1.example.com
+Service is published at https://llama31-service.example.com
 ```
 
 </div>
@@ -103,7 +103,7 @@ By default, the service endpoint requires the `Authorization` header with `Beare
 <div class="termy">
 
 ```shell
-$ curl https://yellow-cat-1.example.com/v1/chat/completions \
+$ curl https://llama31-service.example.com/v1/chat/completions \
     -H 'Content-Type: application/json' \
     -H 'Authorization: Bearer &lt;dstack token&gt;' \
     -d '{
