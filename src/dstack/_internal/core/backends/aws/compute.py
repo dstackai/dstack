@@ -139,68 +139,78 @@ class AWSCompute(Compute):
             {"Key": "dstack_project", "Value": project_name},
             {"Key": "dstack_user", "Value": instance_config.user},
         ]
+        disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
         try:
-            vpc_id, subnets_ids = get_vpc_id_subnet_id_or_error(
+            vpc_id, subnet_ids = get_vpc_id_subnet_id_or_error(
                 ec2_client=ec2_client,
                 config=self.config,
                 region=instance_offer.region,
                 allocate_public_ip=allocate_public_ip,
                 availability_zones=availability_zones,
             )
-            subnet_id = subnets_ids[0]
-            availability_zone = aws_resources.get_availability_zone_by_subnet_id(
+            subnet_id_to_az_map = aws_resources.get_subnets_availability_zones(
                 ec2_client=ec2_client,
-                subnet_id=subnet_id,
-            )
-            disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
-            response = ec2_resource.create_instances(
-                **aws_resources.create_instances_struct(
-                    disk_size=disk_size,
-                    image_id=aws_resources.get_image_id(
-                        ec2_client=ec2_client,
-                        cuda=len(instance_offer.instance.resources.gpus) > 0,
-                    ),
-                    instance_type=instance_offer.instance.name,
-                    iam_instance_profile_arn=None,
-                    user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
-                    tags=tags,
-                    security_group_id=aws_resources.create_security_group(
-                        ec2_client=ec2_client,
-                        project_id=project_name,
-                        vpc_id=vpc_id,
-                    ),
-                    spot=instance_offer.instance.resources.spot,
-                    subnet_id=subnet_id,
-                    allocate_public_ip=allocate_public_ip,
-                )
-            )
-            instance = response[0]
-            instance.wait_until_running()
-            instance.reload()  # populate instance.public_ip_address
-            if instance_offer.instance.resources.spot:  # it will not terminate the instance
-                ec2_client.cancel_spot_instance_requests(
-                    SpotInstanceRequestIds=[instance.spot_instance_request_id]
-                )
-            hostname = _get_instance_ip(instance, allocate_public_ip)
-            return JobProvisioningData(
-                backend=instance_offer.backend,
-                instance_type=instance_offer.instance,
-                instance_id=instance.instance_id,
-                public_ip_enabled=allocate_public_ip,
-                hostname=hostname,
-                internal_ip=instance.private_ip_address,
-                region=instance_offer.region,
-                availability_zone=availability_zone,
-                price=instance_offer.price,
-                username="ubuntu",
-                ssh_port=22,
-                dockerized=True,  # because `dstack-shim docker` is used
-                ssh_proxy=None,
-                backend_data=None,
+                subnet_ids=subnet_ids,
             )
         except botocore.exceptions.ClientError as e:
             logger.warning("Got botocore.exceptions.ClientError: %s", e)
             raise NoCapacityError()
+        tried_availability_zones = set()
+        for subnet_id, az in subnet_id_to_az_map.items():
+            if az in tried_availability_zones:
+                continue
+            tried_availability_zones.add(az)
+            try:
+                logger.debug("Trying provisioning %s in %s", instance_offer.instance.name, az)
+                response = ec2_resource.create_instances(
+                    **aws_resources.create_instances_struct(
+                        disk_size=disk_size,
+                        image_id=aws_resources.get_image_id(
+                            ec2_client=ec2_client,
+                            cuda=len(instance_offer.instance.resources.gpus) > 0,
+                        ),
+                        instance_type=instance_offer.instance.name,
+                        iam_instance_profile_arn=None,
+                        user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
+                        tags=tags,
+                        security_group_id=aws_resources.create_security_group(
+                            ec2_client=ec2_client,
+                            project_id=project_name,
+                            vpc_id=vpc_id,
+                        ),
+                        spot=instance_offer.instance.resources.spot,
+                        subnet_id=subnet_id,
+                        allocate_public_ip=allocate_public_ip,
+                    )
+                )
+                instance = response[0]
+                instance.wait_until_running()
+                instance.reload()  # populate instance.public_ip_address
+                if instance_offer.instance.resources.spot:  # it will not terminate the instance
+                    ec2_client.cancel_spot_instance_requests(
+                        SpotInstanceRequestIds=[instance.spot_instance_request_id]
+                    )
+                hostname = _get_instance_ip(instance, allocate_public_ip)
+                return JobProvisioningData(
+                    backend=instance_offer.backend,
+                    instance_type=instance_offer.instance,
+                    instance_id=instance.instance_id,
+                    public_ip_enabled=allocate_public_ip,
+                    hostname=hostname,
+                    internal_ip=instance.private_ip_address,
+                    region=instance_offer.region,
+                    availability_zone=az,
+                    price=instance_offer.price,
+                    username="ubuntu",
+                    ssh_port=22,
+                    dockerized=True,  # because `dstack-shim docker` is used
+                    ssh_proxy=None,
+                    backend_data=None,
+                )
+            except botocore.exceptions.ClientError as e:
+                logger.warning("Got botocore.exceptions.ClientError: %s", e)
+                continue
+        raise NoCapacityError()
 
     def run_job(
         self,
