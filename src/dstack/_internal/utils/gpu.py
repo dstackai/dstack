@@ -23,7 +23,7 @@ def convert_gpu_name(name: str) -> str:
     name = name.replace(" NVL", "NVL")
     name = name.replace(" Ada Generation", "Ada")
     name = name.replace("RTX ", "RTX")
-    m = re.search(r"([A|H|L|P|T|V]\d+\w*)", name)
+    m = re.search(r"([AHLPTV]\d+\w*)", name)
     if m is not None:
         return m.group(0)
     return name.replace(" ", "")
