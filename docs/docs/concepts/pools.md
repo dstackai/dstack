@@ -93,7 +93,7 @@ $ dstack pool add-ssh -i ~/.ssh/id_rsa ubuntu@54.73.155.119 \
 The `--network` argument accepts the IP address range (CIDR) of the private network of the instance.
 
 Once you've added multiple instances with the same network value, you can use them as a cluster to run
-[multi-node tasks](../reference/dstack.yml/task.md#_nodes).
+[multi-node tasks](../reference/dstack.yml/task.md#distributed-tasks).
 
 ## Removing instances
 
