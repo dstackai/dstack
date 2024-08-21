@@ -7,6 +7,10 @@ from pydantic.generics import GenericModel
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 T = TypeVar("T", bound=Union[int, float])
 
@@ -163,7 +167,7 @@ class GPUSpec(CoreModel):
                 if not token:
                     raise ValueError(f"GPU spec contains empty token: {v}")
                 try:
-                    vendor = gpuhunt.AcceleratorVendor.cast(token)
+                    vendor = cls._vendor_from_string(token)
                 except ValueError:
                     vendor = None
                 if vendor:
@@ -189,9 +193,20 @@ class GPUSpec(CoreModel):
 
     @validator("name", pre=True)
     def _validate_name(cls, v: Any) -> Any:
-        if v is not None and not isinstance(v, list):
-            return [v]
-        return v
+        if v is None:
+            return None
+        if not isinstance(v, list):
+            v = [v]
+        validated: List[Any] = []
+        has_tpu_prefix = False
+        for name in v:
+            if isinstance(name, str) and name.startswith("tpu-"):
+                name = name[4:]
+                has_tpu_prefix = True
+            validated.append(name)
+        if has_tpu_prefix:
+            logger.warning("`tpu-` prefix is deprecated, specify gpu_vendor instead")
+        return validated
 
     @validator("vendor", pre=True)
     def _validate_vendor(
@@ -199,6 +214,17 @@ class GPUSpec(CoreModel):
     ) -> Optional[gpuhunt.AcceleratorVendor]:
         if v is None:
             return None
+        if isinstance(v, gpuhunt.AcceleratorVendor):
+            return v
+        if isinstance(v, str):
+            return cls._vendor_from_string(v)
+        raise TypeError(f"Unsupported type: {v!r}")
+
+    @classmethod
+    def _vendor_from_string(cls, v: str) -> gpuhunt.AcceleratorVendor:
+        v = v.lower()
+        if v == "tpu":
+            return gpuhunt.AcceleratorVendor.GOOGLE
         return gpuhunt.AcceleratorVendor.cast(v)
 
 
