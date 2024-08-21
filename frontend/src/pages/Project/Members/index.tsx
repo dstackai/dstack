@@ -110,6 +110,7 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
                     <div className={styles.role}>
                         <div className={styles.roleFieldWrapper}>
                             <FormSelect
+                                key={field.user.username}
                                 control={control}
                                 name={`members.${field.index}.project_role`}
                                 options={roleSelectOptions}
