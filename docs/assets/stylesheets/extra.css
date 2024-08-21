@@ -940,6 +940,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     grid-template-columns: repeat(auto-fit,minmax(15rem,1fr));
 }
 
+.md-typeset .tabbed-labels>label:last-of-type {
+    margin-right: -2px;
+}
+
 .md-typeset .tabbed-labels>label {
     padding: 18px 18px 16px !important;
     font-size: 16.5px !important;
@@ -947,6 +951,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     -webkit-font-smoothing: auto !important;
     z-index: 1 !important;
     background: none;
+    display: inline-block;
+    margin-right: -1px;
 }
 
 .md-typeset .tabbed-labels--linked>label a {
@@ -976,6 +982,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 .md-typeset .tabbed-set {
    border-radius: 0;
+   display: block;
 }
 
 .md-typeset .tabbed-block>.highlight, .md-typeset .tabbed-block>.termy {
@@ -988,6 +995,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     }
 }
 
+.md-typeset thead {
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.05), rgb(0 114 255 / 0.5%), rgba(0, 42, 255, 0.025));
+}
+
 .md-typeset .tabbed-set>input:checked~.tabbed-labels code,
 .md-typeset .tabbed-set>input:first-child:checked~.tabbed-labels>:first-child {
     /*MKDocs Insiders fix*/
@@ -996,16 +1007,40 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 .js .md-typeset .tabbed-labels:before {
-    height: 100%;
+    height: auto;
     background: none;
     z-index: 1;
     padding: 5px;
-    border-radius: 6px;
+    border-radius: 12px;
     border: 1px solid black;
+    bottom: -0.7px;
+    top: -0.7px;
+    left: -0.7px;
+    right: -0.7px;
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05));
+}
+
+@media screen and (max-width: 44.984375em) {
+    [dir=ltr] .md-content__inner>.tabbed-set .tabbed-labels:after {
+         padding-right: 0;
+    }
 }
 
 .md-typeset .tabbed-labels {
     box-shadow: none !important;
+    margin-bottom: -3px;
+    display: inline-block;
+    height: 100%;
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.025), rgb(0 114 255 / 0.25%), rgba(0, 42, 255, 0.0125));
+    z-index: 1;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,.25);
+    overflow: unset;
+}
+
+.md-typeset table:not([class]) {
+    border-radius: 8px;
+    border: .5px solid rgba(0, 0, 0, .25);
 }
 
 .md-typeset .grid {

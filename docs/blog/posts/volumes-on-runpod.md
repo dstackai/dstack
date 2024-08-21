@@ -1,11 +1,11 @@
 ---
-title: Optimizing inference cold starts on RunPod with volumes
+title: Using volumes to optimize cold starts on RunPod
 date: 2024-08-13
 description: "Learn how to use volumes with dstack to optimize model inference cold start times on RunPod."  
 slug: volumes-on-runpod
 ---
 
-# Optimizing inference cold starts on RunPod with volumes
+# Using volumes to optimize cold starts on RunPod
 
 Deploying custom models in the cloud often faces the challenge of cold start times, including the time to provision a
 new instance and download the model. This is especially relevant for services with autoscaling when new model replicas
