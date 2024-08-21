@@ -30,18 +30,6 @@ except ImportError:
 logger = get_logger(__name__)
 
 
-def _unix_time_ms_to_datetime(unix_time_ms: int) -> datetime:
-    return datetime.fromtimestamp(unix_time_ms / 1000, tz=timezone.utc)
-
-
-def _datetime_to_unix_time_ms(dt: datetime) -> int:
-    return int(dt.timestamp() * 1000)
-
-
-def _b64encode_raw_message(message: bytes) -> str:
-    return base64.b64encode(message).decode()
-
-
 class LogStorageError(DstackError):
     pass
 
@@ -309,6 +297,18 @@ class FileLogStorage(LogStorage):
             log_source=LogEventSource.STDOUT,
             message=_b64encode_raw_message(runner_log_event.message),
         )
+
+
+def _unix_time_ms_to_datetime(unix_time_ms: int) -> datetime:
+    return datetime.fromtimestamp(unix_time_ms / 1000, tz=timezone.utc)
+
+
+def _datetime_to_unix_time_ms(dt: datetime) -> int:
+    return int(dt.timestamp() * 1000)
+
+
+def _b64encode_raw_message(message: bytes) -> str:
+    return base64.b64encode(message).decode()
 
 
 _default_log_storage: Optional[LogStorage] = None
