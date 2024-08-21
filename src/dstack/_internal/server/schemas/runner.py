@@ -16,7 +16,7 @@ class JobStateEvent(CoreModel):
 
 
 class LogEvent(CoreModel):
-    timestamp: int  # nanoseconds
+    timestamp: int  # milliseconds
     message: bytes
 
     @validator("message", pre=True)
