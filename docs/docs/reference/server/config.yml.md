@@ -26,13 +26,13 @@ There are two ways to configure AWS: using an access key or using the default cr
     
     ```yaml
     projects:
-    - name: main
-      backends:
-        - type: aws
-          creds:
-            type: access_key
-            access_key: KKAAUKLIZ5EHKICAOASV
-            secret_key: pn158lMqSBJiySwpQ9ubwmI6VUU3/W2fdJdFwfgO
+      - name: main
+        backends:
+          - type: aws
+            creds:
+              type: access_key
+              access_key: KKAAUKLIZ5EHKICAOASV
+              secret_key: pn158lMqSBJiySwpQ9ubwmI6VUU3/W2fdJdFwfgO
     ```
     
     </div>
@@ -54,41 +54,7 @@ There are two ways to configure AWS: using an access key or using the default cr
     
     </div>
 
-??? info "VPC"
-    By default, `dstack` uses the default VPC. It's possible to customize it:
-
-    === "vpc_name"
-
-        ```yaml
-        projects:
-          - name: main
-            backends:
-              - type: aws
-                creds:
-                  type: default
-
-                vpc_name: my-vpc
-        ```
-
-    === "vpc_ids"
-        ```yaml
-        projects:
-          - name: main
-            backends:
-              - type: aws
-                creds:
-                  type: default
-
-                default_vpcs: true
-                vpc_ids:
-                  us-east-1: vpc-0a2b3c4d5e6f7g8h
-                  us-east-2: vpc-9i8h7g6f5e4d3c2b
-                  us-west-1: vpc-4d3c2b1a0f9e8d7
-        ```
-
-        For the regions without configured `vpc_ids`, enable default VPCs by setting `default_vpcs` to `true`.
-
-??? info "Required AWS permissions"
+??? info "Required permissions"
     The following AWS policy permissions are sufficient for `dstack` to work:
 
     ```
@@ -157,6 +123,40 @@ There are two ways to configure AWS: using an access key or using the default cr
     ```
 
     The `elasticloadbalancing:*` and `acm:*` permissions are only needed for provisioning gateways with ACM (AWS Certificate Manager) certificates.
+
+??? info "VPC"
+    By default, `dstack` uses the default VPC. It's possible to customize it:
+
+    === "vpc_name"
+
+        ```yaml
+        projects:
+          - name: main
+            backends:
+              - type: aws
+                creds:
+                  type: default
+
+                vpc_name: my-vpc
+        ```
+
+    === "vpc_ids"
+        ```yaml
+        projects:
+          - name: main
+            backends:
+              - type: aws
+                creds:
+                  type: default
+
+                default_vpcs: true
+                vpc_ids:
+                  us-east-1: vpc-0a2b3c4d5e6f7g8h
+                  us-east-2: vpc-9i8h7g6f5e4d3c2b
+                  us-west-1: vpc-4d3c2b1a0f9e8d7
+        ```
+
+        For the regions without configured `vpc_ids`, enable default VPCs by setting `default_vpcs` to `true`.
 
 ??? info "Private subnets"
     By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.
@@ -243,7 +243,7 @@ If you don't know your `subscription_id`, run
 az account show --query "{subscription_id: id}"
 ```
 
-??? info "Required Azure permissions"
+??? info "Required permissions"
     The following Azure permissions are sufficient for `dstack` to work:
     ```
     {
@@ -284,16 +284,6 @@ az account show --query "{subscription_id: id}"
     ```
 
 ### GCP
-
-??? info "Enable APIs"
-    First, ensure the required APIs are enabled in your GCP `project_id`.
-
-    ```shell
-    PROJECT_ID=...
-    gcloud config set project $PROJECT_ID
-    gcloud services enable cloudapis.googleapis.com
-    gcloud services enable compute.googleapis.com
-    ```
 
 There are two ways to configure GCP: using a service account or using the default credentials.
 
@@ -348,49 +338,7 @@ If you don't know your GCP project ID, run
 gcloud projects list --format="json(projectId)"
 ```
 
-=== "VPC"
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-      backends:
-        - type: gcp
-          project_id: gcp-project-id
-          creds:
-            type: default
-
-          vpc_name: my-custom-vpc
-    ```
-
-    </div>
-
-=== "Shared VPC"
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-      backends:
-        - type: gcp
-          project_id: gcp-project-id
-          creds:
-            type: default
-
-          vpc_name: my-custom-vpc
-          vpc_project_id: another-project-id
-    ```
-
-    </div>
-
-    To use a shared VPC, that VPC has to be configured with two additional firewall rules:
-
-    * Allow `INGRESS` traffic on port `22`, with the target tag `dstack-runner-instance`
-    * Allow `INGRESS` traffic on ports `22`, `80`, `443`, with the target tag `dstack-gateway-instance`
-
-??? info "Required GCP permissions"
+??? info "Required permissions"
     The following GCP permissions are sufficient for `dstack` to work:
 
     ```
@@ -431,6 +379,60 @@ gcloud projects list --format="json(projectId)"
 
     Also, the use of TPUs requires the `serviceAccountUser` role.
     For TPU VMs, dstack will use the default service account.
+
+??? info "Required APIs"
+    First, ensure the required APIs are enabled in your GCP `project_id`.
+
+    ```shell
+    PROJECT_ID=...
+    gcloud config set project $PROJECT_ID
+    gcloud services enable cloudapis.googleapis.com
+    gcloud services enable compute.googleapis.com
+    ```
+
+??? info "VPC"
+
+    === "VPC"
+    
+        <div editor-title="~/.dstack/server/config.yml">
+    
+        ```yaml
+        projects:
+        - name: main
+          backends:
+            - type: gcp
+              project_id: gcp-project-id
+              creds:
+                type: default
+    
+              vpc_name: my-custom-vpc
+        ```
+    
+        </div>
+    
+    === "Shared VPC"
+    
+        <div editor-title="~/.dstack/server/config.yml">
+    
+        ```yaml
+        projects:
+        - name: main
+          backends:
+            - type: gcp
+              project_id: gcp-project-id
+              creds:
+                type: default
+    
+              vpc_name: my-custom-vpc
+              vpc_project_id: another-project-id
+        ```
+    
+        </div>
+    
+        To use a shared VPC, that VPC has to be configured with two additional firewall rules:
+    
+        * Allow `INGRESS` traffic on port `22`, with the target tag `dstack-runner-instance`
+        * Allow `INGRESS` traffic on ports `22`, `80`, `443`, with the target tag `dstack-gateway-instance`
 
 ??? info "Private subnets"
     By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.
@@ -496,7 +498,7 @@ There are two ways to configure OCI: using client credentials or using the defau
 
     </div>
 
-??? info "Required OCI permissions"
+??? info "Required permissions"
 
     This is an example of a restrictive policy for a group of `dstack` users:
 
@@ -657,12 +659,6 @@ projects:
 
 `dstack` supports both self-managed, and managed Kubernetes clusters.
 
-??? info "Prerequisite"
-    To use GPUs with Kubernetes, the cluster must be installed with the
-    [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html).
-
-    [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
-
 To configure a Kubernetes backend, specify the path to the kubeconfig file,
 and the port that `dstack` can use for proxying SSH traffic.
 In case of a self-managed cluster, also specify the IP address of any node in the cluster.
@@ -744,6 +740,12 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 [//]: # (TODO: Elaborate on gateways, and what backends allow configuring them)
 
 [//]: # (TODO: Should we automatically detect ~/.kube/config)
+
+??? info "NVIDIA GPU Operator"
+    To use GPUs with Kubernetes, the cluster must be installed with the
+    [NVIDIA GPU Operator :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/index.html).
+
+    [//]: # (TODO: Provide short yet clear instructions. Elaborate on whether it works with Kind.)
 
 ## Encryption
 
