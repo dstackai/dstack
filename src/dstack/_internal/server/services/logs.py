@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterator, List, Optional, Set, TypedDict, Union
 from uuid import UUID
 
+from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.logs import (
     JobSubmissionLogs,
     LogEvent,
@@ -41,7 +42,7 @@ def _b64encode_raw_message(message: bytes) -> str:
     return base64.b64encode(message).decode()
 
 
-class LogStorageError(Exception):
+class LogStorageError(DstackError):
     pass
 
 
