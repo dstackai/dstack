@@ -173,7 +173,7 @@ class CloudWatchLogStorage(LogStorage):
         except (botocore.exceptions.BotoCoreError, botocore.exceptions.ClientError) as e:
             raise LogStorageError(f"CloudWatch Logs error: {type(e).__name__}: {e}") from e
 
-    def _is_resource_not_found_exception(self, exc: botocore.exceptions.ClientError) -> bool:
+    def _is_resource_not_found_exception(self, exc: "botocore.exceptions.ClientError") -> bool:
         try:
             return exc.response["Error"]["Code"] == "ResourceNotFoundException"
         except KeyError:
