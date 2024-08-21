@@ -5,7 +5,7 @@ description: "With today's release, dstack Sky supports both options: accessing 
 slug: dstack-sky-own-cloud-accounts
 ---
 
-# dstack Sky now allows using your own cloud accounts
+# dstack Sky now supports your own cloud accounts
 
 [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"} 
 enables you to access GPUs from the global marketplace at the most
