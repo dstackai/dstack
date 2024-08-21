@@ -1,0 +1,15 @@
+type: dev-environment
+name: dev-tgi-amd
+
+image: ghcr.io/huggingface/text-generation-inference:sha-a379d55-rocm
+
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - ROCM_USE_FLASH_ATTN_V2_TRITON=true
+ide: vscode
+
+resources:
+  gpu: MI300X
+  disk: 150GB
+
+spot_policy: auto
