@@ -261,7 +261,14 @@ async def add_remote(instance_id: UUID) -> None:
                 instance.deleted_at = get_current_datetime()
                 instance.termination_reason = "Private SSH key is encrypted, password required"
                 await session.commit()
-                logger.error("Private SSH key is encrypted, password required")
+                logger.warning(
+                    "Failed to start instance %s: private SSH key is encrypted",
+                    instance.name,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATED.value,
+                    },
+                )
                 return
             except SSHException:
                 instance.status = InstanceStatus.TERMINATED
@@ -269,7 +276,14 @@ async def add_remote(instance_id: UUID) -> None:
                 instance.deleted_at = get_current_datetime()
                 instance.termination_reason = "Cannot parse private key, RSA key required"
                 await session.commit()
-                logger.error("Cannot parse private key, RSA key required")
+                logger.warning(
+                    "Failed to start instance %s: private SSH key is not a valid RSA key",
+                    instance.name,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATED.value,
+                    },
+                )
                 return
 
             try:
