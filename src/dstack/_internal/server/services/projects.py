@@ -160,7 +160,7 @@ async def set_project_members(
         project_name=project.name,
     )
     project_role = get_user_project_role(user=user, project=project)
-    if project_role == ProjectRole.MANAGER:
+    if user.global_role != GlobalRole.ADMIN and project_role == ProjectRole.MANAGER:
         new_admins_members = {
             (m.username, m.project_role) for m in members if m.project_role == ProjectRole.ADMIN
         }

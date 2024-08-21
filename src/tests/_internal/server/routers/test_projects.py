@@ -458,6 +458,40 @@ class TestSetProjectMembers:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    async def test_global_admin_manager_can_set_project_admins(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.MANAGER,
+        )
+        user1 = await create_user(session=session, name="user1")
+        members = [
+            {
+                "username": user.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "username": user1.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+        ]
+        body = {"members": members}
+        response = client.post(
+            f"/api/projects/{project.name}/set_members",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(MemberModel))
+        members = res.scalars().all()
+        assert len(members) == 2
+
+    @pytest.mark.asyncio
     async def test_non_manager_cannot_set_project_members(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session, global_role=GlobalRole.USER)
