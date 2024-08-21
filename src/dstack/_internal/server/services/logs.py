@@ -47,7 +47,8 @@ class LogStorageError(Exception):
 
 class LogStorage(ABC):
     @abstractmethod
-    def poll_logs(self, project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs: ...
+    def poll_logs(self, project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
+        pass
 
     @abstractmethod
     def write_logs(
@@ -57,7 +58,8 @@ class LogStorage(ABC):
         job_submission_id: UUID,
         runner_logs: List[RunnerLogEvent],
         job_logs: List[RunnerLogEvent],
-    ) -> None: ...
+    ) -> None:
+        pass
 
     def close(self) -> None:
         pass
