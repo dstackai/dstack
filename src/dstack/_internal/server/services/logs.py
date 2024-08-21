@@ -327,11 +327,11 @@ def get_default_log_storage() -> LogStorage:
                     region=settings.SERVER_CLOUDWATCH_LOG_REGION,
                 )
             except LogStorageError as e:
-                logger.warning("Failed to initialize CloudWatch Logs storage: %s", e)
+                logger.error("Failed to initialize CloudWatch Logs storage: %s", e)
             else:
                 logger.debug("Using CloudWatch Logs storage")
         else:
-            logger.warning("Cannot use CloudWatch Logs storage, boto3 is not installed")
+            logger.error("Cannot use CloudWatch Logs storage, boto3 is not installed")
     if _default_log_storage is None:
         logger.debug("Using file-based storage")
         _default_log_storage = FileLogStorage()
