@@ -843,6 +843,24 @@ projects: ...
 With this configuration, the `aes` key will still be used to decrypt the old data,
 but new writes will store the data in plaintext.
 
+## Default permissions
+
+`dstack` supports changing default permissions. For example, by default all users
+can create and manage their own projects. You can specify `default_permissions`
+so that only global admins can create and manage projects:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+default_permissions:
+  allow_non_admins_create_projects: false
+projects: ...
+```
+
+</div>
+
+See the [reference table](#default-permissions) for all configurable permissions.
+
 ## Root reference
 
 #SCHEMA# dstack._internal.server.services.config.ServerConfig
@@ -1083,3 +1101,9 @@ but new writes will store the data in plaintext.
         show_root_heading: false
         type:
             required: true
+
+## `default_permissions` { #default-permissions data-toc-label="default-permissions" }
+
+#SCHEMA# dstack._internal.server.services.permissions.DefaultPermissions
+    overrides:
+        show_root_heading: false

@@ -29,6 +29,10 @@ from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import encryption as encryption_services
 from dstack._internal.server.services import projects as projects_services
 from dstack._internal.server.services.encryption import AnyEncryptionKeyConfig
+from dstack._internal.server.services.permissions import (
+    DefaultPermissions,
+    set_default_permissions,
+)
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
@@ -358,6 +362,9 @@ class ServerConfig(CoreModel):
     encryption: Annotated[
         Optional[EncryptionConfig], Field(description="The encryption config")
     ] = None
+    default_permissions: Annotated[
+        Optional[DefaultPermissions], Field(description="The default user permissions")
+    ]
 
 
 class ServerConfigManager:
@@ -386,6 +393,8 @@ class ServerConfigManager:
     async def apply_config(self, session: AsyncSession, owner: UserModel):
         if self.config is None:
             raise ValueError("Config is not loaded")
+        if self.config.default_permissions is not None:
+            set_default_permissions(self.config.default_permissions)
         for project_config in self.config.projects:
             await self._apply_project_config(
                 session=session, owner=owner, project_config=project_config
@@ -464,6 +473,7 @@ class ServerConfigManager:
         return ServerConfig(
             projects=[ProjectConfig(name=settings.DEFAULT_PROJECT_NAME, backends=backends)],
             encryption=EncryptionConfig(keys=[]),
+            default_permissions=None,
         )
 
     async def _init_backends(

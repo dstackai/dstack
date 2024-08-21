@@ -13,12 +13,13 @@ from dstack._internal.core.models.backends.dstack import (
     DstackConfigInfo,
 )
 from dstack._internal.core.models.common import is_core_model_instance
-from dstack._internal.core.models.projects import Member, Project
+from dstack._internal.core.models.projects import Member, MemberPermissions, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import get_configurator
+from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
@@ -83,6 +84,9 @@ async def create_project(
     user: UserModel,
     project_name: str,
 ) -> Project:
+    user_permissions = users.get_user_permissions(user)
+    if not user_permissions.can_create_projects:
+        raise ForbiddenError("User cannot create projects")
     project = await get_project_model_by_name(
         session=session, project_name=project_name, ignore_case=True
     )
@@ -330,6 +334,13 @@ def get_user_project_role(user: UserModel, project: ProjectModel) -> Optional[Pr
     return None
 
 
+def get_member(user: UserModel, project: ProjectModel) -> Optional[MemberModel]:
+    for member in project.members:
+        if member.user_id == user.id:
+            return member
+    return None
+
+
 def project_model_to_project(
     project_model: ProjectModel,
     include_backends: bool = True,
@@ -342,6 +353,7 @@ def project_model_to_project(
                 Member(
                     user=users.user_model_to_user(m.user),
                     project_role=m.project_role,
+                    permissions=get_member_permissions(m),
                 )
             )
     backends = []
@@ -379,6 +391,21 @@ def project_model_to_project(
         owner=users.user_model_to_user(project_model.owner),
         backends=backends,
         members=members,
+    )
+
+
+def get_member_permissions(member_model: MemberModel) -> MemberPermissions:
+    default_permissions = get_default_permissions()
+    user_model = member_model.user
+    can_manage_ssh_fleets = True
+    if not default_permissions.allow_non_admins_manage_ssh_fleets:
+        if (
+            user_model.global_role != GlobalRole.ADMIN
+            and member_model.project_role != ProjectRole.ADMIN
+        ):
+            can_manage_ssh_fleets = False
+    return MemberPermissions(
+        can_manage_ssh_fleets=can_manage_ssh_fleets,
     )
 
 
