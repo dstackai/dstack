@@ -189,12 +189,6 @@ To run in detached mode, use `-d` with `dstack apply`.
 The `gpu` property withing `resources` (or the `--gpu` option with `dstack apply`)
 allows specifying not only memory size but also GPU vendor, names, their memory, and quantity.
 
-The GPU vendor is indicated by one of the following case-insensitive values:
-
-- `nvidia` (NVIDIA GPUs)
-- `amd` (AMD GPUs)
-- `google` (Google TPUs)
-
 Examples:
 
 - `1` (any GPU)
@@ -207,7 +201,13 @@ Examples:
 - `A100:2` (two A100)
 - `MI300X:4` (four MI300X)
 - `A100:40GB:2` (two A100 40GB)
-- `v2-8` (`v2` with 8 TPU cores)
+- `tpu:v2-8` (`v2` with 8 TPU cores)
+
+The GPU vendor is indicated by one of the following case-insensitive values:
+
+- `nvidia` (NVIDIA GPUs)
+- `amd` (AMD GPUs)
+- `tpu` or `google` (Google TPUs)
 
 ??? info "Google Cloud TPU"
     Currently, you can't specify other than 8 TPU cores. This means only single host workloads are supported.

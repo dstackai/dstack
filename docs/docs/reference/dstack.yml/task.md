@@ -153,8 +153,8 @@ resources:
 
 </div>
 
-The `gpu` property allows specifying not only memory size but also GPU vendor, names,
-and their quantity. Examples: `NVIDIA:2` (two NVIDIA GPUs), `A100` (one A100), `A10G,A100` (either A10G or A100),
+The `gpu` property allows specifying not only memory size but also GPU vendor, names
+and their quantity. Examples: `nvidia` (one NVIDIA GPU), `A100` (one A100), `A10G,A100` (either A10G or A100),
 `A100:80GB` (one A100 of 80GB), `A100:2` (two A100), `24GB..40GB:2` (two GPUs between 24GB and 40GB),
 `A100:40GB:2` (two A100 GPUs of 40GB).
 
