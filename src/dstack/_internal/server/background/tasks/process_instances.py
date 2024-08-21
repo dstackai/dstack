@@ -6,6 +6,7 @@ from uuid import UUID
 
 import requests
 from paramiko.pkey import PKey
+from paramiko.ssh_exception import PasswordRequiredException, SSHException
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -245,14 +246,45 @@ async def add_remote(instance_id: UUID) -> None:
             )
 
             # Prepare connection key
-            pkeys = [
-                rsa_pkey_from_str(sk.private)
-                for sk in remote_details.ssh_keys
-                if sk.private is not None
-            ]
-            if not pkeys:
-                logger.error("There are no ssh private key")
-                raise ProvisioningError("The SSH private key is not provided")
+            try:
+                pkeys = [
+                    rsa_pkey_from_str(sk.private)
+                    for sk in remote_details.ssh_keys
+                    if sk.private is not None
+                ]
+                if not pkeys:
+                    logger.error("There are no ssh private key")
+                    raise ProvisioningError("The SSH private key is not provided")
+            except PasswordRequiredException:
+                instance.status = InstanceStatus.TERMINATED
+                instance.deleted = True
+                instance.deleted_at = get_current_datetime()
+                instance.termination_reason = "Private SSH key is encrypted, password required"
+                await session.commit()
+                logger.warning(
+                    "Failed to start instance %s: private SSH key is encrypted",
+                    instance.name,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATED.value,
+                    },
+                )
+                return
+            except SSHException:
+                instance.status = InstanceStatus.TERMINATED
+                instance.deleted = True
+                instance.deleted_at = get_current_datetime()
+                instance.termination_reason = "Cannot parse private key, RSA key required"
+                await session.commit()
+                logger.warning(
+                    "Failed to start instance %s: private SSH key is not a valid RSA key",
+                    instance.name,
+                    extra={
+                        "instance_name": instance.name,
+                        "instance_status": InstanceStatus.TERMINATED.value,
+                    },
+                )
+                return
 
             try:
                 future = asyncio.get_running_loop().run_in_executor(
