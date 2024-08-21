@@ -231,6 +231,8 @@ nav:
           - Axolotl: docs/examples/fine-tuning/axolotl/index.md
           - Alignment Handbook: docs/examples/fine-tuning/alignment-handbook/index.md
           - TRL: docs/examples/fine-tuning/trl/index.md
+      - Accelerators:
+          - TPU: docs/examples/accelerators/tpu/index.md
   - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
   - Blog:
       - blog/index.md
