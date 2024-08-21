@@ -1,6 +1,5 @@
-from typing import Annotated
-
 from pydantic import Field
+from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
 
