@@ -4,6 +4,8 @@ import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
 import fetchBaseQueryHeaders from 'libs/fetchBaseQueryHeaders';
 
+import { UserPermission, userPermissionMap } from '../types';
+
 export const userApi = createApi({
     reducerPath: 'userApi',
     refetchOnMountOrArgChange: true,
@@ -19,6 +21,19 @@ export const userApi = createApi({
                 return {
                     url: API.USERS.CURRENT_USER(),
                     method: 'POST',
+                };
+            },
+
+            transformResponse: (userData: IUserResponseData): IUser => {
+                return {
+                    ...userData,
+                    permissions: Object.keys(userPermissionMap).reduce<TUserPermission[]>((acc, key) => {
+                        if (userData?.permissions?.[key as TUserPermissionKeys]) {
+                            acc.push(UserPermission[userPermissionMap[key as TUserPermissionKeys]]);
+                        }
+
+                        return acc;
+                    }, []),
                 };
             },
         }),

@@ -23,3 +23,13 @@ export enum ProjectUserRole {
     USER = 'user',
     MANAGER = 'manager'
 }
+
+export enum UserPermission {
+    CAN_CREATE_PROJECTS = 'CAN_CREATE_PROJECTS',
+}
+
+export const userPermissionMap: Record<TUserPermissionKeys, UserPermission> = {
+    'can_create_projects': UserPermission.CAN_CREATE_PROJECTS
+}
+
+

@@ -1,10 +1,21 @@
 declare type TUserRole = 'user' | 'admin';
+declare type TUserPermission = 'CAN_CREATE_PROJECTS'
+declare type TUserPermissionKeys = 'can_create_projects'
+
+declare interface IUserResponseData {
+    id: string,
+    username: string;
+    global_role: TUserRole
+    email: string | null,
+    permissions: Record<TUserPermissionKeys, boolean>
+}
 
 declare interface IUser {
     id: string,
     username: string;
     global_role: TUserRole
     email: string | null,
+    permissions: TUserPermission[],
 }
 
 declare interface IUserWithCreds extends IUser {
