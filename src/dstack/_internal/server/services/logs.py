@@ -18,6 +18,7 @@ from dstack._internal.server import settings
 from dstack._internal.server.models import ProjectModel
 from dstack._internal.server.schemas.logs import PollLogsRequest
 from dstack._internal.server.schemas.runner import LogEvent as RunnerLogEvent
+from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.logging import get_logger
 
 BOTO_AVAILABLE = True
@@ -338,8 +339,42 @@ def get_default_log_storage() -> LogStorage:
     return _default_log_storage
 
 
-_default_log_storage = get_default_log_storage()
+def poll_logs(project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
+    return get_default_log_storage().poll_logs(project=project, request=request)
 
 
-poll_logs = _default_log_storage.poll_logs
-write_logs = _default_log_storage.write_logs
+def write_logs(
+    project: ProjectModel,
+    run_name: str,
+    job_submission_id: UUID,
+    runner_logs: List[RunnerLogEvent],
+    job_logs: List[RunnerLogEvent],
+) -> None:
+    return get_default_log_storage().write_logs(
+        project=project,
+        run_name=run_name,
+        job_submission_id=job_submission_id,
+        runner_logs=runner_logs,
+        job_logs=job_logs,
+    )
+
+
+async def poll_logs_async(project: ProjectModel, request: PollLogsRequest) -> JobSubmissionLogs:
+    return await run_async(get_default_log_storage().poll_logs, project=project, request=request)
+
+
+async def write_logs_async(
+    project: ProjectModel,
+    run_name: str,
+    job_submission_id: UUID,
+    runner_logs: List[RunnerLogEvent],
+    job_logs: List[RunnerLogEvent],
+) -> None:
+    return await run_async(
+        get_default_log_storage().write_logs,
+        project=project,
+        run_name=run_name,
+        job_submission_id=job_submission_id,
+        runner_logs=runner_logs,
+        job_logs=job_logs,
+    )

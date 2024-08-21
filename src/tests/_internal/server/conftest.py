@@ -34,6 +34,5 @@ def test_log_storage(
     root = tmp_path / "test_logs"
     root.mkdir()
     storage = logs_services.FileLogStorage(root)
-    monkeypatch.setattr(logs_services, "poll_logs", storage.poll_logs)
-    monkeypatch.setattr(logs_services, "write_logs", storage.write_logs)
+    monkeypatch.setattr(logs_services, "_default_log_storage", storage)
     return storage
