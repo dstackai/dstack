@@ -940,6 +940,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     grid-template-columns: repeat(auto-fit,minmax(15rem,1fr));
 }
 
+.md-typeset .tabbed-labels>label:last-of-type {
+    margin-right: -2px;
+}
+
 .md-typeset .tabbed-labels>label {
     padding: 18px 18px 16px !important;
     font-size: 16.5px !important;
