@@ -1,10 +1,10 @@
+import importlib.resources
 import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Awaitable, Callable, List
 
-import pkg_resources
 import sentry_sdk
 from fastapi import FastAPI, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -87,15 +87,19 @@ async def lifespan(app: FastAPI):
 ╰━━┻━━┻╯╱╰╯╰━━┻╯
 [/]"""
         )
-        admin, _ = await get_or_create_admin_user(session=session)
-        default_project, project_created = await get_or_create_default_project(
-            session=session, user=admin
-        )
         if not check_required_ssh_version():
             logger.warning("OpenSSH 8.4+ is required. The dstack server may not work properly")
         if settings.SERVER_CONFIG_ENABLED:
             server_config_manager = ServerConfigManager()
             config_loaded = server_config_manager.load_config()
+            # Encryption has to be configured before working with users and projects
+            await server_config_manager.apply_encryption()
+        admin, _ = await get_or_create_admin_user(session=session)
+        await get_or_create_default_project(
+            session=session,
+            user=admin,
+        )
+        if settings.SERVER_CONFIG_ENABLED:
             server_config_dir = str(SERVER_CONFIG_FILE_PATH).replace(
                 os.path.expanduser("~"), "~", 1
             )
@@ -111,13 +115,12 @@ async def lifespan(app: FastAPI):
                     f"Applying [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]...",
                     {"show_path": False},
                 )
-
                 await server_config_manager.apply_config(session=session, owner=admin)
         await init_gateways(session=session)
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
-        token=admin.token,
+        token=admin.token.get_plaintext_or_error(),
         default=UPDATE_DEFAULT_PROJECT,
         no_default=DO_NOT_UPDATE_DEFAULT_PROJECT,
     )
@@ -125,7 +128,7 @@ async def lifespan(app: FastAPI):
         init_default_storage()
     scheduler = start_background_tasks()
     dstack_version = DSTACK_VERSION if DSTACK_VERSION else "(no version)"
-    logger.info(f"The admin token is {admin.token}", {"show_path": False})
+    logger.info(f"The admin token is {admin.token.get_plaintext_or_error()}", {"show_path": False})
     logger.info(
         f"The dstack server {dstack_version} is running at {SERVER_URL}",
         {"show_path": False},
@@ -170,9 +173,12 @@ def register_routes(app: FastAPI, ui: bool = True):
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):
+        msg = "Access denied"
+        if len(exc.args) > 0:
+            msg = exc.args[0]
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
-            content=error_detail("Access denied"),
+            content=error_detail(msg),
         )
 
     @app.exception_handler(ServerClientError)
@@ -233,7 +239,11 @@ def register_routes(app: FastAPI, ui: bool = True):
                     status_code=status.HTTP_404_NOT_FOUND,
                 )
             else:
-                return HTMLResponse(pkg_resources.resource_string(__name__, "statics/index.html"))
+                return HTMLResponse(
+                    importlib.resources.files("dstack._internal.server")
+                    .joinpath("statics/index.html")
+                    .read_text()
+                )
     else:
 
         @app.get("/")

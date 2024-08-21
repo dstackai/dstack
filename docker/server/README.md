@@ -4,7 +4,7 @@ center. It simplifies dev environments, running tasks on clusters, and deploymen
 The supported cloud providers include AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, and CUDO.
 You can also use `dstack` to run workloads on on-prem clusters.
 
-`dstack` natively supports NVIDIA GPU, and Google Cloud TPU accelerator chips.
+`dstack` natively supports NVIDIA GPU, AMD GPU, and Google Cloud TPU accelerator chips.
 
 ## Configure backends
 

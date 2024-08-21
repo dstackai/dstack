@@ -945,7 +945,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     font-size: 16.5px !important;
     line-height: 1.2 !important;
     -webkit-font-smoothing: auto !important;
-    z-index: 1000 !important;
+    z-index: 1 !important;
     background: none;
 }
 

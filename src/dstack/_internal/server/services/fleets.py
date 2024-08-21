@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.errors import (
+    ForbiddenError,
     ResourceExistsError,
     ServerClientError,
 )
@@ -23,6 +24,7 @@ from dstack._internal.core.models.instances import InstanceStatus
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, get_policy_map
+from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.models import (
     FleetModel,
@@ -36,6 +38,7 @@ from dstack._internal.server.services.jobs import (
     PROCESSING_INSTANCES_IDS,
     PROCESSING_INSTANCES_LOCK,
 )
+from dstack._internal.server.services.projects import get_member, get_member_permissions
 from dstack._internal.server.utils.common import wait_to_lock_many
 from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
@@ -111,6 +114,9 @@ async def create_fleet(
     spec: FleetSpec,
 ) -> Fleet:
     _validate_fleet_spec(spec)
+
+    if spec.configuration.ssh_config is not None:
+        _check_can_manage_ssh_fleets(user=user, project=project)
 
     if spec.configuration.name is not None:
         fleet_model = await get_project_fleet_model_by_name(
@@ -232,6 +238,7 @@ async def create_fleet_ssh_instance_model(
 async def delete_fleets(
     session: AsyncSession,
     project: ProjectModel,
+    user: UserModel,
     names: List[str],
     instance_nums: Optional[List[int]] = None,
 ):
@@ -260,6 +267,10 @@ async def delete_fleets(
             .execution_options(populate_existing=True)
         )
         fleet_models = res.scalars().unique().all()
+        fleets = [fleet_model_to_fleet(m) for m in fleet_models]
+        for fleet in fleets:
+            if fleet.spec.configuration.ssh_config is not None:
+                _check_can_manage_ssh_fleets(user=user, project=project)
         for fleet_model in fleet_models:
             await _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
         # TERMINATING fleets are deleted by process_fleets after instances are terminated
@@ -316,6 +327,18 @@ def is_fleet_in_use(fleet_model: FleetModel, instance_nums: Optional[List[int]] 
 def is_fleet_empty(fleet_model: FleetModel) -> bool:
     active_instances = [i for i in fleet_model.instances if not i.deleted]
     return len(active_instances) == 0
+
+
+def _check_can_manage_ssh_fleets(user: UserModel, project: ProjectModel):
+    if user.global_role == GlobalRole.ADMIN:
+        return
+    member = get_member(user=user, project=project)
+    if member is None:
+        raise ForbiddenError()
+    permissions = get_member_permissions(member)
+    if permissions.can_manage_ssh_fleets:
+        return
+    raise ForbiddenError()
 
 
 def _remove_fleet_spec_sensitive_info(spec: FleetSpec):

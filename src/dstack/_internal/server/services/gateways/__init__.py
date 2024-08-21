@@ -202,7 +202,11 @@ async def connect_to_gateway_with_retry(
     return connection
 
 
-async def delete_gateways(session: AsyncSession, project: ProjectModel, gateways_names: List[str]):
+async def delete_gateways(
+    session: AsyncSession,
+    project: ProjectModel,
+    gateways_names: List[str],
+):
     tasks = []
     gateways = []
     for gateway in await list_project_gateway_models(session=session, project=project):

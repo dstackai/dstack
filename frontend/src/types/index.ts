@@ -20,7 +20,8 @@ export enum GlobalUserRole {
 
 export enum ProjectUserRole {
     ADMIN = 'admin',
-    USER = 'user'
+    USER = 'user',
+    MANAGER = 'manager'
 }
 
 export enum UserPermission {

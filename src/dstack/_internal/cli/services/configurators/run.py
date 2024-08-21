@@ -42,7 +42,7 @@ from dstack.api.utils import load_profile
 
 _KNOWN_AMD_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_AMD_GPUS}
 _KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
-_KNOWN_TPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}
+_KNOWN_TPU_VERSIONS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}
 
 _BIND_ADDRESS_ARG = "bind_address"
 
@@ -316,10 +316,12 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                         vendors.add(gpuhunt.AcceleratorVendor.NVIDIA)
                     elif name in _KNOWN_AMD_GPUS:
                         vendors.add(gpuhunt.AcceleratorVendor.AMD)
-                    elif name in _KNOWN_TPUS:
-                        vendors.add(gpuhunt.AcceleratorVendor.GOOGLE)
                     else:
-                        vendors.add(None)
+                        maybe_tpu_version, _, maybe_tpu_cores = name.partition("-")
+                        if maybe_tpu_version in _KNOWN_TPU_VERSIONS and maybe_tpu_cores.isdigit():
+                            vendors.add(gpuhunt.AcceleratorVendor.GOOGLE)
+                        else:
+                            vendors.add(None)
                 if len(vendors) == 1:
                     # Only one vendor or all names are not known.
                     vendor = next(iter(vendors))

@@ -1,30 +1,37 @@
 # Development setup
 
-## Set up the development environment
+## 1. Clone the repo:
 
-### 1. Clone the repo:
-    ```
-    git clone https://github.com/dstackai/dstack
-    cd dstack
-    ```
+```shell
+git clone https://github.com/dstackai/dstack
+cd dstack
+```
    
-### 2. (Recommended) Create a virtual environment:
-    ```
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
+## 2. (Recommended) Create a virtual environment:
+
+```shell
+python3 -m venv venv
+source venv/bin/activate
+```
    
-### 3. Install `dstack` in editable mode:
-    ```
-    pip install -e '.[all]'
-    ```
+## 3. Install `dstack` in editable mode:
+
+```shell
+pip install -e '.[all]'
+```
    
-### 4. Install dev dependencies:
-    ```
-    pip install -r requirements_dev.txt
-    ```
+## 4. Install dev dependencies:
+
+```shell
+pip install -r requirements_dev.txt
+```
    
-### 5. (Recommended) Install pre-commits:
-    ```
-    pre-commit install
-    ```
+## 5. (Recommended) Install pre-commits:
+
+```shell
+pre-commit install
+```
+
+## 6. Frontend
+
+See [FRONTEND.md](FRONTEND.md) for the details on how to build and develop the frontend.

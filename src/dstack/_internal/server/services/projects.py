@@ -13,12 +13,13 @@ from dstack._internal.core.models.backends.dstack import (
     DstackConfigInfo,
 )
 from dstack._internal.core.models.common import is_core_model_instance
-from dstack._internal.core.models.projects import Member, Project
+from dstack._internal.core.models.projects import Member, MemberPermissions, Project
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import MemberModel, ProjectModel, UserModel
 from dstack._internal.server.schemas.projects import MemberSetting
 from dstack._internal.server.services import users
 from dstack._internal.server.services.backends import get_configurator
+from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.settings import DEFAULT_PROJECT_NAME
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
@@ -29,7 +30,8 @@ logger = get_logger(__name__)
 
 
 async def get_or_create_default_project(
-    session: AsyncSession, user: UserModel
+    session: AsyncSession,
+    user: UserModel,
 ) -> Tuple[Project, bool]:
     default_project = await get_project_by_name(
         session=session,
@@ -38,7 +40,9 @@ async def get_or_create_default_project(
     if default_project is not None:
         return default_project, False
     default_project = await create_project(
-        session=session, user=user, project_name=DEFAULT_PROJECT_NAME
+        session=session,
+        user=user,
+        project_name=DEFAULT_PROJECT_NAME,
     )
     return default_project, True
 
@@ -75,7 +79,14 @@ async def get_project_by_name(
     return project_model_to_project(project_model)
 
 
-async def create_project(session: AsyncSession, user: UserModel, project_name: str) -> Project:
+async def create_project(
+    session: AsyncSession,
+    user: UserModel,
+    project_name: str,
+) -> Project:
+    user_permissions = users.get_user_permissions(user)
+    if not user_permissions.can_create_projects:
+        raise ForbiddenError("User cannot create projects")
     project = await get_project_model_by_name(
         session=session, project_name=project_name, ignore_case=True
     )
@@ -92,6 +103,7 @@ async def create_project(session: AsyncSession, user: UserModel, project_name: s
         project=project,
         user=user,
         project_role=ProjectRole.ADMIN,
+        member_num=0,
     )
     project_model = await get_project_model_by_name_or_error(
         session=session, project_name=project_name
@@ -137,46 +149,67 @@ async def delete_projects(
     await session.commit()
 
 
+async def set_project_members(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    members: List[MemberSetting],
+):
+    # reload with members
+    project = await get_project_model_by_name_or_error(
+        session=session,
+        project_name=project.name,
+    )
+    project_role = get_user_project_role(user=user, project=project)
+    if user.global_role != GlobalRole.ADMIN and project_role == ProjectRole.MANAGER:
+        new_admins_members = {
+            (m.username, m.project_role) for m in members if m.project_role == ProjectRole.ADMIN
+        }
+        current_admins_members = {
+            (m.user.name, m.project_role)
+            for m in project.members
+            if m.project_role == ProjectRole.ADMIN
+        }
+        if new_admins_members != current_admins_members:
+            raise ForbiddenError("Access denied: changing project admins")
+    await clear_project_members(session=session, project=project)
+    usernames = [m.username for m in members]
+    res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))
+    users = res.scalars().all()
+    username_to_user = {user.name: user for user in users}
+    for i, member in enumerate(members):
+        user_to_add = username_to_user.get(member.username)
+        if user_to_add is None:
+            continue
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user_to_add,
+            project_role=member.project_role,
+            member_num=i,
+            commit=False,
+        )
+    await session.commit()
+
+
 async def add_project_member(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
     project_role: ProjectRole,
+    member_num: Optional[int] = None,
     commit: bool = True,
 ) -> MemberModel:
     member = MemberModel(
         user_id=user.id,
         project_id=project.id,
         project_role=project_role,
+        member_num=member_num,
     )
     session.add(member)
     if commit:
         await session.commit()
     return member
-
-
-async def set_project_members(
-    session: AsyncSession,
-    project: ProjectModel,
-    members: List[MemberSetting],
-):
-    await clear_project_members(session=session, project=project)
-    usernames = [m.username for m in members]
-    res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))
-    users = res.scalars().all()
-    username_to_user = {user.name: user for user in users}
-    for member in members:
-        user = username_to_user.get(member.username)
-        if user is None:
-            continue
-        await add_project_member(
-            session=session,
-            project=project,
-            user=user,
-            project_role=member.project_role,
-            commit=False,
-        )
-    await session.commit()
 
 
 async def clear_project_members(
@@ -298,6 +331,20 @@ async def create_project_model(
     return project
 
 
+def get_user_project_role(user: UserModel, project: ProjectModel) -> Optional[ProjectRole]:
+    for member in project.members:
+        if member.user_id == user.id:
+            return member.project_role
+    return None
+
+
+def get_member(user: UserModel, project: ProjectModel) -> Optional[MemberModel]:
+    for member in project.members:
+        if member.user_id == user.id:
+            return member
+    return None
+
+
 def project_model_to_project(
     project_model: ProjectModel,
     include_backends: bool = True,
@@ -310,6 +357,7 @@ def project_model_to_project(
                 Member(
                     user=users.user_model_to_user(m.user),
                     project_role=m.project_role,
+                    permissions=get_member_permissions(m),
                 )
             )
     backends = []
@@ -318,6 +366,12 @@ def project_model_to_project(
             configurator = get_configurator(b.type)
             if configurator is None:
                 logger.warning("Configurator for backend %s not found", b.type)
+                continue
+            if not b.auth.decrypted:
+                logger.warning(
+                    "Failed to decrypt creds for %s backend. Backend will be ignored.",
+                    b.type.value,
+                )
                 continue
             config_info = configurator.get_config_info(model=b, include_creds=False)
             if is_core_model_instance(config_info, DstackConfigInfo):
@@ -341,6 +395,21 @@ def project_model_to_project(
         owner=users.user_model_to_user(project_model.owner),
         backends=backends,
         members=members,
+    )
+
+
+def get_member_permissions(member_model: MemberModel) -> MemberPermissions:
+    default_permissions = get_default_permissions()
+    user_model = member_model.user
+    can_manage_ssh_fleets = True
+    if not default_permissions.allow_non_admins_manage_ssh_fleets:
+        if (
+            user_model.global_role != GlobalRole.ADMIN
+            and member_model.project_role != ProjectRole.ADMIN
+        ):
+            can_manage_ssh_fleets = False
+    return MemberPermissions(
+        can_manage_ssh_fleets=can_manage_ssh_fleets,
     )
 
 

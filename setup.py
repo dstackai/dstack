@@ -62,7 +62,7 @@ BASE_DEPS = [
     "cachetools",
     "dnspython",
     "grpcio>=1.50",  # indirect
-    "gpuhunt>=0.0.13",
+    "gpuhunt>=0.0.15,<0.1.0",
     "sentry-sdk[fastapi]",
     "httpx",
     "aiorwlock",

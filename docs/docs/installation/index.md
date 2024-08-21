@@ -14,7 +14,7 @@ Follow the steps below to set up the server.
 ### 1. Configure backends
 
 If you want the `dstack` server to run containers or manage clusters in your cloud accounts (or use Kubernetes),
-create the [~/.dstack/server/config.yml](../reference/server/config.yml.md) file and configure backends.
+create the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) file and configure backends.
 
 ### 2. Start the server
 

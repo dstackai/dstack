@@ -57,7 +57,11 @@ async def delete_gateways(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectAdmin()),
 ):
     _, project = user_project
-    await gateways.delete_gateways(session=session, project=project, gateways_names=body.names)
+    await gateways.delete_gateways(
+        session=session,
+        project=project,
+        gateways_names=body.names,
+    )
 
 
 @router.post("/set_default")

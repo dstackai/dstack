@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from typing import Awaitable, Callable, List, Optional, Tuple
 
@@ -6,9 +7,19 @@ from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceExistsError
-from dstack._internal.core.models.users import GlobalRole, User, UserTokenCreds, UserWithCreds
-from dstack._internal.server.models import UserModel
+from dstack._internal.core.models.users import (
+    GlobalRole,
+    User,
+    UserPermissions,
+    UserTokenCreds,
+    UserWithCreds,
+)
+from dstack._internal.server.models import DecryptedString, UserModel
+from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.utils.routers import error_forbidden
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 _ADMIN_USERNAME = "admin"
 
@@ -58,16 +69,20 @@ async def create_user(
     username: str,
     global_role: GlobalRole,
     email: Optional[str] = None,
+    active: bool = True,
 ) -> UserModel:
     user_model = await get_user_model_by_name(session=session, username=username, ignore_case=True)
     if user_model is not None:
         raise ResourceExistsError()
+    token = str(uuid.uuid4())
     user = UserModel(
         id=uuid.uuid4(),
         name=username,
         global_role=global_role,
-        token=str(uuid.uuid4()),
+        token=DecryptedString(plaintext=token),
+        token_hash=get_token_hash(token),
         email=email,
+        active=active,
     )
     session.add(user)
     await session.commit()
@@ -81,11 +96,16 @@ async def update_user(
     username: str,
     global_role: GlobalRole,
     email: Optional[str] = None,
+    active: bool = True,
 ) -> UserModel:
     await session.execute(
         update(UserModel)
         .where(UserModel.name == username)
-        .values(global_role=global_role, email=email)
+        .values(
+            global_role=global_role,
+            email=email,
+            active=active,
+        )
     )
     await session.commit()
     return await get_user_model_by_name_or_error(session=session, username=username)
@@ -98,8 +118,14 @@ async def refresh_user_token(
 ) -> Optional[UserModel]:
     if user.global_role != GlobalRole.ADMIN and user.name != username:
         raise error_forbidden()
+    new_token = str(uuid.uuid4())
     await session.execute(
-        update(UserModel).where(UserModel.name == username).values(token=str(uuid.uuid4()))
+        update(UserModel)
+        .where(UserModel.name == username)
+        .values(
+            token=DecryptedString(plaintext=new_token),
+            token_hash=get_token_hash(new_token),
+        )
     )
     await session.commit()
     return await get_user_model_by_name(session=session, username=username)
@@ -133,9 +159,25 @@ async def get_user_model_by_name_or_error(session: AsyncSession, username: str) 
     return res.scalar_one()
 
 
-async def get_user_model_by_token(session: AsyncSession, token: str) -> Optional[UserModel]:
-    res = await session.execute(select(UserModel).where(UserModel.token == token))
-    return res.scalar()
+async def log_in_with_token(session: AsyncSession, token: str) -> Optional[UserModel]:
+    token_hash = get_token_hash(token)
+    res = await session.execute(
+        select(UserModel).where(
+            UserModel.token_hash == token_hash,
+            UserModel.active == True,
+        )
+    )
+    user = res.scalar()
+    if user is None:
+        return None
+    if not user.token.decrypted:
+        logger.error(
+            "Failed to get user by token. Token cannot be decrypted: %s", repr(user.token.exc)
+        )
+        return None
+    if user.token.get_plaintext_or_error() != token:
+        return None
+    return user
 
 
 def user_model_to_user(user_model: UserModel) -> User:
@@ -144,6 +186,8 @@ def user_model_to_user(user_model: UserModel) -> User:
         username=user_model.name,
         global_role=user_model.global_role,
         email=user_model.email,
+        active=user_model.active,
+        permissions=get_user_permissions(user_model),
     )
 
 
@@ -153,7 +197,20 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
         username=user_model.name,
         global_role=user_model.global_role,
         email=user_model.email,
-        creds=UserTokenCreds(token=user_model.token),
+        active=user_model.active,
+        permissions=get_user_permissions(user_model),
+        creds=UserTokenCreds(token=user_model.token.get_plaintext_or_error()),
+    )
+
+
+def get_user_permissions(user_model: UserModel) -> UserPermissions:
+    default_permissions = get_default_permissions()
+    can_create_projects = True
+    if not default_permissions.allow_non_admins_create_projects:
+        if user_model.global_role != GlobalRole.ADMIN:
+            can_create_projects = False
+    return UserPermissions(
+        can_create_projects=can_create_projects,
     )
 
 
@@ -162,3 +219,7 @@ _CREATE_USER_HOOKS = []
 
 def register_create_user_hook(func: Callable[[AsyncSession, UserModel], Awaitable[None]]):
     _CREATE_USER_HOOKS.append(func)
+
+
+def get_token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()

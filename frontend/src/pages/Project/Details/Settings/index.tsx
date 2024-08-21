@@ -42,7 +42,8 @@ export const ProjectSettings: React.FC = () => {
     const navigate = useNavigate();
     const paramProjectName = params.projectName ?? '';
     const [configCliCommand, copyCliCommand] = useConfigProjectCliCommand({ projectName: paramProjectName });
-    const { isAvailableDeletingPermission, isProjectAdmin, isAvailableProjectManaging } = useCheckAvailableProjectPermission();
+    const { isAvailableDeletingPermission, isProjectManager, isProjectAdmin, isAvailableProjectManaging } =
+        useCheckAvailableProjectPermission();
 
     const [pushNotification] = useNotifications();
     const [updateProjectMembers] = useUpdateProjectMembersMutation();
@@ -164,7 +165,7 @@ export const ProjectSettings: React.FC = () => {
 
                     <BackendsTable
                         backends={backendsData}
-                        {...(isProjectAdmin(data)
+                        {...(isProjectManager(data)
                             ? {
                                   onClickAddBackend: addBackend,
                                   editBackend: editBackend,
@@ -179,7 +180,8 @@ export const ProjectSettings: React.FC = () => {
                     <ProjectMembers
                         onChange={debouncedMembersHandler}
                         members={data.members}
-                        readonly={!isProjectAdmin(data)}
+                        readonly={!isProjectManager(data)}
+                        isAdmin={isProjectAdmin(data)}
                     />
 
                     <Container header={<Header variant="h2">{t('common.danger_zone')}</Header>}>

@@ -14,6 +14,7 @@ from dstack._internal.core.models.instances import InstanceStatus, SSHKey
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import FleetModel, InstanceModel
+from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_fleet,
@@ -24,6 +25,7 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    default_permissions_context,
     get_auth_headers,
     get_fleet_configuration,
     get_fleet_spec,
@@ -228,6 +230,7 @@ class TestCreateFleet:
                     user="ubuntu",
                     ssh_key=SSHKey(public="", private="123"),
                     hosts=["1.1.1.1"],
+                    network=None,
                 ),
             )
         )
@@ -330,6 +333,36 @@ class TestCreateFleet:
         instance = res.scalar_one()
         assert instance.remote_connection_info is not None
 
+    @pytest.mark.asyncio
+    async def test_forbids_if_no_permission_to_manage_ssh_fleets(
+        self, test_db, session: AsyncSession
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        spec = get_fleet_spec(
+            conf=FleetConfiguration(
+                name="test-ssh-fleet",
+                ssh_config=SSHParams(
+                    user="ubuntu",
+                    ssh_key=SSHKey(public="", private="123"),
+                    hosts=["1.1.1.1"],
+                    network=None,
+                ),
+            )
+        )
+        with default_permissions_context(
+            DefaultPermissions(allow_non_admins_manage_ssh_fleets=False)
+        ):
+            response = client.post(
+                f"/api/project/{project.name}/fleets/create",
+                headers=get_auth_headers(user.token),
+                json={"spec": spec.dict()},
+            )
+        assert response.status_code in [401, 403]
+
 
 class TestDeleteFleets:
     @pytest.mark.asyncio
@@ -405,6 +438,37 @@ class TestDeleteFleets:
         await session.refresh(fleet)
         assert not fleet.deleted
         assert instance.status == InstanceStatus.BUSY
+
+    @pytest.mark.asyncio
+    async def test_forbids_if_no_permission_to_manage_ssh_fleets(
+        self, test_db, session: AsyncSession
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        spec = get_fleet_spec(
+            conf=FleetConfiguration(
+                name="test-ssh-fleet",
+                ssh_config=SSHParams(
+                    user="ubuntu",
+                    ssh_key=SSHKey(public="", private="123"),
+                    hosts=["1.1.1.1"],
+                    network=None,
+                ),
+            )
+        )
+        fleet = await create_fleet(session=session, project=project, spec=spec)
+        with default_permissions_context(
+            DefaultPermissions(allow_non_admins_manage_ssh_fleets=False)
+        ):
+            response = client.post(
+                f"/api/project/{project.name}/fleets/delete",
+                headers=get_auth_headers(user.token),
+                json={"names": [fleet.name]},
+            )
+        assert response.status_code in [401, 403]
 
 
 class TestDeleteFleetInstances:

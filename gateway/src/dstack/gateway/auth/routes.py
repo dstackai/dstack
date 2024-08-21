@@ -1,7 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Security
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends
 
-from dstack.gateway.core.auth import AuthProvider, get_auth
+from dstack.gateway.core.auth import access_to_project_required
 
 router = APIRouter()
 
@@ -9,12 +8,6 @@ router = APIRouter()
 # TODO(egor-s): support Authorization header alternative for web browsers
 
 
-@router.get("/{project}")
-async def get_auth(
-    project: str,
-    token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
-    auth: AuthProvider = Depends(get_auth),
-):
-    if await auth.has_access(project, token.credentials):
-        return {"status": "ok"}
-    raise HTTPException(status_code=403)
+@router.get("/{project}", dependencies=[Depends(access_to_project_required)])
+async def get_auth():
+    return {"status": "ok"}

@@ -8,6 +8,7 @@ from dstack._internal.core.models.common import CoreModel
 
 class ProjectRole(str, enum.Enum):
     ADMIN = "admin"
+    MANAGER = "manager"
     USER = "user"
 
 
@@ -16,11 +17,17 @@ class GlobalRole(str, enum.Enum):
     USER = "user"
 
 
+class UserPermissions(CoreModel):
+    can_create_projects: bool
+
+
 class User(CoreModel):
     id: UUID4
     username: str
     global_role: GlobalRole
     email: Optional[str]
+    active: bool
+    permissions: UserPermissions
 
 
 class UserTokenCreds(CoreModel):

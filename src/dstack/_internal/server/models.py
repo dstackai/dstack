@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import Callable, List, Optional, Union
 
 from sqlalchemy import (
     BigInteger,
@@ -24,7 +24,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import false
 from sqlalchemy_utils import UUIDType
 
+from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import InstanceStatus
@@ -43,17 +45,19 @@ from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.core.models.volumes import VolumeStatus
 from dstack._internal.server import settings
 from dstack._internal.utils.common import get_current_datetime
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class NaiveDateTime(TypeDecorator):
     """
-    The custom type decorator that ensures datetime objects are offset-naive when stored in the database.
+    A custom type decorator that ensures datetime objects are offset-naive when stored in the database.
     This is needed because we use datetimes in UTC only and store them as offset-naive.
     Some databases (e.g. Postgres) throw an error if the timezone is set.
     """
 
     impl = DateTime
-
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
@@ -63,6 +67,69 @@ class NaiveDateTime(TypeDecorator):
 
     def process_result_value(self, value, dialect):
         return value
+
+
+class DecryptedString(CoreModel):
+    """
+    A type for representing plaintext strings encrypted with `EncryptedString`.
+    Besides the string, stores information if the decryption was successful.
+    This is useful so that application code can have custom handling of failed decrypts (e.g. ignoring).
+    """
+
+    # Do not read plaintext directly to avoid ignoring errors accidentally.
+    # Unpack with get_plaintext_or_error().
+    plaintext: Optional[str]
+    decrypted: bool = True
+    exc: Optional[Exception] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    def get_plaintext_or_error(self) -> str:
+        if self.decrypted and self.plaintext is not None:
+            return self.plaintext
+        exc = DstackError("Failed to access plaintext")
+        if self.exc is not None:
+            raise exc from self.exc
+        raise exc
+
+
+class EncryptedString(TypeDecorator):
+    """
+    A custom type decorator that encrypts and decrypts strings for storing in the db.
+    """
+
+    impl = String
+    cache_ok = True
+
+    _encrypt_func: Callable[[str], str]
+    _decrypt_func: Callable[[str], str]
+
+    @classmethod
+    def set_encrypt_decrypt(
+        cls,
+        encrypt_func: Callable[[str], str],
+        decrypt_func: Callable[[str], str],
+    ):
+        cls._encrypt_func = encrypt_func
+        cls._decrypt_func = decrypt_func
+
+    def process_bind_param(self, value: Union[DecryptedString, str], dialect):
+        if isinstance(value, str):
+            # Passing string allows binding an encrypted value directly
+            # e.g. for comparisons
+            return value
+        return EncryptedString._encrypt_func(value.get_plaintext_or_error())
+
+    def process_result_value(self, value: Optional[str], dialect) -> Optional[DecryptedString]:
+        if value is None:
+            return value
+        try:
+            plaintext = EncryptedString._decrypt_func(value)
+            return DecryptedString(plaintext=plaintext, decrypted=True)
+        except Exception as e:
+            logger.debug("Failed to decrypt encrypted string: %s", repr(e))
+            return DecryptedString(plaintext=None, decrypted=False, exc=e)
 
 
 constraint_naming_convention = {
@@ -85,8 +152,12 @@ class UserModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
-    token: Mapped[str] = mapped_column(String(200), unique=True)
+    token: Mapped[DecryptedString] = mapped_column(EncryptedString(200), unique=True)
+    # token_hash is needed for fast search by token when stored token is encrypted
+    token_hash: Mapped[str] = mapped_column(String(2000), unique=True)
     global_role: Mapped[GlobalRole] = mapped_column(Enum(GlobalRole))
+    # deactivated users cannot access API
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
@@ -106,7 +177,9 @@ class ProjectModel(BaseModel):
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     owner: Mapped[UserModel] = relationship(lazy="joined")
-    members: Mapped[List["MemberModel"]] = relationship(back_populates="project")
+    members: Mapped[List["MemberModel"]] = relationship(
+        back_populates="project", order_by="MemberModel.member_num"
+    )
 
     ssh_private_key: Mapped[str] = mapped_column(Text)
     ssh_public_key: Mapped[str] = mapped_column(Text)
@@ -135,6 +208,8 @@ class MemberModel(BaseModel):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped[UserModel] = relationship(lazy="joined")
     project_role: Mapped[ProjectRole] = mapped_column(Enum(ProjectRole))
+    # member_num defines members ordering
+    member_num: Mapped[Optional[int]] = mapped_column(Integer)
 
 
 class BackendModel(BaseModel):
@@ -148,7 +223,7 @@ class BackendModel(BaseModel):
     type: Mapped[BackendType] = mapped_column(Enum(BackendType))
 
     config: Mapped[str] = mapped_column(String(20000))
-    auth: Mapped[str] = mapped_column(String(20000))
+    auth: Mapped[DecryptedString] = mapped_column(EncryptedString(20000))
 
     gateways: Mapped[List["GatewayModel"]] = relationship(back_populates="backend")
 

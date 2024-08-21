@@ -41,7 +41,7 @@ from dstack._internal.core.models.backends.base import (
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
@@ -167,7 +167,7 @@ class AzureConfigurator(Configurator):
                 **AzureConfigInfo.__response__.parse_obj(config).dict(),
                 resource_group=resource_group,
             ).json(),
-            auth=AzureCreds.parse_obj(config.creds).__root__.json(),
+            auth=DecryptedString(plaintext=AzureCreds.parse_obj(config.creds).__root__.json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyAzureConfigInfo:
@@ -183,7 +183,7 @@ class AzureConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> AzureConfig:
         return AzureConfig.__response__(
             **json.loads(model.config),
-            creds=AzureCreds.parse_raw(model.auth).__root__,
+            creds=AzureCreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
         )
 
     def _set_client_creds_tenant_id(

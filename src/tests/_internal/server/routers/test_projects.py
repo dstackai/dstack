@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.main import app
 from dstack._internal.server.models import MemberModel, ProjectModel
+from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_backend,
     create_project,
     create_user,
+    default_permissions_context,
     get_auth_headers,
 )
 
@@ -54,6 +56,10 @@ class TestListProjects:
                     "username": user.name,
                     "global_role": user.global_role,
                     "email": None,
+                    "active": True,
+                    "permissions": {
+                        "can_create_projects": True,
+                    },
                 },
                 "backends": [],
                 "members": [],
@@ -88,6 +94,10 @@ class TestCreateProject:
                 "username": user.name,
                 "global_role": user.global_role,
                 "email": None,
+                "active": True,
+                "permissions": {
+                    "can_create_projects": True,
+                },
             },
             "backends": [],
             "members": [
@@ -97,14 +107,21 @@ class TestCreateProject:
                         "username": user.name,
                         "global_role": user.global_role,
                         "email": None,
+                        "active": True,
+                        "permissions": {
+                            "can_create_projects": True,
+                        },
                     },
                     "project_role": ProjectRole.ADMIN,
+                    "permissions": {
+                        "can_manage_ssh_fleets": True,
+                    },
                 }
             ],
         }
 
     @pytest.mark.asyncio
-    async def test_return_400_if_project_name_is_taken(self, test_db, session: AsyncSession):
+    async def test_returns_400_if_project_name_is_taken(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         with patch("uuid.uuid4") as m:
             m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
@@ -163,6 +180,21 @@ class TestCreateProject:
                 json={"project_name": f"project{i}"},
             )
             assert response.status_code == 200, response.json()
+
+    @pytest.mark.asyncio
+    async def test_forbids_if_no_permission_to_create_projects(
+        self, test_db, session: AsyncSession
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        with default_permissions_context(
+            DefaultPermissions(allow_non_admins_create_projects=False)
+        ):
+            response = client.post(
+                "/api/projects/create",
+                headers=get_auth_headers(user.token),
+                json={"project_name": "new_project"},
+            )
+        assert response.status_code in [401, 403]
 
 
 class TestDeleteProject:
@@ -277,6 +309,10 @@ class TestGetProject:
                 "username": user.name,
                 "global_role": user.global_role,
                 "email": None,
+                "active": True,
+                "permissions": {
+                    "can_create_projects": True,
+                },
             },
             "backends": [],
             "members": [
@@ -286,8 +322,15 @@ class TestGetProject:
                         "username": user.name,
                         "global_role": user.global_role,
                         "email": None,
+                        "active": True,
+                        "permissions": {
+                            "can_create_projects": True,
+                        },
                     },
                     "project_role": ProjectRole.ADMIN,
+                    "permissions": {
+                        "can_manage_ssh_fleets": True,
+                    },
                 }
             ],
         }
@@ -303,7 +346,10 @@ class TestSetProjectMembers:
         project = await create_project(session=session)
         admin = await create_user(session=session)
         await add_project_member(
-            session=session, project=project, user=admin, project_role=ProjectRole.ADMIN
+            session=session,
+            project=project,
+            user=admin,
+            project_role=ProjectRole.ADMIN,
         )
         user1 = await create_user(session=session, name="user1")
         user2 = await create_user(session=session, name="user2")
@@ -335,8 +381,15 @@ class TestSetProjectMembers:
                     "username": admin.name,
                     "global_role": admin.global_role,
                     "email": None,
+                    "active": True,
+                    "permissions": {
+                        "can_create_projects": True,
+                    },
                 },
                 "project_role": ProjectRole.ADMIN,
+                "permissions": {
+                    "can_manage_ssh_fleets": True,
+                },
             },
             {
                 "user": {
@@ -344,8 +397,15 @@ class TestSetProjectMembers:
                     "username": user1.name,
                     "global_role": user1.global_role,
                     "email": None,
+                    "active": True,
+                    "permissions": {
+                        "can_create_projects": True,
+                    },
                 },
                 "project_role": ProjectRole.ADMIN,
+                "permissions": {
+                    "can_manage_ssh_fleets": True,
+                },
             },
             {
                 "user": {
@@ -353,10 +413,109 @@ class TestSetProjectMembers:
                     "username": user2.name,
                     "global_role": user2.global_role,
                     "email": None,
+                    "active": True,
+                    "permissions": {
+                        "can_create_projects": True,
+                    },
                 },
                 "project_role": ProjectRole.USER,
+                "permissions": {
+                    "can_manage_ssh_fleets": True,
+                },
             },
         ]
         res = await session.execute(select(MemberModel))
         members = res.scalars().all()
         assert len(members) == 3
+
+    @pytest.mark.asyncio
+    async def test_manager_cannot_set_project_admins(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.MANAGER,
+        )
+        user1 = await create_user(session=session, name="user1")
+        members = [
+            {
+                "username": user.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "username": user1.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+        ]
+        body = {"members": members}
+        response = client.post(
+            f"/api/projects/{project.name}/set_members",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_global_admin_manager_can_set_project_admins(
+        self, test_db, session: AsyncSession
+    ):
+        project = await create_project(session=session)
+        user = await create_user(session=session, global_role=GlobalRole.ADMIN)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.MANAGER,
+        )
+        user1 = await create_user(session=session, name="user1")
+        members = [
+            {
+                "username": user.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "username": user1.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+        ]
+        body = {"members": members}
+        response = client.post(
+            f"/api/projects/{project.name}/set_members",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 200
+        res = await session.execute(select(MemberModel))
+        members = res.scalars().all()
+        assert len(members) == 2
+
+    @pytest.mark.asyncio
+    async def test_non_manager_cannot_set_project_members(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        await add_project_member(
+            session=session,
+            project=project,
+            user=user,
+            project_role=ProjectRole.USER,
+        )
+        user1 = await create_user(session=session, name="user1")
+        members = [
+            {
+                "username": user.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+            {
+                "username": user1.name,
+                "project_role": ProjectRole.ADMIN,
+            },
+        ]
+        body = {"members": members}
+        response = client.post(
+            f"/api/projects/{project.name}/set_members",
+            headers=get_auth_headers(user.token),
+            json=body,
+        )
+        assert response.status_code == 403

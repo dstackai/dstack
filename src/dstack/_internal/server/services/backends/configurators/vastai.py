@@ -17,7 +17,7 @@ from dstack._internal.core.models.backends.vastai import (
     VastAICreds,
     VastAIStoredConfig,
 )
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
@@ -49,7 +49,7 @@ class VastAIConfigurator(Configurator):
             config=VastAIStoredConfig(
                 **VastAIConfigInfo.__response__.parse_obj(config).dict()
             ).json(),
-            auth=VastAICreds.parse_obj(config.creds).json(),
+            auth=DecryptedString(plaintext=VastAICreds.parse_obj(config.creds).json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyVastAIConfigInfo:
@@ -65,7 +65,7 @@ class VastAIConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> VastAIConfig:
         return VastAIConfig.__response__(
             **json.loads(model.config),
-            creds=VastAICreds.parse_raw(model.auth),
+            creds=VastAICreds.parse_raw(model.auth.get_plaintext_or_error()),
         )
 
     def _validate_vastai_creds(self, api_key: str):

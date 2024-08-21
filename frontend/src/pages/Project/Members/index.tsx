@@ -6,8 +6,8 @@ import { Button, FormSelect, Header, Link, ListEmptyMessage, Pagination, Table }
 
 import { useCollection } from 'hooks';
 import { ROUTES } from 'routes';
+import { useGetUserListQuery } from 'services/user';
 
-import { useGetUserListQuery } from '../../../services/user';
 import { UserAutosuggest } from './UsersAutosuggest';
 
 import { IProps, TFormValues, TProjectMemberWithIndex } from './types';
@@ -16,7 +16,7 @@ import { TRoleSelectOption } from 'pages/User/Form/types';
 
 import styles from './styles.module.scss';
 
-export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, readonly }) => {
+export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, readonly, isAdmin }) => {
     const { t } = useTranslation();
     const [selectedItems, setSelectedItems] = useState<TProjectMemberWithIndex[]>([]);
     const { data: usersData } = useGetUserListQuery();
@@ -55,7 +55,8 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
     });
 
     const roleSelectOptions: TRoleSelectOption[] = [
-        { label: t('roles.admin'), value: 'admin' },
+        { label: t('roles.admin'), value: 'admin', disabled: !isAdmin },
+        { label: t('roles.manager'), value: 'manager' },
         { label: t('roles.user'), value: 'user' },
     ];
 
@@ -102,35 +103,40 @@ export const ProjectMembers: React.FC<IProps> = ({ members, loading, onChange, r
         {
             id: 'global_role',
             header: t('projects.edit.members.role'),
-            cell: (field: IProjectMember & { index: number }) => (
-                <div className={styles.role}>
-                    <div className={styles.roleFieldWrapper}>
-                        <FormSelect
-                            control={control}
-                            name={`members.${field.index}.project_role`}
-                            options={roleSelectOptions}
-                            disabled={loading || readonly}
-                            expandToViewport
-                            onChange={onChangeHandler}
-                        />
-                    </div>
+            cell: (field: IProjectMember & { index: number }) => {
+                const isAvailableForAdmin = !readonly && (isAdmin || field.project_role !== 'admin');
 
-                    <div className={styles.deleteMemberButtonWrapper}>
-                        {!readonly && (
-                            <Button
-                                disabled={loading}
-                                formAction="none"
-                                onClick={() => {
-                                    remove(field.index);
-                                    onChangeHandler();
-                                }}
-                                variant="icon"
-                                iconName="remove"
+                return (
+                    <div className={styles.role}>
+                        <div className={styles.roleFieldWrapper}>
+                            <FormSelect
+                                key={field.user.username}
+                                control={control}
+                                name={`members.${field.index}.project_role`}
+                                options={roleSelectOptions}
+                                disabled={loading || !isAvailableForAdmin}
+                                expandToViewport
+                                onChange={onChangeHandler}
                             />
-                        )}
+                        </div>
+
+                        <div className={styles.deleteMemberButtonWrapper}>
+                            {isAvailableForAdmin && (
+                                <Button
+                                    disabled={loading}
+                                    formAction="none"
+                                    onClick={() => {
+                                        remove(field.index);
+                                        onChangeHandler();
+                                    }}
+                                    variant="icon"
+                                    iconName="remove"
+                                />
+                            )}
+                        </div>
                     </div>
-                </div>
-            ),
+                );
+            },
         },
     ];
 

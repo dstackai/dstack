@@ -16,7 +16,7 @@ from dstack._internal.core.models.backends.cudo import (
     CudoCreds,
     CudoStoredConfig,
 )
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends import Configurator
 from dstack._internal.server.services.backends.configurators.base import (
     raise_invalid_credentials_error,
@@ -56,7 +56,7 @@ class CudoConfigurator(Configurator):
             project_id=project.id,
             type=self.TYPE.value,
             config=CudoStoredConfig(**CudoConfigInfo.__response__.parse_obj(config).dict()).json(),
-            auth=CudoCreds.parse_obj(config.creds).json(),
+            auth=DecryptedString(plaintext=CudoCreds.parse_obj(config.creds).json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> CudoConfigInfo:
@@ -78,7 +78,7 @@ class CudoConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> CudoConfig:
         return CudoConfig.__response__(
             **json.loads(model.config),
-            creds=CudoCreds.parse_raw(model.auth),
+            creds=CudoCreds.parse_raw(model.auth.get_plaintext_or_error()),
         )
 
     def _validate_cudo_api_key(self, api_key: str):

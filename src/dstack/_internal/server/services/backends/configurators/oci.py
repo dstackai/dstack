@@ -27,7 +27,7 @@ from dstack._internal.core.models.backends.oci import (
 )
 from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
-from dstack._internal.server.models import BackendModel, ProjectModel
+from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
@@ -120,7 +120,7 @@ class OCIConfigurator(Configurator):
             project_id=project.id,
             type=self.TYPE.value,
             config=stored_config.json(),
-            auth=OCICreds.parse_obj(config.creds).json(),
+            auth=DecryptedString(plaintext=OCICreds.parse_obj(config.creds).json()),
         )
 
     def get_config_info(self, model: BackendModel, include_creds: bool) -> AnyOCIConfigInfo:
@@ -136,7 +136,7 @@ class OCIConfigurator(Configurator):
     def _get_backend_config(self, model: BackendModel) -> OCIConfig:
         return OCIConfig.__response__(
             **json.loads(model.config),
-            creds=OCICreds.parse_raw(model.auth).__root__,
+            creds=OCICreds.parse_raw(model.auth.get_plaintext_or_error()).__root__,
         )
 
     def _get_regions_element(
