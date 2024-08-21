@@ -14,7 +14,7 @@ class S3Storage:
     def __init__(
         self,
         bucket: str,
-        region: str,
+        region: Optional[str] = None,
     ):
         self._session = Session()
         self._client = self._session.client("s3", region_name=region)
