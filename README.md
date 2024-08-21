@@ -41,7 +41,7 @@ Before using `dstack` through CLI or API, set up a `dstack` server.
 ### 1. Configure backends
 
 If you want the `dstack` server to run containers or manage clusters in your cloud accounts (or use Kubernetes),
-create the [`~/.dstack/server/config.yml`](https://dstack.ai/docs/reference/server/config.yml.md) file and configure backends.
+create the [`~/.dstack/server/config.yml`](https://dstack.ai/docs/reference/server/config.yml) file and configure backends.
 
 ### 2. Start the server
 
@@ -84,22 +84,22 @@ Configuration is updated at ~/.dstack/config.yml
 ### 4. Create on-prem fleets
     
 > If you want the `dstack` server to run containers on your on-prem servers,
-use [fleets](../fleets.md#__tabbed_1_2).
+use [fleets](https://dstack.ai/docs/fleets).
 
 ## How does it work?
 
-> Before using `dstack`, [install](https://dstack.ai/docs/installation/index.md) the server and configure backends.
+> Before using `dstack`, [install](https://dstack.ai/docs/installation) the server and configure backends.
 
 ### 1. Define configurations
 
 `dstack` supports the following configurations:
    
-* [Dev environments](https://dstack.ai/docs/dev-environments.md) &mdash; for interactive development using a desktop IDE
-* [Tasks](https://dstack.ai/docs/tasks.md) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
-* [Services](https://dstack.ai/docs/services.md) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
-* [Fleets](https://dstack.ai/docs/fleets.md) &mdash; for managing cloud and on-prem clusters
-* [Volumes](https://dstack.ai/docs/concepts/volumes.md) &mdash; for managing persisted volumes
-* [Gateways](https://dstack.ai/docs/concepts/volumes.md) &mdash; for configuring the ingress traffic and public endpoints
+* [Dev environments](https://dstack.ai/docs/dev-environments) &mdash; for interactive development using a desktop IDE
+* [Tasks](https://dstack.ai/docs/tasks) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
+* [Services](https://dstack.ai/docs/services) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
+* [Fleets](https://dstack.ai/docs/fleets) &mdash; for managing cloud and on-prem clusters
+* [Volumes](https://dstack.ai/docs/concepts/volumes) &mdash; for managing persisted volumes
+* [Gateways](https://dstack.ai/docs/concepts/gateways) &mdash; for configuring the ingress traffic and public endpoints
 
 Configuration can be defined as YAML files within your repo.
 
