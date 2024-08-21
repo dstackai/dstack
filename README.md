@@ -24,8 +24,8 @@ If you already use Kubernetes, `dstack` can be used with it.
 
 #### Accelerators
 
-`dstack` supports `NVIDIA GPU` and `Google Cloud TPU` out of the box.
- 
+`dstack` supports `NVIDIA GPU`, `AMD GPU`, and `Google Cloud TPU` out of the box.
+
 ## Major news ✨
 
 - [2024/07] [dstack 0.18.8: GCP volumes](https://github.com/dstackai/dstack/releases/tag/0.18.8) (Release)
