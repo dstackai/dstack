@@ -58,7 +58,7 @@ If you don't specify your Docker image, `dstack` uses the [base](https://hub.doc
 
 !!! info "Auto-scaling"
     By default, the service is deployed to a single instance. However, you can specify the
-    [number of replicas and scaling policy](reference/dstack.yml/service.md#replicas-and-auto-scaling).
+    [number of replicas and scaling policy](reference/dstack.yml/service.md#auto-scaling).
     In this case, `dstack` auto-scales it based on the load.
 
 !!! info "Reference"

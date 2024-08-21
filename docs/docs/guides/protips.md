@@ -8,7 +8,7 @@ By default, when running dev environments, tasks, or services, `dstack apply` re
 instances from existing fleets. If no `idle` instances match the requirements, it creates a new fleet automatically.
 
 To avoid creating new fleet automatically, 
-set [ `creation_policy`](reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the configuration.
+set [ `creation_policy`](../reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the configuration.
 
 > Use [fleets](../fleets.md) configurations to create fleets manually. This reduces startup time for dev environments,
 > tasks, and services, and is very convenient if you want to reuse fleets across runs.
@@ -161,14 +161,14 @@ for this time, `dstack` terminates them.
 If you create a fleet manually, the idle duration is not set.
 
 > You can override idle duration for fleets, dev environment, tasks, and services by
-> setting [`termination_idle_duration`](../reference/dstack.yml/dev-environment.md#termination_idle_duration) in the configuration file. 
+> setting [`termination_idle_time`](../reference/dstack.yml/dev-environment.md#termination_idle_time) in the configuration file. 
 
 [//]: # (## Profiles)
 [//]: # ()
 [//]: # (If you don't want to specify the same parameters for each configuration, you can define them once via [profiles]&#40;../reference/profiles.yml.md&#41;)
 [//]: # (and reuse them across configurations.)
 [//]: # ()
-[//]: # (This can be handy, for example, for configuring parameters such as `max_duration`, `max_price`, `termination_idle_duration`,)
+[//]: # (This can be handy, for example, for configuring parameters such as `max_duration`, `max_price`, `termination_idle_time`,)
 [//]: # (`regions`, etc.)
 [//]: # ()
 [//]: # (Set `default` to `true` in your profile, and it will be applied automatically to any run.)

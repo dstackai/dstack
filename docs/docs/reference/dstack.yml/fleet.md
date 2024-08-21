@@ -70,13 +70,13 @@ ssh_config:
       type:
         required: true
 
-## `ssh`
+## `ssh_config`
 
 #SCHEMA# dstack._internal.core.models.fleets.SSHParams
     overrides:
       show_root_heading: false
 
-## `ssh.hosts[n]`
+## `ssh_config.hosts[n]`
 
 #SCHEMA# dstack._internal.core.models.fleets.SSHHostParams
     overrides:
