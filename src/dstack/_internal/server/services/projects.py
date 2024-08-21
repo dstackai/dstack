@@ -103,6 +103,7 @@ async def create_project(
         project=project,
         user=user,
         project_role=ProjectRole.ADMIN,
+        member_num=0,
     )
     project_model = await get_project_model_by_name_or_error(
         session=session, project_name=project_name
@@ -176,7 +177,7 @@ async def set_project_members(
     res = await session.execute(select(UserModel).where(UserModel.name.in_(usernames)))
     users = res.scalars().all()
     username_to_user = {user.name: user for user in users}
-    for member in members:
+    for i, member in enumerate(members):
         user_to_add = username_to_user.get(member.username)
         if user_to_add is None:
             continue
@@ -185,6 +186,7 @@ async def set_project_members(
             project=project,
             user=user_to_add,
             project_role=member.project_role,
+            member_num=i,
             commit=False,
         )
     await session.commit()
@@ -195,12 +197,14 @@ async def add_project_member(
     project: ProjectModel,
     user: UserModel,
     project_role: ProjectRole,
+    member_num: Optional[int] = None,
     commit: bool = True,
 ) -> MemberModel:
     member = MemberModel(
         user_id=user.id,
         project_id=project.id,
         project_role=project_role,
+        member_num=member_num,
     )
     session.add(member)
     if commit:

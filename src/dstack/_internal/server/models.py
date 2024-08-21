@@ -177,7 +177,9 @@ class ProjectModel(BaseModel):
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     owner: Mapped[UserModel] = relationship(lazy="joined")
-    members: Mapped[List["MemberModel"]] = relationship(back_populates="project")
+    members: Mapped[List["MemberModel"]] = relationship(
+        back_populates="project", order_by="MemberModel.member_num"
+    )
 
     ssh_private_key: Mapped[str] = mapped_column(Text)
     ssh_public_key: Mapped[str] = mapped_column(Text)
@@ -206,6 +208,8 @@ class MemberModel(BaseModel):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     user: Mapped[UserModel] = relationship(lazy="joined")
     project_role: Mapped[ProjectRole] = mapped_column(Enum(ProjectRole))
+    # member_num defines members ordering
+    member_num: Mapped[Optional[int]] = mapped_column(Integer)
 
 
 class BackendModel(BaseModel):
