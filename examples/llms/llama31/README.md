@@ -354,7 +354,7 @@ resources:
 
 ## Fleets
 
-By default, `dstack run` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/fleets).
+By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/fleets).
 If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
 
 Use [fleets](https://dstack.ai/docs/fleets.md) configurations to create fleets manually. This reduces startup time for dev environments,
