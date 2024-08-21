@@ -1,5 +1,6 @@
 import json
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Dict, Optional, Union
 from uuid import UUID
@@ -57,6 +58,11 @@ from dstack._internal.server.models import (
     VolumeModel,
 )
 from dstack._internal.server.services.jobs import get_job_specs_from_run_spec
+from dstack._internal.server.services.permissions import (
+    DefaultPermissions,
+    get_default_permissions,
+    set_default_permissions,
+)
 from dstack._internal.server.services.users import get_token_hash
 
 
@@ -551,6 +557,16 @@ def get_volume_provisioning_data(
         availability_zone=availability_zone,
         backend_data=backend_data,
     )
+
+
+@contextmanager
+def default_permissions_context(default_permissions: DefaultPermissions):
+    prev_default_permissions = get_default_permissions()
+    set_default_permissions(default_permissions)
+    try:
+        yield
+    finally:
+        set_default_permissions(prev_default_permissions)
 
 
 class AsyncContextManager:

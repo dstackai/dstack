@@ -64,8 +64,13 @@ async def delete_fleets(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
-    _, project = user_project
-    await fleets_services.delete_fleets(session=session, project=project, names=body.names)
+    user, project = user_project
+    await fleets_services.delete_fleets(
+        session=session,
+        project=project,
+        user=user,
+        names=body.names,
+    )
 
 
 @router.post("/delete_instances")
@@ -74,7 +79,11 @@ async def delete_fleet_instances(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ):
-    _, project = user_project
+    user, project = user_project
     await fleets_services.delete_fleets(
-        session=session, project=project, names=[body.name], instance_nums=body.instance_nums
+        session=session,
+        project=project,
+        user=user,
+        names=[body.name],
+        instance_nums=body.instance_nums,
     )

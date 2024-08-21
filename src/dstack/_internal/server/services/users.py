@@ -7,8 +7,15 @@ from sqlalchemy import func as safunc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import ResourceExistsError
-from dstack._internal.core.models.users import GlobalRole, User, UserTokenCreds, UserWithCreds
+from dstack._internal.core.models.users import (
+    GlobalRole,
+    User,
+    UserPermissions,
+    UserTokenCreds,
+    UserWithCreds,
+)
 from dstack._internal.server.models import DecryptedString, UserModel
+from dstack._internal.server.services.permissions import get_default_permissions
 from dstack._internal.server.utils.routers import error_forbidden
 from dstack._internal.utils.logging import get_logger
 
@@ -180,6 +187,7 @@ def user_model_to_user(user_model: UserModel) -> User:
         global_role=user_model.global_role,
         email=user_model.email,
         active=user_model.active,
+        permissions=get_user_permissions(user_model),
     )
 
 
@@ -190,7 +198,19 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
         global_role=user_model.global_role,
         email=user_model.email,
         active=user_model.active,
+        permissions=get_user_permissions(user_model),
         creds=UserTokenCreds(token=user_model.token.get_plaintext_or_error()),
+    )
+
+
+def get_user_permissions(user_model: UserModel) -> UserPermissions:
+    default_permissions = get_default_permissions()
+    can_create_projects = True
+    if not default_permissions.allow_non_admins_create_projects:
+        if user_model.global_role != GlobalRole.ADMIN:
+            can_create_projects = False
+    return UserPermissions(
+        can_create_projects=can_create_projects,
     )
 
 

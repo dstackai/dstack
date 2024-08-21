@@ -31,6 +31,9 @@ class TestListUsers:
                 "global_role": user.global_role,
                 "email": None,
                 "active": True,
+                "permissions": {
+                    "can_create_projects": True,
+                },
             }
         ]
 
@@ -61,6 +64,9 @@ class TestGetMyUser:
             "global_role": user.global_role,
             "email": None,
             "active": True,
+            "permissions": {
+                "can_create_projects": True,
+            },
         }
 
 
@@ -97,6 +103,9 @@ class TestGetUser:
             "email": None,
             "creds": {"token": "1234"},
             "active": True,
+            "permissions": {
+                "can_create_projects": True,
+            },
         }
 
 
@@ -127,6 +136,9 @@ class TestCreateUser:
             "global_role": "user",
             "email": "test@example.com",
             "active": True,
+            "permissions": {
+                "can_create_projects": True,
+            },
         }
         res = await session.execute(select(UserModel).where(UserModel.name == "test"))
         assert len(res.scalars().all()) == 1
@@ -151,6 +163,9 @@ class TestCreateUser:
             "global_role": "user",
             "email": None,
             "active": True,
+            "permissions": {
+                "can_create_projects": True,
+            },
         }
         # Username uniqueness check should be case insensitive
         for username in ["test", "Test", "TesT"]:
