@@ -495,6 +495,7 @@ def _process_running(
         timestamp = job_model.runner_timestamp
     resp = runner_client.pull(timestamp)  # raises error if runner is down, causes retry
     job_model.runner_timestamp = resp.last_updated
+    # may raise LogStorageError, causing a retry
     logs_services.write_logs(
         project=run_model.project,
         run_name=run_model.run_name,

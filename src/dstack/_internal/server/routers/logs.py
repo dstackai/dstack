@@ -22,4 +22,4 @@ async def poll_logs(
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> JobSubmissionLogs:
     _, project = user_project
-    return logs.poll_logs(project=project, request=body)
+    return await logs.poll_logs_async(project=project, request=body)

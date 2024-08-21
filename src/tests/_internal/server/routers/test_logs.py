@@ -1,13 +1,10 @@
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server import settings
 from dstack._internal.server.main import app
+from dstack._internal.server.services.logs import FileLogStorage
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import create_project, create_user, get_auth_headers
 
@@ -26,14 +23,16 @@ class TestPollLogs:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_returns_logs(self, test_db, session: AsyncSession, tmp_path: Path):
+    async def test_returns_logs(
+        self, test_db, test_log_storage: FileLogStorage, session: AsyncSession
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         runner_log_path = (
-            tmp_path
+            test_log_storage.root
             / "projects"
             / project.name
             / "logs"
@@ -47,16 +46,15 @@ class TestPollLogs:
             '{"timestamp": "2023-10-06T10:01:53.234235+00:00", "log_source": "stdout", "message": "World"}\n'
             '{"timestamp": "2023-10-06T10:01:53.234236+00:00", "log_source": "stdout", "message": "!"}\n'
         )
-        with patch.object(settings, "SERVER_DIR_PATH", tmp_path):
-            response = client.post(
-                f"/api/project/{project.name}/logs/poll",
-                headers=get_auth_headers(user.token),
-                json={
-                    "run_name": "test_run",
-                    "job_submission_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
-                    "diagnose": True,
-                },
-            )
+        response = client.post(
+            f"/api/project/{project.name}/logs/poll",
+            headers=get_auth_headers(user.token),
+            json={
+                "run_name": "test_run",
+                "job_submission_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                "diagnose": True,
+            },
+        )
         assert response.status_code == 200, response.json()
         assert response.json() == {
             "logs": [
@@ -77,17 +75,16 @@ class TestPollLogs:
                 },
             ]
         }
-        with patch.object(settings, "SERVER_DIR_PATH", tmp_path):
-            response = client.post(
-                f"/api/project/{project.name}/logs/poll",
-                headers=get_auth_headers(user.token),
-                json={
-                    "run_name": "test_run",
-                    "job_submission_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
-                    "start_time": "2023-10-06T10:01:53.234235+00:00",
-                    "diagnose": True,
-                },
-            )
+        response = client.post(
+            f"/api/project/{project.name}/logs/poll",
+            headers=get_auth_headers(user.token),
+            json={
+                "run_name": "test_run",
+                "job_submission_id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
+                "start_time": "2023-10-06T10:01:53.234235+00:00",
+                "diagnose": True,
+            },
+        )
         assert response.status_code == 200, response.json()
         assert response.json() == {
             "logs": [
