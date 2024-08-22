@@ -56,7 +56,7 @@ Once the `~/.dstack/server/config.yml` file is configured, proceed to start the 
     > For more details on how to deploy `dstack` using Docker, check its [Docker repo](https://hub.docker.com/r/dstackai/dstack).
 
 By default, the `dstack` server stores its state in `~/.dstack/server/data` using SQLite, 
-while run logs are stored in `~/.dstack/server/projects<project name>/logs`.
+while run logs are stored in `~/.dstack/server/projects/<project name>/logs`.
 To store the state in a database, set the [`DSTACK_DATABASE_URL`](../reference/cli/index.md#environment-variables) environment variable.
 To store the logs in AWS CloudWatch, set the [`SERVER_CLOUDWATCH_LOG_GROUP`](../reference/cli/index.md#environment-variables) environment variable.
 
