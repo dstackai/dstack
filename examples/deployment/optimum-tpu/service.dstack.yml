@@ -1,6 +1,6 @@
-type: dev-environment
+type: service
 # The name is optional, if not specified, generated randomly
-name: vscode-optimum-tpu
+name: llama31-service-optimum-tpu
 
 # Using a Docker image with a fix instead of the official one
 # More details at https://github.com/huggingface/optimum-tpu/pull/85
@@ -8,7 +8,14 @@ image: sjbbihan/optimum-tpu:latest
 # Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
-ide: vscode
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B
+  - MAX_CONCURRENT_REQUESTS=4
+  - MAX_INPUT_TOKENS=128
+  - MAX_TOTAL_TOKENS=150
+  - MAX_BATCH_PREFILL_TOKENS=128
+commands:
+  - text-generation-launcher --port 8000
+port: 8000
 
 resources:
   # Required resources
@@ -16,3 +23,8 @@ resources:
 
 # Use either spot or on-demand instances
 spot_policy: auto
+
+model:
+  format: tgi
+  type: chat
+  name: meta-llama/Meta-Llama-3.1-8B
