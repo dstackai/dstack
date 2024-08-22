@@ -595,7 +595,7 @@ Also, the `vastai` backend supports on-demand instances only. Spot instance supp
 ### RunPod
 
 Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
-the button to create a key.
+the button to create a Read & Write key.
 
 Then proceed to configuring the backend.
 
@@ -636,7 +636,7 @@ projects:
 
 ### DataCrunch
 
-Log into your [DataCrunch :material-arrow-top-right-thin:{ .external }](https://cloud.datacrunch.io/signin) account, click Account Settings in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
+Log into your [DataCrunch :material-arrow-top-right-thin:{ .external }](https://cloud.datacrunch.io/) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
 Then, go ahead and configure the backend:
 
