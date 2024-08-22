@@ -749,117 +749,85 @@ In case of a self-managed cluster, also specify the IP address of any node in th
 
 ## Encryption
 
-`dstack` support encryption at rest that allows
-encrypting sensitive data such as backend credentials before storing it in the DB.
-It's an additional application-level encryption layer on top of file-system and DB encryption.
+By default, `dstack` stores data in plaintext. To enforce encryption, you 
+specify one or more encryption keys.
 
-By default, the `dstack` server stores all data in plaintext.
-To enable encryption, specify one or more encryption keys:
+`dstack` currently supports AES and identity (plaintext) encryption keys.
+Support for external providers like HashiCorp Vault and AWS KMS is planned.
 
-<div editor-title="~/.dstack/server/config.yml">
+=== "AES"
+    The `aes` encryption key encrypts data using [AES-256](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) in GCM mode.
+    To configure the `aes` encryption, generate a random 32-byte key:
 
-```yaml
-encryption:
-  keys:
-  - type: aes
-    name: key1
-    secret: E5yzN6V3XvBq/f085ISWFCdgnOGED0kuFaAkASlmmO4=
-projects: ...
-```
+    <div class="termy">
+    
+    ```shell
+    $ head -c 32 /dev/urandom | base64
+    
+    opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
+    ```
 
-</div>
+    </div>
+    
+    And specify it as `secret`:
+    
+    ```yaml
+    encryption:
+      keys:
+        - type: aes
+          name: key1
+          secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
+    ```
 
-After that, subsequent DB writes will encrypt sensitive data.
-(This includes backend credentials and user tokens.)
-If several keys are specified, the first key is used for encryption and all are tried for decryption.
-This allows rotating encryption keys by specifying a new encryption key:
+=== "Identity"
+    The `identity` encryption performs no encryption and stores data in plaintext.
+    You can specify an `identity` encryption key explicitly if you want to decrypt the data:
+    
+    ```yaml
+    encryption:
+      keys:
+      - type: identity
+      - type: aes
+        name: key1
+        secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
+    ```
+    
+    With this configuration, the `aes` key will still be used to decrypt the old data,
+    but new writes will store the data in plaintext.
 
-<div editor-title="~/.dstack/server/config.yml">
+??? info "Key rotation"
+    If multiple keys are specified, the first is used for encryption, and all are tried for decryption. This enables key
+    rotation by specifying a new encryption key.
+    
+    ```yaml
+    encryption:
+      keys:
+      - type: aes
+        name: key2
+        secret: cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=
 
-```yaml
-encryption:
-  keys:
-  - type: aes
-    name: key2
-    secret: cR2r1JmkPyL6edBQeHKz6ZBjCfS2oWk87Gc2G3wHVoA=
-  - type: aes
-    name: key1
-    secret: E5yzN6V3XvBq/f085ISWFCdgnOGED0kuFaAkASlmmO4=
-projects: ...
-```
+      - type: aes
+        name: key1
+        secret: E5yzN6V3XvBq/f085ISWFCdgnOGED0kuFaAkASlmmO4=
+    ```
+    
+    Old keys may be deleted once all existing records have been updated to re-encrypt sensitive data. 
+    Encrypted values are prefixed with key names, allowing DB admins to identify the keys used for encryption.
 
-</div>
+[//]: # (## Default permissions)
 
-Old keys may be deleted once all existing records were updated to re-encrypt sensitive data.
-Encrypted values are prefixed with key names so that DB admins can identify keys used for encryption.
+[//]: # (`dstack` supports changing default permissions. For example, by default all users)
+[//]: # (can create and manage their own projects. You can specify `default_permissions`)
+[//]: # (so that only global admins can create and manage projects:)
 
-??? info "Supported encryption keys"
-    Currently, `dstack` supports only `aes` and `identity` (plaintext) encryption keys.
-    There are plans to support external encryption providers including HashiCorp Vault and AWS KMS.
+[//]: # (<div editor-title="~/.dstack/server/config.yml">)
 
-### `aes`
+[//]: # (```yaml)
+[//]: # (default_permissions:)
+[//]: # (  allow_non_admins_create_projects: false)
+[//]: # (```)
 
-The `aes` encryption key encrypts data using [AES-256](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) in GCM mode.
-To configure the `aes` encryption, generate a random 32-byte key:
-
-```shell
-$ head -c 32 /dev/urandom | base64
-
-opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
-```
-
-And specify it as `secret`:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-encryption:
-  keys:
-  - type: aes
-    name: key1
-    secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
-projects: ...
-```
-
-</div>
-
-### `identity`
-
-The `identity` encryption performs no encryption and stores data in plaintext.
-You can specify an `identity` encryption key explicitly if you want to decrypt the data:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-encryption:
-  keys:
-  - type: identity
-  - type: aes
-    name: key1
-    secret: opmx+r5xGJNVZeErnR0+n+ElF9ajzde37uggELxL
-projects: ...
-```
-
-</div>
-
-With this configuration, the `aes` key will still be used to decrypt the old data,
-but new writes will store the data in plaintext.
-
-## Default permissions
-
-`dstack` supports changing default permissions. For example, by default all users
-can create and manage their own projects. You can specify `default_permissions`
-so that only global admins can create and manage projects:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-default_permissions:
-  allow_non_admins_create_projects: false
-projects: ...
-```
-
-</div>
+[//]: # (</div>)
 
 See the [reference table](#default-permissions) for all configurable permissions.
 
