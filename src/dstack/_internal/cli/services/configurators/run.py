@@ -175,7 +175,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                     exit(1)
         except KeyboardInterrupt:
             try:
-                if not confirm_ask("\nStop the run before detaching?"):
+                if not confirm_ask(f"\nStop the run [code]{run.name}[/] before detaching?"):
                     console.print("Detached")
                     abort_at_exit = False
                     return
