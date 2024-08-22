@@ -7,7 +7,6 @@ python: "3.11"
 # Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
-
 # Commands of the task
 commands:
   - git clone https://github.com/huggingface/optimum-tpu.git
@@ -18,8 +17,6 @@ commands:
   - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
   - pip install trl peft
   - python examples/custom/train.py examples/custom/config.yaml
-
-
 ports:
   - 6006
 

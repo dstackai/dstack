@@ -1,93 +1,67 @@
 # TPU
 
-Examples below show how to deploy and fine-tune LLM models on TPU [v5e](https://cloud.google.com/tpu/docs/v5e) using [Hugging Face Optimum TPU](https://github.com/huggingface/optimum-tpu) with `dstack`. 
+If you're using the `gcp` backend, you can use TPUs. Just specify the TPU version and the number of cores 
+(separated by a dash), in the `gpu` property under `resources`. 
 
+> Currently, only 8 TPU cores can be specified, so the supported values are `v2-8`, `v3-8`, `v4-8`, `v5litepod-8`, 
+> and `v5e-8`. Multi-host TPU support, allowing for larger numbers of cores, is coming soon.
+
+Below are a few examples on using TPUs for deployment and fine-tuning.
 
 ## Deployment
 
-### Running as a task
+### Running as a service
 
-If you'd like to run Llama 3.1-8B for development purposes, consider using `dstack` tasks. 
-Here, we use `optimum-tpu`, which utilizes the `TGI` framework to serve the model. 
+ Here's an example of a [service](https://dstack.ai/docs/services) that deploys
+ Llama 3.1 8B using [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}.
 
-=== "optimum-tpu"
+<div editor-title="examples/deployment/optimum-tpu/service.dstack.yml"> 
 
-    <div editor-title="examples/deployment/optimum-tpu/task.dstack.yml"> 
+```yaml
+type: service
+name: llama31-service-optimum-tpu
 
-    ```yaml
-      type: task
-      name: tpu-task
-      # This task runs Meta-Llama-3.1-8B with TGI
-      # Refer to Note section in README.md for more information about the image.
-      image: sjbbihan/optimum-tpu:latest
-      env:
-        - HUGGING_FACE_HUB_TOKEN
-        - MODEL_ID=meta-llama/Meta-Llama-3.1-8B
-      commands:
-        - text-generation-launcher --port 8000 --max-concurrent-requests 4 --max-input-tokens 128 --max-total-tokens 150 --max-batch-prefill-tokens 128
-      ports:
-        - 8000
+# Using a custom Docker image; pending on https://github.com/huggingface/optimum-tpu/pull/85
+image: sjbbihan/optimum-tpu:latest
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B
+  - MAX_CONCURRENT_REQUESTS=4
+  - MAX_INPUT_TOKENS=128
+  - MAX_TOTAL_TOKENS=150
+  - MAX_BATCH_PREFILL_TOKENS=128
+commands:
+  - text-generation-launcher --port 8000
+port: 8000
 
-      resources:
-        gpu: v5litepod-8
-    ```
-    </div>
+resources:
+  gpu: v5litepod-8
 
-**Note:** The official Docker image `huggingface/optimum-tpu:latest` currently does not support the deploying Llama 3.1-8B. 
-To address this, we have forked the optimum-tpu repository and built a custom Docker image `sjbbihan/optimum-tpu:latest` that includes the necessary updates 
-for Llama 3.1-8B deployment. We have raised a [pull request](https://github.com/huggingface/optimum-tpu/pull/85) to officially incorporate these changes. 
-Once it is merged, the official Docker image will be updated accordingly.
+spot_policy: auto
+
+model:
+  format: tgi
+  type: chat
+  name: meta-llama/Meta-Llama-3.1-8B
+```
+</div>
+
+??? info "Docker image"
+    The official Docker image `huggingface/optimum-tpu:latest` doesn’t support Llama 3.1-8B. 
+    We’ve created a custom image with the fix: `sjbbihan/optimum-tpu:latest`. 
+    Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/85){:target="_blank"} is merged, 
+    the official Docker image can be used.
 
 ### Running a configuration
 
-To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/reference/cli/index.md#dstack-apply) command.
+Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
+cloud resources and run the configuration.
 
-<div class="termy">
+## Fine-tuning
 
-```shell
-$ HUGGING_FACE_HUB_TOKEN=...
-
-$ dstack apply -f examples/deployment/optimum-tpu/task.dstack.yml
-
-#  BACKEND  REGION       INSTANCE     RESOURCES                      SPOT  PRICE   
- 1  gcp      us-central1  v5litepod-8  1xv5litepod-8, 100.0GB (disk)  yes   $4.8    
- 2  gcp      us-east5     v5litepod-8  1xv5litepod-8, 100.0GB (disk)  yes   $4.8    
- 3  gcp      us-south1    v5litepod-8  1xv5litepod-8, 100.0GB (disk)  yes   $4.8    
-    ...                                                                             
- Shown 3 of 12 offers, $12.48 max
-
-Submit the run llama31-task-optimum-tpu? [y/n]: 
-
-Provisioning...
----> 100%
-```
-
-</div>
-
-If you run a task, `dstack apply` automatically forwards the remote ports to `localhost` for convenient access.
-
-<div class="termy">
-
-```shell
-$ curl localhost:8000/generate \
-    -X POST \
-    -d '{"inputs":"What is Deep Learning?","parameters":{"max_new_tokens":20}}' \
-    -H 'Content-Type: application/json'
-```
-
-</div>
-
-
-### Deploying as a service
-
-If you'd like to deploy Llama 3.1-8B as public auto-scalable and secure endpoint,
-consider using `dstack` [services](https://dstack.ai/docs/services).
-
-
-## Fine-Tuning
-
-Below is an example of fine-tuning Llama 3.1-8B on the
-[English Quotes Dataset](https://huggingface.co/datasets/Abirate/english_quotes):
+Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"} 
+and the [Abirate/english_quotes :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/Abirate/english_quotes){:target="_blank"}
+dataset.
 
 <div editor-title="examples/fine-tuning/optimum-tpu/llama31/train.dstack.yml"> 
 
@@ -99,8 +73,6 @@ python: "3.11"
 
 env:
   - HUGGING_FACE_HUB_TOKEN
-
-# Refer to Note section in README.md for more information about the optimum-tpu repository.
 commands:
   - git clone https://github.com/Bihan/optimum-tpu.git
   - mkdir -p optimum-tpu/examples/custom/
@@ -111,8 +83,6 @@ commands:
   - pip install datasets evaluate
   - pip install accelerate -U
   - python examples/custom/train.py examples/custom/config.yaml
-
-
 ports:
   - 6006
 
@@ -121,11 +91,9 @@ resources:
 ```
 
 </div>
- 
 
-### Fine-Tuning with TRL
-
-Use the example `examples/fine-tuning/optimum-tpu/gemma/train.dstack.yml` to Finetune `Gemma-2B` model using `trl` with `dstack` and `optimum-tpu`. 
+[//]: # (### Fine-Tuning with TRL)
+[//]: # (Use the example `examples/fine-tuning/optimum-tpu/gemma/train.dstack.yml` to Finetune `Gemma-2B` model using `trl` with `dstack` and `optimum-tpu`. )
 
 ## Dev environments
 
@@ -136,17 +104,18 @@ allow you to run commands interactively.
 ## Source code
 
 The source-code of this example can be found in 
-[examples/deployment/optimum-tpu](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31)
-and [examples/fine-tuning/optimum-tpu](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl).
+[examples/deployment/optimum-tpu :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31){:target="_blank"}
+and [examples/fine-tuning/optimum-tpu :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl){:target="_blank"}.
 
 ## Contributing
 
 Find a mistake or can't find an important example? 
-Raise an [issue](https://github.com/dstackai/dstack/issues) or send a [pull request](https://github.com/dstackai/dstack/tree/master/examples).
+Raise an [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_blank"}
+or send a [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}.
 
 ## What's next?
 
-1. Browse [Optimum-TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/tree/main),
-   [Optimum-TPU Text Generation Inference :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/tree/main/text-generation-inference).
+1. Browse [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu) and
+   [Optimum TPU TGI :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/tree/main/text-generation-inference).
 2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).

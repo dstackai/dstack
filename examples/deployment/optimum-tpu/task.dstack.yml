@@ -1,20 +1,25 @@
 type: task
+# The name is optional, if not specified, generated randomly
 name: llama31-task-optimum-tpu
-# This task runs Meta-Llama-3.1-8B with TGI
-# Refer to Note section in examples/gpus/tpu/README.md for more information about the image.
-image: sjbbihan/optimum-tpu:latest
 
+# Using a Docker image with a fix instead of the official one
+# More details at https://github.com/huggingface/optimum-tpu/pull/85
+image: sjbbihan/optimum-tpu:latest
 # Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
   - MODEL_ID=meta-llama/Meta-Llama-3.1-8B
+  - MAX_CONCURRENT_REQUESTS=4
+  - MAX_INPUT_TOKENS=128
+  - MAX_TOTAL_TOKENS=150
+  - MAX_BATCH_PREFILL_TOKENS=128
 commands:
-  - text-generation-launcher --port 8000 --max-concurrent-requests 4 --max-input-tokens 128 --max-total-tokens 150 --max-batch-prefill-tokens 128
-
+  - text-generation-launcher --port 8000
 ports: [8000]
+
+resources:
+  # Required resources
+  gpu: v5litepod-8
 
 # Use either spot or on-demand instances
 spot_policy: auto
-
-resources:
-  gpu: tpu-v5litepod-8

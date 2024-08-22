@@ -8,7 +8,6 @@ python: "3.11"
 env:
   - HUGGING_FACE_HUB_TOKEN
 
-# Refer to Note section in README.md for more information about the optimum-tpu repository.
 # Commands of the task
 commands:
   - git clone https://github.com/Bihan/optimum-tpu.git
@@ -20,8 +19,6 @@ commands:
   - pip install datasets evaluate
   - pip install accelerate -U
   - python examples/custom/train.py examples/custom/config.yaml
-
-
 ports:
   - 6006
 
