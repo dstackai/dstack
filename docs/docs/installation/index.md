@@ -16,10 +16,6 @@ Follow the steps below to set up the server.
 If you want the `dstack` server to run containers or manage clusters in your cloud accounts (or use Kubernetes),
 create the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) file and configure backends.
 
-### 2. (Optional) Configure log storage
-
-By default, the server stores workloads logs on the disk. To use CloudWatch Logs, set `SERVER_CLOUDWATCH_LOG_GROUP` and optionally `SERVER_CLOUDWATCH_LOG_REGION` environment variables. The group must be created beforehead, the server won't try to create it.
-
 ### 3. Start the server
 
 Once the `~/.dstack/server/config.yml` file is configured, proceed to start the server:
@@ -59,8 +55,10 @@ Once the `~/.dstack/server/config.yml` file is configured, proceed to start the 
 
     > For more details on how to deploy `dstack` using Docker, check its [Docker repo](https://hub.docker.com/r/dstackai/dstack).
 
-By default, the `dstack` server stores its state in `~/.dstack/server/data` using SQLite.
-To use a database, set the [`DSTACK_DATABASE_URL`](../reference/cli/index.md#environment-variables) environment variable.
+By default, the `dstack` server stores its state in `~/.dstack/server/data` using SQLite, 
+while run logs are stored in `~/.dstack/server/projects<project name>/logs`.
+To store the state in a database, set the [`DSTACK_DATABASE_URL`](../reference/cli/index.md#environment-variables) environment variable.
+To store the logs in AWS CloudWatch, set the [`SERVER_CLOUDWATCH_LOG_GROUP`](../reference/cli/index.md#environment-variables) environment variable.
 
 The `dstack` server can run anywhere: on your laptop, a dedicated server, or in the cloud. Once it's up, you
 can use either the CLI or the API.
