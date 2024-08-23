@@ -188,6 +188,36 @@ class TestCloudWatchLogStorage:
         ]
 
     @pytest.mark.asyncio
+    async def test_poll_logs_response_descending(
+        self,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        poll_logs_request: PollLogsRequest,
+    ):
+        mock_client.get_log_events.return_value = {
+            "events": [
+                {"timestamp": 1696586513234, "message": "SGVsbG8="},
+                {"timestamp": 1696586513235, "message": "V29ybGQ="},
+            ]
+        }
+        poll_logs_request.descending = True
+        job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
+
+        assert job_submission_logs.logs == [
+            LogEvent(
+                timestamp=datetime(2023, 10, 6, 10, 1, 53, 235000, tzinfo=timezone.utc),
+                log_source=LogEventSource.STDOUT,
+                message="V29ybGQ=",
+            ),
+            LogEvent(
+                timestamp=datetime(2023, 10, 6, 10, 1, 53, 234000, tzinfo=timezone.utc),
+                log_source=LogEventSource.STDOUT,
+                message="SGVsbG8=",
+            ),
+        ]
+
+    @pytest.mark.asyncio
     async def test_poll_logs_request_params_asc_no_diag_no_dates(
         self,
         project: ProjectModel,
