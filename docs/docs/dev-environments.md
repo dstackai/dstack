@@ -103,7 +103,7 @@ the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly.
 
 ## Manage fleets
 
-By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](fleets.md), 
+By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](concepts/fleets.md), 
 or creates a new fleet through backends.
 
 !!! info "Idle duration"
@@ -120,7 +120,7 @@ or creates a new fleet through backends.
 
 1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and 
     [services](services.md)
-2. See [fleets](fleets.md) on how to manage fleets
+2. See [fleets](concepts/fleets.md) on how to manage fleets
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/dev-environment.md) for all the options supported by

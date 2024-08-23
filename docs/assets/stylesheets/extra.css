@@ -134,7 +134,7 @@
     margin-left: 32px;
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.highlight,.termy,.md-typeset__table,p,h4,h3,.tabbed-set):not(.admonition-title) {
+[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.highlight,.termy,.md-typeset__scrollwrap,p,h4,h3,.tabbed-set):not(.admonition-title) {
     padding-left: 32px;
 }
 

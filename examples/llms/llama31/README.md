@@ -1,28 +1,27 @@
 # Llama 3.1
 
-This example walks you through how to use Llama 3.1 for deployment and fine-tuning with `dstack`, whether in the cloud or
-on-prem.
+This example walks you through how to deploy and fine-tuning Llama 3.1 with `dstack`.
+
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
+
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    $ dstack init
+    ```
+ 
+    </div>
 
 ## Deployment
-
-### Memory requirements
-
-Below are the approximate memory requirements for loading the model. 
-This excludes memory for the model context and CUDA kernel reservations.
-
-| Model size | FP16  | FP8   | INT4  |
-|------------|-------|-------|-------|
-| **8B**     | 16GB  | 8GB   | 4GB   |
-| **70B**    | 140GB | 70GB  | 35GB  |
-| **405B**   | 810GB | 405GB | 203GB |
-
-For example, the FP16 version of Llama 3.1 405B won't fit into a single machine with eight 80GB GPUs, so we'd need at least two
-nodes.
 
 ### Running as a task
 
 If you'd like to run Llama 3.1 for development purposes, consider using `dstack` tasks. 
 You can use any serving framework, such as vLLM, TGI, or Ollama.
+Below is the configuration file for the task.
 
 === "vLLM"
 
@@ -119,6 +118,27 @@ You can use any serving framework, such as vLLM, TGI, or Ollama.
 
 Note, when using Llama 3.1 8B with a 24GB GPU, we must limit the context size to 4096 tokens to fit the memory.
 
+### Deploying as a service
+
+If you'd like to deploy Llama 3.1 as public auto-scalable and secure endpoint,
+consider using `dstack` [services](https://dstack.ai/docs/services).
+
+[//]: # (TODO: Include an example)
+
+### Memory requirements
+
+Below are the approximate memory requirements for loading the model. 
+This excludes memory for the model context and CUDA kernel reservations.
+
+| Model size | FP16  | FP8   | INT4  |
+|------------|-------|-------|-------|
+| **8B**     | 16GB  | 8GB   | 4GB   |
+| **70B**    | 140GB | 70GB  | 35GB  |
+| **405B**   | 810GB | 405GB | 203GB |
+
+For example, the FP16 version of Llama 3.1 405B won't fit into a single machine with eight 80GB GPUs, so we'd need at least two
+nodes.
+
 ### Quantization
 
 The INT4 version of Llama 3.1 70B, can fit into two 40GB GPUs.
@@ -186,33 +206,14 @@ $ curl 127.0.0.1:8001/v1/chat/completions \
 
 [//]: # (TODO: How to prompting and tool calling)
 
-### Deploying as a service
-
-If you'd like to deploy Llama 3.1 as public auto-scalable and secure endpoint,
-consider using `dstack` [services](https://dstack.ai/docs/services).
-
-[//]: # (TODO: Include an example)
-
 [//]: # (TODO: Syntetic data generation)
 
 ## Fine-tuning with TRL
 
-### Memory requirements
-
-Below are the approximate memory requirements for fine-tuning Llama 3.1.
-
-| Model size | Full fine-tuning | LoRA  | QLoRA |
-|------------|------------------|-------|-------|
-| **8B**     | 60GB             | 16GB  | 6GB   |
-| **70B**    | 500GB            | 160GB | 48GB  |
-| **405B**   | 3.25TB           | 950GB | 250GB |
-
-The requirements can be significantly reduced with certain optimizations.
-
 ### Running on multiple GPUs
 
-Below is an example for fine-tuning Llama 3.1 8B on
-OpenAssistant’s [chat dataset](https://huggingface.co/datasets/OpenAssistant/oasst_top1_2023-08-25):
+Here is the task configuration file for fine-tuning Llama 3.1 8B on the
+[`OpenAssistant/oasst_top1_2023-08-25` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/OpenAssistant/oasst_top1_2023-08-25) dataset.
 
 <div editor-title="examples/fine-tuning/trl/train.dstack.yml"> 
 
@@ -273,7 +274,19 @@ shm_size: 24GB
 
 Change the `resources` property to specify more GPUs. 
 
-#### DeepSpeed
+### Memory requirements
+
+Below are the approximate memory requirements for fine-tuning Llama 3.1.
+
+| Model size | Full fine-tuning | LoRA  | QLoRA |
+|------------|------------------|-------|-------|
+| **8B**     | 60GB             | 16GB  | 6GB   |
+| **70B**    | 500GB            | 160GB | 48GB  |
+| **405B**   | 3.25TB           | 950GB | 250GB |
+
+The requirements can be significantly reduced with certain optimizations.
+
+### DeepSpeed
 
 For more memory-efficient use of multiple GPUs, consider using DeepSpeed and ZeRO Stage 3.
 
@@ -283,6 +296,7 @@ To do this, use the `examples/accelerate_configs/deepspeed_zero3.yaml` configura
 ### Running on multiple nodes
 
 In case the model doesn't feet into a single GPU, consider running a `dstack` task on multiple nodes.
+Below is the corresponding task configuration file.
 
 <div editor-title="examples/fine-tuning/trl/train.dstack.yml"> 
 
@@ -352,36 +366,16 @@ resources:
 
 [//]: # (TODO: Find a better example for a multi-node training)
 
-## Fleets
-
-By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/fleets).
-If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
-
-Use [fleets](https://dstack.ai/docs/fleets.md) configurations to create fleets manually. This reduces startup time for dev environments,
-tasks, and services, and is very convenient if you want to reuse fleets across runs.
-
-## Dev environments
-
-Before running a task or service, it's recommended that you first start with
-a [dev environment](https://dstack.ai/docs/dev-environments). Dev environments
-allow you to run commands interactively.
-
 ## Source code
 
 The source-code of this example can be found in 
-[examples/llms/llama31](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31)
-and [examples/fine-tuning/trl](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl).
-
-## Contributing
-
-Find a mistake or can't find an important example? 
-Raise an [issue](https://github.com/dstackai/dstack/issues) or send a [pull request](https://github.com/dstackai/dstack/tree/master/examples).
+[`examples/llms/llama31` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31) and [`examples/fine-tuning/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl).
 
 ## What's next?
 
-1. Browse [Llama 3.1 on HuggingFace :material-arrow-top-right-thin:{ .external }](https://huggingface.co/collections/meta-llama/llama-31-669fc079a0c406a149a5738f), 
+1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+   [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
+2. Browse [Llama 3.1 on HuggingFace :material-arrow-top-right-thin:{ .external }](https://huggingface.co/collections/meta-llama/llama-31-669fc079a0c406a149a5738f), 
    [HuggingFace's Llama recipes :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/huggingface-llama-recipes), 
    [Meta's Llama recipes :material-arrow-top-right-thin:{ .external }](https://github.com/meta-llama/llama-recipes) 
    and [Llama Agentic System :material-arrow-top-right-thin:{ .external }](https://github.com/meta-llama/llama-agentic-system/).
-2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
-   [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).

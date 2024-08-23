@@ -115,7 +115,7 @@ out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-p
 For additional information and examples, see the following links:
 
 * [Docs](https://dstack.ai/docs)
-* [Examples](https://dstack.ai/docs/examples)
+* [Examples](https://dstack.ai#examples)
 * [Changelog](https://github.com/dstackai/dstack/releases)
 * [Discord](https://discord.gg/u8SmfwPpMd)
 

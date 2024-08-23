@@ -110,7 +110,7 @@ the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly.
 
 ## Manage fleets
 
-By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](fleets.md), 
+By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](concepts/fleets.md), 
 or creates a new fleet through backends.
 
 !!! info "Idle duration"
@@ -126,8 +126,8 @@ or creates a new fleet through backends.
 ## What's next?
 
 1. Check the [Axolotl](/docs/examples/fine-tuning/axolotl) example
-2. Browse [all examples](/docs/examples)
-3. See [fleets](fleets.md) on how to manage fleets
+2. Browse [all examples](/#examples)
+3. See [fleets](concepts/fleets.md) on how to manage fleets
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/task.md) for all the options supported by
