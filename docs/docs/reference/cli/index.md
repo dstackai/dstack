@@ -393,8 +393,8 @@ $ dstack pool delete --help
  * `DSTACK_SERVER_PORT` – (Optional) Has the same effect as `--port`. Defaults to `3000`.
  * `DSTACK_SERVER_ADMIN_TOKEN` – (Optional) Has the same effect as `--token`. Defaults to `None`.
  * `DSTACK_DATABASE_URL` – (Optional) The database URL to use instead of default SQLite. Currently `dstack` supports Postgres. Example: `postgresql+asyncpg://myuser:mypassword@localhost:5432/mydatabase`. Defaults to `None`.
- * `SERVER_CLOUDWATCH_LOG_GROUP` – (Optional) The CloudWatch Logs group for workloads logs. If not set, the default file-based log storage is used.
- * `SERVER_CLOUDWATCH_LOG_REGION` — (Optional) The CloudWatch Logs region. Defaults to `None`.
+ * `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP` – (Optional) The CloudWatch Logs group for workloads logs. If not set, the default file-based log storage is used.
+ * `DSTACK_SERVER_CLOUDWATCH_LOG_REGION` — (Optional) The CloudWatch Logs region. Defaults to `None`.
  * `DSTACK_SERVER_DIR` – (Optional) Sets path to store data and server configs. Defaults to `~/.dstack/server`.
 
 ??? info "Internal environment variables"
