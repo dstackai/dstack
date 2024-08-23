@@ -14,7 +14,7 @@ If you already use Kubernetes, `dstack` can be used with it.
 
 ## How does it work?
 
-> Before using `dstack`, [install](installation/index.md) the server and configure backends.
+> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
 #### 1. Define configurations
 
