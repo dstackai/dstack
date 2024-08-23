@@ -28,8 +28,8 @@ env:
   - MODEL_ID=meta-llama/Meta-Llama-3.1-8B
   - MAX_CONCURRENT_REQUESTS=4
   - MAX_INPUT_TOKENS=128
-  - MAX_TOTAL_TOKENS=150
-  - MAX_BATCH_PREFILL_TOKENS=128
+  - MAX_TOTAL_TOKENS=150 # should be equal to max-input-token + max_new_tokens
+  - MAX_BATCH_PREFILL_TOKENS=128 # should be equal to max-input-tokens
 commands:
   - text-generation-launcher --port 8000
 port: 8000
