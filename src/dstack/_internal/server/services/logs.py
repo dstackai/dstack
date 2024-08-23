@@ -189,11 +189,12 @@ class CloudWatchLogStorage(LogStorage):
             return False
 
     def _check_group_exists(self, name: str) -> None:
-        response = self._client.describe_log_groups(logGroupNamePrefix=name)
-        for group in response["logGroups"]:
-            if group["logGroupName"] == name:
-                return
-        raise LogStorageError(f"LogGroup '{name}' does not exist")
+        try:
+            self._client.describe_log_streams(logGroupName=name, limit=1)
+        except botocore.exceptions.ClientError as e:
+            if self._is_resource_not_found_exception(e):
+                raise LogStorageError(f"LogGroup '{name}' does not exist")
+            raise
 
     def _ensure_stream_exists(self, name: str, *, force: bool = False) -> None:
         if not force and name in self._streams:

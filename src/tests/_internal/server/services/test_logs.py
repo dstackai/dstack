@@ -60,7 +60,6 @@ class TestCloudWatchLogStorage:
     def mock_client(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
         mock = Mock()
         monkeypatch.setattr("boto3.Session.client", Mock(return_value=mock))
-        mock.describe_log_groups.return_value = {"logGroups": [{"logGroupName": "test-group"}]}
         mock.get_log_events.return_value = {"events": []}
         return mock
 
@@ -92,21 +91,19 @@ class TestCloudWatchLogStorage:
             CloudWatchLogStorage(group="test-group")
 
     def test_init_error_client_request_error(self, mock_client: Mock):
-        mock_client.describe_log_groups.side_effect = botocore.exceptions.ClientError({}, "name")
+        mock_client.describe_log_streams.side_effect = botocore.exceptions.ClientError({}, "name")
         with pytest.raises(LogStorageError, match="ClientError"):
             CloudWatchLogStorage(group="test-group")
 
     def test_init_error_group_not_found(self, mock_client: Mock):
-        mock_client.describe_log_groups.return_value = {
-            "logGroups": [
-                {"logGroupName": "test-group-1"},
-                {"logGroupName": "test-group-2"},
-            ]
-        }
+        mock_client.describe_log_streams.side_effect = botocore.exceptions.ClientError(
+            {"Error": {"Code": "ResourceNotFoundException"}}, "op_name"
+        )
         with pytest.raises(LogStorageError, match=r"'test-group' does not exist"):
             CloudWatchLogStorage(group="test-group")
 
     def test_ensure_stream_exists_new(self, log_storage: CloudWatchLogStorage, mock_client: Mock):
+        mock_client.describe_log_streams.reset_mock()
         mock_client.describe_log_streams.return_value = {
             "logStreams": [{"logStreamName": "test-stream-1"}]
         }
@@ -123,6 +120,7 @@ class TestCloudWatchLogStorage:
     def test_ensure_stream_exists_existing(
         self, log_storage: CloudWatchLogStorage, mock_client: Mock
     ):
+        mock_client.describe_log_streams.reset_mock()
         mock_client.describe_log_streams.return_value = {
             "logStreams": [{"logStreamName": "test-stream"}]
         }
@@ -137,6 +135,7 @@ class TestCloudWatchLogStorage:
     def test_ensure_stream_exists_cached(
         self, log_storage: CloudWatchLogStorage, mock_client: Mock
     ):
+        mock_client.describe_log_streams.reset_mock()
         log_storage._streams.add("test-stream")
         log_storage._ensure_stream_exists("test-stream")
 
@@ -146,6 +145,7 @@ class TestCloudWatchLogStorage:
     def test_ensure_stream_exists_cached_forced(
         self, log_storage: CloudWatchLogStorage, mock_client: Mock
     ):
+        mock_client.describe_log_streams.reset_mock()
         mock_client.describe_log_streams.return_value = {"logStreams": []}
         log_storage._streams.add("test-stream")
         log_storage._ensure_stream_exists("test-stream", force=True)
