@@ -89,9 +89,11 @@ class CloudWatchLogStorage(LogStorage):
         }
         if request.start_time:
             # XXX: Since callers use start_time/end_time for pagination, one millisecond is added
-            # to avoid an infinite loop, that is, the time range is (start_time, end_time]
+            # to avoid an infinite loop because startTime boundary is inclusive.
             parameters["startTime"] = _datetime_to_unix_time_ms(request.start_time) + 1
         if request.end_time:
+            # No need to substract one millisecond in this case, though, seems that endTime is
+            # exclusive, that is, time interval boundaries are [startTime, entTime)
             parameters["endTime"] = _datetime_to_unix_time_ms(request.end_time)
         cw_events: List[_CloudWatchLogEvent]
         with self._wrap_boto_errors():
@@ -103,13 +105,20 @@ class CloudWatchLogStorage(LogStorage):
                     raise
                 logger.debug("Stream %s not found, returning dummy response", stream)
                 cw_events = []
+        cw_events_iter: Iterator[_CloudWatchLogEvent]
+        if request.descending:
+            # Regardless of the startFromHead value log events are arranged in chronological order,
+            # from earliest to latest.
+            cw_events_iter = reversed(cw_events)
+        else:
+            cw_events_iter = iter(cw_events)
         logs = [
             LogEvent(
                 timestamp=_unix_time_ms_to_datetime(cw_event["timestamp"]),
                 log_source=LogEventSource.STDOUT,
                 message=cw_event["message"],
             )
-            for cw_event in cw_events
+            for cw_event in cw_events_iter
         ]
         return JobSubmissionLogs(logs=logs)
 
