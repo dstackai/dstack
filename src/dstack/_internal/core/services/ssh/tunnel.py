@@ -4,12 +4,14 @@ import subprocess
 import tempfile
 from typing import Dict, Optional
 
+from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
 
 logger = get_logger(__name__)
+SSH_TIMEOUT = 15
 
 
 class SSHTunnel:
@@ -64,7 +66,14 @@ class SSHTunnel:
         # Using stderr=subprocess.PIPE may block subprocess.run.
         # Redirect stderr to file to get ssh error message
         with tempfile.NamedTemporaryFile(delete=False) as f:
-            r = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=f)
+            try:
+                r = subprocess.run(
+                    command, stdout=subprocess.DEVNULL, stderr=f, timeout=SSH_TIMEOUT
+                )
+            except subprocess.TimeoutExpired as e:
+                msg = f"SSH tunnel to {self.host} did not open in {SSH_TIMEOUT} seconds"
+                logger.debug(msg)
+                raise SSHError(msg) from e
         with open(f.name, "r+b") as f:
             error = f.read()
         os.remove(f.name)
@@ -154,7 +163,7 @@ class RunnerTunnel(SSHTunnel):
 
 class ClientTunnel(SSHTunnel):
     """
-    CLITunnel connects to the host from ssh config
+    ClientTunnel connects to the host from ssh config
     """
 
     def __init__(
