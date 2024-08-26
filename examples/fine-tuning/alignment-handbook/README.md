@@ -1,22 +1,20 @@
-# Fine-tuning with Alignment Handbook
+# Alignment Handbook
 
-[Alignment Handbook](https://github.com/huggingface/alignment-handbook) by HuggingFace offers recipes, configs, and
-scripts for fine-tuning LLMs. It includes all the code needed to run CPT, SFT, DPO, and ORPO leveraging HuggingFace's
-libraries like `transformers`, `peft`, `accelerate`, and `trl`. You just need to modify the recipes and run the 
-appropriate script.
+This example shows how use [Alignment Handbook :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/alignment-handbook){:target="_blank"} with `dstack` to 
+fine-tune Gemma 7B on your SFT dataset using one node or multiple nodes. 
 
-> This example shows how use Alignment Handbook with `dstack` to fine-tune Gemma 7B on your 
-> SFT dataset using one node or multiple nodes. 
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
 
-## Prerequisites
-
-Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo and run `dstack init`:
-
-```shell
-git clone https://github.com/dstackai/dstack
-cd dstack
-dstack init
-```
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    $ dstack init
+    ```
+ 
+    </div>
 
 ## Training configuration recipe
 
@@ -25,13 +23,15 @@ as trainer configuration from a YAML file.
 This file can be found at [`examples/fine-tuning/alignment-handbook/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml).
 You can modify it as needed.
 
-> Before you proceed with training, make sure to update the `hub_model_id` in [`examples/fine-tuning/alignment-handbook/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml)
+> Before you proceed with training, make sure to update the `hub_model_id` in
+> [`examples/fine-tuning/alignment-handbook/config.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml){:target="_blank"}
 > with your HuggingFace username.
 
 ## Single-node training
 
 The easiest way to run a training script with `dstack` is by creating a task configuration file.
-This file can be found at [`examples/fine-tuning/alignment-handbook/train.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/train.dstack.yml). Below is its content: 
+This file can be found at [`examples/fine-tuning/alignment-handbook/train.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/train.dstack.yml){:target="_blank"}. 
+Below is its content: 
 
 ```yaml
 type: task
@@ -76,12 +76,16 @@ according to the `resoruce` property.
 
 To run the task, use `dstack apply`:
 
-```shell
-HUGGING_FACE_HUB_TOKEN=...
-WANDB_API_KEY=...
+<div class="termy">
 
-dstack apply -f examples/fine-tuning/alignment-handbook/train.dstack.yml
+```shell
+$ HUGGING_FACE_HUB_TOKEN=...
+$ WANDB_API_KEY=...
+
+$ dstack apply -f examples/fine-tuning/alignment-handbook/train.dstack.yml
 ```
+
+</div>
 
 If you list `tensorbord` via `report_to` in [`examples/fine-tuning/alignment-handbook/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml),
 you'll be able to access experiment metrics via `http://localhost:6006` (while the task is running).
@@ -157,9 +161,13 @@ You can update the fleet configurations to change the vRAM size, GPU model, numb
 
 A fleet can be provisioned with `dstack apply`:
 
+<div class="termy">
+
 ```shell
-dstack apply -f examples/fine-tuning/alignment-handbook/fleet.dstack.yml
+$ dstack apply -f examples/fine-tuning/alignment-handbook/fleet.dstack.yml
 ```
+
+</div>
 
 Once provisioned, the fleet can run dev environments and fine-tuning tasks.
 To delete the fleet, use `dstack fleet delete`.
@@ -171,23 +179,23 @@ The default policy is `reuse_or_create`.
 ## Dev environment
 
 If you'd like to play with the example using a dev environment, run
-[.dstack.yml](https://github.com/dstackai/dstack/examples/fine-tuning/alignment-handbook/.dstack.yml) via `dstack apply`:
+[`.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/examples/fine-tuning/alignment-handbook/.dstack.yml){:target="_blank"} via `dstack apply`:
+
+<div class="termy">
 
 ```shell
 dstack apply -f examples/fine-tuning/alignment-handbook/.dstack.yaml 
 ```
 
+</div>
+
 ## Source code
 
-The source-code of this example can be found in [examples/fine-tuning/alignment-handbook](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook).
-
-## Contributing
-
-Find a mistake or can't find an important example? Raise an [issue](https://github.com/dstackai/dstack/issues) or send a [pull request](https://github.com/dstackai/dstack/tree/master/examples)!
+The source-code of this example can be found in [`examples/fine-tuning/alignment-handbook` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook){:target="_blank"}.
 
 ## What's next?
 
-1. Browse [Alignment Handbook](https://github.com/huggingface/alignment-handbook).
-2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks),
    [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).
-3. See other [examples](https://github.com/dstackai/dstack/blob/master/examples/).
+2. Browse [Alignment Handbook :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/alignment-handbook){:target="_blank"}.
+3. See other [examples](/examples).

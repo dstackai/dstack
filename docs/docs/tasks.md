@@ -126,7 +126,7 @@ or creates a new fleet through backends.
 ## What's next?
 
 1. Check the [Axolotl](/docs/examples/fine-tuning/axolotl) example
-2. Browse [all examples](/#examples)
+2. Browse [all examples](/examples)
 3. See [fleets](concepts/fleets.md) on how to manage fleets
 
 !!! info "Reference"

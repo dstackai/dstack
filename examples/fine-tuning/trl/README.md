@@ -1,4 +1,4 @@
-# Fine-tuning with TRL
+# TRL
 
 This example walks you through how to fine-tune Llama 3.1 with `dstack`, whether in the cloud or
 on-prem.
@@ -17,8 +17,9 @@ The requirements can be significantly reduced with certain optimizations.
 
 ## Running on multiple GPUs
 
-Below is an example for fine-tuning Llama 3.1 8B on
-OpenAssistant’s [chat dataset](https://huggingface.co/datasets/OpenAssistant/oasst_top1_2023-08-25):
+Below is an example for fine-tuning Llama 3.1 8B using
+the [`OpenAssistant/oasst_top1_2023-08-25` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/OpenAssistant/oasst_top1_2023-08-25){:target="_blank"}
+dataset:
 
 <div editor-title="examples/fine-tuning/trl/train.dstack.yml"> 
 
@@ -175,13 +176,8 @@ allow you to run commands interactively.
 ## Source code
 
 The source-code of this example can be found in 
-[examples/llms/llama31](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31)
-and [examples/fine-tuning/trl](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl).
-
-## Contributing
-
-Find a mistake or can't find an important example? 
-Raise an [issue](https://github.com/dstackai/dstack/issues) or send a [pull request](https://github.com/dstackai/dstack/tree/master/examples).
+[`examples/llms/llama31` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31){:target="_blank"}
+and [`examples/fine-tuning/trl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl){:target="_blank"}.
 
 ## What's next?
 

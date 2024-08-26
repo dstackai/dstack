@@ -25,8 +25,8 @@ for root, dirs, files in os.walk("examples"):
             with open(src_file, "r") as f:
                 text = f.read()
             src_dir = os.path.dirname(src_file)
-            dest_dir = os.path.join("docs", src_dir)
-            dest_file = os.path.join(dest_dir, "index.md")
+            # dest_dir = os.path.join("docs", src_dir)
+            dest_file = os.path.join(src_dir, "index.md")
             dest = mkdocs_gen_files._get_file(dest_file, new=True)
             with mkdocs_gen_files.open(dest, "w") as f:
                 f.write(text)

@@ -228,7 +228,7 @@ Your folder can be a regular local folder or a Git repo.
 
 1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), 
     [services](services.md), and [fleets](concepts/fleets.md) 
-2. Browse [examples](https://dstack.ai#examples)
+2. Browse [examples](https://dstack.ai/examples)
 3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
 
 !!! info "Examples"

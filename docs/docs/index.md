@@ -40,5 +40,5 @@ out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-p
 
 1. Proceed to [installation](installation/index.md)
 2. See [quickstart](quickstart.md)
-3. Browse [examples](/#examples)
+3. Browse [examples](/examples)
 4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}
