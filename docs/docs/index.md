@@ -14,7 +14,7 @@ If you already use Kubernetes, `dstack` can be used with it.
 
 ## How does it work?
 
-> Before using `dstack`, [install](installation/index.md) the server and configure backends.
+> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
 #### 1. Define configurations
 
@@ -23,7 +23,7 @@ If you already use Kubernetes, `dstack` can be used with it.
 * [Dev environments](dev-environments.md) &mdash; for interactive development using a desktop IDE
 * [Tasks](tasks.md) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
 * [Services](services.md) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
-* [Fleets](fleets.md) &mdash; for managing cloud and on-prem clusters
+* [Fleets](concepts/fleets.md) &mdash; for managing cloud and on-prem clusters
 * [Volumes](concepts/volumes.md) &mdash; for managing persisted volumes
 * [Gateways](concepts/volumes.md) &mdash; for configuring the ingress traffic and public endpoints
 
@@ -40,5 +40,5 @@ out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-p
 
 1. Proceed to [installation](installation/index.md)
 2. See [quickstart](quickstart.md)
-3. Browse [examples](/docs/examples)
+3. Browse [examples](/examples)
 4. Join [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd){:target="_blank"}

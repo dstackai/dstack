@@ -143,7 +143,7 @@ the dev environment is stopped. Use `--abort` or `-x` to stop the run abruptly.
 
 ## Manage fleets
 
-By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](fleets.md), 
+By default, `dstack apply` reuses `idle` instances from one of the existing [fleets](concepts/fleets.md), 
 or creates a new fleet through backends.
 
 !!! info "Idle duration"
@@ -160,8 +160,8 @@ or creates a new fleet through backends.
 
 1. Check the [TGI :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/tgi/README.md){:target="_blank"} and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/vllm/README.md){:target="_blank"} examples
 2. See [gateways](concepts/gateways.md) on how to set up a gateway
-3. Browse [examples](/docs/examples)
-4. See [fleets](fleets.md) on how to manage fleets
+3. Browse [examples](/examples)
+4. See [fleets](concepts/fleets.md) on how to manage fleets
 
 !!! info "Reference"
     See [.dstack.yml](reference/dstack.yml/service.md) for all the options supported by

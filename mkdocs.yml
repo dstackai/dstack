@@ -112,7 +112,10 @@ plugins:
         'docs/concepts/dev-environments.md': 'docs/dev-environments.md'
         'docs/concepts/tasks.md': 'docs/tasks.md'
         'docs/concepts/services.md': 'docs/services.md'
-        'docs/protips.md': 'docs/guides/protips.md'
+        'docs/fleets.md': 'docs/concepts/fleets.md'
+        'docs/examples/index.md': 'examples/index.md'
+        'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
+        'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
   - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
@@ -199,16 +202,13 @@ nav:
           - Dev environments: docs/dev-environments.md
           - Tasks: docs/tasks.md
           - Services: docs/services.md
-          - Fleets: docs/fleets.md
-      - Learn:
-          - Concepts:
-              - Gateways: docs/concepts/gateways.md
-              - Volumes: docs/concepts/volumes.md
-              - Projects: docs/concepts/projects.md
-          - Guides:
-              - Protips: docs/guides/protips.md
-              - dstack Sky: docs/guides/dstack-sky.md
-          - Examples: docs/examples
+      - Concepts:
+          - Fleets: docs/concepts/fleets.md
+          - Gateways: docs/concepts/gateways.md
+          - Volumes: docs/concepts/volumes.md
+          - Projects: docs/concepts/projects.md
+      - Guides:
+          - Protips: docs/guides/protips.md
       - Reference:
           - server/config.yml: docs/reference/server/config.yml.md
           - .dstack.yml:
@@ -218,24 +218,24 @@ nav:
               - fleet: docs/reference/dstack.yml/fleet.md
               - gateway: docs/reference/dstack.yml/gateway.md
               - volume: docs/reference/dstack.yml/volume.md
-          - profiles.yml: docs/reference/profiles.yml.md
+#          - profiles.yml: docs/reference/profiles.yml.md
           - CLI: docs/reference/cli/index.md
           - API:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
   - Examples:
-      - docs/examples/index.md
-      - LLMs:
-          - Llama 3.1: docs/examples/llms/llama31/index.md
-      - Fine-tuning:
-          - Axolotl: docs/examples/fine-tuning/axolotl/index.md
-          - Alignment Handbook: docs/examples/fine-tuning/alignment-handbook/index.md
-          - TRL: docs/examples/fine-tuning/trl/index.md
-      - Accelerators:
-          - AMD: docs/examples/accelerators/amd/index.md
-  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
+    - examples.md
+    - Fine-tuning:
+        - Axolotl: examples/fine-tuning/axolotl/index.md
+        - Alignment Handbook: examples/fine-tuning/alignment-handbook/index.md
+        - TRL: examples/fine-tuning/trl/index.md
+    - Accelerators:
+        - AMD: examples/accelerators/amd/index.md
+    - LLMs:
+        - Llama 3.1: examples/llms/llama31/index.md
   - Blog:
       - blog/index.md
+  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
   - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
   - GitHub: https://github.com/dstackai/dstack" target="_blank
   - Sign in: https://sky.dstack.ai" target="_blank

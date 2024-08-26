@@ -134,7 +134,7 @@
     margin-left: 32px;
 }
 
-[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.highlight,.termy,.md-typeset__table,p,h4,h3,.tabbed-set):not(.admonition-title) {
+[dir=ltr] .md-typeset :is(.admonition,details):not(blockquote) > :is(.highlight,.termy,.md-typeset__scrollwrap,p,h4,h3,.tabbed-set):not(.admonition-title) {
     padding-left: 32px;
 }
 
@@ -691,7 +691,7 @@ body {
 }
 
 .md-sidebar__inner {
-    margin: 0 0;
+    margin: 0 0 30px;
 }
 
 @media screen and (min-width: 76.1875em) {
@@ -1184,7 +1184,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         visibility: visible;
     }
 
-    .md-tabs__item:nth-child(4) .md-tabs__link:after, .md-tabs__item:nth-child(8) .md-tabs__link:after {
+    .md-tabs__item:nth-child(5) .md-tabs__link:after, .md-tabs__item:nth-child(8) .md-tabs__link:after {
         content: url('data:image/svg+xml,<svg fill="black" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
         line-height: 14px;
         margin-left: 4px;

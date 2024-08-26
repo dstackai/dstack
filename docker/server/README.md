@@ -100,8 +100,8 @@ _**️Note:** The use of Litestream requires that only one instance of the `dsta
 
 For additional information and examples, see the following links:
 
-* [Docs](https://dstack.ai/docs/)
-* [Examples](https://github.com/dstackai/dstack/tree/master/examples)
+* [Docs](https://dstack.ai/docs)
+* [Examples](https://dstack.ai/examples)
 * [Changelog](https://github.com/dstackai/dstack/releases)
 * [Discord](https://discord.gg/u8SmfwPpMd)
  

@@ -40,5 +40,5 @@ the [server/config.yml reference](../reference/server/config.yml.md).
 ## What's next?
 
 1. Follow [quickstart](../quickstart.md)
-2. Browse [examples :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples)
+2. Browse [examples](https://dstack.ai/examples)
 3. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

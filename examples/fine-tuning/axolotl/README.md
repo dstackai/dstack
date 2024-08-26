@@ -1,36 +1,34 @@
-# Fine-tuning with Axolotl
+# Axolotl
 
-[Axolotl](https://github.com/OpenAccess-AI-Collective/axolotl) streamlines the fine-tuning of AI models It not only
-supports multiple configurations and architectures but also provides many
-ready-to-use [recipes](https://github.com/axolotl-ai-cloud/axolotl/tree/main/examples). You just need to pick a suitable
-recipe and adjust it for your use case.
+This example shows how use [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"} 
+with `dstack` to fine-tune Llama3 8B using FSDP and QLoRA.
 
-> This example shows how use Axolotl with `dstack` to fine-tune Llama3 8B using FSDP and QLoRA
-> on one node.
+??? info "Prerequisites"
+    Once `dstack` is [installed](https://dstack.ai/docs/installation), go ahead clone the repo, and run `dstack init`.
 
-## Prerequisites
-
-Once `dstack` is [installed](https://dstack.ai/docs/installation), clone the repo and run `dstack init`:
-
-```shell
-git clone https://github.com/dstackai/dstack
-cd dstack
-dstack init
-```
+    <div class="termy">
+ 
+    ```shell
+    $ git clone https://github.com/dstackai/dstack
+    $ cd dstack
+    $ dstack init
+    ```
+ 
+    </div>
 
 ## Training configuration recipe
 
 Axolotl reads the model, LoRA, and dataset arguments, as well as trainer configuration from a YAML file. This file can
-be found at [`examples/fine-tuning/axolotl/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/config.yaml).
+be found at [`examples/fine-tuning/axolotl/config.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/config.yaml){:target="_blank"}.
 You can modify it as needed.
 
-> Before you proceed with training, make sure to update the `hub_model_id` in [`examples/fine-tuning/axolotl/config.yaml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml)
+> Before you proceed with training, make sure to update the `hub_model_id` in [`examples/fine-tuning/axolotl/config.yaml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/alignment-handbook/config.yaml){:target="_blank"}
 > with your HuggingFace username.
 
 ## Single-node training
 
 The easiest way to run a training script with `dstack` is by creating a task configuration file.
-This file can be found at [`examples/fine-tuning/axolotl/train.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/train.dstack.yml). Below is its content: 
+This file can be found at [`examples/fine-tuning/axolotl/train.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/train.dstack.yml){:target="_blank"}. Below is its content: 
 
 ```yaml
 type: task
@@ -60,12 +58,16 @@ The task uses Axolotl's Docker image, where Axolotl is already pre-installed.
 
 To run the task, use `dstack apply`:
 
-```shell
-HUGGING_FACE_HUB_TOKEN=...
-WANDB_API_KEY=...
+<div class="termy">
 
-dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
+```shell
+$ HUGGING_FACE_HUB_TOKEN=...
+$ WANDB_API_KEY=...
+
+$ dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
 ```
+
+</div>
 
 ## Fleets
 
@@ -73,16 +75,20 @@ dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
 > If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
 
 The example folder includes a fleet configuration: 
-[ `examples/fine-tuning/axolotl/fleet.dstack.yml`](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/fleet.dstack.yml) 
-( a single node with a `24GB` GPU).
+[ `examples/fine-tuning/axolotl/fleet.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/fleet.dstack.yml) {:target="_blank"}
+(a single node with a `24GB` GPU).
 
 You can update the fleet configuration to change the vRAM size, GPU model, number of GPUs per node, or number of nodes. 
 
 A fleet can be provisioned with `dstack apply`:
 
+<div class="termy">
+
 ```shell
 dstack apply -f examples/fine-tuning/axolotl/fleet.dstack.yml
 ```
+
+</div>
 
 Once provisioned, the fleet can run dev environments and fine-tuning tasks.
 To delete the fleet, use `dstack fleet delete`.
@@ -94,22 +100,23 @@ To delete the fleet, use `dstack fleet delete`.
 ## Dev environment
 
 If you'd like to play with the example using a dev environment, run
-[.dstack.yml](https://github.com/dstackai/dstack/examples/fine-tuning/axolotl/.dstack.yml) via `dstack apply`:
+[`.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/examples/fine-tuning/axolotl/.dstack.yml){:target="_blank"} via `dstack apply`:
+
+<div class="termy">
 
 ```shell
 dstack apply -f examples/fine-tuning/axolotl/.dstack.yaml 
 ```
 
+</div>
+
 ## Source code
 
-The source-code of this example can be found in  [examples/fine-tuning/axolotl](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl).
-
-## Contributing
-
-Find a mistake or can't find an important example? Raise an [issue](https://github.com/dstackai/dstack/issues) or send a [pull request](https://github.com/dstackai/dstack/tree/master/examples)!
+The source-code of this example can be found in
+[`examples/fine-tuning/axolotl` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl){:target="_blank"}.
 
 ## What's next?
 
-1. Browse [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl).
-2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).
+2. Browse [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}.
