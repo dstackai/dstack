@@ -1,13 +1,12 @@
-To run, you need to specify AWS credentials in ENV
+# Packer templates for `dstack` VM images
 
-## Build Ubuntu AMI (with CUDA)
-```shell
-packer build packer.json
-```
+This directory contains HashiCorp Packer templates for building VM images that are then used by `dstack` when running instances on some of the VM-based backends. While `dstack` uses standard OS images for some backends, backends with custom-built images have an advantage because these images are optimized for `dstack`, e.g. they contain pre-pulled `dstack` Docker images, which reduces the startup time of `dstack` jobs.
 
-# Azure
+For most backends, we build two images: one for CPU-only instances, typically published as `dstack-X.Y`, and one for NVIDIA GPU instances, typically published as `dstack-cuda-X.Y`, where `X.Y` is the image version. Some backends may have additional images, e.g. Azure has `dstack-grid-X.Y` for instances requiring NVIDIA Grid drivers.
 
-## Allocate resources (make credentials)
+The release and staging versions of the images are built automatically using GitHub Actions. If you need to build the images manually, see `.github/workflows/docker.yml` for examples of how to use the templates. Additional instructions for some backends are provided below.
+
+## Azure
 
 Follow [installation instruction](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?pivots=apt)
 for Azure CLI `az`. [Login](https://learn.microsoft.com/en-us/cli/azure/authenticate-azure-cli) for managing resources:
@@ -54,11 +53,9 @@ Set environment variables.
 | AZURE_TENANT_ID | tenant_id |
 | AZURE_SUBSCRIPTION_ID | subscription_id |
 
-# Nebius
+## Nebius
 
-## Setup Nebius credentials
-
-> `compute.admin` is not sufficient for packer. Use `admin` role instead.
+Create credentials for packer. The `compute.admin` role is not sufficient, use `admin` instead.
 
 ```shell
 ncp config profile create packer
@@ -67,7 +64,7 @@ ncp config set endpoint api.ai.nebius.cloud:443
 export PKR_VAR_nebius_token=$(ncp iam create-token)
 ```
 
-## Build images
+Then build the images.
 
 ```shell
 export PKR_VAR_nebius_folder_id=...
