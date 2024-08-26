@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 import yaml
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,7 +12,6 @@ from dstack._internal.core.backends.oci import region as oci_region
 from dstack._internal.core.errors import BackendAuthError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.main import app
 from dstack._internal.server.models import BackendModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
@@ -21,9 +20,6 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
 )
-
-client = TestClient(app)
-
 
 FAKE_OCI_CLIENT_CREDS = {
     "type": "client",
@@ -49,8 +45,9 @@ SAMPLE_OCI_SUBNETS = {
 
 
 class TestListBackendTypes:
-    def test_returns_backend_types(self):
-        response = client.post("/api/backends/list_types")
+    @pytest.mark.asyncio
+    async def test_returns_backend_types(self, client: AsyncClient):
+        response = await client.post("/api/backends/list_types")
         assert response.status_code == 200, response.json()
         assert response.json() == [
             "aws",
@@ -70,14 +67,16 @@ class TestListBackendTypes:
 
 class TestGetBackendConfigValuesAWS:
     @pytest.mark.asyncio
-    async def test_returns_initial_config(self, test_db, session: AsyncSession):
+    async def test_returns_initial_config(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {"type": "aws"}
         with patch(
             "dstack._internal.core.backends.aws.auth.default_creds_available"
         ) as default_creds_available_mock:
             default_creds_available_mock.return_value = False
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -91,7 +90,9 @@ class TestGetBackendConfigValuesAWS:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
+    async def test_returns_invalid_credentials(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "aws",
@@ -107,7 +108,7 @@ class TestGetBackendConfigValuesAWS:
             "dstack._internal.core.backends.aws.auth.authenticate"
         ) as authenticate_mock:
             authenticate_mock.side_effect = BackendAuthError()
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -131,7 +132,9 @@ class TestGetBackendConfigValuesAWS:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
+    async def test_returns_config_on_valid_creds(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "aws",
@@ -149,7 +152,7 @@ class TestGetBackendConfigValuesAWS:
             "dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"
         ):
             default_creds_available_mock.return_value = True
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -193,14 +196,16 @@ class TestGetBackendConfigValuesAWS:
 
 class TestGetBackendConfigValuesAzure:
     @pytest.mark.asyncio
-    async def test_returns_initial_config(self, test_db, session: AsyncSession):
+    async def test_returns_initial_config(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {"type": "azure"}
         with patch(
             "dstack._internal.core.backends.azure.auth.default_creds_available"
         ) as default_creds_available_mock:
             default_creds_available_mock.return_value = False
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -216,7 +221,9 @@ class TestGetBackendConfigValuesAzure:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
+    async def test_returns_invalid_credentials(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "azure",
@@ -234,7 +241,7 @@ class TestGetBackendConfigValuesAzure:
         ) as authenticate_mock:
             default_creds_available_mock.return_value = False
             authenticate_mock.side_effect = BackendAuthError()
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -286,7 +293,9 @@ class TestGetBackendConfigValuesAzure:
             },
         ],
     )
-    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession, body):
+    async def test_returns_config_on_valid_creds(
+        self, test_db, session: AsyncSession, client: AsyncClient, body
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         with patch(
             "dstack._internal.core.backends.azure.auth.default_creds_available"
@@ -305,7 +314,7 @@ class TestGetBackendConfigValuesAzure:
             subscription_mock.subscription_id = "test_subscription"
             subscription_mock.display_name = "Subscription"
             client_mock.subscriptions.list.return_value = [subscription_mock]
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -375,12 +384,14 @@ class TestGetBackendConfigValuesAzure:
 
 class TestGetBackendConfigValuesGCP:
     @pytest.mark.asyncio
-    async def test_returns_initial_config(self, test_db, session: AsyncSession):
+    async def test_returns_initial_config(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {"type": "gcp"}
         with patch("dstack._internal.core.backends.gcp.auth.default_creds_available") as m:
             m.return_value = True
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -394,7 +405,9 @@ class TestGetBackendConfigValuesGCP:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
+    async def test_returns_invalid_credentials(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "gcp",
@@ -411,7 +424,7 @@ class TestGetBackendConfigValuesGCP:
         ) as authenticate_mock:
             default_creds_available_mock.return_value = False
             authenticate_mock.side_effect = BackendAuthError()
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -429,7 +442,9 @@ class TestGetBackendConfigValuesGCP:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
+    async def test_returns_config_on_valid_creds(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "gcp",
@@ -449,7 +464,7 @@ class TestGetBackendConfigValuesGCP:
         ) as check_vpc_mock:
             default_creds_available_mock.return_value = False
             authenticate_mock.return_value = {}, "test_project"
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -556,10 +571,12 @@ class TestGetBackendConfigValuesGCP:
 
 class TestGetBackendConfigValuesLambda:
     @pytest.mark.asyncio
-    async def test_returns_initial_config(self, test_db, session: AsyncSession):
+    async def test_returns_initial_config(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {"type": "lambda"}
-        response = client.post(
+        response = await client.post(
             "/api/backends/config_values",
             headers=get_auth_headers(user.token),
             json=body,
@@ -571,7 +588,9 @@ class TestGetBackendConfigValuesLambda:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
+    async def test_returns_invalid_credentials(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "lambda",
@@ -582,7 +601,7 @@ class TestGetBackendConfigValuesLambda:
         }
         with patch("dstack._internal.core.backends.lambdalabs.api_client.LambdaAPIClient") as m:
             m.return_value.validate_api_key.return_value = False
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -600,7 +619,9 @@ class TestGetBackendConfigValuesLambda:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
+    async def test_returns_config_on_valid_creds(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "lambda",
@@ -611,7 +632,7 @@ class TestGetBackendConfigValuesLambda:
         }
         with patch("dstack._internal.core.backends.lambdalabs.api_client.LambdaAPIClient") as m:
             m.return_value.validate_api_key.return_value = True
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -645,14 +666,16 @@ class TestGetBackendConfigValuesLambda:
 
 class TestGetBackendConfigValuesOCI:
     @pytest.mark.asyncio
-    async def test_returns_initial_config(self, test_db, session: AsyncSession):
+    async def test_returns_initial_config(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {"type": "oci"}
         with patch(
             "dstack._internal.core.backends.oci.auth.default_creds_available"
         ) as default_creds_available_mock:
             default_creds_available_mock.return_value = False
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -667,7 +690,9 @@ class TestGetBackendConfigValuesOCI:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_invalid_credentials(self, test_db, session: AsyncSession):
+    async def test_returns_invalid_credentials(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "oci",
@@ -676,7 +701,7 @@ class TestGetBackendConfigValuesOCI:
         with patch(
             "dstack._internal.core.backends.oci.auth.default_creds_available"
         ) as default_creds_available_mock:
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -688,7 +713,9 @@ class TestGetBackendConfigValuesOCI:
         assert error["msg"].startswith("Invalid credentials")
 
     @pytest.mark.asyncio
-    async def test_returns_config_on_valid_creds(self, test_db, session: AsyncSession):
+    async def test_returns_config_on_valid_creds(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         body = {
             "type": "oci",
@@ -701,7 +728,7 @@ class TestGetBackendConfigValuesOCI:
         ) as get_regions_mock:
             default_creds_available_mock.return_value = True
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
-            response = client.post(
+            response = await client.post(
                 "/api/backends/config_values",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -728,13 +755,15 @@ class TestGetBackendConfigValuesOCI:
 
 class TestCreateBackend:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+    async def test_returns_403_if_not_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/create",
             headers=get_auth_headers(user.token),
             json={},
@@ -742,7 +771,7 @@ class TestCreateBackend:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_creates_aws_backend(self, test_db, session: AsyncSession):
+    async def test_creates_aws_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -763,7 +792,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.authenticate"
         ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -773,7 +802,7 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
-    async def test_creates_gcp_backend(self, test_db, session: AsyncSession):
+    async def test_creates_gcp_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -799,7 +828,7 @@ class TestCreateBackend:
             default_creds_available_mock.return_value = False
             credentials_mock = Mock()
             authenticate_mock.return_value = credentials_mock, "test_project"
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -810,7 +839,9 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
-    async def test_creates_lambda_backend(self, test_db, session: AsyncSession):
+    async def test_creates_lambda_backend(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -826,7 +857,7 @@ class TestCreateBackend:
         }
         with patch("dstack._internal.core.backends.lambdalabs.api_client.LambdaAPIClient") as m:
             m.return_value.validate_api_key.return_value = True
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -837,7 +868,7 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
-    async def test_creates_oci_backend(self, test_db, session: AsyncSession):
+    async def test_creates_oci_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -857,7 +888,7 @@ class TestCreateBackend:
             default_creds_available_mock.return_value = False
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
             create_resources_mock.return_value = SAMPLE_OCI_COMPARTMENT_ID, SAMPLE_OCI_SUBNETS
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -868,7 +899,7 @@ class TestCreateBackend:
 
     @pytest.mark.asyncio
     async def test_not_creates_oci_backend_if_regions_not_subscribed(
-        self, test_db, session: AsyncSession
+        self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -888,7 +919,7 @@ class TestCreateBackend:
             default_creds_available_mock.return_value = False
             # us-ashburn-1 not subscribed
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -898,7 +929,7 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 0
 
     @pytest.mark.asyncio
-    async def test_create_azure_backend(self, test_db, session: AsyncSession):
+    async def test_create_azure_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -940,7 +971,7 @@ class TestCreateBackend:
             resource_client_mock.resource_groups.create_or_update.return_value = (
                 resource_group_mock
             )
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -954,7 +985,9 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_backend_exists(self, test_db, session: AsyncSession):
+    async def test_returns_400_if_backend_exists(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -975,7 +1008,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.authenticate"
         ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -989,7 +1022,7 @@ class TestCreateBackend:
             "dstack._internal.core.backends.aws.auth.authenticate"
         ) as authenticate_mock:  # noqa: F841
             default_creds_available_mock.return_value = False
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -1001,13 +1034,15 @@ class TestCreateBackend:
 
 class TestUpdateBackend:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+    async def test_returns_403_if_not_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/update",
             headers=get_auth_headers(user.token),
             json={},
@@ -1015,7 +1050,7 @@ class TestUpdateBackend:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_updates_backend(self, test_db, session: AsyncSession):
+    async def test_updates_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -1039,7 +1074,7 @@ class TestUpdateBackend:
             "dstack._internal.core.backends.aws.auth.authenticate"
         ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/update",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -1049,7 +1084,9 @@ class TestUpdateBackend:
         assert json.loads(backend.config)["regions"] == ["us-east-1"]
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_backend_does_not_exist(self, test_db, session: AsyncSession):
+    async def test_returns_400_if_backend_does_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -1064,7 +1101,7 @@ class TestUpdateBackend:
             },
             "regions": ["us-east-1"],
         }
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/update",
             headers=get_auth_headers(user.token),
             json=body,
@@ -1074,27 +1111,29 @@ class TestUpdateBackend:
 
 class TestDeleteBackends:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+    async def test_returns_403_if_not_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/delete",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_deletes_backends(self, test_db, session: AsyncSession):
+    async def test_deletes_backends(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         backend = await create_backend(session=session, project_id=project.id)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/delete",
             headers=get_auth_headers(user.token),
             json={"backends_names": [backend.type.value]},
@@ -1106,28 +1145,30 @@ class TestDeleteBackends:
 
 class TestGetConfigInfo:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+    async def test_returns_403_if_not_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         backend = await create_backend(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/{backend.type.value}/config_info",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_returns_config_info(self, test_db, session: AsyncSession):
+    async def test_returns_config_info(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         backend = await create_backend(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/{backend.type.value}/config_info",
             headers=get_auth_headers(user.token),
         )
@@ -1145,13 +1186,15 @@ class TestGetConfigInfo:
 
 class TestCreateBackendYAML:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+    async def test_returns_403_if_not_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/create_yaml",
             headers=get_auth_headers(user.token),
             json={},
@@ -1159,7 +1202,7 @@ class TestCreateBackendYAML:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_creates_aws_backend(self, test_db, session: AsyncSession):
+    async def test_creates_aws_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -1181,7 +1224,7 @@ class TestCreateBackendYAML:
             "dstack._internal.core.backends.aws.auth.authenticate"
         ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create_yaml",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -1191,7 +1234,7 @@ class TestCreateBackendYAML:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
-    async def test_creates_oci_backend(self, test_db, session: AsyncSession):
+    async def test_creates_oci_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -1212,7 +1255,7 @@ class TestCreateBackendYAML:
             default_creds_available_mock.return_value = False
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
             create_resources_mock.return_value = SAMPLE_OCI_COMPARTMENT_ID, SAMPLE_OCI_SUBNETS
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/create_yaml",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -1224,13 +1267,15 @@ class TestCreateBackendYAML:
 
 class TestUpdateBackendYAML:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+    async def test_returns_403_if_not_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/update_yaml",
             headers=get_auth_headers(user.token),
             json={},
@@ -1238,7 +1283,7 @@ class TestUpdateBackendYAML:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_updates_aws_backend(self, test_db, session: AsyncSession):
+    async def test_updates_aws_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -1266,7 +1311,7 @@ class TestUpdateBackendYAML:
             "dstack._internal.core.backends.aws.auth.authenticate"
         ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
             default_creds_available_mock.return_value = False
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/backends/update_yaml",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -1278,7 +1323,9 @@ class TestUpdateBackendYAML:
 
 class TestGetConfigYAML:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_admin(self, test_db, session: AsyncSession):
+    async def test_returns_403_if_not_admin(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -1290,7 +1337,7 @@ class TestGetConfigYAML:
             backend_type=BackendType.AWS,
             config={"regions": ["us-west-1"]},
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/aws/get_yaml",
             headers=get_auth_headers(user.token),
             json={},
@@ -1298,7 +1345,7 @@ class TestGetConfigYAML:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_returns_config_yaml(self, test_db, session: AsyncSession):
+    async def test_returns_config_yaml(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -1317,7 +1364,7 @@ class TestGetConfigYAML:
             config=config,
             auth=auth,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/backends/aws/get_yaml",
             headers=get_auth_headers(user.token),
             json={},

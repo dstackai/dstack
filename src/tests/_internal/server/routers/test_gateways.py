@@ -1,13 +1,12 @@
 from unittest.mock import Mock, patch
 
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.main import app
 from dstack._internal.server.services.gateways import (
     gateway_model_to_gateway,
     get_project_default_gateway,
@@ -22,17 +21,17 @@ from dstack._internal.server.testing.common import (
     get_auth_headers,
 )
 
-client = TestClient(app)
-
 
 class TestListAndGetGateways:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/gateways/list")
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/gateways/list")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_list(self, test_db, session: AsyncSession):
+    async def test_list(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -49,7 +48,7 @@ class TestListAndGetGateways:
             backend_id=backend.id,
             gateway_compute_id=gateway_compute.id,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/list",
             headers=get_auth_headers(user.token),
         )
@@ -81,7 +80,7 @@ class TestListAndGetGateways:
         ]
 
     @pytest.mark.asyncio
-    async def test_get(self, test_db, session: AsyncSession):
+    async def test_get(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -98,7 +97,7 @@ class TestListAndGetGateways:
             backend_id=backend.id,
             gateway_compute_id=gateway_compute.id,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/get",
             json={"name": gateway.name},
             headers=get_auth_headers(user.token),
@@ -129,13 +128,13 @@ class TestListAndGetGateways:
         }
 
     @pytest.mark.asyncio
-    async def test_get_missing(self, test_db, session: AsyncSession):
+    async def test_get_missing(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/get",
             json={"name": "missing"},
             headers=get_auth_headers(user.token),
@@ -145,27 +144,29 @@ class TestListAndGetGateways:
 
 class TestCreateGateway:
     @pytest.mark.asyncio
-    async def test_only_admin_can_create(self, test_db, session: AsyncSession):
+    async def test_only_admin_can_create(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/create",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_create_gateway(self, test_db, session: AsyncSession):
+    async def test_create_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/create",
             json={"name": "test", "backend_type": "aws", "region": "us"},
             headers=get_auth_headers(user.token),
@@ -196,7 +197,9 @@ class TestCreateGateway:
         }
 
     @pytest.mark.asyncio
-    async def test_create_gateway_without_name(self, test_db, session: AsyncSession):
+    async def test_create_gateway_without_name(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -205,7 +208,7 @@ class TestCreateGateway:
         backend = await create_backend(session, project.id, backend_type=BackendType.AWS)
         with patch("dstack._internal.server.services.gateways.random_names.generate_name") as g:
             g.return_value = "random-name"
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/gateways/create",
                 json={"name": None, "backend_type": "aws", "region": "us"},
                 headers=get_auth_headers(user.token),
@@ -237,13 +240,15 @@ class TestCreateGateway:
         }
 
     @pytest.mark.asyncio
-    async def test_create_gateway_missing_backend(self, test_db, session: AsyncSession):
+    async def test_create_gateway_missing_backend(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/create",
             json={"name": "test", "backend_type": "aws", "region": "us"},
             headers=get_auth_headers(user.token),
@@ -253,7 +258,7 @@ class TestCreateGateway:
 
 class TestDefaultGateway:
     @pytest.mark.asyncio
-    async def test_get_default_gateway(self, test_db, session: AsyncSession):
+    async def test_get_default_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
         project = await create_project(session)
         backend = await create_backend(session, project.id)
         gateway = await create_gateway(session, project.id, backend.id)
@@ -266,7 +271,9 @@ class TestDefaultGateway:
         assert res.dict() == gateway_model_to_gateway(gateway).dict()
 
     @pytest.mark.asyncio
-    async def test_default_gateway_is_missing(self, test_db, session: AsyncSession):
+    async def test_default_gateway_is_missing(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         project = await create_project(session)
         backend = await create_backend(session, project.id)
         await create_gateway(session, project.id, backend.id)
@@ -275,7 +282,9 @@ class TestDefaultGateway:
         assert res is None
 
     @pytest.mark.asyncio
-    async def test_only_admin_can_set_default_gateway(self, test_db, session: AsyncSession):
+    async def test_only_admin_can_set_default_gateway(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -283,7 +292,7 @@ class TestDefaultGateway:
         )
         backend = await create_backend(session, project.id)
         gateway = await create_gateway(session, project.id, backend.id)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/set_default",
             json={"name": gateway.name},
             headers=get_auth_headers(user.token),
@@ -291,7 +300,7 @@ class TestDefaultGateway:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_set_default_gateway(self, test_db, session: AsyncSession):
+    async def test_set_default_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -308,14 +317,14 @@ class TestDefaultGateway:
             backend_id=backend.id,
             gateway_compute_id=gateway_compute.id,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/set_default",
             json={"name": gateway.name},
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 200
 
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/get",
             json={"name": gateway.name},
             headers=get_auth_headers(user.token),
@@ -346,13 +355,15 @@ class TestDefaultGateway:
         }
 
     @pytest.mark.asyncio
-    async def test_set_default_gateway_missing(self, test_db, session: AsyncSession):
+    async def test_set_default_gateway_missing(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/set_default",
             json={"name": "missing"},
             headers=get_auth_headers(user.token),
@@ -362,20 +373,22 @@ class TestDefaultGateway:
 
 class TestDeleteGateway:
     @pytest.mark.asyncio
-    async def test_only_admin_can_delete(self, test_db, session: AsyncSession):
+    async def test_only_admin_can_delete(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/delete",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_delete_gateway(self, test_db, session: AsyncSession):
+    async def test_delete_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -418,7 +431,7 @@ class TestDeleteGateway:
 
             m.side_effect = get_backend
 
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/gateways/delete",
                 json={"names": [gateway_aws.name, gateway_gcp.name]},
                 headers=get_auth_headers(user.token),
@@ -427,7 +440,7 @@ class TestDeleteGateway:
             gcp.compute.return_value.terminate_gateway.assert_called_once()
             assert response.status_code == 200
 
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/list",
             headers=get_auth_headers(user.token),
         )
@@ -461,20 +474,22 @@ class TestDeleteGateway:
 
 class TestUpdateGateway:
     @pytest.mark.asyncio
-    async def test_only_admin_can_set_wildcard_domain(self, test_db, session: AsyncSession):
+    async def test_only_admin_can_set_wildcard_domain(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/set_wildcard_domain",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_set_wildcard_domain(self, test_db, session: AsyncSession):
+    async def test_set_wildcard_domain(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -491,7 +506,7 @@ class TestUpdateGateway:
             backend_id=backend.id,
             gateway_compute_id=gateway_compute.id,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/set_wildcard_domain",
             json={"name": gateway.name, "wildcard_domain": "test.com"},
             headers=get_auth_headers(user.token),
@@ -522,13 +537,15 @@ class TestUpdateGateway:
         }
 
     @pytest.mark.asyncio
-    async def test_set_wildcard_domain_missing(self, test_db, session: AsyncSession):
+    async def test_set_wildcard_domain_missing(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/gateways/set_wildcard_domain",
             json={"name": "missing", "wildcard_domain": "test.com"},
             headers=get_auth_headers(user.token),

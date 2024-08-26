@@ -4,14 +4,13 @@ from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
-from fastapi.testclient import TestClient
 from freezegun import freeze_time
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.main import app
 from dstack._internal.server.models import VolumeModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
@@ -25,17 +24,19 @@ from dstack._internal.server.testing.common import (
     get_volume_provisioning_data,
 )
 
-client = TestClient(app)
-
 
 class TestListVolumes:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/volumes/list")
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/volumes/list")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_lists_volumes_across_projects(self, test_db, session: AsyncSession):
+    async def test_lists_volumes_across_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.ADMIN)
         project1 = await create_project(session, name="project1", owner=user)
         volume1 = await create_volume(
@@ -51,7 +52,7 @@ class TestListVolumes:
             created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
             configuration=get_volume_configuration(name="volume2"),
         )
-        response = client.post(
+        response = await client.post(
             "/api/volumes/list",
             headers=get_auth_headers(user.token),
             json={},
@@ -87,7 +88,7 @@ class TestListVolumes:
                 "attachment_data": None,
             },
         ]
-        response = client.post(
+        response = await client.post(
             "/api/volumes/list",
             headers=get_auth_headers(user.token),
             json={
@@ -114,7 +115,9 @@ class TestListVolumes:
         ]
 
     @pytest.mark.asyncio
-    async def test_non_admin_cannot_see_others_projects(self, test_db, session: AsyncSession):
+    async def test_non_admin_cannot_see_others_projects(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user1 = await create_user(session, name="user1", global_role=GlobalRole.USER)
         user2 = await create_user(session, name="user2", global_role=GlobalRole.USER)
         project1 = await create_project(session, name="project1", owner=user1)
@@ -137,7 +140,7 @@ class TestListVolumes:
             created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
             configuration=get_volume_configuration(name="volume2"),
         )
-        response = client.post(
+        response = await client.post(
             "/api/volumes/list",
             headers=get_auth_headers(user1.token),
             json={},
@@ -163,12 +166,14 @@ class TestListVolumes:
 
 class TestListProjectVolumes:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/volumes/list")
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/volumes/list")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_lists_volumes(self, test_db, session: AsyncSession):
+    async def test_lists_volumes(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -179,7 +184,7 @@ class TestListProjectVolumes:
             project=project,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/volumes/list",
             headers=get_auth_headers(user.token),
         )
@@ -204,12 +209,14 @@ class TestListProjectVolumes:
 
 class TestGetVolume:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/volumes/get")
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/volumes/get")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_returns_volume(self, test_db, session: AsyncSession):
+    async def test_returns_volume(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -220,7 +227,7 @@ class TestGetVolume:
             project=project,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/volumes/get",
             headers=get_auth_headers(user.token),
             json={"name": volume.name},
@@ -242,13 +249,15 @@ class TestGetVolume:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_volume_does_not_exist(self, test_db, session: AsyncSession):
+    async def test_returns_400_if_volume_does_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/volumes/get",
             headers=get_auth_headers(user.token),
             json={"name": "some_volume"},
@@ -258,13 +267,15 @@ class TestGetVolume:
 
 class TestCreateVolume:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/volumes/create")
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/volumes/create")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-    async def test_creates_volume(self, test_db, session: AsyncSession):
+    async def test_creates_volume(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -273,7 +284,7 @@ class TestCreateVolume:
         configuration = get_volume_configuration(backend=BackendType.AWS)
         with patch("uuid.uuid4") as m:
             m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/volumes/create",
                 headers=get_auth_headers(user.token),
                 json={"configuration": configuration.dict()},
@@ -299,12 +310,14 @@ class TestCreateVolume:
 
 class TestDeleteVolumes:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/volumes/delete")
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/volumes/delete")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_deletes_volumes(self, test_db, session: AsyncSession):
+    async def test_deletes_volumes(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -320,7 +333,7 @@ class TestDeleteVolumes:
         ) as m:
             aws_mock = Mock()
             m.return_value = aws_mock
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/volumes/delete",
                 headers=get_auth_headers(user.token),
                 json={"names": [volume.name]},
@@ -331,7 +344,9 @@ class TestDeleteVolumes:
         assert volume.deleted
 
     @pytest.mark.asyncio
-    async def test_returns_400_when_volumes_in_use(self, test_db, session: AsyncSession):
+    async def test_returns_400_when_volumes_in_use(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         pool = await create_pool(session=session, project=project)
@@ -350,7 +365,7 @@ class TestDeleteVolumes:
         )
         volume.instances.append(instance)
         await session.commit()
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/volumes/delete",
             headers=get_auth_headers(user.token),
             json={"names": [volume.name]},
