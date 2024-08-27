@@ -49,7 +49,8 @@ async def session(test_db):
 
 @pytest.fixture
 def client(event_loop):
-    return httpx.AsyncClient(app=app, base_url="http://test")
+    transport = httpx.ASGITransport(app=app)
+    return httpx.AsyncClient(transport=transport, base_url="http://test")
 
 
 @pytest.fixture
