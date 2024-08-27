@@ -1,9 +1,9 @@
-import os
 from pathlib import Path
 
 import httpx
 import pytest
 import pytest_asyncio
+from testcontainers.postgres import PostgresContainer
 
 from dstack._internal.server.db import Database, override_db
 from dstack._internal.server.main import app
@@ -12,23 +12,23 @@ from dstack._internal.server.services import encryption as encryption  # import 
 from dstack._internal.server.services import logs as logs_services
 
 
-def get_database_url(db_type: str) -> str:
-    if db_type == "sqlite":
-        return "sqlite+aiosqlite://"
-    if db_type == "postgres":
-        db_url = os.getenv("DSTACK_DATABASE_TEST_URL")
-        if db_url is None:
-            raise ValueError("DSTACK_DATABASE_TEST_URL not set")
-        return db_url
-    raise ValueError(f"Unknown db_type {db_type}")
+@pytest.fixture(scope="session")
+def postgres_container():
+    with PostgresContainer("postgres:16-alpine", driver="asyncpg") as postgres:
+        yield postgres.get_connection_url()
 
 
 @pytest_asyncio.fixture
 async def test_db(request):
     db_type = getattr(request, "param", "sqlite")
-    if db_type == "postgres" and not request.config.getoption("--runpostgres"):
-        pytest.skip("Skipping Postgres tests as --runpostgres was not provided")
-    db_url = get_database_url(db_type)
+    if db_type == "sqlite":
+        db_url = "sqlite+aiosqlite://"
+    elif db_type == "postgres":
+        if not request.config.getoption("--runpostgres"):
+            pytest.skip("Skipping Postgres tests as --runpostgres was not provided")
+        db_url = request.getfixturevalue("postgres_container")
+    else:
+        raise ValueError(f"Unknown db_type {db_type}")
     db = Database(db_url)
     override_db(db)
     async with db.engine.begin() as conn:
