@@ -76,9 +76,11 @@ jobs:
           name: frontend-build
           path: src/dstack/_internal/server/statics
       - name: Run pytest
+        # Skip Postgres tests on macos since macos runner doesn't have Docker.
+        # Skip Postgres tests for Python 3.8 since testcontainers<4 doesn't support asyncpg correctly.
         run: |
           RUNPOSTGRES=""
-          if [ "${{ matrix.os }}" != "macos-latest" ]; then
+          if [ "${{ matrix.os }}" != "macos-latest" ] && [ "${{ matrix.python-version }}" != "3.8" ]; then
             RUNPOSTGRES="--runpostgres"
           fi
           pytest src/tests --runui $RUNPOSTGRES

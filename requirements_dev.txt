@@ -5,4 +5,4 @@ pytest~=7.2
 pytest-asyncio>=0.21
 freezegun>=1.2.0
 ruff==0.5.3  # Should match .pre-commit-config.yaml
-testcontainers>=4.8.0
+testcontainers # testcontainers<4 may not work with asyncpg
