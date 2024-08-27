@@ -64,8 +64,6 @@ jobs:
         python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -79,7 +77,11 @@ jobs:
           path: src/dstack/_internal/server/statics
       - name: Run pytest
         run: |
-          pytest src/tests --runui --runpostgres
+          RUNPOSTGRES=""
+          if [ "${{ matrix.os }}" != "macos-latest" ]; then
+            RUNPOSTGRES="--runpostgres"
+          fi
+          pytest src/tests --runui $RUNPOSTGRES
 
   update-get-dstack:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
