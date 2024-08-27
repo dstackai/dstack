@@ -10,7 +10,13 @@ are both acceptable).
 
 === "Cloud fleets"
 
-    To provision a fleet in the cloud using the configured backends, specify the required resources, number of nodes, 
+    By default, when running dev environments, tasks, and services, `dstack` 
+    reuses `idle` instances from existing fleets or creates a new cloud fleet on the fly.
+    
+    If you want more control over the lifecycle of cloud instances, you can create a cloud fleet manually. 
+    This allows you to reuse a fleet over a longer period and across multiple runs. You can also delete the fleet only when needed.
+
+    To create a cloud fleet, specify `resources`, `nodes`, 
     and other optional parameters.
     
     <div editor-title="examples/fine-tuning/alignment-handbook/fleet-distrib.dstack.yml">
@@ -37,15 +43,21 @@ are both acceptable).
     ```
     
     </div>
-
-    Set `placement` to `cluster` if the nodes should be interconnected (e.g. if you'd like to use them for multi-node tasks). 
-    In that case, `dstack` will provision all nodes in the same backend and region.
     
-    Defining fleets with YAML isn't supported yet for the `kubernetes`, `vastai`, and `runpod` backends.
+    When you apply this configuration, `dstack` will create cloud instances using the configured backends according 
+    to the specified parameters. Note that this is not supported for the `kubernetes`, `vastai`, and `runpod` backends.
+
+    !!! info "Network"
+        Set `placement` to `cluster` if the nodes should be interconnected (e.g. if you'd like to use them for multi-node tasks). 
+        In that case, `dstack` will provision all nodes in the same backend and region.
 
 === "On-prem fleets"
 
-    To create a fleet from on-prem servers, specify their hosts along with the user, port, and SSH key for connection via SSH.
+    If you’d like to run dev environments, tasks, and services on your on-prem servers that you have access to, you can
+    create an on-prem fleet by providing `dstack` with the hostnames of these servers and the details for connecting to them
+    via SSH.
+
+    To create an on-prem fleet, specify `hosts`, `user`, `port`, and `identity_file` under `ssh_config`.
 
     <div editor-title="fleet-on-prem.dstack.yml"> 
     
@@ -68,8 +80,11 @@ are both acceptable).
     
     </div>
 
-    !!! warning "Requirements"
-        On-prem servers should be pre-installed with Docker.
+    When you apply this configuration, `dstack` will connect to the specified hosts using the provided SSH credentials, 
+    install the dependencies, and configure these servers as a fleet.
+
+    !!! info "Requirements" 
+        Hosts should be pre-installed with Docker.
         Systems with NVIDIA GPUs should also be pre-installed with CUDA 12.1 and
         [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
         The user should have `sudo` access.
@@ -100,58 +115,75 @@ are both acceptable).
             - 3.255.177.52
         ```
 
-    Set `placement` to `cluster` if the nodes are interconnected (e.g. if you'd like to use them for multi-node tasks).
-    In that case, by default, `dstack` will automatically detect the private network. 
-    You can specify the [`network`](reference/dstack.yml/fleet.md#network) parameter manually.
+    !!! info "Network"
+        Set `placement` to `cluster` if the hosts are interconnected (e.g. if you'd like to use them for multi-node tasks).
+        In that case, by default, `dstack` will automatically detect the private network. 
+        You can specify the [`network`](../reference/dstack.yml/fleet.md#network) parameter manually.
 
-!!! info "Reference"
-    See [.dstack.yml](reference/dstack.yml/fleet.md) for all the options supported by
-    fleets, along with multiple examples.
+> See [`.dstack.yml`](../reference/dstack.yml/fleet.md) for all the options supported by
+> the fleet configuration.
 
 ## Create or update a fleet
 
-To create or update the fleet, simply call the [`dstack apply`](reference/cli/index.md#dstack-apply) command:
+To create or update the fleet, simply call the [`dstack apply`](../reference/cli/index.md#dstack-apply) command:
 
 <div class="termy">
 
 ```shell
 $ dstack apply -f examples/fine-tuning/alignment-handbook/fleet-distributed.dstack.yml
-Fleet ah-fleet-distrib does not exist yet. Create the fleet? [y/n]: y
-
- FLEET     INSTANCE  BACKEND  RESOURCES  PRICE  STATUS   CREATED 
- my-fleet  0                                    pending  now     
-           1                                    pending  now     
 ```
 
 </div>
 
-Once the status of instances change to `idle`, they can be used by dev environments, tasks, and services.
+### Ensure the fleet is created
 
-## Creation policy
+To ensure the fleet is created, use the `dstack fleet` command:
 
-By default, when running dev environments, tasks, and services, `dstack apply` tries to reuse `idle` 
-instances from existing fleets. 
-If no `idle` instances meet the requirements, it creates a new fleet automatically.
-To avoid creating new fleet, specify pass `--reuse` to `dstack apply` or (or set [
-`creation_policy`](reference/dstack.yml/dev-environment.md#creation_policy) to `reuse` in the configuration).
+<div class="termy">
 
-## Termination policy
+```shell
+$ dstack fleet
 
-> If you want a fleet to be automatically deleted after a certain idle time, you can set the
-> you can set the [`termination_idle_time`](reference/dstack.yml/fleet.md#termination_idle_time) property.
+ FLEET     INSTANCE  BACKEND              GPU             PRICE    STATUS  CREATED 
+ my-fleet  0         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago      
+           1         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago    
+```
 
-[//]: # (Add Idle time example to the reference page)
+</div>
+
+Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
+
+### Troubleshooting on-prem fleets
+
+!!! info "Resources"
+    If you're creating an on-prem fleet, ensure that the GPU, memory, and disk size are detected properly.
+    If GPU isn't detected, ensure that the hosts meet the requirements (see above).
+
+If the status doesn't change to `idle` after a few minutes, ensure that 
+the hosts meet the requirements (see above).
+
+If the requirements are met but the fleet still fails to be created, check `/root/.dstack/shim.log` for logs 
+on the hosts specified in `ssh_config`.
+
+[//]: # (## Creation policy)
+
+[//]: # (By default, when running dev environments, tasks, and services, `dstack apply` tries to reuse `idle` )
+[//]: # (instances from existing fleets. )
+[//]: # (If no `idle` instances meet the requirements, it creates a new fleet automatically.)
+[//]: # (To avoid creating new fleet, specify pass `--reuse` to `dstack apply` or &#40;or set [)
+[//]: # (`creation_policy`]&#40;../reference/dstack.yml/dev-environment.md#creation_policy&#41; to `reuse` in the configuration&#41;.)
 
 ## Manage fleets
 
 ### List fleets
 
-The [`dstack fleet`](reference/cli/index.md#dstack-gateway-list) command lists fleet instances and theri status:
+The [`dstack fleet`](../reference/cli/index.md#dstack-gateway-list) command lists fleet instances and theri status:
 
 <div class="termy">
 
-```
+```shell
 $ dstack fleet
+
  FLEET     INSTANCE  BACKEND              GPU             PRICE    STATUS  CREATED 
  my-fleet  0         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago      
            1         gcp (europe-west-1)  L4:24GB (spot)  $0.1624  idle    3 mins ago    
@@ -177,6 +209,13 @@ You can pass either the path to the configuration file or the fleet name directl
 
 To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 
+#### Termination policy
+
+If you want a fleet to be automatically deleted after a certain idle time, you can set the
+you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
+
+[//]: # (Add Idle time example to the reference page)
+
 ## What's next?
 
 1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and 
@@ -184,5 +223,5 @@ To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 2. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
 
 !!! info "Reference"
-    See [.dstack.yml](reference/dstack.yml/fleet.md) for all the options supported by
+    See [.dstack.yml](../reference/dstack.yml/fleet.md) for all the options supported by
     fleets, along with multiple examples.

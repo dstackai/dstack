@@ -84,7 +84,7 @@ Configuration is updated at ~/.dstack/config.yml
 ### 4. Create on-prem fleets
     
 > If you want the `dstack` server to run containers on your on-prem servers,
-use [fleets](https://dstack.ai/docs/fleets).
+use [fleets](https://dstack.ai/docs/concepts/fleets).
 
 ## How does it work?
 

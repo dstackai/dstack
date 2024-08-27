@@ -75,7 +75,7 @@ for you.
 
 With `dstack Sky` you can use all of `dstack`'s features, incl. [dev environments](../../docs/dev-environments.md), 
 [tasks](../../docs/tasks.md), [services](../../docs/services.md), and 
-[fleets](../../docs/fleets.md).
+[fleets](../../docs/concepts/fleets.md).
 
 To use services, the open-source version requires setting up a gateway with your own domain. 
 `dstack Sky` comes with a pre-configured gateway.

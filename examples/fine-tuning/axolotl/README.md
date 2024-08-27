@@ -71,7 +71,7 @@ $ dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
 
 ## Fleets
 
-> By default, `dstack run` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/fleets).
+> By default, `dstack run` reuses `idle` instances from one of the existing [fleets](https://dstack.ai/docs/concepts/fleets).
 > If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
 
 The example folder includes a fleet configuration: 
@@ -118,5 +118,5 @@ The source-code of this example can be found in
 ## What's next?
 
 1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
-   [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).
+   [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/concepts/fleets).
 2. Browse [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}.

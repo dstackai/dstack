@@ -87,7 +87,7 @@ This configuration is stored in `~/.dstack/config.yml`.
 ## Create on-prem fleets
 
 If you want the `dstack` server to run containers on your on-prem clusters,
-use [on-fleets](../fleets.md#__tabbed_1_2).
+use [on-fleets](../concepts/fleets.md#__tabbed_1_2).
 
 ## What's next?
 
