@@ -1017,7 +1017,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     top: -0.7px;
     left: -0.7px;
     right: -0.7px;
-    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05));
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.1), rgb(0 114 255 / 1%), rgba(0, 42, 255, 0.05)) !important;
 }
 
 @media screen and (max-width: 44.984375em) {
