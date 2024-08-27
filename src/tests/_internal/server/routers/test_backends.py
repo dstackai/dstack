@@ -67,6 +67,7 @@ class TestListBackendTypes:
 
 class TestGetBackendConfigValuesAWS:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_initial_config(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -90,6 +91,7 @@ class TestGetBackendConfigValuesAWS:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_invalid_credentials(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -132,6 +134,7 @@ class TestGetBackendConfigValuesAWS:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_config_on_valid_creds(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -196,6 +199,7 @@ class TestGetBackendConfigValuesAWS:
 
 class TestGetBackendConfigValuesAzure:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_initial_config(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -221,6 +225,7 @@ class TestGetBackendConfigValuesAzure:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_invalid_credentials(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -270,6 +275,7 @@ class TestGetBackendConfigValuesAzure:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "body",
         [
@@ -384,6 +390,7 @@ class TestGetBackendConfigValuesAzure:
 
 class TestGetBackendConfigValuesGCP:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_initial_config(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -405,6 +412,7 @@ class TestGetBackendConfigValuesGCP:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_invalid_credentials(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -442,6 +450,7 @@ class TestGetBackendConfigValuesGCP:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_config_on_valid_creds(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -571,6 +580,7 @@ class TestGetBackendConfigValuesGCP:
 
 class TestGetBackendConfigValuesLambda:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_initial_config(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -588,6 +598,7 @@ class TestGetBackendConfigValuesLambda:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_invalid_credentials(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -619,6 +630,7 @@ class TestGetBackendConfigValuesLambda:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_config_on_valid_creds(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -666,6 +678,7 @@ class TestGetBackendConfigValuesLambda:
 
 class TestGetBackendConfigValuesOCI:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_initial_config(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -690,6 +703,7 @@ class TestGetBackendConfigValuesOCI:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_invalid_credentials(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -713,6 +727,7 @@ class TestGetBackendConfigValuesOCI:
         assert error["msg"].startswith("Invalid credentials")
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_config_on_valid_creds(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -755,6 +770,7 @@ class TestGetBackendConfigValuesOCI:
 
 class TestCreateBackend:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -771,6 +787,7 @@ class TestCreateBackend:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_aws_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -802,6 +819,7 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_gcp_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -839,6 +857,7 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_lambda_backend(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -868,6 +887,7 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_oci_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -898,6 +918,7 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_not_creates_oci_backend_if_regions_not_subscribed(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -929,6 +950,7 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 0
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_create_azure_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -985,6 +1007,7 @@ class TestCreateBackend:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_backend_exists(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1034,6 +1057,7 @@ class TestCreateBackend:
 
 class TestUpdateBackend:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1050,6 +1074,7 @@ class TestUpdateBackend:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_updates_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1084,6 +1109,7 @@ class TestUpdateBackend:
         assert json.loads(backend.config)["regions"] == ["us-east-1"]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_backend_does_not_exist(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1111,6 +1137,7 @@ class TestUpdateBackend:
 
 class TestDeleteBackends:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1126,6 +1153,7 @@ class TestDeleteBackends:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_backends(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1145,6 +1173,7 @@ class TestDeleteBackends:
 
 class TestGetConfigInfo:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1161,6 +1190,7 @@ class TestGetConfigInfo:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_config_info(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1186,6 +1216,7 @@ class TestGetConfigInfo:
 
 class TestCreateBackendYAML:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1202,6 +1233,7 @@ class TestCreateBackendYAML:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_aws_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1234,6 +1266,7 @@ class TestCreateBackendYAML:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_oci_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1267,6 +1300,7 @@ class TestCreateBackendYAML:
 
 class TestUpdateBackendYAML:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1283,6 +1317,7 @@ class TestUpdateBackendYAML:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_updates_aws_backend(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1323,6 +1358,7 @@ class TestUpdateBackendYAML:
 
 class TestGetConfigYAML:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1345,6 +1381,7 @@ class TestGetConfigYAML:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_config_yaml(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)

@@ -33,6 +33,7 @@ from dstack._internal.server.testing.common import (
 
 class TestListFleets:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -40,6 +41,7 @@ class TestListFleets:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_lists_fleets(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -71,6 +73,7 @@ class TestListFleets:
 
 class TestGetFleet:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -78,6 +81,7 @@ class TestGetFleet:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_fleet(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -106,6 +110,7 @@ class TestGetFleet:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_fleet_does_not_exist(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -124,6 +129,7 @@ class TestGetFleet:
 
 class TestCreateFleet:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -131,6 +137,7 @@ class TestCreateFleet:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
     async def test_creates_fleet(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
@@ -221,6 +228,7 @@ class TestCreateFleet:
         assert res.scalar_one()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
     async def test_creates_ssh_fleet(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
@@ -339,6 +347,7 @@ class TestCreateFleet:
         assert instance.remote_connection_info is not None
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_forbids_if_no_permission_to_manage_ssh_fleets(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -371,6 +380,7 @@ class TestCreateFleet:
 
 class TestDeleteFleets:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -378,6 +388,7 @@ class TestDeleteFleets:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminates_fleet_instances(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -407,6 +418,7 @@ class TestDeleteFleets:
         assert instance.status == InstanceStatus.TERMINATING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_fleets_in_use(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -451,6 +463,7 @@ class TestDeleteFleets:
         assert instance.status == InstanceStatus.BUSY
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_forbids_if_no_permission_to_manage_ssh_fleets(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -484,6 +497,7 @@ class TestDeleteFleets:
 
 class TestDeleteFleetInstances:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -491,6 +505,7 @@ class TestDeleteFleetInstances:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminates_fleet_instances(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -531,6 +546,7 @@ class TestDeleteFleetInstances:
         assert fleet.status != FleetStatus.TERMINATING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_deleting_busy_instances(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

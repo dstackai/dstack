@@ -40,6 +40,7 @@ from dstack._internal.server.testing.common import (
 
 class TestProcessSubmittedJobs:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_fails_job_when_no_backends(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -64,6 +65,7 @@ class TestProcessSubmittedJobs:
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_provisiones_job(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -136,6 +138,7 @@ class TestProcessSubmittedJobs:
         assert pool_job_provisioning_data == job.job_provisioning_data
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_fails_job_when_no_capacity(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -181,6 +184,7 @@ class TestProcessSubmittedJobs:
         assert not project.default_pool.instances
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_job_with_instance(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)
@@ -214,6 +218,7 @@ class TestProcessSubmittedJobs:
         assert job.instance is not None and job.instance.id == instance.id
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_new_instance_in_existing_fleet(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)

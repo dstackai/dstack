@@ -21,11 +21,13 @@ from dstack._internal.server.testing.common import (
 
 class TestListProjects:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/projects/list")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_empty_list(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         response = await client.post("/api/projects/list", headers=get_auth_headers(user.token))
@@ -33,6 +35,7 @@ class TestListProjects:
         assert response.json() == []
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_projects(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -67,11 +70,13 @@ class TestListProjects:
 
 class TestCreateProject:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/projects/create")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_project(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         project_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
@@ -120,6 +125,7 @@ class TestCreateProject:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_project_name_is_taken(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -150,6 +156,7 @@ class TestCreateProject:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_user_project_quota_exceeded(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -172,6 +179,7 @@ class TestCreateProject:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_no_project_quota_for_global_admins(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -185,6 +193,7 @@ class TestCreateProject:
             assert response.status_code == 200, response.json()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_forbids_if_no_permission_to_create_projects(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -202,11 +211,13 @@ class TestCreateProject:
 
 class TestDeleteProject:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/projects/delete")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_cannot_delete_the_only_project(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -225,6 +236,7 @@ class TestDeleteProject:
         assert not project.deleted
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_projects(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project1 = await create_project(session=session, owner=user, name="project1")
@@ -247,6 +259,7 @@ class TestDeleteProject:
         assert not project2.deleted
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -270,6 +283,7 @@ class TestDeleteProject:
         assert len(res.all()) == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -287,11 +301,13 @@ class TestDeleteProject:
 
 class TestGetProject:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/projects/test_project/get")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_404_if_project_does_not_exist(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -303,6 +319,7 @@ class TestGetProject:
         assert response.status_code == 404, response.json()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_project(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -351,11 +368,13 @@ class TestGetProject:
 
 class TestSetProjectMembers:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/projects/test_project/get")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_sets_project_members(self, test_db, session: AsyncSession, client: AsyncClient):
         project = await create_project(session=session)
         admin = await create_user(session=session)
@@ -443,6 +462,7 @@ class TestSetProjectMembers:
         assert len(members) == 3
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_manager_cannot_set_project_admins(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -474,6 +494,7 @@ class TestSetProjectMembers:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_global_admin_manager_can_set_project_admins(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -508,6 +529,7 @@ class TestSetProjectMembers:
         assert len(members) == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_non_manager_cannot_set_project_members(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

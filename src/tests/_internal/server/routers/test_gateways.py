@@ -24,6 +24,7 @@ from dstack._internal.server.testing.common import (
 
 class TestListAndGetGateways:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -31,6 +32,7 @@ class TestListAndGetGateways:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_list(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -80,6 +82,7 @@ class TestListAndGetGateways:
         ]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_get(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -128,6 +131,7 @@ class TestListAndGetGateways:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_get_missing(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -144,6 +148,7 @@ class TestListAndGetGateways:
 
 class TestCreateGateway:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_only_admin_can_create(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -159,6 +164,7 @@ class TestCreateGateway:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_create_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -197,6 +203,7 @@ class TestCreateGateway:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_create_gateway_without_name(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -240,6 +247,7 @@ class TestCreateGateway:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_create_gateway_missing_backend(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -258,6 +266,7 @@ class TestCreateGateway:
 
 class TestDefaultGateway:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_get_default_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
         project = await create_project(session)
         backend = await create_backend(session, project.id)
@@ -271,6 +280,7 @@ class TestDefaultGateway:
         assert res.dict() == gateway_model_to_gateway(gateway).dict()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_default_gateway_is_missing(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -282,6 +292,7 @@ class TestDefaultGateway:
         assert res is None
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_only_admin_can_set_default_gateway(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -300,6 +311,7 @@ class TestDefaultGateway:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_set_default_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -355,6 +367,7 @@ class TestDefaultGateway:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_set_default_gateway_missing(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -373,6 +386,7 @@ class TestDefaultGateway:
 
 class TestDeleteGateway:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_only_admin_can_delete(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -388,6 +402,7 @@ class TestDeleteGateway:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_delete_gateway(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -474,6 +489,7 @@ class TestDeleteGateway:
 
 class TestUpdateGateway:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_only_admin_can_set_wildcard_domain(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -489,6 +505,7 @@ class TestUpdateGateway:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_set_wildcard_domain(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -537,6 +554,7 @@ class TestUpdateGateway:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_set_wildcard_domain_missing(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

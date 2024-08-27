@@ -32,6 +32,7 @@ TEST_POOL_NAME = "test_router_pool_name"
 
 class TestListPools:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -44,6 +45,7 @@ class TestListPools:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(dt.datetime(2023, 10, 4, 12, 0, tzinfo=dt.timezone.utc))
     async def test_creates_and_lists_default_pool(
         self, test_db, session: AsyncSession, client: AsyncClient
@@ -74,6 +76,7 @@ class TestListPools:
 
 class TestDeletePool:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -86,6 +89,7 @@ class TestDeletePool:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_delete_last_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -116,6 +120,7 @@ class TestDeletePool:
         assert dt.datetime.fromisoformat(default_pool["created_at"]) > pool.created_at
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -136,6 +141,7 @@ class TestDeletePool:
         assert pool.name == pool2.name
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_pool_missing(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -154,6 +160,7 @@ class TestDeletePool:
 
 class TestSetDefaultPool:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -166,6 +173,7 @@ class TestSetDefaultPool:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_sets_default(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -183,6 +191,7 @@ class TestSetDefaultPool:
         assert project.default_pool_id == pool.id
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_pool_missing(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -201,6 +210,7 @@ class TestSetDefaultPool:
 
 class TestCreatePool:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -213,6 +223,7 @@ class TestCreatePool:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_create_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -230,6 +241,7 @@ class TestCreatePool:
         res.scalar_one()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_on_duplicate_name(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -255,6 +267,7 @@ class TestCreatePool:
 
 class TestShowPool:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -267,6 +280,7 @@ class TestShowPool:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_show_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -318,6 +332,7 @@ class TestShowPool:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_show_missing_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -343,6 +358,7 @@ class TestShowPool:
 
 class TestAddRemote:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -365,6 +381,7 @@ class TestAddRemote:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_add_remote(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -395,6 +412,7 @@ class TestAddRemote:
 
 class TestRemoveInstance:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -417,6 +435,7 @@ class TestRemoveInstance:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_remove_instance(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -481,6 +500,7 @@ class TestRemoveInstance:
 
 class TestListInstances:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -491,6 +511,7 @@ class TestListInstances:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_lists_instances(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -522,6 +543,7 @@ class TestListInstances:
         assert response_json[1]["id"] == str(instance1.id)
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_lists_paginated_instances(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

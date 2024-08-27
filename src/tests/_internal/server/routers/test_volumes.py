@@ -27,6 +27,7 @@ from dstack._internal.server.testing.common import (
 
 class TestListVolumes:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -34,6 +35,7 @@ class TestListVolumes:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_lists_volumes_across_projects(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -115,6 +117,7 @@ class TestListVolumes:
         ]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_non_admin_cannot_see_others_projects(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -166,6 +169,7 @@ class TestListVolumes:
 
 class TestListProjectVolumes:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -173,6 +177,7 @@ class TestListProjectVolumes:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_lists_volumes(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -209,6 +214,7 @@ class TestListProjectVolumes:
 
 class TestGetVolume:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -216,6 +222,7 @@ class TestGetVolume:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_volume(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -249,6 +256,7 @@ class TestGetVolume:
         }
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_volume_does_not_exist(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -267,6 +275,7 @@ class TestGetVolume:
 
 class TestCreateVolume:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -274,6 +283,7 @@ class TestCreateVolume:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
     async def test_creates_volume(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
@@ -310,6 +320,7 @@ class TestCreateVolume:
 
 class TestDeleteVolumes:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -317,6 +328,7 @@ class TestDeleteVolumes:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_volumes(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -344,6 +356,7 @@ class TestDeleteVolumes:
         assert volume.deleted
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_when_volumes_in_use(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

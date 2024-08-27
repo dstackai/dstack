@@ -81,6 +81,7 @@ async def scale_wrapper(session: AsyncSession, run: RunModel, diff: int):
 
 class TestScaleRunReplicas:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_no_scale(self, test_db, session: AsyncSession):
         run = await make_run(
             session,
@@ -93,6 +94,7 @@ class TestScaleRunReplicas:
         assert len(run.jobs) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_downscale_to_zero(self, test_db, session: AsyncSession):
         run = await make_run(
             session,
@@ -107,6 +109,7 @@ class TestScaleRunReplicas:
         assert run.jobs[0].termination_reason == JobTerminationReason.SCALED_DOWN
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_upscale_new(self, test_db, session: AsyncSession):
         run = await make_run(
             session,
@@ -121,6 +124,7 @@ class TestScaleRunReplicas:
         assert run.jobs[1].replica_num == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_upscale_terminated(self, test_db, session: AsyncSession):
         run = await make_run(
             session,
@@ -138,6 +142,7 @@ class TestScaleRunReplicas:
         assert run.jobs[2].replica_num == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_downscale_less_important(self, test_db, session: AsyncSession):
         run = await make_run(
             session,
@@ -154,6 +159,7 @@ class TestScaleRunReplicas:
         assert run.jobs[1].status == JobStatus.RUNNING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_downscale_greater_replica_num(self, test_db, session: AsyncSession):
         run = await make_run(
             session,
@@ -170,6 +176,7 @@ class TestScaleRunReplicas:
         assert run.jobs[1].termination_reason == JobTerminationReason.SCALED_DOWN
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_no_downscale_below_limit(self, test_db, session: AsyncSession):
         run = await make_run(
             session,
@@ -182,6 +189,7 @@ class TestScaleRunReplicas:
             await scale_wrapper(session, run, -1)
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_no_upscale_above_limit(self, test_db, session: AsyncSession):
         run = await make_run(
             session,
@@ -194,6 +202,7 @@ class TestScaleRunReplicas:
             await scale_wrapper(session, run, 1)
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_upscale_mixed(self, test_db, session: AsyncSession):
         run = await make_run(
             session,

@@ -13,11 +13,13 @@ from dstack._internal.server.testing.common import create_user, get_auth_headers
 
 class TestListUsers:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/users/list")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_users(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         response = await client.post("/api/users/list", headers=get_auth_headers(user.token))
@@ -38,11 +40,13 @@ class TestListUsers:
 
 class TestGetMyUser:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/users/get_my_user")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_deactivated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -59,6 +63,7 @@ class TestGetMyUser:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_logged_in_user(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -81,11 +86,13 @@ class TestGetMyUser:
 
 class TestGetUser:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/users/get_user")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_not_global_admin(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -99,6 +106,7 @@ class TestGetUser:
         assert response.status_code == 400
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_logged_in_user(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -125,11 +133,13 @@ class TestGetUser:
 
 class TestCreateUser:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/users/create")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_user(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(name="admin", session=session)
         with patch("uuid.uuid4") as uuid_mock:
@@ -159,6 +169,7 @@ class TestCreateUser:
         assert len(res.scalars().all()) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_return_400_if_username_taken(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -205,11 +216,13 @@ class TestCreateUser:
 
 class TestDeleteUsers:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/users/delete")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_users(self, test_db, session: AsyncSession, client: AsyncClient):
         admin = await create_user(name="admin", session=session)
         user = await create_user(name="test", session=session)
@@ -225,11 +238,13 @@ class TestDeleteUsers:
 
 class TestRefreshToken:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, client: AsyncClient):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(self, test_db, client: AsyncClient):
         response = await client.post("/api/users/refresh_token")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_refreshes_token(self, test_db, session: AsyncSession, client: AsyncClient):
         user1 = await create_user(name="user1", session=session)
         old_token = user1.token
@@ -244,6 +259,7 @@ class TestRefreshToken:
         assert user1.token != old_token
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_non_admin_refreshes_for_other_user(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -257,6 +273,7 @@ class TestRefreshToken:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_global_admin_refreshes_token(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):

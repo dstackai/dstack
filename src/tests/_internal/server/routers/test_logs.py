@@ -10,6 +10,7 @@ from dstack._internal.server.testing.common import create_project, create_user, 
 
 class TestPollLogs:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -22,6 +23,7 @@ class TestPollLogs:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_logs(
         self, test_db, test_log_storage: FileLogStorage, session: AsyncSession, client: AsyncClient
     ):

@@ -26,6 +26,8 @@ def get_database_url(db_type: str) -> str:
 @pytest_asyncio.fixture
 async def test_db(request):
     db_type = getattr(request, "param", "sqlite")
+    if db_type == "postgres" and not request.config.getoption("--runpostgres"):
+        pytest.skip("Skipping Postgres tests as --runpostgres was not provided")
     db_url = get_database_url(db_type)
     db = Database(db_url)
     override_db(db)

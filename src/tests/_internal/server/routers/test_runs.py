@@ -340,6 +340,7 @@ def get_dev_env_run_dict(
 
 class TestListRuns:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_40x_if_not_authenticated(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -347,6 +348,7 @@ class TestListRuns:
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_lists_runs(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -447,6 +449,7 @@ class TestListRuns:
         ]
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_lists_runs_pagination(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -509,6 +512,7 @@ class TestListRuns:
 
 class TestGetRunPlan:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -521,6 +525,7 @@ class TestGetRunPlan:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_run_plan(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -565,6 +570,7 @@ class TestGetRunPlan:
 
 class TestSubmitRun:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -577,6 +583,7 @@ class TestSubmitRun:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_submits_run(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -623,6 +630,7 @@ class TestSubmitRun:
         assert job is not None
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_submits_run_without_run_name(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -659,6 +667,7 @@ class TestSubmitRun:
         assert job is not None
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "run_name",
         [
@@ -696,6 +705,7 @@ class TestSubmitRun:
         assert response.status_code == 400
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_repo_does_not_exist(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -720,6 +730,7 @@ class TestSubmitRun:
 
 class TestStopRuns:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -732,6 +743,7 @@ class TestStopRuns:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminates_submitted_run(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -768,6 +780,7 @@ class TestStopRuns:
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminates_running_run(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -809,6 +822,7 @@ class TestStopRuns:
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_leaves_finished_runs_unchanged(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -845,6 +859,7 @@ class TestStopRuns:
 
 class TestDeleteRuns:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -857,6 +872,7 @@ class TestDeleteRuns:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_runs(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -893,6 +909,7 @@ class TestDeleteRuns:
         assert job.status == JobStatus.FAILED
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_400_if_runs_active(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -929,6 +946,7 @@ class TestDeleteRuns:
 
 class TestCreateInstance:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -941,6 +959,7 @@ class TestCreateInstance:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_creates_instance(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1010,6 +1029,7 @@ class TestCreateInstance:
             assert result == expected
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_error_if_backends_do_not_support_create_instance(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -1049,6 +1069,7 @@ class TestCreateInstance:
             await process_instances()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_backend_does_not_support_create_instance(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
