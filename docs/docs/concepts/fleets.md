@@ -8,13 +8,13 @@ fleet is created, it can be reused by dev environments, tasks, and services.
 To create a fleet, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.yml`
 are both acceptable).
 
-=== "Cloud fleets"
-
-    By default, when running dev environments, tasks, and services, `dstack` 
-    reuses `idle` instances from existing fleets or creates a new cloud fleet on the fly.
-    
-    If you want more control over the lifecycle of cloud instances, you can create a cloud fleet manually. 
-    This allows you to reuse a fleet over a longer period and across multiple runs. You can also delete the fleet only when needed.
+=== "Cloud"
+    !!! info "What is a cloud fleet?"
+        By default, when running dev environments, tasks, and services, `dstack` 
+        reuses `idle` instances from existing fleets or creates a new cloud fleet on the fly.
+        
+        If you want more control over the lifecycle of cloud instances, you can create a cloud fleet manually. 
+        This allows you to reuse a fleet over a longer period and across multiple runs. You can also delete the fleet only when needed.
 
     To create a cloud fleet, specify `resources`, `nodes`, 
     and other optional parameters.
@@ -45,19 +45,22 @@ are both acceptable).
     </div>
     
     When you apply this configuration, `dstack` will create cloud instances using the configured backends according 
-    to the specified parameters. Note that this is not supported for the `kubernetes`, `vastai`, and `runpod` backends.
+    to the specified parameters.
 
     !!! info "Network"
         Set `placement` to `cluster` if the nodes should be interconnected (e.g. if you'd like to use them for multi-node tasks). 
         In that case, `dstack` will provision all nodes in the same backend and region.
 
-=== "On-prem fleets"
+    Note that cloud fleets aren't supported for the `kubernetes`, `vastai`, and `runpod` backends.
 
-    If you’d like to run dev environments, tasks, and services on your on-prem servers that you have access to, you can
-    create an on-prem fleet by providing `dstack` with the hostnames of these servers and the details for connecting to them
+=== "On-prem"
+
+    !!! info "What is an on-prem fleet?"
+        If you’d like to run dev environments, tasks, and services on arbitrary on-prem servers via `dstack`, you can 
+        create an on-prem fleet.
+
+    To create an on-prem fleet, specify `ssh_config` to allow the `dstack` server to connect to these servers
     via SSH.
-
-    To create an on-prem fleet, specify `hosts`, `user`, `port`, and `identity_file` under `ssh_config`.
 
     <div editor-title="fleet-on-prem.dstack.yml"> 
     
@@ -119,6 +122,8 @@ are both acceptable).
         Set `placement` to `cluster` if the hosts are interconnected (e.g. if you'd like to use them for multi-node tasks).
         In that case, by default, `dstack` will automatically detect the private network. 
         You can specify the [`network`](../reference/dstack.yml/fleet.md#network) parameter manually.
+
+    Note that to use on-prem fleets, you don't need any backends at all.
 
 > See [`.dstack.yml`](../reference/dstack.yml/fleet.md) for all the options supported by
 > the fleet configuration.
