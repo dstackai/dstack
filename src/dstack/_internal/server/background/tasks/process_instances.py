@@ -38,6 +38,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceRuntime,
     InstanceStatus,
+    InstanceType,
     RemoteConnectionInfo,
 )
 from dstack._internal.core.models.profiles import (
@@ -651,7 +652,9 @@ async def check_instance(instance_id: UUID) -> None:
         instance.unreachable = True
 
         if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
-            provisioning_deadline = _get_provisioning_deadline(instance)
+            provisioning_deadline = _get_provisioning_deadline(
+                instance, job_provisioning_data.instance_type
+            )
             if get_current_datetime() > provisioning_deadline:
                 instance.status = InstanceStatus.TERMINATING
                 logger.warning(
@@ -693,7 +696,9 @@ async def wait_for_instance_provisioning_data(
         "Waiting for instance %s to become running",
         instance.name,
     )
-    provisioning_deadline = _get_provisioning_deadline(instance)
+    provisioning_deadline = _get_provisioning_deadline(
+        instance, job_provisioning_data.instance_type
+    )
     if get_current_datetime() > provisioning_deadline:
         logger.warning(
             "Instance %s failed because instance has not become running in time", instance.name
@@ -889,12 +894,19 @@ def _get_retry_duration_deadline(instance: InstanceModel, retry: Retry) -> datet
     )
 
 
-def _get_provisioning_deadline(instance: InstanceModel) -> datetime.datetime:
-    timeout_interval = _get_instance_timeout_interval(backend_type=instance.backend)
+def _get_provisioning_deadline(
+    instance: InstanceModel, instance_type: InstanceType
+) -> datetime.datetime:
+    timeout_interval = _get_instance_timeout_interval(instance.backend, instance_type.name)
     return instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
 
 
-def _get_instance_timeout_interval(backend_type: BackendType) -> timedelta:
+def _get_instance_timeout_interval(
+    backend_type: BackendType, instance_type_name: str
+) -> timedelta:
+    # when changing timeouts, also consider process_running_jobs._get_runner_timeout_interval
     if backend_type == BackendType.RUNPOD:
+        return timedelta(seconds=1200)
+    if backend_type == BackendType.OCI and instance_type_name.startswith("BM."):
         return timedelta(seconds=1200)
     return timedelta(seconds=600)
