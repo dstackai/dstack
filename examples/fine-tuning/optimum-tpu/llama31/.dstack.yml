@@ -19,9 +19,8 @@ env:
 #  - cp examples/fine-tuning/optimum-tpu/llama31/config.yaml optimum-tpu/examples/custom/config.yaml
 #  - cd optimum-tpu
 #  - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
-#  - pip install trl peft
 #  - pip install datasets evaluate
-#  - pip install accelerate>=0.21.0
+#  - pip install accelerate -U
 
 ide: vscode
 
@@ -29,4 +28,4 @@ ide: vscode
 spot_policy: auto
 
 resources:
-  gpu: tpu-v5litepod-8
+  gpu: v5litepod-8

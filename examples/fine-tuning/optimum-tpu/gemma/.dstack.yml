@@ -26,4 +26,4 @@ ide: vscode
 spot_policy: auto
 
 resources:
-  gpu: tpu-v5litepod-8
+  gpu: v5litepod-8

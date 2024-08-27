@@ -224,6 +224,7 @@ nav:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
   - Examples:
+<<<<<<< HEAD
     - examples.md
     - Fine-tuning:
         - Axolotl: examples/fine-tuning/axolotl/index.md
@@ -231,6 +232,7 @@ nav:
         - TRL: examples/fine-tuning/trl/index.md
     - Accelerators:
         - AMD: examples/accelerators/amd/index.md
+        - TPU: docs/examples/accelerators/tpu/index.md
     - LLMs:
         - Llama 3.1: examples/llms/llama31/index.md
   - Blog:
