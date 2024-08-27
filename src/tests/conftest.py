@@ -3,6 +3,9 @@ import pytest
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "ui: mark test as testing UI to run only with --runui")
+    config.addinivalue_line(
+        "markers", "postgres: mark test as testing Postgres to run only with --runpostgres"
+    )
 
 
 def pytest_addoption(parser):
@@ -13,9 +16,10 @@ def pytest_addoption(parser):
 
 
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("--runui"):
-        return
     skip_ui = pytest.mark.skip(reason="need --runui option to run")
+    skip_postgres = pytest.mark.skip(reason="need --runpostgres option to run")
     for item in items:
-        if "ui" in item.keywords:
+        if not config.getoption("--runui") and "ui" in item.keywords:
             item.add_marker(skip_ui)
+        if not config.getoption("--runpostgres") and "postgres" in item.keywords:
+            item.add_marker(skip_postgres)
