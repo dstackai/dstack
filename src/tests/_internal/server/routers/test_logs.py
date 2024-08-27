@@ -1,30 +1,31 @@
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.main import app
 from dstack._internal.server.services.logs import FileLogStorage
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import create_project, create_user, get_auth_headers
 
-client = TestClient(app)
-
 
 class TestPollLogs:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/logs/poll",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_logs(
-        self, test_db, test_log_storage: FileLogStorage, session: AsyncSession
+        self, test_db, test_log_storage: FileLogStorage, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -46,7 +47,7 @@ class TestPollLogs:
             '{"timestamp": "2023-10-06T10:01:53.234235+00:00", "log_source": "stdout", "message": "World"}\n'
             '{"timestamp": "2023-10-06T10:01:53.234236+00:00", "log_source": "stdout", "message": "!"}\n'
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/logs/poll",
             headers=get_auth_headers(user.token),
             json={
@@ -75,7 +76,7 @@ class TestPollLogs:
                 },
             ]
         }
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/logs/poll",
             headers=get_auth_headers(user.token),
             json={

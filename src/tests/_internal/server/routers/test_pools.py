@@ -1,15 +1,14 @@
 import datetime as dt
 
 import pytest
-from fastapi.testclient import TestClient
 from freezegun import freeze_time
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.main import app
 from dstack._internal.server.models import PoolModel
 from dstack._internal.server.schemas.pools import (
     CreatePoolRequest,
@@ -28,31 +27,35 @@ from dstack._internal.server.testing.common import (
     get_auth_headers,
 )
 
-client = TestClient(app)
-
 TEST_POOL_NAME = "test_router_pool_name"
 
 
 class TestListPools:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/list",
             json={},
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(dt.datetime(2023, 10, 4, 12, 0, tzinfo=dt.timezone.utc))
-    async def test_creates_and_lists_default_pool(self, test_db, session: AsyncSession):
+    async def test_creates_and_lists_default_pool(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/list",
             headers=get_auth_headers(user.token),
             json={},
@@ -73,24 +76,28 @@ class TestListPools:
 
 class TestDeletePool:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/delete",
             json=DeletePoolRequest(name=TEST_POOL_NAME, force=False).dict(),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_delete_last_pool(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_delete_last_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         pool = await create_pool(session, project, pool_name=TEST_POOL_NAME)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/delete",
             headers=get_auth_headers(user.token),
             json=DeletePoolRequest(name=TEST_POOL_NAME, force=False).dict(),
@@ -98,7 +105,7 @@ class TestDeletePool:
         assert response.status_code == 200
         assert response.json() is None
 
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/list",
             headers=get_auth_headers(user.token),
             json={},
@@ -113,7 +120,8 @@ class TestDeletePool:
         assert dt.datetime.fromisoformat(default_pool["created_at"]) > pool.created_at
 
     @pytest.mark.asyncio
-    async def test_deletes_pool(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_deletes_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -121,7 +129,7 @@ class TestDeletePool:
         )
         pool1 = await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-left")
         pool2 = await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-right")
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/delete",
             headers=get_auth_headers(user.token),
             json=DeletePoolRequest(name=pool1.name, force=False).dict(),
@@ -133,13 +141,16 @@ class TestDeletePool:
         assert pool.name == pool2.name
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_pool_missing(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_pool_missing(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/delete",
             headers=get_auth_headers(user.token),
             json=DeletePoolRequest(name="missing name", force=False).dict(),
@@ -149,24 +160,28 @@ class TestDeletePool:
 
 class TestSetDefaultPool:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/set_default",
             json=SetDefaultPoolRequest(pool_name=TEST_POOL_NAME).dict(),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_sets_default(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_sets_default(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
         pool = await create_pool(session, project, pool_name=f"{TEST_POOL_NAME}-right")
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/set_default",
             headers=get_auth_headers(user.token),
             json=SetDefaultPoolRequest(pool_name=pool.name).dict(),
@@ -176,13 +191,16 @@ class TestSetDefaultPool:
         assert project.default_pool_id == pool.id
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_pool_missing(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_pool_missing(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/set_default",
             headers=get_auth_headers(user.token),
             json=SetDefaultPoolRequest(pool_name="missing pool").dict(),
@@ -192,23 +210,27 @@ class TestSetDefaultPool:
 
 class TestCreatePool:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/create",
             json=CreatePoolRequest(name=TEST_POOL_NAME).dict(),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_create_pool(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_create_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/create",
             headers=get_auth_headers(user.token),
             json=CreatePoolRequest(name=TEST_POOL_NAME).dict(),
@@ -219,20 +241,23 @@ class TestCreatePool:
         res.scalar_one()
 
     @pytest.mark.asyncio
-    async def test_returns_400_on_duplicate_name(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_on_duplicate_name(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/create",
             headers=get_auth_headers(user.token),
             json=CreatePoolRequest(name=TEST_POOL_NAME).dict(),
         )
         assert response.status_code == 200
         assert response.json() is None
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/create",
             headers=get_auth_headers(user.token),
             json=CreatePoolRequest(name=TEST_POOL_NAME).dict(),
@@ -242,17 +267,21 @@ class TestCreatePool:
 
 class TestShowPool:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/show",
             json=CreatePoolRequest(name=TEST_POOL_NAME).dict(),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_show_pool(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_show_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -264,7 +293,7 @@ class TestShowPool:
             project=project,
             pool=pool,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/show",
             headers=get_auth_headers(user.token),
             json=ShowPoolRequest(name=TEST_POOL_NAME).dict(),
@@ -303,7 +332,8 @@ class TestShowPool:
         }
 
     @pytest.mark.asyncio
-    async def test_show_missing_pool(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_show_missing_pool(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -315,7 +345,7 @@ class TestShowPool:
             project=project,
             pool=pool,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/show",
             headers=get_auth_headers(user.token),
             json=ShowPoolRequest(name="missing_pool").dict(),
@@ -328,7 +358,10 @@ class TestShowPool:
 
 class TestAddRemote:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         remote = AddRemoteInstanceRequest(
@@ -341,14 +374,15 @@ class TestAddRemote:
             ssh_user="user",
             ssh_keys=[SSHKey(public="abc")],
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/add_remote",
             json=remote.dict(),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_add_remote(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_add_remote(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -364,7 +398,7 @@ class TestAddRemote:
             ssh_user="user",
             ssh_keys=[SSHKey(public="abc")],
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/add_remote",
             headers=get_auth_headers(user.token),
             json=remote.dict(),
@@ -378,7 +412,10 @@ class TestAddRemote:
 
 class TestRemoveInstance:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         remote = AddRemoteInstanceRequest(
@@ -391,14 +428,15 @@ class TestRemoveInstance:
             ssh_user="user",
             ssh_keys=[SSHKey(public="abc")],
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/add_remote",
             json=remote.dict(),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_remove_instance(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_remove_instance(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -410,7 +448,7 @@ class TestRemoveInstance:
             project=project,
             pool=pool,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/remove",
             headers=get_auth_headers(user.token),
             json=RemoveInstanceRequest(
@@ -421,7 +459,7 @@ class TestRemoveInstance:
         assert response.status_code == 200
         assert response.json() is None
 
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/pool/show",
             headers=get_auth_headers(user.token),
             json=ShowPoolRequest(name=TEST_POOL_NAME).dict(),
@@ -462,15 +500,19 @@ class TestRemoveInstance:
 
 class TestListInstances:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post(
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post(
             "/api/pools/list_instances",
             json={},
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_lists_instances(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_lists_instances(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -489,7 +531,7 @@ class TestListInstances:
             pool=pool,
             created_at=dt.datetime(2023, 10, 5, 12, 0, tzinfo=dt.timezone.utc),
         )
-        response = client.post(
+        response = await client.post(
             "/api/pools/list_instances",
             headers=get_auth_headers(user.token),
             json={},
@@ -501,7 +543,10 @@ class TestListInstances:
         assert response_json[1]["id"] == str(instance1.id)
 
     @pytest.mark.asyncio
-    async def test_lists_paginated_instances(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_lists_paginated_instances(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -526,7 +571,7 @@ class TestListInstances:
             pool=pool,
             created_at=dt.datetime(2023, 10, 6, 12, 0, tzinfo=dt.timezone.utc),
         )
-        response = client.post(
+        response = await client.post(
             "/api/pools/list_instances",
             headers=get_auth_headers(user.token),
             json={"limit": 2},
@@ -536,7 +581,7 @@ class TestListInstances:
         assert len(response_json) == 2
         assert response_json[0]["id"] == str(instance3.id)
         assert response_json[1]["id"] == str(instance1.id)
-        response = client.post(
+        response = await client.post(
             "/api/pools/list_instances",
             headers=get_auth_headers(user.token),
             json={

@@ -1,12 +1,11 @@
 import json
 
 import pytest
-from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.main import app
 from dstack._internal.server.models import CodeModel, RepoModel
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
@@ -16,28 +15,30 @@ from dstack._internal.server.testing.common import (
     get_auth_headers,
 )
 
-client = TestClient(app)
-
 
 class TestListRepos:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/list",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_returns_empty_list(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_empty_list(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/list",
             headers=get_auth_headers(user.token),
         )
@@ -45,14 +46,15 @@ class TestListRepos:
         assert response.json() == []
 
     @pytest.mark.asyncio
-    async def test_returns_repos(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_repos(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         repo = await create_repo(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/list",
             headers=get_auth_headers(user.token),
         )
@@ -67,23 +69,29 @@ class TestListRepos:
 
 class TestGetRepo:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/get",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_repo_does_not_exist(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_repo_does_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/get",
             headers=get_auth_headers(user.token),
             json={"repo_id": "some_repo", "include_creds": False},
@@ -91,14 +99,15 @@ class TestGetRepo:
         assert response.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_returns_repo(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_repo(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         repo = await create_repo(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/get",
             headers=get_auth_headers(user.token),
             json={"repo_id": repo.name, "include_creds": False},
@@ -111,14 +120,17 @@ class TestGetRepo:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_repo_with_creds(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_repo_with_creds(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         repo = await create_repo(session=session, project_id=project.id)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/get",
             headers=get_auth_headers(user.token),
             json={"repo_id": repo.name, "include_creds": True},
@@ -133,17 +145,21 @@ class TestGetRepo:
 
 class TestInitRepo:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/init",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_creates_remote_repo(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_creates_remote_repo(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -165,7 +181,7 @@ class TestInitRepo:
                 "oauth_token": "test_token",
             },
         }
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/init",
             headers=get_auth_headers(user.token),
             json=body,
@@ -178,7 +194,8 @@ class TestInitRepo:
         assert json.loads(repo.creds) == body["repo_creds"]
 
     @pytest.mark.asyncio
-    async def test_updates_remote_repo(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_updates_remote_repo(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -200,7 +217,7 @@ class TestInitRepo:
                 "oauth_token": "test_token",
             },
         }
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/init",
             headers=get_auth_headers(user.token),
             json=body1,
@@ -222,7 +239,7 @@ class TestInitRepo:
                 "oauth_token": "test_token_updated",
             },
         }
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/init",
             headers=get_auth_headers(user.token),
             json=body2,
@@ -234,24 +251,28 @@ class TestInitRepo:
 
 class TestDeleteRepos:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/delete",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_deletes_repos(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_deletes_repos(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
         repo = await create_repo(session=session, project_id=project.id)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/delete",
             headers=get_auth_headers(user.token),
             json={"repos_ids": [repo.name]},
@@ -264,10 +285,13 @@ class TestDeleteRepos:
 
 class TestUploadCode:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/upload_code",
             headers=get_auth_headers(user.token),
             params={"repo_id": "test_repo"},
@@ -275,7 +299,8 @@ class TestUploadCode:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_uploads_code(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_uploads_code(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -283,7 +308,7 @@ class TestUploadCode:
         )
         repo = await create_repo(session=session, project_id=project.id)
         file = ("blob_hash", b"blob_content")
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/upload_code",
             headers=get_auth_headers(user.token),
             params={"repo_id": repo.name},
@@ -296,7 +321,10 @@ class TestUploadCode:
         assert code.blob == file[1]
 
     @pytest.mark.asyncio
-    async def test_uploads_same_code_for_different_repos(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_uploads_same_code_for_different_repos(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -305,14 +333,14 @@ class TestUploadCode:
         repo1 = await create_repo(session=session, repo_name="repo1", project_id=project.id)
         repo2 = await create_repo(session=session, repo_name="repo2", project_id=project.id)
         file = ("blob_hash", b"blob_content")
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/upload_code",
             headers=get_auth_headers(user.token),
             params={"repo_id": repo1.name},
             files={"file": file},
         )
         assert response.status_code == 200, response.json()
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/repos/upload_code",
             headers=get_auth_headers(user.token),
             params={"repo_id": repo2.name},

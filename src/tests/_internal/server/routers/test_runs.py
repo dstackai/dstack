@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -339,12 +340,16 @@ def get_dev_env_run_dict(
 
 class TestListRuns:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/runs/list")
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/runs/list")
         assert response.status_code in [401, 403]
 
     @pytest.mark.asyncio
-    async def test_lists_runs(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_lists_runs(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -379,7 +384,7 @@ class TestListRuns:
             submitted_at=run2_submitted_at,
         )
         run2_spec = RunSpec.parse_raw(run2.run_spec)
-        response = client.post(
+        response = await client.post(
             "/api/runs/list",
             headers=get_auth_headers(user.token),
             json={},
@@ -444,7 +449,10 @@ class TestListRuns:
         ]
 
     @pytest.mark.asyncio
-    async def test_lists_runs_pagination(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_lists_runs_pagination(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -477,7 +485,7 @@ class TestListRuns:
             user=user,
             submitted_at=datetime(2023, 1, 2, 5, 15, tzinfo=timezone.utc),
         )
-        response1 = client.post(
+        response1 = await client.post(
             "/api/runs/list",
             headers=get_auth_headers(user.token),
             json={"limit": 2},
@@ -487,7 +495,7 @@ class TestListRuns:
         assert len(response1_json) == 2
         assert response1_json[0]["id"] == str(run3.id)
         assert response1_json[1]["id"] == str(run1.id)
-        response2 = client.post(
+        response2 = await client.post(
             "/api/runs/list",
             headers=get_auth_headers(user.token),
             json={
@@ -504,17 +512,21 @@ class TestListRuns:
 
 class TestGetRunPlan:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/get_plan",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_returns_run_plan(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_run_plan(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -547,7 +559,7 @@ class TestGetRunPlan:
             m.return_value = [backend_mock]
             backend_mock.TYPE = BackendType.AWS
             backend_mock.compute.return_value.get_offers.return_value = offers
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/runs/get_plan",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -558,17 +570,21 @@ class TestGetRunPlan:
 
 class TestSubmitRun:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/submit",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_submits_run(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_submits_run(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -599,7 +615,7 @@ class TestSubmitRun:
             get_project_backends_mock.return_value = [Mock()]
             uuid_mock.return_value = run_id
             datetime_mock.return_value = submitted_at
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/runs/submit",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -614,7 +630,10 @@ class TestSubmitRun:
         assert job is not None
 
     @pytest.mark.asyncio
-    async def test_submits_run_without_run_name(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_submits_run_without_run_name(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -633,7 +652,7 @@ class TestSubmitRun:
         ) as get_project_backends_mock:
             get_project_backends_mock.return_value = [Mock()]
             uuid_mock.return_value = run_dict["id"]
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/runs/submit",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -648,6 +667,7 @@ class TestSubmitRun:
         assert job is not None
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @pytest.mark.parametrize(
         "run_name",
         [
@@ -657,7 +677,7 @@ class TestSubmitRun:
         ],
     )
     async def test_returns_400_if_bad_run_name(
-        self, test_db, session: AsyncSession, run_name: str
+        self, test_db, session: AsyncSession, client: AsyncClient, run_name: str
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -677,7 +697,7 @@ class TestSubmitRun:
         ) as get_project_backends_mock:
             get_project_backends_mock.return_value = [Mock()]
             uuid_mock.return_value = run_dict["id"]
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/runs/submit",
                 headers=get_auth_headers(user.token),
                 json=body,
@@ -685,7 +705,10 @@ class TestSubmitRun:
         assert response.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_repo_does_not_exist(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_repo_does_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -697,7 +720,7 @@ class TestSubmitRun:
             repo_id="repo1234",
         )
         body = {"run_spec": run_dict["run_spec"]}
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/submit",
             headers=get_auth_headers(user.token),
             json=body,
@@ -707,17 +730,23 @@ class TestSubmitRun:
 
 class TestStopRuns:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/stop",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_terminates_submitted_run(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_terminates_submitted_run(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -737,7 +766,7 @@ class TestStopRuns:
             session=session,
             run=run,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/stop",
             headers=get_auth_headers(user.token),
             json={"runs_names": [run.run_name], "abort": False},
@@ -751,7 +780,10 @@ class TestStopRuns:
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
-    async def test_terminates_running_run(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_terminates_running_run(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session)
         await add_project_member(
@@ -775,7 +807,7 @@ class TestStopRuns:
             status=JobStatus.RUNNING,
         )
         with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/runs/stop",
                 headers=get_auth_headers(user.token),
                 json={"runs_names": [run.run_name], "abort": False},
@@ -790,7 +822,10 @@ class TestStopRuns:
         assert job.termination_reason == JobTerminationReason.TERMINATED_BY_USER
 
     @pytest.mark.asyncio
-    async def test_leaves_finished_runs_unchanged(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_leaves_finished_runs_unchanged(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -812,7 +847,7 @@ class TestStopRuns:
             run=run,
             status=JobStatus.FAILED,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/stop",
             headers=get_auth_headers(user.token),
             json={"runs_names": [run.run_name], "abort": False},
@@ -824,17 +859,21 @@ class TestStopRuns:
 
 class TestDeleteRuns:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/delete",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_deletes_runs(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_deletes_runs(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -858,7 +897,7 @@ class TestDeleteRuns:
         )
         session.add(run)
         await session.commit()
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/delete",
             headers=get_auth_headers(user.token),
             json={"runs_names": [run.run_name]},
@@ -870,7 +909,10 @@ class TestDeleteRuns:
         assert job.status == JobStatus.FAILED
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_runs_active(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_runs_active(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -890,7 +932,7 @@ class TestDeleteRuns:
             session=session,
             run=run,
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/delete",
             headers=get_auth_headers(user.token),
             json={"runs_names": [run.run_name]},
@@ -904,17 +946,21 @@ class TestDeleteRuns:
 
 class TestCreateInstance:
     @pytest.mark.asyncio
-    async def test_returns_403_if_not_project_member(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/runs/create_instance",
             headers=get_auth_headers(user.token),
         )
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_creates_instance(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_creates_instance(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -957,7 +1003,7 @@ class TestCreateInstance:
             )
             backend.TYPE = BackendType.AWS
             run_plan_by_req.return_value = [(backend, offer)]
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/runs/create_instance",
                 headers=get_auth_headers(user.token),
                 json=request.dict(),
@@ -983,8 +1029,9 @@ class TestCreateInstance:
             assert result == expected
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_error_if_backends_do_not_support_create_instance(
-        self, test_db, session: AsyncSession
+        self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
@@ -1013,7 +1060,7 @@ class TestCreateInstance:
             backend.compute.return_value.get_offers.return_value = [offer]
             backend.compute.return_value.create_instance.side_effect = NotImplementedError()
             run_plan_by_req.return_value = [(backend, offer)]
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/runs/create_instance",
                 headers=get_auth_headers(user.token),
                 json=request.dict(),
@@ -1022,7 +1069,10 @@ class TestCreateInstance:
             await process_instances()
 
     @pytest.mark.asyncio
-    async def test_backend_does_not_support_create_instance(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_backend_does_not_support_create_instance(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -1053,7 +1103,7 @@ class TestCreateInstance:
             backend.compute.return_value.create_instance.side_effect = NotImplementedError()
             run_plan_by_req.return_value = [(backend, offers)]
 
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/runs/create_instance",
                 headers=get_auth_headers(user.token),
                 json=request.dict(),
