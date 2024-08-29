@@ -11,6 +11,7 @@ import paramiko
 from filelock import FileLock
 from paramiko.config import SSHConfig
 from paramiko.pkey import PKey, PublicBlob
+from paramiko.ssh_exception import SSHException
 
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike
@@ -19,6 +20,8 @@ logger = get_logger(__name__)
 
 
 default_ssh_config_path = "~/.ssh/config"
+
+SUPPORTED_KEY_TYPES = (paramiko.RSAKey, paramiko.ECDSAKey, paramiko.Ed25519Key)
 
 
 def get_public_key_fingerprint(text: str) -> str:
@@ -147,11 +150,17 @@ def convert_pkcs8_to_pem(private_string: str) -> str:
     return private_string
 
 
-def rsa_pkey_from_str(private_string: str) -> PKey:
-    key_file = io.StringIO(private_string.strip())
-    pkey = paramiko.RSAKey.from_private_key(key_file)
-    key_file.close()
-    return pkey
+def pkey_from_str(private_string: str) -> PKey:
+    for key_type in SUPPORTED_KEY_TYPES:
+        try:
+            key_file = io.StringIO(private_string.strip())
+            pkey = key_type.from_private_key(key_file)
+            key_file.close()
+            return pkey
+        except (SSHException, ValueError):
+            pass
+
+    raise ValueError("Unsupported key type")
 
 
 def generate_public_key(private_key: PKey) -> str:
