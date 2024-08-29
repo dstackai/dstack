@@ -96,6 +96,51 @@ More [details](https://litestream.io/guides/) on options for configuring replica
 
 _**️Note:** The use of Litestream requires that only one instance of the `dstack` server is running at a time._
 
+## Workload log storage
+
+By default, `dstack` stores workload logs in `~/.dstack/server/projects/<project_name>/logs`.
+
+To use AWS CloudWatch Logs, set the `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP` and optionally
+the `DSTACK_SERVER_CLOUDWATCH_LOG_REGION` environment variables. The log group must be created beforehand,
+`dstack` won't try to create it.
+
+The following permissions are required: `logs:DescribeLogStreams`, `logs:CreateLogStream`, `logs:GetLogEvents`, `logs:PutLogEvents`.
+
+<details>
+  <summary>AWS IAM Policy example</summary>
+
+  Given:
+
+  - AWS Account ID: 112233445566
+  - `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP=dstack-runs`
+  - `DSTACK_SERVER_CLOUDWATCH_LOG_REGION=eu-west-1`
+
+  Policy:
+
+  ```json
+  {
+      "Version": "2012-10-17",
+      "Statement": [
+          {
+              "Sid": "DstackLogStorageAllow",
+              "Effect": "Allow",
+              "Action": [
+                  "logs:DescribeLogStreams",
+                  "logs:CreateLogStream",
+                  "logs:GetLogEvents",
+                  "logs:PutLogEvents"
+              ],
+              "Resource": [
+                  "arn:aws:logs:eu-west-1:112233445566:log-group:dstack-runs",
+                  "arn:aws:logs:eu-west-1:112233445566:log-group:dstack-runs:*"
+              ]
+          }
+      ]
+  }
+  ```
+
+</details>
+
 ## More information
 
 For additional information and examples, see the following links:
