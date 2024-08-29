@@ -51,7 +51,6 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services.docker import parse_image_name
-from dstack._internal.server.services.jobs import PROCESSING_INSTANCES_LOCK
 from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
@@ -186,17 +185,18 @@ async def remove_instance(
     instance_name: str,
     force: bool,
 ):
+    # This is a buggy function since it doesn't lock instances (and never did correctly).
+    # No need to fix it since it's deprecated.
     pool = await get_pool(session, project, pool_name)
     if pool is None:
         raise ResourceNotExistsError("Pool not found")
-    async with PROCESSING_INSTANCES_LOCK:
-        terminated = False
-        for instance in pool.instances:
-            if instance.name == instance_name:
-                if force or instance.job_id is None:
-                    instance.status = InstanceStatus.TERMINATING
-                    terminated = True
-        await session.commit()
+    terminated = False
+    for instance in pool.instances:
+        if instance.name == instance_name:
+            if force or instance.job_id is None:
+                instance.status = InstanceStatus.TERMINATING
+                terminated = True
+    await session.commit()
     if not terminated:
         raise ResourceNotExistsError("Could not find instance to terminate")
 

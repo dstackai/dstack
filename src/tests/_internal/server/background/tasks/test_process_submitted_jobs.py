@@ -14,17 +14,14 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile, ProfileRetryPolicy
+from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobStatus,
     JobTerminationReason,
 )
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
-from dstack._internal.server.models import JobModel, ProjectModel
-from dstack._internal.server.services.pools import (
-    get_or_create_pool_by_name,
-)
+from dstack._internal.server.models import JobModel
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
@@ -44,6 +41,7 @@ class TestProcessSubmittedJobs:
     async def test_fails_job_when_no_backends(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
+        await create_pool(session=session, project=project)
         repo = await create_repo(
             session=session,
             project_id=project.id,
@@ -57,6 +55,7 @@ class TestProcessSubmittedJobs:
         job = await create_job(
             session=session,
             run=run,
+            instance_assigned=True,
         )
         await process_submitted_jobs()
         await session.refresh(job)
@@ -69,6 +68,7 @@ class TestProcessSubmittedJobs:
     async def test_provisiones_job(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
+        pool = await create_pool(session=session, project=project)
         repo = await create_repo(
             session=session,
             project_id=project.id,
@@ -82,6 +82,7 @@ class TestProcessSubmittedJobs:
         job = await create_job(
             session=session,
             run=run,
+            instance_assigned=True,
         )
         offer = InstanceOfferWithAvailability(
             backend=BackendType.AWS,
@@ -121,20 +122,10 @@ class TestProcessSubmittedJobs:
         assert job is not None
         assert job.status == JobStatus.PROVISIONING
 
-        res = await session.execute(
-            select(ProjectModel)
-            .where(ProjectModel.id == project.id)
-            .options(joinedload(ProjectModel.default_pool))
-        )
-        project = res.scalar_one()
-        assert project.default_pool.name == DEFAULT_POOL_NAME
-
-        instance_offer = InstanceOfferWithAvailability.parse_raw(
-            project.default_pool.instances[0].offer
-        )
+        await session.refresh(pool)
+        instance_offer = InstanceOfferWithAvailability.parse_raw(pool.instances[0].offer)
         assert offer == instance_offer
-
-        pool_job_provisioning_data = project.default_pool.instances[0].job_provisioning_data
+        pool_job_provisioning_data = pool.instances[0].job_provisioning_data
         assert pool_job_provisioning_data == job.job_provisioning_data
 
     @pytest.mark.asyncio
@@ -142,6 +133,7 @@ class TestProcessSubmittedJobs:
     async def test_fails_job_when_no_capacity(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
+        pool = await create_pool(session=session, project=project)
         repo = await create_repo(
             session=session,
             project_id=project.id,
@@ -165,6 +157,7 @@ class TestProcessSubmittedJobs:
             session=session,
             run=run,
             submitted_at=datetime(2023, 1, 2, 3, 0, 0, tzinfo=timezone.utc),
+            instance_assigned=True,
         )
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = datetime(2023, 1, 2, 3, 30, 0, tzinfo=timezone.utc)
@@ -174,25 +167,19 @@ class TestProcessSubmittedJobs:
         assert job is not None
         assert job.status == JobStatus.TERMINATING
         assert job.termination_reason == JobTerminationReason.FAILED_TO_START_DUE_TO_NO_CAPACITY
-
-        res = await session.execute(
-            select(ProjectModel)
-            .where(ProjectModel.id == project.id)
-            .options(joinedload(ProjectModel.default_pool))
-        )
-        project = res.scalar_one()
-        assert not project.default_pool.instances
+        await session.refresh(pool)
+        assert not pool.instances
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_job_with_instance(self, test_db, session: AsyncSession):
+    async def test_assignes_job_to_instance(self, test_db, session: AsyncSession):
         project = await create_project(session)
         user = await create_user(session)
+        pool = await create_pool(session=session, project=project)
         repo = await create_repo(
             session=session,
             project_id=project.id,
         )
-        pool = await get_or_create_pool_by_name(session, project, pool_name=None)
         instance = await create_instance(
             session=session,
             project=project,
@@ -209,13 +196,16 @@ class TestProcessSubmittedJobs:
         job = await create_job(
             session=session,
             run=run,
+            instance_assigned=False,
         )
         await process_submitted_jobs()
         await session.refresh(job)
         res = await session.execute(select(JobModel).options(joinedload(JobModel.instance)))
         job = res.scalar_one()
-        assert job.status == JobStatus.PROVISIONING
-        assert job.instance is not None and job.instance.id == instance.id
+        assert job.status == JobStatus.SUBMITTED
+        assert (
+            job.instance_assigned and job.instance is not None and job.instance.id == instance.id
+        )
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
@@ -243,6 +233,7 @@ class TestProcessSubmittedJobs:
         job = await create_job(
             session=session,
             run=run,
+            instance_assigned=True,
         )
         await session.commit()
 

@@ -441,7 +441,7 @@ class TestDeleteGateway:
             gcp = Mock()
             gcp.compute.return_value.terminate_gateway.side_effect = DstackError()  # fail
 
-            def get_backend(_, backend_type):
+            def get_backend(project, backend_type):
                 return {BackendType.AWS: aws, BackendType.GCP: gcp}[backend_type]
 
             m.side_effect = get_backend

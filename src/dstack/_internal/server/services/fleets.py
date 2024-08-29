@@ -1,11 +1,10 @@
-import asyncio
 import uuid
 from datetime import timezone
 from typing import List, Optional, Union
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from dstack._internal.core.errors import (
     ForbiddenError,
@@ -34,20 +33,12 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import pools as pools_services
-from dstack._internal.server.services.jobs import (
-    PROCESSING_INSTANCES_IDS,
-    PROCESSING_INSTANCES_LOCK,
-)
+from dstack._internal.server.services.locking import db_locker, wait_to_lock_many
 from dstack._internal.server.services.projects import get_member, get_member_permissions
-from dstack._internal.server.utils.common import wait_to_lock_many
 from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-PROCESSING_FLEETS_LOCK = asyncio.Lock()
-PROCESSING_FLEETS_IDS = set()
 
 
 async def list_project_fleets(
@@ -243,18 +234,26 @@ async def delete_fleets(
     instance_nums: Optional[List[int]] = None,
 ):
     res = await session.execute(
-        select(FleetModel).where(
+        select(FleetModel)
+        .where(
             FleetModel.project_id == project.id,
             FleetModel.name.in_(names),
             FleetModel.deleted == False,
         )
+        .options(joinedload(FleetModel.instances))
     )
-    fleet_models = res.scalars().all()
-    fleets_ids = sorted([v.id for v in fleet_models])
+    fleet_models = res.scalars().unique().all()
+    fleets_ids = sorted([f.id for f in fleet_models])
+    instances_ids = sorted([i.id for f in fleet_models for i in f.instances])
+    await session.commit()
     logger.info("Deleting fleets: %s", [v.name for v in fleet_models])
-    await wait_to_lock_many(PROCESSING_FLEETS_LOCK, PROCESSING_FLEETS_IDS, fleets_ids)
+    fleet_lock, fleet_lockset = db_locker.get_lock_and_lockset(FleetModel.__tablename__)
+    instance_lock, instance_lockset = db_locker.get_lock_and_lockset(InstanceModel.__tablename__)
+    await wait_to_lock_many(fleet_lock, fleet_lockset, fleets_ids)
+    await wait_to_lock_many(instance_lock, instance_lockset, instances_ids)
     try:
         # Refetch after lock
+        # TODO lock instances with FOR UPDATE?
         res = await session.execute(
             select(FleetModel)
             .where(
@@ -262,9 +261,10 @@ async def delete_fleets(
                 FleetModel.name.in_(names),
                 FleetModel.deleted == False,
             )
-            .options(joinedload(FleetModel.instances))
-            .options(joinedload(FleetModel.runs))
+            .options(selectinload(FleetModel.instances))
+            .options(selectinload(FleetModel.runs))
             .execution_options(populate_existing=True)
+            .with_for_update()
         )
         fleet_models = res.scalars().unique().all()
         fleets = [fleet_model_to_fleet(m) for m in fleet_models]
@@ -272,13 +272,14 @@ async def delete_fleets(
             if fleet.spec.configuration.ssh_config is not None:
                 _check_can_manage_ssh_fleets(user=user, project=project)
         for fleet_model in fleet_models:
-            await _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
-        # TERMINATING fleets are deleted by process_fleets after instances are terminated
-        if instance_nums is None:
-            fleet_model.status = FleetStatus.TERMINATING
+            _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
+            # TERMINATING fleets are deleted by process_fleets after instances are terminated
+            if instance_nums is None:
+                fleet_model.status = FleetStatus.TERMINATING
         await session.commit()
     finally:
-        PROCESSING_FLEETS_IDS.difference_update(fleets_ids)
+        instance_lockset.difference_update(instances_ids)
+        fleet_lockset.difference_update(fleets_ids)
 
 
 def fleet_model_to_fleet(fleet_model: FleetModel, include_sensitive: bool = False) -> Fleet:
@@ -374,19 +375,14 @@ def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:
     return spec.configuration.nodes.min
 
 
-async def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):
+def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):
     if is_fleet_in_use(fleet_model, instance_nums=instance_nums):
         if instance_nums is not None:
             raise ServerClientError(
                 f"Failed to delete fleet {fleet_model.name} instances {instance_nums}. Fleet instances are in use."
             )
         raise ServerClientError(f"Failed to delete fleet {fleet_model.name}. Fleet is in use.")
-    instances_ids = sorted([i.id for i in fleet_model.instances])
-    await wait_to_lock_many(PROCESSING_INSTANCES_LOCK, PROCESSING_INSTANCES_IDS, instances_ids)
-    try:
-        for instance in fleet_model.instances:
-            if instance_nums is not None and instance.instance_num not in instance_nums:
-                continue
-            instance.status = InstanceStatus.TERMINATING
-    finally:
-        PROCESSING_INSTANCES_IDS.difference_update(instances_ids)
+    for instance in fleet_model.instances:
+        if instance_nums is not None and instance.instance_num not in instance_nums:
+            continue
+        instance.status = InstanceStatus.TERMINATING

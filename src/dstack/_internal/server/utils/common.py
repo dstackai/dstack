@@ -7,7 +7,6 @@ from typing import (
     List,
     Optional,
     Sequence,
-    Set,
     Tuple,
     TypeVar,
     Union,
@@ -53,55 +52,6 @@ async def gather_map_async(
             ),
         )
     ]
-
-
-KeyT = TypeVar("KeyT")
-
-
-async def wait_unlock(
-    lock: asyncio.Lock, locked: Set[KeyT], keys: Iterable[KeyT], *, delay: float = 0.1
-):
-    """
-    Wait until all keys are unlocked (not presented in the `locked` set).
-    Lock is released during the sleep.
-    """
-    keys_set = set(keys)
-    while True:
-        async with lock:
-            if not keys_set.intersection(locked):
-                return
-        await asyncio.sleep(delay)
-
-
-async def wait_to_lock(lock: asyncio.Lock, locked: Set[KeyT], key: KeyT, *, delay: float = 0.1):
-    """
-    Retry locking until the key is locked.
-    Lock is released during the sleep.
-    """
-    while True:
-        async with lock:
-            if key not in locked:
-                locked.add(key)
-                return
-        await asyncio.sleep(delay)
-
-
-async def wait_to_lock_many(
-    lock: asyncio.Lock, locked: Set[KeyT], keys: List[KeyT], *, delay: float = 0.1
-):
-    """
-    Retry locking until all the keys are locked.
-    Lock is released during the sleep.
-    The keys must be sorted to prevent deadlock.
-    """
-    left_to_lock = keys.copy()
-    while len(left_to_lock) > 0:
-        async with lock:
-            for key in left_to_lock:
-                if key not in locked:
-                    locked.add(key)
-                    left_to_lock.remove(key)
-        await asyncio.sleep(delay)
 
 
 def join_byte_stream_checked(stream: Iterable[bytes], max_size: int) -> Optional[bytes]:

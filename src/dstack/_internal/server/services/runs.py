@@ -3,7 +3,7 @@ import itertools
 import math
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Tuple
 
 import pydantic
 from sqlalchemy import and_, or_, select, update
@@ -76,12 +76,6 @@ from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target, parse_image_name
 from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.jobs import (
-    RUNNING_PROCESSING_JOBS_IDS,
-    RUNNING_PROCESSING_JOBS_LOCK,
-    SUBMITTED_PROCESSING_JOBS_IDS,
-    SUBMITTED_PROCESSING_JOBS_LOCK,
-    TERMINATING_PROCESSING_JOBS_IDS,
-    TERMINATING_PROCESSING_JOBS_LOCK,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
     job_model_to_job_submission,
@@ -92,6 +86,7 @@ from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
+from dstack._internal.server.services.locking import db_locker, wait_to_lock
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
@@ -103,18 +98,11 @@ from dstack._internal.server.services.pools import (
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.services.users import get_user_model_by_name
-from dstack._internal.server.utils.common import wait_to_lock, wait_unlock
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
 
 logger = get_logger(__name__)
 
-# Run processing task must acquire the lock and add the run id to the set.
-# Run processing has higher priority than job processing.
-# It means that job processing tasks should not take the job if `job.run_id` is in the set.
-# But run processing tasks should wait until job processing tasks release PROCESSING_JOBS locks.
-PROCESSING_RUNS_LOCK = asyncio.Lock()
-PROCESSING_RUNS_IDS: Set[uuid.UUID] = set()
 
 JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
@@ -503,19 +491,22 @@ async def stop_runs(
         )
     )
     runs = res.scalars().all()
-    # TODO(egor-s): consider raising an exception if no runs found
-    # FIXME: not safe to share session between tasks – sqlalchemy can error
-    await asyncio.gather(*(stop_run(session, run, abort) for run in runs))
+    run_ids = sorted([r.id for r in runs])
+    await session.commit()
+    for run_id in run_ids:
+        await stop_run(session=session, run_id=run_id, abort=abort)
 
 
-async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
-    run_id = run.id  # run.id won't load if transaction is rolled back
-    await wait_to_lock(PROCESSING_RUNS_LOCK, PROCESSING_RUNS_IDS, run_id)
+async def stop_run(session: AsyncSession, run_id: uuid.UUID, abort: bool):
+    lock, lockset = db_locker.get_lock_and_lockset(RunModel.__tablename__)
+    await wait_to_lock(lock, lockset, run_id)
     try:
-        await session.refresh(run)
+        res = await session.execute(
+            select(RunModel).where(RunModel.id == run_id).with_for_update()
+        )
+        run = res.scalar_one()
         if run.status.is_finished():
             return
-
         run.status = RunStatus.TERMINATING
         if abort:
             run.termination_reason = RunTerminationReason.ABORTED_BY_USER
@@ -525,11 +516,10 @@ async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
         # process the run out of turn
         logger.debug("%s: terminating because %s", fmt(run), run.termination_reason.name)
         await process_terminating_run(session, run)
-
         run.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
     finally:
-        PROCESSING_RUNS_IDS.remove(run_id)
+        lockset.remove(run_id)
 
 
 async def delete_runs(
@@ -887,20 +877,10 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
     Used by both `process_runs` and `stop_run` to process a run that is TERMINATING.
     Caller must acquire the lock on run.
     """
-
     assert run.termination_reason is not None
     job_termination_reason = run.termination_reason.to_job_termination_reason()
 
-    jobs_ids_set = {job.id for job in run.jobs}
-    await wait_unlock(RUNNING_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_IDS, jobs_ids_set)
-    await wait_unlock(SUBMITTED_PROCESSING_JOBS_LOCK, SUBMITTED_PROCESSING_JOBS_IDS, jobs_ids_set)
-    await wait_unlock(
-        TERMINATING_PROCESSING_JOBS_LOCK, TERMINATING_PROCESSING_JOBS_IDS, jobs_ids_set
-    )
-    await session.refresh(run)
-
     unfinished_jobs_count = 0
-    job: JobModel
     for job in run.jobs:
         if job.status.is_finished():
             continue

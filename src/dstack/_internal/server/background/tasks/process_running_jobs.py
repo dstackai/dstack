@@ -1,6 +1,5 @@
 from datetime import timedelta
 from typing import Dict, List, Optional
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,18 +29,15 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import logs as logs_services
 from dstack._internal.server.services.jobs import (
-    RUNNING_PROCESSING_JOBS_IDS,
-    RUNNING_PROCESSING_JOBS_LOCK,
     find_job,
     job_model_to_job_submission,
 )
+from dstack._internal.server.services.locking import db_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
-    PROCESSING_RUNS_IDS,
-    PROCESSING_RUNS_LOCK,
     get_run_volumes,
     run_model_to_run,
 )
@@ -55,175 +51,138 @@ logger = get_logger(__name__)
 
 
 async def process_running_jobs():
+    lock, lockset = db_locker.get_lock_and_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
-        async with PROCESSING_RUNS_LOCK, RUNNING_PROCESSING_JOBS_LOCK:
+        async with lock:
             res = await session.execute(
                 select(JobModel)
                 .where(
                     JobModel.status.in_(
                         [JobStatus.PROVISIONING, JobStatus.PULLING, JobStatus.RUNNING]
                     ),
-                    JobModel.id.not_in(RUNNING_PROCESSING_JOBS_IDS),
-                    JobModel.run_id.not_in(
-                        PROCESSING_RUNS_IDS
-                    ),  # runs processing has higher priority
+                    JobModel.id.not_in(lockset),
                 )
                 .order_by(JobModel.last_processed_at.asc())
-                .limit(1)  # TODO process multiple at once
+                .limit(1)
+                .with_for_update(skip_locked=True)
             )
             job_model = res.scalar()
             if job_model is None:
                 return
+            lockset.add(job_model.id)
 
-            RUNNING_PROCESSING_JOBS_IDS.add(job_model.id)
-
-    try:
-        job_model_id = job_model.id
-        await _process_job(job_id=job_model_id)
-    finally:
-        RUNNING_PROCESSING_JOBS_IDS.remove(job_model_id)
+        try:
+            job_model_id = job_model.id
+            await _process_running_job(session=session, job_model=job_model)
+        finally:
+            lockset.remove(job_model_id)
 
 
-async def _process_job(job_id: UUID):
-    async with get_session_ctx() as session:
-        res = await session.execute(
-            select(JobModel).where(JobModel.id == job_id).options(joinedload(JobModel.instance))
-        )
-        job_model = res.scalar_one()
-        res = await session.execute(
-            select(RunModel)
-            .where(RunModel.id == job_model.run_id)
-            .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-            .options(joinedload(RunModel.user))
-            .options(joinedload(RunModel.repo))
-        )
-        run_model = res.unique().scalar_one()
-        repo_model = run_model.repo
-        project = run_model.project
-        run = run_model_to_run(run_model)
-        job_submission = job_model_to_job_submission(job_model)
-        job_provisioning_data = job_submission.job_provisioning_data
-        if job_provisioning_data is None:
-            logger.error("%s: job_provisioning_data of an active job is None", fmt(job_model))
-            job_model.status = JobStatus.TERMINATING
-            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+async def _process_running_job(session: AsyncSession, job_model: JobModel):
+    # Refetch to load related attributes.
+    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
+    res = await session.execute(
+        select(JobModel)
+        .where(JobModel.id == job_model.id)
+        .options(joinedload(JobModel.instance))
+        .execution_options(populate_existing=True)
+    )
+    job_model = res.scalar_one()
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == job_model.run_id)
+        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.repo))
+        .options(joinedload(RunModel.jobs))
+    )
+    run_model = res.unique().scalar_one()
+    repo_model = run_model.repo
+    project = run_model.project
+    run = run_model_to_run(run_model)
+    job_submission = job_model_to_job_submission(job_model)
+    job_provisioning_data = job_submission.job_provisioning_data
+    if job_provisioning_data is None:
+        logger.error("%s: job_provisioning_data of an active job is None", fmt(job_model))
+        job_model.status = JobStatus.TERMINATING
+        job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+        job_model.last_processed_at = common_utils.get_current_datetime()
+        return
+
+    job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+
+    # Wait until all other jobs in the replica are provisioned
+    for other_job in run.jobs:
+        if (
+            other_job.job_spec.replica_num == job.job_spec.replica_num
+            and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
+        ):
             job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
             return
 
-        job = find_job(run.jobs, job_model.replica_num, job_model.job_num)
+    master_job = find_job(run.jobs, job_model.replica_num, 0)
+    cluster_info = ClusterInfo(
+        master_job_ip=master_job.job_submissions[-1].job_provisioning_data.internal_ip or "",
+        gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
+    )
 
-        # Wait until all other jobs in the replica are provisioned
-        for other_job in run.jobs:
-            if (
-                other_job.job_spec.replica_num == job.job_spec.replica_num
-                and other_job.job_submissions[-1].status == JobStatus.SUBMITTED
-            ):
-                job_model.last_processed_at = common_utils.get_current_datetime()
-                await session.commit()
-                return
+    volumes = await get_run_volumes(
+        session=session,
+        project=project,
+        run_spec=run.run_spec,
+    )
 
-        master_job = find_job(run.jobs, job_model.replica_num, 0)
-        cluster_info = ClusterInfo(
-            master_job_ip=master_job.job_submissions[-1].job_provisioning_data.internal_ip or "",
-            gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
+    server_ssh_private_key = project.ssh_private_key
+    if (
+        job_model.instance is not None
+        and job_model.instance.remote_connection_info is not None
+        and job_provisioning_data.dockerized
+    ):
+        remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
+            job_model.instance.remote_connection_info
         )
+        server_ssh_private_key = remote_conn_info.ssh_keys[0].private
 
-        volumes = await get_run_volumes(
-            session=session,
-            project=project,
-            run_spec=run.run_spec,
-        )
+    secrets = {}  # TODO secrets
+    repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
 
-        server_ssh_private_key = project.ssh_private_key
-        if (
-            job_model.instance is not None
-            and job_model.instance.remote_connection_info is not None
-            and job_provisioning_data.dockerized
-        ):
-            remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
-                job_model.instance.remote_connection_info
-            )
-            server_ssh_private_key = remote_conn_info.ssh_keys[0].private
-
-        secrets = {}  # TODO secrets
-        repo_creds = repo_model_to_repo_head(repo_model, include_creds=True).repo_creds
-
-        initial_status = job_model.status
-        if initial_status == JobStatus.PROVISIONING:
-            if job_provisioning_data.hostname is None:
-                await _wait_for_instance_provisioning_data(job_model=job_model)
-            else:
-                # fails are acceptable until timeout is exceeded
-                if job_provisioning_data.dockerized:
-                    logger.debug(
-                        "%s: process provisioning job with shim, age=%s",
-                        fmt(job_model),
-                        job_submission.age,
-                    )
-                    ssh_user = job_provisioning_data.username
-                    user_ssh_key = run.run_spec.ssh_key_pub.strip()
-                    public_keys = [project.ssh_public_key.strip(), user_ssh_key]
-                    if job_provisioning_data.backend == BackendType.LOCAL:
-                        # No need to update ~/.ssh/authorized_keys when running shim localy
-                        user_ssh_key = ""
-                    success = await run_async(
-                        _process_provisioning_with_shim,
-                        server_ssh_private_key,
-                        job_provisioning_data,
-                        run,
-                        job_model,
-                        volumes,
-                        secrets,
-                        job.job_spec.registry_auth,
-                        public_keys,
-                        ssh_user,
-                        user_ssh_key,
-                    )
-                else:
-                    logger.debug(
-                        "%s: process provisioning job without shim, age=%s",
-                        fmt(job_model),
-                        job_submission.age,
-                    )
-                    code = await _get_job_code(
-                        session=session,
-                        project=project,
-                        repo=repo_model,
-                        code_hash=run.run_spec.repo_code_hash,
-                    )
-                    success = await run_async(
-                        _process_provisioning_no_shim,
-                        server_ssh_private_key,
-                        job_provisioning_data,
-                        run,
-                        job_model,
-                        job,
-                        cluster_info,
-                        code,
-                        secrets,
-                        repo_creds,
-                    )
-
-                if not success:
-                    # check timeout
-                    if job_submission.age > _get_runner_timeout_interval(
-                        job_provisioning_data.backend, job_provisioning_data.instance_type.name
-                    ):
-                        logger.warning(
-                            "%s: failed because runner has not become available in time, age=%s",
-                            fmt(job_model),
-                            job_submission.age,
-                        )
-                        job_model.status = JobStatus.TERMINATING
-                        job_model.termination_reason = (
-                            JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
-                        )
-                        # instance will be emptied by process_terminating_jobs
-
-        else:  # fails are not acceptable
-            if initial_status == JobStatus.PULLING:
+    initial_status = job_model.status
+    if initial_status == JobStatus.PROVISIONING:
+        if job_provisioning_data.hostname is None:
+            await _wait_for_instance_provisioning_data(job_model=job_model)
+        else:
+            # fails are acceptable until timeout is exceeded
+            if job_provisioning_data.dockerized:
                 logger.debug(
-                    "%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age
+                    "%s: process provisioning job with shim, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
+                )
+                ssh_user = job_provisioning_data.username
+                user_ssh_key = run.run_spec.ssh_key_pub.strip()
+                public_keys = [project.ssh_public_key.strip(), user_ssh_key]
+                if job_provisioning_data.backend == BackendType.LOCAL:
+                    # No need to update ~/.ssh/authorized_keys when running shim localy
+                    user_ssh_key = ""
+                success = await run_async(
+                    _process_provisioning_with_shim,
+                    server_ssh_private_key,
+                    job_provisioning_data,
+                    run,
+                    job_model,
+                    volumes,
+                    secrets,
+                    job.job_spec.registry_auth,
+                    public_keys,
+                    ssh_user,
+                    user_ssh_key,
+                )
+            else:
+                logger.debug(
+                    "%s: process provisioning job without shim, age=%s",
+                    fmt(job_model),
+                    job_submission.age,
                 )
                 code = await _get_job_code(
                     session=session,
@@ -232,7 +191,7 @@ async def _process_job(job_id: UUID):
                     code_hash=run.run_spec.repo_code_hash,
                 )
                 success = await run_async(
-                    _process_pulling_with_shim,
+                    _process_provisioning_no_shim,
                     server_ssh_private_key,
                     job_provisioning_data,
                     run,
@@ -243,49 +202,89 @@ async def _process_job(job_id: UUID):
                     secrets,
                     repo_creds,
                 )
-            elif initial_status == JobStatus.RUNNING:
-                logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
-                success = await run_async(
-                    _process_running,
-                    server_ssh_private_key,
-                    job_provisioning_data,
-                    run_model,
-                    job_model,
-                )
-                if not success:
-                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
 
-            if not success:  # kill the job
-                logger.warning(
-                    "%s: failed because runner is not available or return an error,  age=%s",
-                    fmt(job_model),
-                    job_submission.age,
-                )
-                job_model.status = JobStatus.TERMINATING
-                if not job_model.termination_reason:
-                    job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
-                # job will be terminated and instance will be emptied by process_terminating_jobs
+            if not success:
+                # check timeout
+                if job_submission.age > _get_runner_timeout_interval(
+                    job_provisioning_data.backend, job_provisioning_data.instance_type.name
+                ):
+                    logger.warning(
+                        "%s: failed because runner has not become available in time, age=%s",
+                        fmt(job_model),
+                        job_submission.age,
+                    )
+                    job_model.status = JobStatus.TERMINATING
+                    job_model.termination_reason = (
+                        JobTerminationReason.WAITING_RUNNER_LIMIT_EXCEEDED
+                    )
+                    # instance will be emptied by process_terminating_jobs
 
-        if (
-            initial_status != job_model.status
-            and job_model.status == JobStatus.RUNNING
-            and job_model.job_num == 0  # gateway connects only to the first node
-            and run.run_spec.configuration.type == "service"
-        ):
-            try:
-                await gateways.register_replica(session, run_model.gateway_id, run, job_model)
-            except GatewayError as e:
-                logger.warning(
-                    "%s: failed to register service replica: %s, age=%s",
-                    fmt(job_model),
-                    e,
-                    job_submission.age,
-                )
-                job_model.status = JobStatus.TERMINATING
-                job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
+    else:  # fails are not acceptable
+        if initial_status == JobStatus.PULLING:
+            logger.debug(
+                "%s: process pulling job with shim, age=%s", fmt(job_model), job_submission.age
+            )
+            code = await _get_job_code(
+                session=session,
+                project=project,
+                repo=repo_model,
+                code_hash=run.run_spec.repo_code_hash,
+            )
+            success = await run_async(
+                _process_pulling_with_shim,
+                server_ssh_private_key,
+                job_provisioning_data,
+                run,
+                job_model,
+                job,
+                cluster_info,
+                code,
+                secrets,
+                repo_creds,
+            )
+        elif initial_status == JobStatus.RUNNING:
+            logger.debug("%s: process running job, age=%s", fmt(job_model), job_submission.age)
+            success = await run_async(
+                _process_running,
+                server_ssh_private_key,
+                job_provisioning_data,
+                run_model,
+                job_model,
+            )
+            if not success:
+                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
 
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
+        if not success:  # kill the job
+            logger.warning(
+                "%s: failed because runner is not available or return an error,  age=%s",
+                fmt(job_model),
+                job_submission.age,
+            )
+            job_model.status = JobStatus.TERMINATING
+            if not job_model.termination_reason:
+                job_model.termination_reason = JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY
+            # job will be terminated and instance will be emptied by process_terminating_jobs
+
+    if (
+        initial_status != job_model.status
+        and job_model.status == JobStatus.RUNNING
+        and job_model.job_num == 0  # gateway connects only to the first node
+        and run.run_spec.configuration.type == "service"
+    ):
+        try:
+            await gateways.register_replica(session, run_model.gateway_id, run, job_model)
+        except GatewayError as e:
+            logger.warning(
+                "%s: failed to register service replica: %s, age=%s",
+                fmt(job_model),
+                e,
+                job_submission.age,
+            )
+            job_model.status = JobStatus.TERMINATING
+            job_model.termination_reason = JobTerminationReason.GATEWAY_ERROR
+
+    job_model.last_processed_at = common_utils.get_current_datetime()
+    await session.commit()
 
 
 async def _wait_for_instance_provisioning_data(job_model: JobModel):

@@ -12,7 +12,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.profiles import Profile, ProfileRetryPolicy, TerminationPolicy
+from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
     JobStatus,
@@ -20,9 +20,6 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.server.background.tasks.process_instances import (
     HealthStatus,
     process_instances,
-)
-from dstack._internal.server.background.tasks.process_instances import (
-    create_instance as task_create_instance,
 )
 from dstack._internal.server.testing.common import (
     create_instance,
@@ -54,7 +51,7 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances.instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
         ) as healthcheck:
             healthcheck.return_value = HealthStatus(healthy=True, reason="OK")
             await process_instances()
@@ -85,7 +82,7 @@ class TestCheckShim:
         health_reason = "Shim problem"
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances.instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
         ) as healthcheck:
             healthcheck.return_value = HealthStatus(healthy=False, reason=health_reason)
             await process_instances()
@@ -133,7 +130,7 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances.instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
         ) as healthcheck:
             healthcheck.return_value = HealthStatus(healthy=True, reason="OK")
             await process_instances()
@@ -156,7 +153,7 @@ class TestCheckShim:
 
         health_status = "SSH connection fail"
         with patch(
-            "dstack._internal.server.background.tasks.process_instances.instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
         ) as healthcheck:
             healthcheck.return_value = HealthStatus(healthy=False, reason=health_status)
             await process_instances()
@@ -182,7 +179,7 @@ class TestCheckShim:
         await session.commit()
 
         with patch(
-            "dstack._internal.server.background.tasks.process_instances.instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
         ) as healthcheck:
             healthcheck.return_value = HealthStatus(healthy=True, reason="OK")
             await process_instances()
@@ -207,7 +204,7 @@ class TestCheckShim:
 
         health_status = "Not ok"
         with patch(
-            "dstack._internal.server.background.tasks.process_instances.instance_healthcheck"
+            "dstack._internal.server.background.tasks.process_instances._instance_healthcheck"
         ) as healthcheck:
             healthcheck.return_value = HealthStatus(healthy=False, reason=health_status)
             await process_instances()
@@ -283,10 +280,10 @@ class TestTerminate:
 class TestCreateInstance:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_create_instance(self, test_db, session: AsyncSession):
+    async def test_creates_instance(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         pool = await create_pool(session, project)
-        instance = await create_instance(session, project, pool)
+        instance = await create_instance(session, project, pool, status=InstanceStatus.PENDING)
         with patch(
             "dstack._internal.server.background.tasks.process_instances.get_create_instance_offers"
         ) as get_create_instance_offers:
@@ -319,47 +316,7 @@ class TestCreateInstance:
                 backend_data=None,
             )
             get_create_instance_offers.return_value = [(backend_mock, offer)]
-            await task_create_instance(instance_id=instance.id)
+            await process_instances()
 
         await session.refresh(instance)
         assert instance.status == InstanceStatus.PROVISIONING
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_expire_retry_duration(self, test_db, session: AsyncSession):
-        project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        profile = Profile(
-            name="test_profile", retry_policy=ProfileRetryPolicy(retry=True, duration=123)
-        )
-        instance = await create_instance(
-            session, project, pool, profile=profile, status=InstanceStatus.TERMINATING
-        )
-        await task_create_instance(instance_id=instance.id)
-        await session.refresh(instance)
-        assert instance.status == InstanceStatus.TERMINATED
-        assert instance.termination_reason == "Retry duration expired"
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_retry_delay(self, test_db, session: AsyncSession):
-        project = await create_project(session=session)
-        pool = await create_pool(session, project)
-        profile = Profile(
-            name="test_profile", retry_policy=ProfileRetryPolicy(retry=True, duration=123)
-        )
-        instance = await create_instance(
-            session,
-            project,
-            pool,
-            created_at=get_current_datetime(),
-            profile=profile,
-            status=InstanceStatus.TERMINATING,
-        )
-        last_retry = get_current_datetime() - dt.timedelta(seconds=10)
-        instance.last_retry_at = last_retry
-        session.add(instance)
-        await session.commit()
-        await task_create_instance(instance_id=instance.id)
-        await session.refresh(instance)
-        assert instance.last_retry_at.replace(tzinfo=dt.timezone.utc) == last_retry
