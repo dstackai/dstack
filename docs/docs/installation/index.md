@@ -9,6 +9,18 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 > If you don't want to host the `dstack` server or want to access affordable GPU from the marketplace,
 > skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
+## Requirements
+
+Both `dstack` client and server are supported on the following platforms:
+
+- macOS
+- Linux
+- Windows Subsystem for Linux (WSL)
+
+Native Windows installation is not yet supported.
+
+In addition, OpenSSH version 8.4+ is required.
+
 ## Configure backends
 
 To use `dstack` with your own cloud accounts, or Kubernetes,
@@ -83,6 +95,34 @@ Configuration is updated at ~/.dstack/config.yml
 </div>
 
 This configuration is stored in `~/.dstack/config.yml`.
+
+??? info "(WSL only) VS Code SSH configuration"
+
+    If you plan to use the `dstack` client with VS Code on a Windows machine with WSL, some additional setup is required.
+
+    ### Given
+
+    - WSL and the Linux distribution are installed.
+    - VS Code is installed on Windows.
+    - `dstack` is installed on the Linux distribution.
+
+    ### Steps
+
+    1. Install the [Remote - SSH](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh) extension.
+
+    2. Execute the following command in the Linux distribution:
+        ```
+        sshdir=$(wslpath "$(cmd.exe /c '<nul set /p=%USERPROFILE%' 2> /dev/null)")/.ssh; mkdir -p "$sshdir"; echo 'Include "\\wsl.localhost\'$WSL_DISTRO_NAME'\home\'$USER'\.dstack\ssh\config"' >> "$sshdir/config"
+        ```
+        This commmand updates your Windows SSH configuration file adding the `Include` directive pointing to the `dstack`'s SSH configuration, allowing VS Code to discover SSH hosts added by `dstack`.
+
+    3. Execute the following command in the Linux distribution:
+        ```
+        batpath=$(cmd.exe /c '<nul set /p=%USERPROFILE%' 2> /dev/null)'\wsl-ssh.bat'; echo $batpath; echo "wsl -d $WSL_DISTRO_NAME ssh %*" > $(wslpath "$batpath")
+        ```
+        This commmand creates the `wsl-ssh.bat` file inside your Windows user's home directory. Basically, this file is a wrapper that calls the `ssh` program installed in the Linux distribution instead of the native Windows SSH client, which lacks some features required for `dstack` client. The command prints the full path of the wrapper, which looks like this: `C:\Users\<user name>\wsl-ssh.bat`. Copy this path, it's required for the next step.
+
+    4. Open VS Code settings and paste the path from the previous step into the `Extensions` > `Remote - SSH` > `Remote.SSH: Path` field. It's also recommended to disable `Remote.SSH: Enable Dynamic Forwarding` because it may cause connection issues.
 
 ## Create on-prem fleets
 
