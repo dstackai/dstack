@@ -226,6 +226,7 @@ nav:
           - API:
               - Python API: docs/reference/api/python/index.md
               - REST API: docs/reference/api/rest/index.md
+  - Providers: providers.md
   - Examples:
     - examples.md
     - Fine-tuning:
@@ -238,7 +239,7 @@ nav:
         - Llama 3.1: examples/llms/llama31/index.md
   - Blog:
       - blog/index.md
-  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
+#  - Changelog: https://github.com/dstackai/dstack/releases" target="_blank
   - Discord: https://discord.gg/u8SmfwPpMd" target="_blank
   - GitHub: https://github.com/dstackai/dstack" target="_blank
-  - Sign in: https://sky.dstack.ai" target="_blank
+#  - Sign in: https://sky.dstack.ai" target="_blank
