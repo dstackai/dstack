@@ -6,4 +6,5 @@ output_dir: "./finetuned_models/llama3_fine_tuned"
 optim: "adafactor"
 dataset_name: "Abirate/english_quotes"
 model_name: "meta-llama/Meta-Llama-3.1-8B"
+lora_r: 4
 push_to_hub: True

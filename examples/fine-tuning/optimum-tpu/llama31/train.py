@@ -3,6 +3,7 @@ from typing import Optional
 
 from datasets import load_dataset
 from optimum.tpu import AutoModelForCausalLM, fsdp_v2
+from peft import LoraConfig, TaskType, get_peft_model
 from transformers import (
     AutoTokenizer,
     DataCollatorForLanguageModeling,
@@ -47,7 +48,7 @@ class ScriptArguments:
             "help": "Only models Gemma 2B, Gemma 7B, Llama-2 7B and Llama-3 8B Llama-3.1 8B are tested with TPU v5e"
         },
     )
-    lora_r: Optional[int] = field(default=8, metadata={"help": "LoRA attention dimension."})
+    lora_r: Optional[int] = field(default=4, metadata={"help": "LoRA attention dimension."})
     max_seq_length: Optional[int] = field(
         default=1024, metadata={"help": "Maximum sequence length to use."}
     )
@@ -62,7 +63,18 @@ class ScriptArguments:
 
 
 def create_and_prepare_model(args):
-    model = AutoModelForCausalLM.from_pretrained(args.model_name)
+    base_model = AutoModelForCausalLM.from_pretrained(args.model_name)
+    lora_config = LoraConfig(
+        r=args.lora_r,  # the dimension of the low-rank matrices
+        lora_alpha=8,  # scaling factor for LoRA activations vs pre-trained weight activations
+        lora_dropout=0.05,
+        bias="none",
+        inference_mode=False,
+        task_type=TaskType.CAUSAL_LM,
+        target_modules=["o_proj", "v_proj"],
+    )  #
+
+    model = get_peft_model(base_model, lora_config)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     # Add custom token for padding Llama
     tokenizer.add_special_tokens({"pad_token": tokenizer.eos_token})

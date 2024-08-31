@@ -3,12 +3,12 @@ type: service
 name: llama31-service-optimum-tpu
 
 # Using a Docker image with a fix instead of the official one
-# More details at https://github.com/huggingface/optimum-tpu/pull/85
+# More details at https://github.com/huggingface/optimum-tpu/pull/87
 image: sjbbihan/optimum-tpu:latest
 # Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
-  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
   - MAX_CONCURRENT_REQUESTS=4
   - MAX_INPUT_TOKENS=128
   - MAX_TOTAL_TOKENS=150

@@ -3,7 +3,7 @@ type: dev-environment
 name: vscode-optimum-tpu
 
 # Using a Docker image with a fix instead of the official one
-# More details at https://github.com/huggingface/optimum-tpu/pull/85
+# More details at https://github.com/huggingface/optimum-tpu/pull/87
 image: sjbbihan/optimum-tpu:latest
 # Required environment variables
 env:

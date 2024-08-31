@@ -17,8 +17,7 @@ commands:
   - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
   - pip install trl peft
   - python examples/custom/train.py examples/custom/config.yaml
-ports:
-  - 6006
+
 
 resources:
   gpu: v5litepod-8

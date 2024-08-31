@@ -13,7 +13,7 @@ env:
 # Refer to Note section in examples/gpus/tpu/README.md for more information about the optimum-tpu repository.
 # Uncomment if you want the environment to be pre-installed
 #init:
-#  - git clone https://github.com/Bihan/optimum-tpu.git
+#  - git clone -b add_llama_31_support https://github.com/dstackai/optimum-tpu.git
 #  - mkdir -p optimum-tpu/examples/custom/
 #  - cp examples/fine-tuning/optimum-tpu/llama31/train.py optimum-tpu/examples/custom/train.py
 #  - cp examples/fine-tuning/optimum-tpu/llama31/config.yaml optimum-tpu/examples/custom/config.yaml
@@ -21,6 +21,7 @@ env:
 #  - pip install -e . -f https://storage.googleapis.com/libtpu-releases/index.html
 #  - pip install datasets evaluate
 #  - pip install accelerate -U
+#  - pip install peft
 
 ide: vscode
 
