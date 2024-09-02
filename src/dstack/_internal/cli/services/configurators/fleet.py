@@ -14,7 +14,7 @@ from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.ssh import convert_pkcs8_to_pem, generate_public_key, rsa_pkey_from_str
+from dstack._internal.utils.ssh import convert_pkcs8_to_pem, generate_public_key, pkey_from_str
 from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
@@ -158,9 +158,13 @@ def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:
         try:
             pub_key = ssh_key_path_obj.with_suffix(".pub").read_text()
         except FileNotFoundError:
-            pub_key = generate_public_key(rsa_pkey_from_str(private_key))
+            pub_key = generate_public_key(pkey_from_str(private_key))
         return SSHKey(public=pub_key, private=private_key)
     except OSError as e:
         logger.debug("Got OSError: %s", repr(e))
         console.print(f"[error]Unable to read the SSH key at {ssh_key_path}[/]")
+        exit()
+    except ValueError as e:
+        logger.debug("Key type is not supported", repr(e))
+        console.print("[error]Key type is not supported[/]")
         exit()
