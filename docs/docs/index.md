@@ -36,6 +36,12 @@ Apply the configuration either via the `dstack apply` CLI command or through a p
 `dstack` automatically manages provisioning, job queuing, auto-scaling, networking, volumes, run failures,
 out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-prem clusters.
 
+## Why dstack?
+
+`dstack`'s founder and CEO explains the challenges `dstack` addresses for AI and Ops teams.
+
+<iframe width="700" height="394" src="https://www.youtube.com/embed/RIDMEutHuWo?si=6Quy34Kwj8wHvBTQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 ## Where do I start?
 
 1. Proceed to [installation](installation/index.md)
