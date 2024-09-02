@@ -81,25 +81,10 @@ class CloudWatchLogStorage(LogStorage):
         stream = self._get_stream_name(
             project.name, request.run_name, request.job_submission_id, log_producer
         )
-        parameters = {
-            "logGroupName": self._group,
-            "logStreamName": stream,
-            "limit": request.limit,
-            "startFromHead": (not request.descending),
-        }
-        if request.start_time:
-            # XXX: Since callers use start_time/end_time for pagination, one millisecond is added
-            # to avoid an infinite loop because startTime boundary is inclusive.
-            parameters["startTime"] = _datetime_to_unix_time_ms(request.start_time) + 1
-        if request.end_time:
-            # No need to substract one millisecond in this case, though, seems that endTime is
-            # exclusive, that is, time interval boundaries are [startTime, entTime)
-            parameters["endTime"] = _datetime_to_unix_time_ms(request.end_time)
         cw_events: List[_CloudWatchLogEvent]
         with self._wrap_boto_errors():
             try:
-                response = self._client.get_log_events(**parameters)
-                cw_events = response["events"]
+                cw_events = self._get_log_events(stream, request)
             except botocore.exceptions.ClientError as e:
                 if not self._is_resource_not_found_exception(e):
                     raise
@@ -121,6 +106,42 @@ class CloudWatchLogStorage(LogStorage):
             for cw_event in cw_events_iter
         ]
         return JobSubmissionLogs(logs=logs)
+
+    def _get_log_events(self, stream: str, request: PollLogsRequest) -> List[_CloudWatchLogEvent]:
+        parameters = {
+            "logGroupName": self._group,
+            "logStreamName": stream,
+            "limit": request.limit,
+        }
+        start_from_head = not request.descending
+        parameters["startFromHead"] = start_from_head
+        if request.start_time:
+            # XXX: Since callers use start_time/end_time for pagination, one millisecond is added
+            # to avoid an infinite loop because startTime boundary is inclusive.
+            parameters["startTime"] = _datetime_to_unix_time_ms(request.start_time) + 1
+        if request.end_time:
+            # No need to substract one millisecond in this case, though, seems that endTime is
+            # exclusive, that is, time interval boundaries are [startTime, entTime)
+            parameters["endTime"] = _datetime_to_unix_time_ms(request.end_time)
+        response = self._client.get_log_events(**parameters)
+        events: List[_CloudWatchLogEvent] = response["events"]
+        if start_from_head or events:
+            return events
+        # Workaround for https://github.com/boto/boto3/issues/3718
+        # Required only when startFromHead = false (the default value).
+        next_token: str = response["nextBackwardToken"]
+        # Limit max tries to avoid a possible infinite loop if the API is misbehaving
+        tries_left = 10
+        while tries_left:
+            parameters["nextToken"] = next_token
+            response = self._client.get_log_events(**parameters)
+            events = response["events"]
+            if events or response["nextBackwardToken"] == next_token:
+                return events
+            next_token = response["nextBackwardToken"]
+            tries_left -= 1
+        logger.warning("too many empty responses from stream %s, returning dummy response", stream)
+        return []
 
     def write_logs(
         self,
