@@ -16,7 +16,7 @@ create the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) fi
 
 ## Start the server
 
-Once the `~/.dstack/server/config.yml` file is configured, proceed and start the server:
+Once backends are configured, proceed and start the server:
 
 === "pip"
 

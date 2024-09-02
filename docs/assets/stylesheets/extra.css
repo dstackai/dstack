@@ -1,7 +1,9 @@
 @media screen and (min-width: 76.1875em) {
     .md-header {
         backdrop-filter: blur(5px);
-        background-color: rgba(255, 255, 255, 0.6);
+        background-color: rgba(255, 255, 255, 0);
+        border-bottom: 0.5px dotted rgba(0, 0, 0, 0.4);
+        padding-bottom: 2px;
     }
 
     [dir=ltr] .md-header__source {
@@ -188,7 +190,7 @@
     margin-left: 1px !important;
     font-weight: 700;
     font-size: 20px;
-    padding-top: 2px;
+    /*padding-top: 2px;*/
 }
 
 @media screen and (min-width: 76.1875em) {
@@ -246,10 +248,10 @@
 }
 
 .md-nav--secondary {
-    border: 1px solid black;
+    border: 0.5px dotted black;
     padding: 20px 5px;
     margin-top: 20px;
-    border-radius: 12px;
+    border-radius: 3px;
 }
 
 .md-nav--secondary .md-nav__title {
@@ -375,7 +377,7 @@
 /*}*/
 
 .md-nav__link {
-    margin-top: .6em;
+    margin-top: .5em;
 }
 
 .md-nav__link:hover {
@@ -462,7 +464,7 @@ h4.doc-heading {
 }
 
 .md-typeset .highlight pre > code:before, .md-typeset div[editor-title] pre > code:before {
-     content: '';
+    content: '';
     position: absolute;
     top: 15px;
     left: 15px;
@@ -475,7 +477,7 @@ h4.doc-heading {
     /*-webkit-box-shadow: 25px 0 0 #f4c025, 50px 0 0 #3ec930;*/
     /*        box-shadow: 25px 0 0 #f4c025, 50px 0 0 #3ec930;*/
     -webkit-box-shadow: 20px 0 0 #f4c025, 40px 0 0 #3ec930;
-            box-shadow: 20px 0 0 #f4c025, 40px 0 0 #3ec930;
+    box-shadow: 20px 0 0 #f4c025, 40px 0 0 #3ec930;
 }
 
 @media screen and (min-width: 60em) {
@@ -690,6 +692,10 @@ body {
     opacity: 1;
 }
 
+.md-main__inner {
+    margin-top: 1.25em;
+}
+
 .md-sidebar__inner {
     margin: 0 0 30px;
 }
@@ -701,6 +707,17 @@ body {
     }
 
     .md-sidebar--primary .md-nav__item--section.md-nav__item .md-nav__link {
+        margin-left: 2px;
+    }
+
+    .md-sidebar--primary .md-nav__item--section.md-nav__item .md-nav__link--active {
+        border-left: 2px solid var(--md-typeset-a-color);
+        color: inherit;
+        margin-left: -2px;
+        border-image: linear-gradient(8deg, #0048ff, #ce00ff, #ce00ff, #ce00ff) 10;
+    }
+
+    .md-sidebar--primary .md-nav__item--section.md-nav__item .md-nav__link {
         display: flex;
     }
 
@@ -709,12 +726,14 @@ body {
     }
 
     .md-nav__item--section > .md-nav__link {
-        text-transform: uppercase;
+        /*text-transform: uppercase;*/
         display: inline-block;
-        font-size: 0.75rem;
-        font-weight: 800;
+        font-size: 17px;
+        font-weight: 700;
         line-height: 1.4rem;
         letter-spacing: -0.5px;
+        position: relative;
+        left: -11px;
     }
 
     .md-nav__item--section>.md-nav__link[for] {
@@ -765,7 +784,7 @@ body {
 
 .md-sidebar--primary .md-nav__link {
     padding: 3px 15px 4px;
-    margin-top: 5px;
+    margin-top: 4px;
 }
 
 .md-sidebar--secondary .md-nav__link {
@@ -791,6 +810,7 @@ body {
 .md-sidebar--secondary .md-nav__item .md-nav__link--active {
     border-left: 2px solid var(--md-typeset-a-color);
     color: inherit;
+    border-image: linear-gradient(8deg, #0048ff, #ce00ff, #ce00ff, #ce00ff) 10;
 }
 
 .md-nav__item .md-nav__link--active, .md-nav__item .md-nav__link--active:hover {
@@ -1034,7 +1054,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.025), rgb(0 114 255 / 0.25%), rgba(0, 42, 255, 0.0125));
     z-index: 1;
     border-radius: 12px;
-    border: 1px solid rgba(0,0,0,.25);
+    border: 0.5px solid rgba(0,0,0, 0.5);
     overflow: unset;
 }
 
@@ -1133,10 +1153,27 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         border-bottom: none;
     }
 
+    .md-tabs{
+        overflow: visible;
+        contain: none;
+    }
+
+    .md-tabs__item--active .md-tabs__link:after {
+        position: absolute;
+        background: -webkit-linear-gradient(100deg, #0048ff, #ce00ff);
+        content: "";
+        width: 100%;
+        z-index: 1000;
+        height: 1.5px;
+        bottom: -2px;
+        border-radius: 2px;
+    }
+
     .md-tabs[hidden] .md-tabs__link {
         opacity: inherit;
         transform: inherit;
         transition: inherit;
+        position: relative;
     }
 
     .md-tabs[hidden] {
@@ -1149,13 +1186,15 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
     [dir=ltr] .md-tabs__list {
         display: flex;
+        overflow: visible;
+        contain: none;
     }
 
     .md-tabs__item {
         display: flex;
-        height: 2.9rem;
+        height: 2.8rem;
         padding-left: 0;
-        padding-right: 20px;
+        padding-right: 22px;
     }
 
     .md-tabs__item:nth-child(1) {
@@ -1174,7 +1213,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         visibility: hidden;
         width: 35px;
         display: inline-block;
-        margin-top: 18px;
+        margin-top: 15px;
     }
 
     .md-tabs__item:nth-child(n+6) .md-tabs__link:before {
@@ -1184,7 +1223,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         visibility: visible;
     }
 
-    .md-tabs__item:nth-child(5) .md-tabs__link:after, .md-tabs__item:nth-child(8) .md-tabs__link:after {
+    .md-tabs__item:nth-child(8) .md-tabs__link:after {
         content: url('data:image/svg+xml,<svg fill="black" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
         line-height: 14px;
         margin-left: 4px;
@@ -1243,11 +1282,11 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     }
 
     .md-tabs__link {
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         font-weight: 600;
         color: black;
         letter-spacing: -0.5px;
-        margin-top: 7px;
+        margin-top: 2px;
         line-height: 24px;
     }
 
@@ -1302,7 +1341,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 @media screen and (min-width: 76.25em) {
     .md-search .md-search__inner {
-        padding-top: 0.58rem;
+        /*padding-top: 0.58rem;*/
         margin-right: 0.8rem;
     }
 
@@ -1514,7 +1553,7 @@ div[editor-title] code .editor-title {
 
 .md-ellipsis, .md-ellipsis .md-typeset {
     white-space: normal;
-    font-size: 98%;
+    /*font-size: 98%;*/
 }
 
 .md-header__topic .md-ellipsis {

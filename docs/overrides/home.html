@@ -16,15 +16,14 @@
 </script>
 <script src="https://unpkg.com/typed.js@2.1.0/dist/typed.umd.js"></script>
 <script>
-    /*
         var typed = new Typed('#typed', {
-          strings: ['AWS', 'GCP', 'Azure', 'Lambda', 'TensorDock', 'Vast.ai', 'any cloud'],
+          strings: ['for AI teams', 'for training', `for deployment of AI models`, `that works with on-prem`,
+          'that works with any cloud'],
           backDelay: 5000,
           typeSpeed: 150,
           backSpeed: 100,
           loop: true,
         });
-    */
 </script>
 <script type="text/javascript">
     /*
@@ -109,11 +108,12 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>AI container orchestration engine for everyone</h1>
+                <h1>AI container orchestration <br> for everyone</h1>
 
                 <p>
-                    dstack is a lightweight alternative to Kubernetes for AI. It simplifies container orchestration for
-                    AI on any cloud or on-premises, accelerating the development, training, and deployment.
+                    dstack is a lightweight alternative to Kubernetes designed to streamline the development,
+                    training, and deployment of AI models in the cloud and on-prem, with support for
+                    NVIDIA, TPU, and AMD.
                 </p>
             </div>
 
@@ -275,7 +275,7 @@
                 <div class="block">
                     <h2>Fleets</h2>
 
-                    <p>Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and on-prem.</p>
+                    <p>Fleets enable efficient provisioning and management of clusters and instances, both in the cloud and gem.</p>
 
                     <p>Once a fleet is created, it can be reused by dev environments, tasks, and services.</p>
 
@@ -284,77 +284,6 @@
                            class="md-button md-button-secondary small">Learn more</a>
                     </p>
                 </div>
-            </div>
-        </div>
-
-        <div class="tx-landing__highlights">
-            <div class="tx-landing__highlights_text">
-                <h2 id="examples">Examples</h2>
-                <!--<p class="tx-landing__bottom_cta_text">
-                    dstack is easy to use with any open-source frameworks and models.
-                </p>-->
-            </div>
-
-            <div class="tx-landing__highlights_grid">
-                <a href="/examples/fine-tuning/axolotl" class="feature-cell">
-                    <h3>
-                        Axolotl
-                    </h3>
-
-                    <p>
-                        Fine-tune Llama 3 on a custom dataset using Axolotl.
-                    </p>
-                </a>
-
-                <a href="/examples/fine-tuning/alignment-handbook" class="feature-cell">
-                    <h3>
-                        Alignment Handbook
-                    </h3>
-
-                    <p>
-                        Fine-tune Gemma 7B on a custom dataset.
-                    </p>
-                </a>
-
-                <a href="/examples/fine-tuning/trl" class="feature-cell">
-                    <h3>
-                        TRL
-                    </h3>
-
-                    <p>
-                        Fine-tune Llama 3.1 8B on a custom dataset using TRL.
-                    </p>
-                </a>
-
-                <a href="/examples/accelerators/amd" class="feature-cell sky">
-                    <h3>
-                        AMD
-                    </h3>
-
-                    <p>
-                        Learn how to deploy and fine-tune LLMs on AMD.
-                    </p>
-                </a>
-
-                <a href="/examples/llms/llama31" class="feature-cell sky">
-                    <h3>
-                        Llama 3.1
-                    </h3>
-
-                    <p>
-                        Learn how to deploy and fine-tune Llama 3.1.
-                    </p>
-                </a>
-
-                <a href="/examples" class="feature-cell sky">
-                    <h3>
-                        More examples
-                    </h3>
-
-                    <p>
-                        Find more examples on training and deploying models.
-                    </p>
-                </a>
             </div>
         </div>
 
@@ -457,7 +386,7 @@
                         Self-hosted
                     </div>
                     <div class="plans_card__subtitle">
-                        Use your own cloud accounts or data centers.
+                        Use your own cloud accounts or on-prem servers.
                     </div>
 
                     <div class="plans_card__services">
@@ -478,24 +407,8 @@
                         </div>
 
                         <div class="plans_card__service-item">
-                            <img width="25" height="24" src="/assets/images/oci-logo.svg"
-                                 title="Oracle Cloud Infrastructure">
-                            <div class="plans_card__service-name">OCI</div>
-                        </div>
-
-                        <div class="plans_card__service-item">
                             <img width="20" height="23" src="/assets/images/lambda-logo.svg" title="Lambda Cloud">
                             <div class="plans_card__service-name">Lambda</div>
-                        </div>
-
-                        <div class="plans_card__service-item">
-                            <img width="20" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
-                            <div class="plans_card__service-name">TensorDock</div>
-                        </div>
-
-                        <div class="plans_card__service-item">
-                            <img width="22" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
-                            <div class="plans_card__service-name">Vast.ai</div>
                         </div>
 
                         <div class="plans_card__service-item">
@@ -504,13 +417,34 @@
                         </div>
 
                         <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/vastai-logo.svg" title="Vast.ai">
+                            <div class="plans_card__service-name">Vast.ai</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="20" height="23" src="/assets/images/tensordock-logo.svg" title="TensorDock">
+                            <div class="plans_card__service-name">TensorDock</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
                             <img width="22" height="24" src="/assets/images/cudo-logo.svg" title="CUDO">
                             <div class="plans_card__service-name">CUDO</div>
                         </div>
 
                         <div class="plans_card__service-item">
+                            <img width="25" height="24" src="/assets/images/oci-logo.svg"
+                                 title="Oracle Cloud Infrastructure">
+                            <div class="plans_card__service-name">OCI</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
                             <img width="22" height="24" src="/assets/images/kubernetes-logo.svg" title="Kubernetes">
                             <div class="plans_card__service-name">K8S</div>
+                        </div>
+
+                        <div class="plans_card__service-item">
+                            <img width="22" height="24" src="/assets/images/ssh-logo.svg" title="SSH">
+                            <div class="plans_card__service-name">SSH</div>
                         </div>
                     </div>
 
@@ -518,7 +452,7 @@
                         <div class="plans_card__panel">
                             <div class="plans_card__items">
                                 <div class="item">Your cloud accounts</div>
-                                <div class="item">Your data centers</div>
+                                <div class="item">Your on-prem servers</div>
                                 <div class="item">CLI & API</div>
                             </div>
                         </div>
@@ -656,7 +590,7 @@
                                 <!--<div class="item crown">Web console</div>-->
                                 <div class="item crown">GPU marketplace</div>
                                 <div class="item">Your cloud accounts</div>
-                                <div class="item">Your data centers</div>
+                                <div class="item">Your on-prem servers</div>
                                 <div class="item">CLI & API</div>
                             </div>
                         </div>
