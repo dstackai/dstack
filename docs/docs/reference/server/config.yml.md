@@ -451,6 +451,115 @@ gcloud projects list --format="json(projectId)"
     
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets (e.g., through VPC peering). Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
 
+### Lambda
+
+Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
+button to create a new API key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: lambda
+      creds:
+        type: api_key
+        api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
+```
+
+</div>
+
+### RunPod
+
+Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
+the button to create a Read & Write key.
+
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: runpod
+        creds:
+          type: api_key
+          api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+```
+
+</div>
+
+### Vast.ai
+
+Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
+API Key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: vastai
+      creds:
+        type: api_key
+        api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
+```
+
+</div>
+
+Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
+
+### TensorDock
+
+Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: tensordock
+        creds:
+          type: api_key
+          api_key: 248e621d-9317-7494-dc1557fa5825b-98b
+          api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
+```
+
+</div>
+
+The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
+
+### CUDO
+
+Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
+
+Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: cudo
+        project_id: my-cudo-project
+        creds:
+          type: api_key
+          api_key: 7487240a466624b48de22865589
+```
+
+</div>
+
 ### OCI
 
 There are two ways to configure OCI: using client credentials or using the default credentials.
@@ -524,115 +633,6 @@ There are two ways to configure OCI: using client credentials or using the defau
           type: default
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
-
-### Lambda
-
-Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
-button to create a new API key.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-    - type: lambda
-      creds:
-        type: api_key
-        api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
-```
-
-</div>
-
-### RunPod
-
-Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
-the button to create a Read & Write key.
-
-Then proceed to configuring the backend.
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: runpod
-        creds:
-          type: api_key
-          api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
-```
-
-</div>
-
-### TensorDock
-
-Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: tensordock
-        creds:
-          type: api_key
-          api_key: 248e621d-9317-7494-dc1557fa5825b-98b
-          api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
-```
-
-</div>
-
-The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
-
-### Vast.ai
-
-Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
-API Key.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-    - type: vastai
-      creds:
-        type: api_key
-        api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
-```
-
-</div>
-
-Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
-
-### CUDO
-
-Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
-
-Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: cudo
-        project_id: my-cudo-project
-        creds:
-          type: api_key
-          api_key: 7487240a466624b48de22865589
-```
-
-</div>
 
 ### DataCrunch
 
