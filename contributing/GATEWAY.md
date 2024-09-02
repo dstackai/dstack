@@ -1,8 +1,10 @@
-A dstack gateway is a dedicated instance responsible for publishing user applications to the outer internet via the HTTP protocol. One dstack gateway can serve many services, domains, or projects.
+# Gateway
+
+A `dstack` gateway is a dedicated instance responsible for publishing user applications to the outer internet via the HTTP protocol. One dstack gateway can serve many services, domains, or projects.
 
 ## Gateway creation
 
-Gateways are managed by the dstack server. A gateway is associated with a project and some backend in the project. Users must attach a wildcard domain to the gateway, i.e., all direct subdomains should resolve to the gateway IP address. Since the IP address is unknown during provisioning, dstack doesn't check DNS records.
+Gateways are managed by the `dstack` server. A gateway is associated with a project and some backend in the project. Users must attach a wildcard domain to the gateway, i.e., all direct subdomains should resolve to the gateway IP address. Since the IP address is unknown during provisioning, `dstack` doesn't check DNS records.
 
 Provisioning happens as follows:
 1. Launch a non-GPU instance (usually the smallest) with all ports exposed.
@@ -25,7 +27,7 @@ The `dstack-gateway` server dumps its internal state to the file `~/dstack/state
 
 ## Connection between server and gateway
 
-The dstack server keeps a bidirectional tunnel with each GatewayCompute for the whole uptime of the server.
+The `dstack` server keeps a bidirectional tunnel with each GatewayCompute for the whole uptime of the server.
 
 - The tunnel from the server to the gateway is used to manage the gateway: register and unregister services and replicas.
 - The tunnel from the gateway to the server is used to authenticate requests to the gateway based on dstack's tokens.

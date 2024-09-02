@@ -1,3 +1,5 @@
+# gpuhunt
+
 [`dstackai/gpuhunt`](https://github.com/dstackai/gpuhunt) is a library developed and used for dstack. It implements the unified interface for fetching offers and prices from different cloud providers.
 
 An offer is a possible configuration. It consists of:
