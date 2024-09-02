@@ -25,17 +25,19 @@ from dstack._internal.server.services.backends.configurators.base import (
 
 REGIONS = [
     "us-south-1",
+    "us-south-2",
+    "us-south-3",
     "us-west-2",
     "us-west-1",
     "us-midwest-1",
     "us-west-3",
     "us-east-1",
-    "australia-southeast-1",
+    "us-east-2",
     "europe-central-1",
     "asia-south-1",
     "me-west-1",
-    "europe-south-1",
     "asia-northeast-1",
+    "asia-northeast-2",
 ]
 
 DEFAULT_REGION = "us-east-1"

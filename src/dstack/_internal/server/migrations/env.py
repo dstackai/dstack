@@ -59,7 +59,7 @@ def run_migrations(connection: Connection):
     # Temporarily disable foreign keys,
     # so that sqlite batch table migrations are performed without data loss:
     # https://alembic.sqlalchemy.org/en/latest/batch.html#dealing-with-referencing-foreign-keys
-    if db.get_dialect_name() == "sqlite":
+    if connection.dialect.name == "sqlite":
         connection.execute(text("PRAGMA foreign_keys=OFF;"))
     connection.commit()
     context.configure(
@@ -70,7 +70,7 @@ def run_migrations(connection: Connection):
     )
     with context.begin_transaction():
         context.run_migrations()
-    if db.get_dialect_name() == "sqlite":
+    if connection.dialect.name == "sqlite":
         connection.execute(text("PRAGMA foreign_keys=ON;"))
     connection.commit()
 

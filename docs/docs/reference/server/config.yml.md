@@ -16,6 +16,23 @@ See the examples below.
 
 There are two ways to configure AWS: using an access key or using the default credentials.
 
+=== "Default credentials"
+
+    If you have default credentials set up (e.g. in `~/.aws/credentials`), configure the backend like this:
+
+    <div editor-title="~/.dstack/server/config.yml">
+    
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: aws
+            creds:
+              type: default
+    ```
+    
+    </div>
+
 === "Access key"
 
     Create an access key by following the [this guide :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/cli/latest/userguide/cli-authentication-user.html#cli-authentication-user-get).
@@ -33,23 +50,6 @@ There are two ways to configure AWS: using an access key or using the default cr
               type: access_key
               access_key: KKAAUKLIZ5EHKICAOASV
               secret_key: pn158lMqSBJiySwpQ9ubwmI6VUU3/W2fdJdFwfgO
-    ```
-    
-    </div>
-
-=== "Default credentials"
-
-    If you have default credentials set up (e.g. in `~/.aws/credentials`), configure the backend like this:
-
-    <div editor-title="~/.dstack/server/config.yml">
-    
-    ```yaml
-    projects:
-      - name: main
-        backends:
-          - type: aws
-            creds:
-              type: default
     ```
     
     </div>
@@ -180,6 +180,31 @@ There are two ways to configure AWS: using an access key or using the default cr
 
 There are two ways to configure Azure: using a client secret or using the default credentials.
 
+=== "Default credentials"
+
+    Obtain the `subscription_id` and `tenant_id` via the [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+
+    ```shell
+    az account show --query "{subscription_id: id, tenant_id: tenantId}"
+    ```
+
+    Then proceed to configure the backend:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: azure
+            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
+            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
+            creds:
+              type: default
+    ```
+
+    </div>
+
 === "Client secret"
 
     A client secret can be created using the [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
@@ -210,31 +235,6 @@ There are two ways to configure Azure: using a client secret or using the defaul
           client_secret: 1Kb8Q~o3Q2hdEvrul9yaj5DJDFkuL3RG7lger2VQ
     ```
     
-    </div>
-
-=== "Default credentials"
-
-    Obtain the `subscription_id` and `tenant_id` via the [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
-
-    ```shell
-    az account show --query "{subscription_id: id, tenant_id: tenantId}"
-    ```
-
-    Then proceed to configure the backend:
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-      - name: main
-        backends:
-          - type: azure
-            subscription_id: 06c82ce3-28ff-4285-a146-c5e981a9d808
-            tenant_id: f84a7584-88e4-4fd2-8e97-623f0a715ee1
-            creds:
-              type: default
-    ```
-
     </div>
 
 If you don't know your `subscription_id`, run
@@ -287,27 +287,6 @@ az account show --query "{subscription_id: id}"
 
 There are two ways to configure GCP: using a service account or using the default credentials.
 
-=== "Service account"
-
-    To create a service account, follow [this guide :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/service-accounts-create). After setting up the service account [create a key :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/keys-create-delete) for it and download the corresponding JSON file.
-
-    Then go ahead and configure the backend by specifying the downloaded file path.
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-      backends:
-        - type: gcp
-          project_id: gcp-project-id
-          creds:
-            type: service_account
-            filename: ~/.dstack/server/gcp-024ed630eab5.json
-    ```
-
-    </div>
-
 === "Default credentials"
 
     Enable GCP application default credentials:
@@ -328,6 +307,27 @@ There are two ways to configure GCP: using a service account or using the defaul
           project_id: gcp-project-id
           creds:
             type: default
+    ```
+
+    </div>
+
+=== "Service account"
+
+    To create a service account, follow [this guide :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/service-accounts-create). After setting up the service account [create a key :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/iam/docs/keys-create-delete) for it and download the corresponding JSON file.
+
+    Then go ahead and configure the backend by specifying the downloaded file path.
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+        - type: gcp
+          project_id: gcp-project-id
+          creds:
+            type: service_account
+            filename: ~/.dstack/server/gcp-024ed630eab5.json
     ```
 
     </div>
@@ -451,9 +451,134 @@ gcloud projects list --format="json(projectId)"
     
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets (e.g., through VPC peering). Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
 
+### Lambda
+
+Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
+button to create a new API key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: lambda
+      creds:
+        type: api_key
+        api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
+```
+
+</div>
+
+### RunPod
+
+Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
+the button to create a Read & Write key.
+
+Then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: runpod
+        creds:
+          type: api_key
+          api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
+```
+
+</div>
+
+### Vast.ai
+
+Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
+API Key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+- name: main
+  backends:
+    - type: vastai
+      creds:
+        type: api_key
+        api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
+```
+
+</div>
+
+Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
+
+### TensorDock
+
+Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
+
+Then, go ahead and configure the backend:
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: tensordock
+        creds:
+          type: api_key
+          api_key: 248e621d-9317-7494-dc1557fa5825b-98b
+          api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
+```
+
+</div>
+
+The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
+
+### CUDO
+
+Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
+
+Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
+
+<div editor-title="~/.dstack/server/config.yml">
+
+```yaml
+projects:
+  - name: main
+    backends:
+      - type: cudo
+        project_id: my-cudo-project
+        creds:
+          type: api_key
+          api_key: 7487240a466624b48de22865589
+```
+
+</div>
+
 ### OCI
 
 There are two ways to configure OCI: using client credentials or using the default credentials.
+
+=== "Default credentials"
+    If you have default credentials set up in `~/.oci/config`, configure the backend like this:
+
+    <div editor-title="~/.dstack/server/config.yml">
+
+    ```yaml
+    projects:
+    - name: main
+      backends:
+      - type: oci
+        creds:
+          type: default
+    ```
+
+    </div>
 
 === "Client credentials"
 
@@ -482,22 +607,6 @@ There are two ways to configure OCI: using client credentials or using the defau
 
     Make sure to include either the path to your private key via `key_file` or the contents of the key via `key_content`.
 
-=== "Default credentials"
-    If you have default credentials set up in `~/.oci/config`, configure the backend like this:
-
-    <div editor-title="~/.dstack/server/config.yml">
-
-    ```yaml
-    projects:
-    - name: main
-      backends:
-      - type: oci
-        creds:
-          type: default
-    ```
-
-    </div>
-
 ??? info "Required permissions"
 
     This is an example of a restrictive policy for a group of `dstack` users:
@@ -524,115 +633,6 @@ There are two ways to configure OCI: using client credentials or using the defau
           type: default
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
-
-### Lambda
-
-Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
-button to create a new API key.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-    - type: lambda
-      creds:
-        type: api_key
-        api_key: eersct_yrpiey-naaeedst-tk-_cb6ba38e1128464aea9bcc619e4ba2a5.iijPMi07obgt6TZ87v5qAEj61RVxhd0p
-```
-
-</div>
-
-### TensorDock
-
-Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: tensordock
-        creds:
-          type: api_key
-          api_key: 248e621d-9317-7494-dc1557fa5825b-98b
-          api_token: FyBI3YbnFEYXdth2xqYRnQI7hiusssBC
-```
-
-</div>
-
-The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
-
-### Vast.ai
-
-Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
-API Key.
-
-Then, go ahead and configure the backend:
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-- name: main
-  backends:
-    - type: vastai
-      creds:
-        type: api_key
-        api_key: d75789f22f1908e0527c78a283b523dd73051c8c7d05456516fc91e9d4efd8c5
-```
-
-</div>
-
-Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
-
-### RunPod
-
-Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
-the button to create a Read & Write key.
-
-Then proceed to configuring the backend.
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: runpod
-        creds:
-          type: api_key
-          api_key: US9XTPDIV8AR42MMINY8TCKRB8S4E7LNRQ6CAUQ9
-```
-
-</div>
-
-### CUDO
-
-Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
-
-Ensure you've created a project with CUDO Compute, then proceed to configuring the backend.
-
-<div editor-title="~/.dstack/server/config.yml">
-
-```yaml
-projects:
-  - name: main
-    backends:
-      - type: cudo
-        project_id: my-cudo-project
-        creds:
-          type: api_key
-          api_key: 7487240a466624b48de22865589
-```
-
-</div>
 
 ### DataCrunch
 
@@ -837,7 +837,7 @@ See the [reference table](#default-permissions) for all configurable permissions
     overrides:
       show_root_heading: false
 
-## `projects[n]` { #projects data-toc-label="projects" }
+## `projects[n]` { #_projects data-toc-label="projects" }
 
 #SCHEMA# dstack._internal.server.services.config.ProjectConfig
     overrides:
@@ -845,7 +845,7 @@ See the [reference table](#default-permissions) for all configurable permissions
         backends:
             type: 'Union[AWSConfigInfoWithCreds, AzureConfigInfoWithCreds, GCPConfigInfoWithCreds, LambdaConfigInfoWithCreds, TensorDockConfigInfoWithCreds, VastAIConfigInfoWithCreds, KubernetesConfig]'
 
-## `projects[n].backends[type=aws]` { #aws data-toc-label="backends[type=aws]" }
+## `projects[n].backends[type=aws]` { #_aws data-toc-label="backends[type=aws]" }
 
 #SCHEMA# dstack._internal.server.services.config.AWSConfig
     overrides:
@@ -854,7 +854,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             required: true
         item_id_prefix: aws-
 
-## `projects[n].backends[type=aws].creds` { #aws-creds data-toc-label="backends[type=aws].creds" }
+## `projects[n].backends[type=aws].creds` { #_aws-creds data-toc-label="backends[type=aws].creds" }
 
 === "Access key"
     #SCHEMA# dstack._internal.core.models.backends.aws.AWSAccessKeyCreds
@@ -870,7 +870,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             type:
                 required: true
 
-## `projects[n].backends[type=azure]` { #azure data-toc-label="backends[type=azure]" }
+## `projects[n].backends[type=azure]` { #_azure data-toc-label="backends[type=azure]" }
 
 #SCHEMA# dstack._internal.server.services.config.AzureConfig
     overrides:
@@ -879,7 +879,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             required: true
         item_id_prefix: azure-
 
-## `projects[n].backends[type=azure].creds` { #azure-creds data-toc-label="backends[type=azure].creds" }
+## `projects[n].backends[type=azure].creds` { #_azure-creds data-toc-label="backends[type=azure].creds" }
 
 === "Client"
     #SCHEMA# dstack._internal.core.models.backends.azure.AzureClientCreds
@@ -895,7 +895,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             type:
                 required: true
 
-## `projects[n].backends[type=datacrunch]` { #datacrunch data-toc-label="backends[type=datacrunch]" }
+## `projects[n].backends[type=datacrunch]` { #_datacrunch data-toc-label="backends[type=datacrunch]" }
 
 #SCHEMA# dstack._internal.server.services.config.DataCrunchConfig
     overrides:
@@ -904,7 +904,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             required: true
         item_id_prefix: datacrunch-
 
-## `projects[n].backends[type=datacrunch].creds` { #datacrunch-creds data-toc-label="backends[type=datacrunch].creds" }
+## `projects[n].backends[type=datacrunch].creds` { #_datacrunch-creds data-toc-label="backends[type=datacrunch].creds" }
 
 #SCHEMA# dstack._internal.core.models.backends.datacrunch.DataCrunchAPIKeyCreds
     overrides:
@@ -912,7 +912,7 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
-## `projects[n].backends[type=gcp]` { #gcp data-toc-label="backends[type=gcp]" }
+## `projects[n].backends[type=gcp]` { #_gcp data-toc-label="backends[type=gcp]" }
 
 #SCHEMA# dstack._internal.server.services.config.GCPConfig
     overrides:
@@ -921,7 +921,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             required: true
         item_id_prefix: gcp-
 
-## `projects[n].backends[type=gcp].creds` { #gcp-creds data-toc-label="backends[type=gcp].creds" }
+## `projects[n].backends[type=gcp].creds` { #_gcp-creds data-toc-label="backends[type=gcp].creds" }
 
 === "Service account"
     #SCHEMA# dstack._internal.server.services.config.GCPServiceAccountCreds
@@ -937,7 +937,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             type:
                 required: true
 
-## `projects[n].backends[type=lambda]` { #lambda data-toc-label="backends[type=lambda]" }
+## `projects[n].backends[type=lambda]` { #_lambda data-toc-label="backends[type=lambda]" }
 
 #SCHEMA# dstack._internal.server.services.config.LambdaConfig
     overrides:
@@ -946,7 +946,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             required: true
         item_id_prefix: lambda-
 
-## `projects[n].backends[type=lambda].creds` { #lambda-creds data-toc-label="backends[type=lambda].creds" }
+## `projects[n].backends[type=lambda].creds` { #_lambda-creds data-toc-label="backends[type=lambda].creds" }
 
 #SCHEMA# dstack._internal.core.models.backends.lambdalabs.LambdaAPIKeyCreds
     overrides:
@@ -954,7 +954,7 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
-## `projects[n].backends[type=oci]` { #oci data-toc-label="backends[type=oci]" }
+## `projects[n].backends[type=oci]` { #_oci data-toc-label="backends[type=oci]" }
 
 #SCHEMA# dstack._internal.server.services.config.OCIConfig
     overrides:
@@ -963,7 +963,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             required: true
         item_id_prefix: oci-
 
-## `projects[n].backends[type=oci].creds` { #oci-creds data-toc-label="backends[type=oci].creds" }
+## `projects[n].backends[type=oci].creds` { #_oci-creds data-toc-label="backends[type=oci].creds" }
 
 === "Client"
     #SCHEMA# dstack._internal.core.models.backends.oci.OCIClientCreds
@@ -979,7 +979,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             type:
                 required: true
 
-## `projects[n].backends[type=tensordock]` { #tensordock data-toc-label="backends[type=tensordock]" }
+## `projects[n].backends[type=tensordock]` { #_tensordock data-toc-label="backends[type=tensordock]" }
 
 #SCHEMA# dstack._internal.server.services.config.TensorDockConfig
     overrides:
@@ -988,7 +988,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             required: true
         item_id_prefix: tensordock-
 
-## `projects[n].backends[type=tensordock].creds` { #tensordock-creds data-toc-label="backends[type=tensordock].creds" }
+## `projects[n].backends[type=tensordock].creds` { #_tensordock-creds data-toc-label="backends[type=tensordock].creds" }
 
 #SCHEMA# dstack._internal.core.models.backends.tensordock.TensorDockAPIKeyCreds
     overrides:
@@ -996,7 +996,7 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
-## `projects[n].backends[type=vastai]` { #vastai data-toc-label="backends[type=vastai]" }
+## `projects[n].backends[type=vastai]` { #_vastai data-toc-label="backends[type=vastai]" }
 
 #SCHEMA# dstack._internal.server.services.config.VastAIConfig
     overrides:
@@ -1005,7 +1005,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             required: true
         item_id_prefix: vastai-
 
-## `projects[n].backends[type=vastai].creds` { #vastai-creds data-toc-label="backends[type=vastai].creds" }
+## `projects[n].backends[type=vastai].creds` { #_vastai-creds data-toc-label="backends[type=vastai].creds" }
 
 #SCHEMA# dstack._internal.core.models.backends.vastai.VastAIAPIKeyCreds
     overrides:
@@ -1013,7 +1013,7 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
-## `projects[n].backends[type=cudo]` { #cudo data-toc-label="backends[type=cudo]" }
+## `projects[n].backends[type=cudo]` { #_cudo data-toc-label="backends[type=cudo]" }
 
 #SCHEMA# dstack._internal.server.services.config.CudoConfig
     overrides:
@@ -1022,7 +1022,7 @@ See the [reference table](#default-permissions) for all configurable permissions
             required: true
         item_id_prefix: cudo-
 
-## `projects[n].backends[type=cudo].creds` { #cudo-creds data-toc-label="backends[type=cudo].creds" }
+## `projects[n].backends[type=cudo].creds` { #_cudo-creds data-toc-label="backends[type=cudo].creds" }
 
 #SCHEMA# dstack._internal.core.models.backends.cudo.CudoAPIKeyCreds
     overrides:
@@ -1030,7 +1030,7 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
-## `projects[n].backends[type=kubernetes]` { #kubernetes data-toc-label="backends[type=kubernetes]" }
+## `projects[n].backends[type=kubernetes]` { #_kubernetes data-toc-label="backends[type=kubernetes]" }
 
 #SCHEMA# dstack._internal.server.services.config.KubernetesConfig
     overrides:
@@ -1038,25 +1038,25 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
-## `projects[n].backends[type=kubernetes].kubeconfig` { #kubeconfig data-toc-label="kubeconfig" }
+## `projects[n].backends[type=kubernetes].kubeconfig` { #_kubeconfig data-toc-label="kubeconfig" }
 
 ##SCHEMA# dstack._internal.server.services.config.KubeconfigConfig
     overrides:
         show_root_heading: false
 
-## `projects[n].backends[type=kubernetes].networking` { #networking data-toc-label="networking" }
+## `projects[n].backends[type=kubernetes].networking` { #_networking data-toc-label="networking" }
 
 ##SCHEMA# dstack._internal.core.models.backends.kubernetes.KubernetesNetworkingConfig
     overrides:
         show_root_heading: false
 
-## `encryption` { #encryption data-toc-label="encryption" }
+## `encryption` { #_encryption data-toc-label="encryption" }
 
 #SCHEMA# dstack._internal.server.services.config.EncryptionConfig
     overrides:
         show_root_heading: false
 
-## `encryption.keys[n][type=identity]` { #encryption-keys-identity data-toc-label="encryption.keys.identity" }
+## `encryption.keys[n][type=identity]` { #_encryption-keys-identity data-toc-label="encryption.keys.identity" }
 
 #SCHEMA# dstack._internal.server.services.encryption.keys.identity.IdentityEncryptionKeyConfig
     overrides:
@@ -1064,7 +1064,7 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
-## `encryption.keys[n][type=aes]` { #encryption-keys-aes data-toc-label="encryption.keys.aes" }
+## `encryption.keys[n][type=aes]` { #_encryption-keys-aes data-toc-label="encryption.keys.aes" }
 
 #SCHEMA# dstack._internal.server.services.encryption.keys.aes.AESEncryptionKeyConfig
     overrides:
@@ -1072,7 +1072,7 @@ See the [reference table](#default-permissions) for all configurable permissions
         type:
             required: true
 
-## `default_permissions` { #default-permissions data-toc-label="default-permissions" }
+## `default_permissions` { #_default-permissions data-toc-label="default-permissions" }
 
 #SCHEMA# dstack._internal.server.services.permissions.DefaultPermissions
     overrides:

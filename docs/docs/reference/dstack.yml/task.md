@@ -209,7 +209,7 @@ commands:
 > If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
 `dstack` will require the value to be passed via the CLI or set in the current process.
 
-For instance, you can define environment variables in a `.env` file and utilize tools like `direnv`.
+For instance, you can define environment variables in a `.envrc` file and utilize tools like `direnv`.
 
 ##### System environment variables
 
@@ -266,7 +266,7 @@ is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, 
 
 ??? info "Backends"
     Running on multiple nodes is supported only with the `aws`, `gcp`, `azure`, `oci` backends, or
-    [on-prem fleets](../../fleets.md#__tabbed_1_2).
+    [on-prem fleets](../../concepts/fleets.md#on-prem).
 
 ### Web applications
 

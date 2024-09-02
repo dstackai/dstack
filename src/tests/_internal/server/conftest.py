@@ -1,30 +1,18 @@
 from pathlib import Path
 
+import httpx
 import pytest
-import pytest_asyncio
 
-from dstack._internal.server.db import Database, override_db
-from dstack._internal.server.models import BaseModel
+from dstack._internal.server.main import app
 from dstack._internal.server.services import encryption as encryption  # import for side-effect
 from dstack._internal.server.services import logs as logs_services
-
-db = Database("sqlite+aiosqlite://")
-override_db(db)
+from dstack._internal.server.testing.conf import postgres_container, session, test_db  # noqa: F401
 
 
-@pytest_asyncio.fixture
-async def test_db():
-    async with db.engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.create_all)
-        yield conn
-        await conn.run_sync(BaseModel.metadata.drop_all)
-
-
-@pytest_asyncio.fixture
-async def session():
-    async with db.get_session() as session:
-        yield session
-        await session.commit()
+@pytest.fixture
+def client(event_loop):
+    transport = httpx.ASGITransport(app=app)
+    return httpx.AsyncClient(transport=transport, base_url="http://test")
 
 
 @pytest.fixture

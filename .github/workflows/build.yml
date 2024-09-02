@@ -76,8 +76,14 @@ jobs:
           name: frontend-build
           path: src/dstack/_internal/server/statics
       - name: Run pytest
+        # Skip Postgres tests on macos since macos runner doesn't have Docker.
+        # Skip Postgres tests for Python 3.8 since testcontainers<4 doesn't support asyncpg correctly.
         run: |
-          pytest src/tests --runui
+          RUNPOSTGRES=""
+          if [ "${{ matrix.os }}" != "macos-latest" ] && [ "${{ matrix.python-version }}" != "3.8" ]; then
+            RUNPOSTGRES="--runpostgres"
+          fi
+          pytest src/tests --runui $RUNPOSTGRES
 
   update-get-dstack:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository

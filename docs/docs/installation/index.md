@@ -16,7 +16,7 @@ create the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) fi
 
 ## Start the server
 
-Once the `~/.dstack/server/config.yml` file is configured, proceed and start the server:
+Once backends are configured, proceed and start the server:
 
 === "pip"
 
@@ -87,7 +87,7 @@ This configuration is stored in `~/.dstack/config.yml`.
 ## Create on-prem fleets
 
 If you want the `dstack` server to run containers on your on-prem clusters,
-use [on-fleets](../fleets.md#__tabbed_1_2).
+use [on-prem fleets](../concepts/fleets.md#on-prem).
 
 ## What's next?
 

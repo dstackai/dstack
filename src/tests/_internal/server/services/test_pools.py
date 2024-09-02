@@ -14,6 +14,7 @@ from dstack._internal.utils.common import get_current_datetime
 
 class TestGenerateInstanceName:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_generates_instance_name(self, test_db, session: AsyncSession):
         user = await create_user(session=session)
         project = await create_project(session=session, owner=user)
@@ -43,6 +44,7 @@ class TestGenerateInstanceName:
 
 class TestInstanceModelToInstance:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_converts_instance(self, test_db, session: AsyncSession):
         project = await create_project(
             session=session,

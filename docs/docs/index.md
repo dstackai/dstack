@@ -1,12 +1,9 @@
 # What is dstack?
 
-`dstack` is a lightweight alternative to Kubernetes, designed specifically for managing the development, training, and
-deployment of AI models at any scale.
+`dstack` is a lightweight alternative to Kubernetes built for AI. It simplifies container orchestration for AI across
+in the cloud and on-prem, accelerating the development, training, and deployment of AI models at any scale.
 
-`dstack` is easy to use with any cloud provider (AWS, GCP, Azure, OCI, Lambda, TensorDock, Vast.ai, RunPod, etc.) or
-any on-prem clusters.
-
-If you already use Kubernetes, `dstack` can be used with it.
+`dstack` supports [on-prem](concepts/fleets.md#on-prem) servers and natively integrates with a variety of [providers](../providers.md). 
 
 #### Accelerators
 
@@ -35,6 +32,12 @@ Apply the configuration either via the `dstack apply` CLI command or through a p
 
 `dstack` automatically manages provisioning, job queuing, auto-scaling, networking, volumes, run failures,
 out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-prem clusters.
+
+## Why dstack?
+
+`dstack`'s founder and CEO explains the challenges `dstack` addresses for AI and Ops teams.
+
+<iframe width="700" height="394" src="https://www.youtube.com/embed/RIDMEutHuWo?si=6Quy34Kwj8wHvBTQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 ## Where do I start?
 

@@ -20,6 +20,7 @@ from dstack._internal.server.testing.common import (
 class TestServerConfigManager:
     class TestInitConfig:
         @pytest.mark.asyncio
+        @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
         async def test_inits_backend(self, test_db, session: AsyncSession, tmp_path: Path):
             await create_project(session=session, name="main")
             config_filepath = tmp_path / "config.yml"
@@ -54,6 +55,7 @@ class TestServerConfigManager:
 
     class TestApplyConfig:
         @pytest.mark.asyncio
+        @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
         async def test_creates_backend(self, test_db, session: AsyncSession, tmp_path: Path):
             owner = await create_user(session=session, name="test_owner")
             await create_project(session=session, owner=owner, name="main")
