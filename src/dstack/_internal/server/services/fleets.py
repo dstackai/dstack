@@ -262,9 +262,8 @@ async def delete_fleets(
     instances_ids = sorted([i.id for f in fleet_models for i in f.instances])
     await session.commit()
     logger.info("Deleting fleets: %s", [v.name for v in fleet_models])
-    async with (
-        get_locker().lock_ctx(FleetModel.__tablename__, fleets_ids),
-        get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids),
+    async with get_locker().lock_ctx(FleetModel.__tablename__, fleets_ids), get_locker().lock_ctx(
+        InstanceModel.__tablename__, instances_ids
     ):
         # Refetch after lock
         # TODO lock instances with FOR UPDATE?
