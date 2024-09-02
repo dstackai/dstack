@@ -3,6 +3,7 @@ from argparse import Namespace
 
 import uvicorn
 
+from dstack import version
 from dstack._internal.cli.commands import BaseCommand
 
 
@@ -62,7 +63,7 @@ class ServerCommand(BaseCommand):
             "dstack._internal.server.main:app",
             host=args.host,
             port=args.port,
-            # reload=version.__version__ is None,
+            reload=version.__version__ is None,
             log_level=uvicorn_log_level,
             workers=1,
         )

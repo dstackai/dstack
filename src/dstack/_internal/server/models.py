@@ -326,6 +326,8 @@ class JobModel(BaseModel):
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
     # `removed` is used to ensure that the instance is killed after the job is finished
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+    # `instance_assigned` means instance assignment was done.
+    # if `instance_assigned` is True and `instance` is None, no instance was assiged.
     instance_assigned: Mapped[bool] = mapped_column(Boolean, default=False)
     instance: Mapped[Optional["InstanceModel"]] = relationship(back_populates="job")
     used_instance_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUIDType(binary=False))

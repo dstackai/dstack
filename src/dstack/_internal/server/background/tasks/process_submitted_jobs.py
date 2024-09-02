@@ -163,6 +163,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     )
     pool = res.scalar_one()
 
+    # Submitted jobs processing happens in two steps (transactions).
+    # First, the jobs gets an instance assigned (or no instance).
+    # Then, the job runs on the assigned instance or a new instance is provisioned.
+    # This is needed to avoid holding instances lock for a long time.
     if not job_model.instance_assigned:
         # Try assigning instances from the pool.
         res = await session.execute(
