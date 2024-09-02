@@ -26,7 +26,7 @@ from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
 )
-from dstack._internal.server.services.locking import db_locker
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.runs import (
     create_job_model_for_new_submission,
     fmt,
@@ -43,8 +43,8 @@ RETRY_DELAY = datetime.timedelta(seconds=15)
 
 
 async def process_runs():
-    run_lock, run_lockset = db_locker.get_lock_and_lockset(RunModel.__tablename__)
-    job_lock, job_lockset = db_locker.get_lock_and_lockset(JobModel.__tablename__)
+    run_lock, run_lockset = get_locker().get_lockset(RunModel.__tablename__)
+    job_lock, job_lockset = get_locker().get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with run_lock, job_lock:
             res = await session.execute(
@@ -69,7 +69,7 @@ async def process_runs():
             run_model_id = run_model.id
             await _process_run(session=session, run_model=run_model)
         finally:
-            run_lockset.remove(run_model_id)
+            run_lockset.difference_update([run_model_id])
             job_lockset.difference_update(job_ids)
 
 

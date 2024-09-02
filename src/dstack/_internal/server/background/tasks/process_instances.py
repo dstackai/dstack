@@ -60,7 +60,7 @@ from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.jobs import (
     terminate_job_provisioning_data_instance,
 )
-from dstack._internal.server.services.locking import db_locker
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.pools import get_instance_provisioning_data
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
@@ -85,7 +85,7 @@ logger = get_logger(__name__)
 
 
 async def process_instances() -> None:
-    lock, lockset = db_locker.get_lock_and_lockset(InstanceModel.__tablename__)
+    lock, lockset = get_locker().get_lockset(InstanceModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -115,7 +115,7 @@ async def process_instances() -> None:
             instance_model_id = instance.id
             await _process_instance(session=session, instance=instance)
         finally:
-            lockset.remove(instance_model_id)
+            lockset.difference_update([instance_model_id])
 
 
 async def _process_instance(session: AsyncSession, instance: InstanceModel):

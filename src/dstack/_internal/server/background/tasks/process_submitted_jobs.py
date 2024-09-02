@@ -48,7 +48,7 @@ from dstack._internal.server.services.fleets import (
 from dstack._internal.server.services.jobs import (
     find_job,
 )
-from dstack._internal.server.services.locking import db_locker, wait_to_lock, wait_to_lock_many
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
@@ -70,7 +70,7 @@ logger = get_logger(__name__)
 
 
 async def process_submitted_jobs():
-    lock, lockset = db_locker.get_lock_and_lockset(JobModel.__tablename__)
+    lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -91,7 +91,7 @@ async def process_submitted_jobs():
             job_model_id = job_model.id
             await _process_submitted_job(session=session, job_model=job_model)
         finally:
-            lockset.remove(job_model_id)
+            lockset.difference_update([job_model_id])
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
@@ -175,16 +175,12 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             .options(lazyload(InstanceModel.job))
             .with_for_update()
         )
-        instance_lock, instance_lockset = db_locker.get_lock_and_lockset(
-            InstanceModel.__tablename__
-        )
         pool_instances = list(res.scalars().all())
         instances_ids = sorted([i.id for i in pool_instances])
         if get_db().dialect_name == "sqlite":
             # Start new transaction to see commited changes after lock
             await session.commit()
-        await wait_to_lock_many(instance_lock, instance_lockset, instances_ids)
-        try:
+        async with get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids):
             # Refetch after lock
             res = await session.execute(
                 select(InstanceModel).where(InstanceModel.id.in_(instances_ids))
@@ -204,8 +200,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             job_model.last_processed_at = common_utils.get_current_datetime()
             await session.commit()
             return
-        finally:
-            instance_lockset.difference_update(instances_ids)
 
     if job_model.instance is not None:
         job_model.status = JobStatus.PROVISIONING
@@ -282,12 +276,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     # TODO: lock instances for attaching volumes?
     # Take lock to prevent attaching volumes that are to be deleted.
     # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
-    lock, lockset = db_locker.get_lock_and_lockset(VolumeModel.__tablename__)
-    await wait_to_lock_many(lock, lockset, volumes_ids)
     await session.execute(
         select(VolumeModel).where(VolumeModel.id.in_(volumes_ids)).with_for_update()
     )
-    try:
+    async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
         if len(volume_models) > 0:
             await _attach_volumes(
                 session=session,
@@ -298,8 +290,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             )
         job_model.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
-    finally:
-        lockset.difference_update(volumes_ids)
 
 
 async def _assign_job_to_pool_instance(
@@ -456,9 +446,7 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
     if len(fleet_model.instances) == 0:
         # No instances means the fleet is not in the db yet, so don't lock.
         return 0
-    lock, lockset = db_locker.get_lock_and_lockset(FleetModel.__tablename__)
-    await wait_to_lock(lock, lockset, fleet_model.id)
-    try:
+    async with get_locker().lock_ctx(FleetModel.__tablename__, [fleet_model.id]):
         fleet_model = (
             (
                 await session.execute(
@@ -472,8 +460,6 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
             .scalar_one()
         )
         return len(fleet_model.instances)
-    finally:
-        lockset.difference_update([fleet_model.id])
 
 
 def _create_instance_model_for_job(

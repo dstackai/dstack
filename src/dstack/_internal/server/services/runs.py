@@ -86,7 +86,7 @@ from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
-from dstack._internal.server.services.locking import db_locker, string_to_lock_id, wait_to_lock
+from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
@@ -407,7 +407,7 @@ async def submit_run(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
 
-    lock, _ = db_locker.get_lock_and_lockset(lock_namespace)
+    lock, _ = get_locker().get_lockset(lock_namespace)
     async with lock:
         if run_spec.run_name is None:
             run_spec.run_name = await _generate_run_name(
@@ -509,9 +509,7 @@ async def stop_runs(
 
 
 async def stop_run(session: AsyncSession, run_id: uuid.UUID, abort: bool):
-    lock, lockset = db_locker.get_lock_and_lockset(RunModel.__tablename__)
-    await wait_to_lock(lock, lockset, run_id)
-    try:
+    async with get_locker().lock_ctx(RunModel.__tablename__, [run_id]):
         res = await session.execute(
             select(RunModel).where(RunModel.id == run_id).with_for_update()
         )
@@ -523,14 +521,13 @@ async def stop_run(session: AsyncSession, run_id: uuid.UUID, abort: bool):
             run.termination_reason = RunTerminationReason.ABORTED_BY_USER
         else:
             run.termination_reason = RunTerminationReason.STOPPED_BY_USER
+        # FIXME: do not commit
         await session.commit()  # run will be refreshed later
         # process the run out of turn
         logger.debug("%s: terminating because %s", fmt(run), run.termination_reason.name)
         await process_terminating_run(session, run)
         run.last_processed_at = common_utils.get_current_datetime()
         await session.commit()
-    finally:
-        lockset.remove(run_id)
 
 
 async def delete_runs(

@@ -35,9 +35,8 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services.locking import (
-    db_locker,
+    get_locker,
     string_to_lock_id,
-    wait_to_lock_many,
 )
 from dstack._internal.server.services.projects import get_member, get_member_permissions
 from dstack._internal.utils import random_names
@@ -123,7 +122,7 @@ async def create_fleet(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
 
-    lock, _ = db_locker.get_lock_and_lockset(lock_namespace)
+    lock, _ = get_locker().get_lockset(lock_namespace)
     async with lock:
         if spec.configuration.name is not None:
             fleet_model = await get_project_fleet_model_by_name(
@@ -263,11 +262,10 @@ async def delete_fleets(
     instances_ids = sorted([i.id for f in fleet_models for i in f.instances])
     await session.commit()
     logger.info("Deleting fleets: %s", [v.name for v in fleet_models])
-    fleet_lock, fleet_lockset = db_locker.get_lock_and_lockset(FleetModel.__tablename__)
-    instance_lock, instance_lockset = db_locker.get_lock_and_lockset(InstanceModel.__tablename__)
-    await wait_to_lock_many(fleet_lock, fleet_lockset, fleets_ids)
-    await wait_to_lock_many(instance_lock, instance_lockset, instances_ids)
-    try:
+    async with (
+        get_locker().lock_ctx(FleetModel.__tablename__, fleets_ids),
+        get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids),
+    ):
         # Refetch after lock
         # TODO lock instances with FOR UPDATE?
         res = await session.execute(
@@ -293,9 +291,6 @@ async def delete_fleets(
             if instance_nums is None:
                 fleet_model.status = FleetStatus.TERMINATING
         await session.commit()
-    finally:
-        instance_lockset.difference_update(instances_ids)
-        fleet_lockset.difference_update(fleets_ids)
 
 
 def fleet_model_to_fleet(fleet_model: FleetModel, include_sensitive: bool = False) -> Fleet:

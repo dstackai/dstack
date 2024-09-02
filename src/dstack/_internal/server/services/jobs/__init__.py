@@ -28,7 +28,7 @@ from dstack._internal.server.services.jobs.configurators.base import JobConfigur
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
-from dstack._internal.server.services.locking import db_locker, wait_to_lock
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import get_runner_ports, runner_ssh_tunnel
@@ -191,10 +191,8 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
         # it's too early to terminate the instance
         return
 
-    # FIXME: unlock after the commit
-    lock, lockset = db_locker.get_lock_and_lockset(InstanceModel.__tablename__)
-    await wait_to_lock(lock, lockset, job_model.used_instance_id)
-    try:
+    # FIXME: The caller should take instance lock since unlock must be after commit
+    async with get_locker().lock_ctx(InstanceModel.__tablename__, [job_model.used_instance_id]):
         res = await session.execute(
             select(InstanceModel)
             .where(InstanceModel.id == job_model.used_instance_id)
@@ -250,20 +248,18 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             await gateways.unregister_replica(
                 session, job_model
             )  # TODO(egor-s) ensure always runs
-    finally:
-        lockset.remove(job_model.used_instance_id)
 
-    if job_model.termination_reason is not None:
-        job_model.status = job_model.termination_reason.to_status()
-    else:
-        job_model.status = JobStatus.FAILED
-        logger.warning("%s: job termination reason is not set", fmt(job_model))
-    logger.info(
-        "%s: job status is %s, reason: %s",
-        fmt(job_model),
-        job_model.status.name,
-        job_model.termination_reason.name,
-    )
+        if job_model.termination_reason is not None:
+            job_model.status = job_model.termination_reason.to_status()
+        else:
+            job_model.status = JobStatus.FAILED
+            logger.warning("%s: job termination reason is not set", fmt(job_model))
+        logger.info(
+            "%s: job status is %s, reason: %s",
+            fmt(job_model),
+            job_model.status.name,
+            job_model.termination_reason.name,
+        )
 
 
 async def stop_container(

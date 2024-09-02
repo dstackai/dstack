@@ -8,7 +8,7 @@ from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import ProjectModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import volumes as volumes_services
-from dstack._internal.server.services.locking import db_locker
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 
 
 async def process_submitted_volumes():
-    lock, lockset = db_locker.get_lock_and_lockset(VolumeModel.__tablename__)
+    lock, lockset = get_locker().get_lockset(VolumeModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -38,7 +38,7 @@ async def process_submitted_volumes():
             volume_model_id = volume_model.id
             await _process_submitted_volume(session=session, volume_model=volume_model)
         finally:
-            lockset.remove(volume_model_id)
+            lockset.difference_update([volume_model_id])
 
 
 async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeModel):

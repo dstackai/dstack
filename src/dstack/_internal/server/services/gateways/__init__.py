@@ -58,9 +58,8 @@ from dstack._internal.server.services.gateways.connection import GatewayConnecti
 from dstack._internal.server.services.gateways.options import get_service_options
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.locking import (
-    db_locker,
+    get_locker,
     string_to_lock_id,
-    wait_to_lock_many,
 )
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.utils.common import (
@@ -161,7 +160,7 @@ async def create_gateway(
             select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
 
-    lock, _ = db_locker.get_lock_and_lockset(lock_namespace)
+    lock, _ = get_locker().get_lockset(lock_namespace)
     async with lock:
         if configuration.name is None:
             configuration.name = await generate_gateway_name(session=session, project=project)
@@ -228,9 +227,7 @@ async def delete_gateways(
     gateways_ids = sorted([g.id for g in gateway_models])
     await session.commit()
     logger.info("Deleting gateways: %s", [g.name for g in gateway_models])
-    lock, lockset = db_locker.get_lock_and_lockset(GatewayModel.__tablename__)
-    await wait_to_lock_many(lock, lockset, gateways_ids)
-    try:
+    async with get_locker().lock_ctx(GatewayModel.__tablename__, gateways_ids):
         # Refetch after lock
         res = await session.execute(
             select(GatewayModel)
@@ -274,8 +271,6 @@ async def delete_gateways(
                 session.add(gateway_model.gateway_compute)
             await session.delete(gateway_model)
         await session.commit()
-    finally:
-        lockset.difference_update(gateways_ids)
 
 
 async def set_gateway_wildcard_domain(

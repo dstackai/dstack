@@ -54,7 +54,7 @@ from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
-from dstack._internal.server.services.locking import db_locker
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
@@ -269,7 +269,7 @@ async def generate_instance_name(
 ) -> str:
     # FIXME: The locking is not correct since concurrently commited changes
     # are not visible due to SQLite repeatable reads
-    lock, _ = db_locker.get_lock_and_lockset(f"instance_names_{project.name}")
+    lock, _ = get_locker().get_lockset(f"instance_names_{project.name}")
     async with lock:
         pool_instances = []
         pool = await get_pool(session, project, pool_name)

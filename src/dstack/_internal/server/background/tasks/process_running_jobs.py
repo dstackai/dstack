@@ -32,7 +32,7 @@ from dstack._internal.server.services.jobs import (
     find_job,
     job_model_to_job_submission,
 )
-from dstack._internal.server.services.locking import db_locker
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.repos import get_code_model, repo_model_to_repo_head
 from dstack._internal.server.services.runner import client
@@ -51,7 +51,7 @@ logger = get_logger(__name__)
 
 
 async def process_running_jobs():
-    lock, lockset = db_locker.get_lock_and_lockset(JobModel.__tablename__)
+    lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -75,7 +75,7 @@ async def process_running_jobs():
             job_model_id = job_model.id
             await _process_running_job(session=session, job_model=job_model)
         finally:
-            lockset.remove(job_model_id)
+            lockset.difference_update([job_model_id])
 
 
 async def _process_running_job(session: AsyncSession, job_model: JobModel):

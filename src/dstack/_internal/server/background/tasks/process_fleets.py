@@ -10,7 +10,7 @@ from dstack._internal.server.services.fleets import (
     is_fleet_empty,
     is_fleet_in_use,
 )
-from dstack._internal.server.services.locking import db_locker
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 
 
 async def process_fleets():
-    lock, lockset = db_locker.get_lock_and_lockset(FleetModel.__tablename__)
+    lock, lockset = get_locker().get_lockset(FleetModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -39,7 +39,7 @@ async def process_fleets():
             fleet_model_id = fleet_model.id
             await _process_fleet(session=session, fleet_model=fleet_model)
         finally:
-            lockset.remove(fleet_model_id)
+            lockset.difference_update([fleet_model_id])
 
 
 async def _process_fleet(session: AsyncSession, fleet_model: FleetModel):

@@ -15,7 +15,7 @@ from dstack._internal.server.services.gateways import (
     create_gateway_compute,
     gateway_connections_pool,
 )
-from dstack._internal.server.services.locking import db_locker
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -29,7 +29,7 @@ async def process_gateways_connections():
 
 
 async def process_submitted_gateways():
-    lock, lockset = db_locker.get_lock_and_lockset(GatewayModel.__tablename__)
+    lock, lockset = get_locker().get_lockset(GatewayModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -51,7 +51,7 @@ async def process_submitted_gateways():
             gateway_model_id = gateway_model.id
             await _process_submitted_gateway(session=session, gateway_model=gateway_model)
         finally:
-            lockset.remove(gateway_model_id)
+            lockset.difference_update([gateway_model_id])
 
 
 async def _process_connection(conn: GatewayConnection):

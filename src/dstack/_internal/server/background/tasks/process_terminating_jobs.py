@@ -7,7 +7,7 @@ from dstack._internal.server.models import JobModel
 from dstack._internal.server.services.jobs import (
     process_terminating_job,
 )
-from dstack._internal.server.services.locking import db_locker
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 
 async def process_terminating_jobs():
-    lock, lockset = db_locker.get_lock_and_lockset(JobModel.__tablename__)
+    lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
         async with lock:
             res = await session.execute(
@@ -37,7 +37,7 @@ async def process_terminating_jobs():
             job_model_id = job_model.id
             await _process_job(session=session, job_model=job_model)
         finally:
-            lockset.remove(job_model_id)
+            lockset.difference_update([job_model_id])
 
 
 async def _process_job(session: AsyncSession, job_model: JobModel):
