@@ -21,6 +21,7 @@ from dstack._internal.core.models.volumes import (
     VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.server.db import db
 from dstack._internal.server.models import ProjectModel, UserModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.locking import db_locker, wait_to_lock_many
@@ -163,29 +164,34 @@ async def create_volume(
     configuration: VolumeConfiguration,
 ) -> Volume:
     _validate_volume_configuration(configuration)
+    if db.get_dialect_name() == "sqlite":
+        # Start new transaction to see commited changes after lock
+        await session.commit()
+    lock, _ = db_locker.get_lock_and_lockset(f"volume_names_{project.name}")
+    async with lock:
+        # TODO: add postgres locking via advisory locks
+        if configuration.name is not None:
+            volume_model = await get_project_volume_model_by_name(
+                session=session,
+                project=project,
+                name=configuration.name,
+            )
+            if volume_model is not None:
+                raise ResourceExistsError()
+        else:
+            configuration.name = await generate_volume_name(session=session, project=project)
 
-    if configuration.name is not None:
-        volume_model = await get_project_volume_model_by_name(
-            session=session,
-            project=project,
+        volume_model = VolumeModel(
+            id=uuid.uuid4(),
             name=configuration.name,
+            project=project,
+            status=VolumeStatus.SUBMITTED,
+            configuration=configuration.json(),
         )
-        if volume_model is not None:
-            raise ResourceExistsError()
-    else:
-        configuration.name = await generate_volume_name(session=session, project=project)
-
-    volume_model = VolumeModel(
-        id=uuid.uuid4(),
-        name=configuration.name,
-        project=project,
-        status=VolumeStatus.SUBMITTED,
-        configuration=configuration.json(),
-    )
-    session.add(volume_model)
-    await session.commit()
-    await session.refresh(volume_model)
-    return volume_model_to_volume(volume_model)
+        session.add(volume_model)
+        await session.commit()
+        await session.refresh(volume_model)
+        return volume_model_to_volume(volume_model)
 
 
 async def delete_volumes(session: AsyncSession, project: ProjectModel, names: List[str]):

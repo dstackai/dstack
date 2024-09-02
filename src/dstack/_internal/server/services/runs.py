@@ -1,4 +1,3 @@
-import asyncio
 import itertools
 import math
 import uuid
@@ -58,6 +57,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume, VolumeStatus
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.server.db import db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -398,55 +398,61 @@ async def submit_run(
     if repo is None:
         raise RepoDoesNotExistError.with_id(run_spec.repo_id)
 
-    if run_spec.run_name is None:
-        run_spec.run_name = await _generate_run_name(
-            session=session,
-            project=project,
-        )
-    else:
-        await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
-
-    await validate_run(
-        session=session,
-        user=user,
-        project=project,
-        run_spec=run_spec,
-    )
-
-    submitted_at = common_utils.get_current_datetime()
-    run_model = RunModel(
-        id=uuid.uuid4(),
-        project_id=project.id,
-        project=project,
-        repo_id=repo.id,
-        user_id=user.id,
-        run_name=run_spec.run_name,
-        submitted_at=submitted_at,
-        status=RunStatus.SUBMITTED,
-        run_spec=run_spec.json(),
-        last_processed_at=submitted_at,
-    )
-    session.add(run_model)
-
-    replicas = 1
-    if run_spec.configuration.type == "service":
-        replicas = run_spec.configuration.replicas.min
-        await gateways.register_service(session, run_model)
-
-    for replica_num in range(replicas):
-        jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
-        for job in jobs:
-            job_model = create_job_model_for_new_submission(
-                run_model=run_model,
-                job=job,
-                status=JobStatus.SUBMITTED,
+    if db.get_dialect_name() == "sqlite":
+        # Start new transaction to see commited changes after lock
+        await session.commit()
+    lock, _ = db_locker.get_lock_and_lockset(f"run_names_{project.name}")
+    async with lock:
+        # TODO: add postgres locking via advisory locks
+        if run_spec.run_name is None:
+            run_spec.run_name = await _generate_run_name(
+                session=session,
+                project=project,
             )
-            session.add(job_model)
-    await session.commit()
-    await session.refresh(run_model)
+        else:
+            await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
-    run = run_model_to_run(run_model, return_in_api=True)
-    return run
+        await validate_run(
+            session=session,
+            user=user,
+            project=project,
+            run_spec=run_spec,
+        )
+
+        submitted_at = common_utils.get_current_datetime()
+        run_model = RunModel(
+            id=uuid.uuid4(),
+            project_id=project.id,
+            project=project,
+            repo_id=repo.id,
+            user_id=user.id,
+            run_name=run_spec.run_name,
+            submitted_at=submitted_at,
+            status=RunStatus.SUBMITTED,
+            run_spec=run_spec.json(),
+            last_processed_at=submitted_at,
+        )
+        session.add(run_model)
+
+        replicas = 1
+        if run_spec.configuration.type == "service":
+            replicas = run_spec.configuration.replicas.min
+            await gateways.register_service(session, run_model)
+
+        for replica_num in range(replicas):
+            jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
+            for job in jobs:
+                job_model = create_job_model_for_new_submission(
+                    run_model=run_model,
+                    job=job,
+                    status=JobStatus.SUBMITTED,
+                )
+                session.add(job_model)
+        await session.commit()
+        await session.refresh(run_model)
+
+        run = run_model_to_run(run_model, return_in_api=True)
+        return run
 
 
 def create_job_model_for_new_submission(
@@ -725,9 +731,6 @@ def run_model_to_run(
     return run
 
 
-_PROJECTS_TO_RUN_NAMES_LOCK = {}
-
-
 def _get_pool_offers(
     pool: PoolModel,
     run_spec: RunSpec,
@@ -760,20 +763,20 @@ async def _generate_run_name(
     session: AsyncSession,
     project: ProjectModel,
 ) -> str:
-    lock = _PROJECTS_TO_RUN_NAMES_LOCK.setdefault(project.name, asyncio.Lock())
     run_name_base = generate_name()
     idx = 1
-    async with lock:
-        while (
-            await get_run(
-                session=session,
-                project=project,
-                run_name=f"{run_name_base}-{idx}",
+    while True:
+        res = await session.execute(
+            select(RunModel).where(
+                RunModel.project_id == project.id,
+                RunModel.run_name == f"{run_name_base}-{idx}",
+                RunModel.deleted == False,
             )
-            is not None
-        ):
-            idx += 1
-        return f"{run_name_base}-{idx}"
+        )
+        run_model = res.scalar()
+        if run_model is None:
+            return f"{run_name_base}-{idx}"
+        idx += 1
 
 
 async def validate_run(

@@ -42,6 +42,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
+from dstack._internal.server.db import db
 from dstack._internal.server.models import (
     GatewayComputeModel,
     GatewayModel,
@@ -147,26 +148,32 @@ async def create_gateway(
         project=project, backend_type=configuration.backend
     )
 
-    if configuration.name is None:
-        configuration.name = await generate_gateway_name(session=session, project=project)
+    if db.get_dialect_name() == "sqlite":
+        # Start new transaction to see commited changes after lock
+        await session.commit()
+    lock, _ = db_locker.get_lock_and_lockset(f"fleet_names_{project.name}")
+    async with lock:
+        # TODO: add postgres locking via advisory locks
+        if configuration.name is None:
+            configuration.name = await generate_gateway_name(session=session, project=project)
 
-    gateway = GatewayModel(
-        name=configuration.name,
-        region=configuration.region,
-        project_id=project.id,
-        backend_id=backend_model.id,
-        wildcard_domain=configuration.domain,
-        configuration=configuration.json(),
-        status=GatewayStatus.SUBMITTED,
-        last_processed_at=get_current_datetime(),
-    )
-    session.add(gateway)
-    await session.commit()
+        gateway = GatewayModel(
+            name=configuration.name,
+            region=configuration.region,
+            project_id=project.id,
+            backend_id=backend_model.id,
+            wildcard_domain=configuration.domain,
+            configuration=configuration.json(),
+            status=GatewayStatus.SUBMITTED,
+            last_processed_at=get_current_datetime(),
+        )
+        session.add(gateway)
+        await session.commit()
 
-    if project.default_gateway is None or configuration.default:
-        await set_default_gateway(session=session, project=project, name=configuration.name)
+        if project.default_gateway is None or configuration.default:
+            await set_default_gateway(session=session, project=project, name=configuration.name)
 
-    return gateway_model_to_gateway(gateway)
+        return gateway_model_to_gateway(gateway)
 
 
 async def connect_to_gateway_with_retry(

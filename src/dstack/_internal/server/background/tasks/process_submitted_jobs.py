@@ -31,7 +31,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -180,10 +180,12 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         )
         pool_instances = list(res.scalars().all())
         instances_ids = sorted([i.id for i in pool_instances])
+        if db.get_dialect_name() == "sqlite":
+            # Start new transaction to see commited changes after lock
+            await session.commit()
         await wait_to_lock_many(instance_lock, instance_lockset, instances_ids)
         try:
             # Refetch after lock
-            # TODO: Commit before refetching to see commited changes but only for SQLite
             res = await session.execute(
                 select(InstanceModel).where(InstanceModel.id.in_(instances_ids))
             )

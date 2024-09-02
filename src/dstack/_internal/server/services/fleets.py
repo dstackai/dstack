@@ -25,6 +25,7 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.server.db import db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -109,54 +110,60 @@ async def create_fleet(
     if spec.configuration.ssh_config is not None:
         _check_can_manage_ssh_fleets(user=user, project=project)
 
-    if spec.configuration.name is not None:
-        fleet_model = await get_project_fleet_model_by_name(
-            session=session,
-            project=project,
-            name=spec.configuration.name,
-        )
-        if fleet_model is not None:
-            raise ResourceExistsError()
-    else:
-        spec.configuration.name = await generate_fleet_name(session=session, project=project)
-
-    pool = await pools_services.get_or_create_pool_by_name(
-        session=session, project=project, pool_name=None
-    )
-    fleet_model = FleetModel(
-        id=uuid.uuid4(),
-        name=spec.configuration.name,
-        project=project,
-        status=FleetStatus.ACTIVE,
-        spec=spec.json(),
-        instances=[],
-    )
-    session.add(fleet_model)
-    if spec.configuration.ssh_config is not None:
-        for i, host in enumerate(spec.configuration.ssh_config.hosts):
-            instances_model = await create_fleet_ssh_instance_model(
-                project=project,
-                pool=pool,
-                spec=spec,
-                ssh_params=spec.configuration.ssh_config,
-                env=spec.configuration.env,
-                instance_num=i,
-                host=host,
-            )
-            fleet_model.instances.append(instances_model)
-    else:
-        for i in range(_get_fleet_nodes_to_provision(spec)):
-            instance_model = await create_fleet_instance_model(
+    if db.get_dialect_name() == "sqlite":
+        # Start new transaction to see commited changes after lock
+        await session.commit()
+    lock, _ = db_locker.get_lock_and_lockset(f"fleet_names_{project.name}")
+    async with lock:
+        # TODO: add postgres locking via advisory locks
+        if spec.configuration.name is not None:
+            fleet_model = await get_project_fleet_model_by_name(
                 session=session,
                 project=project,
-                user=user,
-                pool=pool,
-                spec=spec,
-                instance_num=i,
+                name=spec.configuration.name,
             )
-            fleet_model.instances.append(instance_model)
-    await session.commit()
-    return fleet_model_to_fleet(fleet_model)
+            if fleet_model is not None:
+                raise ResourceExistsError()
+        else:
+            spec.configuration.name = await generate_fleet_name(session=session, project=project)
+
+        pool = await pools_services.get_or_create_pool_by_name(
+            session=session, project=project, pool_name=None
+        )
+        fleet_model = FleetModel(
+            id=uuid.uuid4(),
+            name=spec.configuration.name,
+            project=project,
+            status=FleetStatus.ACTIVE,
+            spec=spec.json(),
+            instances=[],
+        )
+        session.add(fleet_model)
+        if spec.configuration.ssh_config is not None:
+            for i, host in enumerate(spec.configuration.ssh_config.hosts):
+                instances_model = await create_fleet_ssh_instance_model(
+                    project=project,
+                    pool=pool,
+                    spec=spec,
+                    ssh_params=spec.configuration.ssh_config,
+                    env=spec.configuration.env,
+                    instance_num=i,
+                    host=host,
+                )
+                fleet_model.instances.append(instances_model)
+        else:
+            for i in range(_get_fleet_nodes_to_provision(spec)):
+                instance_model = await create_fleet_instance_model(
+                    session=session,
+                    project=project,
+                    user=user,
+                    pool=pool,
+                    spec=spec,
+                    instance_num=i,
+                )
+                fleet_model.instances.append(instance_model)
+        await session.commit()
+        return fleet_model_to_fleet(fleet_model)
 
 
 async def create_fleet_instance_model(
