@@ -21,7 +21,7 @@ class Database:
             class_=AsyncSession,
         )
 
-        if self.get_dialect_name() == "sqlite":
+        if self.dialect_name == "sqlite":
 
             @event.listens_for(self.engine.sync_engine, "connect")
             def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _: ConnectionPoolEntry):
@@ -31,28 +31,33 @@ class Database:
                 cursor.execute("PRAGMA busy_timeout=10000;")
                 cursor.close()
 
-    def get_dialect_name(self) -> str:
+    @property
+    def dialect_name(self) -> str:
         return self.engine.dialect.name
 
     def get_session(self) -> AsyncSession:
         return self.session_maker()
 
 
-db = Database(url=DATABASE_URL)
+_db = Database(url=DATABASE_URL)
+
+
+def get_db() -> Database:
+    return _db
 
 
 def override_db(new_db: Database):
-    global db
-    db = new_db
+    global _db
+    _db = new_db
 
 
 async def migrate():
-    async with db.engine.connect() as connection:
+    async with _db.engine.connect() as connection:
         await connection.run_sync(_run_alembic_upgrade)
 
 
 async def get_session():
-    async with db.get_session() as session:
+    async with _db.get_session() as session:
         yield session
         await session.commit()
 

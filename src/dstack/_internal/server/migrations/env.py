@@ -5,7 +5,7 @@ import alembic_postgresql_enum  # noqa: F401
 from alembic import context
 from sqlalchemy import Connection, MetaData, text
 
-from dstack._internal.server.db import db
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import BaseModel
 
 config = context.config
@@ -31,7 +31,7 @@ def run_migrations_offline():
     script output.
     """
     context.configure(
-        url=db.url,
+        url=get_db().url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -76,8 +76,8 @@ def run_migrations(connection: Connection):
 
 
 async def run_async_migrations():
-    engine = db.engine
-    async with db.engine.connect() as connection:
+    engine = get_db().engine
+    async with engine.connect() as connection:
         await connection.run_sync(run_migrations)
     await engine.dispose()
 

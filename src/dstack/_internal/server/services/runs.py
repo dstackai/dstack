@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 import pydantic
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -57,7 +57,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume, VolumeStatus
 from dstack._internal.core.services import validate_dstack_resource_name
-from dstack._internal.server.db import db
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -86,7 +86,7 @@ from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
-from dstack._internal.server.services.locking import db_locker, wait_to_lock
+from dstack._internal.server.services.locking import db_locker, string_to_lock_id, wait_to_lock
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
@@ -398,12 +398,17 @@ async def submit_run(
     if repo is None:
         raise RepoDoesNotExistError.with_id(run_spec.repo_id)
 
-    if db.get_dialect_name() == "sqlite":
+    lock_namespace = f"run_names_{project.name}"
+    if get_db().dialect_name == "sqlite":
         # Start new transaction to see commited changes after lock
         await session.commit()
-    lock, _ = db_locker.get_lock_and_lockset(f"run_names_{project.name}")
+    elif get_db().dialect_name == "postgresql":
+        await session.execute(
+            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
+        )
+
+    lock, _ = db_locker.get_lock_and_lockset(lock_namespace)
     async with lock:
-        # TODO: add postgres locking via advisory locks
         if run_spec.run_name is None:
             run_spec.run_name = await _generate_run_name(
                 session=session,

@@ -5,7 +5,7 @@ from typing import List, Optional, Sequence
 from urllib.parse import urlparse
 
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -42,7 +42,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
-from dstack._internal.server.db import db
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     GatewayComputeModel,
     GatewayModel,
@@ -57,7 +57,11 @@ from dstack._internal.server.services.backends import (
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.options import get_service_options
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
-from dstack._internal.server.services.locking import db_locker, wait_to_lock_many
+from dstack._internal.server.services.locking import (
+    db_locker,
+    string_to_lock_id,
+    wait_to_lock_many,
+)
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.utils.common import (
     gather_map_async,
@@ -148,12 +152,17 @@ async def create_gateway(
         project=project, backend_type=configuration.backend
     )
 
-    if db.get_dialect_name() == "sqlite":
+    lock_namespace = f"gateway_names_{project.name}"
+    if get_db().dialect_name == "sqlite":
         # Start new transaction to see commited changes after lock
         await session.commit()
-    lock, _ = db_locker.get_lock_and_lockset(f"fleet_names_{project.name}")
+    elif get_db().dialect_name == "postgresql":
+        await session.execute(
+            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
+        )
+
+    lock, _ = db_locker.get_lock_and_lockset(lock_namespace)
     async with lock:
-        # TODO: add postgres locking via advisory locks
         if configuration.name is None:
             configuration.name = await generate_gateway_name(session=session, project=project)
 

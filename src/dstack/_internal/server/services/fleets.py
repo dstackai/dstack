@@ -2,7 +2,7 @@ import uuid
 from datetime import timezone
 from typing import List, Optional, Union
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -25,7 +25,7 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
-from dstack._internal.server.db import db
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -34,7 +34,11 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import pools as pools_services
-from dstack._internal.server.services.locking import db_locker, wait_to_lock_many
+from dstack._internal.server.services.locking import (
+    db_locker,
+    string_to_lock_id,
+    wait_to_lock_many,
+)
 from dstack._internal.server.services.projects import get_member, get_member_permissions
 from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
@@ -110,12 +114,17 @@ async def create_fleet(
     if spec.configuration.ssh_config is not None:
         _check_can_manage_ssh_fleets(user=user, project=project)
 
-    if db.get_dialect_name() == "sqlite":
+    lock_namespace = f"fleet_names_{project.name}"
+    if get_db().dialect_name == "sqlite":
         # Start new transaction to see commited changes after lock
         await session.commit()
-    lock, _ = db_locker.get_lock_and_lockset(f"fleet_names_{project.name}")
+    elif get_db().dialect_name == "postgresql":
+        await session.execute(
+            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
+        )
+
+    lock, _ = db_locker.get_lock_and_lockset(lock_namespace)
     async with lock:
-        # TODO: add postgres locking via advisory locks
         if spec.configuration.name is not None:
             fleet_model = await get_project_fleet_model_by_name(
                 session=session,

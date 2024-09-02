@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,10 +21,14 @@ from dstack._internal.core.models.volumes import (
     VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
-from dstack._internal.server.db import db
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import ProjectModel, UserModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
-from dstack._internal.server.services.locking import db_locker, wait_to_lock_many
+from dstack._internal.server.services.locking import (
+    db_locker,
+    string_to_lock_id,
+    wait_to_lock_many,
+)
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common, random_names
@@ -164,12 +168,18 @@ async def create_volume(
     configuration: VolumeConfiguration,
 ) -> Volume:
     _validate_volume_configuration(configuration)
-    if db.get_dialect_name() == "sqlite":
+
+    lock_namespace = f"volume_names_{project.name}"
+    if get_db().dialect_name == "sqlite":
         # Start new transaction to see commited changes after lock
         await session.commit()
-    lock, _ = db_locker.get_lock_and_lockset(f"volume_names_{project.name}")
+    elif get_db().dialect_name == "postgresql":
+        await session.execute(
+            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
+        )
+
+    lock, _ = db_locker.get_lock_and_lockset(lock_namespace)
     async with lock:
-        # TODO: add postgres locking via advisory locks
         if configuration.name is not None:
             volume_model = await get_project_volume_model_by_name(
                 session=session,

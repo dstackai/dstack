@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from asyncio import Lock
 from typing import Dict, List, Set, Tuple, TypeVar
 
@@ -43,6 +44,10 @@ async def wait_to_lock_many(
                     locked.add(key)
                     left_to_lock.remove(key)
         await asyncio.sleep(delay)
+
+
+def string_to_lock_id(s: str) -> int:
+    return int(hashlib.sha256(s.encode()).hexdigest(), 16) % (2**63)
 
 
 db_locker = DBLocker()
