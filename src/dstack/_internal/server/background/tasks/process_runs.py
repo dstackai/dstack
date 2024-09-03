@@ -55,7 +55,7 @@ async def process_runs():
                     JobModel.id.not_in(job_lockset),
                 )
                 .join(RunModel.jobs)
-                .order_by(JobModel.last_processed_at.asc())
+                .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
                 .with_for_update(skip_locked=True)
             )
@@ -74,6 +74,7 @@ async def process_runs():
 
 
 async def _process_run(session: AsyncSession, run_model: RunModel):
+    logger.debug("%s: processing run", fmt(run_model))
     # Refetch to load related attributes.
     # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
     res = await session.execute(

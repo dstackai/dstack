@@ -53,7 +53,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import InstanceModel, ProjectModel
+from dstack._internal.server.models import FleetModel, InstanceModel, ProjectModel
 from dstack._internal.server.schemas.runner import HealthcheckResponse
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import fleet_model_to_fleet
@@ -126,6 +126,7 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         .where(InstanceModel.id == instance.id)
         .options(joinedload(InstanceModel.project).joinedload(ProjectModel.backends))
         .options(joinedload(InstanceModel.job))
+        .options(joinedload(InstanceModel.fleet).joinedload(FleetModel.instances))
         .execution_options(populate_existing=True)
     )
     instance = res.unique().scalar_one()

@@ -25,14 +25,25 @@ def get_scheduler() -> AsyncIOScheduler:
 
 
 def start_background_tasks() -> AsyncIOScheduler:
-    _scheduler.add_job(process_submitted_jobs, IntervalTrigger(seconds=2))
-    _scheduler.add_job(process_running_jobs, IntervalTrigger(seconds=2))
-    _scheduler.add_job(process_terminating_jobs, IntervalTrigger(seconds=2))
-    _scheduler.add_job(process_instances, IntervalTrigger(seconds=10))
-    _scheduler.add_job(process_runs, IntervalTrigger(seconds=3))
+    # In-memory locking via locksets does not guarantee
+    # that the first waiting for the lock wil acquire it.
+    # The jitter is needed to give all tasks a chance to acquire locks.
+    _scheduler.add_job(
+        process_submitted_jobs, IntervalTrigger(seconds=4, jitter=2), max_instances=5
+    )
+    _scheduler.add_job(process_running_jobs, IntervalTrigger(seconds=4, jitter=2), max_instances=5)
+    _scheduler.add_job(
+        process_terminating_jobs, IntervalTrigger(seconds=4, jitter=2), max_instances=5
+    )
+    _scheduler.add_job(process_instances, IntervalTrigger(seconds=4, jitter=2), max_instances=5)
+    _scheduler.add_job(process_runs, IntervalTrigger(seconds=2), max_instances=5)
     _scheduler.add_job(process_gateways_connections, IntervalTrigger(seconds=15))
-    _scheduler.add_job(process_submitted_gateways, IntervalTrigger(seconds=10), max_instances=5)
-    _scheduler.add_job(process_submitted_volumes, IntervalTrigger(seconds=5))
+    _scheduler.add_job(
+        process_submitted_gateways, IntervalTrigger(seconds=10, jitter=2), max_instances=5
+    )
+    _scheduler.add_job(
+        process_submitted_volumes, IntervalTrigger(seconds=10, jitter=2), max_instances=5
+    )
     _scheduler.add_job(process_fleets, IntervalTrigger(seconds=15))
     _scheduler.start()
     return _scheduler
