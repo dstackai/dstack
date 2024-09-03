@@ -52,15 +52,25 @@ async def process_runs():
                 .where(
                     RunModel.status.not_in(RunStatus.finished_statuses()),
                     RunModel.id.not_in(run_lockset),
-                    JobModel.id.not_in(job_lockset),
                 )
-                .join(RunModel.jobs)
                 .order_by(RunModel.last_processed_at.asc())
                 .limit(1)
                 .with_for_update(skip_locked=True)
             )
             run_model = res.scalar()
             if run_model is None:
+                return
+            res = await session.execute(
+                select(JobModel)
+                .where(
+                    JobModel.run_id == run_model.id,
+                    JobModel.id.not_in(job_lockset),
+                )
+                .with_for_update(skip_locked=True)
+            )
+            job_models = res.scalars().all()
+            if len(run_model.jobs) != len(job_models):
+                # Some jobs are locked
                 return
             job_ids = [j.id for j in run_model.jobs]
             run_lockset.add(run_model.id)
