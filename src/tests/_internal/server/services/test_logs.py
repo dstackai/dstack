@@ -1,3 +1,4 @@
+import itertools
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, call
@@ -61,7 +62,11 @@ class TestCloudWatchLogStorage:
     def mock_client(self, monkeypatch: pytest.MonkeyPatch) -> Mock:
         mock = Mock()
         monkeypatch.setattr("boto3.Session.client", Mock(return_value=mock))
-        mock.get_log_events.return_value = {"events": []}
+        mock.get_log_events.return_value = {
+            "events": [],
+            "nextBackwardToken": "bwd",
+            "nextFormartToken": "fwd",
+        }
         return mock
 
     @pytest.fixture
@@ -160,19 +165,17 @@ class TestCloudWatchLogStorage:
         )
 
     @pytest.mark.asyncio
-    async def test_poll_logs_response(
+    async def test_poll_logs_non_empty_response(
         self,
         project: ProjectModel,
         log_storage: CloudWatchLogStorage,
         mock_client: Mock,
         poll_logs_request: PollLogsRequest,
     ):
-        mock_client.get_log_events.return_value = {
-            "events": [
-                {"timestamp": 1696586513234, "message": "SGVsbG8="},
-                {"timestamp": 1696586513235, "message": "V29ybGQ="},
-            ]
-        }
+        mock_client.get_log_events.return_value["events"] = [
+            {"timestamp": 1696586513234, "message": "SGVsbG8="},
+            {"timestamp": 1696586513235, "message": "V29ybGQ="},
+        ]
         job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
 
         assert job_submission_logs.logs == [
@@ -189,19 +192,33 @@ class TestCloudWatchLogStorage:
         ]
 
     @pytest.mark.asyncio
-    async def test_poll_logs_response_descending(
+    async def test_poll_logs_empty_response(
         self,
         project: ProjectModel,
         log_storage: CloudWatchLogStorage,
         mock_client: Mock,
         poll_logs_request: PollLogsRequest,
     ):
-        mock_client.get_log_events.return_value = {
-            "events": [
-                {"timestamp": 1696586513234, "message": "SGVsbG8="},
-                {"timestamp": 1696586513235, "message": "V29ybGQ="},
-            ]
-        }
+        # Check that we don't use the workaround when descending=False -> startFromHead=True
+        # https://github.com/dstackai/dstack/issues/1647
+        mock_client.get_log_events.return_value["events"] = []
+        job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
+
+        assert job_submission_logs.logs == []
+        mock_client.get_log_events.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_poll_logs_descending_non_empty_response_on_first_call(
+        self,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        poll_logs_request: PollLogsRequest,
+    ):
+        mock_client.get_log_events.return_value["events"] = [
+            {"timestamp": 1696586513234, "message": "SGVsbG8="},
+            {"timestamp": 1696586513235, "message": "V29ybGQ="},
+        ]
         poll_logs_request.descending = True
         job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
 
@@ -217,6 +234,118 @@ class TestCloudWatchLogStorage:
                 message="SGVsbG8=",
             ),
         ]
+
+    @pytest.mark.asyncio
+    async def test_poll_logs_descending_two_first_calls_return_empty_response(
+        self,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        poll_logs_request: PollLogsRequest,
+    ):
+        # The first two calls return empty event lists, though the token is not the same, meaning
+        # there are more events.
+        # https://github.com/dstackai/dstack/issues/1647
+        mock_client.get_log_events.side_effect = [
+            {
+                "events": [],
+                "nextBackwardToken": "bwd1",
+                "nextForwardToken": "fwd",
+            },
+            {
+                "events": [],
+                "nextBackwardToken": "bwd2",
+                "nextForwardToken": "fwd",
+            },
+            {
+                "events": [
+                    {"timestamp": 1696586513234, "message": "SGVsbG8="},
+                    {"timestamp": 1696586513235, "message": "V29ybGQ="},
+                ],
+                "nextBackwardToken": "bwd3",
+                "nextForwardToken": "fwd",
+            },
+        ]
+        poll_logs_request.descending = True
+        job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
+
+        assert job_submission_logs.logs == [
+            LogEvent(
+                timestamp=datetime(2023, 10, 6, 10, 1, 53, 235000, tzinfo=timezone.utc),
+                log_source=LogEventSource.STDOUT,
+                message="V29ybGQ=",
+            ),
+            LogEvent(
+                timestamp=datetime(2023, 10, 6, 10, 1, 53, 234000, tzinfo=timezone.utc),
+                log_source=LogEventSource.STDOUT,
+                message="SGVsbG8=",
+            ),
+        ]
+        assert mock_client.get_log_events.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_poll_logs_descending_empty_response_with_same_token(
+        self,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        poll_logs_request: PollLogsRequest,
+    ):
+        # The first two calls return empty event lists with the same token, meaning we reached
+        # the end.
+        # https://github.com/dstackai/dstack/issues/1647
+        mock_client.get_log_events.side_effect = [
+            {
+                "events": [],
+                "nextBackwardToken": "bwd",
+                "nextForwardToken": "fwd",
+            },
+            {
+                "events": [],
+                "nextBackwardToken": "bwd",
+                "nextForwardToken": "fwd",
+            },
+            # We should not reach this response
+            {
+                "events": [
+                    {"timestamp": 1696586513234, "message": "SGVsbG8="},
+                ],
+                "nextBackwardToken": "bwd2",
+                "nextForwardToken": "fwd",
+            },
+        ]
+        poll_logs_request.descending = True
+        job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
+
+        assert job_submission_logs.logs == []
+        assert mock_client.get_log_events.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_poll_logs_descending_empty_response_max_tries(
+        self,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        poll_logs_request: PollLogsRequest,
+    ):
+        # Test for a circuit breaker when the API returns empty results on each call, but the
+        # token is different on each call.
+        # https://github.com/dstackai/dstack/issues/1647
+        counter = itertools.count()
+
+        def _response_producer(*args, **kwargs):
+            return {
+                "events": [],
+                "nextBackwardToken": f"bwd{next(counter)}",
+                "nextForwardToken": "fwd",
+            }
+
+        mock_client.get_log_events.side_effect = _response_producer
+        poll_logs_request.descending = True
+        job_submission_logs = log_storage.poll_logs(project, poll_logs_request)
+
+        assert job_submission_logs.logs == []
+        assert mock_client.get_log_events.call_count == 11  # initial call + 10 tries
 
     @pytest.mark.asyncio
     async def test_poll_logs_request_params_asc_no_diag_no_dates(
@@ -245,6 +374,11 @@ class TestCloudWatchLogStorage:
         mock_client: Mock,
         poll_logs_request: PollLogsRequest,
     ):
+        # Ensure the first response has events to avoid triggering a workaround for
+        # https://github.com/dstackai/dstack/issues/1647
+        mock_client.get_log_events.return_value["events"] = [
+            {"timestamp": 1696586513234, "message": "SGVsbG8="}
+        ]
         poll_logs_request.start_time = datetime(
             2023, 10, 6, 10, 1, 53, 234000, tzinfo=timezone.utc
         )
