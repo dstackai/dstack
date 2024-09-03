@@ -501,33 +501,39 @@ async def stop_runs(
             RunModel.status.not_in(RunStatus.finished_statuses()),
         )
     )
-    runs = res.scalars().all()
-    run_ids = sorted([r.id for r in runs])
+    run_models = res.scalars().all()
+    run_ids = sorted([r.id for r in run_models])
+    res = await session.execute(select(JobModel).where(JobModel.run_id.in_(run_ids)))
+    job_models = res.scalars().all()
+    job_ids = sorted([j.id for j in job_models])
     await session.commit()
-    for run_id in run_ids:
-        await stop_run(session=session, run_id=run_id, abort=abort)
+    async with get_locker().lock_ctx(RunModel.__tablename__, run_ids), get_locker().lock_ctx(
+        JobModel.__tablename__, job_ids
+    ):
+        for run_model in run_models:
+            await stop_run(session=session, run_model=run_model, abort=abort)
 
 
-async def stop_run(session: AsyncSession, run_id: uuid.UUID, abort: bool):
-    async with get_locker().lock_ctx(RunModel.__tablename__, [run_id]):
-        res = await session.execute(
-            select(RunModel).where(RunModel.id == run_id).with_for_update()
-        )
-        run = res.scalar_one()
-        if run.status.is_finished():
-            return
-        run.status = RunStatus.TERMINATING
-        if abort:
-            run.termination_reason = RunTerminationReason.ABORTED_BY_USER
-        else:
-            run.termination_reason = RunTerminationReason.STOPPED_BY_USER
-        # FIXME: do not commit
-        await session.commit()  # run will be refreshed later
-        # process the run out of turn
-        logger.debug("%s: terminating because %s", fmt(run), run.termination_reason.name)
-        await process_terminating_run(session, run)
-        run.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
+async def stop_run(session: AsyncSession, run_model: RunModel, abort: bool):
+    res = await session.execute(
+        select(RunModel).where(RunModel.id == run_model.id).with_for_update()
+    )
+    run_model = res.scalar_one()
+    await session.execute(
+        select(JobModel).where(JobModel.run_id == run_model.id).with_for_update()
+    )
+    if run_model.status.is_finished():
+        return
+    run_model.status = RunStatus.TERMINATING
+    if abort:
+        run_model.termination_reason = RunTerminationReason.ABORTED_BY_USER
+    else:
+        run_model.termination_reason = RunTerminationReason.STOPPED_BY_USER
+    # process the run out of turn
+    logger.debug("%s: terminating because %s", fmt(run_model), run_model.termination_reason.name)
+    await process_terminating_run(session, run_model)
+    run_model.last_processed_at = common_utils.get_current_datetime()
+    await session.commit()
 
 
 async def delete_runs(
