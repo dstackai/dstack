@@ -543,24 +543,32 @@ async def delete_runs(
 ):
     res = await session.execute(
         select(RunModel).where(
-            RunModel.project_id == project.id, RunModel.run_name.in_(runs_names)
-        )
-    )
-    run_models = res.scalars().all()
-    active_runs = [r for r in run_models if not r.status.is_finished()]
-    if len(active_runs) > 0:
-        raise ServerClientError(
-            msg=f"Cannot delete active runs: {[r.run_name for r in active_runs]}"
-        )
-    await session.execute(
-        update(RunModel)
-        .where(
             RunModel.project_id == project.id,
             RunModel.run_name.in_(runs_names),
         )
-        .values(deleted=True)
     )
+    run_models = res.scalars().all()
+    run_ids = sorted([r.id for r in run_models])
     await session.commit()
+    async with get_locker().lock_ctx(RunModel.__tablename__, run_ids):
+        res = await session.execute(
+            select(RunModel).where(RunModel.id.in_(run_ids)).with_for_update()
+        )
+        run_models = res.scalars().all()
+        active_runs = [r for r in run_models if not r.status.is_finished()]
+        if len(active_runs) > 0:
+            raise ServerClientError(
+                msg=f"Cannot delete active runs: {[r.run_name for r in active_runs]}"
+            )
+        await session.execute(
+            update(RunModel)
+            .where(
+                RunModel.project_id == project.id,
+                RunModel.run_name.in_(runs_names),
+            )
+            .values(deleted=True)
+        )
+        await session.commit()
 
 
 async def get_create_instance_offers(
