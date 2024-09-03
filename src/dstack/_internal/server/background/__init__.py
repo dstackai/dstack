@@ -26,7 +26,7 @@ def get_scheduler() -> AsyncIOScheduler:
 
 def start_background_tasks() -> AsyncIOScheduler:
     # In-memory locking via locksets does not guarantee
-    # that the first waiting for the lock wil acquire it.
+    # that the first waiting for the lock will acquire it.
     # The jitter is needed to give all tasks a chance to acquire locks.
     _scheduler.add_job(
         process_submitted_jobs, IntervalTrigger(seconds=4, jitter=2), max_instances=5
