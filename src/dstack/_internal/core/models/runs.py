@@ -366,9 +366,8 @@ class PoolInstanceOffers(CoreModel):
 
 
 def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Optional[bool]:
-    """Map profile.spot_policy[SpotPolicy|None] to requirements.spot[bool|None]
-    - SpotPolicy.AUTO by default for `dstack run`
-    - SpotPolicy.ONDEMAND by default for `dstack pool add`
+    """
+    Map profile.spot_policy[SpotPolicy|None] to requirements.spot[bool|None]
     """
     if spot_policy is None:
         spot_policy = default
