@@ -9,7 +9,7 @@ type Args = {
 export const useConfigProjectCliCommand = ({ projectName }: Args) => {
     const currentUserToken = useAppSelector(selectAuthToken);
 
-    const cliCommand = `dstack config --url ${location.origin} --project ${projectName} --token ${currentUserToken}`;
+    const cliCommand = `pip install dstack\n\ndstack config --url ${location.origin} --project ${projectName} --token ${currentUserToken}`;
 
     const copyCliCommand = () => {
         copyToClipboard(cliCommand);

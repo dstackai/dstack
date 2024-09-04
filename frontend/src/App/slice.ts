@@ -52,6 +52,7 @@ const getInitialState = (): IAppState => {
             configureCLICompleted: false,
             discordCompleted: false,
             tallyCompleted: false,
+            quickStartCompleted: false,
         },
     };
 };

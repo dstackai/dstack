@@ -154,7 +154,7 @@ export const ProjectSettings: React.FC = () => {
                     >
                         <SpaceBetween size="s">
                             <Box variant="p" color="text-body-secondary">
-                                Run the command below to configure this project as a remote
+                                Run the following commands to set up the CLI for this project
                             </Box>
 
                             <Hotspot hotspotId={HotspotIds.CONFIGURE_CLI_COMMAND}>

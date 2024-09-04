@@ -36,5 +36,6 @@ export interface IAppState {
         configureCLICompleted: boolean;
         discordCompleted: boolean;
         tallyCompleted: boolean;
+        quickStartCompleted: boolean;
     };
 }
