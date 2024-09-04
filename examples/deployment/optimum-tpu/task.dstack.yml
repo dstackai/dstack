@@ -8,18 +8,16 @@ image: sjbbihan/optimum-tpu:latest
 # Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
-  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B
-  - MAX_CONCURRENT_REQUESTS=4
-  - MAX_INPUT_TOKENS=128
-  - MAX_TOTAL_TOKENS=150
-  - MAX_BATCH_PREFILL_TOKENS=128
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+  - MAX_TOTAL_TOKENS=4096
+  - MAX_BATCH_PREFILL_TOKENS=4095
 commands:
   - text-generation-launcher --port 8000
 ports: [8000]
 
 resources:
   # Required resources
-  gpu: v5litepod-8
+  gpu: v5litepod-4
 
 # Use either spot or on-demand instances
 spot_policy: auto

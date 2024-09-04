@@ -3,7 +3,7 @@
 If you're using the `gcp` backend, you can use TPUs. Just specify the TPU version and the number of cores 
 (separated by a dash), in the `gpu` property under `resources`. 
 
-> Currently, only 8 TPU cores can be specified, so the supported values are `v2-8`, `v3-8`, `v4-8`, `v5litepod-8`, 
+> Currently, maximum 8 TPU cores can be specified, so the maximum supported values are `v2-8`, `v3-8`, `v4-8`, `v5litepod-8`, 
 > and `v5e-8`. Multi-host TPU support, allowing for larger numbers of cores, is coming soon.
 
 Below are a few examples on using TPUs for deployment and fine-tuning.
@@ -54,13 +54,13 @@ Llama 3.1 8B using [vLLM :material-arrow-top-right-thin:{ .external }](https://g
     spot_policy: auto
 
     resources:
-      gpu: v5litepod-8
+      gpu: v5litepod-4
 
     # (Optional) Enable the OpenAI-compatible endpoint
     model:
       format: openai
       type: chat
-      name: meta-llama/Meta-Llama-3.1-8B
+      name: meta-llama/Meta-Llama-3.1-8B-Instruct
     ```
     </div>
 
@@ -76,7 +76,7 @@ Llama 3.1 8B using [vLLM :material-arrow-top-right-thin:{ .external }](https://g
     image: sjbbihan/optimum-tpu:latest
     env:
       - HUGGING_FACE_HUB_TOKEN
-      - MODEL_ID=meta-llama/Meta-Llama-3.1-8B
+      - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
       - MAX_TOTAL_TOKENS=4096
       - MAX_BATCH_PREFILL_TOKENS=4095
     commands:
@@ -84,14 +84,14 @@ Llama 3.1 8B using [vLLM :material-arrow-top-right-thin:{ .external }](https://g
     port: 8000
     
     resources:
-      gpu: v5litepod-8
+      gpu: v5litepod-4
     
     spot_policy: auto
     
     model:
       format: tgi
       type: chat
-      name: meta-llama/Meta-Llama-3.1-8B
+      name: meta-llama/Meta-Llama-3.1-8B-Instruct
     ```
     </div>
 
@@ -106,19 +106,19 @@ Note, for `Optimum TPU` by default `MAX_INPUT_TOKEN` is set to 4095, consequentl
 
 Below are the approximate memory requirements for serving LLMs with their corresponding TPUs. 
 
-| Model size | bfloat16 | TPU          |
-|------------|----------|--------------|
-| **8B**     | 16GB     | v5litepod-8  |
-| **70B**    | 140GB    | v5litepod-16 |
-| **405B**   | 810GB    | v5litepod-64 |
+| Model size | bfloat16 | TPU          | int8  | TPU            |
+|------------|----------|--------------|-------|----------------|
+| **8B**     | 16GB     | v5litepod-4  | 8GB   | v5litepod-4    |
+| **70B**    | 140GB    | v5litepod-16 | 70GB  | v5litepod-16   |
+| **405B**   | 810GB    | v5litepod-64 | 405GB | v5litepod-64   |
 Note, TPU v5litepod is optimized for serving transformer-based models. Each core within the v5litepod is equipped with 16GB of memory.
 
 ### Supported Framework
 
-| Framework | Quantization   | Note                                            |
-|-----------|----------------|-------------------------------------------------|
-| **TGI**   | bfloat16       | To deploy with TGI, Optimum-tpu is recommended. |
-| **vLLM**  | int8, bfloat16 |                                                 |
+| Framework | Quantization   | Note                                                                                                                                                                                                                          |
+|-----------|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **TGI**   | bfloat16       | To deploy with TGI, Optimum-tpu is recommended.                                                                                                                                                                               |
+| **vLLM**  | int8, bfloat16 | int8 quantization still requires the same memory because the weights are first moved to the TPU in bfloat16, and then converted to int8. See [Pull Request](https://github.com/vllm-project/vllm/pull/7005) for more details. |
 
 ### Running a configuration
 
@@ -152,8 +152,7 @@ commands:
   - pip install accelerate -U
   - pip install peft
   - python examples/custom/train.py examples/custom/config.yaml
-ports:
-  - 6006
+
 
 resources:
   gpu: v5litepod-8

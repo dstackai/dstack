@@ -12,7 +12,7 @@ ide: vscode
 
 resources:
   # Required resources
-  gpu: v5litepod-8
+  gpu: v5litepod-4
 
 # Use either spot or on-demand instances
 spot_policy: auto
