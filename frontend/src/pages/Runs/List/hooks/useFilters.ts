@@ -6,19 +6,28 @@ import { SelectCSDProps } from 'components';
 import { useGetProjectReposQuery, useGetProjectsQuery } from 'services/project';
 import { useGetUserListQuery } from 'services/user';
 
+import { useLocalStorageState } from '../../../../hooks/useLocalStorageState';
+
 type Args = {
+    localStorePrefix: string;
     repoSearchKey?: string;
     projectSearchKey?: string;
     userSearchKey?: string;
-
     selectedProject?: string;
 };
-export const useFilters = ({ repoSearchKey, projectSearchKey, userSearchKey, selectedProject: selectedProjectProp }: Args) => {
+
+export const useFilters = ({
+    localStorePrefix,
+    repoSearchKey,
+    projectSearchKey,
+    userSearchKey,
+    selectedProject: selectedProjectProp,
+}: Args) => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
     const [selectedRepo, setSelectedRepo] = useState<SelectCSDProps.Option | null>(null);
     const [selectedUser, setSelectedUser] = useState<SelectCSDProps.Option | null>(null);
-    const [onlyActive, setOnlyActive] = useState<boolean>(false);
+    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${localStorePrefix}-is-active`, false);
 
     useEffect(() => {
         setSelectedRepo(null);

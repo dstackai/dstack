@@ -9,19 +9,19 @@ export const getStatusIconType = (status: IRun['status']): StatusIndicatorProps[
             return 'error';
         case 'aborted':
         case 'terminated':
-            return 'stopped';
         case 'done':
-            return 'success';
+            return 'stopped';
         case 'running':
+            return 'success';
         case 'terminating':
+        case 'pulling':
+        case 'provisioning':
             return 'in-progress';
         case 'submitted':
         case 'pending':
-        case 'pulling':
-        case 'provisioning':
             return 'pending';
         default:
-            return 'stopped';
+            console.error(new Error('Undefined run status'));
     }
 };
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Container, ContentLayout, DetailsHeader, Header, Loader, Pagination, Table, Toggle } from 'components';
+import { Button, FormField, Header, Pagination, SelectCSD, Table, Toggle } from 'components';
 
 import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
 import { useCollection } from 'hooks';
@@ -18,7 +18,15 @@ export const AdministrationFleetsList: React.FC = () => {
     const [pagesCount, setPagesCount] = useState<number>(1);
     const [disabledNext, setDisabledNext] = useState(false);
 
-    const { onlyActive, setOnlyActive, isDisabledClearFilter, clearFilters } = useFilters();
+    const {
+        onlyActive,
+        setOnlyActive,
+        isDisabledClearFilter,
+        clearFilters,
+        projectOptions,
+        selectedProject,
+        setSelectedProject,
+    } = useFilters();
 
     const [getPools, { isLoading, isFetching }] = useLazyGetPoolsInstancesQuery();
     const isDisabledPagination = isLoading || isFetching || data.length === 0;
@@ -26,6 +34,7 @@ export const AdministrationFleetsList: React.FC = () => {
     const getPoolsRequest = (params?: Partial<TPoolInstancesRequestParams>) => {
         return getPools({
             only_active: onlyActive,
+            project_name: selectedProject?.value,
             limit: DEFAULT_TABLE_PAGE_SIZE,
             ...params,
         }).unwrap();
@@ -37,7 +46,7 @@ export const AdministrationFleetsList: React.FC = () => {
             setDisabledNext(false);
             setData(result);
         });
-    }, [onlyActive]);
+    }, [onlyActive, selectedProject?.value]);
 
     const { columns } = useColumnsDefinitions();
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages();
@@ -105,47 +114,60 @@ export const AdministrationFleetsList: React.FC = () => {
     };
 
     return (
-        <ContentLayout header={<DetailsHeader title={t('navigation.fleets')} />}>
-            {isLoading && (
-                <Container>
-                    <Loader />
-                </Container>
-            )}
+        <Table
+            {...collectionProps}
+            variant="full-page"
+            columnDefinitions={columns}
+            items={items}
+            loading={isLoading || isFetching}
+            loadingText={t('common.loading')}
+            stickyHeader={true}
+            header={
+                <Header variant="awsui-h1-sticky" counter={renderCounter()}>
+                    {t('navigation.fleets')}
+                </Header>
+            }
+            filter={
+                <div className={styles.filters}>
+                    <div className={styles.select}>
+                        <FormField label={t('projects.run.project')}>
+                            <SelectCSD
+                                disabled={!projectOptions?.length}
+                                options={projectOptions}
+                                selectedOption={selectedProject}
+                                onChange={(event) => {
+                                    setSelectedProject(event.detail.selectedOption);
+                                }}
+                                placeholder={t('projects.run.project_placeholder')}
+                                expandToViewport={true}
+                                filteringType="auto"
+                            />
+                        </FormField>
+                    </div>
 
-            {!isLoading && (
-                <Table
-                    {...collectionProps}
-                    columnDefinitions={columns}
-                    items={items}
-                    loading={isLoading}
-                    loadingText={t('common.loading')}
-                    stickyHeader={true}
-                    header={<Header counter={renderCounter()}>{t('fleets.instances.title')}</Header>}
-                    filter={
-                        <div className={styles.filters}>
-                            <div className={styles.activeOnly}>
-                                <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
-                                    {t('fleets.active_only')}
-                                </Toggle>
-                            </div>
+                    <div className={styles.activeOnly}>
+                        <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
+                            {t('fleets.active_only')}
+                        </Toggle>
+                    </div>
 
-                            <Button formAction="none" onClick={clearFilters} disabled={isDisabledClearFilter}>
-                                {t('common.clearFilter')}
-                            </Button>
-                        </div>
-                    }
-                    pagination={
-                        <Pagination
-                            currentPageIndex={pagesCount}
-                            pagesCount={pagesCount}
-                            openEnd={!disabledNext}
-                            disabled={isDisabledPagination}
-                            onPreviousPageClick={prevPage}
-                            onNextPageClick={nextPage}
-                        />
-                    }
+                    <div className={styles.clear}>
+                        <Button formAction="none" onClick={clearFilters} disabled={isDisabledClearFilter}>
+                            {t('common.clearFilter')}
+                        </Button>
+                    </div>
+                </div>
+            }
+            pagination={
+                <Pagination
+                    currentPageIndex={pagesCount}
+                    pagesCount={pagesCount}
+                    openEnd={!disabledNext}
+                    disabled={isDisabledPagination}
+                    onPreviousPageClick={prevPage}
+                    onNextPageClick={nextPage}
                 />
-            )}
-        </ContentLayout>
+            }
+        />
     );
 };

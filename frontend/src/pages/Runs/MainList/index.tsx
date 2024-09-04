@@ -30,6 +30,7 @@ export const List: React.FC = () => {
     const { selectedRepo, setSelectedRepo, repoOptions, clearSelected, onlyActive, setOnlyActive } = useFilters({
         repoSearchKey: 'repo',
         selectedProject: selectedProject ?? undefined,
+        localStorePrefix: 'main-run-list-page',
     });
 
     const [getRuns, { isLoading, isFetching }] = useLazyGetRunsQuery();

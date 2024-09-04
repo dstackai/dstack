@@ -32,7 +32,7 @@ export const UserList: React.FC = () => {
 
     useBreadcrumbs([
         {
-            text: t('navigation.users'),
+            text: t('navigation.account'),
             href: ROUTES.USER.LIST,
         },
     ]);
@@ -45,7 +45,7 @@ export const UserList: React.FC = () => {
                 <NavigateLink href={ROUTES.USER.DETAILS.FORMAT(item.username)}>{item.username}</NavigateLink>
             ),
         },
-        {
+        process.env.UI_VERSION !== 'enterprise' && {
             id: 'email',
             header: t('users.email'),
             cell: (item: IUser) => item.email ?? '-',
@@ -55,7 +55,7 @@ export const UserList: React.FC = () => {
             header: t('users.global_role'),
             cell: (item: IUser) => t(`roles.${item.global_role}`),
         },
-    ];
+    ].filter(Boolean);
 
     const toggleDeleteConfirm = () => {
         setShowConfirmDelete((val) => !val);

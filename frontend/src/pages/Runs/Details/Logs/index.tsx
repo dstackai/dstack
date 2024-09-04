@@ -12,7 +12,7 @@ import { useAppSelector } from 'hooks';
 import { useGetProjectLogsQuery } from 'services/project';
 import { useGetRunQuery } from 'services/run';
 
-import { selectAppliedThemeMode } from 'App/slice';
+import { selectSystemMode } from 'App/slice';
 
 import { getJobSubmissionId } from './helpers';
 
@@ -29,7 +29,7 @@ export const Logs: React.FC<IProps> = ({ className, ...props }) => {
     // @ts-ignore
     const paramProjectName: string = props.name ?? params.projectName ?? '';
     const paramRunName = props.run_name ?? params.runName ?? '';
-    const appliedTheme = useAppSelector(selectAppliedThemeMode);
+    const appliedTheme = useAppSelector(selectSystemMode);
 
     const terminalInstance = useRef<Terminal>(new Terminal());
 

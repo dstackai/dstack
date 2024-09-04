@@ -4,6 +4,14 @@
     .b-page-header {
         .awsui-context-top-navigation {
             border-bottom: 1px solid awsui.$color-border-divider-default;
+
+            [class*="awsui_utility-type-button"] {
+                [class*="awsui_link"][href="theme-button"] {
+                    [class^="awsui_icon"] {
+                        width: 48px !important;
+                    }
+                }
+            }
         }
     }
 }
@@ -38,10 +46,42 @@
 }
 
 .themeIcon {
-    stroke: none !important;
-    fill: currentColor !important;
-    transform: scale(1.5);
-    path {
-        stroke: none !important;
+    display: flex;
+    align-items: center;
+    width: 48px;
+    gap: 6px;
+
+    .switcher {
+        position: relative;
+        flex-shrink: 0;
+        width: 24px;
+        height: 16px;
+        border-radius: 8px;
+        background-color: awsui.$color-background-layout-toggle-default;
+        transition: background-color .2s ease;
+
+        &::before {
+            content: "";
+            position: absolute;
+            top: 2px;
+            left: 0;
+            transform: translateX(2px);
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: awsui.$color-foreground-control-default;
+            transition: transform .2s ease;
+        }
+
+        &.on {
+            background-color: awsui.$color-background-control-checked;
+            &::before {
+                transform: translateX(10px);
+            }
+        }
+    }
+
+    .icon {
+        flex-shrink: 0;
     }
 }
