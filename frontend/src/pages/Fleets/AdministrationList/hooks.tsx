@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
@@ -6,6 +6,10 @@ import { Icon, StatusIndicator, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { getStatusIconType } from 'libs/fleet';
+
+import { SelectCSDProps } from '../../../components';
+import { useLocalStorageState } from '../../../hooks/useLocalStorageState';
+import { useGetProjectsQuery } from '../../../services/project';
 
 export const useColumnsDefinitions = () => {
     const { t } = useTranslation();
@@ -66,10 +70,20 @@ export const useColumnsDefinitions = () => {
 };
 
 export const useFilters = () => {
-    const [onlyActive, setOnlyActive] = useState<boolean>(false);
+    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('administration-fleet-list-is-active', false);
+    const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
+
+    const { data: projectsData } = useGetProjectsQuery();
+
+    const projectOptions = useMemo<SelectCSDProps.Options>(() => {
+        if (!projectsData?.length) return [];
+
+        return projectsData.map((project) => ({ label: project.project_name, value: project.project_name }));
+    }, [projectsData]);
 
     const clearFilters = () => {
         setOnlyActive(false);
+        setSelectedProject(null);
     };
 
     const filteringFunction = useCallback<(pool: IPoolListItem) => boolean>(
@@ -79,7 +93,16 @@ export const useFilters = () => {
         [onlyActive],
     );
 
-    const isDisabledClearFilter = !onlyActive;
+    const isDisabledClearFilter = !selectedProject && !onlyActive;
 
-    return { onlyActive, setOnlyActive, filteringFunction, clearFilters, isDisabledClearFilter } as const;
+    return {
+        projectOptions,
+        selectedProject,
+        setSelectedProject,
+        onlyActive,
+        setOnlyActive,
+        filteringFunction,
+        clearFilters,
+        isDisabledClearFilter,
+    } as const;
 };

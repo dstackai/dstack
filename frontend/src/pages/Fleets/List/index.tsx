@@ -1,15 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Header, Pagination, Table } from 'components';
+import { Button, FormField, Header, Pagination, SelectCSD, Table, Toggle } from 'components';
 import { useProjectDropdown } from 'layouts/AppLayout/hooks';
 
 import { useCollection } from 'hooks';
 import { useGetFleetsQuery } from 'services/fleet';
 
-import { useColumnsDefinitions, useEmptyMessages } from './hooks';
+import { useColumnsDefinitions, useEmptyMessages, useFilters } from './hooks';
 
 import { TFleetInstance } from './types';
+
+import styles from './styles.module.scss';
 
 export const FleetsList: React.FC = () => {
     const { t } = useTranslation();
@@ -19,6 +21,17 @@ export const FleetsList: React.FC = () => {
 
     const { columns } = useColumnsDefinitions();
     const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages();
+
+    const {
+        fleetOptions,
+        selectedFleet,
+        setSelectedFleet,
+        setOnlyActive,
+        onlyActive,
+        isDisabledClearFilter,
+        clearFilters,
+        filteringFunction,
+    } = useFilters({ fleets: data });
 
     const fleetInstances = useMemo<TFleetInstance[]>(() => {
         if (!data) return [];
@@ -46,6 +59,7 @@ export const FleetsList: React.FC = () => {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
+            filteringFunction,
         },
         pagination: { pageSize: 20 },
         selection: {},
@@ -61,6 +75,41 @@ export const FleetsList: React.FC = () => {
             loadingText={t('common.loading')}
             stickyHeader={true}
             header={<Header variant="awsui-h1-sticky">{t('navigation.fleets')}</Header>}
+            filter={
+                <div className={styles.filters}>
+                    <div className={styles.select}>
+                        <FormField label={t('fleets.fleet')}>
+                            <SelectCSD
+                                disabled={!fleetOptions?.length}
+                                options={fleetOptions}
+                                selectedOption={selectedFleet}
+                                onChange={(event) => {
+                                    setSelectedFleet(event.detail.selectedOption);
+                                }}
+                                placeholder={t('fleets.fleet_placeholder')}
+                                expandToViewport={true}
+                                filteringType="auto"
+                            />
+                        </FormField>
+                    </div>
+
+                    <div className={styles.activeOnly}>
+                        <Toggle
+                            disabled={!fleetInstances.length}
+                            onChange={({ detail }) => setOnlyActive(detail.checked)}
+                            checked={onlyActive}
+                        >
+                            {t('fleets.active_only')}
+                        </Toggle>
+                    </div>
+
+                    <div className={styles.clear}>
+                        <Button formAction="none" onClick={clearFilters} disabled={isDisabledClearFilter}>
+                            {t('common.clearFilter')}
+                        </Button>
+                    </div>
+                </div>
+            }
             pagination={<Pagination {...paginationProps} disabled={isLoading} />}
         />
     );

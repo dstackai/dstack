@@ -65,8 +65,9 @@
     "administration": "Administration",
     "users": "Users",
     "user_settings": "User settings",
-    "account": "Account",
-    "billing": "Billing"
+    "account": "User",
+    "billing": "Billing",
+    "resources": "Resources"
   },
 
   "backend": {
@@ -409,6 +410,7 @@
 
   "fleets": {
     "fleet": "Fleet",
+    "fleet_placeholder": "Filtering by fleet",
     "fleet_name": "Fleet name",
     "total_instances": "Number of instances",
     "default": "Default pool",
@@ -417,7 +419,7 @@
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
-    "active_only": "Active Fleets",
+    "active_only": "Active Instances",
     "instances": {
       "title": "Instances",
       "empty_message_title": "No instances",
@@ -457,8 +459,8 @@
     "token_description": "Specify use your personal access token",
     "global_role": "Global role",
     "email": "Email",
-    "account": "Account",
-    "account_settings": "Account settings",
+    "account": "User",
+    "account_settings": "User settings",
     "settings": "Settings",
     "create": {
       "page_title": "Create user",

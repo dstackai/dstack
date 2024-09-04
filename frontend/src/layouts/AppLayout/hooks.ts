@@ -13,6 +13,9 @@ import { GlobalUserRole } from 'types';
 import { selectUserName } from 'App/slice';
 import { useCheckAvailableProjectPermission } from 'pages/Project/hooks/useCheckAvailableProjectPermission';
 
+import { DISCORD_URL, DOCS_URL } from '../../consts';
+import { goToUrl } from '../../libs';
+
 export const useSideNavigation = () => {
     const { t } = useTranslation();
     const userName = useAppSelector(selectUserName) ?? '';
@@ -82,6 +85,29 @@ export const useSideNavigation = () => {
             type: 'section-group',
             title: t('navigation.account'),
             items: userSettingsLinks,
+        },
+
+        { type: 'divider' },
+
+        {
+            type: 'section-group',
+            title: t('navigation.resources'),
+            items: [
+                {
+                    type: 'link',
+                    text: t('common.docs'),
+                    external: true,
+                    href: DOCS_URL,
+                    // onClick: () => goToUrl(DOCS_URL, true),
+                },
+                {
+                    type: 'link',
+                    text: t('common.discord'),
+                    external: true,
+                    href: DISCORD_URL,
+                    onClick: () => goToUrl(DISCORD_URL, true),
+                },
+            ],
         },
     ].filter(Boolean) as SideNavigationProps['items'];
 

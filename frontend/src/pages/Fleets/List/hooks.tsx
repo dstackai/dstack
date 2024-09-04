@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
@@ -6,6 +6,9 @@ import { ListEmptyMessage, StatusIndicator, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { getStatusIconType } from 'libs/fleet';
+
+import { SelectCSDProps } from '../../../components';
+import { useLocalStorageState } from '../../../hooks/useLocalStorageState';
 
 import { TFleetInstance } from './types';
 
@@ -19,6 +22,11 @@ export const useColumnsDefinitions = () => {
             cell: (item) =>
                 // <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(item.project_name, item.name)}>{item.name}</NavigateLink>
                 item.fleetName,
+        },
+        {
+            id: 'instance',
+            header: `${t('fleets.instances.instance_name')}`,
+            cell: (item) => item?.instance_type?.name,
         },
         {
             id: 'backend',
@@ -67,4 +75,52 @@ export const useEmptyMessages = () => {
     }, []);
 
     return { renderEmptyMessage, renderNoMatchMessage } as const;
+};
+
+export const useFilters = ({ fleets }: { fleets?: IFleet[] }) => {
+    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('administration-fleet-list-is-active', false);
+    const [selectedFleet, setSelectedFleet] = useState<SelectCSDProps.Option | null>(null);
+
+    const fleetOptions = useMemo<SelectCSDProps.Options>(() => {
+        if (!fleets?.length) return [];
+
+        return fleets.map((fleet) => ({ label: fleet.name, value: fleet.name }));
+    }, [fleets]);
+
+    const clearFilters = () => {
+        setOnlyActive(false);
+        setSelectedFleet(null);
+    };
+
+    const filteringFunction = useCallback<(instance: TFleetInstance) => boolean>(
+        (instance: TFleetInstance) => {
+            let isMatch = true;
+
+            if (selectedFleet) {
+                isMatch = isMatch && instance.fleetName === selectedFleet.value;
+            }
+
+            if (onlyActive) {
+                isMatch =
+                    isMatch &&
+                    ['creating', 'starting', 'provisioning', 'terminating', 'busy', 'idle'].includes(instance.status ?? '');
+            }
+
+            return isMatch;
+        },
+        [onlyActive, selectedFleet],
+    );
+
+    const isDisabledClearFilter = !selectedFleet && !onlyActive;
+
+    return {
+        onlyActive,
+        setOnlyActive,
+        selectedFleet,
+        setSelectedFleet,
+        fleetOptions,
+        isDisabledClearFilter,
+        clearFilters,
+        filteringFunction,
+    } as const;
 };

@@ -18,7 +18,7 @@ export const UserAdd: React.FC = () => {
 
     useBreadcrumbs([
         {
-            text: t('navigation.users'),
+            text: t('navigation.account'),
             href: ROUTES.USER.LIST,
         },
         {

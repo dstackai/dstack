@@ -11,7 +11,6 @@ const getInitialState = (): IAppState => {
     let authData = null;
     let storageData = null;
     let activeMode = getThemeMode();
-    let selectedMode: IAppState['systemMode'] = 'system';
 
     try {
         storageData = localStorage.getItem(AUTH_DATA_STORAGE_KEY);
@@ -22,9 +21,8 @@ const getInitialState = (): IAppState => {
     try {
         const modeStorageData = localStorage.getItem(MODE_STORAGE_KEY);
 
-        if (modeStorageData) {
+        if (modeStorageData && JSON.parse(modeStorageData)) {
             activeMode = modeStorageData as Mode;
-            selectedMode = modeStorageData as Mode;
         }
     } catch (e) {
         console.log(e);
@@ -38,7 +36,7 @@ const getInitialState = (): IAppState => {
         authData,
         userData: null,
         breadcrumbs: null,
-        systemMode: selectedMode,
+        systemMode: activeMode,
 
         toolsPanelState: {
             isOpen: false,
@@ -75,17 +73,11 @@ export const appSlice = createSlice({
             }
         },
 
-        setSystemMode: (state, action: PayloadAction<Mode | null>) => {
-            state.systemMode = action.payload ?? 'system';
-
-            applyMode(action.payload ?? getThemeMode());
-
+        setSystemMode: (state, action: PayloadAction<Mode>) => {
+            state.systemMode = action.payload;
+            applyMode(action.payload);
             try {
-                if (action.payload) {
-                    localStorage.setItem(MODE_STORAGE_KEY, action.payload);
-                } else {
-                    localStorage.removeItem(MODE_STORAGE_KEY);
-                }
+                localStorage.setItem(MODE_STORAGE_KEY, action.payload);
             } catch (e) {
                 console.log(e);
             }
@@ -168,12 +160,4 @@ export const selectToolsPanelState = (state: RootState) => state.app.toolsPanelS
 export const selectHelpPanelContent = (state: RootState) => state.app.helpPanel.content;
 export const selectTutorialPanel = (state: RootState) => state.app.tutorialPanel;
 export const selectSystemMode = (state: RootState) => state.app.systemMode;
-
-export const selectAppliedThemeMode = (state: RootState): Mode => {
-    if (state.app.systemMode === 'system') {
-        return getThemeMode();
-    }
-
-    return state.app.systemMode;
-};
 export default appSlice.reducer;

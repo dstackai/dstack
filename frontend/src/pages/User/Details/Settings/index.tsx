@@ -29,7 +29,7 @@ export const Settings: React.FC = () => {
 
     useBreadcrumbs([
         {
-            text: t('navigation.users'),
+            text: t('navigation.account'),
             href: ROUTES.USER.LIST,
         },
         {
@@ -80,10 +80,12 @@ export const Settings: React.FC = () => {
                             {/*    <div>{data.user_name}</div>*/}
                             {/*</div>*/}
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('users.email')}</Box>
-                                <div>{data.email ?? '-'}</div>
-                            </div>
+                            {process.env.UI_VERSION !== 'enterprise' && (
+                                <div>
+                                    <Box variant="awsui-key-label">{t('users.email')}</Box>
+                                    <div>{data.email ?? '-'}</div>
+                                </div>
+                            )}
 
                             <PermissionGuard allowedGlobalRoles={[GlobalUserRole.ADMIN]}>
                                 <div>

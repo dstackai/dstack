@@ -39,6 +39,7 @@ export const AdministrationList: React.FC = () => {
         repoSearchKey: 'repo',
         projectSearchKey: 'project',
         userSearchKey: 'user',
+        localStorePrefix: 'administration-run-list-page',
     });
 
     const [getRuns, { isLoading, isFetching }] = useLazyGetRunsQuery();

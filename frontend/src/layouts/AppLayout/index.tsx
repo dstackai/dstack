@@ -37,13 +37,11 @@ import {
 import { AnnotationContext } from './AnnotationContext';
 import { useProjectDropdown, useSideNavigation } from './hooks';
 import { TallyComponent } from './Tally';
+import { DarkThemeIcon, LightThemeIcon } from './themeIcons';
 import { TutorialPanel } from './TutorialPanel';
 
 import { ToolsTabs } from 'App/types';
 
-import { ReactComponent as DarkThemeIcon } from 'assets/icons/dark-theme.svg';
-import { ReactComponent as LightThemeIcon } from 'assets/icons/light-theme.svg';
-import { ReactComponent as SystemThemeIcon } from 'assets/icons/system-theme.svg';
 import logo from 'assets/images/logo.svg';
 import styles from './index.module.scss';
 
@@ -55,10 +53,9 @@ const HeaderPortal = ({ children }: PortalProps) => {
     return null;
 };
 
-const THEME_ICON_MAP: Record<Mode | 'system', React.ReactElement> = {
+const THEME_ICON_MAP: Record<Mode, React.FC> = {
     [Mode.Dark]: DarkThemeIcon,
     [Mode.Light]: LightThemeIcon,
-    system: SystemThemeIcon,
 };
 
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -76,7 +73,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
     const onFollowHandler: SideNavigationProps['onFollow'] = (event) => {
         event.preventDefault();
-        navigate(event.detail.href);
+
+        if (event.detail.external) {
+            goToUrl(event.detail.href, true);
+        } else {
+            navigate(event.detail.href);
+        }
     };
 
     const renderBreadcrumbs = () => {
@@ -124,14 +126,11 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         event.preventDefault();
 
         switch (systemMode) {
-            case 'system':
-                dispatch(setSystemMode(Mode.Light));
-                return;
             case Mode.Light:
                 dispatch(setSystemMode(Mode.Dark));
                 return;
             default:
-                dispatch(setSystemMode(null));
+                dispatch(setSystemMode(Mode.Light));
         }
     };
 
@@ -155,16 +154,10 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 onClick: toggleTutorialPanel,
                             },
                             {
+                                href: 'theme-button',
                                 type: 'button',
-                                text: t('common.docs'),
-                                external: true,
-                                onClick: () => goToUrl(DOCS_URL, true),
-                            },
-                            {
-                                type: 'button',
-                                text: t('common.discord'),
-                                external: true,
-                                onClick: () => goToUrl(DISCORD_URL, true),
+                                iconSvg: <ThemeIcon />,
+                                onClick: onChangeSystemModeToggle,
                             },
                             isAvailableProjectDropdown && {
                                 type: 'menu-dropdown',
@@ -173,12 +166,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 items: projectsDropdownList,
                                 onItemFollow: onFollowProject,
                             },
-                            {
-                                type: 'button',
-                                iconSvg: <ThemeIcon className={styles.themeIcon} />,
-                                onClick: onChangeSystemModeToggle,
-                            },
-
                             {
                                 'data-class': 'user-menu',
                                 type: 'menu-dropdown',
