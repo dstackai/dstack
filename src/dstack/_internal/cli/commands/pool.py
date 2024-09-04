@@ -30,7 +30,7 @@ from dstack._internal.core.models.resources import DEFAULT_CPU_COUNT, DEFAULT_ME
 from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.utils.common import pretty_date
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.ssh import convert_pkcs8_to_pem, generate_public_key, rsa_pkey_from_str
+from dstack._internal.utils.ssh import convert_pkcs8_to_pem, generate_public_key, pkey_from_str
 from dstack.api._public.resources import Resources
 from dstack.api.utils import load_profile
 
@@ -316,11 +316,14 @@ class PoolCommand(APIBaseCommand):
                 try:
                     pub_key = args.ssh_identity_file.with_suffix(".pub").read_text()
                 except FileNotFoundError:
-                    pub_key = generate_public_key(rsa_pkey_from_str(private_key))
+                    pub_key = generate_public_key(pkey_from_str(private_key))
                 ssh_key = SSHKey(public=pub_key, private=private_key)
                 ssh_keys.append(ssh_key)
             except OSError:
                 console.print("[error]Unable to read the public key.[/]")
+                return
+            except ValueError:
+                console.print("[error]Key type is not supported.[/]")
                 return
 
         login, ssh_host, port = parse_destination(args.destination)

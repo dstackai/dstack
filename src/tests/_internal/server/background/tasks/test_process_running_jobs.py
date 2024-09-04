@@ -48,6 +48,7 @@ def get_job_provisioning_data(dockerized: bool) -> JobProvisioningData:
 
 class TestProcessRunningJobs:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_leaves_provisioning_job_unchanged_if_runner_not_alive(
         self, test_db, session: AsyncSession
     ):
@@ -90,6 +91,7 @@ class TestProcessRunningJobs:
         assert job.status == JobStatus.PROVISIONING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_runs_provisioning_job(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -130,6 +132,7 @@ class TestProcessRunningJobs:
         assert job.status == JobStatus.RUNNING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_updates_running_job(self, test_db, session: AsyncSession, tmp_path: Path):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -189,6 +192,7 @@ class TestProcessRunningJobs:
         assert job.runner_timestamp == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_provisioning_shim(self, test_db, session: AsyncSession):
         project_ssh_pub_key = "__project_ssh_pub_key__"
         project = await create_project(session=session, ssh_public_key=project_ssh_pub_key)
@@ -244,6 +248,7 @@ class TestProcessRunningJobs:
         assert job.status == JobStatus.PULLING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_pulling_shim(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)
@@ -287,6 +292,7 @@ class TestProcessRunningJobs:
         assert job.status == JobStatus.RUNNING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_pulling_shim_failed(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         user = await create_user(session=session)

@@ -196,6 +196,6 @@ The source-code of this example can be found in [`examples/fine-tuning/alignment
 ## What's next?
 
 1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks),
-   [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).
+   [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/concepts/fleets).
 2. Browse [Alignment Handbook :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/alignment-handbook){:target="_blank"}.
 3. See other [examples](/examples).

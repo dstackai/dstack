@@ -18,6 +18,7 @@ from dstack._internal.server.testing.common import (
 
 class TestProcessEmptyFleets:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_empty_autocreated_fleet(self, test_db, session: AsyncSession):
         project = await create_project(session)
         spec = get_fleet_spec()
@@ -32,6 +33,7 @@ class TestProcessEmptyFleets:
         assert fleet.deleted
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_deletes_terminating_user_fleet(self, test_db, session: AsyncSession):
         project = await create_project(session)
         spec = get_fleet_spec()
@@ -46,6 +48,7 @@ class TestProcessEmptyFleets:
         assert fleet.deleted
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_does_not_delete_non_terminating_empty_user_fleets(
         self, test_db, session: AsyncSession
     ):
@@ -62,6 +65,7 @@ class TestProcessEmptyFleets:
         assert not fleet.deleted
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_does_not_delete_fleet_with_active_run(self, test_db, session: AsyncSession):
         project = await create_project(session)
         fleet = await create_fleet(

@@ -70,6 +70,7 @@ async def make_run(
 
 class TestProcessRuns:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_submitted_to_provisioning(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.SUBMITTED)
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING)
@@ -79,6 +80,7 @@ class TestProcessRuns:
         assert run.status == RunStatus.PROVISIONING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_provisioning_to_running(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.PROVISIONING)
         await create_job(session=session, run=run, status=JobStatus.RUNNING)
@@ -88,6 +90,7 @@ class TestProcessRuns:
         assert run.status == RunStatus.RUNNING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_keep_provisioning(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.PROVISIONING)
         await create_job(session=session, run=run, status=JobStatus.PULLING)
@@ -97,6 +100,7 @@ class TestProcessRuns:
         assert run.status == RunStatus.PROVISIONING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_running_to_done(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.RUNNING)
         await create_job(session=session, run=run, status=JobStatus.DONE)
@@ -107,6 +111,7 @@ class TestProcessRuns:
         assert run.termination_reason == RunTerminationReason.ALL_JOBS_DONE
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_terminate_run_jobs(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.TERMINATING)
         run.termination_reason = RunTerminationReason.JOB_FAILED
@@ -127,6 +132,7 @@ class TestProcessRuns:
         assert run.status == RunStatus.TERMINATING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_retry_running_to_pending(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.RUNNING)
         instance = await create_instance(
@@ -149,6 +155,7 @@ class TestProcessRuns:
         assert run.status == RunStatus.PENDING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_retry_running_to_failed(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.RUNNING)
         instance = await create_instance(
@@ -171,6 +178,7 @@ class TestProcessRuns:
         assert run.termination_reason == RunTerminationReason.JOB_FAILED
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_pending_to_submitted(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.PENDING)
         await create_job(session=session, run=run, status=JobStatus.FAILED)
@@ -185,6 +193,7 @@ class TestProcessRuns:
 
 class TestProcessRunsReplicas:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_submitted_to_provisioning_if_any(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.SUBMITTED, replicas=2)
         await create_job(session=session, run=run, status=JobStatus.SUBMITTED, replica_num=0)
@@ -195,6 +204,7 @@ class TestProcessRunsReplicas:
         assert run.status == RunStatus.PROVISIONING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_provisioning_to_running_if_any(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.PROVISIONING, replicas=2)
         await create_job(session=session, run=run, status=JobStatus.RUNNING, replica_num=0)
@@ -205,6 +215,7 @@ class TestProcessRunsReplicas:
         assert run.status == RunStatus.RUNNING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_all_no_capacity_to_pending(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.RUNNING, replicas=2)
         await create_job(
@@ -240,6 +251,7 @@ class TestProcessRunsReplicas:
         assert run.status == RunStatus.PENDING
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_some_no_capacity_keep_running(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.RUNNING, replicas=2)
         await create_job(
@@ -270,10 +282,11 @@ class TestProcessRunsReplicas:
         await session.refresh(run)
         assert run.status == RunStatus.RUNNING
         assert len(run.jobs) == 3
-        assert run.jobs[2].status == JobStatus.SUBMITTED
-        assert run.jobs[2].replica_num == 0
+        assert run.jobs[1].replica_num == 0
+        assert run.jobs[1].status == JobStatus.SUBMITTED
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_some_failed_to_terminating(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.RUNNING, replicas=2)
         await create_job(
@@ -291,6 +304,7 @@ class TestProcessRunsReplicas:
         assert run.termination_reason == RunTerminationReason.JOB_FAILED
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_pending_to_submitted_adds_replicas(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.PENDING, replicas=2)
         await create_job(

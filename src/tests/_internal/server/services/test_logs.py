@@ -22,6 +22,7 @@ from dstack._internal.server.testing.common import create_project
 
 class TestFileLogStorage:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_writes_logs(self, test_db, session: AsyncSession, tmp_path: Path):
         project = await create_project(session=session)
         log_storage = FileLogStorage(tmp_path)

@@ -284,7 +284,9 @@ class RunModel(BaseModel):
     run_name: Mapped[str] = mapped_column(String(100))
     status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
     run_spec: Mapped[str] = mapped_column(String(4000))
-    jobs: Mapped[List["JobModel"]] = relationship(back_populates="run", lazy="selectin")
+    jobs: Mapped[List["JobModel"]] = relationship(
+        back_populates="run", lazy="selectin", order_by="[JobModel.replica_num, JobModel.job_num]"
+    )
     last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateways.id", ondelete="SET NULL")

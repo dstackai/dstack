@@ -6,7 +6,7 @@ from uuid import UUID
 
 import requests
 from paramiko.pkey import PKey
-from paramiko.ssh_exception import PasswordRequiredException, SSHException
+from paramiko.ssh_exception import PasswordRequiredException
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -38,6 +38,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceRuntime,
     InstanceStatus,
+    InstanceType,
     RemoteConnectionInfo,
 )
 from dstack._internal.core.models.profiles import (
@@ -71,7 +72,7 @@ from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.network import get_ip_from_network
 from dstack._internal.utils.ssh import (
-    rsa_pkey_from_str,
+    pkey_from_str,
 )
 
 PENDING_JOB_RETRY_INTERVAL = timedelta(seconds=60)
@@ -248,7 +249,7 @@ async def add_remote(instance_id: UUID) -> None:
             # Prepare connection key
             try:
                 pkeys = [
-                    rsa_pkey_from_str(sk.private)
+                    pkey_from_str(sk.private)
                     for sk in remote_details.ssh_keys
                     if sk.private is not None
                 ]
@@ -270,14 +271,14 @@ async def add_remote(instance_id: UUID) -> None:
                     },
                 )
                 return
-            except SSHException:
+            except ValueError:
                 instance.status = InstanceStatus.TERMINATED
                 instance.deleted = True
                 instance.deleted_at = get_current_datetime()
-                instance.termination_reason = "Cannot parse private key, RSA key required"
+                instance.termination_reason = "Cannot parse private key, key type is not supported"
                 await session.commit()
                 logger.warning(
-                    "Failed to start instance %s: private SSH key is not a valid RSA key",
+                    "Failed to start instance %s: unsupported private SSH key type",
                     instance.name,
                     extra={
                         "instance_name": instance.name,
@@ -651,7 +652,9 @@ async def check_instance(instance_id: UUID) -> None:
         instance.unreachable = True
 
         if instance.status == InstanceStatus.PROVISIONING and instance.started_at is not None:
-            provisioning_deadline = _get_provisioning_deadline(instance)
+            provisioning_deadline = _get_provisioning_deadline(
+                instance, job_provisioning_data.instance_type
+            )
             if get_current_datetime() > provisioning_deadline:
                 instance.status = InstanceStatus.TERMINATING
                 logger.warning(
@@ -693,7 +696,9 @@ async def wait_for_instance_provisioning_data(
         "Waiting for instance %s to become running",
         instance.name,
     )
-    provisioning_deadline = _get_provisioning_deadline(instance)
+    provisioning_deadline = _get_provisioning_deadline(
+        instance, job_provisioning_data.instance_type
+    )
     if get_current_datetime() > provisioning_deadline:
         logger.warning(
             "Instance %s failed because instance has not become running in time", instance.name
@@ -889,12 +894,19 @@ def _get_retry_duration_deadline(instance: InstanceModel, retry: Retry) -> datet
     )
 
 
-def _get_provisioning_deadline(instance: InstanceModel) -> datetime.datetime:
-    timeout_interval = _get_instance_timeout_interval(backend_type=instance.backend)
+def _get_provisioning_deadline(
+    instance: InstanceModel, instance_type: InstanceType
+) -> datetime.datetime:
+    timeout_interval = _get_instance_timeout_interval(instance.backend, instance_type.name)
     return instance.started_at.replace(tzinfo=datetime.timezone.utc) + timeout_interval
 
 
-def _get_instance_timeout_interval(backend_type: BackendType) -> timedelta:
+def _get_instance_timeout_interval(
+    backend_type: BackendType, instance_type_name: str
+) -> timedelta:
+    # when changing timeouts, also consider process_running_jobs._get_runner_timeout_interval
     if backend_type == BackendType.RUNPOD:
+        return timedelta(seconds=1200)
+    if backend_type == BackendType.OCI and instance_type_name.startswith("BM."):
         return timedelta(seconds=1200)
     return timedelta(seconds=600)

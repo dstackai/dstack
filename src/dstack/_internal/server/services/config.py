@@ -386,7 +386,8 @@ class ServerConfigManager:
 
     async def apply_encryption(self):
         if self.config is None:
-            raise ValueError("Config is not loaded")
+            logger.warning("server/config.yml not loaded. Skipping encryption configuration.")
+            return
         if self.config.encryption is not None:
             encryption_services.init_encryption_keys(self.config.encryption.keys)
 

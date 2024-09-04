@@ -16,6 +16,7 @@ from dstack._internal.server.testing.common import (
 
 class TestProcessSubmittedGateways:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_provisions_gateway(self, test_db, session: AsyncSession):
         project = await create_project(session=session)
         backend = await create_backend(session=session, project_id=project.id)
@@ -48,6 +49,7 @@ class TestProcessSubmittedGateways:
         assert gateway.gateway_compute.ip_address == "2.2.2.2"
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_marks_gateway_as_failed_if_gateway_creation_errors(
         self, test_db, session: AsyncSession
     ):
@@ -72,6 +74,7 @@ class TestProcessSubmittedGateways:
         assert gateway.status_message == "Some error"
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_marks_gateway_as_failed_if_fails_to_connect(
         self, test_db, session: AsyncSession
     ):

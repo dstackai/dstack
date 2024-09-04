@@ -290,6 +290,7 @@ def downgrade() -> None:
                 name="jobstatus",
             ),
             existing_nullable=False,
+            postgresql_using="status::VARCHAR::jobstatus",
         )
 
     with op.batch_alter_table("jobs", schema=None) as batch_op:

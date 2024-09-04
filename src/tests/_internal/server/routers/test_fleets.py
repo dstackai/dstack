@@ -4,15 +4,14 @@ from unittest.mock import patch
 from uuid import UUID
 
 import pytest
-from fastapi.testclient import TestClient
 from freezegun import freeze_time
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.fleets import FleetConfiguration, FleetStatus, SSHParams
 from dstack._internal.core.models.instances import InstanceStatus, SSHKey
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.server.main import app
 from dstack._internal.server.models import FleetModel, InstanceModel
 from dstack._internal.server.services.permissions import DefaultPermissions
 from dstack._internal.server.services.projects import add_project_member
@@ -31,17 +30,19 @@ from dstack._internal.server.testing.common import (
     get_fleet_spec,
 )
 
-client = TestClient(app)
-
 
 class TestListFleets:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/fleets/list")
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/fleets/list")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_lists_fleets(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_lists_fleets(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -52,7 +53,7 @@ class TestListFleets:
             project=project,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/fleets/list",
             headers=get_auth_headers(user.token),
         )
@@ -72,12 +73,16 @@ class TestListFleets:
 
 class TestGetFleet:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/fleets/get")
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/fleets/get")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_returns_fleet(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_fleet(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -88,7 +93,7 @@ class TestGetFleet:
             project=project,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/fleets/get",
             headers=get_auth_headers(user.token),
             json={"name": fleet.name},
@@ -105,13 +110,16 @@ class TestGetFleet:
         }
 
     @pytest.mark.asyncio
-    async def test_returns_400_if_fleet_does_not_exist(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_if_fleet_does_not_exist(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.USER
         )
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/fleets/get",
             headers=get_auth_headers(user.token),
             json={"name": "some_fleet"},
@@ -121,13 +129,17 @@ class TestGetFleet:
 
 class TestCreateFleet:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/fleets/create")
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/fleets/create")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-    async def test_creates_fleet(self, test_db, session: AsyncSession):
+    async def test_creates_fleet(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -136,7 +148,7 @@ class TestCreateFleet:
         spec = get_fleet_spec(conf=get_fleet_configuration())
         with patch("uuid.uuid4") as m:
             m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/fleets/create",
                 headers=get_auth_headers(user.token),
                 json={"spec": spec.dict()},
@@ -216,8 +228,9 @@ class TestCreateFleet:
         assert res.scalar_one()
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
-    async def test_creates_ssh_fleet(self, test_db, session: AsyncSession):
+    async def test_creates_ssh_fleet(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -236,7 +249,7 @@ class TestCreateFleet:
         )
         with patch("uuid.uuid4") as m:
             m.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/fleets/create",
                 headers=get_auth_headers(user.token),
                 json={"spec": spec.dict()},
@@ -334,8 +347,9 @@ class TestCreateFleet:
         assert instance.remote_connection_info is not None
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_forbids_if_no_permission_to_manage_ssh_fleets(
-        self, test_db, session: AsyncSession
+        self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -356,7 +370,7 @@ class TestCreateFleet:
         with default_permissions_context(
             DefaultPermissions(allow_non_admins_manage_ssh_fleets=False)
         ):
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/fleets/create",
                 headers=get_auth_headers(user.token),
                 json={"spec": spec.dict()},
@@ -366,12 +380,18 @@ class TestCreateFleet:
 
 class TestDeleteFleets:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/fleets/delete")
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/fleets/delete")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_terminates_fleet_instances(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_terminates_fleet_instances(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -386,7 +406,7 @@ class TestDeleteFleets:
         )
         fleet.instances.append(instance)
         await session.commit()
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/fleets/delete",
             headers=get_auth_headers(user.token),
             json={"names": [fleet.name]},
@@ -398,7 +418,10 @@ class TestDeleteFleets:
         assert instance.status == InstanceStatus.TERMINATING
 
     @pytest.mark.asyncio
-    async def test_returns_400_when_fleets_in_use(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_when_fleets_in_use(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         pool = await create_pool(session=session, project=project)
@@ -429,7 +452,7 @@ class TestDeleteFleets:
         )
         fleet.instances.append(instance)
         await session.commit()
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/fleets/delete",
             headers=get_auth_headers(user.token),
             json={"names": [fleet.name]},
@@ -440,8 +463,9 @@ class TestDeleteFleets:
         assert instance.status == InstanceStatus.BUSY
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_forbids_if_no_permission_to_manage_ssh_fleets(
-        self, test_db, session: AsyncSession
+        self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session)
@@ -463,7 +487,7 @@ class TestDeleteFleets:
         with default_permissions_context(
             DefaultPermissions(allow_non_admins_manage_ssh_fleets=False)
         ):
-            response = client.post(
+            response = await client.post(
                 f"/api/project/{project.name}/fleets/delete",
                 headers=get_auth_headers(user.token),
                 json={"names": [fleet.name]},
@@ -473,12 +497,18 @@ class TestDeleteFleets:
 
 class TestDeleteFleetInstances:
     @pytest.mark.asyncio
-    async def test_returns_40x_if_not_authenticated(self, test_db, session: AsyncSession):
-        response = client.post("/api/project/main/fleets/delete_instances")
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/fleets/delete_instances")
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_terminates_fleet_instances(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_terminates_fleet_instances(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -501,7 +531,7 @@ class TestDeleteFleetInstances:
         fleet.instances.append(instance1)
         fleet.instances.append(instance2)
         await session.commit()
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/fleets/delete_instances",
             headers=get_auth_headers(user.token),
             json={"name": fleet.name, "instance_nums": [1]},
@@ -516,7 +546,10 @@ class TestDeleteFleetInstances:
         assert fleet.status != FleetStatus.TERMINATING
 
     @pytest.mark.asyncio
-    async def test_returns_400_when_deleting_busy_instances(self, test_db, session: AsyncSession):
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_400_when_deleting_busy_instances(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
         user = await create_user(session, global_role=GlobalRole.USER)
         project = await create_project(session)
         await add_project_member(
@@ -548,7 +581,7 @@ class TestDeleteFleetInstances:
         )
         fleet.instances.append(instance)
         await session.commit()
-        response = client.post(
+        response = await client.post(
             f"/api/project/{project.name}/fleets/delete_instances",
             headers=get_auth_headers(user.token),
             json={"name": fleet.name, "instance_nums": [1]},

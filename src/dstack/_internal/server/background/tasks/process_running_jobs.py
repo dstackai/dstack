@@ -578,6 +578,7 @@ def _submit_job_to_runner(
 
 
 def _get_runner_timeout_interval(backend_type: BackendType, instance_type_name: str) -> timedelta:
+    # when changing timeouts, also consider process_instances._get_instance_timeout_interval
     if backend_type == BackendType.LAMBDA:
         return timedelta(seconds=1200)
     if backend_type == BackendType.KUBERNETES:
