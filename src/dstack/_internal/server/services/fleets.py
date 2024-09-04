@@ -180,7 +180,7 @@ async def create_fleet_instance_model(
     requirements = Requirements(
         resources=spec.configuration.resources or ResourcesSpec(),
         max_price=profile.max_price,
-        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.AUTO),
+        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
     )
     instance_model = await pools_services.create_instance_model(
         session=session,

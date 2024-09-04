@@ -15,7 +15,7 @@ class ServiceJobConfigurator(JobConfigurator):
         return None
 
     def _spot_policy(self) -> SpotPolicy:
-        return self.run_spec.merged_profile.spot_policy or SpotPolicy.AUTO
+        return self.run_spec.merged_profile.spot_policy or SpotPolicy.ONDEMAND
 
     def _ports(self) -> List[PortMapping]:
         return []

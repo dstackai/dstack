@@ -183,7 +183,7 @@ class FleetSpec(CoreModel):
             if conf_val is not None:
                 setattr(merged_profile, key, conf_val)
         if merged_profile.spot_policy is None:
-            merged_profile.spot_policy = SpotPolicy.AUTO
+            merged_profile.spot_policy = SpotPolicy.ONDEMAND
         if merged_profile.retry is None:
             merged_profile.retry = False
         if merged_profile.termination_policy is None:
