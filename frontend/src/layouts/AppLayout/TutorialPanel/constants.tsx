@@ -78,7 +78,7 @@ export const BILLING_TUTORIAL: TutorialPanelProps.Tutorial = {
 
 export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
     completed: false,
-    title: 'Configure the CLI',
+    title: 'Set up the CLI',
     description: (
         <>
             <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
@@ -103,11 +103,25 @@ export const CONFIGURE_CLI_TUTORIAL: TutorialPanelProps.Tutorial = {
 
 export const JOIN_DISCORD_TUTORIAL: TutorialPanelProps.Tutorial = {
     completed: false,
-    title: 'Join Discord',
+    title: 'Community',
     description: (
         <>
             <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
                 Need help or want to chat with other users of dstack? Join our Discord server!
+            </Box>
+        </>
+    ),
+    completedScreenDescription: 'TBA',
+    tasks: [],
+};
+
+export const QUICKSTART_TUTORIAL: TutorialPanelProps.Tutorial = {
+    completed: false,
+    title: 'Quickstart',
+    description: (
+        <>
+            <Box variant="p" color="text-body-secondary" padding={{ top: 'n' }}>
+                Check out the quickstart guide to get started with dstack
             </Box>
         </>
     ),

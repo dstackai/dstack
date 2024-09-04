@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { DISCORD_URL, TALLY_FORM_ID } from 'consts';
+import { DISCORD_URL, QUICK_START_URL, TALLY_FORM_ID } from 'consts';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { goToUrl } from 'libs';
 import { useGetRunsQuery } from 'services/run';
@@ -10,7 +10,13 @@ import { useGetUserBillingInfoQuery } from 'services/user';
 import { openTutorialPanel, selectTutorialPanel, selectUserName, updateTutorialPanelState } from 'App/slice';
 
 import { useSideNavigation } from '../hooks';
-import { BILLING_TUTORIAL, CONFIGURE_CLI_TUTORIAL, CREDITS_TUTORIAL, JOIN_DISCORD_TUTORIAL } from './constants';
+import {
+    BILLING_TUTORIAL,
+    CONFIGURE_CLI_TUTORIAL,
+    // CREDITS_TUTORIAL,
+    JOIN_DISCORD_TUTORIAL,
+    QUICKSTART_TUTORIAL,
+} from './constants';
 
 import { ITutorialItem } from 'App/types';
 
@@ -19,7 +25,8 @@ export const useTutorials = () => {
     const dispatch = useAppDispatch();
     const { mainProjectSettingsUrl, billingUrl } = useSideNavigation();
     const useName = useAppSelector(selectUserName);
-    const { billingCompleted, configureCLICompleted, discordCompleted, tallyCompleted } = useAppSelector(selectTutorialPanel);
+    const { billingCompleted, configureCLICompleted, discordCompleted, tallyCompleted, quickStartCompleted } =
+        useAppSelector(selectTutorialPanel);
 
     const { data: userBillingData } = useGetUserBillingInfoQuery({ username: useName ?? '' }, { skip: !useName });
     const { data: runsData } = useGetRunsQuery({
@@ -66,22 +73,27 @@ export const useTutorials = () => {
         dispatch(updateTutorialPanelState({ discordCompleted: true }));
     }, []);
 
-    const startCreditsTutorial = useCallback(() => {
-        if (typeof Tally !== 'undefined') {
-            Tally.openPopup(TALLY_FORM_ID);
-            dispatch(updateTutorialPanelState({ tallyCompleted: true }));
-        }
+    const startQuickStartTutorial = useCallback(() => {
+        goToUrl(QUICK_START_URL, true);
+        dispatch(updateTutorialPanelState({ quickStartCompleted: true }));
     }, []);
+
+    // const startCreditsTutorial = useCallback(() => {
+    //     if (typeof Tally !== 'undefined') {
+    //         Tally.openPopup(TALLY_FORM_ID);
+    //         dispatch(updateTutorialPanelState({ tallyCompleted: true }));
+    //     }
+    // }, []);
 
     const tutorials = useMemo<ITutorialItem[]>(() => {
         return [
-            {
-                ...CREDITS_TUTORIAL,
-                id: 1,
-                startWithoutActivation: true,
-                completed: tallyCompleted,
-                startCallback: startCreditsTutorial,
-            },
+            // {
+            //     ...CREDITS_TUTORIAL,
+            //     id: 1,
+            //     startWithoutActivation: true,
+            //     completed: tallyCompleted,
+            //     startCallback: startCreditsTutorial,
+            // },
 
             {
                 ...CONFIGURE_CLI_TUTORIAL,
@@ -100,8 +112,16 @@ export const useTutorials = () => {
             },
 
             {
-                ...JOIN_DISCORD_TUTORIAL,
+                ...QUICKSTART_TUTORIAL,
                 id: 4,
+                startWithoutActivation: true,
+                completed: quickStartCompleted,
+                startCallback: startQuickStartTutorial,
+            },
+
+            {
+                ...JOIN_DISCORD_TUTORIAL,
+                id: 5,
                 startWithoutActivation: true,
                 completed: discordCompleted,
                 startCallback: startDiscordTutorial,
@@ -110,6 +130,7 @@ export const useTutorials = () => {
     }, [
         mainProjectSettingsUrl,
         billingUrl,
+        quickStartCompleted,
         discordCompleted,
         tallyCompleted,
         billingCompleted,
