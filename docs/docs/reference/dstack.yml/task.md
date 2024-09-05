@@ -315,7 +315,7 @@ spot_policy: auto
 
 </div>
 
-The `spot_policy` accepts `spot`, `on-demand`, and `auto`. The default for tasks is `auto`.
+The `spot_policy` accepts `spot`, `on-demand`, and `auto`. The default for tasks is `on-demand`.
 
 ### Queueing tasks { #queueing-tasks }
 
