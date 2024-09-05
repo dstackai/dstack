@@ -112,7 +112,7 @@ class ProfileParams(CoreModel):
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
-            description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`"
+            description="The policy for provisioning spot or on-demand instances: `spot`, `on-demand`, or `auto`. Defaults to `on-demand`"
         ),
     ]
     retry: Annotated[

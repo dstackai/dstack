@@ -359,7 +359,7 @@ spot_policy: auto
 
 </div>
 
-The `spot_policy` accepts `spot`, `on-demand`, and `auto`. The default for services is `auto`.
+The `spot_policy` accepts `spot`, `on-demand`, and `auto`. The default for services is `on-demand`.
 
 ### Backends
 
