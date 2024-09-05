@@ -18,7 +18,7 @@ Locksets are Python sets that store IDs of locked resources.
 Concurrent access to locksets is guarded with asyncio locks:
 
 ```python
-lock, locket = get_lockset("my_table")
+lock, lockset = get_lockset("my_table")
 async with lock:
     # select resource that is not in lockset
     lockset.add(resource.id)
@@ -44,7 +44,7 @@ Concurrency is hard. Below you'll find common patterns and gotchas when working 
 
 **A task should acquire locks on resources it modifies**
 
-This is a common sense approach. An alternative could be the inverse: job processing cannot run in parallel with run processing, so job processing takes run lock. This indirection complicates things and is discouraged.
+This is a common sense approach. An alternative could be the inverse: job processing cannot run in parallel with run processing, so job processing takes run lock. This indirection complicates things and is discouraged. In this example, run processing should take job lock instead.
 
 
 **Start new transaction after acquiring a lock to see other transactions changes in SQLite.**
