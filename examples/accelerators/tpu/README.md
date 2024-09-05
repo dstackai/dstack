@@ -12,17 +12,53 @@ Below are a few examples on using TPUs for deployment and fine-tuning.
 
 ### Running as a service
 You can use any serving framework, such as vLLM, TGI. Here's an example of a [service](https://dstack.ai/docs/services) that deploys
-Llama 3.1 8B using [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"} or 
-[Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}.
+Llama 3.1 8B using 
+[Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}
+and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}.
+
+=== "Optimum TPU"
+
+    <div editor-title="examples/deployment/optimum-tpu/service.dstack.yml"> 
+    
+    ```yaml
+    type: service
+    name: llama31-service-optimum-tpu
+    
+    image: dstackai/optimum-tpu:llama31
+    env:
+      - HUGGING_FACE_HUB_TOKEN
+      - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
+      - MAX_TOTAL_TOKENS=4096
+      - MAX_BATCH_PREFILL_TOKENS=4095
+    commands:
+      - text-generation-launcher --port 8000
+    port: 8000
+    
+    spot_policy: auto
+    resources:
+      gpu: v5litepod-4 
+    
+    model:
+      format: tgi
+      type: chat
+      name: meta-llama/Meta-Llama-3.1-8B-Instruct
+    ```
+    </div>
+
+    Note, for `Optimum TPU` by default `MAX_INPUT_TOKEN` is set to 4095, consequently we must set `MAX_BATCH_PREFILL_TOKENS` to 4095.
+
+    ??? info "Docker image"
+        The official Docker image `huggingface/optimum-tpu:latest` doesn’t support Llama 3.1-8B. 
+        We’ve created a custom image with the fix: `dstackai/optimum-tpu:llama31`. 
+        Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/87){:target="_blank"} is merged, 
+        the official Docker image can be used.
 
 === "vLLM"
-
     <div editor-title="examples/deployment/vllm/service-tpu.dstack.yml"> 
     
     ```yaml
     type: service
-    # The name is optional, if not specified, generated randomly
-    name: llama31-service-vLLM
+    name: llama31-service-vllm-tpu
 
     env:
       - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
@@ -31,7 +67,6 @@ Llama 3.1 8B using [vLLM :material-arrow-top-right-thin:{ .external }](https://g
       - TORCH_VERSION=2.5.0
       - VLLM_TARGET_DEVICE=tpu
       - MAX_MODEL_LEN=4096
-
     commands:
       - pip install https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch-${TORCH_VERSION}.dev${DATE}-cp311-cp311-linux_x86_64.whl
       - pip3 install https://storage.googleapis.com/pytorch-xla-releases/wheels/tpuvm/torch_xla-${TORCH_VERSION}.dev${DATE}-cp311-cp311-linux_x86_64.whl
@@ -46,17 +81,13 @@ Llama 3.1 8B using [vLLM :material-arrow-top-right-thin:{ .external }](https://g
           --tensor-parallel-size 8 
           --max-model-len $MAX_MODEL_LEN
           --port 8000
-
-    # Expose the vllm server port
     port:
       - 8000
 
     spot_policy: auto
-
     resources:
       gpu: v5litepod-4
 
-    # (Optional) Enable the OpenAI-compatible endpoint
     model:
       format: openai
       type: chat
@@ -64,43 +95,7 @@ Llama 3.1 8B using [vLLM :material-arrow-top-right-thin:{ .external }](https://g
     ```
     </div>
 
-=== "Optimum TPU"
-
-    <div editor-title="examples/deployment/optimum-tpu/service.dstack.yml"> 
-    
-    ```yaml
-    type: service
-    name: llama31-service-optimum-tpu
-    
-    # Using a custom Docker image; pending on https://github.com/huggingface/optimum-tpu/pull/87
-    image: sjbbihan/optimum-tpu:latest
-    env:
-      - HUGGING_FACE_HUB_TOKEN
-      - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
-      - MAX_TOTAL_TOKENS=4096
-      - MAX_BATCH_PREFILL_TOKENS=4095
-    commands:
-      - text-generation-launcher --port 8000
-    port: 8000
-    
-    resources:
-      gpu: v5litepod-4
-    
-    spot_policy: auto
-    
-    model:
-      format: tgi
-      type: chat
-      name: meta-llama/Meta-Llama-3.1-8B-Instruct
-    ```
-    </div>
-
-Note, for `Optimum TPU` by default `MAX_INPUT_TOKEN` is set to 4095, consequently we must set `MAX_BATCH_PREFILL_TOKENS` to 4095.
-??? info "Docker image"
-    The official Docker image `huggingface/optimum-tpu:latest` doesn’t support Llama 3.1-8B. 
-    We’ve created a custom image with the fix: `sjbbihan/optimum-tpu:latest`. 
-    Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/87){:target="_blank"} is merged, 
-    the official Docker image can be used.
+    Note, when using Llama 3.1 8B with a `v5litepod` which has 16GB memory per core, we must limit the context size to 4096 tokens to fit the memory.
 
 ### Memory requirements
 
@@ -111,21 +106,22 @@ Below are the approximate memory requirements for serving LLMs with their corres
 | **8B**     | 16GB     | v5litepod-4  | 8GB   | v5litepod-4    |
 | **70B**    | 140GB    | v5litepod-16 | 70GB  | v5litepod-16   |
 | **405B**   | 810GB    | v5litepod-64 | 405GB | v5litepod-64   |
-Note, TPU v5litepod is optimized for serving transformer-based models. Each core within the v5litepod is equipped with 16GB of memory.
 
-### Supported Framework
+Note, `v5litepod` is optimized for serving transformer-based models. Each core is equipped with 16GB of memory.
 
-| Framework | Quantization   | Note                                                                                                                                                                                                                          |
-|-----------|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **TGI**   | bfloat16       | To deploy with TGI, Optimum-tpu is recommended.                                                                                                                                                                               |
-| **vLLM**  | int8, bfloat16 | int8 quantization still requires the same memory because the weights are first moved to the TPU in bfloat16, and then converted to int8. See [Pull Request](https://github.com/vllm-project/vllm/pull/7005) for more details. |
+### Supported frameworks
+
+| Framework | Quantization   | Note                                                                                                                                                                                                                                                                                             |
+|-----------|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **TGI**   | bfloat16       | To deploy with TGI, Optimum TPU must be used.                                                                                                                                                                                                                                                    |
+| **vLLM**  | int8, bfloat16 | int8 quantization still requires the same memory because the weights are first moved to the TPU in bfloat16, and then converted to int8. See the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm/pull/7005){:target="_blank"} for more details. |
 
 ### Running a configuration
 
 Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
 cloud resources and run the configuration.
 
-## Fine-tuning
+## Fine-tuning with Optimum TPU
 
 Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"} 
 and the [Abirate/english_quotes :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/Abirate/english_quotes){:target="_blank"}
@@ -172,14 +168,15 @@ Below are the approximate memory requirements for fine-tuning LLMs with their co
 | **8B**     | 16GB  | v5litepod-8  |
 | **70B**    | 160GB | v5litepod-16 |
 | **405B**   | 950GB | v5litepod-64 |
-Note, TPU v5litepod is optimized for fine-tuning transformer-based models. Each core within the v5litepod is equipped with 16GB of memory.
 
-### Supported Framework
+Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each core is equipped with 16GB of memory.
 
-| Framework       | Quantization | Note                                                                                |
-|-----------------|--------------|-------------------------------------------------------------------------------------|
-| **Trl**         | bfloat16     | To fine-tune using Trl, Optimum-tpu is recommended. Llama 3.1 is not yet supported. |
-| **Pytorch XLA** | bfloat16     |                                                                                     |
+### Supported frameworks
+
+| Framework       | Quantization | Note                                                                                              |
+|-----------------|--------------|---------------------------------------------------------------------------------------------------|
+| **TRL**         | bfloat16     | To fine-tune using TRL, Optimum TPU is recommended. TRL doesn't support Llama 3.1 out of the box. |
+| **Pytorch XLA** | bfloat16     |                                                                                                   |
 
 ## Dev environments
 
@@ -192,12 +189,6 @@ allow you to run commands interactively.
 The source-code of this example can be found in 
 [examples/deployment/optimum-tpu :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31){:target="_blank"}
 and [examples/fine-tuning/optimum-tpu :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl){:target="_blank"}.
-
-## Contributing
-
-Find a mistake or can't find an important example? 
-Raise an [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues){:target="_blank"}
-or send a [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/tree/master/examples){:target="_blank"}.
 
 ## What's next?
 

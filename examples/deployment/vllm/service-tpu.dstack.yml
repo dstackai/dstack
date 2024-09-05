@@ -1,10 +1,10 @@
 type: service
 # The name is optional, if not specified, generated randomly
-name: llama31-service-vLLM
+name: llama31-service-vllm-tpu
 
 env:
-  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
   - HUGGING_FACE_HUB_TOKEN
+  - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
   - DATE=20240828
   - TORCH_VERSION=2.5.0
   - VLLM_TARGET_DEVICE=tpu

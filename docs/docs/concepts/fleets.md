@@ -223,8 +223,8 @@ you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termi
 
 ## What's next?
 
-1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), and 
-    [services](services.md) 
+1. Read about [dev environments](../dev-environments.md), [tasks](../tasks.md), and 
+    [services](../services.md) 
 2. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
 
 !!! info "Reference"

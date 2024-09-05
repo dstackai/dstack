@@ -5,7 +5,6 @@ name: optimum-tpu-vscode
 # If `image` is not specified, dstack uses its default image
 python: "3.11"
 
-
 # Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
