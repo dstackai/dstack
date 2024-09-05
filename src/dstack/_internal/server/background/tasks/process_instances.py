@@ -219,28 +219,11 @@ async def _add_remote(instance: InstanceModel) -> None:
                 for sk in remote_details.ssh_keys
                 if sk.private is not None
             ]
-            if not pkeys:
-                logger.error("There are no ssh private key")
-                raise ProvisioningError("The SSH private key is not provided")
-        except PasswordRequiredException:
+        except (ValueError, PasswordRequiredException):
             instance.status = InstanceStatus.TERMINATED
             instance.deleted = True
             instance.deleted_at = get_current_datetime()
-            instance.termination_reason = "Private SSH key is encrypted, password required"
-            logger.warning(
-                "Failed to start instance %s: private SSH key is encrypted",
-                instance.name,
-                extra={
-                    "instance_name": instance.name,
-                    "instance_status": InstanceStatus.TERMINATED.value,
-                },
-            )
-            return
-        except ValueError:
-            instance.status = InstanceStatus.TERMINATED
-            instance.deleted = True
-            instance.deleted_at = get_current_datetime()
-            instance.termination_reason = "Cannot parse private key, key type is not supported"
+            instance.termination_reason = "Unsupported private SSH key type"
             logger.warning(
                 "Failed to start instance %s: unsupported private SSH key type",
                 instance.name,
@@ -259,10 +242,9 @@ async def _add_remote(instance: InstanceModel) -> None:
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
             health, host_info = result
         except (asyncio.TimeoutError, TimeoutError) as e:
-            raise ProvisioningError(f"Deploy timeout {e}") from e
+            raise ProvisioningError(f"Deploy timeout: {e}") from e
         except Exception as e:
-            logger.debug("deploy_instance raise an error: %s", e)
-            raise ProvisioningError(f"Deploy instance raise an error {e}") from e
+            raise ProvisioningError(f"Deploy instance raised an error: {e}") from e
         else:
             logger.info(
                 "The instance %s (%s) was successfully added",

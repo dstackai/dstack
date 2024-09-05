@@ -11,6 +11,7 @@ from dstack._internal.core.errors import (
     ResourceExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     Fleet,
@@ -19,7 +20,7 @@ from dstack._internal.core.models.fleets import (
     SSHHostParams,
     SSHParams,
 )
-from dstack._internal.core.models.instances import InstanceStatus
+from dstack._internal.core.models.instances import InstanceStatus, SSHKey
 from dstack._internal.core.models.profiles import SpotPolicy
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, get_policy_map
@@ -41,6 +42,7 @@ from dstack._internal.server.services.locking import (
 from dstack._internal.server.services.projects import get_member, get_member_permissions
 from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.ssh import pkey_from_str
 
 logger = get_logger(__name__)
 
@@ -366,17 +368,38 @@ def _validate_fleet_spec(spec: FleetSpec):
     if spec.configuration.ssh_config is None and spec.configuration.nodes is None:
         raise ServerClientError("No ssh_config or nodes specified")
     if spec.configuration.ssh_config is not None:
+        _validate_all_ssh_params_specified(spec.configuration.ssh_config)
+        if spec.configuration.ssh_config.ssh_key is not None:
+            _validate_ssh_key(spec.configuration.ssh_config.ssh_key)
         for host in spec.configuration.ssh_config.hosts:
-            if isinstance(host, str):
-                if spec.configuration.ssh_config.ssh_key is None:
-                    raise ServerClientError(f"No ssh key specified for host {host}")
-                if spec.configuration.ssh_config.user is None:
-                    raise ServerClientError(f"No ssh user specified for host {host}")
-            else:
-                if spec.configuration.ssh_config.ssh_key is None and host.ssh_key is None:
-                    raise ServerClientError(f"No ssh key specified for host {host.hostname}")
-                if spec.configuration.ssh_config.user is None and host.user is None:
-                    raise ServerClientError(f"No ssh user specified for host {host.hostname}")
+            if is_core_model_instance(host, SSHHostParams) and host.ssh_key is not None:
+                _validate_ssh_key(host.ssh_key)
+
+
+def _validate_all_ssh_params_specified(ssh_config: SSHParams):
+    for host in ssh_config.hosts:
+        if isinstance(host, str):
+            if ssh_config.ssh_key is None:
+                raise ServerClientError(f"No ssh key specified for host {host}")
+            if ssh_config.user is None:
+                raise ServerClientError(f"No ssh user specified for host {host}")
+        else:
+            if ssh_config.ssh_key is None and host.ssh_key is None:
+                raise ServerClientError(f"No ssh key specified for host {host.hostname}")
+            if ssh_config.user is None and host.user is None:
+                raise ServerClientError(f"No ssh user specified for host {host.hostname}")
+
+
+def _validate_ssh_key(ssh_key: SSHKey):
+    if ssh_key.private is None:
+        raise ServerClientError("Private key not provided")
+    try:
+        pkey_from_str(ssh_key.private)
+    except ValueError:
+        raise ServerClientError(
+            "Unsupported key type. "
+            "The key type should be RSA, ECDSA, or Ed25519 and should not be encrypted with passphrase."
+        )
 
 
 def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:

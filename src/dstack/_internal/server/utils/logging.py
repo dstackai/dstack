@@ -47,3 +47,5 @@ def configure_logging():
     root_logger.setLevel(settings.ROOT_LOG_LEVEL)
     dstack_logger = logging.getLogger("dstack")
     dstack_logger.setLevel(settings.LOG_LEVEL)
+    # paramiko emits error logs in cases handled by dstack
+    logging.getLogger("paramiko").setLevel(logging.CRITICAL)
