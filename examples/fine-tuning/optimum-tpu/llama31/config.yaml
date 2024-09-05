@@ -1,0 +1,10 @@
+per_device_train_batch_size: 24
+per_device_eval_batch_size: 8
+num_train_epochs: 1
+max_steps: -1
+output_dir: "./finetuned_models/llama3_fine_tuned"
+optim: "adafactor"
+dataset_name: "Abirate/english_quotes"
+model_name: "meta-llama/Meta-Llama-3.1-8B"
+lora_r: 4
+push_to_hub: True
