@@ -74,8 +74,7 @@ class TestProcessRuns:
     async def test_submitted_to_provisioning(self, test_db, session: AsyncSession):
         run = await make_run(session, status=RunStatus.SUBMITTED)
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING)
-
-        await process_runs.process_single_run(run.id, [])
+        await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.PROVISIONING
 
@@ -85,7 +84,7 @@ class TestProcessRuns:
         run = await make_run(session, status=RunStatus.PROVISIONING)
         await create_job(session=session, run=run, status=JobStatus.RUNNING)
 
-        await process_runs.process_single_run(run.id, [])
+        await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.RUNNING
 
@@ -95,7 +94,7 @@ class TestProcessRuns:
         run = await make_run(session, status=RunStatus.PROVISIONING)
         await create_job(session=session, run=run, status=JobStatus.PULLING)
 
-        await process_runs.process_single_run(run.id, [])
+        await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.PROVISIONING
 
@@ -105,7 +104,7 @@ class TestProcessRuns:
         run = await make_run(session, status=RunStatus.RUNNING)
         await create_job(session=session, run=run, status=JobStatus.DONE)
 
-        await process_runs.process_single_run(run.id, [])
+        await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.ALL_JOBS_DONE
@@ -123,7 +122,7 @@ class TestProcessRuns:
         )
 
         with patch("dstack._internal.server.services.jobs._stop_runner") as stop_runner:
-            await process_runs.process_single_run(run.id, [])
+            await process_runs.process_runs()
             stop_runner.assert_called_once()
         await session.refresh(job)
         assert job.status == JobStatus.TERMINATING
@@ -150,7 +149,7 @@ class TestProcessRuns:
         )
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
-            await process_runs.process_single_run(run.id, [])
+            await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.PENDING
 
@@ -172,7 +171,7 @@ class TestProcessRuns:
 
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
-            await process_runs.process_single_run(run.id, [])
+            await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.JOB_FAILED
@@ -183,7 +182,7 @@ class TestProcessRuns:
         run = await make_run(session, status=RunStatus.PENDING)
         await create_job(session=session, run=run, status=JobStatus.FAILED)
 
-        await process_runs.process_single_run(run.id, [])
+        await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.SUBMITTED
         assert len(run.jobs) == 2
@@ -199,7 +198,7 @@ class TestProcessRunsReplicas:
         await create_job(session=session, run=run, status=JobStatus.SUBMITTED, replica_num=0)
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING, replica_num=1)
 
-        await process_runs.process_single_run(run.id, [])
+        await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.PROVISIONING
 
@@ -210,7 +209,7 @@ class TestProcessRunsReplicas:
         await create_job(session=session, run=run, status=JobStatus.RUNNING, replica_num=0)
         await create_job(session=session, run=run, status=JobStatus.PROVISIONING, replica_num=1)
 
-        await process_runs.process_single_run(run.id, [])
+        await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.RUNNING
 
@@ -246,7 +245,7 @@ class TestProcessRunsReplicas:
         )
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
-            await process_runs.process_single_run(run.id, [])
+            await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.PENDING
 
@@ -278,7 +277,7 @@ class TestProcessRunsReplicas:
         )
         with patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock:
             datetime_mock.return_value = run.submitted_at + datetime.timedelta(minutes=3)
-            await process_runs.process_single_run(run.id, [])
+            await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.RUNNING
         assert len(run.jobs) == 3
@@ -298,7 +297,7 @@ class TestProcessRunsReplicas:
         )
         await create_job(session=session, run=run, status=JobStatus.RUNNING, replica_num=1)
 
-        await process_runs.process_single_run(run.id, [])
+        await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.TERMINATING
         assert run.termination_reason == RunTerminationReason.JOB_FAILED
@@ -315,7 +314,7 @@ class TestProcessRunsReplicas:
             replica_num=0,
         )
 
-        await process_runs.process_single_run(run.id, [])
+        await process_runs.process_runs()
         await session.refresh(run)
         assert run.status == RunStatus.SUBMITTED
         assert len(run.jobs) == 3

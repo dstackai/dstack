@@ -1,4 +1,6 @@
-dstack features auto-scaling for services published via the gateway. The general flow is:
+# Autoscaling
+
+`dstack` features auto-scaling for services published via the gateway. The general flow is:
 
 - STEP 1: `dstack-gateway` parses nginx `access.log` to collect per-second statistics about requests to the service and request times.
 - STEP 2: `dstack-gateway` aggregates statistics over a 1-minute window.

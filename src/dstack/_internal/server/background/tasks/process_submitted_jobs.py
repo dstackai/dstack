@@ -1,10 +1,9 @@
 import uuid
 from typing import List, Optional, Tuple
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, lazyload
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError, ServerClientError
@@ -19,6 +18,7 @@ from dstack._internal.core.models.instances import (
     InstanceStatus,
 )
 from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_NAME,
     CreationPolicy,
     TerminationPolicy,
 )
@@ -31,7 +31,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.models.volumes import Volume
-from dstack._internal.server.db import get_session_ctx
+from dstack._internal.server.db import get_db, get_session_ctx
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -43,36 +43,26 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services.backends import get_project_backend_by_type_or_error
 from dstack._internal.server.services.fleets import (
-    PROCESSING_FLEETS_IDS,
-    PROCESSING_FLEETS_LOCK,
     fleet_model_to_fleet,
 )
 from dstack._internal.server.services.jobs import (
-    PROCESSING_INSTANCES_LOCK,
-    SUBMITTED_PROCESSING_JOBS_IDS,
-    SUBMITTED_PROCESSING_JOBS_LOCK,
     find_job,
 )
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
-    get_or_create_pool_by_name,
-    get_pool_instances,
 )
 from dstack._internal.server.services.runs import (
-    PROCESSING_RUNS_IDS,
-    PROCESSING_RUNS_LOCK,
     check_can_attach_run_volumes,
     get_offers_by_requirements,
     get_run_volume_models,
     run_model_to_run,
 )
 from dstack._internal.server.services.volumes import (
-    PROCESSING_VOLUMES_IDS,
-    PROCESSING_VOLUMES_LOCK,
     volume_model_to_volume,
 )
-from dstack._internal.server.utils.common import run_async, wait_to_lock, wait_to_lock_many
+from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils.logging import get_logger
 
@@ -80,43 +70,38 @@ logger = get_logger(__name__)
 
 
 async def process_submitted_jobs():
+    lock, lockset = get_locker().get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
-        async with PROCESSING_RUNS_LOCK, SUBMITTED_PROCESSING_JOBS_LOCK:
+        async with lock:
             res = await session.execute(
                 select(JobModel)
                 .where(
                     JobModel.status == JobStatus.SUBMITTED,
-                    JobModel.id.not_in(SUBMITTED_PROCESSING_JOBS_IDS),
-                    JobModel.run_id.not_in(PROCESSING_RUNS_IDS),
+                    JobModel.id.not_in(lockset),
                 )
                 .order_by(JobModel.last_processed_at.asc())
-                .limit(1)  # TODO process multiple at once
+                .limit(1)
+                .with_for_update(skip_locked=True)
             )
             job_model = res.scalar()
             if job_model is None:
                 return
-
-            SUBMITTED_PROCESSING_JOBS_IDS.add(job_model.id)
-
-    try:
-        job_model_id = job_model.id
-        await _process_job(job_id=job_model_id)
-    finally:
-        SUBMITTED_PROCESSING_JOBS_IDS.remove(job_model_id)
-
-
-async def _process_job(job_id: UUID):
-    async with get_session_ctx() as session:
-        res = await session.execute(select(JobModel).where(JobModel.id == job_id))
-        job_model = res.scalar_one()
-        await _process_submitted_job(
-            session=session,
-            job_model=job_model,
-        )
+            lockset.add(job_model.id)
+        try:
+            job_model_id = job_model.id
+            await _process_submitted_job(session=session, job_model=job_model)
+        finally:
+            lockset.difference_update([job_model_id])
 
 
 async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     logger.debug("%s: provisioning has started", fmt(job_model))
+    # Refetch to load related attributes.
+    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
+    res = await session.execute(
+        select(JobModel).where(JobModel.id == job_model.id).options(joinedload(JobModel.instance))
+    )
+    job_model = res.unique().scalar_one()
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
@@ -167,23 +152,63 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.commit()
         return
 
-    # Try to provision on an instance from the pool
-    pool = await get_or_create_pool_by_name(
-        session=session,
-        project=project,
-        pool_name=profile.pool_name,
+    res = await session.execute(
+        select(PoolModel)
+        .where(
+            PoolModel.project_id == project.id,
+            PoolModel.name == (profile.pool_name or DEFAULT_POOL_NAME),
+            PoolModel.deleted == False,
+        )
+        .options(lazyload(PoolModel.instances))
     )
-    instance = await _run_job_on_pool_instance(
-        session=session,
-        pool=pool,
-        run_spec=run_spec,
-        job_model=job_model,
-        job=job,
-        fleet_model=run_model.fleet,
-        master_job_provisioning_data=master_job_provisioning_data,
-        volumes=volumes,
-    )
-    if instance is None:
+    pool = res.scalar_one()
+
+    # Submitted jobs processing happens in two steps (transactions).
+    # First, the jobs gets an instance assigned (or no instance).
+    # Then, the job runs on the assigned instance or a new instance is provisioned.
+    # This is needed to avoid holding instances lock for a long time.
+    if not job_model.instance_assigned:
+        # Try assigning instances from the pool.
+        res = await session.execute(
+            select(InstanceModel)
+            .where(
+                InstanceModel.pool_id == pool.id,
+                InstanceModel.deleted == False,
+                InstanceModel.job_id.is_(None),
+            )
+            .options(lazyload(InstanceModel.job))
+            .with_for_update()
+        )
+        pool_instances = list(res.scalars().all())
+        instances_ids = sorted([i.id for i in pool_instances])
+        if get_db().dialect_name == "sqlite":
+            # Start new transaction to see commited changes after lock
+            await session.commit()
+        async with get_locker().lock_ctx(InstanceModel.__tablename__, instances_ids):
+            # Refetch after lock
+            res = await session.execute(
+                select(InstanceModel).where(InstanceModel.id.in_(instances_ids))
+            )
+            pool_instances = list(res.scalars().all())
+            instance = await _assign_job_to_pool_instance(
+                session=session,
+                pool_instances=pool_instances,
+                run_spec=run_spec,
+                job_model=job_model,
+                job=job,
+                fleet_model=run_model.fleet,
+                master_job_provisioning_data=master_job_provisioning_data,
+                volumes=volumes,
+            )
+            job_model.instance_assigned = True
+            job_model.last_processed_at = common_utils.get_current_datetime()
+            await session.commit()
+            return
+
+    if job_model.instance is not None:
+        job_model.status = JobStatus.PROVISIONING
+    else:
+        # Assigned no instance, create a new one
         if profile.creation_policy == CreationPolicy.REUSE:
             logger.debug("%s: reuse instance failed", fmt(job_model))
             job_model.status = JobStatus.TERMINATING
@@ -251,22 +276,29 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.flush()  # to get im.id
         job_model.used_instance_id = instance.id
 
-    if len(volume_models) > 0:
-        await _attach_volumes(
-            session=session,
-            project=project,
-            job_model=job_model,
-            instance=instance,
-            volume_models=volume_models,
-        )
+    volumes_ids = sorted([v.id for v in volume_models])
+    # TODO: lock instances for attaching volumes?
+    # Take lock to prevent attaching volumes that are to be deleted.
+    # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
+    await session.execute(
+        select(VolumeModel).where(VolumeModel.id.in_(volumes_ids)).with_for_update()
+    )
+    async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
+        if len(volume_models) > 0:
+            await _attach_volumes(
+                session=session,
+                project=project,
+                job_model=job_model,
+                instance=instance,
+                volume_models=volume_models,
+            )
+        job_model.last_processed_at = common_utils.get_current_datetime()
+        await session.commit()
 
-    job_model.last_processed_at = common_utils.get_current_datetime()
-    await session.commit()
 
-
-async def _run_job_on_pool_instance(
+async def _assign_job_to_pool_instance(
     session: AsyncSession,
-    pool: PoolModel,
+    pool_instances: List[InstanceModel],
     run_spec: RunSpec,
     job_model: JobModel,
     job: Job,
@@ -275,46 +307,42 @@ async def _run_job_on_pool_instance(
     volumes: Optional[List[Volume]] = None,
 ) -> Optional[InstanceModel]:
     profile = run_spec.merged_profile
-    async with PROCESSING_INSTANCES_LOCK:
-        relevant_instances = filter_pool_instances(
-            pool_instances=get_pool_instances(pool),
-            profile=profile,
-            requirements=job.job_spec.requirements,
-            status=InstanceStatus.IDLE,
-            fleet_model=fleet_model,
-            multinode=job.job_spec.jobs_per_replica > 1,
-            master_job_provisioning_data=master_job_provisioning_data,
-            volumes=volumes,
-        )
-        if len(relevant_instances) == 0:
-            return None
-        sorted_instances = sorted(relevant_instances, key=lambda instance: instance.price)
-        instance = sorted_instances[0]
-        # Reload InstanceModel with volumes
-        res = await session.execute(
-            select(InstanceModel)
-            .where(InstanceModel.id == instance.id)
-            .options(joinedload(InstanceModel.volumes))
-        )
-        instance = res.unique().scalar_one()
-        instance.status = InstanceStatus.BUSY
-        instance.job = job_model
-        logger.info(
-            "The job %s switched instance %s status to BUSY",
-            job_model.job_name,
-            instance.name,
-            extra={
-                "instance_name": instance.name,
-                "instance_status": InstanceStatus.BUSY.value,
-            },
-        )
-        logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
-        job_model.job_provisioning_data = instance.job_provisioning_data
-        job_model.used_instance_id = instance.id
-        job_model.status = JobStatus.PROVISIONING
-        job_model.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
-        return instance
+    relevant_instances = filter_pool_instances(
+        pool_instances=pool_instances,
+        profile=profile,
+        requirements=job.job_spec.requirements,
+        status=InstanceStatus.IDLE,
+        fleet_model=fleet_model,
+        multinode=job.job_spec.jobs_per_replica > 1,
+        master_job_provisioning_data=master_job_provisioning_data,
+        volumes=volumes,
+    )
+    if len(relevant_instances) == 0:
+        return None
+    sorted_instances = sorted(relevant_instances, key=lambda instance: instance.price)
+    instance = sorted_instances[0]
+    # Reload InstanceModel with volumes
+    res = await session.execute(
+        select(InstanceModel)
+        .where(InstanceModel.id == instance.id)
+        .options(joinedload(InstanceModel.volumes))
+    )
+    instance = res.unique().scalar_one()
+    instance.status = InstanceStatus.BUSY
+    instance.job = job_model
+    logger.info(
+        "The job %s switched instance %s status to BUSY",
+        job_model.job_name,
+        instance.name,
+        extra={
+            "instance_name": instance.name,
+            "instance_status": InstanceStatus.BUSY.value,
+        },
+    )
+    logger.info("%s: now is provisioning on '%s'", fmt(job_model), instance.name)
+    job_model.job_provisioning_data = instance.job_provisioning_data
+    job_model.used_instance_id = instance.id
+    return instance
 
 
 async def _run_job_on_new_instance(
@@ -422,8 +450,7 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
     if len(fleet_model.instances) == 0:
         # No instances means the fleet is not in the db yet, so don't lock.
         return 0
-    await wait_to_lock(PROCESSING_FLEETS_LOCK, PROCESSING_FLEETS_IDS, fleet_model.id)
-    try:
+    async with get_locker().lock_ctx(FleetModel.__tablename__, [fleet_model.id]):
         fleet_model = (
             (
                 await session.execute(
@@ -437,8 +464,6 @@ async def _get_next_instance_num(session: AsyncSession, fleet_model: FleetModel)
             .scalar_one()
         )
         return len(fleet_model.instances)
-    finally:
-        PROCESSING_FLEETS_IDS.difference_update([fleet_model.id])
 
 
 def _create_instance_model_for_job(
@@ -496,40 +521,33 @@ async def _attach_volumes(
         project=project,
         backend_type=job_provisioning_data.backend,
     )
-    volumes_ids = sorted([v.id for v in volume_models])
     logger.info("Attaching volumes: %s", [v.name for v in volume_models])
-    # Take lock to prevent attaching deleted volumes.
-    # If the volume was deleted before the lock, fail the job.
-    await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
-    try:
-        for volume_model in volume_models:
-            volume = volume_model_to_volume(volume_model)
-            try:
-                if volume.provisioning_data is not None and volume.provisioning_data.attachable:
-                    await _attach_volume(
-                        session=session,
-                        backend=backend,
-                        volume_model=volume_model,
-                        instance=instance,
-                        instance_id=job_provisioning_data.instance_id,
-                    )
-            except (ServerClientError, BackendError) as e:
-                logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
-                job_model.status = JobStatus.TERMINATING
-                # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
-                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-                job_model.termination_reason_message = "Failed to attach volume"
-            except Exception:
-                logger.exception(
-                    "%s: got exception when attaching volume",
-                    fmt(job_model),
+    for volume_model in volume_models:
+        volume = volume_model_to_volume(volume_model)
+        try:
+            if volume.provisioning_data is not None and volume.provisioning_data.attachable:
+                await _attach_volume(
+                    session=session,
+                    backend=backend,
+                    volume_model=volume_model,
+                    instance=instance,
+                    instance_id=job_provisioning_data.instance_id,
                 )
-                job_model.status = JobStatus.TERMINATING
-                # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
-                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-                job_model.termination_reason_message = "Failed to attach volume"
-    finally:
-        PROCESSING_VOLUMES_IDS.difference_update(volumes_ids)
+        except (ServerClientError, BackendError) as e:
+            logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
+            job_model.status = JobStatus.TERMINATING
+            # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = "Failed to attach volume"
+        except Exception:
+            logger.exception(
+                "%s: got exception when attaching volume",
+                fmt(job_model),
+            )
+            job_model.status = JobStatus.TERMINATING
+            # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
+            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+            job_model.termination_reason_message = "Failed to attach volume"
 
 
 async def _attach_volume(

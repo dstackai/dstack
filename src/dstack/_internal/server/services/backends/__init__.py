@@ -1,6 +1,6 @@
 import asyncio
 import heapq
-from typing import Callable, Coroutine, List, Optional, Tuple, Type, Union
+from typing import Callable, Coroutine, Dict, List, Optional, Tuple, Type, Union
 from uuid import UUID
 
 from sqlalchemy import delete, update
@@ -177,7 +177,6 @@ async def create_backend(
     backend = await run_async(configurator.create_backend, project=project, config=config)
     session.add(backend)
     await session.commit()
-    await clear_backend_cache(project.id)
     return config
 
 
@@ -205,7 +204,6 @@ async def update_backend(
             auth=backend.auth,
         )
     )
-    await clear_backend_cache(project.id)
     return config
 
 
@@ -241,29 +239,33 @@ async def delete_backends(
             BackendModel.project_id == project.id,
         )
     )
-    await clear_backend_cache(project.id)
+
+
+BackendTuple = Tuple[BackendModel, Backend]
 
 
 _BACKENDS_CACHE_LOCKS = {}
-_BACKENDS_CACHE = {}
+_BACKENDS_CACHE: Dict[UUID, Dict[BackendType, BackendTuple]] = {}
 
 
 def _get_project_cache_lock(project_id: UUID) -> asyncio.Lock:
     return _BACKENDS_CACHE_LOCKS.setdefault(project_id, asyncio.Lock())
 
 
-BackendTuple = Tuple[BackendModel, Backend]
-
-
 async def get_project_backends_with_models(project: ProjectModel) -> List[BackendTuple]:
+    backends = []
     async with _get_project_cache_lock(project.id):
         key = project.id
-        backends = _BACKENDS_CACHE.get(key)
-        if backends is not None:
-            return backends
-
-        backends = []
+        project_backends_cache = _BACKENDS_CACHE.setdefault(key, {})
         for backend_model in project.backends:
+            cached_backend = project_backends_cache.get(backend_model.type)
+            if (
+                cached_backend is not None
+                and cached_backend[0].config == backend_model.config
+                and cached_backend[0].auth == backend_model.auth
+            ):
+                backends.append(cached_backend)
+                continue
             configurator = get_configurator(backend_model.type)
             if configurator is None:
                 logger.warning(
@@ -286,9 +288,8 @@ async def get_project_backends_with_models(project: ProjectModel) -> List[Backen
                 )
                 continue
             backends.append((backend_model, backend))
-
-        _BACKENDS_CACHE[key] = backends
-        return _BACKENDS_CACHE[key]
+            _BACKENDS_CACHE[key][backend_model.type] = (backend_model, backend)
+    return backends
 
 
 _get_project_backend_with_model_by_type = None
@@ -372,12 +373,6 @@ async def get_project_backend_by_type_or_error(
     if backend is None:
         raise BackendNotAvailable()
     return backend
-
-
-async def clear_backend_cache(project_id: UUID):
-    async with _get_project_cache_lock(project_id):
-        if project_id in _BACKENDS_CACHE:
-            del _BACKENDS_CACHE[project_id]
 
 
 async def get_project_backend_model_by_type(

@@ -1,9 +1,8 @@
 import asyncio
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, lazyload
 
 from dstack._internal.core.errors import BackendError, BackendNotAvailable, SSHError
 from dstack._internal.core.models.gateways import GatewayStatus
@@ -12,12 +11,11 @@ from dstack._internal.server.models import GatewayModel, ProjectModel
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services import gateways as gateways_services
 from dstack._internal.server.services.gateways import (
-    PROCESSING_GATEWAYS_IDS,
-    PROCESSING_GATEWAYS_LOCK,
     GatewayConnection,
     create_gateway_compute,
     gateway_connections_pool,
 )
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
@@ -31,28 +29,29 @@ async def process_gateways_connections():
 
 
 async def process_submitted_gateways():
+    lock, lockset = get_locker().get_lockset(GatewayModel.__tablename__)
     async with get_session_ctx() as session:
-        async with PROCESSING_GATEWAYS_LOCK:
+        async with lock:
             res = await session.execute(
                 select(GatewayModel)
                 .where(
                     GatewayModel.status == GatewayStatus.SUBMITTED,
-                    GatewayModel.id.not_in(PROCESSING_GATEWAYS_IDS),
+                    GatewayModel.id.not_in(lockset),
                 )
+                .options(lazyload(GatewayModel.gateway_compute))
                 .order_by(GatewayModel.last_processed_at.asc())
                 .limit(1)
+                .with_for_update(skip_locked=True)
             )
             gateway_model = res.scalar()
             if gateway_model is None:
                 return
-
-            PROCESSING_GATEWAYS_IDS.add(gateway_model.id)
-
-    try:
-        gateway_model_id = gateway_model.id
-        await _process_gateway(gateway_id=gateway_model_id)
-    finally:
-        PROCESSING_GATEWAYS_IDS.remove(gateway_model_id)
+            lockset.add(gateway_model.id)
+        try:
+            gateway_model_id = gateway_model.id
+            await _process_submitted_gateway(session=session, gateway_model=gateway_model)
+        finally:
+            lockset.difference_update([gateway_model_id])
 
 
 async def _process_connection(conn: GatewayConnection):
@@ -63,22 +62,17 @@ async def _process_connection(conn: GatewayConnection):
         logger.error("Connection to gateway %s failed: %s", conn.ip_address, e)
 
 
-async def _process_gateway(gateway_id: UUID):
-    async with get_session_ctx() as session:
-        res = await session.execute(
-            select(GatewayModel)
-            .where(GatewayModel.id == gateway_id)
-            .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
-        )
-        gateway_model = res.unique().scalar_one()
-        await _process_submitted_gateway(
-            session=session,
-            gateway_model=gateway_model,
-        )
-
-
 async def _process_submitted_gateway(session: AsyncSession, gateway_model: GatewayModel):
     logger.info("Started gateway %s provisioning", gateway_model.name)
+    # Refetch to load related attributes.
+    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
+    res = await session.execute(
+        select(GatewayModel)
+        .where(GatewayModel.id == gateway_model.id)
+        .options(joinedload(GatewayModel.project).joinedload(ProjectModel.backends))
+        .execution_options(populate_existing=True)
+    )
+    gateway_model = res.unique().scalar_one()
     configuration = gateways_services.get_gateway_configuration(gateway_model)
     try:
         (

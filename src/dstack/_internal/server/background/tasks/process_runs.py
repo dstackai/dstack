@@ -1,10 +1,8 @@
-import asyncio
 import datetime
 import itertools
-import uuid
 from typing import List, Optional, Set, Tuple
 
-import sqlalchemy as sa
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -24,19 +22,12 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 from dstack._internal.server.services.jobs import (
-    RUNNING_PROCESSING_JOBS_IDS,
-    RUNNING_PROCESSING_JOBS_LOCK,
-    SUBMITTED_PROCESSING_JOBS_IDS,
-    SUBMITTED_PROCESSING_JOBS_LOCK,
-    TERMINATING_PROCESSING_JOBS_IDS,
-    TERMINATING_PROCESSING_JOBS_LOCK,
     find_job,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
 )
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.runs import (
-    PROCESSING_RUNS_IDS,
-    PROCESSING_RUNS_LOCK,
     create_job_model_for_new_submission,
     fmt,
     process_terminating_run,
@@ -44,89 +35,90 @@ from dstack._internal.server.services.runs import (
     run_model_to_run,
     scale_run_replicas,
 )
-from dstack._internal.server.utils.common import wait_unlock
 from dstack._internal.utils import common
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-PROCESSING_INTERVAL = datetime.timedelta(seconds=2)
 RETRY_DELAY = datetime.timedelta(seconds=15)
 
 
 async def process_runs():
+    run_lock, run_lockset = get_locker().get_lockset(RunModel.__tablename__)
+    job_lock, job_lockset = get_locker().get_lockset(JobModel.__tablename__)
     async with get_session_ctx() as session:
-        async with PROCESSING_RUNS_LOCK:
+        async with run_lock, job_lock:
             res = await session.execute(
-                sa.select(RunModel).where(
+                select(RunModel)
+                .where(
                     RunModel.status.not_in(RunStatus.finished_statuses()),
-                    RunModel.last_processed_at
-                    < common.get_current_datetime() - PROCESSING_INTERVAL,
-                    RunModel.id.not_in(PROCESSING_RUNS_IDS),
+                    RunModel.id.not_in(run_lockset),
                 )
+                .order_by(RunModel.last_processed_at.asc())
+                .limit(1)
+                .with_for_update(skip_locked=True)
             )
-            runs = res.scalars().all()
-            unprocessed_runs_ids = set(run.id for run in runs)
-            PROCESSING_RUNS_IDS.update(unprocessed_runs_ids)
-
-    futures = [process_single_run(run.id, [job.id for job in run.jobs]) for run in runs]
-    try:
-        for future in asyncio.as_completed(futures):
-            run_id = await future
-            # Unlock job processing as soon as possible.
-            PROCESSING_RUNS_IDS.remove(run_id)
-            unprocessed_runs_ids.remove(run_id)
-    finally:
-        # Ensure that all runs are unlocked.
-        # Note that runs should not be unlocked twice!
-        PROCESSING_RUNS_IDS.difference_update(unprocessed_runs_ids)
-
-
-async def process_single_run(run_id: uuid.UUID, job_ids: List[uuid.UUID]) -> uuid.UUID:
-    jobs_ids_set = set(job_ids)
-    await wait_unlock(SUBMITTED_PROCESSING_JOBS_LOCK, SUBMITTED_PROCESSING_JOBS_IDS, jobs_ids_set)
-    await wait_unlock(RUNNING_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_IDS, jobs_ids_set)
-    await wait_unlock(
-        TERMINATING_PROCESSING_JOBS_LOCK, TERMINATING_PROCESSING_JOBS_IDS, jobs_ids_set
-    )
-
-    async with get_session_ctx() as session:
-        res = await session.execute(
-            sa.select(RunModel)
-            .where(RunModel.id == run_id)
-            .execution_options(populate_existing=True)
-            .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
-            .options(joinedload(RunModel.user))
-            .options(joinedload(RunModel.repo))
-            .options(selectinload(RunModel.jobs).joinedload(JobModel.instance))
-        )
-        run = res.unique().scalar()
-        if run is None:
-            logger.error(f"Run {run_id} not found")
-            return run_id
-
+            run_model = res.scalar()
+            if run_model is None:
+                return
+            res = await session.execute(
+                select(JobModel)
+                .where(
+                    JobModel.run_id == run_model.id,
+                    JobModel.id.not_in(job_lockset),
+                )
+                .with_for_update(skip_locked=True)
+            )
+            job_models = res.scalars().all()
+            if len(run_model.jobs) != len(job_models):
+                # Some jobs are locked
+                return
+            job_ids = [j.id for j in run_model.jobs]
+            run_lockset.add(run_model.id)
+            job_lockset.update(job_ids)
         try:
-            if run.status == RunStatus.PENDING:
-                await process_pending_run(session, run)
-            elif run.status in {RunStatus.SUBMITTED, RunStatus.PROVISIONING, RunStatus.RUNNING}:
-                await process_active_run(session, run)
-            elif run.status == RunStatus.TERMINATING:
-                await process_terminating_run(session, run)
-            else:
-                logger.error("%s: unexpected status %s", fmt(run), run.status.name)
-                run.status = RunStatus.TERMINATING
-                run.termination_reason = RunTerminationReason.SERVER_ERROR
-        except ServerError as e:
-            logger.error("%s: run processing error: %s", fmt(run), e)
-            run.status = RunStatus.TERMINATING
-            run.termination_reason = RunTerminationReason.SERVER_ERROR
-
-        run.last_processed_at = common.get_current_datetime()
-        await session.commit()
-
-    return run_id
+            run_model_id = run_model.id
+            await _process_run(session=session, run_model=run_model)
+        finally:
+            run_lockset.difference_update([run_model_id])
+            job_lockset.difference_update(job_ids)
 
 
-async def process_pending_run(session: AsyncSession, run_model: RunModel):
+async def _process_run(session: AsyncSession, run_model: RunModel):
+    logger.debug("%s: processing run", fmt(run_model))
+    # Refetch to load related attributes.
+    # joinedload produces LEFT OUTER JOIN that can't be used with FOR UPDATE.
+    res = await session.execute(
+        select(RunModel)
+        .where(RunModel.id == run_model.id)
+        .execution_options(populate_existing=True)
+        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(RunModel.user))
+        .options(joinedload(RunModel.repo))
+        .options(selectinload(RunModel.jobs).joinedload(JobModel.instance))
+        .execution_options(populate_existing=True)
+    )
+    run_model = res.unique().scalar_one()
+    try:
+        if run_model.status == RunStatus.PENDING:
+            await _process_pending_run(session, run_model)
+        elif run_model.status in {RunStatus.SUBMITTED, RunStatus.PROVISIONING, RunStatus.RUNNING}:
+            await _process_active_run(session, run_model)
+        elif run_model.status == RunStatus.TERMINATING:
+            await process_terminating_run(session, run_model)
+        else:
+            logger.error("%s: unexpected status %s", fmt(run_model), run_model.status.name)
+            run_model.status = RunStatus.TERMINATING
+            run_model.termination_reason = RunTerminationReason.SERVER_ERROR
+    except ServerError as e:
+        logger.error("%s: run processing error: %s", fmt(run_model), e)
+        run_model.status = RunStatus.TERMINATING
+        run_model.termination_reason = RunTerminationReason.SERVER_ERROR
+
+    run_model.last_processed_at = common.get_current_datetime()
+    await session.commit()
+
+
+async def _process_pending_run(session: AsyncSession, run_model: RunModel):
     """Jobs are not created yet"""
     run = run_model_to_run(run_model)
     if (
@@ -182,14 +174,14 @@ async def process_pending_run(session: AsyncSession, run_model: RunModel):
     logger.info("%s: run status has changed PENDING -> SUBMITTED", fmt(run_model))
 
 
-async def process_active_run(session: AsyncSession, run_model: RunModel):
+async def _process_active_run(session: AsyncSession, run_model: RunModel):
     """
     Run is submitted, provisioning, or running.
     We handle fails, scaling, and status changes.
     """
     run = run_model_to_run(run_model)
     run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
-    retry_single_job = can_retry_single_job(run_spec)
+    retry_single_job = _can_retry_single_job(run_spec)
 
     run_statuses: Set[RunStatus] = set()
     run_termination_reasons: Set[RunTerminationReason] = set()
@@ -234,12 +226,12 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
                 and job_model.termination_reason
                 not in {JobTerminationReason.DONE_BY_RUNNER, JobTerminationReason.SCALED_DOWN}
             ):
-                current_duration = should_retry_job(run, job, job_model)
+                current_duration = _should_retry_job(run, job, job_model)
                 if current_duration is None:
                     replica_statuses.add(RunStatus.FAILED)
                     run_termination_reasons.add(RunTerminationReason.JOB_FAILED)
                 else:
-                    if is_retry_duration_exceeded(job, current_duration):
+                    if _is_retry_duration_exceeded(job, current_duration):
                         replica_statuses.add(RunStatus.FAILED)
                         run_termination_reasons.add(RunTerminationReason.RETRY_LIMIT_EXCEEDED)
                     else:
@@ -345,7 +337,7 @@ async def process_active_run(session: AsyncSession, run_model: RunModel):
         run_model.termination_reason = termination_reason
 
 
-def should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datetime.timedelta]:
+def _should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[datetime.timedelta]:
     """
     Checks if the job should be retried.
     Returns the current duration of retrying if retry is enabled.
@@ -394,13 +386,13 @@ def should_retry_job(run: Run, job: Job, job_model: JobModel) -> Optional[dateti
     return None
 
 
-def is_retry_duration_exceeded(job: Job, current_duration: datetime.timedelta) -> bool:
+def _is_retry_duration_exceeded(job: Job, current_duration: datetime.timedelta) -> bool:
     if job.job_spec.retry is None:
         return True
     return current_duration > datetime.timedelta(seconds=job.job_spec.retry.duration)
 
 
-def can_retry_single_job(run_spec: RunSpec) -> bool:
+def _can_retry_single_job(run_spec: RunSpec) -> bool:
     # TODO: Currently, we terminate and retry the entire replica if one of the job fails.
     # We could make partial retry in some multi-node cases.
     # E.g. restarting a worker node, independent jobs.

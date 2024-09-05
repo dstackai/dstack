@@ -245,6 +245,7 @@ async def create_job(
     instance: Optional[InstanceModel] = None,
     job_num: int = 0,
     replica_num: int = 0,
+    instance_assigned: bool = False,
 ) -> JobModel:
     run_spec = RunSpec.parse_raw(run.run_spec)
     job_spec = (await get_job_specs_from_run_spec(run_spec, replica_num=replica_num))[0]
@@ -263,6 +264,7 @@ async def create_job(
         job_spec_data=job_spec.json(),
         job_provisioning_data=job_provisioning_data.json() if job_provisioning_data else None,
         instance=instance,
+        instance_assigned=instance_assigned,
         used_instance_id=instance.id if instance is not None else None,
     )
     session.add(job)

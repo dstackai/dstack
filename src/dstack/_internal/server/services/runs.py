@@ -1,12 +1,11 @@
-import asyncio
 import itertools
 import math
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Set, Tuple
+from typing import List, Optional, Tuple
 
 import pydantic
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -58,6 +57,7 @@ from dstack._internal.core.models.runs import (
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import Volume, VolumeStatus
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -76,12 +76,6 @@ from dstack._internal.server.services import volumes as volumes_services
 from dstack._internal.server.services.docker import is_valid_docker_volume_target, parse_image_name
 from dstack._internal.server.services.fleets import fleet_model_to_fleet
 from dstack._internal.server.services.jobs import (
-    RUNNING_PROCESSING_JOBS_IDS,
-    RUNNING_PROCESSING_JOBS_LOCK,
-    SUBMITTED_PROCESSING_JOBS_IDS,
-    SUBMITTED_PROCESSING_JOBS_LOCK,
-    TERMINATING_PROCESSING_JOBS_IDS,
-    TERMINATING_PROCESSING_JOBS_LOCK,
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
     job_model_to_job_submission,
@@ -92,6 +86,7 @@ from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
+from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
@@ -103,18 +98,11 @@ from dstack._internal.server.services.pools import (
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.services.users import get_user_model_by_name
-from dstack._internal.server.utils.common import wait_to_lock, wait_unlock
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.random_names import generate_name
 
 logger = get_logger(__name__)
 
-# Run processing task must acquire the lock and add the run id to the set.
-# Run processing has higher priority than job processing.
-# It means that job processing tasks should not take the job if `job.run_id` is in the set.
-# But run processing tasks should wait until job processing tasks release PROCESSING_JOBS locks.
-PROCESSING_RUNS_LOCK = asyncio.Lock()
-PROCESSING_RUNS_IDS: Set[uuid.UUID] = set()
 
 JOB_TERMINATION_REASONS_TO_RETRY = {
     JobTerminationReason.INTERRUPTED_BY_NO_CAPACITY,
@@ -410,55 +398,66 @@ async def submit_run(
     if repo is None:
         raise RepoDoesNotExistError.with_id(run_spec.repo_id)
 
-    if run_spec.run_name is None:
-        run_spec.run_name = await _generate_run_name(
-            session=session,
-            project=project,
+    lock_namespace = f"run_names_{project.name}"
+    if get_db().dialect_name == "sqlite":
+        # Start new transaction to see commited changes after lock
+        await session.commit()
+    elif get_db().dialect_name == "postgresql":
+        await session.execute(
+            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
-    else:
-        await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
-    await validate_run(
-        session=session,
-        user=user,
-        project=project,
-        run_spec=run_spec,
-    )
-
-    submitted_at = common_utils.get_current_datetime()
-    run_model = RunModel(
-        id=uuid.uuid4(),
-        project_id=project.id,
-        project=project,
-        repo_id=repo.id,
-        user_id=user.id,
-        run_name=run_spec.run_name,
-        submitted_at=submitted_at,
-        status=RunStatus.SUBMITTED,
-        run_spec=run_spec.json(),
-        last_processed_at=submitted_at,
-    )
-    session.add(run_model)
-
-    replicas = 1
-    if run_spec.configuration.type == "service":
-        replicas = run_spec.configuration.replicas.min
-        await gateways.register_service(session, run_model)
-
-    for replica_num in range(replicas):
-        jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
-        for job in jobs:
-            job_model = create_job_model_for_new_submission(
-                run_model=run_model,
-                job=job,
-                status=JobStatus.SUBMITTED,
+    lock, _ = get_locker().get_lockset(lock_namespace)
+    async with lock:
+        if run_spec.run_name is None:
+            run_spec.run_name = await _generate_run_name(
+                session=session,
+                project=project,
             )
-            session.add(job_model)
-    await session.commit()
-    await session.refresh(run_model)
+        else:
+            await delete_runs(session=session, project=project, runs_names=[run_spec.run_name])
 
-    run = run_model_to_run(run_model, return_in_api=True)
-    return run
+        await validate_run(
+            session=session,
+            user=user,
+            project=project,
+            run_spec=run_spec,
+        )
+
+        submitted_at = common_utils.get_current_datetime()
+        run_model = RunModel(
+            id=uuid.uuid4(),
+            project_id=project.id,
+            project=project,
+            repo_id=repo.id,
+            user_id=user.id,
+            run_name=run_spec.run_name,
+            submitted_at=submitted_at,
+            status=RunStatus.SUBMITTED,
+            run_spec=run_spec.json(),
+            last_processed_at=submitted_at,
+        )
+        session.add(run_model)
+
+        replicas = 1
+        if run_spec.configuration.type == "service":
+            replicas = run_spec.configuration.replicas.min
+            await gateways.register_service(session, run_model)
+
+        for replica_num in range(replicas):
+            jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)
+            for job in jobs:
+                job_model = create_job_model_for_new_submission(
+                    run_model=run_model,
+                    job=job,
+                    status=JobStatus.SUBMITTED,
+                )
+                session.add(job_model)
+        await session.commit()
+        await session.refresh(run_model)
+
+        run = run_model_to_run(run_model, return_in_api=True)
+        return run
 
 
 def create_job_model_for_new_submission(
@@ -502,34 +501,39 @@ async def stop_runs(
             RunModel.status.not_in(RunStatus.finished_statuses()),
         )
     )
-    runs = res.scalars().all()
-    # TODO(egor-s): consider raising an exception if no runs found
-    # FIXME: not safe to share session between tasks – sqlalchemy can error
-    await asyncio.gather(*(stop_run(session, run, abort) for run in runs))
+    run_models = res.scalars().all()
+    run_ids = sorted([r.id for r in run_models])
+    res = await session.execute(select(JobModel).where(JobModel.run_id.in_(run_ids)))
+    job_models = res.scalars().all()
+    job_ids = sorted([j.id for j in job_models])
+    await session.commit()
+    async with get_locker().lock_ctx(RunModel.__tablename__, run_ids), get_locker().lock_ctx(
+        JobModel.__tablename__, job_ids
+    ):
+        for run_model in run_models:
+            await stop_run(session=session, run_model=run_model, abort=abort)
 
 
-async def stop_run(session: AsyncSession, run: RunModel, abort: bool):
-    run_id = run.id  # run.id won't load if transaction is rolled back
-    await wait_to_lock(PROCESSING_RUNS_LOCK, PROCESSING_RUNS_IDS, run_id)
-    try:
-        await session.refresh(run)
-        if run.status.is_finished():
-            return
-
-        run.status = RunStatus.TERMINATING
-        if abort:
-            run.termination_reason = RunTerminationReason.ABORTED_BY_USER
-        else:
-            run.termination_reason = RunTerminationReason.STOPPED_BY_USER
-        await session.commit()  # run will be refreshed later
-        # process the run out of turn
-        logger.debug("%s: terminating because %s", fmt(run), run.termination_reason.name)
-        await process_terminating_run(session, run)
-
-        run.last_processed_at = common_utils.get_current_datetime()
-        await session.commit()
-    finally:
-        PROCESSING_RUNS_IDS.remove(run_id)
+async def stop_run(session: AsyncSession, run_model: RunModel, abort: bool):
+    res = await session.execute(
+        select(RunModel).where(RunModel.id == run_model.id).with_for_update()
+    )
+    run_model = res.scalar_one()
+    await session.execute(
+        select(JobModel).where(JobModel.run_id == run_model.id).with_for_update()
+    )
+    if run_model.status.is_finished():
+        return
+    run_model.status = RunStatus.TERMINATING
+    if abort:
+        run_model.termination_reason = RunTerminationReason.ABORTED_BY_USER
+    else:
+        run_model.termination_reason = RunTerminationReason.STOPPED_BY_USER
+    # process the run out of turn
+    logger.debug("%s: terminating because %s", fmt(run_model), run_model.termination_reason.name)
+    await process_terminating_run(session, run_model)
+    run_model.last_processed_at = common_utils.get_current_datetime()
+    await session.commit()
 
 
 async def delete_runs(
@@ -539,24 +543,32 @@ async def delete_runs(
 ):
     res = await session.execute(
         select(RunModel).where(
-            RunModel.project_id == project.id, RunModel.run_name.in_(runs_names)
-        )
-    )
-    run_models = res.scalars().all()
-    active_runs = [r for r in run_models if not r.status.is_finished()]
-    if len(active_runs) > 0:
-        raise ServerClientError(
-            msg=f"Cannot delete active runs: {[r.run_name for r in active_runs]}"
-        )
-    await session.execute(
-        update(RunModel)
-        .where(
             RunModel.project_id == project.id,
             RunModel.run_name.in_(runs_names),
         )
-        .values(deleted=True)
     )
+    run_models = res.scalars().all()
+    run_ids = sorted([r.id for r in run_models])
     await session.commit()
+    async with get_locker().lock_ctx(RunModel.__tablename__, run_ids):
+        res = await session.execute(
+            select(RunModel).where(RunModel.id.in_(run_ids)).with_for_update()
+        )
+        run_models = res.scalars().all()
+        active_runs = [r for r in run_models if not r.status.is_finished()]
+        if len(active_runs) > 0:
+            raise ServerClientError(
+                msg=f"Cannot delete active runs: {[r.run_name for r in active_runs]}"
+            )
+        await session.execute(
+            update(RunModel)
+            .where(
+                RunModel.project_id == project.id,
+                RunModel.run_name.in_(runs_names),
+            )
+            .values(deleted=True)
+        )
+        await session.commit()
 
 
 async def get_create_instance_offers(
@@ -735,9 +747,6 @@ def run_model_to_run(
     return run
 
 
-_PROJECTS_TO_RUN_NAMES_LOCK = {}
-
-
 def _get_pool_offers(
     pool: PoolModel,
     run_spec: RunSpec,
@@ -770,20 +779,20 @@ async def _generate_run_name(
     session: AsyncSession,
     project: ProjectModel,
 ) -> str:
-    lock = _PROJECTS_TO_RUN_NAMES_LOCK.setdefault(project.name, asyncio.Lock())
     run_name_base = generate_name()
     idx = 1
-    async with lock:
-        while (
-            await get_run(
-                session=session,
-                project=project,
-                run_name=f"{run_name_base}-{idx}",
+    while True:
+        res = await session.execute(
+            select(RunModel).where(
+                RunModel.project_id == project.id,
+                RunModel.run_name == f"{run_name_base}-{idx}",
+                RunModel.deleted == False,
             )
-            is not None
-        ):
-            idx += 1
-        return f"{run_name_base}-{idx}"
+        )
+        run_model = res.scalar()
+        if run_model is None:
+            return f"{run_name_base}-{idx}"
+        idx += 1
 
 
 async def validate_run(
@@ -887,20 +896,10 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
     Used by both `process_runs` and `stop_run` to process a run that is TERMINATING.
     Caller must acquire the lock on run.
     """
-
     assert run.termination_reason is not None
     job_termination_reason = run.termination_reason.to_job_termination_reason()
 
-    jobs_ids_set = {job.id for job in run.jobs}
-    await wait_unlock(RUNNING_PROCESSING_JOBS_LOCK, RUNNING_PROCESSING_JOBS_IDS, jobs_ids_set)
-    await wait_unlock(SUBMITTED_PROCESSING_JOBS_LOCK, SUBMITTED_PROCESSING_JOBS_IDS, jobs_ids_set)
-    await wait_unlock(
-        TERMINATING_PROCESSING_JOBS_LOCK, TERMINATING_PROCESSING_JOBS_IDS, jobs_ids_set
-    )
-    await session.refresh(run)
-
     unfinished_jobs_count = 0
-    job: JobModel
     for job in run.jobs:
         if job.status.is_finished():
             continue

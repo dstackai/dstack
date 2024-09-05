@@ -1,11 +1,10 @@
-import asyncio
 import uuid
 from datetime import timezone
 from typing import List, Optional, Union
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from dstack._internal.core.errors import (
     ForbiddenError,
@@ -26,6 +25,7 @@ from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     FleetModel,
     InstanceModel,
@@ -34,20 +34,15 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services import pools as pools_services
-from dstack._internal.server.services.jobs import (
-    PROCESSING_INSTANCES_IDS,
-    PROCESSING_INSTANCES_LOCK,
+from dstack._internal.server.services.locking import (
+    get_locker,
+    string_to_lock_id,
 )
 from dstack._internal.server.services.projects import get_member, get_member_permissions
-from dstack._internal.server.utils.common import wait_to_lock_many
 from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-PROCESSING_FLEETS_LOCK = asyncio.Lock()
-PROCESSING_FLEETS_IDS = set()
 
 
 async def list_project_fleets(
@@ -118,54 +113,65 @@ async def create_fleet(
     if spec.configuration.ssh_config is not None:
         _check_can_manage_ssh_fleets(user=user, project=project)
 
-    if spec.configuration.name is not None:
-        fleet_model = await get_project_fleet_model_by_name(
-            session=session,
-            project=project,
-            name=spec.configuration.name,
+    lock_namespace = f"fleet_names_{project.name}"
+    if get_db().dialect_name == "sqlite":
+        # Start new transaction to see commited changes after lock
+        await session.commit()
+    elif get_db().dialect_name == "postgresql":
+        await session.execute(
+            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
-        if fleet_model is not None:
-            raise ResourceExistsError()
-    else:
-        spec.configuration.name = await generate_fleet_name(session=session, project=project)
 
-    pool = await pools_services.get_or_create_pool_by_name(
-        session=session, project=project, pool_name=None
-    )
-    fleet_model = FleetModel(
-        id=uuid.uuid4(),
-        name=spec.configuration.name,
-        project=project,
-        status=FleetStatus.ACTIVE,
-        spec=spec.json(),
-        instances=[],
-    )
-    session.add(fleet_model)
-    if spec.configuration.ssh_config is not None:
-        for i, host in enumerate(spec.configuration.ssh_config.hosts):
-            instances_model = await create_fleet_ssh_instance_model(
-                project=project,
-                pool=pool,
-                spec=spec,
-                ssh_params=spec.configuration.ssh_config,
-                env=spec.configuration.env,
-                instance_num=i,
-                host=host,
-            )
-            fleet_model.instances.append(instances_model)
-    else:
-        for i in range(_get_fleet_nodes_to_provision(spec)):
-            instance_model = await create_fleet_instance_model(
+    lock, _ = get_locker().get_lockset(lock_namespace)
+    async with lock:
+        if spec.configuration.name is not None:
+            fleet_model = await get_project_fleet_model_by_name(
                 session=session,
                 project=project,
-                user=user,
-                pool=pool,
-                spec=spec,
-                instance_num=i,
+                name=spec.configuration.name,
             )
-            fleet_model.instances.append(instance_model)
-    await session.commit()
-    return fleet_model_to_fleet(fleet_model)
+            if fleet_model is not None:
+                raise ResourceExistsError()
+        else:
+            spec.configuration.name = await generate_fleet_name(session=session, project=project)
+
+        pool = await pools_services.get_or_create_pool_by_name(
+            session=session, project=project, pool_name=None
+        )
+        fleet_model = FleetModel(
+            id=uuid.uuid4(),
+            name=spec.configuration.name,
+            project=project,
+            status=FleetStatus.ACTIVE,
+            spec=spec.json(),
+            instances=[],
+        )
+        session.add(fleet_model)
+        if spec.configuration.ssh_config is not None:
+            for i, host in enumerate(spec.configuration.ssh_config.hosts):
+                instances_model = await create_fleet_ssh_instance_model(
+                    project=project,
+                    pool=pool,
+                    spec=spec,
+                    ssh_params=spec.configuration.ssh_config,
+                    env=spec.configuration.env,
+                    instance_num=i,
+                    host=host,
+                )
+                fleet_model.instances.append(instances_model)
+        else:
+            for i in range(_get_fleet_nodes_to_provision(spec)):
+                instance_model = await create_fleet_instance_model(
+                    session=session,
+                    project=project,
+                    user=user,
+                    pool=pool,
+                    spec=spec,
+                    instance_num=i,
+                )
+                fleet_model.instances.append(instance_model)
+        await session.commit()
+        return fleet_model_to_fleet(fleet_model)
 
 
 async def create_fleet_instance_model(
@@ -243,18 +249,24 @@ async def delete_fleets(
     instance_nums: Optional[List[int]] = None,
 ):
     res = await session.execute(
-        select(FleetModel).where(
+        select(FleetModel)
+        .where(
             FleetModel.project_id == project.id,
             FleetModel.name.in_(names),
             FleetModel.deleted == False,
         )
+        .options(joinedload(FleetModel.instances))
     )
-    fleet_models = res.scalars().all()
-    fleets_ids = sorted([v.id for v in fleet_models])
+    fleet_models = res.scalars().unique().all()
+    fleets_ids = sorted([f.id for f in fleet_models])
+    instances_ids = sorted([i.id for f in fleet_models for i in f.instances])
+    await session.commit()
     logger.info("Deleting fleets: %s", [v.name for v in fleet_models])
-    await wait_to_lock_many(PROCESSING_FLEETS_LOCK, PROCESSING_FLEETS_IDS, fleets_ids)
-    try:
+    async with get_locker().lock_ctx(FleetModel.__tablename__, fleets_ids), get_locker().lock_ctx(
+        InstanceModel.__tablename__, instances_ids
+    ):
         # Refetch after lock
+        # TODO lock instances with FOR UPDATE?
         res = await session.execute(
             select(FleetModel)
             .where(
@@ -262,9 +274,10 @@ async def delete_fleets(
                 FleetModel.name.in_(names),
                 FleetModel.deleted == False,
             )
-            .options(joinedload(FleetModel.instances))
-            .options(joinedload(FleetModel.runs))
+            .options(selectinload(FleetModel.instances))
+            .options(selectinload(FleetModel.runs))
             .execution_options(populate_existing=True)
+            .with_for_update()
         )
         fleet_models = res.scalars().unique().all()
         fleets = [fleet_model_to_fleet(m) for m in fleet_models]
@@ -272,13 +285,11 @@ async def delete_fleets(
             if fleet.spec.configuration.ssh_config is not None:
                 _check_can_manage_ssh_fleets(user=user, project=project)
         for fleet_model in fleet_models:
-            await _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
-        # TERMINATING fleets are deleted by process_fleets after instances are terminated
-        if instance_nums is None:
-            fleet_model.status = FleetStatus.TERMINATING
+            _terminate_fleet_instances(fleet_model=fleet_model, instance_nums=instance_nums)
+            # TERMINATING fleets are deleted by process_fleets after instances are terminated
+            if instance_nums is None:
+                fleet_model.status = FleetStatus.TERMINATING
         await session.commit()
-    finally:
-        PROCESSING_FLEETS_IDS.difference_update(fleets_ids)
 
 
 def fleet_model_to_fleet(fleet_model: FleetModel, include_sensitive: bool = False) -> Fleet:
@@ -374,19 +385,14 @@ def _get_fleet_nodes_to_provision(spec: FleetSpec) -> int:
     return spec.configuration.nodes.min
 
 
-async def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):
+def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[List[int]]):
     if is_fleet_in_use(fleet_model, instance_nums=instance_nums):
         if instance_nums is not None:
             raise ServerClientError(
                 f"Failed to delete fleet {fleet_model.name} instances {instance_nums}. Fleet instances are in use."
             )
         raise ServerClientError(f"Failed to delete fleet {fleet_model.name}. Fleet is in use.")
-    instances_ids = sorted([i.id for i in fleet_model.instances])
-    await wait_to_lock_many(PROCESSING_INSTANCES_LOCK, PROCESSING_INSTANCES_IDS, instances_ids)
-    try:
-        for instance in fleet_model.instances:
-            if instance_nums is not None and instance.instance_num not in instance_nums:
-                continue
-            instance.status = InstanceStatus.TERMINATING
-    finally:
-        PROCESSING_INSTANCES_IDS.difference_update(instances_ids)
+    for instance in fleet_model.instances:
+        if instance_nums is not None and instance.instance_num not in instance_nums:
+            continue
+        instance.status = InstanceStatus.TERMINATING

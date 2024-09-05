@@ -5,9 +5,9 @@ from typing import List, Optional, Sequence
 from urllib.parse import urlparse
 
 import httpx
-import sqlalchemy.orm as sa_orm
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.server.services.jobs as jobs_services
 import dstack._internal.utils.random_names as random_names
@@ -15,7 +15,6 @@ from dstack._internal.core.backends import (
     BACKENDS_WITH_GATEWAY_SUPPORT,
     BACKENDS_WITH_PRIVATE_GATEWAY_SUPPORT,
 )
-from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.backends.base.compute import (
     Compute,
     get_dstack_gateway_wheel,
@@ -43,6 +42,7 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server import settings
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     GatewayComputeModel,
     GatewayModel,
@@ -57,21 +57,20 @@ from dstack._internal.server.services.backends import (
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.services.gateways.options import get_service_options
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
+from dstack._internal.server.services.locking import (
+    get_locker,
+    string_to_lock_id,
+)
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.utils.common import (
     gather_map_async,
     run_async,
-    wait_to_lock,
 )
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-PROCESSING_GATEWAYS_LOCK = asyncio.Lock()
-PROCESSING_GATEWAYS_IDS = set()
 
 
 GATEWAY_CONNECT_ATTEMPTS = 30
@@ -152,26 +151,37 @@ async def create_gateway(
         project=project, backend_type=configuration.backend
     )
 
-    if configuration.name is None:
-        configuration.name = await generate_gateway_name(session=session, project=project)
+    lock_namespace = f"gateway_names_{project.name}"
+    if get_db().dialect_name == "sqlite":
+        # Start new transaction to see commited changes after lock
+        await session.commit()
+    elif get_db().dialect_name == "postgresql":
+        await session.execute(
+            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
+        )
 
-    gateway = GatewayModel(
-        name=configuration.name,
-        region=configuration.region,
-        project_id=project.id,
-        backend_id=backend_model.id,
-        wildcard_domain=configuration.domain,
-        configuration=configuration.json(),
-        status=GatewayStatus.SUBMITTED,
-        last_processed_at=get_current_datetime(),
-    )
-    session.add(gateway)
-    await session.commit()
+    lock, _ = get_locker().get_lockset(lock_namespace)
+    async with lock:
+        if configuration.name is None:
+            configuration.name = await generate_gateway_name(session=session, project=project)
 
-    if project.default_gateway is None or configuration.default:
-        await set_default_gateway(session=session, project=project, name=configuration.name)
+        gateway = GatewayModel(
+            name=configuration.name,
+            region=configuration.region,
+            project_id=project.id,
+            backend_id=backend_model.id,
+            wildcard_domain=configuration.domain,
+            configuration=configuration.json(),
+            status=GatewayStatus.SUBMITTED,
+            last_processed_at=get_current_datetime(),
+        )
+        session.add(gateway)
+        await session.commit()
 
-    return gateway_model_to_gateway(gateway)
+        if project.default_gateway is None or configuration.default:
+            await set_default_gateway(session=session, project=project, name=configuration.name)
+
+        return gateway_model_to_gateway(gateway)
 
 
 async def connect_to_gateway_with_retry(
@@ -207,54 +217,60 @@ async def delete_gateways(
     project: ProjectModel,
     gateways_names: List[str],
 ):
-    tasks = []
-    gateways = []
-    for gateway in await list_project_gateway_models(session=session, project=project):
-        if gateway.backend.type == BackendType.DSTACK:
-            continue
-        if gateway.name not in gateways_names:
-            continue
-        backend = await get_project_backend_by_type_or_error(project, gateway.backend.type)
-        tasks.append(_terminate_gateway(session=session, gateway=gateway, backend=backend))
-        gateways.append(gateway)
-    gateways_ids = [g.id for g in gateways]
-    logger.info("Deleting gateways: %s", [g.name for g in gateways])
-    try:
-        # terminate in parallel
-        # FIXME: not safe to share session between tasks – sqlalchemy can error
-        terminate_results = await asyncio.gather(*tasks, return_exceptions=True)
-        for gateway, error in zip(gateways, terminate_results):
-            if isinstance(error, Exception):
-                logger.exception(
-                    "Error when deleting gateway compute for %s",
-                    gateway.name,
-                    exc_info=(type(error), error, error.__traceback__),
-                )
-                continue  # keep gateway
-            if gateway.gateway_compute is not None:
-                await gateway_connections_pool.remove(gateway.gateway_compute.ip_address)
-                gateway.gateway_compute.active = False
-                gateway.gateway_compute.deleted = True
-                session.add(gateway.gateway_compute)
-            await session.delete(gateway)
-        await session.commit()
-    finally:
-        PROCESSING_GATEWAYS_IDS.difference_update(gateways_ids)
-
-
-async def _terminate_gateway(session: AsyncSession, gateway: GatewayModel, backend: Backend):
-    await wait_to_lock(PROCESSING_GATEWAYS_LOCK, PROCESSING_GATEWAYS_IDS, gateway.id)
-    await session.refresh(gateway)
-    gateway_compute_configuration = get_gateway_compute_configuration(gateway)
-    if gateway.gateway_compute is not None and gateway_compute_configuration is not None:
-        logger.info("Deleting gateway compute for %s...", gateway.name)
-        await run_async(
-            backend.compute().terminate_gateway,
-            gateway.gateway_compute.instance_id,
-            gateway_compute_configuration,
-            gateway.gateway_compute.backend_data,
+    res = await session.execute(
+        select(GatewayModel).where(
+            GatewayModel.project_id == project.id,
+            GatewayModel.name.in_(gateways_names),
         )
-        logger.info("Deleted gateway compute for %s", gateway.name)
+    )
+    gateway_models = res.scalars().all()
+    gateways_ids = sorted([g.id for g in gateway_models])
+    await session.commit()
+    logger.info("Deleting gateways: %s", [g.name for g in gateway_models])
+    async with get_locker().lock_ctx(GatewayModel.__tablename__, gateways_ids):
+        # Refetch after lock
+        res = await session.execute(
+            select(GatewayModel)
+            .where(
+                GatewayModel.project_id == project.id,
+                GatewayModel.name.in_(gateways_names),
+            )
+            .options(selectinload(GatewayModel.gateway_compute))
+            .execution_options(populate_existing=True)
+            .with_for_update()
+        )
+        gateway_models = res.scalars().all()
+        for gateway_model in gateway_models:
+            backend = await get_project_backend_by_type_or_error(
+                project=project, backend_type=gateway_model.backend.type
+            )
+            gateway_compute_configuration = get_gateway_compute_configuration(gateway_model)
+            if (
+                gateway_model.gateway_compute is not None
+                and gateway_compute_configuration is not None
+            ):
+                logger.info("Deleting gateway compute for %s...", gateway_model.name)
+                try:
+                    await run_async(
+                        backend.compute().terminate_gateway,
+                        gateway_model.gateway_compute.instance_id,
+                        gateway_compute_configuration,
+                        gateway_model.gateway_compute.backend_data,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Error when deleting gateway compute for %s",
+                        gateway_model.name,
+                    )
+                    continue
+                logger.info("Deleted gateway compute for %s", gateway_model.name)
+            if gateway_model.gateway_compute is not None:
+                await gateway_connections_pool.remove(gateway_model.gateway_compute.ip_address)
+                gateway_model.gateway_compute.active = False
+                gateway_model.gateway_compute.deleted = True
+                session.add(gateway_model.gateway_compute)
+            await session.delete(gateway_model)
+        await session.commit()
 
 
 async def set_gateway_wildcard_domain(
@@ -454,7 +470,7 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
     res = await session.execute(
         select(RunModel)
         .where(RunModel.id == job_model.run_id)
-        .options(sa_orm.joinedload(RunModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
     )
     run_model = res.unique().scalar()
     if run_model.gateway_id is None:

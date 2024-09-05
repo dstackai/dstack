@@ -1,0 +1,61 @@
+import asyncio
+import hashlib
+from asyncio import Lock
+from contextlib import asynccontextmanager
+from typing import Dict, List, Set, Tuple, TypeVar
+
+KeyT = TypeVar("KeyT")
+
+
+class ResourceLocker:
+    def __init__(self):
+        self.namespace_to_locks_map: Dict[str, Tuple[Lock, set]] = {}
+
+    def get_lockset(self, namespace: str) -> Tuple[Lock, set]:
+        """
+        Returns a lockset containing locked resources for in-memory locking.
+        Also returns a lock that guards the lockset.
+        """
+        return self.namespace_to_locks_map.setdefault(namespace, (Lock(), set()))
+
+    @asynccontextmanager
+    async def lock_ctx(self, namespace: str, keys: List[KeyT]):
+        """
+        Acquires locks for all keys in namespace.
+        The keys must be sorted to prevent deadlock.
+        """
+        lock, lockset = self.get_lockset(namespace)
+        try:
+            await _wait_to_lock_many(lock, lockset, keys)
+            yield
+        finally:
+            lockset.difference_update(keys)
+
+
+def string_to_lock_id(s: str) -> int:
+    return int(hashlib.sha256(s.encode()).hexdigest(), 16) % (2**63)
+
+
+_locker = ResourceLocker()
+
+
+def get_locker() -> ResourceLocker:
+    return _locker
+
+
+async def _wait_to_lock_many(
+    lock: asyncio.Lock, locked: Set[KeyT], keys: List[KeyT], *, delay: float = 0.1
+):
+    """
+    Retry locking until all the keys are locked.
+    Lock is released during the sleep.
+    The keys must be sorted to prevent deadlock.
+    """
+    left_to_lock = keys.copy()
+    while len(left_to_lock) > 0:
+        async with lock:
+            for key in left_to_lock:
+                if key not in locked:
+                    locked.add(key)
+                    left_to_lock.remove(key)
+        await asyncio.sleep(delay)

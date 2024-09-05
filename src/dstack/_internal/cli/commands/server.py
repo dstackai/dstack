@@ -65,4 +65,5 @@ class ServerCommand(BaseCommand):
             port=args.port,
             reload=version.__version__ is None,
             log_level=uvicorn_log_level,
+            workers=1,
         )

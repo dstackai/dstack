@@ -1,8 +1,7 @@
-import asyncio
 import ipaddress
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import gpuhunt
 from sqlalchemy import and_, or_, select
@@ -51,11 +50,11 @@ from dstack._internal.server.models import (
     UserModel,
 )
 from dstack._internal.server.services.docker import parse_image_name
-from dstack._internal.server.services.jobs import PROCESSING_INSTANCES_LOCK
 from dstack._internal.server.services.jobs.configurators.base import (
     get_default_image,
     get_default_python_verison,
 )
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
@@ -186,17 +185,18 @@ async def remove_instance(
     instance_name: str,
     force: bool,
 ):
+    # This is a buggy function since it doesn't lock instances (and never did correctly).
+    # No need to fix it since it's deprecated.
     pool = await get_pool(session, project, pool_name)
     if pool is None:
         raise ResourceNotExistsError("Pool not found")
-    async with PROCESSING_INSTANCES_LOCK:
-        terminated = False
-        for instance in pool.instances:
-            if instance.name == instance_name:
-                if force or instance.job_id is None:
-                    instance.status = InstanceStatus.TERMINATING
-                    terminated = True
-        await session.commit()
+    terminated = False
+    for instance in pool.instances:
+        if instance.name == instance_name:
+            if force or instance.job_id is None:
+                instance.status = InstanceStatus.TERMINATING
+                terminated = True
+    await session.commit()
     if not terminated:
         raise ResourceNotExistsError("Could not find instance to terminate")
 
@@ -262,15 +262,14 @@ def get_instance_offer(instance_model: InstanceModel) -> Optional[InstanceOfferW
     return InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
 
 
-_GENERATE_POOL_NAME_LOCK: Dict[str, asyncio.Lock] = {}
-
-
 async def generate_instance_name(
     session: AsyncSession,
     project: ProjectModel,
     pool_name: str,
 ) -> str:
-    lock = _GENERATE_POOL_NAME_LOCK.setdefault(project.name, asyncio.Lock())
+    # FIXME: The locking is not correct since concurrently commited changes
+    # are not visible due to SQLite repeatable reads
+    lock, _ = get_locker().get_lockset(f"instance_names_{project.name}")
     async with lock:
         pool_instances = []
         pool = await get_pool(session, project, pool_name)

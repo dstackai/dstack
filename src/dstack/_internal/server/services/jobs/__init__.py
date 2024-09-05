@@ -1,13 +1,12 @@
-import asyncio
 import datetime
 import itertools
 import json
 from datetime import timezone
 from typing import Dict, Iterable, List, Optional, Tuple
 
-import sqlalchemy as sa
-import sqlalchemy.orm as sa_orm
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import BackendError, ResourceNotExistsError, SSHError
@@ -29,28 +28,16 @@ from dstack._internal.server.services.jobs.configurators.base import JobConfigur
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
 from dstack._internal.server.services.jobs.configurators.service import ServiceJobConfigurator
 from dstack._internal.server.services.jobs.configurators.task import TaskJobConfigurator
+from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import get_runner_ports, runner_ssh_tunnel
 from dstack._internal.server.services.volumes import volume_model_to_volume
-from dstack._internal.server.utils.common import run_async, wait_to_lock
+from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-# TODO Make locks per project
-SUBMITTED_PROCESSING_JOBS_LOCK = asyncio.Lock()
-SUBMITTED_PROCESSING_JOBS_IDS = set()
-
-RUNNING_PROCESSING_JOBS_LOCK = asyncio.Lock()
-RUNNING_PROCESSING_JOBS_IDS = set()
-
-PROCESSING_INSTANCES_LOCK = asyncio.Lock()
-PROCESSING_INSTANCES_IDS = set()
-
-TERMINATING_PROCESSING_JOBS_LOCK = asyncio.Lock()
-TERMINATING_PROCESSING_JOBS_IDS = set()
 
 
 async def get_jobs_from_run_spec(run_spec: RunSpec, replica_num: int) -> List[Job]:
@@ -154,8 +141,9 @@ async def stop_runner(session: AsyncSession, job_model: JobModel):
     ssh_private_key = project.ssh_private_key
 
     res = await session.execute(
-        sa.select(InstanceModel).where(
-            InstanceModel.project_id == job_model.project_id, InstanceModel.job_id == job_model.id
+        select(InstanceModel).where(
+            InstanceModel.project_id == job_model.project_id,
+            InstanceModel.job_id == job_model.id,
         )
     )
     instance: Optional[InstanceModel] = res.scalar()
@@ -203,35 +191,20 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
         # it's too early to terminate the instance
         return
 
-    res = await session.execute(
-        sa.select(InstanceModel).where(
-            InstanceModel.project_id == job_model.project_id,
-            InstanceModel.job_id == job_model.id,
-        )
-    )
-    instance: Optional[InstanceModel] = res.scalar()
-
-    if instance is not None:
-        await wait_to_lock(PROCESSING_INSTANCES_LOCK, PROCESSING_INSTANCES_IDS, instance.id)
-        try:
-            # Refresh after lock
-            instance = (
-                (
-                    await session.execute(
-                        sa.select(InstanceModel)
-                        .where(InstanceModel.id == instance.id)
-                        .options(
-                            sa_orm.joinedload(InstanceModel.project).joinedload(
-                                ProjectModel.backends
-                            ),
-                            sa_orm.joinedload(InstanceModel.volumes),
-                        )
-                    )
-                )
-                .unique()
-                .scalar_one()
+    # FIXME: The caller should take instance lock since unlock must be after commit
+    async with get_locker().lock_ctx(InstanceModel.__tablename__, [job_model.used_instance_id]):
+        res = await session.execute(
+            select(InstanceModel)
+            .where(InstanceModel.id == job_model.used_instance_id)
+            .options(
+                selectinload(InstanceModel.project).joinedload(ProjectModel.backends),
+                selectinload(InstanceModel.volumes),
+                selectinload(InstanceModel.job),
             )
-            # there is an associated instance to empty
+            .with_for_update()
+        )
+        instance = res.unique().scalar()
+        if instance is not None:
             jpd = None
             if job_model.job_provisioning_data is not None:
                 jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
@@ -275,20 +248,18 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             await gateways.unregister_replica(
                 session, job_model
             )  # TODO(egor-s) ensure always runs
-        finally:
-            PROCESSING_INSTANCES_IDS.remove(instance.id)
 
-    if job_model.termination_reason is not None:
-        job_model.status = job_model.termination_reason.to_status()
-    else:
-        job_model.status = JobStatus.FAILED
-        logger.warning("%s: job termination reason is not set", fmt(job_model))
-    logger.info(
-        "%s: job status is %s, reason: %s",
-        fmt(job_model),
-        job_model.status.name,
-        job_model.termination_reason.name,
-    )
+        if job_model.termination_reason is not None:
+            job_model.status = job_model.termination_reason.to_status()
+        else:
+            job_model.status = JobStatus.FAILED
+            logger.warning("%s: job termination reason is not set", fmt(job_model))
+        logger.info(
+            "%s: job status is %s, reason: %s",
+            fmt(job_model),
+            job_model.status.name,
+            job_model.termination_reason.name,
+        )
 
 
 async def stop_container(

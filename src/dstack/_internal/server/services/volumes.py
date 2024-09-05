@@ -1,11 +1,10 @@
-import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from dstack._internal.core.backends import BACKENDS_WITH_VOLUMES_SUPPORT
 from dstack._internal.core.errors import (
@@ -22,18 +21,19 @@ from dstack._internal.core.models.volumes import (
     VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.server.db import get_db
 from dstack._internal.server.models import ProjectModel, UserModel, VolumeModel
 from dstack._internal.server.services import backends as backends_services
+from dstack._internal.server.services.locking import (
+    get_locker,
+    string_to_lock_id,
+)
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
-from dstack._internal.server.utils.common import run_async, wait_to_lock_many
+from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils import common, random_names
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-PROCESSING_VOLUMES_LOCK = asyncio.Lock()
-PROCESSING_VOLUMES_IDS = set()
 
 
 async def list_volumes(
@@ -168,28 +168,39 @@ async def create_volume(
 ) -> Volume:
     _validate_volume_configuration(configuration)
 
-    if configuration.name is not None:
-        volume_model = await get_project_volume_model_by_name(
-            session=session,
-            project=project,
-            name=configuration.name,
+    lock_namespace = f"volume_names_{project.name}"
+    if get_db().dialect_name == "sqlite":
+        # Start new transaction to see commited changes after lock
+        await session.commit()
+    elif get_db().dialect_name == "postgresql":
+        await session.execute(
+            select(func.pg_advisory_xact_lock(string_to_lock_id(lock_namespace)))
         )
-        if volume_model is not None:
-            raise ResourceExistsError()
-    else:
-        configuration.name = await generate_volume_name(session=session, project=project)
 
-    volume_model = VolumeModel(
-        id=uuid.uuid4(),
-        name=configuration.name,
-        project=project,
-        status=VolumeStatus.SUBMITTED,
-        configuration=configuration.json(),
-    )
-    session.add(volume_model)
-    await session.commit()
-    await session.refresh(volume_model)
-    return volume_model_to_volume(volume_model)
+    lock, _ = get_locker().get_lockset(lock_namespace)
+    async with lock:
+        if configuration.name is not None:
+            volume_model = await get_project_volume_model_by_name(
+                session=session,
+                project=project,
+                name=configuration.name,
+            )
+            if volume_model is not None:
+                raise ResourceExistsError()
+        else:
+            configuration.name = await generate_volume_name(session=session, project=project)
+
+        volume_model = VolumeModel(
+            id=uuid.uuid4(),
+            name=configuration.name,
+            project=project,
+            status=VolumeStatus.SUBMITTED,
+            configuration=configuration.json(),
+        )
+        session.add(volume_model)
+        await session.commit()
+        await session.refresh(volume_model)
+        return volume_model_to_volume(volume_model)
 
 
 async def delete_volumes(session: AsyncSession, project: ProjectModel, names: List[str]):
@@ -202,9 +213,9 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
     )
     volume_models = res.scalars().all()
     volumes_ids = sorted([v.id for v in volume_models])
+    await session.commit()
     logger.info("Deleting volumes: %s", [v.name for v in volume_models])
-    await wait_to_lock_many(PROCESSING_VOLUMES_LOCK, PROCESSING_VOLUMES_IDS, volumes_ids)
-    try:
+    async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
         # Refetch after lock
         res = await session.execute(
             select(VolumeModel)
@@ -213,8 +224,9 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
                 VolumeModel.name.in_(names),
                 VolumeModel.deleted == False,
             )
-            .options(joinedload(VolumeModel.instances))
+            .options(selectinload(VolumeModel.instances))
             .execution_options(populate_existing=True)
+            .with_for_update()
         )
         volume_models = res.scalars().unique().all()
         for volume_model in volume_models:
@@ -239,8 +251,6 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
             )
         )
         await session.commit()
-    finally:
-        PROCESSING_VOLUMES_IDS.difference_update(volumes_ids)
 
 
 def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
