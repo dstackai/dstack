@@ -28,6 +28,7 @@ from dstack._internal.server.testing.common import (
     get_auth_headers,
     get_fleet_configuration,
     get_fleet_spec,
+    get_private_key_string,
 )
 
 
@@ -241,7 +242,7 @@ class TestCreateFleet:
                 name="test-ssh-fleet",
                 ssh_config=SSHParams(
                     user="ubuntu",
-                    ssh_key=SSHKey(public="", private="123"),
+                    ssh_key=SSHKey(public="", private=get_private_key_string()),
                     hosts=["1.1.1.1"],
                     network=None,
                 ),
@@ -348,6 +349,35 @@ class TestCreateFleet:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
+    async def test_errors_if_ssh_key_is_bad(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session, global_role=GlobalRole.USER)
+        project = await create_project(session)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        spec = get_fleet_spec(
+            conf=FleetConfiguration(
+                name="test-ssh-fleet",
+                ssh_config=SSHParams(
+                    user="ubuntu",
+                    ssh_key=SSHKey(public="", private="123"),
+                    hosts=["1.1.1.1"],
+                    network=None,
+                ),
+            )
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/fleets/create",
+            headers=get_auth_headers(user.token),
+            json={"spec": spec.dict()},
+        )
+        assert response.status_code == 400
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_forbids_if_no_permission_to_manage_ssh_fleets(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
@@ -361,7 +391,7 @@ class TestCreateFleet:
                 name="test-ssh-fleet",
                 ssh_config=SSHParams(
                     user="ubuntu",
-                    ssh_key=SSHKey(public="", private="123"),
+                    ssh_key=SSHKey(public="", private=get_private_key_string()),
                     hosts=["1.1.1.1"],
                     network=None,
                 ),
@@ -477,7 +507,7 @@ class TestDeleteFleets:
                 name="test-ssh-fleet",
                 ssh_config=SSHParams(
                     user="ubuntu",
-                    ssh_key=SSHKey(public="", private="123"),
+                    ssh_key=SSHKey(public="", private=get_private_key_string()),
                     hosts=["1.1.1.1"],
                     network=None,
                 ),

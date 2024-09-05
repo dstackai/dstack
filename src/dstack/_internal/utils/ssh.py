@@ -125,7 +125,7 @@ def update_ssh_config(path: PathLike, host: str, options: Dict[str, str]):
             f.flush()
 
 
-def convert_pkcs8_to_pem(private_string: str) -> str:
+def convert_ssh_key_to_pem(private_string: str) -> str:
     if not private_string.startswith("-----BEGIN PRIVATE KEY-----"):
         return private_string
 

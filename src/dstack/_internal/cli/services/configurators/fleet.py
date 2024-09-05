@@ -14,7 +14,7 @@ from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.ssh import convert_pkcs8_to_pem, generate_public_key, pkey_from_str
+from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
 from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
@@ -154,7 +154,7 @@ def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:
         return None
     ssh_key_path_obj = Path(ssh_key_path).expanduser()
     try:
-        private_key = convert_pkcs8_to_pem(ssh_key_path_obj.read_text())
+        private_key = convert_ssh_key_to_pem(ssh_key_path_obj.read_text())
         try:
             pub_key = ssh_key_path_obj.with_suffix(".pub").read_text()
         except FileNotFoundError:
