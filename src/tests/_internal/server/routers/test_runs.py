@@ -1021,6 +1021,7 @@ class TestCreateInstance:
                 "hostname": None,
                 "status": "pending",
                 "unreachable": False,
+                "termination_reason": None,
                 "created": result["created"],
                 "pool_name": None,
                 "region": None,

@@ -24,6 +24,9 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
     table.add_column("STATUS")
     table.add_column("CREATED")
 
+    if verbose:
+        table.add_column("ERROR")
+
     for fleet in fleets:
         for i, instance in enumerate(fleet.instances):
             resources = ""
@@ -55,6 +58,13 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
                 status,
                 pretty_date(instance.created),
             ]
+
+            if verbose:
+                error = ""
+                if instance.status == InstanceStatus.TERMINATED and instance.termination_reason:
+                    error = f"{instance.termination_reason}"
+                row.append(error)
+
             table.add_row(*row)
 
         if len(fleet.instances) == 0 and fleet.status != FleetStatus.TERMINATING:

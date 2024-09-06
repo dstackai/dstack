@@ -418,4 +418,7 @@ def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[
     for instance in fleet_model.instances:
         if instance_nums is not None and instance.instance_num not in instance_nums:
             continue
-        instance.status = InstanceStatus.TERMINATING
+        if instance.status == InstanceStatus.TERMINATED:
+            instance.deleted = True
+        else:
+            instance.status = InstanceStatus.TERMINATING

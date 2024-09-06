@@ -27,6 +27,7 @@ class Instance(CoreModel):
     hostname: Optional[str] = None
     status: InstanceStatus
     unreachable: bool = False
+    termination_reason: Optional[str] = None
     created: datetime.datetime
     region: Optional[str] = None
     price: Optional[float] = None
