@@ -211,6 +211,7 @@ nav:
           - Volumes: docs/concepts/volumes.md
           - Projects: docs/concepts/projects.md
       - Guides:
+          - Troubleshooting: docs/guides/troubleshooting.md
           - Protips: docs/guides/protips.md
       - Reference:
           - server/config.yml: docs/reference/server/config.yml.md

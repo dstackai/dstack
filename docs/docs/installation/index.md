@@ -84,6 +84,10 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
+??? info "Windows"
+    If you're using the CLI on Windows, make sure to run it through WSL by following [these instructions :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1644#issuecomment-2321559265){:target="_blank"}. 
+    Native support will be available soon.
+
 ## Create on-prem fleets
 
 If you want the `dstack` server to run containers on your on-prem clusters,

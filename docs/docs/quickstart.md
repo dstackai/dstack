@@ -224,6 +224,10 @@ Your folder can be a regular local folder or a Git repo.
 
 > `dstack apply` automatically uploads the code from the current repo, including your local uncommitted changes.
 
+## Troubleshooting
+
+Something not working? Make sure to check out the [troubleshooting](guides/troubleshooting.md) guide.
+
 ## What's next?
 
 1. Read about [dev environments](dev-environments.md), [tasks](tasks.md), 
