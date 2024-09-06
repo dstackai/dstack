@@ -21,7 +21,7 @@ from dstack._internal.core.models.runs import (
     JobSubmission,
     RunSpec,
 )
-from dstack._internal.core.services.ssh import tunnel as ssh_tunnel
+from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
 from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel
 from dstack._internal.server.services.backends import get_project_backend_by_type
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
@@ -36,6 +36,7 @@ from dstack._internal.server.services.volumes import volume_model_to_volume
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 
@@ -167,12 +168,11 @@ def _stop_runner(
     jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
     logger.debug("%s: stopping runner %s", fmt(job_model), jpd.hostname)
     ports = get_runner_ports()
-    with ssh_tunnel.RunnerTunnel(
-        hostname=jpd.hostname,
-        ssh_port=jpd.ssh_port,
-        user=jpd.username,
-        ports=ports,
-        id_rsa=server_ssh_private_key,
+    with SSHTunnel(
+        destination=f"{jpd.username}@{jpd.hostname}",
+        port=jpd.ssh_port,
+        forwarded_sockets=ports_to_forwarded_sockets(ports),
+        identity=FileContent(server_ssh_private_key),
         ssh_proxy=jpd.ssh_proxy,
     ):
         runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])

@@ -555,7 +555,7 @@ async def init_gateways(session: AsyncSession):
 
 async def _update_gateway(connection: GatewayConnection, build: str):
     logger.debug("Updating gateway %s", connection.ip_address)
-    stdout = await connection.tunnel.exec(
+    stdout = await connection.tunnel.aexec(
         f"/bin/sh dstack/update.sh {get_dstack_gateway_wheel(build)} {build}"
     )
     if "Update successfully completed" in stdout:

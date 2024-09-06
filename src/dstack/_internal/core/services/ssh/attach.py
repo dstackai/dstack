@@ -8,7 +8,11 @@ from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh.ports import PortsLock
-from dstack._internal.core.services.ssh.tunnel import ClientTunnel
+from dstack._internal.core.services.ssh.tunnel import (
+    FilePath,
+    SSHTunnel,
+    ports_to_forwarded_sockets,
+)
 from dstack._internal.utils.path import PathLike
 from dstack._internal.utils.ssh import get_ssh_config, include_ssh_config, update_ssh_config
 
@@ -52,13 +56,15 @@ class SSHAttach:
         self.ports = ports_lock.dict()
         self.run_name = run_name
         self.ssh_config_path = str(ConfigManager().dstack_ssh_config_path)
-        self.tunnel = ClientTunnel(
-            run_name,
-            self.ports,
-            id_rsa_path=id_rsa_path,
+        self.tunnel = SSHTunnel(
+            destination=run_name,
+            identity=FilePath(id_rsa_path),
+            forwarded_sockets=ports_to_forwarded_sockets(
+                ports=self.ports,
+                bind_local=bind_address or "localhost",
+            ),
             control_sock_path=control_sock_path,
             ssh_config_path=self.ssh_config_path,
-            bind_address=bind_address,
         )
         self.ssh_proxy = ssh_proxy
         if ssh_proxy is None:

@@ -9,10 +9,11 @@ from typing_extensions import Concatenate, ParamSpec
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.runs import JobProvisioningData
-from dstack._internal.core.services.ssh.tunnel import RunnerTunnel
+from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.logging import get_logger
+from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 P = ParamSpec("P")
@@ -54,16 +55,18 @@ def runner_ssh_tunnel(
 
             for attempt in range(retries):
                 last = attempt == retries - 1
+                runner_ports_map = get_runner_ports(ports=ports)
                 try:
-                    with RunnerTunnel(
-                        hostname=job_provisioning_data.hostname,
-                        ssh_port=job_provisioning_data.ssh_port,
-                        user=job_provisioning_data.username,
-                        ports=get_runner_ports(ports=ports),
-                        id_rsa=ssh_private_key,
+                    with SSHTunnel(
+                        destination=(
+                            f"{job_provisioning_data.username}@{job_provisioning_data.hostname}"
+                        ),
+                        port=job_provisioning_data.ssh_port,
+                        forwarded_sockets=ports_to_forwarded_sockets(runner_ports_map),
+                        identity=FileContent(ssh_private_key),
                         ssh_proxy=job_provisioning_data.ssh_proxy,
-                    ) as tun:
-                        return func(*args, ports=tun.ports, **ssh_kwargs, **kwargs)
+                    ):
+                        return func(*args, ports=runner_ports_map, **ssh_kwargs, **kwargs)
                 except SSHError:
                     pass  # error is logged in the tunnel
                 except requests.RequestException as e:
