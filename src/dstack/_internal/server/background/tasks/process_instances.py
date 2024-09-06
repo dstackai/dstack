@@ -187,7 +187,7 @@ async def _terminate_idle_instance(instance: InstanceModel):
 
 
 async def _add_remote(instance: InstanceModel) -> None:
-    logger.info("Adding remote instance %s...", instance.name)
+    logger.info("Adding ssh instance %s...", instance.name)
     if instance.status == InstanceStatus.PENDING:
         instance.status = InstanceStatus.PROVISIONING
 
@@ -196,11 +196,9 @@ async def _add_remote(instance: InstanceModel) -> None:
     ) + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
     if retry_duration_deadline < get_current_datetime():
         instance.status = InstanceStatus.TERMINATED
-        instance.deleted = True
-        instance.deleted_at = get_current_datetime()
-        instance.termination_reason = "The proivisioning timeout expired"
+        instance.termination_reason = "Proivisioning timeout expired"
         logger.warning(
-            "Failed to start the instance in %s seconds. Terminate instance %s",
+            "Failed to start instance in %s seconds. Terminating...",
             PROVISIONING_TIMEOUT_SECONDS,
             instance.name,
             extra={
@@ -221,11 +219,9 @@ async def _add_remote(instance: InstanceModel) -> None:
             ]
         except (ValueError, PasswordRequiredException):
             instance.status = InstanceStatus.TERMINATED
-            instance.deleted = True
-            instance.deleted_at = get_current_datetime()
             instance.termination_reason = "Unsupported private SSH key type"
             logger.warning(
-                "Failed to start instance %s: unsupported private SSH key type",
+                "Failed to add instance %s: unsupported private SSH key type",
                 instance.name,
                 extra={
                     "instance_name": instance.name,
@@ -253,7 +249,7 @@ async def _add_remote(instance: InstanceModel) -> None:
             )
     except ProvisioningError as e:
         logger.warning(
-            "Provisioning the instance '%s' could not be completed because of the error: %s",
+            "Provisioning instance %s could not be completed because of the error: %s",
             instance.name,
             e,
         )
@@ -275,13 +271,9 @@ async def _add_remote(instance: InstanceModel) -> None:
     )
     if instance_network is not None and internal_ip is None:
         instance.status = InstanceStatus.TERMINATED
-        instance.deleted = True
-        instance.deleted_at = get_current_datetime()
-        instance.termination_reason = (
-            "Unable to locate the internal ip-address for the given network"
-        )
+        instance.termination_reason = "Failed to locate internal IP address on the given network"
         logger.warning(
-            "Failed to configure internal ip-address on instance %s. Terminate it",
+            "Failed to add instance %s: failed to locate internal IP address on the given network",
             instance.name,
             extra={
                 "instance_name": instance.name,
@@ -391,8 +383,6 @@ async def _create_instance(instance: InstanceModel) -> None:
         or instance.instance_configuration is None
     ):
         instance.status = InstanceStatus.TERMINATED
-        instance.deleted = True
-        instance.deleted_at = get_current_datetime()
         instance.termination_reason = "Empty profile, requirements or instance_configuration"
         instance.last_retry_at = get_current_datetime()
         logger.warning(
@@ -417,8 +407,6 @@ async def _create_instance(instance: InstanceModel) -> None:
         )
     except ValidationError as e:
         instance.status = InstanceStatus.TERMINATED
-        instance.deleted = True
-        instance.deleted_at = get_current_datetime()
         instance.termination_reason = (
             f"Error to parse profile, requirements or instance_configuration: {e}"
         )
@@ -440,11 +428,9 @@ async def _create_instance(instance: InstanceModel) -> None:
         retry_duration_deadline = _get_retry_duration_deadline(instance, retry)
         if get_current_datetime() > retry_duration_deadline:
             instance.status = InstanceStatus.TERMINATED
-            instance.deleted = True
-            instance.deleted_at = get_current_datetime()
             instance.termination_reason = "Retry duration expired"
             logger.warning(
-                "Retry duration expired. Terminate instance %s",
+                "Retry duration expired. Terminating instance %s",
                 instance.name,
                 extra={
                     "instance_name": instance.name,
@@ -523,8 +509,6 @@ async def _create_instance(instance: InstanceModel) -> None:
 
     if not should_retry:
         instance.status = InstanceStatus.TERMINATED
-        instance.deleted = True
-        instance.deleted_at = get_current_datetime()
         instance.termination_reason = "No offers found"
         logger.info(
             "No offers found. Terminated instance %s",
@@ -760,6 +744,7 @@ def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
     if (
         instance.id == instance.fleet.instances[0].id
         or instance.fleet.instances[0].job_provisioning_data is not None
+        or instance.fleet.instances[0].status == InstanceStatus.TERMINATED
     ):
         return False
     fleet = fleet_model_to_fleet(instance.fleet)

@@ -230,6 +230,7 @@ def instance_model_to_instance(instance_model: InstanceModel) -> Instance:
         instance_num=instance_model.instance_num,
         status=instance_model.status,
         unreachable=instance_model.unreachable,
+        termination_reason=instance_model.termination_reason,
         created=instance_model.created_at.replace(tzinfo=timezone.utc),
     )
 
