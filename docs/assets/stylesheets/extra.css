@@ -29,6 +29,43 @@
     }
 }
 
+#kapa-widget-container .mantine-Text-root {
+    font-size: 0.7em !important;
+    font-weight: 700;
+    color: black !important;
+    text-shadow: none !important;
+    letter-spacing: -0.5px;
+}
+
+#kapa-widget-container .mantine-Button-inner:focus-visible {
+    border: none !important;
+}
+
+#kapa-widget-container .mantine-Button-root {
+    height: 4.5rem !important;
+    width: 4.25rem !important;
+    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.075), rgba(0, 42, 255, 0.075), rgba(0, 42, 255, 0.025)) !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+#kapa-widget-container .mantine-Image-image {
+    width: 1.3rem !important;
+    height: 1.3rem !important;;
+}
+
+#kapa-widget-container .mantine-Image-root {
+    width: 1.3rem !important;
+}
+
+.mantine-Modal-body .mantine-Input-input {
+    font-size: 18px !important;
+}
+
+.mantine-Modal-body .mantine-Text-root, .mantine-Modal-body .mantine-List-root, .mantine-Modal-body .mantine-List-item, .mantine-Modal-body .mantine-Prism-code {
+    font-size: 17px !important;
+}
+
 .md-copyright {
     width: inherit;
 }
