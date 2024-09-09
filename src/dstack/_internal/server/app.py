@@ -15,7 +15,7 @@ from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
-from dstack._internal.server.db import get_session_ctx, migrate
+from dstack._internal.server.db import get_db, get_session_ctx, migrate
 from dstack._internal.server.routers import (
     backends,
     fleets,
@@ -31,6 +31,7 @@ from dstack._internal.server.routers import (
 )
 from dstack._internal.server.services.config import ServerConfigManager
 from dstack._internal.server.services.gateways import gateway_connections_pool, init_gateways
+from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
 from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
@@ -73,50 +74,43 @@ def create_app() -> FastAPI:
 async def lifespan(app: FastAPI):
     configure_logging()
     await migrate()
+    _print_dstack_logo()
+    if not check_required_ssh_version():
+        logger.warning("OpenSSH 8.4+ is required. The dstack server may not work properly")
+    if settings.SERVER_CONFIG_ENABLED:
+        server_config_manager = ServerConfigManager()
+        config_loaded = server_config_manager.load_config()
+        # Encryption has to be configured before working with users and projects
+        await server_config_manager.apply_encryption()
     async with get_session_ctx() as session:
-        console.print(
-            """[purple]╱╱╭╮╱╱╭╮╱╱╱╱╱╱╭╮
-╱╱┃┃╱╭╯╰╮╱╱╱╱╱┃┃
-╭━╯┣━┻╮╭╋━━┳━━┫┃╭╮
-┃╭╮┃━━┫┃┃╭╮┃╭━┫╰╯╯
-┃╰╯┣━━┃╰┫╭╮┃╰━┫╭╮╮
-╰━━┻━━┻━┻╯╰┻━━┻╯╰╯
-╭━━┳━━┳━┳╮╭┳━━┳━╮
-┃━━┫┃━┫╭┫╰╯┃┃━┫╭╯
-┣━━┃┃━┫┃╰╮╭┫┃━┫┃
-╰━━┻━━┻╯╱╰╯╰━━┻╯
-[/]"""
-        )
-        if not check_required_ssh_version():
-            logger.warning("OpenSSH 8.4+ is required. The dstack server may not work properly")
-        if settings.SERVER_CONFIG_ENABLED:
-            server_config_manager = ServerConfigManager()
-            config_loaded = server_config_manager.load_config()
-            # Encryption has to be configured before working with users and projects
-            await server_config_manager.apply_encryption()
-        admin, _ = await get_or_create_admin_user(session=session)
-        await get_or_create_default_project(
-            session=session,
-            user=admin,
-        )
-        if settings.SERVER_CONFIG_ENABLED:
-            server_config_dir = str(SERVER_CONFIG_FILE_PATH).replace(
-                os.path.expanduser("~"), "~", 1
+        async with advisory_lock_ctx(
+            bind=session,
+            dialect_name=get_db().dialect_name,
+            resource="server_init",
+        ):
+            admin, _ = await get_or_create_admin_user(session=session)
+            await get_or_create_default_project(
+                session=session,
+                user=admin,
             )
-            if not config_loaded:
-                logger.info("Initializing the default configuration...", {"show_path": False})
-                await server_config_manager.init_config(session=session)
-                logger.info(
-                    f"Initialized the default configuration at [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]",
-                    {"show_path": False},
+            if settings.SERVER_CONFIG_ENABLED:
+                server_config_dir = str(SERVER_CONFIG_FILE_PATH).replace(
+                    os.path.expanduser("~"), "~", 1
                 )
-            else:
-                logger.info(
-                    f"Applying [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]...",
-                    {"show_path": False},
-                )
-                await server_config_manager.apply_config(session=session, owner=admin)
-        await init_gateways(session=session)
+                if not config_loaded:
+                    logger.info("Initializing the default configuration...", {"show_path": False})
+                    await server_config_manager.init_config(session=session)
+                    logger.info(
+                        f"Initialized the default configuration at [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]",
+                        {"show_path": False},
+                    )
+                else:
+                    logger.info(
+                        f"Applying [link=file://{SERVER_CONFIG_FILE_PATH}]{server_config_dir}[/link]...",
+                        {"show_path": False},
+                    )
+                    await server_config_manager.apply_config(session=session, owner=admin)
+            await init_gateways(session=session)
     update_default_project(
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
@@ -249,3 +243,19 @@ def register_routes(app: FastAPI, ui: bool = True):
         @app.get("/")
         async def index():
             return RedirectResponse("/api/docs")
+
+
+def _print_dstack_logo():
+    console.print(
+        """[purple]╱╱╭╮╱╱╭╮╱╱╱╱╱╱╭╮
+╱╱┃┃╱╭╯╰╮╱╱╱╱╱┃┃
+╭━╯┣━┻╮╭╋━━┳━━┫┃╭╮
+┃╭╮┃━━┫┃┃╭╮┃╭━┫╰╯╯
+┃╰╯┣━━┃╰┫╭╮┃╰━┫╭╮╮
+╰━━┻━━┻━┻╯╰┻━━┻╯╰╯
+╭━━┳━━┳━┳╮╭┳━━┳━╮
+┃━━┫┃━┫╭┫╰╯┃┃━┫╭╯
+┣━━┃┃━┫┃╰╮╭┫┃━┫┃
+╰━━┻━━┻╯╱╰╯╰━━┻╯
+[/]"""
+    )
