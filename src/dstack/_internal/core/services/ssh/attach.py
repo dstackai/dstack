@@ -2,40 +2,64 @@ import atexit
 import re
 import subprocess
 import time
-from typing import Optional, Tuple
+from pathlib import Path
+from typing import Optional
 
+from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.core.services.ssh.ports import PortsLock
-from dstack._internal.core.services.ssh.tunnel import (
-    FilePath,
-    SSHTunnel,
-    ports_to_forwarded_sockets,
+from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
+from dstack._internal.utils.path import FilePath, PathLike
+from dstack._internal.utils.ssh import (
+    get_ssh_client_info,
+    include_ssh_config,
+    normalize_path,
+    update_ssh_config,
 )
-from dstack._internal.utils.path import PathLike
-from dstack._internal.utils.ssh import get_ssh_config, include_ssh_config, update_ssh_config
 
 
 class SSHAttach:
-    @staticmethod
-    def reuse_control_sock_path_and_port_locks(run_name: str) -> Optional[Tuple[str, PortsLock]]:
-        ssh_config_path = str(ConfigManager().dstack_ssh_config_path)
-        host_config = get_ssh_config(ssh_config_path, run_name)
-        if host_config and host_config.get("ControlPath"):
-            ps = subprocess.Popen(("ps", "-A", "-o", "command"), stdout=subprocess.PIPE)
-            control_sock_path = host_config.get("ControlPath")
-            output = subprocess.check_output(("grep", control_sock_path), stdin=ps.stdout)
-            ps.wait()
-            commands = list(
-                filter(lambda s: not s.startswith("grep"), output.decode().strip().split("\n"))
+    @classmethod
+    def get_control_sock_path(cls, run_name: str) -> Path:
+        return ConfigManager().dstack_ssh_dir / f"{run_name}.control.sock"
+
+    @classmethod
+    def reuse_ports_lock(cls, run_name: str) -> Optional[PortsLock]:
+        if not get_ssh_client_info().supports_control_socket:
+            raise SSHError("Unsupported SSH client")
+        control_sock_path = normalize_path(cls.get_control_sock_path(run_name))
+        filter_prefix: str
+        output: bytes
+        if IS_WINDOWS:
+            filter_prefix = "powershell"
+            output = subprocess.check_output(
+                [
+                    "powershell",
+                    "-c",
+                    f"""Get-CimInstance Win32_Process \
+                        -filter "commandline like '%-S {control_sock_path}%'" \
+                        | select -ExpandProperty CommandLine \
+                    """,
+                ]
             )
-            if commands:
-                port_pattern = r"-L (?:[\w.-]+:)?(\d+):localhost:(\d+)"
-                matches = re.findall(port_pattern, commands[0])
-                return control_sock_path, PortsLock(
-                    {int(target_port): int(local_port) for local_port, target_port in matches}
-                )
+        else:
+            filter_prefix = "grep"
+            ps = subprocess.Popen(("ps", "-A", "-o", "command"), stdout=subprocess.PIPE)
+            output = subprocess.check_output(
+                ["grep", "--", f"-S {control_sock_path}"], stdin=ps.stdout
+            )
+            ps.wait()
+        commands = list(
+            filter(lambda s: not s.startswith(filter_prefix), output.decode().strip().split("\n"))
+        )
+        if commands:
+            port_pattern = r"-L (?:[\w.-]+:)?(\d+):localhost:(\d+)"
+            matches = re.findall(port_pattern, commands[0])
+            return PortsLock(
+                {int(target_port): int(local_port) for local_port, target_port in matches}
+            )
         return None
 
     def __init__(
@@ -48,17 +72,21 @@ class SSHAttach:
         run_name: str,
         dockerized: bool,
         ssh_proxy: Optional[SSHConnectionParams] = None,
-        control_sock_path: Optional[str] = None,
         local_backend: bool = False,
         bind_address: Optional[str] = None,
     ):
         self._ports_lock = ports_lock
         self.ports = ports_lock.dict()
         self.run_name = run_name
-        self.ssh_config_path = str(ConfigManager().dstack_ssh_config_path)
+        self.ssh_config_path = ConfigManager().dstack_ssh_config_path
+        control_sock_path = self.get_control_sock_path(run_name)
+        # Cast all path-like values used in configs to FilePath instances for automatic
+        # path normalization in :func:`update_ssh_config`.
+        self.control_sock_path = FilePath(control_sock_path)
+        self.identity_file = FilePath(id_rsa_path)
         self.tunnel = SSHTunnel(
             destination=run_name,
-            identity=FilePath(id_rsa_path),
+            identity=self.identity_file,
             forwarded_sockets=ports_to_forwarded_sockets(
                 ports=self.ports,
                 bind_local=bind_address or "localhost",
@@ -72,7 +100,7 @@ class SSHAttach:
                 "HostName": hostname,
                 "Port": ssh_port,
                 "User": user,
-                "IdentityFile": id_rsa_path,
+                "IdentityFile": self.identity_file,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
@@ -82,7 +110,7 @@ class SSHAttach:
                 "HostName": ssh_proxy.hostname,
                 "Port": ssh_proxy.port,
                 "User": ssh_proxy.username,
-                "IdentityFile": id_rsa_path,
+                "IdentityFile": self.identity_file,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
@@ -92,13 +120,10 @@ class SSHAttach:
                 "HostName": "localhost",
                 "Port": 10022,
                 "User": "root",  # TODO(#1535): support non-root images properly
-                "IdentityFile": id_rsa_path,
+                "IdentityFile": self.identity_file,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
-                "ControlPath": self.tunnel.control_sock_path,
-                "ControlMaster": "auto",
-                "ControlPersist": "yes",
                 "ProxyJump": f"{run_name}-host",
             }
         elif ssh_proxy is not None:
@@ -106,17 +131,21 @@ class SSHAttach:
                 "HostName": hostname,
                 "Port": ssh_port,
                 "User": user,
-                "IdentityFile": id_rsa_path,
+                "IdentityFile": self.identity_file,
                 "IdentitiesOnly": "yes",
                 "StrictHostKeyChecking": "no",
                 "UserKnownHostsFile": "/dev/null",
-                "ControlPath": self.tunnel.control_sock_path,
-                "ControlMaster": "auto",
-                "ControlPersist": "yes",
                 "ProxyJump": f"{run_name}-jump-host",
             }
         else:
             self.container_config = None
+        if self.container_config is not None and get_ssh_client_info().supports_multiplexing:
+            self.container_config.update(
+                {
+                    "ControlMaster": "auto",
+                    "ControlPath": self.control_sock_path,
+                }
+            )
 
     def attach(self):
         include_ssh_config(self.ssh_config_path)

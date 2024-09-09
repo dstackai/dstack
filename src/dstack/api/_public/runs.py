@@ -252,11 +252,9 @@ class Run(ABC):
             job = self._run.jobs[0]  # TODO(egor-s): pull logs from all replicas?
             provisioning_data = job.job_submissions[-1].job_provisioning_data
 
-            control_sock_path_and_port_locks = SSHAttach.reuse_control_sock_path_and_port_locks(
-                run_name=self.name
-            )
+            ports_lock = SSHAttach.reuse_ports_lock(run_name=self.name)
 
-            if control_sock_path_and_port_locks is None:
+            if ports_lock is None:
                 if self._ports_lock is None:
                     self._ports_lock = _reserve_ports(job.job_spec)
                 logger.debug(
@@ -266,7 +264,7 @@ class Run(ABC):
                     self._ports_lock.dict(),
                 )
             else:
-                self._ports_lock = control_sock_path_and_port_locks[1]
+                self._ports_lock = ports_lock
                 logger.debug(
                     "Reusing the existing tunnel to %s (%s: %s)",
                     self.name,
@@ -283,13 +281,10 @@ class Run(ABC):
                 run_name=self.name,
                 dockerized=provisioning_data.dockerized,
                 ssh_proxy=provisioning_data.ssh_proxy,
-                control_sock_path=control_sock_path_and_port_locks[0]
-                if control_sock_path_and_port_locks
-                else None,
                 local_backend=provisioning_data.backend == BackendType.LOCAL,
                 bind_address=bind_address,
             )
-            if not control_sock_path_and_port_locks:
+            if not ports_lock:
                 self._ssh_attach.attach()
             self._ports_lock = None
 
