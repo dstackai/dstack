@@ -1,77 +1,175 @@
+import abc
+import asyncio
 import os
 import shlex
 import subprocess
 import tempfile
-from typing import Dict, Optional
+from dataclasses import dataclass
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh import get_ssh_error
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.path import PathLike
+from dstack._internal.utils.path import FilePath, FilePathOrContent, PathLike
 
 logger = get_logger(__name__)
 SSH_TIMEOUT = 15
+SSH_DEFAULT_OPTIONS = {
+    "StrictHostKeyChecking": "no",
+    "UserKnownHostsFile": "/dev/null",
+    "ExitOnForwardFailure": "yes",
+    "StreamLocalBindUnlink": "yes",
+    "ConnectTimeout": "3",
+}
+
+
+class Socket(abc.ABC):
+    @abc.abstractmethod
+    def render(self) -> str:
+        pass
+
+
+@dataclass
+class UnixSocket(Socket):
+    path: PathLike
+
+    def render(self) -> str:
+        return str(self.path)
+
+
+@dataclass
+class IPSocket(Socket):
+    host: str
+    port: int
+
+    def render(self) -> str:
+        if ":" in self.host:  # assuming IPv6
+            return f"[{self.host}]:{self.port}"
+        return f"{self.host}:{self.port}"
+
+
+@dataclass
+class SocketPair:
+    local: Socket
+    remote: Socket
 
 
 class SSHTunnel:
     def __init__(
         self,
-        host: str,
-        id_rsa_path: PathLike,
-        ports: Dict[int, int],
-        control_sock_path: PathLike,
-        options: Dict[str, str],
+        destination: str,
+        identity: FilePathOrContent,
+        forwarded_sockets: Iterable[SocketPair] = (),
+        reverse_forwarded_sockets: Iterable[SocketPair] = (),
+        control_sock_path: Optional[PathLike] = None,
+        options: Dict[str, str] = SSH_DEFAULT_OPTIONS,
         ssh_config_path: str = "none",
-        bind_address: Optional[str] = None,
+        port: Optional[int] = None,
+        ssh_proxy: Optional[SSHConnectionParams] = None,
     ):
         """
-        :param ports: Mapping { remote port -> local port }
-        :param bind_address: A local address to bind as described in `ssh(1)`, a hostname or an IP.
-            If `None`, then the socket is bound in accordance with the `GatewayPorts` setting:
-            `no` (the default) means loopback only, `yes` means all interfaces, see `ssh_config(5)`
-            for details.
+        :param forwarded_sockets: Connections to the specified local sockets will be
+            forwarded to their corresponding remote sockets
+        :param reverse_forwarded_sockets: Connections to the specified remote sockets
+            will be forwarded to their corresponding local sockets
         """
-        self.host = host
-        self.id_rsa_path = id_rsa_path
-        self.ports = ports
-        self.control_sock_path = control_sock_path
+        self.destination = destination
+        self.forwarded_sockets = list(forwarded_sockets)
+        self.reverse_forwarded_sockets = list(reverse_forwarded_sockets)
         self.options = options
+        self.port = port
         self.ssh_config_path = ssh_config_path
-        self.bind_address = bind_address
+        self.ssh_proxy = ssh_proxy
 
-    def open(self):
-        # ControlMaster and ControlPath are always set
+        self.temp_dir, self.identity_path, self.control_sock_path = self._init_temp_dir_if_needed(
+            identity, control_sock_path
+        )
+
+    @staticmethod
+    def _init_temp_dir_if_needed(
+        identity: FilePathOrContent, control_sock_path: Optional[PathLike]
+    ) -> Tuple[Optional[tempfile.TemporaryDirectory], PathLike, PathLike]:
+        if control_sock_path is not None and isinstance(identity, FilePath):
+            return None, identity.path, control_sock_path
+
+        temp_dir = tempfile.TemporaryDirectory()
+        if control_sock_path is None:
+            control_sock_path = os.path.join(temp_dir.name, "control.sock")
+        if isinstance(identity, FilePath):
+            identity_path = identity.path
+        else:
+            identity_path = os.path.join(temp_dir.name, "identity")
+            with open(
+                identity_path, opener=lambda path, flags: os.open(path, flags, 0o600), mode="w"
+            ) as f:
+                f.write(identity.content)
+
+        return temp_dir, identity_path, control_sock_path
+
+    def open_command(self) -> List[str]:
         command = [
             "ssh",
             "-F",
             self.ssh_config_path,
-            "-f",
-            "-N",
-            "-M",
+            "-f",  # go to background after connecting
+            "-N",  # do not run commands on remote
+            "-M",  # use the control socket in master mode
             "-S",
-            self.control_sock_path,
+            str(self.control_sock_path),
             "-i",
-            self.id_rsa_path,
+            str(self.identity_path),
         ]
+        if self.port is not None:
+            command += ["-p", str(self.port)]
         for k, v in self.options.items():
             command += ["-o", f"{k}={v}"]
-        if self.bind_address is not None:
-            host_local = f"{self.bind_address}:"
-        else:
-            host_local = ""
-        for port_remote, port_local in self.ports.items():
-            command += ["-L", f"{host_local}{port_local}:localhost:{port_remote}"]
-        command += [self.host]
+        if proxy_command := self.proxy_command():
+            command += ["-o", "ProxyCommand=" + shlex.join(proxy_command)]
+        for socket_pair in self.forwarded_sockets:
+            command += ["-L", f"{socket_pair.local.render()}:{socket_pair.remote.render()}"]
+        for socket_pair in self.reverse_forwarded_sockets:
+            command += ["-R", f"{socket_pair.remote.render()}:{socket_pair.local.render()}"]
+        command += [self.destination]
+        return command
+
+    def close_command(self) -> List[str]:
+        return ["ssh", "-S", str(self.control_sock_path), "-O", "exit", self.destination]
+
+    def check_command(self) -> List[str]:
+        return ["ssh", "-S", str(self.control_sock_path), "-O", "check", self.destination]
+
+    def exec_command(self) -> List[str]:
+        return ["ssh", "-S", str(self.control_sock_path), self.destination]
+
+    def proxy_command(self) -> Optional[List[str]]:
+        if self.ssh_proxy is None:
+            return None
+        return [
+            "ssh",
+            "-i",
+            str(self.identity_path),
+            "-W",
+            "%h:%p",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-p",
+            str(self.ssh_proxy.port),
+            f"{self.ssh_proxy.username}@{self.ssh_proxy.hostname}",
+        ]
+
+    def open(self) -> None:
         # Using stderr=subprocess.PIPE may block subprocess.run.
         # Redirect stderr to file to get ssh error message
         with tempfile.NamedTemporaryFile(delete=False) as f:
             try:
                 r = subprocess.run(
-                    command, stdout=subprocess.DEVNULL, stderr=f, timeout=SSH_TIMEOUT
+                    self.open_command(), stdout=subprocess.DEVNULL, stderr=f, timeout=SSH_TIMEOUT
                 )
             except subprocess.TimeoutExpired as e:
-                msg = f"SSH tunnel to {self.host} did not open in {SSH_TIMEOUT} seconds"
+                msg = f"SSH tunnel to {self.destination} did not open in {SSH_TIMEOUT} seconds"
                 logger.debug(msg)
                 raise SSHError(msg) from e
         with open(f.name, "r+b") as f:
@@ -82,9 +180,46 @@ class SSHTunnel:
         logger.debug("SSH tunnel failed: %s", error)
         raise get_ssh_error(error)
 
-    def close(self):
-        command = ["ssh", "-S", self.control_sock_path, "-O", "exit", self.host]
-        subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    async def aopen(self) -> None:
+        proc = await asyncio.create_subprocess_exec(
+            *self.open_command(), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+        )
+        try:
+            _, stderr = await asyncio.wait_for(proc.communicate(), SSH_TIMEOUT)
+        except asyncio.TimeoutError as e:
+            msg = f"SSH tunnel to {self.destination} did not open in {SSH_TIMEOUT} seconds"
+            logger.debug(msg)
+            raise SSHError(msg) from e
+        if proc.returncode == 0:
+            return
+        logger.debug("SSH tunnel failed: %s", stderr)
+        raise get_ssh_error(stderr)
+
+    def close(self) -> None:
+        subprocess.run(self.close_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    async def aclose(self) -> None:
+        proc = await asyncio.create_subprocess_exec(
+            *self.close_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        await proc.wait()
+
+    async def acheck(self) -> bool:
+        proc = await asyncio.create_subprocess_exec(
+            *self.check_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        await proc.wait()
+        ok = proc.returncode == 0
+        return ok
+
+    async def aexec(self, command: str) -> str:
+        proc = await asyncio.create_subprocess_exec(
+            *self.exec_command(), command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise SSHError(stderr.decode())
+        return stdout.decode()
 
     def __enter__(self):
         self.open()
@@ -94,96 +229,16 @@ class SSHTunnel:
         self.close()
 
 
-class RunnerTunnel(SSHTunnel):
+def ports_to_forwarded_sockets(
+    ports: Dict[int, int], bind_local: str = "localhost"
+) -> List[SocketPair]:
     """
-    RunnerTunnel cancel forwarding without closing the connection on close()
+    Converts remote->local ports mapping to List[SocketPair] suitable for SSHTunnel
     """
-
-    def __init__(
-        self,
-        hostname: str,
-        ssh_port: int,
-        user: str,
-        ports: Dict[int, int],
-        id_rsa: str,
-        *,
-        control_sock_path: Optional[PathLike] = None,
-        ssh_proxy: Optional[SSHConnectionParams] = None,
-        disconnect_delay: int = 5,
-    ):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        id_rsa_path = os.path.join(self.temp_dir.name, "id_rsa")
-        with open(
-            id_rsa_path, opener=lambda path, flags: os.open(path, flags, 0o600), mode="w"
-        ) as f:
-            f.write(id_rsa)
-        if control_sock_path is None:
-            control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
-        options = {}
-        if ssh_proxy is not None:
-            proxy_command = ["ssh", "-i", id_rsa_path, "-W", "%h:%p"]
-            proxy_command += [
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-o",
-                "UserKnownHostsFile=/dev/null",
-            ]
-            proxy_command += [
-                "-p",
-                str(ssh_proxy.port),
-                f"{ssh_proxy.username}@{ssh_proxy.hostname}",
-            ]
-            options["ProxyCommand"] = shlex.join(proxy_command)
-        options.update(
-            {
-                "StrictHostKeyChecking": "no",
-                "UserKnownHostsFile": "/dev/null",
-                "ExitOnForwardFailure": "yes",
-                "ConnectTimeout": "3",
-                # "ControlPersist": f"{disconnect_delay}s",
-                "Port": str(ssh_port),
-            }
+    return [
+        SocketPair(
+            local=IPSocket(host=bind_local, port=port_local),
+            remote=IPSocket(host="localhost", port=port_remote),
         )
-        super().__init__(
-            host=f"{user}@{hostname}",
-            id_rsa_path=id_rsa_path,
-            ports=ports,
-            control_sock_path=control_sock_path,
-            options=options,
-        )
-
-    # def close(self):
-    #     # cancel forwarding without closing the connection
-    #     command = ["ssh", "-S", self.control_sock_path, "-O", "cancel"]
-    #     for port_remote, port_local in self.ports.items():
-    #         command += ["-L", f"{port_local}:localhost:{port_remote}"]
-    #     command += [self.host]
-    #     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-
-class ClientTunnel(SSHTunnel):
-    """
-    ClientTunnel connects to the host from ssh config
-    """
-
-    def __init__(
-        self,
-        host: str,
-        ports: Dict[int, int],
-        id_rsa_path: PathLike,
-        ssh_config_path: str,
-        control_sock_path: Optional[str] = None,
-        bind_address: Optional[str] = None,
-    ):
-        if control_sock_path is None:
-            self.temp_dir = tempfile.TemporaryDirectory()
-            control_sock_path = os.path.join(self.temp_dir.name, "control.sock")
-        super().__init__(
-            host=host,
-            id_rsa_path=id_rsa_path,
-            ports=ports,
-            control_sock_path=control_sock_path,
-            options={},
-            ssh_config_path=ssh_config_path,
-            bind_address=bind_address,
-        )
+        for port_remote, port_local in ports.items()
+    ]

@@ -73,8 +73,8 @@ class TestProcessRunningJobs:
             job_provisioning_data=job_provisioning_data,
         )
         with patch(
-            "dstack._internal.server.services.runner.ssh.RunnerTunnel"
-        ) as RunnerTunnelMock, patch(
+            "dstack._internal.server.services.runner.ssh.SSHTunnel"
+        ) as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
         ) as RunnerClientMock, patch(
             "dstack._internal.utils.common.get_current_datetime"
@@ -84,7 +84,7 @@ class TestProcessRunningJobs:
             runner_client_mock.healthcheck = Mock()
             runner_client_mock.healthcheck.return_value = None
             await process_running_jobs()
-            RunnerTunnelMock.assert_called_once()
+            SSHTunnelMock.assert_called_once()
             runner_client_mock.healthcheck.assert_called_once()
         await session.refresh(job)
         assert job is not None
@@ -113,8 +113,8 @@ class TestProcessRunningJobs:
             job_provisioning_data=job_provisioning_data,
         )
         with patch(
-            "dstack._internal.server.services.runner.ssh.RunnerTunnel"
-        ) as RunnerTunnelMock, patch(
+            "dstack._internal.server.services.runner.ssh.SSHTunnel"
+        ) as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
         ) as RunnerClientMock:
             runner_client_mock = RunnerClientMock.return_value
@@ -122,7 +122,7 @@ class TestProcessRunningJobs:
                 service="dstack-runner", version="0.0.1.dev2"
             )
             await process_running_jobs()
-            RunnerTunnelMock.assert_called_once()
+            SSHTunnelMock.assert_called_once()
             runner_client_mock.healthcheck.assert_called_once()
             runner_client_mock.submit_job.assert_called_once()
             runner_client_mock.upload_code.assert_called_once()
@@ -154,8 +154,8 @@ class TestProcessRunningJobs:
             job_provisioning_data=job_provisioning_data,
         )
         with patch(
-            "dstack._internal.server.services.runner.ssh.RunnerTunnel"
-        ) as RunnerTunnelMock, patch(
+            "dstack._internal.server.services.runner.ssh.SSHTunnel"
+        ) as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
         ) as RunnerClientMock, patch.object(settings, "SERVER_DIR_PATH", tmp_path):
             runner_client_mock = RunnerClientMock.return_value
@@ -166,14 +166,14 @@ class TestProcessRunningJobs:
                 last_updated=1,
             )
             await process_running_jobs()
-            RunnerTunnelMock.assert_called_once()
+            SSHTunnelMock.assert_called_once()
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.RUNNING
         assert job.runner_timestamp == 1
         with patch(
-            "dstack._internal.server.services.runner.ssh.RunnerTunnel"
-        ) as RunnerTunnelMock, patch(
+            "dstack._internal.server.services.runner.ssh.SSHTunnel"
+        ) as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
         ) as RunnerClientMock:
             runner_client_mock = RunnerClientMock.return_value
@@ -184,7 +184,7 @@ class TestProcessRunningJobs:
                 last_updated=2,
             )
             await process_running_jobs()
-            RunnerTunnelMock.assert_called_once()
+            SSHTunnelMock.assert_called_once()
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.TERMINATING
@@ -220,15 +220,15 @@ class TestProcessRunningJobs:
                 job_provisioning_data=job_provisioning_data,
             )
         with patch(
-            "dstack._internal.server.services.runner.ssh.RunnerTunnel"
-        ) as RunnerTunnelMock, patch(
+            "dstack._internal.server.services.runner.ssh.SSHTunnel"
+        ) as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.ShimClient"
         ) as ShimClientMock:
             ShimClientMock.return_value.healthcheck.return_value = HealthcheckResponse(
                 service="dstack-shim", version="0.0.1.dev2"
             )
             await process_running_jobs()
-            RunnerTunnelMock.assert_called_once()
+            SSHTunnelMock.assert_called_once()
             ShimClientMock.return_value.healthcheck.assert_called_once()
             ShimClientMock.return_value.submit.assert_called_once_with(
                 username="",
@@ -270,17 +270,17 @@ class TestProcessRunningJobs:
             job_provisioning_data=job_provisioning_data,
         )
         with patch(
-            "dstack._internal.server.services.runner.ssh.RunnerTunnel"
-        ) as RunnerTunnelMock, patch(
+            "dstack._internal.server.services.runner.ssh.SSHTunnel"
+        ) as SSHTunnelMock, patch(
             "dstack._internal.server.services.runner.client.RunnerClient"
         ) as RunnerClientMock, patch(
             "dstack._internal.server.services.runner.client.ShimClient"
         ) as ShimClientMock:
-            RunnerTunnelMock.return_value.healthcheck.return_value = HealthcheckResponse(
+            RunnerClientMock.return_value.healthcheck.return_value = HealthcheckResponse(
                 service="dstack-runner", version="0.0.1.dev2"
             )
             await process_running_jobs()
-            RunnerTunnelMock.assert_called_once()
+            SSHTunnelMock.assert_called_once()
             ShimClientMock.return_value.pull.assert_called_once()
             RunnerClientMock.return_value.healthcheck.assert_called_once()
 
@@ -322,11 +322,11 @@ class TestProcessRunningJobs:
             instance=instance,
         )
         with patch(
-            "dstack._internal.server.services.runner.ssh.RunnerTunnel"
-        ) as RunnerTunnelMock, patch("dstack._internal.server.services.runner.ssh.time.sleep"):
-            RunnerTunnelMock.side_effect = SSHError
+            "dstack._internal.server.services.runner.ssh.SSHTunnel"
+        ) as SSHTunnelMock, patch("dstack._internal.server.services.runner.ssh.time.sleep"):
+            SSHTunnelMock.side_effect = SSHError
             await process_running_jobs()
-            assert RunnerTunnelMock.call_count == 3
+            assert SSHTunnelMock.call_count == 3
         await session.refresh(job)
         assert job is not None
         assert job.status == JobStatus.TERMINATING

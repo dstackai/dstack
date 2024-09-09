@@ -19,9 +19,9 @@ class GatewayConnectionsPool:
                 logger.warning(f"Gateway connection for {hostname} already exists")
                 return self._connections[hostname]
             self._connections[hostname] = GatewayConnection(hostname, id_rsa, SERVER_PORT)
-            start_task = self._connections[hostname].tunnel.start()
+            open_task = self._connections[hostname].tunnel.aopen()
         try:
-            await start_task
+            await open_task
             return self._connections[hostname]
         except Exception:
             async with self._lock:
@@ -33,14 +33,14 @@ class GatewayConnectionsPool:
             if hostname not in self._connections:
                 logger.warning(f"Gateway connection for {hostname} does not exist")
                 return False
-            stop_task = self._connections.pop(hostname).tunnel.stop()
-        await stop_task
+            close_task = self._connections.pop(hostname).tunnel.aclose()
+        await close_task
         return True
 
     async def remove_all(self) -> None:
         async with self._lock:
             await asyncio.gather(
-                *(conn.tunnel.stop() for conn in self._connections.values()),
+                *(conn.tunnel.aclose() for conn in self._connections.values()),
                 return_exceptions=True,
             )
             self._connections = {}

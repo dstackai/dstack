@@ -1,8 +1,22 @@
 import os
+from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Union
 
 PathLike = Union[str, os.PathLike]
+
+
+@dataclass
+class FilePath:
+    path: PathLike
+
+
+@dataclass
+class FileContent:
+    content: str
+
+
+FilePathOrContent = Union[FilePath, FileContent]
 
 
 def path_in_dir(path: PathLike, directory: PathLike) -> bool:
