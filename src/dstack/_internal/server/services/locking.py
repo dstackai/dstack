@@ -2,7 +2,10 @@ import asyncio
 import hashlib
 from asyncio import Lock
 from contextlib import asynccontextmanager
-from typing import Dict, List, Set, Tuple, TypeVar
+from typing import Dict, List, Set, Tuple, TypeVar, Union
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 KeyT = TypeVar("KeyT")
 
@@ -34,6 +37,19 @@ class ResourceLocker:
 
 def string_to_lock_id(s: str) -> int:
     return int(hashlib.sha256(s.encode()).hexdigest(), 16) % (2**63)
+
+
+@asynccontextmanager
+async def advisory_lock_ctx(
+    bind: Union[AsyncConnection, AsyncSession], dialect_name: str, resource: str
+):
+    if dialect_name == "postgresql":
+        await bind.execute(select(func.pg_advisory_lock(string_to_lock_id(resource))))
+    try:
+        yield
+    finally:
+        if dialect_name == "postgresql":
+            await bind.execute(select(func.pg_advisory_unlock(string_to_lock_id(resource))))
 
 
 _locker = ResourceLocker()

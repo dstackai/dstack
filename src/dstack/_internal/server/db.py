@@ -1,14 +1,14 @@
 from contextlib import asynccontextmanager
 
 from alembic import command, config
-from sqlalchemy import event, func, select
+from sqlalchemy import event
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import ConnectionPoolEntry
 
 from dstack._internal.server import settings
-from dstack._internal.server.services.locking import string_to_lock_id
+from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.settings import DATABASE_URL
 
 
@@ -54,15 +54,12 @@ def override_db(new_db: Database):
 
 async def migrate():
     async with _db.engine.connect() as connection:
-        if _db.dialect_name == "postgresql":
-            await connection.execute(
-                select(func.pg_advisory_lock(string_to_lock_id("migrations")))
-            )
-        await connection.run_sync(_run_alembic_upgrade)
-        if _db.dialect_name == "postgresql":
-            await connection.execute(
-                select(func.pg_advisory_unlock(string_to_lock_id("migrations")))
-            )
+        async with advisory_lock_ctx(
+            bind=connection,
+            dialect_name=_db.dialect_name,
+            resource="migrations",
+        ):
+            await connection.run_sync(_run_alembic_upgrade)
 
 
 async def get_session():
