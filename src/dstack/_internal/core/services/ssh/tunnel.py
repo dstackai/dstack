@@ -39,7 +39,7 @@ class UnixSocket(Socket):
 
 
 @dataclass
-class TCPSocket(Socket):
+class IPSocket(Socket):
     host: str
     port: int
 
@@ -237,8 +237,8 @@ def ports_to_forwarded_sockets(
     """
     return [
         SocketPair(
-            local=TCPSocket(host=bind_local, port=port_local),
-            remote=TCPSocket(host="localhost", port=port_remote),
+            local=IPSocket(host=bind_local, port=port_local),
+            remote=IPSocket(host="localhost", port=port_remote),
         )
         for port_remote, port_local in ports.items()
     ]

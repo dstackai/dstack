@@ -3,9 +3,9 @@ from pathlib import Path
 
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh.tunnel import (
+    IPSocket,
     SocketPair,
     SSHTunnel,
-    TCPSocket,
     UnixSocket,
     ports_to_forwarded_sockets,
 )
@@ -109,12 +109,12 @@ class TestSSHTunnel:
             control_sock_path="/tmp/control.sock",
             options={},
             forwarded_sockets=[
-                SocketPair(local=UnixSocket("/tmp/80"), remote=TCPSocket("localhost", 80)),
-                SocketPair(local=TCPSocket("127.0.0.1", 8000), remote=TCPSocket("::1", 80)),
+                SocketPair(local=UnixSocket("/tmp/80"), remote=IPSocket("localhost", 80)),
+                SocketPair(local=IPSocket("127.0.0.1", 8000), remote=IPSocket("::1", 80)),
             ],
             reverse_forwarded_sockets=[
                 SocketPair(local=UnixSocket("/tmp/local"), remote=UnixSocket("/tmp/remote")),
-                SocketPair(local=TCPSocket("test.local", 80), remote=TCPSocket("localhost", 8000)),
+                SocketPair(local=IPSocket("test.local", 80), remote=IPSocket("localhost", 8000)),
             ],
         )
         assert " ".join(tunnel.open_command()) == (
@@ -145,6 +145,6 @@ class TestSSHTunnel:
 
 def test_ports_to_forwarded_sockets() -> None:
     assert ports_to_forwarded_sockets({80: 8000, 22: 2200}, bind_local="::1") == [
-        SocketPair(local=TCPSocket("::1", 8000), remote=TCPSocket("localhost", 80)),
-        SocketPair(local=TCPSocket("::1", 2200), remote=TCPSocket("localhost", 22)),
+        SocketPair(local=IPSocket("::1", 8000), remote=IPSocket("localhost", 80)),
+        SocketPair(local=IPSocket("::1", 2200), remote=IPSocket("localhost", 22)),
     ]

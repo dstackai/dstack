@@ -8,9 +8,9 @@ import aiorwlock
 
 from dstack._internal.core.services.ssh.tunnel import (
     SSH_DEFAULT_OPTIONS,
+    IPSocket,
     SocketPair,
     SSHTunnel,
-    TCPSocket,
     UnixSocket,
 )
 from dstack._internal.server.services.gateways.client import (
@@ -53,13 +53,13 @@ class GatewayConnection:
             forwarded_sockets=[
                 SocketPair(
                     local=UnixSocket(path=self.gateway_socket_path),
-                    remote=TCPSocket(host="localhost", port=GATEWAY_MANAGEMENT_PORT),
+                    remote=IPSocket(host="localhost", port=GATEWAY_MANAGEMENT_PORT),
                 ),
             ],
             reverse_forwarded_sockets=[
                 SocketPair(
-                    local=TCPSocket(host="localhost", port=server_port),
-                    remote=TCPSocket(host="localhost", port=SERVER_PORT_ON_GATEWAY),
+                    local=IPSocket(host="localhost", port=server_port),
+                    remote=IPSocket(host="localhost", port=SERVER_PORT_ON_GATEWAY),
                 ),
             ],
         )
