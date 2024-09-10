@@ -1,16 +1,46 @@
-# TPU
+---
+title: Using TPUs for fine-tuning and deploying LLMs
+date: 2024-09-10
+description: "Learn how to use TPUs with dstack for fine-tuning and deploying LLMs, leveraging open-source tools like Hugging Face’s Optimum TPU and vLLM."  
+slug: tpu-on-gcp
+---
 
-If you're using the `gcp` backend, you can use TPUs. Just specify the TPU version and the number of cores 
+# Using TPUs for fine-tuning and deploying LLMs
+
+If you’re using or planning to use TPUs with Google Cloud, you can now do so via `dstack`. Just specify the TPU version and the number of cores 
 (separated by a dash), in the `gpu` property under `resources`. 
+
+Read below to find out how to use TPUs with `dstack` for fine-tuning and deploying
+LLMs, leveraging open-source tools like Hugging Face’s 
+[Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"} 
+and [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html){:target="_blank"}.
+
+<!-- more -->
+
+Below is an example of a dev environment:
+
+<div editor-title="examples/tpu/.dstack.yml">
+
+    ```yaml
+    type: dev-environment
+    name: vscode-tpu    
+    
+    python: 3.11
+    ide: vscode
+    
+    resources:
+      gpu: v2-8
+    ```
+
+</div>
+
+If you've configured the `gcp` backend, `dstack` will automatically provision the dev environment with a TPU.
 
 > Currently, maximum 8 TPU cores can be specified, so the maximum supported values are `v2-8`, `v3-8`, `v4-8`, `v5litepod-8`, 
 > and `v5e-8`. Multi-host TPU support, allowing for larger numbers of cores, is coming soon.
 
-Below are a few examples on using TPUs for deployment and fine-tuning.
-
 ## Deployment
 
-### Running as a service
 You can use any serving framework, such as vLLM, TGI. Here's an example of a [service](https://dstack.ai/docs/services) that deploys
 Llama 3.1 8B using 
 [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}
@@ -45,13 +75,8 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     ```
     </div>
 
-    Note, for `Optimum TPU` by default `MAX_INPUT_TOKEN` is set to 4095, consequently we must set `MAX_BATCH_PREFILL_TOKENS` to 4095.
-
-    ??? info "Docker image"
-        The official Docker image `huggingface/optimum-tpu:latest` doesn’t support Llama 3.1-8B. 
-        We’ve created a custom image with the fix: `dstackai/optimum-tpu:llama31`. 
-        Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/87){:target="_blank"} is merged, 
-        the official Docker image can be used.
+    Once the [pull request :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/pull/87){:target="_blank"} is merged, 
+    the official Docker image can be used instead of `dstackai/optimum-tpu:llama31`.
 
 === "vLLM"
     <div editor-title="examples/deployment/vllm/service-tpu.dstack.yml"> 
@@ -95,7 +120,11 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     ```
     </div>
 
-    Note, when using Llama 3.1 8B with a `v5litepod` which has 16GB memory per core, we must limit the context size to 4096 tokens to fit the memory.
+??? info "Control plane"
+    If you specify `model` when running a service, `dstack` will automatically register the model on the gateway's global
+    endpoint and allow you to use it for chat via the control plane UI.
+    
+    <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-control-plane-model-llama31.png?raw=true" width="750px" />
 
 ### Memory requirements
 
@@ -121,7 +150,7 @@ Note, `v5litepod` is optimized for serving transformer-based models. Each core i
 Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
 cloud resources and run the configuration.
 
-## Fine-tuning with Optimum TPU
+## Fine-tuning
 
 Below is an example of fine-tuning Llama 3.1 8B using [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"} 
 and the [Abirate/english_quotes :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/Abirate/english_quotes){:target="_blank"}
@@ -156,9 +185,6 @@ resources:
 
 </div>
 
-[//]: # (### Fine-Tuning with TRL)
-[//]: # (Use the example `examples/fine-tuning/optimum-tpu/gemma/train.dstack.yml` to Finetune `Gemma-2B` model using `trl` with `dstack` and `optimum-tpu`. )
-
 ### Memory requirements
 
 Below are the approximate memory requirements for fine-tuning LLMs with their corresponding TPUs.
@@ -178,22 +204,14 @@ Note, `v5litepod` is optimized for fine-tuning transformer-based models. Each co
 | **TRL**         | bfloat16     | To fine-tune using TRL, Optimum TPU is recommended. TRL doesn't support Llama 3.1 out of the box. |
 | **Pytorch XLA** | bfloat16     |                                                                                                   |
 
-## Dev environments
-
-Before running a task or service, it's recommended that you first start with
-a [dev environment](https://dstack.ai/docs/dev-environments). Dev environments
-allow you to run commands interactively.
-
-## Source code
-
-The source-code of this example can be found in 
-[`examples/deployment/optimum-tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/llms/llama31){:target="_blank"}
-and [`examples/fine-tuning/optimum-tpu` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/trl){:target="_blank"}.
-
 ## What's next?
 
-1. Browse [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu),
-   [Optimum TPU TGI :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/tree/main/text-generation-inference) and
-   [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html).
-2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
-   [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/concepts/fleets).
+1. Browse [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"},
+   [Optimum TPU TGI :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu/tree/main/text-generation-inference){:target="_blank"} and
+   [vLLM :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/getting_started/tpu-installation.html){:target="_blank"}.
+2. Check [dev environments](../../docs/dev-environments.md), [tasks](https://dstack.ai/docs/tasks), 
+   [services](../../docs/services.md), and [fleets](../../docs/concepts/fleets.md).
+
+!!! info "Multi-host TPUs"
+    If you’d like to use `dstack` with more than eight TPU cores, upvote the corresponding
+    [issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1337){:target="_blank"}.

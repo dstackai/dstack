@@ -1,6 +1,6 @@
 ---
 template: pricing.html
-title: AI container orchestration engine for everyone
+title: AI container orchestration for everyone
 hide:
    - navigation
    - toc

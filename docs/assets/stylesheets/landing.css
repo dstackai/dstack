@@ -29,6 +29,13 @@
     margin-right: -4px;
 }
 
+.tx-landing__hero_text .highlight {
+    display: inline-block;
+    border-radius: 3px;
+    padding: 1px 5px;
+    border: 0.5px solid rgba(0, 0, 0, 0.33);
+}
+
 /*.tx-landing__hero_text p {
     font-size: 0.95rem;
 }*/
@@ -94,7 +101,7 @@
 
     .tx-landing__hero {
         margin-bottom: 2.5rem;
-        font-size: 1.1em;
+        font-size: 1em;
         line-height: 1.5;
     }
 
@@ -183,7 +190,7 @@
 .md-typeset .md-button {
     margin-top: 1.2rem;
     margin-bottom: 1.5rem;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 400 !important;
     text-align: center;
     border-radius: 3px;
@@ -192,7 +199,8 @@
 }
 
 .md-header__buttons .md-button {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
+    letter-spacing: -0.5px;
 }
 
 .md-typeset .md-button {
@@ -203,7 +211,7 @@
 .md-typeset .md-button.small {
     min-width: 150px;
     padding: 0.5em 1.9em;
-    font-size: 19px;
+    font-size: 18px;
 }
 
 .md-typeset .md-button {
@@ -270,7 +278,9 @@
 .md-header__buttons .md-button-secondary,
 .md-typeset .md-button-secondary,
 .md-header__buttons .md-button-secondary:hover,
-.md-typeset .md-button-secondary:hover {
+.md-typeset .md-button-secondary:hover,
+.md-header__buttons .md-button-secondary:focus,
+.md-typeset .md-button-secondary:focus {
     background: transparent;
     color: black;
     border: 1.5px solid rgba(0, 0, 0, 0.87);
@@ -300,8 +310,9 @@
 }
 
 .tx-landing__highlights_text h2 {
-    font-size: 2.2em;
+    font-size: 2em;
     max-width: 600px;
+    font-weight: 700;
     margin-top: 1.5em;
     margin-bottom: 1.8em;
     letter-spacing: -1.5px;
@@ -516,7 +527,7 @@
 }
 
 .tx-landing__major_feature {
-    font-size: 1.025em;
+    font-size: 1em;
     margin-top: 5em;
 }
 
@@ -540,7 +551,7 @@
 }
 
 .tx-landing__major_feature h2 {
-    font-size: 1.8em;
+    font-size: 1.5em;
     max-width: 500px;
     margin-top: 0.75em;
     margin-bottom: 0.75em;

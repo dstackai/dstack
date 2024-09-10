@@ -53,16 +53,16 @@ are both acceptable).
 
     Note that cloud fleets aren't supported for the `kubernetes`, `vastai`, and `runpod` backends.
 
-=== "On-prem"
+=== "SSH"
 
-    !!! info "What is an on-prem fleet?"
+    !!! info "What is an SSH fleet?"
         If you’d like to run dev environments, tasks, and services on arbitrary on-prem servers via `dstack`, you can 
         create an on-prem fleet.
 
     To create an on-prem fleet, specify `ssh_config` to allow the `dstack` server to connect to these servers
     via SSH.
 
-    <div editor-title="fleet-on-prem.dstack.yml"> 
+    <div editor-title="fleet-ssh.dstack.yml"> 
     
     ```yaml
     type: fleet

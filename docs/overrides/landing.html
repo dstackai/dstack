@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "main.html" %}
 
 {% block header %}
     {% include "header.html" %}
@@ -8,10 +8,6 @@
 <script src="/assets/javascripts/termynal.js" data-termynal-container="#termynal"></script>
 <script async src="https://tally.so/widgets/embed.js"></script>
 {{ super() }}
-{% endblock %}
-
-{% block announce %}
-🔥 Introducing a new way to manage cloud and on-prem clusters! <a href="/docs/concepts/fleets">Learn more</a>.
 {% endblock %}
 
 {% block footer %}

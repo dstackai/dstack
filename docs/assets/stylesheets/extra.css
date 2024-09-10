@@ -30,8 +30,8 @@
 }
 
 #kapa-widget-container .mantine-Text-root {
-    font-size: 0.7em !important;
-    font-weight: 700;
+    font-size: 0.68em !important;
+    font-weight: 600;
     color: black !important;
     text-shadow: none !important;
     letter-spacing: -0.5px;
@@ -42,20 +42,21 @@
 }
 
 #kapa-widget-container .mantine-Button-root {
-    height: 4.5rem !important;
-    width: 4.25rem !important;
-    background: -webkit-linear-gradient(45deg, rgba(0, 42, 255, 0.075), rgba(0, 42, 255, 0.075), rgba(0, 42, 255, 0.025)) !important;
+    height: 4rem !important;
+    width: 4rem !important;
+    background: rgb(245 247 255) !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 6px;
 }
 
 #kapa-widget-container .mantine-Image-image {
-    width: 1.3rem !important;
-    height: 1.3rem !important;;
+    width: 1.2rem !important;
+    height: 1.2rem !important;;
 }
 
 #kapa-widget-container .mantine-Image-root {
-    width: 1.3rem !important;
+    width: 1.2rem !important;
 }
 
 .mantine-Modal-body .mantine-Input-input {
@@ -232,7 +233,7 @@
 
 @media screen and (min-width: 76.1875em) {
     .md-header__topic:first-child {
-        font-size: 30px;
+        font-size: 24px;
         /*font-family: Poppins, metro-web, Metro, -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;*/
         /*font-weight: 500;*/
     }
@@ -717,7 +718,7 @@ body {
 }
 
 .md-header__button.md-logo :where(img,svg) {
-    height: 1.6rem !important;
+    height: 1.25rem !important;
 }
 
 .md-header__button.md-logo {
@@ -821,7 +822,7 @@ body {
 
 .md-sidebar--primary .md-nav__link {
     padding: 3px 15px 4px;
-    margin-top: 4px;
+    margin-top: 3px;
 }
 
 .md-sidebar--secondary .md-nav__link {
@@ -1201,7 +1202,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         content: "";
         width: 100%;
         z-index: 1000;
-        height: 1.5px;
+        height: 2px;
         bottom: -2px;
         border-radius: 2px;
     }
@@ -1229,7 +1230,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
     .md-tabs__item {
         display: flex;
-        height: 2.8rem;
+        height: 2.4rem;
         padding-left: 0;
         padding-right: 22px;
     }
@@ -1250,7 +1251,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         visibility: hidden;
         width: 35px;
         display: inline-block;
-        margin-top: 15px;
+        margin-top: 10px;
     }
 
     .md-tabs__item:nth-child(n+6) .md-tabs__link:before {
@@ -1288,8 +1289,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     .md-tabs__item:nth-child(6) .md-tabs__link:before {
         position: relative;
         content: '';
-        width: 43px;
-        height: 37px;
+        width: 40px;
+        height: 35px;
         display: inline-block;
         -webkit-mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg width="22" height="10" viewBox="0 -28.5 256 256" version="1.1" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid"><g><path d="M216.856339,16.5966031 C200.285002,8.84328665 182.566144,3.2084988 164.041564,0 C161.766523,4.11318106 159.108624,9.64549908 157.276099,14.0464379 C137.583995,11.0849896 118.072967,11.0849896 98.7430163,14.0464379 C96.9108417,9.64549908 94.1925838,4.11318106 91.8971895,0 C73.3526068,3.2084988 55.6133949,8.86399117 39.0420583,16.6376612 C5.61752293,67.146514 -3.4433191,116.400813 1.08711069,164.955721 C23.2560196,181.510915 44.7403634,191.567697 65.8621325,198.148576 C71.0772151,190.971126 75.7283628,183.341335 79.7352139,175.300261 C72.104019,172.400575 64.7949724,168.822202 57.8887866,164.667963 C59.7209612,163.310589 61.5131304,161.891452 63.2445898,160.431257 C105.36741,180.133187 151.134928,180.133187 192.754523,160.431257 C194.506336,161.891452 196.298154,163.310589 198.110326,164.667963 C191.183787,168.842556 183.854737,172.420929 176.223542,175.320965 C180.230393,183.341335 184.861538,190.991831 190.096624,198.16893 C211.238746,191.588051 232.743023,181.531619 254.911949,164.955721 C260.227747,108.668201 245.831087,59.8662432 216.856339,16.5966031 Z M85.4738752,135.09489 C72.8290281,135.09489 62.4592217,123.290155 62.4592217,108.914901 C62.4592217,94.5396472 72.607595,82.7145587 85.4738752,82.7145587 C98.3405064,82.7145587 108.709962,94.5189427 108.488529,108.914901 C108.508531,123.290155 98.3405064,135.09489 85.4738752,135.09489 Z M170.525237,135.09489 C157.88039,135.09489 147.510584,123.290155 147.510584,108.914901 C147.510584,94.5396472 157.658606,82.7145587 170.525237,82.7145587 C183.391518,82.7145587 193.761324,94.5189427 193.539891,108.914901 C193.539891,123.290155 183.391518,135.09489 170.525237,135.09489 Z" fill="none" fill-rule="nonzero" stroke="currentColor" stroke-width="16px"></path></g></svg>') no-repeat 50% 50%;
         mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg width="22" height="10" viewBox="0 -28.5 256 256" version="1.1" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid"><g><path d="M216.856339,16.5966031 C200.285002,8.84328665 182.566144,3.2084988 164.041564,0 C161.766523,4.11318106 159.108624,9.64549908 157.276099,14.0464379 C137.583995,11.0849896 118.072967,11.0849896 98.7430163,14.0464379 C96.9108417,9.64549908 94.1925838,4.11318106 91.8971895,0 C73.3526068,3.2084988 55.6133949,8.86399117 39.0420583,16.6376612 C5.61752293,67.146514 -3.4433191,116.400813 1.08711069,164.955721 C23.2560196,181.510915 44.7403634,191.567697 65.8621325,198.148576 C71.0772151,190.971126 75.7283628,183.341335 79.7352139,175.300261 C72.104019,172.400575 64.7949724,168.822202 57.8887866,164.667963 C59.7209612,163.310589 61.5131304,161.891452 63.2445898,160.431257 C105.36741,180.133187 151.134928,180.133187 192.754523,160.431257 C194.506336,161.891452 196.298154,163.310589 198.110326,164.667963 C191.183787,168.842556 183.854737,172.420929 176.223542,175.320965 C180.230393,183.341335 184.861538,190.991831 190.096624,198.16893 C211.238746,191.588051 232.743023,181.531619 254.911949,164.955721 C260.227747,108.668201 245.831087,59.8662432 216.856339,16.5966031 Z M85.4738752,135.09489 C72.8290281,135.09489 62.4592217,123.290155 62.4592217,108.914901 C62.4592217,94.5396472 72.607595,82.7145587 85.4738752,82.7145587 C98.3405064,82.7145587 108.709962,94.5189427 108.488529,108.914901 C108.508531,123.290155 98.3405064,135.09489 85.4738752,135.09489 Z M170.525237,135.09489 C157.88039,135.09489 147.510584,123.290155 147.510584,108.914901 C147.510584,94.5396472 157.658606,82.7145587 170.525237,82.7145587 C183.391518,82.7145587 193.761324,94.5189427 193.539891,108.914901 C193.539891,123.290155 183.391518,135.09489 170.525237,135.09489 Z" fill="none" fill-rule="nonzero" stroke="currentColor" stroke-width="16px"></path></g></svg>') no-repeat 50% 50%;
@@ -1302,8 +1303,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     .md-tabs__item:nth-child(7) .md-tabs__link:before {
         position: relative;
         content: '';
-        width: 43px;
-        height: 37px;
+        width: 40px;
+        height: 35px;
         display: inline-block;
         -webkit-mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-30 -30 606 572"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>') no-repeat 50% 50%;
         mask: url('data:image/svg+xml,<?xml version="1.0" encoding="utf-8"?><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="-30 -30 606 572"><!--! Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>') no-repeat 50% 50%;
@@ -1319,7 +1320,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     }
 
     .md-tabs__link {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         font-weight: 600;
         color: black;
         letter-spacing: -0.5px;
@@ -1467,13 +1468,18 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 .md-typeset.md-banner__inner {
     margin: 0.3rem auto;
     text-align: center;
-    font-size: 0.77rem;
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.md-typeset.md-banner__inner strong {
+    font-weight: 600;
 }
 
 .md-typeset.md-banner__inner a {
     color: var(--md-default-bg-color);
-    border-bottom: 2px dotted;
-    font-weight: 700;
+    border-bottom: 1.5px dotted;
+    font-weight: 600;
 }
 
 .md-typeset.md-banner__inner .md-banner__button {

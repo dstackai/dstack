@@ -6,7 +6,7 @@
 
 To use the open-source version of `dstack` with your own cloud accounts or on-prem clusters, follow this guide.
 
-> If you don't want to host the `dstack` server or want to access affordable GPU from the marketplace,
+> If you don't want to host the `dstack` server (or want to access GPU marketplace),
 > skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
 ## Configure backends

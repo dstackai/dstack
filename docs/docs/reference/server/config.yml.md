@@ -182,13 +182,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
 
 === "Default credentials"
 
-    Obtain the `subscription_id` and `tenant_id` via the [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
-
-    ```shell
-    az account show --query "{subscription_id: id, tenant_id: tenantId}"
-    ```
-
-    Then proceed to configure the backend:
+    If you have default credentials set up, configure the backend like this:
 
     <div editor-title="~/.dstack/server/config.yml">
 
@@ -204,6 +198,12 @@ There are two ways to configure Azure: using a client secret or using the defaul
     ```
 
     </div>
+
+    If you don't know your `subscription_id` and `tenant_id`, use [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+
+    ```shell
+    az account show --query "{subscription_id: id, tenant_id: tenantId}"
+    ```
 
 === "Client secret"
 
@@ -237,15 +237,16 @@ There are two ways to configure Azure: using a client secret or using the defaul
     
     </div>
 
-If you don't know your `subscription_id`, run
-
-```shell
-az account show --query "{subscription_id: id}"
-```
+    If you don't know your `subscription_id`, use [Azure CLI :material-arrow-top-right-thin:{ .external }](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli):
+    
+    ```shell
+    az account show --query "{subscription_id: id}"
+    ```
 
 ??? info "Required permissions"
     The following Azure permissions are sufficient for `dstack` to work:
-    ```
+
+    ```json
     {
         "properties": {
             "roleName": "dstack-role",
@@ -332,7 +333,7 @@ There are two ways to configure GCP: using a service account or using the defaul
 
     </div>
 
-If you don't know your GCP project ID, run
+If you don't know your GCP project ID, use [Google Cloud CLI :material-arrow-top-right-thin:{ .external }](https://cloud.google.com/sdk/docs/install-sdk):
 
 ```shell
 gcloud projects list --format="json(projectId)"
@@ -492,6 +493,13 @@ projects:
 ```
 
 </div>
+
+### SSH 
+
+The `ssh` backend enables container orchestration across any on-prem servers. 
+
+> This backend requires no configuration.
+> To use it, create [SSH fleets](../../concepts/fleets.md#ssh).
 
 ### Vast.ai
 
