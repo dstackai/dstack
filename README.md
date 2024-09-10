@@ -78,10 +78,10 @@ $ dstack config --url http://127.0.0.1:3000 \
 Configuration is updated at ~/.dstack/config.yml
 ```
 
-### 4. Create on-prem fleets
+### 4. Create SSH fleets
     
 > If you want the `dstack` server to run containers on your on-prem servers,
-use [fleets](https://dstack.ai/docs/concepts/fleets).
+use [fleets](https://dstack.ai/docs/concepts/fleets#ssh).
 
 ## How does it work?
 

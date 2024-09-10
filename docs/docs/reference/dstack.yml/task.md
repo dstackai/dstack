@@ -266,7 +266,7 @@ is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, 
 
 ??? info "Backends"
     Running on multiple nodes is supported only with the `aws`, `gcp`, `azure`, `oci` backends, or
-    [on-prem fleets](../../concepts/fleets.md#on-prem).
+    [SSH fleets](../../concepts/fleets.md#ssh).
 
 ### Web applications
 

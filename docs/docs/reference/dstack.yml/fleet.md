@@ -8,7 +8,7 @@ The `fleet` configuration type allows creating and updating fleets.
 
 ## Examples
 
-### Cloud fleet { #cloud-fleet }
+### Cloud
 
 <div editor-title="fleet-distrib.dstack.yml"> 
 
@@ -35,14 +35,14 @@ resources:
 
 </div>
 
-### On-prem fleet { #on-prem-fleet }
+### SSH
 
-<div editor-title="fleet-on-prem.dstack.yml"> 
+<div editor-title="fleet-ssh.dstack.yml"> 
     
 ```yaml
 type: fleet
 # The name is optional, if not specified, generated randomly
-name: my-on-prem-fleet
+name: my-ssh-fleet
 
 # Ensure instances are interconnected
 placement: cluster

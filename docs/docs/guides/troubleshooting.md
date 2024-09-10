@@ -85,9 +85,9 @@ correct DNS record pointing to the gateway's hostname.
 If the service endpoint returns a 403 error, it is likely because the [`Authorization`](../services.md#access-the-endpoint) 
 header with the correct `dstack` token was not provided.
 
-#### On-prem fleets
+#### SSH fleets
 
-If you attempt to run a service on an on-prem fleet, it won't work due to a [known issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1640){:target="_blank"} that is expected to be fixed soon.
+If you attempt to run a service on an SSH fleet, it won't work due to a [known issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1640){:target="_blank"} that is expected to be fixed soon.
 
 [//]: # (#### Other)
 [//]: # (TODO: Explain how to get the gateway logs)
@@ -103,9 +103,9 @@ If you interrupt the command, the port forwarding will be disconnected. To reatt
 If you're using the CLI on Windows, make sure to run it through WSL by following [these instructions:material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1644#issuecomment-2321559265){:target="_blank"}. 
 Native support will be available soon.
 
-### An on-prem fleet doesn't provision
+### An SSH fleet doesn't provision
 
-If you set up an on-prem fleet and it fails to provision after a long wait, first check the server logs. 
+If you set up an SSH fleet and it fails to provision after a long wait, first check the server logs. 
 Also, review the  `/root/.dstack/shim.log` file on each host used to create the fleet.
 
 ## Questions

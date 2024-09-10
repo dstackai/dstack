@@ -88,10 +88,10 @@ This configuration is stored in `~/.dstack/config.yml`.
     If you're using the CLI on Windows, make sure to run it through WSL by following [these instructions :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1644#issuecomment-2321559265){:target="_blank"}. 
     Native support will be available soon.
 
-## Create on-prem fleets
+## Create SSH fleets
 
 If you want the `dstack` server to run containers on your on-prem clusters,
-use [on-prem fleets](../concepts/fleets.md#on-prem).
+create [SSH fleets](../concepts/fleets.md#ssh).
 
 ## What's next?
 

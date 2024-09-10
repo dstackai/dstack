@@ -136,7 +136,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     def apply_args(self, conf: FleetConfiguration, args: argparse.Namespace, unknown: List[str]):
         self.apply_env_vars(conf.env, args)
         if conf.ssh_config is None and conf.env:
-            raise ConfigurationError("`env` is currently supported for on-prem fleets only")
+            raise ConfigurationError("`env` is currently supported for SSH fleets only")
 
 
 def _preprocess_spec(spec: FleetSpec):

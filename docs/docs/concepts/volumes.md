@@ -4,7 +4,7 @@ Volumes allow you to persist data between runs. `dstack` allows to create and at
 dev environments, tasks, and services.
 
 > Volumes are currently supported with the `aws`, `gcp`, and `runpod` backends.
-Support for other backends and on-prem fleets is coming soon.
+Support for other backends and SSH fleets is coming soon.
 
 ## Define a configuration
 

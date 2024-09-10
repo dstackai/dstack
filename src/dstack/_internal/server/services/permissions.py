@@ -19,7 +19,7 @@ class DefaultPermissions(CoreModel):
         Field(
             description=(
                 "This flag controls whether regular project members (i.e. Users)"
-                " can add and delete on-prem fleets"
+                " can add and delete SSH fleets"
             )
         ),
     ] = True

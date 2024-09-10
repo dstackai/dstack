@@ -57,9 +57,9 @@ are both acceptable).
 
     !!! info "What is an SSH fleet?"
         If you’d like to run dev environments, tasks, and services on arbitrary on-prem servers via `dstack`, you can 
-        create an on-prem fleet.
+        create an SSH fleet.
 
-    To create an on-prem fleet, specify `ssh_config` to allow the `dstack` server to connect to these servers
+    To create an SSH fleet, specify `ssh_config` to allow the `dstack` server to connect to these servers
     via SSH.
 
     <div editor-title="fleet-ssh.dstack.yml"> 
@@ -67,7 +67,7 @@ are both acceptable).
     ```yaml
     type: fleet
     # The name is optional, if not specified, generated randomly
-    name: my-on-prem-fleet
+    name: my-ssh-fleet
 
     # Ensure instances are interconnected
     placement: cluster
@@ -93,7 +93,7 @@ are both acceptable).
         The user should have `sudo` access.
 
     ??? info "Environment variables"
-        For on-prem fleets, it's possible to pre-configure environment variables. 
+        For SSH fleets, it's possible to pre-configure environment variables. 
         These variables will be used when installing the `dstack-shim` service on hosts 
         and running containers.
 
@@ -123,7 +123,7 @@ are both acceptable).
         In that case, by default, `dstack` will automatically detect the private network. 
         You can specify the [`network`](../reference/dstack.yml/fleet.md#network) parameter manually.
 
-    Note that to use on-prem fleets, you don't need any backends at all.
+    Note that to use SSH fleets, you don't need any backends at all.
 
 > See [`.dstack.yml`](../reference/dstack.yml/fleet.md) for all the options supported by
 > the fleet configuration.
@@ -158,10 +158,10 @@ $ dstack fleet
 
 Once the status of instances changes to `idle`, they can be used by dev environments, tasks, and services.
 
-### Troubleshooting on-prem fleets
+### Troubleshooting SSH fleets
 
 !!! info "Resources"
-    If you're creating an on-prem fleet, ensure that the GPU, memory, and disk size are detected properly.
+    If you're creating an SSH fleet, ensure that the GPU, memory, and disk size are detected properly.
     If GPU isn't detected, ensure that the hosts meet the requirements (see above).
 
 If the status doesn't change to `idle` after a few minutes, ensure that 
