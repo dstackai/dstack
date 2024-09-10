@@ -241,7 +241,7 @@ class RepoModel(BaseModel):
     name: Mapped[str] = mapped_column(String(100))
     type: Mapped[RepoType] = mapped_column(Enum(RepoType))
 
-    info: Mapped[str] = mapped_column(String(2000))
+    info: Mapped[str] = mapped_column(Text)
     creds: Mapped[Optional[str]] = mapped_column(String(5000))
 
 
@@ -283,7 +283,7 @@ class RunModel(BaseModel):
     submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     run_name: Mapped[str] = mapped_column(String(100))
     status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
-    run_spec: Mapped[str] = mapped_column(String(4000))
+    run_spec: Mapped[str] = mapped_column(Text)
     jobs: Mapped[List["JobModel"]] = relationship(
         back_populates="run", lazy="selectin", order_by="[JobModel.replica_num, JobModel.job_num]"
     )
@@ -295,7 +295,7 @@ class RunModel(BaseModel):
     termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
         Enum(RunTerminationReason)
     )
-    service_spec: Mapped[Optional[str]] = mapped_column(String(4000))
+    service_spec: Mapped[Optional[str]] = mapped_column(Text)
 
     __table_args__ = (Index("ix_submitted_at_id", submitted_at.desc(), id),)
 
@@ -321,8 +321,8 @@ class JobModel(BaseModel):
         Enum(JobTerminationReason)
     )
     termination_reason_message: Mapped[Optional[str]] = mapped_column(Text)
-    job_spec_data: Mapped[str] = mapped_column(String(4000))
-    job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
+    job_spec_data: Mapped[str] = mapped_column(Text)
+    job_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
     runner_timestamp: Mapped[Optional[int]] = mapped_column(BigInteger)
     # `removed` is used to ensure that the instance is killed after the job is finished
     remove_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
@@ -476,11 +476,11 @@ class InstanceModel(BaseModel):
     # TODO: Introduce a field that would store all resolved instance profile parameters, etc, (similar to job_spec).
     # Currently, profile parameters are parsed every time they are accessed (e.g. see profile.retry).
     profile: Mapped[Optional[str]] = mapped_column(Text)
-    requirements: Mapped[Optional[str]] = mapped_column(String(10_000))
+    requirements: Mapped[Optional[str]] = mapped_column(Text)
     instance_configuration: Mapped[Optional[str]] = mapped_column(Text)
 
     # temination policy
-    termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(50))
+    termination_policy: Mapped[Optional[TerminationPolicy]] = mapped_column(String(100))
     termination_idle_time: Mapped[int] = mapped_column(
         Integer, default=DEFAULT_POOL_TERMINATION_IDLE_TIME
     )
@@ -495,14 +495,14 @@ class InstanceModel(BaseModel):
 
     # backend
     backend: Mapped[Optional[BackendType]] = mapped_column(Enum(BackendType))
-    backend_data: Mapped[Optional[str]] = mapped_column(String(4000))
+    backend_data: Mapped[Optional[str]] = mapped_column(Text)
 
     # offer
-    offer: Mapped[Optional[str]] = mapped_column(String(4000))
+    offer: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[Optional[str]] = mapped_column(String(2000))
     price: Mapped[Optional[float]] = mapped_column(Float)
 
-    job_provisioning_data: Mapped[Optional[str]] = mapped_column(String(4000))
+    job_provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
 
     remote_connection_info: Mapped[Optional[str]] = mapped_column(Text)
 
