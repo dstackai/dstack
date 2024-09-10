@@ -178,8 +178,9 @@ class SSHTunnel:
 
     def open(self) -> None:
         # We cannot use `stderr=subprocess.PIPE` here since the forked process (daemon) does not
-        # close standard streams (it calls `daemon(3)` with `noclose` set to `1`), therefore
-        # we will wait EOF from the pipe as long as the daemon exists.
+        # close standard streams if ProxyJump is used, therefore we will wait EOF from the pipe
+        # as long as the daemon exists.
+        self._remove_log_file()
         try:
             r = subprocess.run(
                 self.open_command(),
@@ -193,23 +194,26 @@ class SSHTunnel:
             raise SSHError(msg) from e
         if r.returncode == 0:
             return
-        with open(self.log_path, "rb") as f:
-            error = f.read()
-        logger.debug("SSH tunnel failed: %s", error)
-        raise get_ssh_error(error)
+        stderr = self._read_log_file()
+        logger.debug("SSH tunnel failed: %s", stderr)
+        raise get_ssh_error(stderr)
 
     async def aopen(self) -> None:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._remove_log_file)
         proc = await asyncio.create_subprocess_exec(
-            *self.open_command(), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+            *self.open_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         try:
-            _, stderr = await asyncio.wait_for(proc.communicate(), SSH_TIMEOUT)
+            await asyncio.wait_for(proc.communicate(), SSH_TIMEOUT)
         except asyncio.TimeoutError as e:
+            proc.kill()
             msg = f"SSH tunnel to {self.destination} did not open in {SSH_TIMEOUT} seconds"
             logger.debug(msg)
             raise SSHError(msg) from e
         if proc.returncode == 0:
             return
+        stderr = await loop.run_in_executor(None, self._read_log_file)
         logger.debug("SSH tunnel failed: %s", stderr)
         raise get_ssh_error(stderr)
 
@@ -245,6 +249,18 @@ class SSHTunnel:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    def _read_log_file(self) -> bytes:
+        with open(self.log_path, "rb") as f:
+            return f.read()
+
+    def _remove_log_file(self) -> None:
+        try:
+            os.remove(self.log_path)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            logger.debug("Failed to remove SSH tunnel log file %s: %s", self.log_path, e)
 
 
 def ports_to_forwarded_sockets(
