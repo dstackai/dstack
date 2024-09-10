@@ -62,15 +62,20 @@ Here's the list of environment variables which you can override:
 ## Persist state
 
 By default, `dstack` stores its state in `~/.dstack/server/data` using SQLite.
-To use a database, set the `DSTACK_DATABASE_URL` environment variable (see below).
+The limitation of this setup is that there can only be one replica of the `dstack` server.
+You can also use an external Postgres database by setting the `DSTACK_DATABASE_URL` environment variable.
+The Postgres setup supports multiple server replicas.
 
 ### Replicate SQLite state via Litestream
 
-If not using `DSTACK_DATABASE_URL`, you can still replicate the state to cloud object storage using Litestream. To do
-this, you need to set the following environment variables.
+If you're using SQLite, you can still replicate the server state to cloud object storage using Litestream.
+This will provide you with real-time backups and allow to persist state across deployments.
+To enable Litestream replication, set the following environment variables:
 
 - `LITESTREAM_REPLICA_URL` - The url of the cloud object storage.
   Examples: `s3://<bucket-name>/<path>`, `gcs://<bucket-name>/<path>`, `abs://<storage-account>@<container-name>/<path>`, etc.
+
+You also need to configure cloud storage credentials.
 
 #### AWS S3
 
@@ -81,7 +86,7 @@ To persist state into an AWS S3 bucket, provide the following environment variab
 
 #### GCP Storage
 
-To persist state into an AWS S3 bucket, provide one of the following environment variables:
+To persist state into a GCP Storage bucket, provide one of the following environment variables:
 
 - `GOOGLE_APPLICATION_CREDENTIALS` - The path to the GCP service account key JSON file
 - `GOOGLE_APPLICATION_CREDENTIALS_JSON` - The GCP service account key JSON
@@ -94,9 +99,30 @@ To persist state into an Azure blog storage, provide the following environment v
 
 More [details](https://litestream.io/guides/) on options for configuring replication.
 
-_**️Note:** The use of Litestream requires that only one instance of the `dstack` server is running at a time._
+### Migrate from SQLite to Postgres
 
-## Workload log storage
+You can migrate `dstack` server data from SQLite to Postgres using pgloader:
+
+1. Create an new Postgres database.
+2. [Clone the `dstack` repo and install `dstack` from source](https://github.com/dstackai/dstack/blob/master/contributing/DEVELOPMENT.md).
+  Ensure you checked out the tag that corresponds to your server version (e.g. `git checkout 0.18.10`).
+3. Apply database migrations to the new database:
+  ```bash
+  cd src/dstack/_internal/server/
+  export DSTACK_DATABASE_URL="postgresql+asyncpg://..."
+  alembic upgrade head
+  ```
+4. Install [pgloader](https://github.com/dimitri/pgloader).
+5. Run pgloader script:
+  ```bash
+  cd scripts/
+  export SOURCE_PATH=sqlite:///Users/me/.dstack/server/data/sqlite.db
+  export TARGET_PATH=postgresql://postgres:postgres@localhost:5432/postgres
+  pgloader sqlite_to_psql.load
+  ```
+  pgloader will migrate all SQLite data to Postgres. It may emit warnings that are safe to ignore. If you encounter errors, please [submit an issue](https://github.com/dstackai/dstack/issues/new/choose). 
+
+## Configure log storage
 
 By default, `dstack` stores workload logs in `~/.dstack/server/projects/<project_name>/logs`.
 
