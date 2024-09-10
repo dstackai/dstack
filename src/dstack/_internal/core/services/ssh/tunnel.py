@@ -82,8 +82,8 @@ class SSHTunnel:
         self.port = port
         self.ssh_config_path = normalize_path(ssh_config_path)
         self.ssh_proxy = ssh_proxy
-
-        temp_dir = self._init_temp_dir()
+        temp_dir = tempfile.TemporaryDirectory()
+        self.temp_dir = temp_dir
         if control_sock_path is None:
             control_sock_path = os.path.join(temp_dir.name, "control.sock")
         self.control_sock_path = normalize_path(control_sock_path)
@@ -99,11 +99,6 @@ class SSHTunnel:
         self.log_path = normalize_path(os.path.join(temp_dir.name, "tunnel.log"))
         self.ssh_client_info = get_ssh_client_info()
         self.ssh_exec_path = str(self.ssh_client_info.path)
-
-    def _init_temp_dir(self) -> tempfile.TemporaryDirectory:
-        # A dedicated method makes testing easier.
-        self.temp_dir = tempfile.TemporaryDirectory()
-        return self.temp_dir
 
     def open_command(self) -> List[str]:
         # Some information about how `ssh(1)` handles options:

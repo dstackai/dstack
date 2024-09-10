@@ -1,7 +1,4 @@
-import re
-import tempfile
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 
@@ -25,16 +22,7 @@ class TestSSHTunnel:
         return ssh_client_info
 
     @pytest.fixture
-    def mocked_temp_dir(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-        mock = Mock(spec_spec=tempfile.TemporaryDirectory)
-        mock.name = str(tmp_path)
-        monkeypatch.setattr(SSHTunnel, "_init_temp_dir", Mock(return_value=mock))
-        return tmp_path
-
-    @pytest.fixture
-    def sample_tunnel_with_all_params(
-        self, ssh_client_info: SSHClientInfo, mocked_temp_dir: Path
-    ) -> SSHTunnel:
+    def sample_tunnel_with_all_params(self, ssh_client_info: SSHClientInfo) -> SSHTunnel:
         return SSHTunnel(
             destination="ubuntu@my-server",
             identity=FilePath("/home/user/.ssh/id_rsa"),
@@ -48,7 +36,7 @@ class TestSSHTunnel:
         )
 
     @pytest.mark.usefixtures("ssh_client_info")
-    def test_open_command_basic(self, mocked_temp_dir: Path) -> None:
+    def test_open_command_basic(self) -> None:
         tunnel = SSHTunnel(
             destination="ubuntu@my-server",
             identity=FilePath("/home/user/.ssh/id_rsa"),
@@ -64,7 +52,7 @@ class TestSSHTunnel:
             "/usr/bin/ssh"
             " -F /home/user/.ssh/config"
             " -i /home/user/.ssh/id_rsa"
-            f" -E {mocked_temp_dir}/tunnel.log"
+            f" -E {tunnel.temp_dir.name}/tunnel.log"
             " -N -f"
             " -o ControlMaster=auto"
             " -S /tmp/control.sock"
@@ -75,43 +63,47 @@ class TestSSHTunnel:
         )
 
     @pytest.mark.usefixtures("ssh_client_info")
-    def test_open_command_with_temp_identity_file(self, mocked_temp_dir: Path) -> None:
+    def test_open_command_with_temp_identity_file(self) -> None:
         tunnel = SSHTunnel(
             destination="ubuntu@my-server",
             identity=FileContent("my private key"),
             control_sock_path="/tmp/control.sock",
             options={},
         )
-        command = " ".join(tunnel.open_command())
-        match = re.fullmatch(
-            (
-                rf"/usr/bin/ssh -F none -i {mocked_temp_dir}/identity "
-                rf"-E {mocked_temp_dir}/tunnel.log "
-                r"-N -f -o ControlMaster=auto -S /tmp/control.sock ubuntu@my-server"
-            ),
-            command,
+        temp_dir = tunnel.temp_dir.name
+        assert " ".join(tunnel.open_command()) == (
+            "/usr/bin/ssh"
+            " -F none"
+            f" -i {temp_dir}/identity"
+            f" -E {temp_dir}/tunnel.log"
+            " -N -f"
+            " -o ControlMaster=auto"
+            " -S /tmp/control.sock"
+            " ubuntu@my-server"
         )
-        assert match
-        assert (mocked_temp_dir / "identity").read_text() == "my private key"
+        assert (Path(temp_dir) / "identity").read_text() == "my private key"
 
     @pytest.mark.usefixtures("ssh_client_info")
-    def test_open_command_with_temp_control_socket(self, mocked_temp_dir: Path) -> None:
+    def test_open_command_with_temp_control_socket(self) -> None:
         tunnel = SSHTunnel(
             destination="ubuntu@my-server",
             identity=FilePath("/home/user/.ssh/id_rsa"),
             options={},
         )
-        command = " ".join(tunnel.open_command())
-        assert re.fullmatch(
-            (
-                rf"/usr/bin/ssh -F none -i /home/user/.ssh/id_rsa -E {mocked_temp_dir}/tunnel.log "
-                rf"-N -f -o ControlMaster=auto -S {mocked_temp_dir}/control.sock ubuntu@my-server"
-            ),
-            command,
+        temp_dir = tunnel.temp_dir.name
+        assert " ".join(tunnel.open_command()) == (
+            "/usr/bin/ssh"
+            " -F none"
+            " -i /home/user/.ssh/id_rsa"
+            f" -E {temp_dir}/tunnel.log"
+            " -N -f"
+            " -o ControlMaster=auto"
+            f" -S {temp_dir}/control.sock"
+            " ubuntu@my-server"
         )
 
     @pytest.mark.usefixtures("ssh_client_info")
-    def test_open_command_with_proxy(self, mocked_temp_dir: Path) -> None:
+    def test_open_command_with_proxy(self) -> None:
         tunnel = SSHTunnel(
             destination="ubuntu@my-server",
             identity=FilePath("/home/user/.ssh/id_rsa"),
@@ -126,7 +118,7 @@ class TestSSHTunnel:
             "-i",
             "/home/user/.ssh/id_rsa",
             "-E",
-            f"{mocked_temp_dir}/tunnel.log",
+            f"{tunnel.temp_dir.name}/tunnel.log",
             "-N",
             "-f",
             "-o",
@@ -143,7 +135,7 @@ class TestSSHTunnel:
         ]
 
     @pytest.mark.usefixtures("ssh_client_info")
-    def test_open_command_with_forwarding(self, mocked_temp_dir: Path) -> None:
+    def test_open_command_with_forwarding(self) -> None:
         tunnel = SSHTunnel(
             destination="ubuntu@my-server",
             identity=FilePath("/home/user/.ssh/id_rsa"),
@@ -162,7 +154,7 @@ class TestSSHTunnel:
             "/usr/bin/ssh"
             " -F none"
             " -i /home/user/.ssh/id_rsa"
-            f" -E {mocked_temp_dir}/tunnel.log"
+            f" -E {tunnel.temp_dir.name}/tunnel.log"
             " -N -f"
             " -o ControlMaster=auto"
             " -S /tmp/control.sock"
