@@ -11,6 +11,8 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 
 ## Prerequisites
 
+`dstack` works on Linux, macOS, and Windows, with one exception — the `dstack server` functionality is not currently supported on Windows.
+
 `dstack` requires Git and OpenSSH client to operate.
 
 On Windows, install [Git for Windows](https://git-scm.com/download/win), it contains both Git and OpenSSH. During the installation,
