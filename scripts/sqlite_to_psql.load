@@ -1,0 +1,9 @@
+LOAD DATABASE
+    FROM {{SOURCE_PATH}} /* e.g. sqlite:///Users/me/.dstack/server/data/sqlite.db */
+    INTO {{TARGET_PATH}} /* e.g. postgresql://postgres:postgres@localhost:5432/postgres */
+
+WITH preserve index names, data only
+
+EXCLUDING TABLE NAMES LIKE 'alembic_version'
+
+SET work_mem to '16MB', maintenance_work_mem to '512 MB';
