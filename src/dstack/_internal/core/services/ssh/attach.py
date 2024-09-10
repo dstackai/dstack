@@ -9,11 +9,11 @@ from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.configs import ConfigManager
+from dstack._internal.core.services.ssh.client import get_ssh_client_info
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
 from dstack._internal.utils.path import FilePath, PathLike
 from dstack._internal.utils.ssh import (
-    get_ssh_client_info,
     include_ssh_config,
     normalize_path,
     update_ssh_config,

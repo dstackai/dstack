@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from dstack._internal.core.models.instances import SSHConnectionParams
+from dstack._internal.core.services.ssh.client import SSHClientInfo
 from dstack._internal.core.services.ssh.tunnel import (
     IPSocket,
     SocketPair,
@@ -11,14 +12,15 @@ from dstack._internal.core.services.ssh.tunnel import (
     ports_to_forwarded_sockets,
 )
 from dstack._internal.utils.path import FileContent, FilePath
-from dstack._internal.utils.ssh import SSHClientInfo
 
 
 class TestSSHTunnel:
     @pytest.fixture
     def ssh_client_info(self, monkeypatch: pytest.MonkeyPatch) -> SSHClientInfo:
         ssh_client_info = SSHClientInfo.from_raw_version("OpenSSH_9.7p1", Path("/usr/bin/ssh"))
-        monkeypatch.setattr("dstack._internal.utils.ssh._ssh_client_info", ssh_client_info)
+        monkeypatch.setattr(
+            "dstack._internal.core.services.ssh.client._ssh_client_info", ssh_client_info
+        )
         return ssh_client_info
 
     @pytest.fixture

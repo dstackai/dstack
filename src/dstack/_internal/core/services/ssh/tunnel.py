@@ -10,9 +10,10 @@ from typing import Dict, Iterable, List, Literal, Optional, Union
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh import get_ssh_error
+from dstack._internal.core.services.ssh.client import get_ssh_client_info
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FilePath, FilePathOrContent, PathLike
-from dstack._internal.utils.ssh import get_ssh_client_info, normalize_path
+from dstack._internal.utils.ssh import normalize_path
 
 logger = get_logger(__name__)
 SSH_TIMEOUT = 15
