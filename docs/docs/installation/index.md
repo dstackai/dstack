@@ -9,18 +9,6 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 > If you don't want to host the `dstack` server (or want to access GPU marketplace),
 > skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
-## Prerequisites
-
-`dstack` works on Linux, macOS, and Windows, with one exception — the `dstack server` functionality is not currently supported on Windows.
-
-`dstack` requires Git and OpenSSH client to operate.
-
-On Windows, install [Git for Windows](https://git-scm.com/download/win), it contains both Git and OpenSSH. During the installation,
-make sure the following options are checked:
-
-- _“Git from the command line and also from 3-rd party software”_ or _“Use Git and optional Unix tools from the Command Prompt”_
-- _“Use bundled OpenSSH”_
-
 ## Configure backends
 
 To use `dstack` with your own cloud accounts, or Kubernetes,
@@ -31,6 +19,9 @@ create the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) fi
 Once backends are configured, proceed and start the server:
 
 === "pip"
+
+    > The server can be set up via `pip` on Linux, macOS, and Windows (as long as you use WSL 2).
+    > It requires Git and OpenSSH.
 
     <div class="termy">
     
@@ -68,7 +59,7 @@ Once backends are configured, proceed and start the server:
 The `dstack` server can run anywhere: on your laptop, a dedicated server, or in the cloud. Once it's up, you
 can use either the CLI or the API.
 
-??? info "State"
+??? info "Persisting state"
     By default, the `dstack` server stores its state locally in `~/.dstack/server`.
     To store it externally, use the `DSTACK_DATABASE_URL` and 
     `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP` [environment variables](../reference/cli/index.md#environment-variables).
@@ -77,6 +68,18 @@ can use either the CLI or the API.
     [`~/.dstack/server/config.yml`](../reference/server/config.yml.md#encryption_1).
 
 ## Set up the CLI
+
+> The CLI can be set up on Linux, macOS, and Windows. It requires
+> Git and OpenSSH.
+    
+??? info "Windows"
+    To use the CLI on Windows, ensure you've installed Git and OpenSSH via 
+    [Git for Windows:material-arrow-top-right-thin:{ .external }](https://git-scm.com/download/win){:target="_blank"}. 
+
+    When installing it, ensure you've checked 
+    `Git from the command line and also from 3-rd party software` 
+    (or `Use Git and optional Unix tools from the Command Prompt`), and 
+    `Use bundled OpenSSH`.
 
 To point the CLI to the `dstack` server, configure it
 with the server address, user token, and project name:
@@ -95,10 +98,6 @@ Configuration is updated at ~/.dstack/config.yml
 </div>
 
 This configuration is stored in `~/.dstack/config.yml`.
-
-??? info "Windows"
-    If you're using the CLI on Windows, make sure to run it through WSL by following [these instructions :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1644#issuecomment-2321559265){:target="_blank"}. 
-    Native support will be available soon.
 
 ## Create SSH fleets
 
