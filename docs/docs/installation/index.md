@@ -9,6 +9,18 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 > If you don't want to host the `dstack` server (or want to access GPU marketplace),
 > skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
+## Prerequisites
+
+`dstack` works on Linux, macOS, and Windows, with one exception — the `dstack server` functionality is not currently supported on Windows.
+
+`dstack` requires Git and OpenSSH client to operate.
+
+On Windows, install [Git for Windows](https://git-scm.com/download/win), it contains both Git and OpenSSH. During the installation,
+make sure the following options are checked:
+
+- _“Git from the command line and also from 3-rd party software”_ or _“Use Git and optional Unix tools from the Command Prompt”_
+- _“Use bundled OpenSSH”_
+
 ## Configure backends
 
 To use `dstack` with your own cloud accounts, or Kubernetes,

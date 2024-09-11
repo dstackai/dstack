@@ -5,7 +5,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import paramiko
 from filelock import FileLock
@@ -13,8 +13,9 @@ from paramiko.config import SSHConfig
 from paramiko.pkey import PKey, PublicBlob
 from paramiko.ssh_exception import SSHException
 
+from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.utils.logging import get_logger
-from dstack._internal.utils.path import PathLike
+from dstack._internal.utils.path import FilePath, PathLike
 
 logger = get_logger(__name__)
 
@@ -51,6 +52,46 @@ def try_ssh_key_passphrase(identity_file: PathLike, passphrase: str = "") -> boo
     return r.returncode == 0
 
 
+def normalize_path(path: PathLike, *, collapse_user: bool = False) -> str:
+    """
+    Converts a path to the most compatible format.
+    On Windows, replaces backslashes with slashes.
+    Additionally, if `collapse_user` is `True`, tries to replace the user home part of the path
+    with `~`.
+
+    :param path: Path object or string
+    :param collapse_user: try to replace user home prefix with `~`. `False` by default.
+    :return: Normalized path as string
+    """
+    if collapse_user:
+        # The following "reverse" expanduser operation not only makes paths shorter and "nicer",
+        # but also fixes one specific issue with OpenSSH bundled with Git for Windows (MSYS2),
+        # see :func:`include_ssh_config` for details.
+        try:
+            path = Path(path).relative_to(Path.home())
+            path = f"~/{path}"
+        except ValueError:
+            pass
+    if IS_WINDOWS:
+        # Git for Windows ssh (based on MSYS2, but there may be subtle differences between
+        # vanilla MSYS2 ssh and Git for Windows ssh) supports:
+        #   * C:\\Users\\User
+        #   * C:/Users/User
+        #   * /c/Users/User
+        # does not support:
+        #   * C:\Users\User (as pathllib.WindowsPath is rendered)
+        # OpenSSH_for_Windows supports:
+        #   * C:\Users\User
+        #   * C:\\Users\\User
+        #   * C:/Users/User
+        # does not support:
+        #   * /c/User/User
+        # We use C:/Users/User format as the safest (supported by both ssh builds;
+        # no backslash-escaping pitfalls)
+        return str(path).replace("\\", "/")
+    return str(path)
+
+
 def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_config_path):
     """
     Adds Include entry on top of the default ssh config file
@@ -59,6 +100,10 @@ def include_ssh_config(path: PathLike, ssh_config_path: PathLike = default_ssh_c
     """
     ssh_config_path = os.path.expanduser(ssh_config_path)
     Path(ssh_config_path).parent.mkdir(0o600, parents=True, exist_ok=True)
+    # MSYS2 OpenSSH accepts only /c/Users/User/... format in the Include directive (although
+    # it accepts C:/Users/User/... in other directives). We try to work around this issue
+    # converting the path to ~/.dstack/... format.
+    path = normalize_path(path, collapse_user=True)
     include = f"Include {path}\n"
     content = ""
     with FileLock(str(ssh_config_path) + ".lock"):
@@ -103,7 +148,7 @@ def get_ssh_config(path: PathLike, host: str) -> Optional[Dict[str, str]]:
         return None
 
 
-def update_ssh_config(path: PathLike, host: str, options: Dict[str, str]):
+def update_ssh_config(path: PathLike, host: str, options: Dict[str, Union[str, FilePath]]):
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     with FileLock(str(path) + ".lock"):
         copy_mode = True
@@ -121,6 +166,8 @@ def update_ssh_config(path: PathLike, host: str, options: Dict[str, str]):
             if options:
                 f.write(f"Host {host}\n")
                 for k, v in options.items():
+                    if isinstance(v, FilePath):
+                        v = normalize_path(v.path, collapse_user=True)
                     f.write(f"    {k} {v}\n")
             f.flush()
 

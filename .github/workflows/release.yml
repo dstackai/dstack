@@ -51,7 +51,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ macos-latest, ubuntu-latest]
+        os: [ macos-latest, ubuntu-latest, windows-latest ]
         python-version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
     steps:
       - uses: actions/checkout@v4
@@ -66,7 +66,8 @@ jobs:
         with:
           name: frontend-build
           path: src/dstack/_internal/server/statics
-      - name: Run pytest
+      - name: Run pytest on POSIX
+        if: matrix.os != 'windows-latest'
         # Skip Postgres tests on macos since macos runner doesn't have Docker.
         # Skip Postgres tests for Python 3.8 since testcontainers<4 doesn't support asyncpg correctly.
         run: |
@@ -75,6 +76,10 @@ jobs:
             RUNPOSTGRES="--runpostgres"
           fi
           pytest src/tests --runui $RUNPOSTGRES
+      - name: Run pytest on Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          pytest src/tests --runui --runpostgres
 
   runner-test:
     defaults:

@@ -2,6 +2,7 @@ import errno
 import socket
 from typing import Dict, List, Optional
 
+from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import DstackError
 from dstack._internal.core.models.configurations import PortMapping
 
@@ -52,7 +53,6 @@ class PortsLock:
     def release(self) -> Dict[int, int]:
         mapping = self.dict()
         for sock in self.sockets.values():
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.close()
         self.sockets = {}
         return mapping
@@ -73,6 +73,10 @@ class PortsLock:
     def _listen(port: int) -> Optional[socket.socket]:
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            if IS_WINDOWS:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            else:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.bind(("", port))
             return sock
         except socket.error as e:

@@ -5,13 +5,15 @@ import shlex
 import subprocess
 import tempfile
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Literal, Optional, Union
 
 from dstack._internal.core.errors import SSHError
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.services.ssh import get_ssh_error
+from dstack._internal.core.services.ssh.client import get_ssh_client_info
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FilePath, FilePathOrContent, PathLike
+from dstack._internal.utils.ssh import normalize_path
 
 logger = get_logger(__name__)
 SSH_TIMEOUT = 15
@@ -64,7 +66,7 @@ class SSHTunnel:
         reverse_forwarded_sockets: Iterable[SocketPair] = (),
         control_sock_path: Optional[PathLike] = None,
         options: Dict[str, str] = SSH_DEFAULT_OPTIONS,
-        ssh_config_path: str = "none",
+        ssh_config_path: Union[PathLike, Literal["none"]] = "none",
         port: Optional[int] = None,
         ssh_proxy: Optional[SSHConnectionParams] = None,
     ):
@@ -79,23 +81,13 @@ class SSHTunnel:
         self.reverse_forwarded_sockets = list(reverse_forwarded_sockets)
         self.options = options
         self.port = port
-        self.ssh_config_path = ssh_config_path
+        self.ssh_config_path = normalize_path(ssh_config_path)
         self.ssh_proxy = ssh_proxy
-
-        self.temp_dir, self.identity_path, self.control_sock_path = self._init_temp_dir_if_needed(
-            identity, control_sock_path
-        )
-
-    @staticmethod
-    def _init_temp_dir_if_needed(
-        identity: FilePathOrContent, control_sock_path: Optional[PathLike]
-    ) -> Tuple[Optional[tempfile.TemporaryDirectory], PathLike, PathLike]:
-        if control_sock_path is not None and isinstance(identity, FilePath):
-            return None, identity.path, control_sock_path
-
         temp_dir = tempfile.TemporaryDirectory()
+        self.temp_dir = temp_dir
         if control_sock_path is None:
             control_sock_path = os.path.join(temp_dir.name, "control.sock")
+        self.control_sock_path = normalize_path(control_sock_path)
         if isinstance(identity, FilePath):
             identity_path = identity.path
         else:
@@ -104,22 +96,47 @@ class SSHTunnel:
                 identity_path, opener=lambda path, flags: os.open(path, flags, 0o600), mode="w"
             ) as f:
                 f.write(identity.content)
-
-        return temp_dir, identity_path, control_sock_path
+        self.identity_path = normalize_path(identity_path)
+        self.log_path = normalize_path(os.path.join(temp_dir.name, "tunnel.log"))
+        self.ssh_client_info = get_ssh_client_info()
+        self.ssh_exec_path = str(self.ssh_client_info.path)
 
     def open_command(self) -> List[str]:
+        # Some information about how `ssh(1)` handles options:
+        # 1. Command-line options override config options regardless of the order of the arguments:
+        #   `ssh -S sock2 -F config` with `ControlPath sock1` in the config -> the control socket
+        #   path is `sock2`.
+        # 2. First argument wins:
+        #   `ssh -S sock2 -S sock1` -> the control socket path is `sock2`.
+        # 3. `~` is not expanded in the arguments, but expanded in the config file.
         command = [
-            "ssh",
+            self.ssh_exec_path,
             "-F",
             self.ssh_config_path,
-            "-f",  # go to background after connecting
-            "-N",  # do not run commands on remote
-            "-M",  # use the control socket in master mode
-            "-S",
-            str(self.control_sock_path),
             "-i",
-            str(self.identity_path),
+            self.identity_path,
+            "-E",
+            self.log_path,
+            "-N",  # do not run commands on remote
         ]
+        if self.ssh_client_info.supports_background_mode:
+            command += ["-f"]  # go to background after successful authentication
+        else:
+            raise SSHError("Unsupported SSH client")
+        if self.ssh_client_info.supports_control_socket:
+            # It's safe to use ControlMaster even if the ssh client does not support multiplexing
+            # as long as we don't allow more than one tunnel to the specific host to be running.
+            # We use this feature for control only (see :meth:`close_command`).
+            command += [
+                # Not `-M`, which means `ControlMaster=yes`, to avoid spawning uncontrollable
+                # ssh instances if more than one tunnel is started (precaution).
+                "-o",
+                "ControlMaster=auto",
+                "-S",
+                self.control_sock_path,
+            ]
+        else:
+            raise SSHError("Unsupported SSH client")
         if self.port is not None:
             command += ["-p", str(self.port)]
         for k, v in self.options.items():
@@ -134,21 +151,21 @@ class SSHTunnel:
         return command
 
     def close_command(self) -> List[str]:
-        return ["ssh", "-S", str(self.control_sock_path), "-O", "exit", self.destination]
+        return [self.ssh_exec_path, "-S", self.control_sock_path, "-O", "exit", self.destination]
 
     def check_command(self) -> List[str]:
-        return ["ssh", "-S", str(self.control_sock_path), "-O", "check", self.destination]
+        return [self.ssh_exec_path, "-S", self.control_sock_path, "-O", "check", self.destination]
 
     def exec_command(self) -> List[str]:
-        return ["ssh", "-S", str(self.control_sock_path), self.destination]
+        return [self.ssh_exec_path, "-S", self.control_sock_path, self.destination]
 
     def proxy_command(self) -> Optional[List[str]]:
         if self.ssh_proxy is None:
             return None
         return [
-            "ssh",
+            self.ssh_exec_path,
             "-i",
-            str(self.identity_path),
+            self.identity_path,
             "-W",
             "%h:%p",
             "-o",
@@ -161,37 +178,43 @@ class SSHTunnel:
         ]
 
     def open(self) -> None:
-        # Using stderr=subprocess.PIPE may block subprocess.run.
-        # Redirect stderr to file to get ssh error message
-        with tempfile.NamedTemporaryFile(delete=False) as f:
-            try:
-                r = subprocess.run(
-                    self.open_command(), stdout=subprocess.DEVNULL, stderr=f, timeout=SSH_TIMEOUT
-                )
-            except subprocess.TimeoutExpired as e:
-                msg = f"SSH tunnel to {self.destination} did not open in {SSH_TIMEOUT} seconds"
-                logger.debug(msg)
-                raise SSHError(msg) from e
-        with open(f.name, "r+b") as f:
-            error = f.read()
-        os.remove(f.name)
+        # We cannot use `stderr=subprocess.PIPE` here since the forked process (daemon) does not
+        # close standard streams if ProxyJump is used, therefore we will wait EOF from the pipe
+        # as long as the daemon exists.
+        self._remove_log_file()
+        try:
+            r = subprocess.run(
+                self.open_command(),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=SSH_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired as e:
+            msg = f"SSH tunnel to {self.destination} did not open in {SSH_TIMEOUT} seconds"
+            logger.debug(msg)
+            raise SSHError(msg) from e
         if r.returncode == 0:
             return
-        logger.debug("SSH tunnel failed: %s", error)
-        raise get_ssh_error(error)
+        stderr = self._read_log_file()
+        logger.debug("SSH tunnel failed: %s", stderr)
+        raise get_ssh_error(stderr)
 
     async def aopen(self) -> None:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._remove_log_file)
         proc = await asyncio.create_subprocess_exec(
-            *self.open_command(), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+            *self.open_command(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         try:
-            _, stderr = await asyncio.wait_for(proc.communicate(), SSH_TIMEOUT)
+            await asyncio.wait_for(proc.communicate(), SSH_TIMEOUT)
         except asyncio.TimeoutError as e:
+            proc.kill()
             msg = f"SSH tunnel to {self.destination} did not open in {SSH_TIMEOUT} seconds"
             logger.debug(msg)
             raise SSHError(msg) from e
         if proc.returncode == 0:
             return
+        stderr = await loop.run_in_executor(None, self._read_log_file)
         logger.debug("SSH tunnel failed: %s", stderr)
         raise get_ssh_error(stderr)
 
@@ -227,6 +250,18 @@ class SSHTunnel:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    def _read_log_file(self) -> bytes:
+        with open(self.log_path, "rb") as f:
+            return f.read()
+
+    def _remove_log_file(self) -> None:
+        try:
+            os.remove(self.log_path)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            logger.debug("Failed to remove SSH tunnel log file %s: %s", self.log_path, e)
 
 
 def ports_to_forwarded_sockets(
