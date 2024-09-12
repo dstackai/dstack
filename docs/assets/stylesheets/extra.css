@@ -2,7 +2,7 @@
     .md-header {
         backdrop-filter: blur(5px);
         background-color: rgba(255, 255, 255, 0);
-        border-bottom: 0.5px dotted rgba(0, 0, 0, 0.4);
+        border-bottom: 0.5px dotted rgba(0, 0, 0, 1);
         padding-bottom: 2px;
     }
 
@@ -30,11 +30,12 @@
 }
 
 #kapa-widget-container .mantine-Text-root {
-    font-size: 0.68em !important;
-    font-weight: 600;
-    color: black !important;
+    font-size: 16.5px !important;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 1.87) !important;
     text-shadow: none !important;
     letter-spacing: -0.5px;
+    line-height: 1.2;
 }
 
 #kapa-widget-container .mantine-Button-inner:focus-visible {
@@ -44,10 +45,10 @@
 #kapa-widget-container .mantine-Button-root {
     height: 4rem !important;
     width: 4rem !important;
-    background: rgb(245 247 255) !important;
+    background: rgba(255,255,255, 0.4) !important;
     box-shadow: none !important;
-    border: none !important;
-    border-radius: 6px;
+    border: 0.5px solid black !important;
+    border-radius: 4px;
 }
 
 #kapa-widget-container .mantine-Image-image {
@@ -286,16 +287,13 @@
 }
 
 .md-nav--secondary {
-    border: 0.5px dotted black;
-    padding: 20px 5px;
     margin-top: 20px;
-    border-radius: 3px;
 }
 
 .md-nav--secondary .md-nav__title {
     background: transparent;
     box-shadow: none;
-    padding: 2px 15px 3px;
+    padding: 6px 15px 5px;
     font-size: 17px;
     font-weight: 700;
     color: rgba(0, 0, 0, 0.87);
@@ -415,7 +413,7 @@
 /*}*/
 
 .md-nav__link {
-    margin-top: .5em;
+    margin-top: 0;
 }
 
 .md-nav__link:hover {
@@ -521,8 +519,9 @@ h4.doc-heading {
 @media screen and (min-width: 60em) {
     [data-md-color-primary=white] .md-search__form {
         background-color: transparent;
-        border-radius: 18px;
-        border: 1px solid rgba(0,0,0,0.87);
+        border-radius: 4px;
+        border: 1px solid black;
+        height: 1.9rem;
     }
 
     [data-md-color-primary=white] .md-search__form:hover {
@@ -731,7 +730,8 @@ body {
 }
 
 .md-main__inner {
-    margin-top: 1.25em;
+    /* DO NOT CHANGE: IT BREAKS SIDEBAR NAVIGATION */
+    /*margin-top: 1.25em;*/
 }
 
 .md-sidebar__inner {
@@ -749,10 +749,12 @@ body {
     }
 
     .md-sidebar--primary .md-nav__item--section.md-nav__item .md-nav__link--active {
-        border-left: 2px solid var(--md-typeset-a-color);
+        border-left: 2.5px solid var(--md-typeset-a-color);
         color: inherit;
-        margin-left: -2px;
         border-image: linear-gradient(8deg, #0048ff, #ce00ff, #ce00ff, #ce00ff) 10;
+        margin-left: 1px;
+        font-size: 16.5px;
+        padding-left: 15px;
     }
 
     .md-sidebar--primary .md-nav__item--section.md-nav__item .md-nav__link {
@@ -766,7 +768,7 @@ body {
     .md-nav__item--section > .md-nav__link {
         /*text-transform: uppercase;*/
         display: inline-block;
-        font-size: 17px;
+        font-size: 17.5px;
         font-weight: 700;
         line-height: 1.4rem;
         letter-spacing: -0.5px;
@@ -821,20 +823,24 @@ body {
 }
 
 .md-sidebar--primary .md-nav__link {
-    padding: 3px 15px 4px;
-    margin-top: 3px;
+    padding: 6px 15px 5px;
+    margin-top: 0;
+}
+
+.md-nav.md-nav--secondary > .md-nav__list > .md-nav__item {
+    margin-left: 12px;
+    border-left: 0.5px dotted rgba(0, 0, 0, 0.4);
+    font-size: 16.5px;
 }
 
 .md-sidebar--secondary .md-nav__link {
-    padding-left: 15px;
     margin-left: -8px;
     border-left: 2px solid transparent;
-    padding-top: 1px;
-    padding-bottom: 1px;
+    padding: 6px 15px 5px;
 }
 
 .md-sidebar--secondary .md-nav__item {
-    padding-left: 0.6rem;
+    padding-left: 0.35rem;
 }
 
 .md-sidebar--secondary .md-nav__item .md-nav__link--passed {
@@ -842,17 +848,18 @@ body {
 }
 
 .md-sidebar--secondary .md-nav__item .md-nav__link--active .md-typeset {
-    font-weight: 700;
+    font-weight: 600;
 }
 
 .md-sidebar--secondary .md-nav__item .md-nav__link--active {
-    border-left: 2px solid var(--md-typeset-a-color);
+    border-left: 2.5px solid var(--md-typeset-a-color);
     color: inherit;
     border-image: linear-gradient(8deg, #0048ff, #ce00ff, #ce00ff, #ce00ff) 10;
+    margin-left: -9px;
 }
 
 .md-nav__item .md-nav__link--active, .md-nav__item .md-nav__link--active:hover {
-    font-weight: 700;
+    font-weight: 600;
     color: inherit;
 }
 
@@ -863,15 +870,18 @@ body {
 
 @media screen and (min-width: 76.1875em) {
     .md-nav__item--section>.md-nav>.md-nav__list>li.md-nav__item:not(.md-nav__item--nested):not(.md-nav__item--active) {
-        padding-left: 0.4rem;
-        /*margin-left: -4px;*/
-        /*color: inherit;*/
+        margin-left: 12px;
+        border-left: 0.5px dotted rgba(0, 0, 0, 0.4);
+        font-size: 16.5px;
     }
     .md-sidebar--primary a.md-nav__link--active {
         overflow: inherit;
     }
     .md-nav__item--section>.md-nav>.md-nav__list>.md-nav__item {
-        padding-left: 0.4rem;
+        margin-left: 10px;
+    }
+    .md-nav__item--section {
+        margin: 0.7em 0
     }
     /*MKDocs Insiders fix*/
     /*.md-sidebar--primary a.md-nav__link--active::before {*/
@@ -887,7 +897,7 @@ body {
     /*      margin-left: -24px;*/
     /*}*/
     .md-sidebar--primary .md-nav__link--active {
-        font-weight: 700;
+        font-weight: 600;
         justify-content: start;
     }
 }
@@ -1202,8 +1212,8 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         content: "";
         width: 100%;
         z-index: 1000;
-        height: 2px;
-        bottom: -2px;
+        height: 2.5px;
+        bottom: -4.5px;
         border-radius: 2px;
     }
 
@@ -1324,7 +1334,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         font-weight: 600;
         color: black;
         letter-spacing: -0.5px;
-        margin-top: 2px;
+        margin-top: 1px;
         line-height: 24px;
     }
 
@@ -1466,10 +1476,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 }
 
 .md-typeset.md-banner__inner {
-    margin: 0.3rem auto;
+    margin: 0.15rem auto;
     text-align: center;
-    font-size: 0.75rem;
-    font-weight: 400;
+    font-size: 0.725rem;
+    font-weight: 300;
 }
 
 .md-typeset.md-banner__inner strong {
@@ -1480,6 +1490,12 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     color: var(--md-default-bg-color);
     border-bottom: 1.5px dotted;
     font-weight: 600;
+}
+
+.md-typeset.md-banner__inner .md-banner__button svg {
+    height: 20px;
+    max-width: 100%;
+    margin: 0.2rem 0;
 }
 
 .md-typeset.md-banner__inner .md-banner__button {
