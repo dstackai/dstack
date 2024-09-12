@@ -223,7 +223,7 @@
 .md-typeset .md-button {
     margin-top: 1.2rem;
     margin-bottom: 1.5rem;
-    font-size: 20px;
+    font-size: 21px;
     font-weight: 400 !important;
     text-align: center;
     border-radius: 3px;
@@ -931,8 +931,14 @@
     margin: 0;
 }
 
-@media screen and (max-width: 76.1875em) {
+@media screen and (max-width: 44.984375em) {
+    .md-header__buttons .md-button:before, .md-header__buttons .md-button:after {
+        display: none !important;
+    }
 
+    .md-header__buttons .md-button-secondary.borderless, .md-header__buttons .md-button-secondary.borderless:hover {
+        padding-right: 10px;
+    }
 }
 
 @media screen and (min-width: 76.1875em) {

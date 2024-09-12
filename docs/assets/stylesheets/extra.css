@@ -45,7 +45,7 @@
 #kapa-widget-container .mantine-Button-root {
     height: 4rem !important;
     width: 4rem !important;
-    background: rgba(255,255,255, 0.4) !important;
+    background: rgba(255,255,255, 0.5) !important;
     box-shadow: none !important;
     border: 0.5px solid black !important;
     border-radius: 4px;
@@ -1450,16 +1450,36 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         border-radius: 0 !important;
     }
 
-    .md-typeset .termy{
-        margin: 0 -.8rem 0 -0.8rem;
+    .md-typeset .termy {
+        margin-left: -0.8rem;
+        margin-right: -0.8rem;
+    }
+
+    .md-typeset .tabbed-set .termy {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .md-typeset blockquote {
+        margin-left: -0.8rem;
+        margin-right: -0.8rem;
+        border-radius: 0;
+    }
+
+    .md-typeset .tabbed-set blockquote {
+        margin-left: 0;
+        margin-right: 0;
+        border-radius: 0;
     }
 
     .md-typeset .tabbed-set {
         margin: 0 -.8rem 0 -0.8rem;
     }
 
-    [dir=ltr] .md-typeset blockquote, [dir=ltr] .md-typeset :is(.admonition,details) {
-        margin: 0 -.8rem 0 -0.8rem;
+    [dir=ltr] .md-typeset :is(.admonition,details) {
+        border-radius: 0 !important;
+        margin-left: -0.8rem;
+        margin-right: -0.8rem;
     }
 
     [dir=ltr] .md-content__inner>.tabbed-set .tabbed-labels {
@@ -1480,6 +1500,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     text-align: center;
     font-size: 0.725rem;
     font-weight: 300;
+    white-space: nowrap;
 }
 
 .md-typeset.md-banner__inner strong {
