@@ -6,22 +6,18 @@ from aiocache import cached
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from dstack.gateway.common import AsyncClientWrapper
+from dstack.gateway.core.multi_client import dstack_server_client
 
-DSTACK_SERVER_TUNNEL_PORT = 8001
 logger = logging.getLogger(__name__)
 
 
 class AuthProvider:
-    def __init__(self):
-        self.client = AsyncClientWrapper(base_url=f"http://localhost:{DSTACK_SERVER_TUNNEL_PORT}")
-
     @cached(ttl=60, noself=True, skip_cache_func=lambda r: r is None)
     async def has_access(self, project: str, token: str) -> bool | None:
         """True - yes, False - no, None - failed checking"""
 
         try:
-            resp = await self.client.post(
+            resp = await dstack_server_client.post(
                 f"/api/projects/{project}/get",
                 headers={"Authorization": f"Bearer {token}"},
             )
