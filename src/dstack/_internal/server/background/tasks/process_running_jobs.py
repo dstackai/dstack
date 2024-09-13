@@ -206,7 +206,8 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
             if not success:
                 # check timeout
                 if job_submission.age > _get_runner_timeout_interval(
-                    job_provisioning_data.backend, job_provisioning_data.instance_type.name
+                    backend_type=job_provisioning_data.get_base_backend(),
+                    instance_type_name=job_provisioning_data.instance_type.name,
                 ):
                     logger.warning(
                         "%s: failed because runner has not become available in time, age=%s",

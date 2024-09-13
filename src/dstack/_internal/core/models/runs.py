@@ -204,6 +204,8 @@ class JobSpec(CoreModel):
 
 class JobProvisioningData(CoreModel):
     backend: BackendType
+    # In case backend provisions instance in another backend, it may set that backend as base_backend.
+    base_backend: Optional[BackendType] = None
     instance_type: InstanceType
     instance_id: str
     # hostname may not be set immediately after instance provisioning.
@@ -226,6 +228,11 @@ class JobProvisioningData(CoreModel):
     dockerized: bool  # True if backend starts shim
     ssh_proxy: Optional[SSHConnectionParams] = None
     backend_data: Optional[str] = None  # backend-specific data in json
+
+    def get_base_backend(self) -> BackendType:
+        if self.base_backend is not None:
+            return self.base_backend
+        return self.backend
 
 
 class ClusterInfo(CoreModel):

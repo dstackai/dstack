@@ -411,8 +411,10 @@ def filter_pool_instances(
     # The default behavior is to provision all nodes in the same backend and region.
     if master_job_provisioning_data is not None:
         if not backend_types:
-            backend_types = [master_job_provisioning_data.backend]
-        backend_types = [b for b in backend_types if b == master_job_provisioning_data.backend]
+            backend_types = [master_job_provisioning_data.get_base_backend()]
+        backend_types = [
+            b for b in backend_types if b == master_job_provisioning_data.get_base_backend()
+        ]
         if not regions:
             regions = [master_job_provisioning_data.region]
         regions = [r for r in regions if r == master_job_provisioning_data.region]
