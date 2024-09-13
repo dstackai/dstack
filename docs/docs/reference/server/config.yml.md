@@ -12,7 +12,9 @@ and other sever-level settings such as encryption.
 Each cloud account must be configured under the `backends` property of the respective project.
 See the examples below.
 
-### AWS
+### Cloud providers
+
+#### AWS
 
 There are two ways to configure AWS: using an access key or using the default credentials.
 
@@ -176,7 +178,7 @@ There are two ways to configure AWS: using an access key or using the default cr
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets 
     (e.g., through VPC peering).
 
-### Azure
+#### Azure
 
 There are two ways to configure Azure: using a client secret or using the default credentials.
 
@@ -284,7 +286,7 @@ There are two ways to configure Azure: using a client secret or using the defaul
     }
     ```
 
-### GCP
+#### GCP
 
 There are two ways to configure GCP: using a service account or using the default credentials.
 
@@ -452,7 +454,7 @@ gcloud projects list --format="json(projectId)"
     
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets (e.g., through VPC peering). Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
 
-### Lambda
+#### Lambda
 
 Log into your [Lambda Cloud :material-arrow-top-right-thin:{ .external }](https://lambdalabs.com/service/gpu-cloud) account, click API keys in the sidebar, and then click the `Generate API key`
 button to create a new API key.
@@ -473,7 +475,7 @@ projects:
 
 </div>
 
-### RunPod
+#### RunPod
 
 Log into your [RunPod :material-arrow-top-right-thin:{ .external }](https://www.runpod.io/console/) console, click Settings in the sidebar, expand the `API Keys` section, and click
 the button to create a Read & Write key.
@@ -494,14 +496,7 @@ projects:
 
 </div>
 
-### SSH 
-
-The `ssh` backend enables container orchestration across any on-prem servers. 
-
-> This backend requires no configuration.
-> To use it, create [SSH fleets](../../concepts/fleets.md#ssh).
-
-### Vast.ai
+#### Vast.ai
 
 Log into your [Vast.ai :material-arrow-top-right-thin:{ .external }](https://cloud.vast.ai/) account, click Account in the sidebar, and copy your
 API Key.
@@ -524,7 +519,7 @@ projects:
 
 Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
 
-### TensorDock
+#### TensorDock
 
 Log into your [TensorDock :material-arrow-top-right-thin:{ .external }](https://dashboard.tensordock.com/) account, click Developers in the sidebar, and use the `Create an Authorization` section to create a new authorization key.
 
@@ -547,7 +542,7 @@ projects:
 
 The `tensordock` backend supports on-demand instances only. Spot instance support coming soon.
 
-### CUDO
+#### CUDO
 
 Log into your [CUDO Compute :material-arrow-top-right-thin:{ .external }](https://compute.cudo.org/) account, click API keys in the sidebar, and click the `Create an API key` button.
 
@@ -568,7 +563,7 @@ projects:
 
 </div>
 
-### OCI
+#### OCI
 
 There are two ways to configure OCI: using client credentials or using the default credentials.
 
@@ -642,7 +637,7 @@ There are two ways to configure OCI: using client credentials or using the defau
         compartment_id: ocid1.compartment.oc1..aaaaaaaa
     ```
 
-### DataCrunch
+#### DataCrunch
 
 Log into your [DataCrunch :material-arrow-top-right-thin:{ .external }](https://cloud.datacrunch.io/) account, click Keys in the sidebar, find `REST API Credentials` area and then click the `Generate Credentials` button.
 
@@ -663,9 +658,19 @@ projects:
 
 </div>
 
-### Kubernetes
+### On-prem servers
 
-`dstack` supports both self-managed, and managed Kubernetes clusters.
+#### SSH fleets
+
+> To use `dstack` with your on-prem servers, no backend configuration is required.
+
+Simply create [SSH fleets](../../concepts/fleets.md#ssh) by specifying the hostnames 
+of the servers and the SSH private key to access these hosts.
+
+Upon fleet creation, `dstack` will automatically connect to the hosts and add them as a fleet.
+Once the fleet is created, it can be used to run dev environments, tasks, and services.
+
+#### Kubernetes
 
 To configure a Kubernetes backend, specify the path to the kubeconfig file,
 and the port that `dstack` can use for proxying SSH traffic.

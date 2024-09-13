@@ -287,7 +287,7 @@
 }
 
 .md-nav--secondary {
-    margin-top: 20px;
+    margin-top: 14px;
 }
 
 .md-nav--secondary .md-nav__title {
@@ -298,6 +298,8 @@
     font-weight: 700;
     color: rgba(0, 0, 0, 0.87);
     position: relative;
+    margin-left: 8px;
+    margin-bottom: 4px;
 }
 
 @font-face {
@@ -828,7 +830,7 @@ body {
 }
 
 .md-nav.md-nav--secondary > .md-nav__list > .md-nav__item {
-    margin-left: 12px;
+    margin-left: 16px;
     border-left: 0.5px dotted rgba(0, 0, 0, 0.4);
     font-size: 16.5px;
 }
@@ -837,6 +839,7 @@ body {
     margin-left: -8px;
     border-left: 2px solid transparent;
     padding: 6px 15px 5px;
+    margin-right: 0 !important;
 }
 
 .md-sidebar--secondary .md-nav__item {
@@ -881,7 +884,7 @@ body {
         margin-left: 10px;
     }
     .md-nav__item--section {
-        margin: 0.7em 0
+        margin: 0.6em 0;
     }
     /*MKDocs Insiders fix*/
     /*.md-sidebar--primary a.md-nav__link--active::before {*/

@@ -11,7 +11,7 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 
 ## Configure backends
 
-To use `dstack` with your own cloud accounts, or Kubernetes,
+To use `dstack` with your own cloud accounts or on prem servers,
 create the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) file and configure backends.
 
 ## Start the server
