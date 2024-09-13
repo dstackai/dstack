@@ -335,6 +335,7 @@ def get_dev_env_run_dict(
         "cost": 0.0,
         "service": None,
         "termination_reason": None,
+        "error": "",
     }
 
 
@@ -431,6 +432,7 @@ class TestListRuns:
                 "cost": 0,
                 "service": None,
                 "termination_reason": None,
+                "error": "",
             },
             {
                 "id": str(run2.id),
@@ -445,6 +447,7 @@ class TestListRuns:
                 "cost": 0,
                 "service": None,
                 "termination_reason": None,
+                "error": "",
             },
         ]
 

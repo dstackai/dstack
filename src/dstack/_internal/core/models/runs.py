@@ -351,6 +351,16 @@ class Run(CoreModel):
     latest_job_submission: Optional[JobSubmission]
     cost: float = 0
     service: Optional[ServiceSpec] = None
+    # TODO: make error a computed field after migrating to pydanticV2
+    error: Optional[str] = None
+
+    @root_validator
+    def _error(cls, values) -> Dict:
+        values["error"] = _get_run_error(
+            run_termination_reason=values["termination_reason"],
+            run_jobs=values["jobs"],
+        )
+        return values
 
 
 class JobPlan(CoreModel):
@@ -384,3 +394,31 @@ def get_policy_map(spot_policy: Optional[SpotPolicy], default: SpotPolicy) -> Op
         SpotPolicy.ONDEMAND: False,
     }
     return policy_map[spot_policy]
+
+
+def _get_run_error(
+    run_termination_reason: Optional[RunTerminationReason],
+    run_jobs: List[Job],
+) -> str:
+    if run_termination_reason is None:
+        return ""
+    if len(run_jobs) > 1:
+        return run_termination_reason.name
+    run_job_termination_reason = _get_run_job_termination_reason(run_jobs)
+    # For failed runs, also show termination reason to provide more context.
+    # For other run statuses, the job termination reason will duplicate run status.
+    if run_job_termination_reason is not None and run_termination_reason in [
+        RunTerminationReason.JOB_FAILED,
+        RunTerminationReason.SERVER_ERROR,
+        RunTerminationReason.RETRY_LIMIT_EXCEEDED,
+    ]:
+        return f"{run_termination_reason.name}\n({run_job_termination_reason.name})"
+    return run_termination_reason.name
+
+
+def _get_run_job_termination_reason(run_jobs: List[Job]) -> Optional[JobTerminationReason]:
+    for job in run_jobs:
+        if len(job.job_submissions) > 0:
+            if job.job_submissions[-1].termination_reason is not None:
+                return job.job_submissions[-1].termination_reason
+    return None

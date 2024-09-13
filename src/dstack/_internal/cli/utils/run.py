@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 
 from rich.markup import escape
 from rich.table import Table
@@ -8,9 +8,7 @@ from dstack._internal.core.models.instances import InstanceAvailability
 from dstack._internal.core.models.profiles import TerminationPolicy
 from dstack._internal.core.models.runs import (
     Job,
-    JobTerminationReason,
     RunPlan,
-    RunTerminationReason,
 )
 from dstack._internal.utils.common import format_pretty_duration, pretty_date
 from dstack.api import Run
@@ -175,28 +173,7 @@ def get_runs_table(
 
 
 def _get_run_error(run: Run) -> str:
-    if run._run.termination_reason is None:
-        return ""
-    if len(run._run.jobs) > 1:
-        return run._run.termination_reason.name
-    run_job_termination_reason = _get_run_job_termination_reason(run)
-    # For failed runs, also show termination reason to provide more context.
-    # For other run statuses, the job termination reason will duplicate run status.
-    if run_job_termination_reason is not None and run._run.termination_reason in [
-        RunTerminationReason.JOB_FAILED,
-        RunTerminationReason.SERVER_ERROR,
-        RunTerminationReason.RETRY_LIMIT_EXCEEDED,
-    ]:
-        return f"{run._run.termination_reason.name}\n({run_job_termination_reason.name})"
-    return run._run.termination_reason.name
-
-
-def _get_run_job_termination_reason(run: Run) -> Optional[JobTerminationReason]:
-    for job in run._run.jobs:
-        if len(job.job_submissions) > 0:
-            if job.job_submissions[-1].termination_reason is not None:
-                return job.job_submissions[-1].termination_reason
-    return None
+    return run._run.error or ""
 
 
 def _get_job_error(job: Job) -> str:
