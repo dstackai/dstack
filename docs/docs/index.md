@@ -37,7 +37,7 @@ out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-p
 
 `dstack`'s founder and CEO explains the challenges `dstack` addresses for AI and Ops teams.
 
-<iframe width="700" height="394" src="https://www.youtube.com/embed/RIDMEutHuWo?si=6Quy34Kwj8wHvBTQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+<iframe width="700" height="394" src="https://www.youtube.com/embed/yzVMp5Q0aPg?si=22QzF2OvtAybBWDg&rel=0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 ## Where do I start?
 

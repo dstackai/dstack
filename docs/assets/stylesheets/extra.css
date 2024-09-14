@@ -101,8 +101,11 @@
 }
 
 .md-typeset a.md-footer__link:hover .md-ellipsis {
-    color: var(--md-typeset-a-color);
     opacity: 1;
+}
+
+.md-footer__title {
+    font-size: 17px;
 }
 
 .md-footer__link--prev .md-footer__title {
