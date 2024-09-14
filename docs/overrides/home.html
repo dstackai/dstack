@@ -108,13 +108,12 @@
     <div class="md-grid md-typeset">
         <div class="tx-landing__hero">
             <div class="tx-landing__hero_text">
-                <h1>AI container orchestration <br> for everyone</h1>
+                <h1>AI container orchestration <br> <span class="gradient">for everyone</span></h1>
 
                 <p>
-                    dstack is an open-source alternative to Kubernetes, designed to simplify development,
-                    training, and deployment of AI across <span class="highlight"> any cloud</span> or
-                    <span class="highlight">on-prem</span>.
-                    It supports
+                    dstack is an <span class="highlight">open-source</span> alternative to <span class="highlight">Kubernetes</span>,
+                    designed to simplify development and deployment of AI. It works with top <span class="highlight">cloud</span> providers and
+                    <span class="highlight">on-prem</span> servers, and supports
                     <span class="highlight">NVIDIA</span>, <span class="highlight">AMD</span>, and <span class="highlight">TPU</span>.
                 </p>
             </div>
@@ -147,11 +146,14 @@
             <div class="section">
                 <div class="block margin">
                     <h2>Dev environments</h2>
-                    <p>Before scheduling a task or deploying a model, you may want to run code interactively.</p>
+                    <p>
+                        Dev environments allow you to provision a remote machine, set up with your code and favorite
+                        IDE, with just one command.
+                    </p>
 
                     <p>
-                        Dev environments allow you to provision a remote machine set up with your code and favorite IDE
-                        with just one command.
+                        Dev environments are perfect for interactively running code
+                        using your favorite IDE or notebook before scheduling a task or deploying a service.
                     </p>
 
                     <p>
@@ -197,9 +199,11 @@
                     <h2>Services</h2>
 
                     <p>
-                        A service allows you to deploy a web app or a model as a scalable endpoint. It lets you configure
-                        dependencies, resources, authorizarion, auto-scaling rules, etc.
+                        Services allow you to deploy web apps or models as private or public auto-scalable endpoints.
+                        You can configure dependencies, resources, authorizarion, auto-scaling rules, etc.
                     </p>
+
+                    <p>Once deployed, the web app or a model can be used by anyone on the team.</p>
 
                     <p>
                         <a href="/docs/services" target="_blank"
@@ -405,10 +409,10 @@
                     <div class="plans_card__buttons">
                         <div class="plans_card__panel">
                             <div class="plans_card__items">
-                                <div class="item">CLI & API</div>
-                                <div class="item">Control plane</div>
-                                <div class="item">Multiple tenancies</div>
                                 <div class="item crown">Private subnets</div>
+                                <div class="item">Multiple tenancies</div>
+                                <div class="item">Control plane</div>
+                                <div class="item">CLI & API</div>
                             </div>
                         </div>
 
@@ -425,26 +429,25 @@
                     </div>
 
                     <div class="plans_card__subtitle">
-                        Get the cheapest GPU from the marketplace.
+                        Get the cheapest GPUs from the marketplace.
                     </div>
 
                     <!--TODO: Add pricing link -->
 
                     <div class="plans_card__services">
-                        <a href="#" class="plans_card__service-item">
+                        <a href="javascript:void()" class="plans_card__service-item">
                             <img width="25" height="24" src="/assets/images/dstack-logo-notext.svg">
-                            <div class="plans_card__service-name">GPU marketplace</div>
+                            <div class="plans_card__service-name">Marketplace</div>
                         </a>
                     </div>
 
                     <div class="plans_card__buttons">
                         <div class="plans_card__panel">
                             <div class="plans_card__items">
-                                <!--<div class="item crown">Web console</div>-->
-                                <div class="item">CLI & API</div>
-                                <div class="item">Control plane</div>
                                 <div class="item">Multiple tenancies</div>
-                                <div class="item crown">GPU marketplace</div>
+                                <div class="item">Control plane</div>
+                                <div class="item">CLI & API</div>
+                                <!--<div class="item crown">GPU marketplace</div>-->
                             </div>
                         </div>
 
@@ -467,101 +470,121 @@
             <div class="tx-faq__list">
                 <div class="tx-faq__item">
                     <div class="tx-faq__item-title">
-                        What is dstack?
+                        Who is using dstack and why?
                         <div class="tx-faq__item-title-icon">
                         </div>
                     </div>
 
                     <div class="tx-faq__item-body">
                         <p>
-                            dstack is an open-source orchestration engine that simplifies developing, training, and
-                            deploying AI
-                            models, as well as managing clusters on any cloud or data center.
-                            It provides a unified interface to manage AI model development at any scale,
-                            whether in the cloud or on-premises.
+                            <span class="highlight">dstack</span> is used by both small teams and large
+                            enterprises.
                         </p>
+                        <p>Small teams use <span class="highlight">dstack</span> as
+                            an alternative to <span class="highlight">Kubernetes</span> or <span class="highlight">Slurm</span>
+                            for the ease of development, training, and deployment of AI.
+                            One of the advantages for small teams is that <span class="highlight">dstack</span>
+                            allows to access GPUs from a variety of providers at most affordable rate.</p>
+
                         <p>
-                            With dstack, you can utilize various cloud providers or on-prem infrastructure, along with
-                            any hardware, and leverage open-source frameworks and tools for both training and
-                            deployment.
+                            Large enterprises use <span class="highlight">dstack</span>
+                            as an alternative to <span class="highlight">Kubernetes</span>
+                            or cloud platforms such as <span class="highlight">SageMaker</span>,
+                            <span class="highlight">Vertex AI</span>, or <span class="highlight">Azure ML</span>,
+                            for development simplicity and flexibility while also
+                            avoiding vendor lock-in, and the ability to combine multiple
+                            <span class="highlight">clouds</span>
+                            and <span class="highlight">on-prem</span> servers.
                         </p>
                     </div>
                 </div>
 
                 <div class="tx-faq__item">
                     <div class="tx-faq__item-title">
-                        How does it compare to Kubernetes?
+                        How does dstack compare to Kubernetes?
                         <div class="tx-faq__item-title-icon">
                         </div>
                     </div>
 
                     <div class="tx-faq__item-body">
                         <p>
-                            Both dstack and Kubernetes are container orchestration engines that can be used with cloud
-                            and on-prem. The difference is that dstack is much more lightweight and tailored to simplify
-                            AI development.
+                            Both <span class="highlight">dstack</span> and
+                            <span class="highlight">Kubernetes</span> are container orchestrators that can be used with
+                            <span class="highlight">cloud</span>
+                            and <span class="highlight">on-prem</span>.
                         </p>
-                        <p>First of all, dstack offers an interface tailored for AI, allowing any AI engineer to use it
-                            out of the box for development, training, and deployment without needing additional tools or
+                        <p>First of all, <span class="highlight">dstack</span> offers an interface tailored for AI,
+                            allowing AI engineers to use it out of the box for development,
+                            training, and deployment without needing additional tools or
                             help from the Ops team.</p>
                         <p>
-                            dstack, out of the box, supports multiple cloud providers and offers all the features of a
-                            managed version of Kubernetes. It's very easy to integrate dstack with new cloud providers.
+                            <span class="highlight">dstack</span>, out of the box, supports multiple cloud providers
+                            and offers all the features of a managed version of <span class="highlight">Kubernetes</span>.
+                            It's very easy to integrate <span class="highlight">dstack</span> with new cloud providers.
                         </p>
-                        <p>dstack is much easier to use for running containers on on-prem servers. If you have a cluster
-                            of on-prem servers, you just need to provide dstack with their hostnames and SSH
-                            credentials. dstack will automatically add them as a fleet that you can reuse to run
+                        <p><span class="highlight">dstack</span> is much easier to use for running containers
+                            on <span class="highlight">on-prem</span> servers. If you have a cluster
+                            of <span class="highlight">on-prem</span> servers, you just need to
+                            provide <span class="highlight">dstack</span> with their hostnames and SSH
+                            credentials. <span class="highlight">dstack</span> will automatically add them as a fleet that you can reuse to run
                             containers.</p>
                     </div>
                 </div>
 
                 <div class="tx-faq__item">
                     <div class="tx-faq__item-title">
-                        Can I use dstack with Kubernetes?
+                        Can dstack and Kubernetes be used together?
                         <div class="tx-faq__item-title-icon">
                         </div>
                     </div>
 
                     <div class="tx-faq__item-body">
                         <p>
-                            If you already use Kubernetes, you can set up the dstack server to run containers via
-                            Kubernetes. In that case, dstack provides your AI engineers with a simple interface for
+                            If you already use <span class="highlight">Kubernetes</span>, you can set up the
+                            <span class="highlight">dstack</span> server to run containers via
+                            <span class="highlight">Kubernetes</span>. In that case,
+                            <span class="highlight">dstack</span> provides your AI engineers with a simple interface for
                             running dev environments, tasks, and services without involving your Ops team or using any
                             other tools.
                         </p>
                         <p>
-                            Unless you're required to use Kubernetes, it's generally recommended to use dstack without
-                            Kubernetes and set up cloud accounts and on-prem servers directly via dstack's backends and
-                            fleets. In that case, the provisioning of instances will be more efficient and convenient.
+                            Often mature teams use <span class="highlight">dstack</span>
+                            and <span class="highlight">Kubernetes</span> side by side, where
+                            <span class="highlight">dstack</span> is used for anything
+                            related to AI development and <span class="highlight">Kubernetes</span>
+                            for production-grade deployment.
                         </p>
                     </div>
                 </div>
 
                 <div class="tx-faq__item">
                     <div class="tx-faq__item-title">
-                        What is dstack Sky?
+                        Who is behind dstack?
                         <div class="tx-faq__item-title-icon">
                         </div>
                     </div>
 
                     <div class="tx-faq__item-body">
                         <p>
-                            If you don't want to host the dstack server yourself or would like to access GPU from the
-                            dstack's marketplace, sign up with
-                            <a href="https://sky.dstack.ai" target="_blank">dstack Sky</a>.
+                            <span class="highlight">dstack</span> is being developed
+                            as an open-source project under the MPL-2.0 licence by a team
+                            of senior system engineers with lots of experience
+                            building container orchestration and managing infrastructure.
                         </p>
+
                         <p>
-                            Unlike the open-source dstack where you have to set up and manage the server yourself,
-                            dstack Sky takes care of hosting the server on your behalf.
-                            Most importantly, dstack Sky offers access to cloud GPUs through its marketplace,
-                            ensuring you get them at competitive rates.
+                            <span class="highlight">dstack</span> is a Munich-based company
+                            backed by european VCs.
                         </p>
-                        <p>
-                            If needed, you can still configure dstack Sky to use your own cloud accounts or connect to
-                            your on-prem servers.
+
+                        <p>While <span class="highlight">dstack</span> helps enterprises adopt <span class="highlight">dstack</span>,
+                            it's primarily committed to developing <span class="highlight">dstack</span> as
+                            an open-source project, open to third-party contribution
+                            from individuals and large vendors.
                         </p>
                     </div>
                 </div>
+
             </div>
         </div>
 
@@ -569,14 +592,14 @@
             <p>
                 Have questions, or need help?
                 <br>
+                <a href="https://calendly.com/dstackai/discovery-call" target="_blank"
+                   class="md-button md-button-secondary external">
+                    Contact us
+                </a>
                 <a href="https://discord.gg/u8SmfwPpMd" target="_blank"
                    class="md-button md-button-secondary discord">
                     Community
                 </a>
-                <!--<a href="https://calendly.com/dstackai/discovery-call" target="_blank"
-                   class="md-button md-button-secondary small external">
-                    Contact us
-                </a>-->
             </p>
         </div>
     </div>

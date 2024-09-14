@@ -12,7 +12,7 @@
 
 .tx-landing__hero_text h1 {
     margin-bottom: .75rem;
-    font-weight: 800;
+    font-weight: 700;
     font-size: 2.5em;
     letter-spacing: -3px;
 }
@@ -29,7 +29,7 @@
     margin-right: -4px;
 }
 
-.tx-landing__hero_text .highlight {
+.tx-landing__hero_text .highlight, .tx-faq__item-body .highlight {
     display: inline-block;
     border-radius: 3px;
     padding: 1px 5px;
@@ -110,7 +110,7 @@
     }
 
     .tx-landing__hero_text h1 {
-        font-size: 2.8rem;
+        font-size: 3rem;
         max-width: 36rem;
         line-height: 1.2;
     }
@@ -223,7 +223,7 @@
 .md-typeset .md-button {
     margin-top: 1.2rem;
     margin-bottom: 1.5rem;
-    font-size: 21px;
+    font-size: 20px;
     font-weight: 400 !important;
     text-align: center;
     border-radius: 3px;
@@ -232,7 +232,7 @@
 }
 
 .md-header__buttons .md-button {
-    font-size: 18px;
+    font-size: 18.7px;
     letter-spacing: -0.5px;
 }
 
@@ -273,7 +273,7 @@
 [data-md-color-primary=white] .md-typeset .md-button--primary, [data-md-color-primary=white] .md-typeset .md-button--primary:hover {
     background: rgba(0, 0, 0, 0.87);
     border: 1.5px solid rgba(0, 0, 0, 0.87);
-    border-radius: 4px;
+    border-radius: 3px;
     font-weight: 400 !important;
     /*margin-right: 10px;*/
 }
@@ -285,7 +285,7 @@
 
 .md-header__buttons .md-button--primary,
 .md-header__buttons .md-button-secondary {
-    font-weight: 500 !important;
+    font-weight: 400 !important;
     white-space: nowrap;
     padding: 0.4rem 0.8rem;
 }
@@ -321,8 +321,14 @@
 .md-typeset .md-button-secondary:focus {
     background: transparent;
     color: rgba(0, 0, 0, 0.87);
-    border: 1.5px solid rgba(0, 0, 0, 0.87);
-    border-radius: 4px;
+    border: 0.5px solid rgba(0, 0, 0, 0.87);
+    border-radius: 3px;
+}
+
+.md-header__buttons .md-button-secondary:hover,
+.md-typeset .md-button-secondary:hover {
+    color: black;
+    border: 0.5px solid blackl
 }
 
 .md-header__buttons .md-button-secondary.borderless,
@@ -330,7 +336,7 @@
     border: none;
     padding: 0 20px 0 0;
     margin: 0;
-    font-weight: 600 !important;
+    font-weight: 500 !important;
 }
 
 .md-header__buttons {
@@ -383,8 +389,10 @@
 
 .providers.tx-landing__highlights_grid .feature-cell h3 {
     align-content: center;
-    font-size: 1.1em;
+    font-size: 17.5px;
+    font-weight: 600;
     padding-bottom: 0.05em;
+    line-height: 25px;
 }
 
 .providers.tx-landing__highlights_grid .feature-cell {
@@ -513,7 +521,7 @@
 }
 
 .tx-landing__highlights_grid h3 {
-    font-size: 1.2em;
+    font-size: 1.1em;
     font-weight: 700;
     border-bottom: none;
     padding-bottom: 0.3em;
@@ -568,6 +576,10 @@
 .tx-landing__bottom_cta_text {
     font-size: 0.95em;
     max-width: 500px;
+}
+
+.tx-landing__major_feature h2 {
+    font-weight: 700;
 }
 
 .tx-landing__major_feature h3 {
@@ -747,7 +759,7 @@
 .md-header__buttons .md-button--primary.sky, .md-header__buttons .md-button--primary.sky:hover,
 .md-typeset .md-button--primary.sky, .md-typeset .md-button--primary.sky:hover {
     background: -webkit-linear-gradient(45deg, #002aff, #002aff, #e165fe);
-    border-radius: 4px;
+    border-radius: 3px;
     border: 1px solid transparent;
 }
 

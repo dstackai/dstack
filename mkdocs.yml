@@ -11,7 +11,7 @@ repo_name: dstackai/dstack
 edit_uri: edit/master/docs/
 
 #Copyright
-copyright: © 2024 dstack GmbH
+copyright: © 2024 dstack
 
 # Configuration
 theme:
@@ -186,12 +186,12 @@ extra:
       link: https://discord.gg/u8SmfwPpMd
     - icon: /simple/x
       link: https://twitter.com/dstackai
-#    - icon: /fontawesome/brands/github
-#      link: https://github.com/dstackai/dstack
-#    - icon: /fontawesome/brands/python
-#      link: https://pypi.org/project/dstack
-#    - icon: /fontawesome/brands/docker
-#      link: https://hub.docker.com/r/dstackai/dstack
+    - icon: /fontawesome/brands/github
+      link: https://github.com/dstackai/dstack
+    - icon: /fontawesome/brands/python
+      link: https://pypi.org/project/dstack
+    - icon: /fontawesome/brands/docker
+      link: https://hub.docker.com/r/dstackai/dstack
   status:
     new: Recently added
 # Page tree

@@ -1,4 +1,8 @@
 @media screen and (min-width: 76.1875em) {
+    html {
+        scroll-behavior: smooth;
+    }
+
     .md-header {
         backdrop-filter: blur(5px);
         background-color: rgba(255, 255, 255, 0);
@@ -43,8 +47,8 @@
 }
 
 #kapa-widget-container .mantine-Button-root {
-    height: 4rem !important;
-    width: 4rem !important;
+    height: 3.5rem !important;
+    width: 3.5rem !important;
     background: rgba(255,255,255, 0.5) !important;
     box-shadow: none !important;
     border: 0.5px solid black !important;
@@ -52,12 +56,12 @@
 }
 
 #kapa-widget-container .mantine-Image-image {
-    width: 1.2rem !important;
-    height: 1.2rem !important;;
+    width: 27.5px !important;
+    height: 27.5px !important;;
 }
 
 #kapa-widget-container .mantine-Image-root {
-    width: 1.2rem !important;
+    width: 27.5px !important;
 }
 
 .mantine-Modal-body .mantine-Input-input {
@@ -294,12 +298,13 @@
     background: transparent;
     box-shadow: none;
     padding: 6px 15px 5px;
-    font-size: 17px;
-    font-weight: 700;
+    font-size: 17.5px;
+    font-weight: 600;
     color: rgba(0, 0, 0, 0.87);
     position: relative;
     margin-left: 8px;
     margin-bottom: 4px;
+    letter-spacing: -0.5px;
 }
 
 @font-face {
@@ -416,6 +421,7 @@
 
 .md-nav__link {
     margin-top: 0;
+    color: black;
 }
 
 .md-nav__link:hover {
@@ -424,7 +430,7 @@
 
 .md-nav__item, .md-nav__link .md-typeset {
     /*color: rgba(0,0,0,0.87);*/
-    font-weight: 500;
+    font-weight: 400;
     font-size: 0.75rem;
 }
 
@@ -489,7 +495,7 @@ h4.doc-heading {
 .md-typeset pre > code {
     background-color: rgb(21, 22, 29);
     padding: 65px 30px 35px 40px;
-    border-radius: 4px;
+    border-radius: 3px;
     font-size: 15px;
 
     /*border-radius: 6px;*/
@@ -521,14 +527,14 @@ h4.doc-heading {
 @media screen and (min-width: 60em) {
     [data-md-color-primary=white] .md-search__form {
         background-color: transparent;
-        border-radius: 4px;
-        border: 1px solid black;
+        border-radius: 3px;
+        border: 0.5px solid rgba(0, 0, 0, 0.87);
         height: 1.9rem;
     }
 
     [data-md-color-primary=white] .md-search__form:hover {
         background-color: transparent;
-        border: 1px solid black;
+        border: 0.5px solid black
     }
 }
 
@@ -770,8 +776,8 @@ body {
     .md-nav__item--section > .md-nav__link {
         /*text-transform: uppercase;*/
         display: inline-block;
-        font-size: 17.5px;
-        font-weight: 700;
+        font-size: 17px;
+        font-weight: 600;
         line-height: 1.4rem;
         letter-spacing: -0.5px;
         position: relative;
@@ -825,7 +831,7 @@ body {
 }
 
 .md-sidebar--primary .md-nav__link {
-    padding: 6px 15px 5px;
+    padding: 5px 15px 5px;
     margin-top: 0;
 }
 
@@ -838,7 +844,7 @@ body {
 .md-sidebar--secondary .md-nav__link {
     margin-left: -8px;
     border-left: 2px solid transparent;
-    padding: 6px 15px 5px;
+    padding: 5px 15px 5px;
     margin-right: 0 !important;
 }
 
@@ -875,7 +881,7 @@ body {
     .md-nav__item--section>.md-nav>.md-nav__list>li.md-nav__item:not(.md-nav__item--nested):not(.md-nav__item--active) {
         margin-left: 12px;
         border-left: 0.5px dotted rgba(0, 0, 0, 0.4);
-        font-size: 16.5px;
+        /*font-size: 16.5px;*/
     }
     .md-sidebar--primary a.md-nav__link--active {
         overflow: inherit;
@@ -1209,6 +1215,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
         contain: none;
     }
 
+    .md-tabs__item--active .md-tabs__link {
+        font-weight: 600;
+    }
+
     .md-tabs__item--active .md-tabs__link:after {
         position: absolute;
         background: -webkit-linear-gradient(100deg, #0048ff, #ce00ff);
@@ -1334,11 +1344,15 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
     .md-tabs__link {
         font-size: 0.85rem;
-        font-weight: 600;
-        color: black;
+        font-weight: 500;
+        color: rgba(0,0,0,0.87);
         letter-spacing: -0.5px;
         margin-top: 1px;
         line-height: 24px;
+    }
+
+    .md-tabs__link:hover {
+        color: black;
     }
 
     .md-tabs__link.md-tabs__link--active {
@@ -1393,7 +1407,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 @media screen and (min-width: 76.25em) {
     .md-search .md-search__inner {
         /*padding-top: 0.58rem;*/
-        margin-right: 0.8rem;
+        margin-right: 8px;
     }
 
     [data-md-toggle=search]:checked ~ .md-header .md-search__inner, .md-search__scrollwrap {
@@ -1564,7 +1578,7 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     font-weight: 500 !important;
     padding: 0.4em 1.5em;
     font-size: 17px;
-    border-radius: 4px;
+    border-radius: 3px;
 }
 
 /*[data-md-color-primary=white] .md-button:hover{
