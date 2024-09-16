@@ -448,6 +448,19 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		envVars = append(envVars, fmt.Sprintf("PJRT_DEVICE=%s", dockerParams.DockerPJRTDevice()))
 	}
 
+	// Override /dev/shm with tmpfs mount with `exec` option (the default is `noexec`)
+	// if ShmSize is specified (i.e. not zero, which is the default value).
+	// This is required by some workloads, e.g., Oracle Database with Java Stored Procedures,
+	// see https://github.com/moby/moby/issues/6758
+	var tmpfs map[string]string
+	if taskConfig.ShmSize > 0 {
+		// No need to specify all default options (`nosuid`, etc.),
+		// the docker daemon will merge our options with the defaults.
+		tmpfs = map[string]string{
+			"/dev/shm": fmt.Sprintf("exec,size=%d", taskConfig.ShmSize),
+		}
+	}
+
 	containerConfig := &container.Config{
 		Image:        taskConfig.ImageName,
 		Cmd:          []string{strings.Join(dockerParams.DockerShellCommands(taskConfig.PublicKeys), " && ")},
@@ -469,6 +482,7 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		},
 		Mounts:  mounts,
 		ShmSize: taskConfig.ShmSize,
+		Tmpfs:   tmpfs,
 	}
 
 	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", taskConfig.ContainerName, containerConfig, hostConfig)

@@ -86,9 +86,46 @@ func TestDocker_SSHServerConnect(t *testing.T) {
 	wg.Wait()
 }
 
+func TestDocker_ShmNoexecByDefault(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+
+	params := &dockerParametersMock{
+		commands: []string{"mount | grep '/dev/shm .*size=65536k' | grep noexec"},
+	}
+
+	timeout := 180 // seconds
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	dockerRunner, _ := NewDockerRunner(params)
+	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu"}))
+}
+
+func TestDocker_ShmExecIfSizeSpecified(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	t.Parallel()
+
+	params := &dockerParametersMock{
+		commands: []string{"mount | grep '/dev/shm .*size=1024k' | grep -v noexec"},
+	}
+
+	timeout := 180 // seconds
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	dockerRunner, _ := NewDockerRunner(params)
+	assert.NoError(t, dockerRunner.Run(ctx, TaskConfig{ImageName: "ubuntu", ShmSize: 1024 * 1024}))
+}
+
 /* Mocks */
 
 type dockerParametersMock struct {
+	// If sshPort is not set (equals zero), sshd won't be started.
 	commands     []string
 	sshPort      int
 	publicSSHKey string
@@ -112,7 +149,9 @@ func (c *dockerParametersMock) DockerShellCommands(publicKeys []string) []string
 		userPublicKey = strings.Join(publicKeys, "\n")
 	}
 	commands := make([]string, 0)
-	commands = append(commands, getSSHShellCommands(c.sshPort, userPublicKey)...)
+	if c.sshPort != 0 {
+		commands = append(commands, getSSHShellCommands(c.sshPort, userPublicKey)...)
+	}
 	commands = append(commands, c.commands...)
 	return commands
 }

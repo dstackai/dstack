@@ -144,7 +144,7 @@ class ShimClient:
         mounts: List[VolumeMountPoint],
         volumes: List[Volume],
     ):
-        _shm_size = int(shm_size * 1024 * 1024 * 1014) if shm_size else 0
+        _shm_size = int(shm_size * 1024 * 1024 * 1024) if shm_size else 0
         volume_infos = [_volume_to_shim_volume_info(v) for v in volumes]
         post_body = TaskConfigBody(
             username=username,
