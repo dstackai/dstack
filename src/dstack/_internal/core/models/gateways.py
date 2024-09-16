@@ -91,7 +91,7 @@ class GatewayComputeConfiguration(CoreModel):
 
 class GatewayProvisioningData(CoreModel):
     instance_id: str
-    ip_address: str
+    ip_address: str  # TODO: rename, Kubernetes uses domain names
     region: str
     availability_zone: Optional[str] = None
     hostname: Optional[str] = None
