@@ -1,6 +1,4 @@
-import os
 import re
-import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,6 +7,7 @@ from typing import Optional, Tuple
 from dstack._internal.compat import IS_WINDOWS
 from dstack._internal.core.errors import SSHError
 from dstack._internal.utils.path import PathLike
+from dstack._internal.utils.ssh import find_ssh_client
 
 
 @dataclass
@@ -85,39 +84,6 @@ def inspect_ssh_client(path: PathLike) -> SSHClientInfo:
         return SSHClientInfo.from_raw_version(output, path)
     except ValueError:
         raise SSHError(f"failed to parse `{path} -V` output: {output}")
-
-
-def find_ssh_client() -> Optional[Path]:
-    path_str = os.getenv("DSTACK_SSH_CLIENT")
-    if path_str:
-        return Path(path_str)
-    if not IS_WINDOWS:
-        path_str = shutil.which("ssh")
-        if path_str:
-            return Path(path_str)
-        return None
-    # First, we check for ssh bundled with Git for Windows (MSYS2/MinGW-w64-built OpenSSH Portable)
-    # as a preferred client. It supports ForkAfterAuthentication; ControlMaster is only partially
-    # supported, we don't use it.
-    git_path_str = shutil.which("git")
-    if git_path_str:
-        # C:\Program Files\Git\cmd\git.exe -> C:\Program Files\Git\usr\bin\ssh.exe
-        path = Path(git_path_str).parent.parent / "usr" / "bin" / "ssh.exe"
-        if path.exists():
-            return path
-    # Then we check for OpenSSH for Windows (Microsoft's fork of OpenSSH Portable).
-    # It does not support some features, namely ControlMaster and ForkAfterAuthentication.
-    windir_str = os.getenv("WINDIR")
-    if windir_str:
-        path = Path(windir_str) / "System32" / "OpenSSH" / "ssh.exe"
-        if path.exists():
-            return path
-    # Finally, we check for any ssh client in PATH. It can be anything, it can be not compatible,
-    # so we use it only as a last resort.
-    path_str = shutil.which("ssh")
-    if path_str:
-        return Path(path_str)
-    return None
 
 
 _ssh_client_info: Optional[SSHClientInfo] = None
