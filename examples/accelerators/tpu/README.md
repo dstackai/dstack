@@ -10,7 +10,6 @@ Below are a few examples on using TPUs for deployment and fine-tuning.
 
 ## Deployment
 
-### Running as a service
 You can use any serving framework, such as vLLM, TGI. Here's an example of a [service](https://dstack.ai/docs/services) that deploys
 Llama 3.1 8B using 
 [Optimum TPU :material-arrow-top-right-thin:{ .external }](https://github.com/huggingface/optimum-tpu){:target="_blank"}

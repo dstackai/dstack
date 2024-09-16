@@ -78,7 +78,10 @@ shm_size: 24GB
 
 </div>
 
-Change the `resources` property to specify more GPUs. 
+Change the `resources` property to specify more GPUs.
+
+!!! info "AMD"
+    The example above uses NVIDIA accelerators. To use it with AMD, check out [AMD](https://dstack.ai/examples/accelerators/amd#trl).
 
 ### DeepSpeed
 
@@ -183,5 +186,6 @@ and [`examples/fine-tuning/trl` :material-arrow-top-right-thin:{ .external }](ht
 
 1. Browse the [Axolotl](https://dstack.ai/docs/examples/fine-tuning/axolotl) 
    and [Alignment Handbook](https://dstack.ai/docs/examples/fine-tuning/alignment-handbook) examples
-2. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+2. See [AMD](https://dstack.ai/examples/accelerators/amd#axolotl). 
+3. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/fleets).
