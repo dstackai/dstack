@@ -135,7 +135,7 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
         replicas = run.run_spec.configuration.replicas.min or 0  # new default
         scaler = autoscalers.get_service_autoscaler(run.run_spec.configuration)
         if scaler is not None:
-            conn = await gateways.get_gateway_connection(session, run_model.gateway_id)
+            conn = await gateways.get_or_add_gateway_connection(session, run_model.gateway_id)
             stats = await conn.get_stats(run_model.id)
             if stats:
                 # replicas info doesn't matter for now
@@ -316,7 +316,7 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
         if run_spec.configuration.type == "service":
             scaler = autoscalers.get_service_autoscaler(run_spec.configuration)
             if scaler is not None:
-                conn = await gateways.get_gateway_connection(session, run_model.gateway_id)
+                conn = await gateways.get_or_add_gateway_connection(session, run_model.gateway_id)
                 stats = await conn.get_stats(run_model.id)
                 if stats:
                     # use replicas_info from before retrying

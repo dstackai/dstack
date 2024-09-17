@@ -28,7 +28,7 @@ class TestProcessSubmittedGateways:
         with patch(
             "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
         ) as m, patch(
-            "dstack._internal.server.services.gateways.gateway_connections_pool.add"
+            "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
         ) as pool_add:
             aws = Mock()
             m.return_value = (backend, aws)
