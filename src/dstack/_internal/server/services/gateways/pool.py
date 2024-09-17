@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from dstack._internal.server.services.gateways.connection import GatewayConnection
 from dstack._internal.server.settings import SERVER_PORT
@@ -13,13 +13,20 @@ class GatewayConnectionsPool:
         self._connections: Dict[str, GatewayConnection] = {}
         self._lock = asyncio.Lock()
 
-    async def add(self, hostname: str, id_rsa: str) -> GatewayConnection:
+    async def get_or_add(
+        self,
+        hostname: str,
+        id_rsa: str,
+        close_existing_tunnel: bool = False,
+    ) -> GatewayConnection:
         async with self._lock:
-            if hostname in self._connections:
-                logger.warning(f"Gateway connection for {hostname} already exists")
-                return self._connections[hostname]
+            connection = self._connections.get(hostname)
+            if connection is not None:
+                return connection
             self._connections[hostname] = GatewayConnection(hostname, id_rsa, SERVER_PORT)
-            open_task = self._connections[hostname].open()
+            open_task = self._connections[hostname].open(
+                close_existing_tunnel=close_existing_tunnel,
+            )
         try:
             await open_task
             return self._connections[hostname]
@@ -31,7 +38,6 @@ class GatewayConnectionsPool:
     async def remove(self, hostname: str) -> bool:
         async with self._lock:
             if hostname not in self._connections:
-                logger.warning(f"Gateway connection for {hostname} does not exist")
                 return False
             close_task = self._connections.pop(hostname).close()
         await close_task
@@ -44,9 +50,6 @@ class GatewayConnectionsPool:
                 return_exceptions=True,
             )
             self._connections = {}
-
-    async def get(self, hostname: str) -> Optional[GatewayConnection]:
-        return self._connections.get(hostname)
 
     async def all(self) -> List[GatewayConnection]:
         return list(self._connections.values())

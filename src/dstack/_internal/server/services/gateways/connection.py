@@ -75,18 +75,20 @@ class GatewayConnection:
         symlink_dir.symlink_to(connection_dir, target_is_directory=True)
         return temp_dir, symlink_dir
 
-    async def check_or_restart(self):
+    async def check_or_restart(self) -> bool:
         async with self._lock.writer_lock:
             if not await self.tunnel.acheck():
                 logger.info("Connection to gateway %s is down, restarting", self.ip_address)
                 await self.tunnel.aopen()
-        return
+                return True
+        return False
 
-    async def open(self) -> None:
+    async def open(self, close_existing_tunnel: bool = False) -> None:
         async with self._lock.writer_lock:
-            # Close remaining tunnel if previous server process died w/o graceful shutdown
-            if await self.tunnel.acheck():
-                await self.tunnel.aclose()
+            if close_existing_tunnel:
+                # Close remaining tunnel if previous server process died w/o graceful shutdown
+                if await self.tunnel.acheck():
+                    await self.tunnel.aclose()
 
             self.connection_dir.mkdir(parents=True, exist_ok=True)
             await self.tunnel.aopen()
@@ -103,7 +105,7 @@ class GatewayConnection:
     async def close(self) -> None:
         async with self._lock.writer_lock:
             await self.tunnel.aclose()
-            shutil.rmtree(self.connection_dir)
+            shutil.rmtree(self.connection_dir, ignore_errors=True)
 
     async def try_collect_stats(self) -> None:
         if not self._client.is_server_ready:

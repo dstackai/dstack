@@ -58,6 +58,7 @@ from dstack._internal.server.services.gateways.connection import GatewayConnecti
 from dstack._internal.server.services.gateways.options import get_service_options
 from dstack._internal.server.services.gateways.pool import gateway_connections_pool
 from dstack._internal.server.services.locking import (
+    advisory_lock_ctx,
     get_locker,
     string_to_lock_id,
 )
@@ -198,7 +199,7 @@ async def connect_to_gateway_with_retry(
 
     for attempt in range(GATEWAY_CONNECT_ATTEMPTS):
         try:
-            connection = await gateway_connections_pool.add(
+            connection = await gateway_connections_pool.get_or_add(
                 gateway_compute.ip_address, gateway_compute.ssh_private_key
             )
             break
@@ -404,10 +405,7 @@ async def register_service(session: AsyncSession, run_model: RunModel):
     run_model.gateway = gateway
     run_model.service_spec = service_spec.json()
 
-    conn = await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
-    if conn is None:
-        raise ServerClientError("Gateway is not connected")
-
+    conn = await get_or_add_gateway_connection(session, gateway.id)
     try:
         logger.debug("%s: registering service as %s", fmt(run_model), service_spec.url)
         async with conn.client() as client:
@@ -432,7 +430,7 @@ async def register_service(session: AsyncSession, run_model: RunModel):
 async def register_replica(
     session: AsyncSession, gateway_id: uuid.UUID, run: Run, job_model: JobModel
 ):
-    conn = await get_gateway_connection(session, gateway_id)
+    conn = await get_or_add_gateway_connection(session, gateway_id)
     job_submission = jobs_services.job_model_to_job_submission(job_model)
     try:
         logger.debug("%s: registering replica for service %s", fmt(job_model), run.id.hex)
@@ -448,8 +446,16 @@ async def register_replica(
 
 
 async def unregister_service(session: AsyncSession, run_model: RunModel):
-    conn = await get_gateway_connection(session, run_model.gateway_id)
-    project = await session.get(ProjectModel, run_model.project_id)
+    if run_model.gateway_id is None:
+        logger.error(
+            "Failed to unregister service. run_model.gateway_id is None for %s", run_model.run_name
+        )
+        return
+    conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
+    res = await session.execute(
+        select(ProjectModel).where(ProjectModel.id == run_model.project_id)
+    )
+    project = res.scalar_one()
     try:
         logger.debug("%s: unregistering service", fmt(run_model))
         async with conn.client() as client:
@@ -472,11 +478,14 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
         .where(RunModel.id == job_model.run_id)
         .options(joinedload(RunModel.project).joinedload(ProjectModel.backends))
     )
-    run_model = res.unique().scalar()
+    run_model = res.unique().scalar_one()
     if run_model.gateway_id is None:
+        logger.error(
+            "Failed to unregister replica. run_model.gateway_id is None for %s", run_model.run_name
+        )
         return
 
-    conn = await get_gateway_connection(session, run_model.gateway_id)
+    conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
     try:
         logger.debug(
             "%s: unregistering replica from service %s", fmt(job_model), job_model.run_id.hex
@@ -498,17 +507,24 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
         raise GatewayError(repr(e))
 
 
-async def get_gateway_connection(
+async def get_or_add_gateway_connection(
     session: AsyncSession, gateway_id: uuid.UUID
 ) -> GatewayConnection:
     gateway = await session.get(GatewayModel, gateway_id)
     if gateway is None:
-        raise GatewayError("Gateway doesn't exist")
+        raise GatewayError("Gateway not found")
     if gateway.gateway_compute is None:
-        raise GatewayError("Gateway is broken, no compute")
-    conn = await gateway_connections_pool.get(gateway.gateway_compute.ip_address)
-    if conn is None:
-        raise GatewayError("Gateway is not connected")
+        raise GatewayError("Gateway compute not found")
+    try:
+        conn = await gateway_connections_pool.get_or_add(
+            hostname=gateway.gateway_compute.ip_address,
+            id_rsa=gateway.gateway_compute.ssh_private_key,
+        )
+    except Exception as e:
+        logger.warning(
+            "Failed to connect to gateway %s: %s", gateway.gateway_compute.ip_address, e
+        )
+        raise GatewayError("Failed to connect to gateway")
     return conn
 
 
@@ -523,34 +539,40 @@ async def init_gateways(session: AsyncSession):
 
     if len(gateway_computes) > 0:
         logger.info(f"Connecting to {len(gateway_computes)} gateways...", {"show_path": False})
-    for gateway, error in await gather_map_async(
-        gateway_computes,
-        lambda g: gateway_connections_pool.add(g.ip_address, g.ssh_private_key),
-        return_exceptions=True,
+
+    async with advisory_lock_ctx(
+        bind=session,
+        dialect_name=get_db().dialect_name,
+        resource="gateway_tunnels",
     ):
-        if isinstance(error, Exception):
-            logger.warning("Failed to connect to gateway %s: %s", gateway.ip_address, error)
-
-    if settings.SKIP_GATEWAY_UPDATE:
-        logger.debug("Skipping gateway update due to DSTACK_SKIP_GATEWAY_UPDATE env variable")
-    else:
-        build = get_dstack_runner_version()
-
-        for conn, error in await gather_map_async(
-            await gateway_connections_pool.all(),
-            lambda c: _update_gateway(c, build),
+        for gateway, error in await gather_map_async(
+            gateway_computes,
+            lambda g: gateway_connections_pool.get_or_add(g.ip_address, g.ssh_private_key, True),
             return_exceptions=True,
         ):
             if isinstance(error, Exception):
-                logger.warning("Failed to update gateway %s: %s", conn.ip_address, error)
+                logger.warning("Failed to connect to gateway %s: %s", gateway.ip_address, error)
 
-    for conn, error in await gather_map_async(
-        await gateway_connections_pool.all(),
-        configure_gateway,
-        return_exceptions=True,
-    ):
-        if isinstance(error, Exception):
-            logger.warning("Failed to configure gateway %s: %r", conn.ip_address, error)
+        if settings.SKIP_GATEWAY_UPDATE:
+            logger.debug("Skipping gateway update due to DSTACK_SKIP_GATEWAY_UPDATE env variable")
+        else:
+            build = get_dstack_runner_version()
+
+            for conn, error in await gather_map_async(
+                await gateway_connections_pool.all(),
+                lambda c: _update_gateway(c, build),
+                return_exceptions=True,
+            ):
+                if isinstance(error, Exception):
+                    logger.warning("Failed to update gateway %s: %s", conn.ip_address, error)
+
+        for conn, error in await gather_map_async(
+            await gateway_connections_pool.all(),
+            configure_gateway,
+            return_exceptions=True,
+        ):
+            if isinstance(error, Exception):
+                logger.warning("Failed to configure gateway %s: %r", conn.ip_address, error)
 
 
 async def _update_gateway(connection: GatewayConnection, build: str):
