@@ -1,6 +1,7 @@
 import asyncio
+import datetime
 import uuid
-from datetime import timezone
+from datetime import timedelta, timezone
 from typing import List, Optional, Sequence
 from urllib.parse import urlparse
 
@@ -554,34 +555,58 @@ async def init_gateways(session: AsyncSession):
                 logger.warning("Failed to connect to gateway %s: %s", gateway.ip_address, error)
 
         if settings.SKIP_GATEWAY_UPDATE:
-            logger.debug("Skipping gateway update due to DSTACK_SKIP_GATEWAY_UPDATE env variable")
+            logger.debug("Skipping gateways update due to DSTACK_SKIP_GATEWAY_UPDATE env variable")
         else:
             build = get_dstack_runner_version()
 
-            for conn, error in await gather_map_async(
-                await gateway_connections_pool.all(),
+            for gateway_compute, res in await gather_map_async(
+                gateway_computes,
                 lambda c: _update_gateway(c, build),
                 return_exceptions=True,
             ):
-                if isinstance(error, Exception):
-                    logger.warning("Failed to update gateway %s: %s", conn.ip_address, error)
+                if isinstance(res, Exception):
+                    logger.warning(
+                        "Failed to update gateway %s: %s", gateway_compute.ip_address, error
+                    )
+                elif isinstance(res, bool) and res:
+                    gateway_compute.app_updated_at = get_current_datetime()
 
-        for conn, error in await gather_map_async(
+        for gateway_compute, error in await gather_map_async(
             await gateway_connections_pool.all(),
             configure_gateway,
             return_exceptions=True,
         ):
             if isinstance(error, Exception):
-                logger.warning("Failed to configure gateway %s: %r", conn.ip_address, error)
+                logger.warning(
+                    "Failed to configure gateway %s: %r", gateway_compute.ip_address, error
+                )
 
 
-async def _update_gateway(connection: GatewayConnection, build: str):
+async def _update_gateway(gateway_compute_model: GatewayComputeModel, build: str) -> bool:
+    if _recently_updated(gateway_compute_model):
+        logger.debug(
+            "Skipping gateway %s update. Gateway was recently updated.",
+            gateway_compute_model.ip_address,
+        )
+        return False
+    connection = await gateway_connections_pool.get_or_add(
+        gateway_compute_model.ip_address,
+        gateway_compute_model.ssh_private_key,
+    )
     logger.debug("Updating gateway %s", connection.ip_address)
     stdout = await connection.tunnel.aexec(
         f"/bin/sh dstack/update.sh {get_dstack_gateway_wheel(build)} {build}"
     )
     if "Update successfully completed" in stdout:
         logger.info("Gateway %s updated", connection.ip_address)
+        return True
+    return False
+
+
+def _recently_updated(gateway_compute_model: GatewayComputeModel) -> bool:
+    return gateway_compute_model.app_updated_at.replace(
+        tzinfo=datetime.timezone.utc
+    ) > get_current_datetime() - timedelta(seconds=60)
 
 
 async def configure_gateway(connection: GatewayConnection) -> None:
