@@ -390,6 +390,7 @@ class GatewayComputeModel(BaseModel):
     # active means the server should maintain connection to gateway.
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     deleted: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    app_updated_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
 
 
 class PoolModel(BaseModel):
