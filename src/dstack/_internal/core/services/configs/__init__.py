@@ -120,9 +120,7 @@ class ConfigManager:
         return self.dstack_ssh_dir / "config"
 
 
-def update_default_project(
-    project_name: str, url: str, token: str, default: bool, no_default: bool
-):
+def update_default_project(project_name: str, url: str, token: str, yes: bool, no: bool):
     config_manager = ConfigManager()
     default_project = config_manager.get_project_config()
     config_dir = str(config_manager.config_filepath).replace(os.path.expanduser("~"), "~", 1)
@@ -135,12 +133,12 @@ def update_default_project(
         set_it_as_default = (
             (
                 default_project is None
-                or default
+                or yes
                 or confirm_ask(
                     f"Update the [code]{project_name}[/] project in [code]{config_dir}[/]?"
                 )
             )
-            if not no_default
+            if not no
             else False
         )
         if set_it_as_default:

@@ -24,17 +24,18 @@ class ConfigCommand(BaseCommand):
         self._parser.add_argument("--url", type=str, help="Server url")
         self._parser.add_argument("--token", type=str, help="User token")
         self._parser.add_argument(
-            "--default",
+            "-y",
+            "--yes",
+            help="Don't ask for confirmation (e.g. update the config)",
             action="store_true",
-            help="Set the project as default. It will be used when --project is omitted in commands.",
-            default=False,
         )
         self._parser.add_argument(
             "--remove", action="store_true", help="Delete project configuration"
         )
         self._parser.add_argument(
-            "--no-default",
-            help="Do not prompt to set the project as default",
+            "-n",
+            "--no",
+            help="Don't ask for confirmation (e.g. do not update the config)",
             action="store_true",
         )
 
@@ -71,11 +72,11 @@ class ConfigCommand(BaseCommand):
         ):
             set_it_as_default = (
                 (
-                    args.default
+                    args.yes
                     or not default_project
                     or confirm_ask(f"Set '{args.project}' as your default project?")
                 )
-                if not args.no_default
+                if not args.no
                 else False
             )
             config_manager.configure_project(
