@@ -34,6 +34,7 @@ class SSHAttach:
         output: bytes
         if IS_WINDOWS:
             filter_prefix = "powershell"
+            # This script always returns zero exit status.
             output = subprocess.check_output(
                 [
                     "powershell",
@@ -47,10 +48,21 @@ class SSHAttach:
         else:
             filter_prefix = "grep"
             ps = subprocess.Popen(("ps", "-A", "-o", "command"), stdout=subprocess.PIPE)
-            output = subprocess.check_output(
-                ["grep", "--", f"-S {control_sock_path}"], stdin=ps.stdout
+            cp = subprocess.run(
+                ["grep", "-F", "--", f"-S {control_sock_path}"],
+                stdin=ps.stdout,
+                stdout=subprocess.PIPE,
             )
             ps.wait()
+            # From grep man page: "the exit status is 0 if a line is selected,
+            # 1 if no lines were selected, and 2 if an error occurred".
+            if cp.returncode == 1:
+                return None
+            if cp.returncode != 0:
+                raise SSHError(
+                    f"Unexpected grep exit status {cp.returncode} while searching for ssh process"
+                )
+            output = cp.stdout
         commands = list(
             filter(lambda s: not s.startswith(filter_prefix), output.decode().strip().split("\n"))
         )
