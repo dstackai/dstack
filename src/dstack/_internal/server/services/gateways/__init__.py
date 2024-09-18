@@ -481,9 +481,7 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
     )
     run_model = res.unique().scalar_one()
     if run_model.gateway_id is None:
-        logger.error(
-            "Failed to unregister replica. run_model.gateway_id is None for %s", run_model.run_name
-        )
+        # The run is not a service
         return
 
     conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
