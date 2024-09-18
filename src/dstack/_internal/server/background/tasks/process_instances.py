@@ -196,11 +196,11 @@ async def _add_remote(instance: InstanceModel) -> None:
     ) + timedelta(seconds=PROVISIONING_TIMEOUT_SECONDS)
     if retry_duration_deadline < get_current_datetime():
         instance.status = InstanceStatus.TERMINATED
-        instance.termination_reason = "Proivisioning timeout expired"
+        instance.termination_reason = "Provisioning timeout expired"
         logger.warning(
-            "Failed to start instance in %s seconds. Terminating...",
-            PROVISIONING_TIMEOUT_SECONDS,
+            "Failed to start instance %s in %d seconds. Terminating...",
             instance.name,
+            PROVISIONING_TIMEOUT_SECONDS,
             extra={
                 "instance_name": instance.name,
                 "instance_status": InstanceStatus.TERMINATED.value,

@@ -242,6 +242,29 @@ class TestTerminateIdleTime:
         assert instance.termination_reason == "Idle timeout"
 
 
+class TestOnPremInstanceTerminateProvisionTimeoutExpired:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_terminate_by_idle_timeout(self, test_db, session: AsyncSession):
+        project = await create_project(session=session)
+        pool = await create_pool(session, project)
+        instance = await create_instance(
+            session,
+            project,
+            pool,
+            status=InstanceStatus.PENDING,
+            created_at=get_current_datetime() - dt.timedelta(days=100),
+        )
+        instance.remote_connection_info = "{}"
+        await session.commit()
+
+        await process_instances()
+
+        await session.refresh(instance)
+        assert instance.status == InstanceStatus.TERMINATED
+        assert instance.termination_reason == "Provisioning timeout expired"
+
+
 class TestTerminate:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
