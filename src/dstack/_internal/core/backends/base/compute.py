@@ -207,10 +207,14 @@ def get_shim_pre_start_commands(build: str) -> List[str]:
 
     url = f"https://{bucket}.s3.eu-west-1.amazonaws.com/{build}/binaries/dstack-shim-linux-amd64"
 
-    dstack_shim_binary_path = "/usr/local/bin/dstack-shim"
+    dstack_shim_binary_name = "dstack-shim"
+    dstack_shim_binary_path = f"/usr/local/bin/{dstack_shim_binary_name}"
 
     return [
-        f'sudo curl -s --compressed --connect-timeout 60 --max-time 240 --retry 1 --output {dstack_shim_binary_path} "{url}"',
+        f"dlpath=$(sudo mktemp -t {dstack_shim_binary_name}.XXXXXXXXXX)",
+        # -sS -- disable progress meter and warnings, but still show errors (unlike bare -s)
+        f'sudo curl -sS --compressed --connect-timeout 60 --max-time 240 --retry 1 --output "$dlpath" "{url}"',
+        f'sudo mv "$dlpath" {dstack_shim_binary_path}',
         f"sudo chmod +x {dstack_shim_binary_path}",
         f"sudo mkdir {DSTACK_WORKING_DIR} -p",
     ]
