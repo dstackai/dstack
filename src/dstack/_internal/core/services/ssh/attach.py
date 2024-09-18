@@ -93,6 +93,7 @@ class SSHAttach:
             ),
             control_sock_path=control_sock_path,
             ssh_config_path=self.ssh_config_path,
+            options={},
         )
         self.ssh_proxy = ssh_proxy
         if ssh_proxy is None:
