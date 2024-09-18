@@ -100,7 +100,7 @@ def run_shim_as_systemd_service(client: paramiko.SSHClient, working_dir: str, de
     Restart=always
     WorkingDirectory={working_dir}
     EnvironmentFile={working_dir}/{DSTACK_SHIM_ENV_FILE}
-    ExecStart=/usr/local/bin/dstack-shim {dev_flag} docker --keep-container
+    ExecStart=/usr/local/bin/dstack-shim {dev_flag} docker
     StandardOutput=append:/root/.dstack/shim.log
     StandardError=append:/root/.dstack/shim.log
 

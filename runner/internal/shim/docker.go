@@ -33,6 +33,10 @@ import (
 // TODO: Allow for configuration via cli arguments or environment variables.
 const ImagePullTimeout time.Duration = 20 * time.Minute
 
+// Set to "true" on containers spawned by DockerRunner, used for identification.
+const LabelKeyIsRun = "ai.dstack.shim.is-run"
+const LabelValueTrue = "true"
+
 // Depricated: Remove on next release (0.19)
 type ContainerStatus struct {
 	ContainerID   string
@@ -153,10 +157,24 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 
 	if !d.dockerParams.DockerKeepContainer() {
 		defer func() {
-			log.Println("Deleting container")
-			err := d.client.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: true})
+			log.Println("Deleting old container(s)")
+			listFilters := filters.NewArgs(
+				filters.Arg("label", fmt.Sprintf("%s=%s", LabelKeyIsRun, LabelValueTrue)),
+				filters.Arg("status", "exited"),
+			)
+			containers, err := d.client.ContainerList(ctx, container.ListOptions{Filters: listFilters})
 			if err != nil {
-				log.Printf("ContainerRemove error: %s\n", err.Error())
+				log.Printf("ContainerList error: %s\n", err.Error())
+				return
+			}
+			for _, container_ := range containers {
+				if container_.ID == containerID {
+					continue
+				}
+				err := d.client.ContainerRemove(ctx, container_.ID, container.RemoveOptions{Force: true})
+				if err != nil {
+					log.Printf("ContainerRemove error: %s\n", err.Error())
+				}
 			}
 		}()
 	}
@@ -467,6 +485,9 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		Entrypoint:   []string{"/bin/sh", "-c"},
 		ExposedPorts: exposePorts(dockerParams.DockerPorts()...),
 		Env:          envVars,
+		Labels: map[string]string{
+			LabelKeyIsRun: LabelValueTrue,
+		},
 	}
 	if taskConfig.ContainerUser != "" {
 		containerConfig.User = taskConfig.ContainerUser
