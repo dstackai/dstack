@@ -133,8 +133,8 @@ jobs:
           CGO_ENABLED: 0
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          go build -ldflags "-X '$REPO_NAME/runner/cmd/runner/version.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
-          go build -ldflags "-X '$REPO_NAME/runner/cmd/shim/version.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
+          go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-runner-$GOOS-$GOARCH $REPO_NAME/runner/cmd/runner
+          go build -ldflags "-X 'main.Version=$VERSION' -extldflags '-static'" -o dstack-shim-$GOOS-$GOARCH $REPO_NAME/runner/cmd/shim
       - uses: actions/upload-artifact@v4
         with:
           name: dstack-runner-${{ matrix.goos }}-${{ matrix.goarch }}
