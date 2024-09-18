@@ -35,13 +35,15 @@ class ServerCommand(BaseCommand):
             default=os.getenv("DSTACK_SERVER_LOG_LEVEL", "INFO"),
         )
         self._parser.add_argument(
-            "--default",
-            help="Update the default project configuration",
+            "-y",
+            "--yes",
+            help="Don't ask for confirmation (e.g. update the config)",
             action="store_true",
         )
         self._parser.add_argument(
-            "--no-default",
-            help="Do not update the default project configuration",
+            "-n",
+            "--no",
+            help="Don't ask for confirmation (e.g. do not update the config)",
             action="store_true",
         )
         self._parser.add_argument("--token", type=str, help="The admin user token")
@@ -52,9 +54,9 @@ class ServerCommand(BaseCommand):
         os.environ["DSTACK_SERVER_HOST"] = args.host
         os.environ["DSTACK_SERVER_PORT"] = str(args.port)
         os.environ["DSTACK_SERVER_LOG_LEVEL"] = args.log_level
-        if args.default:
+        if args.yes:
             os.environ["DSTACK_UPDATE_DEFAULT_PROJECT"] = "1"
-        if args.no_default:
+        if args.no:
             os.environ["DSTACK_DO_NOT_UPDATE_DEFAULT_PROJECT"] = "1"
         if args.token:
             os.environ["DSTACK_SERVER_ADMIN_TOKEN"] = args.token

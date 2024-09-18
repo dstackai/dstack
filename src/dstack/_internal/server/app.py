@@ -116,8 +116,8 @@ async def lifespan(app: FastAPI):
         project_name=DEFAULT_PROJECT_NAME,
         url=SERVER_URL,
         token=admin.token.get_plaintext_or_error(),
-        default=UPDATE_DEFAULT_PROJECT,
-        no_default=DO_NOT_UPDATE_DEFAULT_PROJECT,
+        yes=UPDATE_DEFAULT_PROJECT,
+        no=DO_NOT_UPDATE_DEFAULT_PROJECT,
     )
     if settings.SERVER_BUCKET is not None:
         init_default_storage()
@@ -240,6 +240,7 @@ def register_routes(app: FastAPI, ui: bool = True):
                     .joinpath("statics/index.html")
                     .read_text()
                 )
+
     else:
 
         @app.get("/")
