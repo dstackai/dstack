@@ -155,29 +155,27 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		return tracerr.Wrap(err)
 	}
 
-	if !d.dockerParams.DockerKeepContainer() {
-		defer func() {
-			log.Println("Deleting old container(s)")
-			listFilters := filters.NewArgs(
-				filters.Arg("label", fmt.Sprintf("%s=%s", LabelKeyIsRun, LabelValueTrue)),
-				filters.Arg("status", "exited"),
-			)
-			containers, err := d.client.ContainerList(ctx, container.ListOptions{Filters: listFilters})
+	defer func() {
+		log.Println("Deleting old container(s)")
+		listFilters := filters.NewArgs(
+			filters.Arg("label", fmt.Sprintf("%s=%s", LabelKeyIsRun, LabelValueTrue)),
+			filters.Arg("status", "exited"),
+		)
+		containers, err := d.client.ContainerList(ctx, container.ListOptions{Filters: listFilters})
+		if err != nil {
+			log.Printf("ContainerList error: %s\n", err.Error())
+			return
+		}
+		for _, container_ := range containers {
+			if container_.ID == containerID {
+				continue
+			}
+			err := d.client.ContainerRemove(ctx, container_.ID, container.RemoveOptions{Force: true})
 			if err != nil {
-				log.Printf("ContainerList error: %s\n", err.Error())
-				return
+				log.Printf("ContainerRemove error: %s\n", err.Error())
 			}
-			for _, container_ := range containers {
-				if container_.ID == containerID {
-					continue
-				}
-				err := d.client.ContainerRemove(ctx, container_.ID, container.RemoveOptions{Force: true})
-				if err != nil {
-					log.Printf("ContainerRemove error: %s\n", err.Error())
-				}
-			}
-		}()
-	}
+		}
+	}()
 
 	d.containerStatus, _ = inspectContainer(d.client, containerID)
 	d.state = Running
@@ -641,10 +639,6 @@ func getContainerLastLogs(client docker.APIClient, containerID string, n int) ([
 }
 
 /* DockerParameters interface implementation for CLIArgs */
-
-func (c CLIArgs) DockerKeepContainer() bool {
-	return c.Docker.KeepContainer
-}
 
 func (c CLIArgs) DockerPrivileged() bool {
 	return c.Docker.Privileged

@@ -93,11 +93,6 @@ func main() {
 				Flags: []cli.Flag{
 					/* Docker Parameters */
 					&cli.BoolFlag{
-						Name:        "keep-container",
-						Usage:       "Do not delete container on exit",
-						Destination: &args.Docker.KeepContainer,
-					},
-					&cli.BoolFlag{
 						Name:        "privileged",
 						Usage:       "Give extended privileges to the container",
 						Destination: &args.Docker.Privileged,
