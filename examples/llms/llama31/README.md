@@ -36,7 +36,7 @@ Below is the configuration file for the task.
     env:
       - HUGGING_FACE_HUB_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
-      - MAX_MODE_LEN=4096
+      - MAX_MODEL_LEN=4096
     commands:
       - pip install vllm
       - vllm serve $MODEL_ID
