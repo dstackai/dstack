@@ -8,7 +8,8 @@ fleet is created, it can be reused by dev environments, tasks, and services.
 To create a fleet, create a YAML file in your project folder. Its name must end with `.dstack.yml` (e.g. `.dstack.yml` or `fleet.dstack.yml`
 are both acceptable).
 
-=== "Cloud"
+=== "Cloud fleets"
+
     !!! info "What is a cloud fleet?"
         By default, when running dev environments, tasks, and services, `dstack` 
         reuses `idle` instances from existing fleets or creates a new cloud fleet on the fly.
@@ -53,7 +54,7 @@ are both acceptable).
 
     Note that cloud fleets aren't supported for the `kubernetes`, `vastai`, and `runpod` backends.
 
-=== "SSH"
+=== "SSH fleets"
 
     !!! info "What is an SSH fleet?"
         If you’d like to run dev environments, tasks, and services on arbitrary on-prem servers via `dstack`, you can 

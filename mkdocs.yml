@@ -214,6 +214,7 @@ nav:
       - Guides:
           - Troubleshooting: docs/guides/troubleshooting.md
           - Protips: docs/guides/protips.md
+          - Server deployment: docs/guides/server-deployment.md
       - Reference:
           - server/config.yml: docs/reference/server/config.yml.md
           - .dstack.yml:

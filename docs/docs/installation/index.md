@@ -11,8 +11,8 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 
 ## Configure backends
 
-To use `dstack` with your own cloud accounts or on prem servers,
-create the [`~/.dstack/server/config.yml`](../reference/server/config.yml.md) file and configure backends.
+To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
+[configure backends](../reference/server/config.yml.md).
 
 ## Start the server
 
@@ -54,20 +54,12 @@ Once backends are configured, proceed and start the server:
         
     </div>
 
-    > For more details on how to deploy `dstack` using Docker, check its [Docker repo](https://hub.docker.com/r/dstackai/dstack).
-
-The `dstack` server can run anywhere: on your laptop, a dedicated server, or in the cloud. Once it's up, you
-can use either the CLI or the API.
-
-??? info "Persisting state"
-    By default, the `dstack` server stores its state locally in `~/.dstack/server`.
-    To store it externally, use the `DSTACK_DATABASE_URL` and 
-    `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP` [environment variables](../reference/cli/index.md#environment-variables).
-
-    If you want backend credentials and user tokens to be encrypted, you can set up encryption keys via
-    [`~/.dstack/server/config.yml`](../reference/server/config.yml.md#encryption_1).
+> For more details on server configuration options, see the
+> [server deployment](../guides/server-deployment.md) guide.
 
 ## Set up the CLI
+
+Once it's up, you can use either the CLI or the API.
 
 > The CLI can be set up on Linux, macOS, and Windows. It requires
 > Git and OpenSSH.
@@ -102,7 +94,7 @@ This configuration is stored in `~/.dstack/config.yml`.
 ## Create SSH fleets
 
 If you want the `dstack` server to run containers on your on-prem clusters,
-create [SSH fleets](../concepts/fleets.md#ssh).
+create [SSH fleets](../concepts/fleets.md#ssh-fleets).
 
 ## What's next?
 

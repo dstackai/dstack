@@ -662,13 +662,8 @@ projects:
 
 #### SSH fleets
 
-> To use `dstack` with your on-prem servers, no backend configuration is required.
-
-Simply create [SSH fleets](../../concepts/fleets.md#ssh) by specifying the hostnames 
-of the servers and the SSH private key to access these hosts.
-
-Upon fleet creation, `dstack` will automatically connect to the hosts and add them as a fleet.
-Once the fleet is created, it can be used to run dev environments, tasks, and services.
+For using `dstack` with on-prem servers, no backend configuration is required.
+See [SSH fleets](../../concepts/fleets.md#ssh-fleets) for more details.
 
 #### Kubernetes
 

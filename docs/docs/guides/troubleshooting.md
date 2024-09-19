@@ -2,16 +2,21 @@
 
 ## Reporting issues
 
-When you encounter a problem and need help, it's essential to report it as a [GitHub issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/new/choose){:target="_blank"}.
-Please avoid brining up the issue to Discord before reporting it.
+When you encounter a problem and need help, it's essential to report it as
+a [GitHub issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/new/choose){:target="_blank"}.
 
-!!! warning "Steps to reproduce"
-    Make sure to provide clear, detailed steps to reproduce the issue. This will allow us to troubleshoot it and request any
-    additional information. Include server logs, CLI outputs, and configuration samples. 
-    Avoid using screenshots for logs or errors—use text instead. 
+> When brining up issues on Discord, please include the steps to reproduce.
 
-    See these examples for well-reported issues: [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1640){:target="_blank"}
-    and [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1551){:target="_blank"}.
+### Steps to reproduce
+
+Make sure to provide clear, detailed steps to reproduce the issue. 
+Include server logs, CLI outputs, and configuration samples. Avoid using screenshots for logs or errors—use text instead. 
+
+To get more detailed logs, make sure to set the `DSTACK_CLI_LOG_LEVEL` and `DSTACK_SERVER_LOG_LEVEL` 
+environent variables to `debug` when running the CLI and the server, respectively.
+
+> See these examples for well-reported issues: [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1640){:target="_blank"}
+and [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1551){:target="_blank"}.
 
 ## Typical issues
 
@@ -58,12 +63,12 @@ requirements specified in `resources`.
 There could be several reasons for a run failing after successful provisioning. 
 
 !!! info "Termination reason"
-    To find out why a run terminated, use `--verbose/-v` with `dstack ps`.
+    To find out why a run terminated, use `--verbose` (or `-v`) with `dstack ps`.
     This will show the run's status and any failure reasons.
 
-!!! info "Diagnostic logs"
+??? info "Diagnostic logs"
     You can get more information on why a run fails with diagnostic logs.
-    Pass `--diagnose/-v` to `dstack logs` and you'll see logs of the run executor.
+    Pass `--diagnose` (or `-d`) to `dstack logs` and you'll see logs of the run executor.
 
 #### Spot interruption
 
@@ -112,7 +117,6 @@ Native support will be available soon.
 If you set up an SSH fleet and it fails to provision after a long wait, first check the server logs. 
 Also, review the  `/root/.dstack/shim.log` file on each host used to create the fleet.
 
-## Questions
+## Community
 
-!!! info "Community"
-    If you have a question, please feel free to ask it in our [Discord server](https://discord.gg/u8SmfwPpMd).
+If you have a question, please feel free to ask it in our [Discord server](https://discord.gg/u8SmfwPpMd).

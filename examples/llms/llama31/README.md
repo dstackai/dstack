@@ -208,11 +208,11 @@ $ curl 127.0.0.1:8001/v1/chat/completions \
 
 [//]: # (TODO: Syntetic data generation)
 
-## Fine-tuning with TRL
+## Fine-tuning
 
 ### Running on multiple GPUs
 
-Here is the task configuration file for fine-tuning Llama 3.1 8B on the
+Below is the task configuration file of fine-tuning Llama 3.1 8B using TRL on the
 [`OpenAssistant/oasst_top1_2023-08-25` :material-arrow-top-right-thin:{ .external }](https://huggingface.co/datasets/OpenAssistant/oasst_top1_2023-08-25) dataset.
 
 <div editor-title="examples/fine-tuning/trl/train.dstack.yml"> 
