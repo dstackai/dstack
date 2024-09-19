@@ -131,10 +131,6 @@ type dockerParametersMock struct {
 	publicSSHKey string
 }
 
-func (c *dockerParametersMock) DockerKeepContainer() bool {
-	return false
-}
-
 func (c *dockerParametersMock) DockerPrivileged() bool {
 	return false
 }

@@ -226,7 +226,7 @@ def get_run_shim_script(is_privileged: bool, pjrt_device: Optional[str]) -> List
     pjrt_device_env = f"--pjrt-device={pjrt_device}" if pjrt_device else ""
 
     return [
-        f"nohup dstack-shim {dev_flag} docker --keep-container {privileged_flag} {pjrt_device_env} >{DSTACK_WORKING_DIR}/shim.log 2>&1 &",
+        f"nohup dstack-shim {dev_flag} docker {privileged_flag} {pjrt_device_env} >{DSTACK_WORKING_DIR}/shim.log 2>&1 &",
     ]
 
 

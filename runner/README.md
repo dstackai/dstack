@@ -25,7 +25,7 @@ Here's the steps to build `dstack-shim` and `dstack-runner` and run `dstack` wit
 3. Start the shim:
 
     ```shell
-    ./shim --home $RUNNER_DIR --runner-binary-path $COMPILED_RUNNER_PATH docker --ssh-key $DSTACK_PUBLIC_KEY --keep-container
+    ./shim --home $RUNNER_DIR --runner-binary-path $COMPILED_RUNNER_PATH docker --ssh-key $DSTACK_PUBLIC_KEY
     ```
 
     Notes:
