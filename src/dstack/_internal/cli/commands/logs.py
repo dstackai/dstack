@@ -12,12 +12,14 @@ class LogsCommand(APIBaseCommand):
 
     def _register(self):
         super()._register()
-        self._parser.add_argument("-d", "--diagnose", action="store_true")
+        self._parser.add_argument(
+            "-d", "--diagnose", action="store_true", help="Show run diagnostic logs"
+        )
         self._parser.add_argument(
             "-a",
             "--attach",
             action="store_true",
-            help="Set up an SSH tunnel, and print logs as they follow.",
+            help="Set up an SSH tunnel and print logs as they follow",
         )
         self._parser.add_argument(
             "--ssh-identity",

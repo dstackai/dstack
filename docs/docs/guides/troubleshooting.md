@@ -58,8 +58,12 @@ requirements specified in `resources`.
 There could be several reasons for a run failing after successful provisioning. 
 
 !!! info "Termination reason"
-    To find out why, use `-v` (stands for `--verbose`) with `dstack ps`.
+    To find out why a run terminated, use `--verbose/-v` with `dstack ps`.
     This will show the run's status and any failure reasons.
+
+!!! info "Diagnostic logs"
+    You can get more information on why a run fails with diagnostic logs.
+    Pass `--diagnose/-v` to `dstack logs` and you'll see logs of the run executor.
 
 #### Spot interruption
 
