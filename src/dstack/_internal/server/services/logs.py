@@ -230,10 +230,15 @@ class CloudWatchLogStorage(LogStorage):
             # as message is base64-encoded, length in bytes = length in code points.
             message_size = len(cw_event["message"]) + self.MESSAGE_OVERHEAD_SIZE
             if message_size > self.MESSAGE_MAX_SIZE:
-                logger.warning(
-                    "Stream %s: skipping event %d, message exceeds max size",
+                # we should never hit this limit, as we use `io.Copy` to copy from pty to logs,
+                # which under the hood uses 32KiB buffer, see runner/internal/executor/executor.go,
+                # `execJob` -> `io.Copy(logger, ptmx)`
+                logger.error(
+                    "Stream %s: skipping event %d, message exceeds max size: %d > %d",
                     stream,
                     event.timestamp,
+                    message_size,
+                    self.MESSAGE_MAX_SIZE,
                 )
                 continue
             if total_size + message_size > self.BATCH_MAX_SIZE:
