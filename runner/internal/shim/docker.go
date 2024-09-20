@@ -595,7 +595,13 @@ func requestGpuIfAvailable(ctx context.Context, client docker.APIClient) ([]cont
 	for runtime := range info.Runtimes {
 		if runtime == consts.NVIDIA_RUNTIME {
 			return []container.DeviceRequest{
-				{Capabilities: [][]string{{"gpu"}}, Count: -1}, // --gpus=all
+				{
+					// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
+					// Default capabilities: utility, compute.
+					// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
+					Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
+					Count:        -1, // --gpus=all
+				},
 			}, nil
 		}
 	}
