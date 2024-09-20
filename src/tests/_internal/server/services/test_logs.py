@@ -1,6 +1,8 @@
+import base64
 import itertools
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import List
 from unittest.mock import Mock, call
 from uuid import UUID
 
@@ -528,3 +530,107 @@ class TestCloudWatchLogStorage:
                 ],
                 job_logs=[],
             )
+
+    @pytest.mark.parametrize(
+        ["messages", "expected"],
+        [
+            # `messages` is a concatenated list for better readability — each list is a batch
+            # `expected` is a list of lists, each nested list is a batch.
+            [
+                ["", "toolong"],
+                [],
+            ],
+            [
+                ["111", "toolong", "111"] + ["222222"] + ["333"],
+                [["111", "111"], ["222222"], ["333"]],
+            ],
+            [
+                ["111", "111"] + ["222", "222"],
+                [["111", "111"], ["222", "222"]],
+            ],
+            [
+                ["111", "111"] + ["222"],
+                [["111", "111"], ["222"]],
+            ],
+            [
+                ["111"] + ["222222"] + ["333", "333"],
+                [["111"], ["222222"], ["333", "333"]],
+            ],
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_write_logs_batching_by_size(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        mock_ensure_stream_exists: Mock,
+        messages: List[str],
+        expected: List[List[str]],
+    ):
+        # maximum 6 bytes: 12 (in base64) + 26 (overhead) = 34
+        monkeypatch.setattr(CloudWatchLogStorage, "MESSAGE_MAX_SIZE", 34)
+        monkeypatch.setattr(CloudWatchLogStorage, "BATCH_MAX_SIZE", 60)
+        log_storage.write_logs(
+            project=project,
+            run_name="test-run",
+            job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
+            runner_logs=[
+                RunnerLogEvent(timestamp=1696586513234, message=message.encode())
+                for message in messages
+            ],
+            job_logs=[],
+        )
+        assert mock_client.put_log_events.call_count == len(expected)
+        actual = [
+            [base64.b64decode(e["message"]).decode() for e in c.kwargs["logEvents"]]
+            for c in mock_client.put_log_events.call_args_list
+        ]
+        assert actual == expected
+
+    @pytest.mark.parametrize(
+        ["messages", "expected"],
+        [
+            # `messages` is a concatenated list for better readability — each list is a batch
+            # `expected` is a list of lists, each nested list is a batch.
+            [
+                ["111", "111", "111"] + ["222"],
+                [["111", "111", "111"], ["222"]],
+            ],
+            [
+                ["111", "111", "111"] + ["222", "222", "toolong", "", "222222"],
+                [["111", "111", "111"], ["222", "222", "222222"]],
+            ],
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_write_logs_batching_by_count(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        mock_ensure_stream_exists: Mock,
+        messages: List[str],
+        expected: List[List[str]],
+    ):
+        # maximum 6 bytes: 12 (in base64) + 26 (overhead) = 34
+        monkeypatch.setattr(CloudWatchLogStorage, "MESSAGE_MAX_SIZE", 34)
+        monkeypatch.setattr(CloudWatchLogStorage, "EVENT_MAX_COUNT_IN_BATCH", 3)
+        log_storage.write_logs(
+            project=project,
+            run_name="test-run",
+            job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
+            runner_logs=[
+                RunnerLogEvent(timestamp=1696586513234, message=message.encode())
+                for message in messages
+            ],
+            job_logs=[],
+        )
+        assert mock_client.put_log_events.call_count == len(expected)
+        actual = [
+            [base64.b64decode(e["message"]).decode() for e in c.kwargs["logEvents"]]
+            for c in mock_client.put_log_events.call_args_list
+        ]
+        assert actual == expected
