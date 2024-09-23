@@ -116,4 +116,9 @@ export const API = {
         LIST: () => `${API.POOLS.BASE()}/list`,
         INSTANCES_LIST: () => `${API.POOLS.BASE()}/list_instances`,
     },
+
+    SERVER: {
+        BASE: () => `${API.BASE()}/server`,
+        INFO: () => `${API.SERVER.BASE()}/get_info`,
+    },
 };

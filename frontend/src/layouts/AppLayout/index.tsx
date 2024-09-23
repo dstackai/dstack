@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { SideNavigationProps } from '@cloudscape-design/components/side-navigation';
 import { Mode } from '@cloudscape-design/global-styles';
 
+import { Box } from 'components';
 import {
     AppLayout as GenericAppLayout,
     AppLayoutProps as GenericAppLayoutProps,
@@ -21,6 +22,7 @@ import { DISCORD_URL, DOCS_URL } from 'consts';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';
+import { useGetServerInfoQuery } from 'services/server';
 
 import {
     closeToolsPanel,
@@ -61,6 +63,7 @@ const THEME_ICON_MAP: Record<Mode, React.FC> = {
 const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const { data } = useGetServerInfoQuery();
 
     const userName = useAppSelector(selectUserName) ?? '';
     const systemMode = useAppSelector(selectSystemMode) ?? '';
@@ -236,6 +239,12 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             />
 
             <TallyComponent />
+
+            {data?.server_version && (
+                <div className={styles.dstackVersion}>
+                    <Box color="text-status-inactive">Dstack version: {data?.server_version}</Box>
+                </div>
+            )}
         </AnnotationContext>
     );
 };

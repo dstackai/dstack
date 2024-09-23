@@ -419,7 +419,7 @@
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
     "nomatch_message_button_label": "Clear filter",
-    "active_only": "Active Instances",
+    "active_only": "Active instances",
     "instances": {
       "title": "Instances",
       "empty_message_title": "No instances",

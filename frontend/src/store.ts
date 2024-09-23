@@ -10,6 +10,7 @@ import { mainApi } from 'services/mainApi';
 import { poolApi } from 'services/pool';
 import { projectApi } from 'services/project';
 import { runApi } from 'services/run';
+import { serverApi } from 'services/server';
 import { userApi } from 'services/user';
 
 import appReducer from 'App/slice';
@@ -26,7 +27,8 @@ export const store = configureStore({
         [userApi.reducerPath]: userApi.reducer,
         [gatewayApi.reducerPath]: gatewayApi.reducer,
         [authApi.reducerPath]: authApi.reducer,
-        [authApi.mainApi]: mainApi.reducer,
+        [serverApi.reducerPath]: serverApi.reducer,
+        [authApi.reducerPath]: mainApi.reducer,
     },
 
     middleware: (getDefaultMiddleware) =>
@@ -41,6 +43,7 @@ export const store = configureStore({
             .concat(gatewayApi.middleware)
             .concat(userApi.middleware)
             .concat(authApi.middleware)
+            .concat(serverApi.middleware)
             .concat(mainApi.middleware),
 });
 
