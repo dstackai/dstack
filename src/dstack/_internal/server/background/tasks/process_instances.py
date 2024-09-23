@@ -230,9 +230,12 @@ async def _add_remote(instance: InstanceModel) -> None:
             )
             return
 
+        authorized_keys = [pk.public.strip() for pk in remote_details.ssh_keys]
+        authorized_keys.append(instance.project.ssh_public_key.strip())
+
         try:
             future = asyncio.get_running_loop().run_in_executor(
-                None, _deploy_instance, remote_details, pkeys
+                None, _deploy_instance, remote_details, pkeys, authorized_keys
             )
             deploy_timeout = 20 * 60  # 20 minutes
             result = await asyncio.wait_for(future, timeout=deploy_timeout)
@@ -317,7 +320,9 @@ async def _add_remote(instance: InstanceModel) -> None:
 
 
 def _deploy_instance(
-    remote_details: RemoteConnectionInfo, pkeys: List[PKey]
+    remote_details: RemoteConnectionInfo,
+    pkeys: List[PKey],
+    authorized_keys: List[str],
 ) -> Tuple[HealthStatus, Dict[str, Any]]:
     with get_paramiko_connection(
         remote_details.ssh_user, remote_details.host, remote_details.port, pkeys
@@ -328,17 +333,11 @@ def _deploy_instance(
 
         # Execute pre start commands
         shim_pre_start_commands = get_shim_pre_start_commands(runner_build)
-        run_pre_start_commands(
-            client,
-            shim_pre_start_commands,
-            authorized_keys=[pk.public.strip() for pk in remote_details.ssh_keys],
-        )
+        run_pre_start_commands(client, shim_pre_start_commands, authorized_keys)
         logger.debug("The script for installing dstack has been executed")
 
         # Upload envs
-        shim_envs = get_shim_env(
-            runner_build, authorized_keys=[sk.public for sk in remote_details.ssh_keys]
-        )
+        shim_envs = get_shim_env(runner_build, authorized_keys)
         try:
             fleet_configuration_envs = remote_details.env.as_dict()
         except ValueError as e:
