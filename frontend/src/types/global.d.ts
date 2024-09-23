@@ -19,7 +19,6 @@ declare namespace NodeJS {
         readonly UI_VERSION: 'sky' | 'enterprise';
         readonly PUBLIC_URL: string;
         readonly API_URL: string;
-        readonly DSTACK_VERSION: string;
     }
 }
 

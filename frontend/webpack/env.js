@@ -16,7 +16,6 @@ const publicDir = join(__dirname, '../public');
 const apiUrl = process.env.API_URL || apiURLs;
 const publicUrl = process.env.PUBLIC_URL || publicURLs;
 const uiVersion = process.env.UI_VERSION === 'sky' ? 'sky' : 'enterprise';
-const dstackVersion = process.env.DSTACK_VERSION;
 
 
 const title = uiVersion === 'enterprise' ? "dstack" : "dstack Sky";
@@ -38,5 +37,4 @@ module.exports = {
     title,
     description,
     uiVersion,
-    dstackVersion,
 }
