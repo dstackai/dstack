@@ -13,3 +13,5 @@ class FeatureFlags:
     large features. This class may be empty if there are no such features in
     development. Feature flags are environment variables of the form DSTACK_FF_*
     """
+
+    GATEWAY_IN_SERVER = bool(os.getenv("DSTACK_FF_GATEWAY_IN_SERVER"))

@@ -7,12 +7,15 @@ from typing import Awaitable, Callable, List
 
 import sentry_sdk
 from fastapi import FastAPI, Request, status
+from fastapi.datastructures import URL
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
+from dstack._internal.gateway.routers import service_proxy
+from dstack._internal.gateway.services.service_connection import service_replica_connection_pool
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
@@ -31,6 +34,9 @@ from dstack._internal.server.routers import (
     volumes,
 )
 from dstack._internal.server.services.config import ServerConfigManager
+from dstack._internal.server.services.gateway_in_server.deps import (
+    GatewayInServerDependencyInjector,
+)
 from dstack._internal.server.services.gateways import gateway_connections_pool, init_gateways
 from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
@@ -49,7 +55,7 @@ from dstack._internal.server.utils.routers import (
     error_detail,
     get_server_client_error_details,
 )
-from dstack._internal.settings import DSTACK_VERSION
+from dstack._internal.settings import DSTACK_VERSION, FeatureFlags
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import check_required_ssh_version
 
@@ -68,6 +74,7 @@ def create_app() -> FastAPI:
         )
 
     app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
+    app.state.gateway_dependency_injector = GatewayInServerDependencyInjector()
     return app
 
 
@@ -133,6 +140,7 @@ async def lifespan(app: FastAPI):
     yield
     scheduler.shutdown()
     await gateway_connections_pool.remove_all()
+    await service_replica_connection_pool.remove_all()
 
 
 _ON_STARTUP_HOOKS = []
@@ -166,6 +174,10 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(gateways.router)
     app.include_router(volumes.root_router)
     app.include_router(volumes.project_router)
+    if FeatureFlags.GATEWAY_IN_SERVER:
+        app.include_router(
+            service_proxy.router, prefix="/gateway/services", tags=["gateway-in-server"]
+        )
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):
@@ -229,7 +241,11 @@ def register_routes(app: FastAPI, ui: bool = True):
 
         @app.exception_handler(404)
         async def custom_http_exception_handler(request, exc):
-            if request.url.path.startswith("/api"):
+            if (
+                request.url.path.startswith("/api")
+                or FeatureFlags.GATEWAY_IN_SERVER
+                and _is_gateway_in_server_request(request)
+            ):
                 return JSONResponse(
                     {"detail": exc.detail},
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -246,6 +262,18 @@ def register_routes(app: FastAPI, ui: bool = True):
         @app.get("/")
         async def index():
             return RedirectResponse("/api/docs")
+
+
+def _is_gateway_in_server_request(request: Request) -> bool:
+    if request.url.path.startswith("/gateway"):
+        return True
+    # Attempt detecting requests originating from services served by gateway-in-server.
+    # Such requests can "leak" to dstack server paths if the service does not support
+    # running under a path prefix properly.
+    referrer = URL(request.headers.get("Referer", ""))
+    return (
+        referrer.netloc == "" or referrer.netloc == request.url.netloc
+    ) and referrer.path.startswith("/gateway/services")
 
 
 def _print_dstack_logo():
