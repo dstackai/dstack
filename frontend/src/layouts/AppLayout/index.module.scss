@@ -85,3 +85,10 @@
         flex-shrink: 0;
     }
 }
+
+.dstackVersion {
+    z-index: 9999;
+    position: absolute;
+    bottom: 6px;
+    left: 28px;
+}

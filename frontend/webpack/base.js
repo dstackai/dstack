@@ -3,7 +3,7 @@ const {join} = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const FaviconsWebpackPlugin = require('favicons-webpack-plugin');
 const CopyPlugin = require("copy-webpack-plugin");
-const { environment, publicUrl, apiUrl, isDev, isProd, srcDir, landing, title, description, uiVersion } = require('./env');
+const { environment, publicUrl, apiUrl, isDev, isProd, srcDir, landing, title, description, uiVersion, dstackVersion } = require('./env');
 const { getStyleLoaders } = require('./getStyleLoaders');
 
 const env = {
@@ -11,6 +11,7 @@ const env = {
     PUBLIC_URL: JSON.stringify(publicUrl),
     API_URL: JSON.stringify(apiUrl),
     UI_VERSION: JSON.stringify(uiVersion),
+    DSTACK_VERSION: JSON.stringify(dstackVersion),
 };
 
 const sourceMap = !isProd;
