@@ -17,6 +17,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
 )
+from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -62,8 +63,8 @@ class Compute(ABC):
         backend_data: Optional[str] = None,
     ) -> None:
         """
-        Terminates an instance by `instance_id`. If instance does not exist,
-        it should not raise errors but return silently.
+        Terminates an instance by `instance_id`.
+        If the instance does not exist, it should not raise errors but return silently.
         """
         pass
 
@@ -92,6 +93,25 @@ class Compute(ABC):
         It should not wait but return immediately.
         If it raises `ProvisioningError`, there will be no further attempts to update the provisioning data,
         and the run will be terminated.
+        """
+        pass
+
+    def create_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ):
+        """
+        Creates a placement group.
+        """
+        pass
+
+    def delete_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ):
+        """
+        Deletes a placement group.
+        If the group does not exist, it should not raise errors but return silently.
         """
         pass
 

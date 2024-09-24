@@ -17,6 +17,7 @@ from dstack._internal.core.models.fleets import (
     Fleet,
     FleetSpec,
     FleetStatus,
+    InstanceGroupPlacement,
     SSHHostParams,
     SSHParams,
 )
@@ -190,6 +191,10 @@ async def create_fleet_instance_model(
         max_price=profile.max_price,
         spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
     )
+    placement_group_name = _get_placement_group_name(
+        project=project,
+        fleet_spec=spec,
+    )
     instance_model = await pools_services.create_instance_model(
         session=session,
         project=project,
@@ -199,6 +204,7 @@ async def create_fleet_instance_model(
         requirements=requirements,
         instance_name=f"{spec.configuration.name}-{instance_num}",
         instance_num=instance_num,
+        placement_group_name=placement_group_name,
     )
     return instance_model
 
@@ -422,3 +428,12 @@ def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[
             instance.deleted = True
         else:
             instance.status = InstanceStatus.TERMINATING
+
+
+def _get_placement_group_name(
+    project: ProjectModel,
+    fleet_spec: FleetSpec,
+) -> Optional[str]:
+    if fleet_spec.configuration.placement != InstanceGroupPlacement.CLUSTER:
+        return None
+    return f"{project.name}-{fleet_spec.configuration.name}-pg"

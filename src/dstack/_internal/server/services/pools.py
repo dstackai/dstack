@@ -263,6 +263,18 @@ def get_instance_offer(instance_model: InstanceModel) -> Optional[InstanceOfferW
     return InstanceOfferWithAvailability.__response__.parse_raw(instance_model.offer)
 
 
+def get_instance_configuration(instance_model: InstanceModel) -> InstanceConfiguration:
+    return InstanceConfiguration.__response__.parse_raw(instance_model.instance_configuration)
+
+
+def get_instance_profile(instance_model: InstanceModel) -> Profile:
+    return Profile.__response__.parse_raw(instance_model.profile)
+
+
+def get_instance_requirements(instance_model: InstanceModel) -> Requirements:
+    return Requirements.__response__.parse_raw(instance_model.requirements)
+
+
 async def generate_instance_name(
     session: AsyncSession,
     project: ProjectModel,
@@ -582,6 +594,7 @@ async def create_instance_model(
     requirements: Requirements,
     instance_name: str,
     instance_num: int,
+    placement_group_name: Optional[str],
 ) -> InstanceModel:
     instance = InstanceModel(
         id=uuid.uuid4(),
@@ -608,13 +621,14 @@ async def create_instance_model(
     instance_config = InstanceConfiguration(
         project_name=project.name,
         instance_name=instance_name,
+        user=user.name,
         instance_id=str(instance.id),
         ssh_keys=[project_ssh_key],
+        placement_group_name=placement_group_name,
         job_docker_config=DockerConfig(
             image=dstack_default_image,
             registry_auth=None,
         ),
-        user=user.name,
     )
     instance.instance_configuration = instance_config.json()
     return instance

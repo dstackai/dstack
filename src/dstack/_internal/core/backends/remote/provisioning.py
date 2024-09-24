@@ -7,6 +7,7 @@ from typing import Any, Dict, Generator, List
 import paramiko
 from gpuhunt import correct_gpu_memory_gib
 
+# FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
 from dstack._internal.core.errors import ProvisioningError
 from dstack._internal.core.models.instances import (
     Disk,

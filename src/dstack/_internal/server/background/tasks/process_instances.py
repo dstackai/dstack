@@ -12,7 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, lazyload
 
 from dstack._internal import settings
-from dstack._internal.core.backends import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+from dstack._internal.core.backends import (
+    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
+    BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT,
+)
 from dstack._internal.core.backends.base.compute import (
     DSTACK_WORKING_DIR,
     get_dstack_runner_version,
@@ -29,6 +32,8 @@ from dstack._internal.core.backends.remote.provisioning import (
     run_shim_as_systemd_service,
     upload_envs,
 )
+
+# FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
 from dstack._internal.core.errors import BackendError, ProvisioningError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import InstanceGroupPlacement
@@ -41,19 +46,27 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     RemoteConnectionInfo,
 )
+from dstack._internal.core.models.placement import (
+    PlacementGroup,
+    PlacementGroupConfiguration,
+    PlacementStrategy,
+)
 from dstack._internal.core.models.profiles import (
-    Profile,
     RetryEvent,
     TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
     JobProvisioningData,
-    Requirements,
     Retry,
 )
 from dstack._internal.core.services.profiles import get_retry
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import FleetModel, InstanceModel, ProjectModel
+from dstack._internal.server.models import (
+    FleetModel,
+    InstanceModel,
+    PlacementGroupModel,
+    ProjectModel,
+)
 from dstack._internal.server.schemas.runner import HealthcheckResponse
 from dstack._internal.server.services import backends as backends_services
 from dstack._internal.server.services.fleets import fleet_model_to_fleet
@@ -61,7 +74,16 @@ from dstack._internal.server.services.jobs import (
     terminate_job_provisioning_data_instance,
 )
 from dstack._internal.server.services.locking import get_locker
-from dstack._internal.server.services.pools import get_instance_provisioning_data
+from dstack._internal.server.services.placement import (
+    get_fleet_placement_groups,
+    placement_group_model_to_placement_group,
+)
+from dstack._internal.server.services.pools import (
+    get_instance_configuration,
+    get_instance_profile,
+    get_instance_provisioning_data,
+    get_instance_requirements,
+)
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
@@ -138,9 +160,12 @@ async def _process_instance(session: AsyncSession, instance: InstanceModel):
         await _terminate_idle_instance(instance)
     elif instance.status == InstanceStatus.PENDING:
         if instance.remote_connection_info is not None:
-            await _add_remote(instance=instance)
+            await _add_remote(instance)
         else:
-            await _create_instance(instance)
+            await _create_instance(
+                session=session,
+                instance=instance,
+            )
     elif instance.status in (
         InstanceStatus.PROVISIONING,
         InstanceStatus.IDLE,
@@ -371,7 +396,7 @@ def _deploy_instance(
         return health, host_info
 
 
-async def _create_instance(instance: InstanceModel) -> None:
+async def _create_instance(session: AsyncSession, instance: InstanceModel) -> None:
     if instance.last_retry_at is not None:
         last_retry = instance.last_retry_at.replace(tzinfo=datetime.timezone.utc)
         if get_current_datetime() < last_retry + timedelta(minutes=1):
@@ -400,11 +425,9 @@ async def _create_instance(instance: InstanceModel) -> None:
         return
 
     try:
-        profile: Profile = Profile.__response__.parse_raw(instance.profile)
-        requirements: Requirements = Requirements.__response__.parse_raw(instance.requirements)
-        instance_configuration: InstanceConfiguration = (
-            InstanceConfiguration.__response__.parse_raw(instance.instance_configuration)
-        )
+        instance_configuration = get_instance_configuration(instance)
+        profile = get_instance_profile(instance)
+        requirements = get_instance_requirements(instance)
     except ValidationError as e:
         instance.status = InstanceStatus.TERMINATED
         instance.termination_reason = (
@@ -456,9 +479,32 @@ async def _create_instance(instance: InstanceModel) -> None:
         )
         return
 
+    placement_groups = []
+    if instance.fleet_id:
+        placement_groups = await get_fleet_placement_groups(
+            session=session, fleet_id=instance.fleet_id
+        )
+
+    instance_configuration = _patch_instance_configuration(instance)
+
     for backend, instance_offer in offers:
         if instance_offer.backend not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT:
             continue
+        if (
+            instance_offer.backend in BACKENDS_WITH_PLACEMENT_GROUPS_SUPPORT
+            and instance.fleet
+            and instance_configuration.placement_group_name
+        ):
+            placement_group, created = _get_or_create_placement_group(
+                session=session,
+                fleet_model=instance.fleet,
+                placement_groups=placement_groups,
+                name=instance_configuration.placement_group_name,
+                backend=backend.TYPE,
+                region=instance_offer.region,
+            )
+            if created:
+                await run_async(backend.compute().create_placement_group, placement_group)
         logger.debug(
             "Trying %s in %s/%s for $%0.4f per hour",
             instance_offer.instance.name,
@@ -490,6 +536,7 @@ async def _create_instance(instance: InstanceModel) -> None:
         instance.backend = backend.TYPE
         instance.region = instance_offer.region
         instance.price = instance_offer.price
+        instance.instance_configuration = instance_configuration.json()
         instance.job_provisioning_data = job_provisioning_data.json()
         instance.offer = instance_offer.json()
         instance.started_at = get_current_datetime()
@@ -752,6 +799,50 @@ def _need_to_wait_fleet_provisioning(instance: InstanceModel) -> bool:
         fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
         and fleet.spec.configuration.ssh_config is None
     )
+
+
+def _patch_instance_configuration(instance: InstanceModel) -> InstanceConfiguration:
+    instance_configuration = get_instance_configuration(instance)
+    if instance.fleet is None:
+        return instance_configuration
+
+    fleet = fleet_model_to_fleet(instance.fleet)
+    master_instance = instance.fleet.instances[0]
+    master_job_provisioning_data = get_instance_provisioning_data(master_instance)
+    if (
+        fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        and master_job_provisioning_data is not None
+    ):
+        instance_configuration.availability_zone = master_job_provisioning_data.availability_zone
+
+    return instance_configuration
+
+
+def _get_or_create_placement_group(
+    session: AsyncSession,
+    fleet_model: FleetModel,
+    placement_groups: List[PlacementGroup],
+    name: str,
+    backend: BackendType,
+    region: str,
+) -> Tuple[PlacementGroup, bool]:
+    for pg in placement_groups:
+        if pg.configuration.backend == backend and pg.configuration.region == region:
+            return pg, False
+    placement_group_model = PlacementGroupModel(
+        name=name,
+        project=fleet_model.project,
+        fleet=fleet_model,
+        configuration=PlacementGroupConfiguration(
+            backend=backend,
+            region=region,
+            placement_strategy=PlacementStrategy.CLUSTER,
+        ).json(),
+    )
+    placement_group = placement_group_model_to_placement_group(placement_group_model)
+    session.add(placement_group_model)
+    placement_groups.append(placement_group)
+    return placement_group, True
 
 
 def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:
