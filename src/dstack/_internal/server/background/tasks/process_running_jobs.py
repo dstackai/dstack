@@ -134,6 +134,8 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
     )
 
     server_ssh_private_key = project.ssh_private_key
+    # TODO: Drop this logic and always use project key once it's safe to assume that most on-prem
+    # fleets are (re)created after this change: https://github.com/dstackai/dstack/pull/1716
     if (
         job_model.instance is not None
         and job_model.instance.remote_connection_info is not None

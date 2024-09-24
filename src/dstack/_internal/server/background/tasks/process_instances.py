@@ -537,6 +537,8 @@ async def _check_instance(instance: InstanceModel) -> None:
         return
 
     ssh_private_key = instance.project.ssh_private_key
+    # TODO: Drop this logic and always use project key once it's safe to assume that most on-prem
+    # fleets are (re)created after this change: https://github.com/dstackai/dstack/pull/1716
     if instance.remote_connection_info is not None:
         remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
             instance.remote_connection_info
