@@ -149,6 +149,8 @@ async def stop_runner(session: AsyncSession, job_model: JobModel):
     )
     instance: Optional[InstanceModel] = res.scalar()
 
+    # TODO: Drop this logic and always use project key once it's safe to assume that most on-prem
+    # fleets are (re)created after this change: https://github.com/dstackai/dstack/pull/1716
     if instance and instance.remote_connection_info is not None:
         remote_conn_info: RemoteConnectionInfo = RemoteConnectionInfo.__response__.parse_raw(
             instance.remote_connection_info
@@ -210,6 +212,9 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                 jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
                 logger.debug("%s: stopping container", fmt(job_model))
                 ssh_private_key = instance.project.ssh_private_key
+                # TODO: Drop this logic and always use project key once it's safe to assume that
+                # most on-prem fleets are (re)created after this change:
+                # https://github.com/dstackai/dstack/pull/1716
                 if instance and instance.remote_connection_info is not None:
                     remote_conn_info: RemoteConnectionInfo = (
                         RemoteConnectionInfo.__response__.parse_raw(
