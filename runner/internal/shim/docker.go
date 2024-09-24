@@ -22,6 +22,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	docker "github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
@@ -626,14 +627,20 @@ func getContainerLastLogs(client docker.APIClient, containerID string, n int) ([
 	}
 
 	ctx := context.Background()
-	reader, err := client.ContainerLogs(ctx, containerID, options)
+	muxedReader, err := client.ContainerLogs(ctx, containerID, options)
 	if err != nil {
 		return nil, err
 	}
-	defer reader.Close()
+	defer muxedReader.Close()
+
+	demuxedBuffer := new(bytes.Buffer)
+	// Using the same Writer for both stdout and stderr should be roughly equivalent to 2>&1
+	if _, err := stdcopy.StdCopy(demuxedBuffer, demuxedBuffer, muxedReader); err != nil {
+		return nil, err
+	}
 
 	var lines []string
-	scanner := bufio.NewScanner(reader)
+	scanner := bufio.NewScanner(demuxedBuffer)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
