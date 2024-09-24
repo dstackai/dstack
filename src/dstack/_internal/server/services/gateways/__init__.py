@@ -372,23 +372,16 @@ async def register_service(session: AsyncSession, run_model: RunModel):
     if gateway.status != GatewayStatus.RUNNING:
         raise ServerClientError("Gateway status is not running")
 
-    gateway_configuration = None
-    if gateway.configuration is not None:
-        gateway_configuration = GatewayConfiguration.__response__.parse_raw(gateway.configuration)
-
+    gateway_configuration = get_gateway_configuration(gateway)
     service_https = _get_service_https(run_spec, gateway_configuration)
     service_protocol = "https" if service_https else "http"
 
-    if (
-        service_https
-        and gateway_configuration is not None
-        and gateway_configuration.certificate is None
-    ):
+    if service_https and gateway_configuration.certificate is None:
         raise ServerClientError(
-            "Cannot run HTTPS service on gateway with no SSL cerfificates configured"
+            "Cannot run HTTPS service on gateway with no SSL certificates configured"
         )
 
-    gateway_https = _get_gateway_https(run_spec, gateway_configuration)
+    gateway_https = _get_gateway_https(gateway_configuration)
     gateway_protocol = "https" if gateway_https else "http"
 
     wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
@@ -729,19 +722,15 @@ def _validate_gateway_configuration(configuration: GatewayConfiguration):
             raise ServerClientError("acm certificate type is supported for aws backend only")
 
 
-def _get_service_https(run_spec: RunSpec, configuration: Optional[GatewayConfiguration]) -> bool:
+def _get_service_https(run_spec: RunSpec, configuration: GatewayConfiguration) -> bool:
     if not run_spec.configuration.https:
         return False
-    if configuration is None:
-        return True
     if configuration.certificate is not None and configuration.certificate.type == "acm":
         return False
     return True
 
 
-def _get_gateway_https(run_spec: RunSpec, configuration: Optional[GatewayConfiguration]) -> bool:
-    if configuration is None:
-        return True
+def _get_gateway_https(configuration: GatewayConfiguration) -> bool:
     if configuration.certificate is not None and configuration.certificate.type == "acm":
         return False
     if configuration.certificate is not None and configuration.certificate.type == "lets-encrypt":
