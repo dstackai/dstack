@@ -16,7 +16,7 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.errors import ComputeError, NoCapacityError
+from dstack._internal.core.errors import ComputeError, NoCapacityError, PlacementGroupInUseError
 from dstack._internal.core.models.backends.aws import AWSAccessKeyCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel, is_core_model_instance
@@ -31,6 +31,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     SSHKey,
 )
+from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
@@ -116,7 +117,7 @@ class AWSCompute(Compute):
             ec2_client.terminate_instances(InstanceIds=[instance_id])
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
-                pass
+                logger.debug("Skipping instance %s termination. Instance not found.", instance_id)
             else:
                 raise e
 
@@ -181,6 +182,7 @@ class AWSCompute(Compute):
                         spot=instance_offer.instance.resources.spot,
                         subnet_id=subnet_id,
                         allocate_public_ip=allocate_public_ip,
+                        placement_group_name=instance_config.placement_group_name,
                     )
                 )
                 instance = response[0]
@@ -238,6 +240,41 @@ class AWSCompute(Compute):
             ):
                 instance_config.availability_zone = volume.provisioning_data.availability_zone
         return self.create_instance(instance_offer, instance_config)
+
+    def create_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ) -> PlacementGroupProvisioningData:
+        ec2_client = self.session.client("ec2", region_name=placement_group.configuration.region)
+        logger.debug("Creating placement group %s...", placement_group.name)
+        ec2_client.create_placement_group(
+            GroupName=placement_group.name,
+            Strategy=placement_group.configuration.placement_strategy.value,
+        )
+        logger.debug("Created placement group %s", placement_group.name)
+        return PlacementGroupProvisioningData(
+            backend=BackendType.AWS,
+            backend_data=None,
+        )
+
+    def delete_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ):
+        ec2_client = self.session.client("ec2", region_name=placement_group.configuration.region)
+        logger.debug("Deleting placement group %s...", placement_group.name)
+        try:
+            ec2_client.delete_placement_group(GroupName=placement_group.name)
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "InvalidPlacementGroup.Unknown":
+                logger.debug("Placement group %s not found", placement_group.name)
+                return
+            elif e.response["Error"]["Code"] == "InvalidPlacementGroup.InUse":
+                logger.debug("Placement group %s is in use", placement_group.name)
+                raise PlacementGroupInUseError()
+            else:
+                raise e
+        logger.debug("Deleted placement group %s", placement_group.name)
 
     def create_gateway(
         self,
@@ -372,7 +409,7 @@ class AWSCompute(Compute):
 
     def terminate_gateway(
         self,
-        instance_id,
+        instance_id: str,
         configuration: GatewayComputeConfiguration,
         backend_data: Optional[str] = None,
     ):

@@ -1,3 +1,5 @@
+import random
+import string
 import uuid
 from datetime import timezone
 from typing import List, Optional, Union
@@ -17,6 +19,7 @@ from dstack._internal.core.models.fleets import (
     Fleet,
     FleetSpec,
     FleetStatus,
+    InstanceGroupPlacement,
     SSHHostParams,
     SSHParams,
 )
@@ -162,6 +165,10 @@ async def create_fleet(
                 )
                 fleet_model.instances.append(instances_model)
         else:
+            placement_group_name = _get_placement_group_name(
+                project=project,
+                fleet_spec=spec,
+            )
             for i in range(_get_fleet_nodes_to_provision(spec)):
                 instance_model = await create_fleet_instance_model(
                     session=session,
@@ -169,6 +176,7 @@ async def create_fleet(
                     user=user,
                     pool=pool,
                     spec=spec,
+                    placement_group_name=placement_group_name,
                     instance_num=i,
                 )
                 fleet_model.instances.append(instance_model)
@@ -182,6 +190,7 @@ async def create_fleet_instance_model(
     user: UserModel,
     pool: PoolModel,
     spec: FleetSpec,
+    placement_group_name: Optional[str],
     instance_num: int,
 ) -> InstanceModel:
     profile = spec.merged_profile
@@ -199,6 +208,7 @@ async def create_fleet_instance_model(
         requirements=requirements,
         instance_name=f"{spec.configuration.name}-{instance_num}",
         instance_num=instance_num,
+        placement_group_name=placement_group_name,
     )
     return instance_model
 
@@ -422,3 +432,18 @@ def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[
             instance.deleted = True
         else:
             instance.status = InstanceStatus.TERMINATING
+
+
+def _get_placement_group_name(
+    project: ProjectModel,
+    fleet_spec: FleetSpec,
+) -> Optional[str]:
+    if fleet_spec.configuration.placement != InstanceGroupPlacement.CLUSTER:
+        return None
+    # A random suffix to avoid clashing with to-be-deleted placement groups left by old fleets
+    suffix = _generate_random_placement_group_suffix()
+    return f"{project.name}-{fleet_spec.configuration.name}-{suffix}-pg"
+
+
+def _generate_random_placement_group_suffix(length: int = 8) -> str:
+    return "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(length))

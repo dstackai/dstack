@@ -99,12 +99,13 @@ class DockerConfig(CoreModel):
 
 class InstanceConfiguration(CoreModel):
     project_name: str
-    instance_name: str  # unique in pool
-    instance_id: Optional[str] = None
-    ssh_keys: List[SSHKey]
-    job_docker_config: Optional[DockerConfig]
+    instance_name: str
     user: str  # dstack user name
+    ssh_keys: List[SSHKey]
+    instance_id: Optional[str] = None
     availability_zone: Optional[str] = None
+    placement_group_name: Optional[str] = None
+    job_docker_config: Optional[DockerConfig]  # FIXME: cannot find any usages – remove?
 
     def get_public_keys(self) -> List[str]:
         return [ssh_key.public.strip() for ssh_key in self.ssh_keys]

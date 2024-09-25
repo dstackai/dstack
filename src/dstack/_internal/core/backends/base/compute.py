@@ -17,6 +17,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
 )
+from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -62,8 +63,8 @@ class Compute(ABC):
         backend_data: Optional[str] = None,
     ) -> None:
         """
-        Terminates an instance by `instance_id`. If instance does not exist,
-        it should not raise errors but return silently.
+        Terminates an instance by `instance_id`.
+        If the instance does not exist, it should not raise errors but return silently.
         """
         pass
 
@@ -94,6 +95,25 @@ class Compute(ABC):
         and the run will be terminated.
         """
         pass
+
+    def create_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ) -> PlacementGroupProvisioningData:
+        """
+        Creates a placement group.
+        """
+        raise NotImplementedError()
+
+    def delete_placement_group(
+        self,
+        placement_group: PlacementGroup,
+    ):
+        """
+        Deletes a placement group.
+        If the group does not exist, it should not raise errors but return silently.
+        """
+        raise NotImplementedError()
 
     def create_gateway(
         self,

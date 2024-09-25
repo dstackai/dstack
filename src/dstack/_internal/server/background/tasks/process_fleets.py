@@ -1,10 +1,10 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from dstack._internal.core.models.fleets import FleetStatus
 from dstack._internal.server.db import get_session_ctx
-from dstack._internal.server.models import FleetModel
+from dstack._internal.server.models import FleetModel, PlacementGroupModel
 from dstack._internal.server.services.fleets import (
     fleet_model_to_fleet,
     is_fleet_empty,
@@ -73,5 +73,16 @@ async def _autodelete_fleet(session: AsyncSession, fleet_model: FleetModel):
     fleet_model.status = FleetStatus.TERMINATED
     fleet_model.deleted = True
     fleet_model.last_processed_at = get_current_datetime()
+    await _mark_placement_groups_as_ready_for_deletion(session=session, fleet_model=fleet_model)
     await session.commit()
     logger.info("Fleet %s deleted", fleet_model.name)
+
+
+async def _mark_placement_groups_as_ready_for_deletion(
+    session: AsyncSession, fleet_model: FleetModel
+):
+    await session.execute(
+        update(PlacementGroupModel)
+        .where(PlacementGroupModel.fleet_id == fleet_model.id)
+        .values(fleet_deleted=True)
+    )

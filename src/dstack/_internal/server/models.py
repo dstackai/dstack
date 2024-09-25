@@ -561,3 +561,29 @@ volumes_attachments_table = Table(
     Column("volume_id", ForeignKey("volumes.id"), primary_key=True),
     Column("instace_id", ForeignKey("instances.id"), primary_key=True),
 )
+
+
+class PlacementGroupModel(BaseModel):
+    __tablename__ = "placement_groups"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(100))
+
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
+
+    fleet_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("fleets.id"))
+    fleet: Mapped["FleetModel"] = relationship(foreign_keys=[fleet_id])
+    fleet_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
+    last_processed_at: Mapped[datetime] = mapped_column(
+        NaiveDateTime, default=get_current_datetime
+    )
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
+
+    configuration: Mapped[str] = mapped_column(Text)
+    provisioning_data: Mapped[Optional[str]] = mapped_column(Text)

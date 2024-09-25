@@ -105,8 +105,9 @@ def create_instances_struct(
     spot: bool,
     subnet_id: Optional[str] = None,
     allocate_public_ip: bool = True,
+    placement_group_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    struct = dict(
+    struct: Dict[str, Any] = dict(
         BlockDeviceMappings=[
             {
                 "DeviceName": "/dev/sda1",
@@ -151,6 +152,12 @@ def create_instances_struct(
         ]
     else:
         struct["SecurityGroupIds"] = [security_group_id]
+
+    if placement_group_name is not None:
+        struct["Placement"] = {
+            "GroupName": placement_group_name,
+        }
+
     return struct
 
 

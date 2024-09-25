@@ -98,6 +98,10 @@ class ComputeResourceNotFoundError(ComputeError):
     pass
 
 
+class PlacementGroupInUseError(ComputeError):
+    pass
+
+
 class CLIError(DstackError):
     pass
 
