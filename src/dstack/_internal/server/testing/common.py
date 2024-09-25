@@ -20,7 +20,11 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.core.models.placement import PlacementGroupConfiguration, PlacementStrategy
+from dstack._internal.core.models.placement import (
+    PlacementGroupConfiguration,
+    PlacementGroupProvisioningData,
+    PlacementStrategy,
+)
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
@@ -570,18 +574,22 @@ async def create_placement_group(
     name: str = "test-pg",
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     configuration: Optional[PlacementGroupConfiguration] = None,
+    provisioning_data: Optional[PlacementGroupProvisioningData] = None,
     fleet_deleted: Optional[bool] = False,
     deleted: Optional[bool] = False,
     deleted_at: Optional[datetime] = None,
 ) -> PlacementGroupModel:
     if configuration is None:
         configuration = get_placement_group_configuration()
+    if provisioning_data is None:
+        provisioning_data = get_placement_group_provisioning_data()
     pg = PlacementGroupModel(
         project=project,
         fleet=fleet,
         name=name,
         created_at=created_at,
         configuration=configuration.json(),
+        provisioning_data=provisioning_data.json(),
         fleet_deleted=fleet_deleted,
         deleted=deleted,
         deleted_at=deleted_at,
@@ -601,6 +609,12 @@ def get_placement_group_configuration(
         region=region,
         placement_strategy=strategy,
     )
+
+
+def get_placement_group_provisioning_data(
+    backend: BackendType = BackendType.AWS,
+) -> PlacementGroupProvisioningData:
+    return PlacementGroupProvisioningData(backend=backend)
 
 
 def get_private_key_string() -> str:
