@@ -49,8 +49,10 @@ are both acceptable).
     to the specified parameters.
 
     !!! info "Network"
-        Set `placement` to `cluster` if the nodes should be interconnected (e.g. if you'd like to use them for multi-node tasks). 
-        In that case, `dstack` will provision all nodes in the same backend and region.
+        Set `placement` to `cluster` if the nodes should be interconnected
+        (e.g. if you'd like to use them for [multi-node tasks](reference/dstack.yml/task.md#distributed-tasks)). 
+        In that case, `dstack` will provision all nodes in the same backend and region and configure the optimal
+        connectivity via availability zones, placement groups, etc.
 
     Note that cloud fleets aren't supported for the `kubernetes`, `vastai`, and `runpod` backends.
 
@@ -120,7 +122,8 @@ are both acceptable).
         ```
 
     !!! info "Network"
-        Set `placement` to `cluster` if the hosts are interconnected (e.g. if you'd like to use them for multi-node tasks).
+        Set `placement` to `cluster` if the hosts are interconnected
+        (e.g. if you'd like to use them for [multi-node tasks](reference/dstack.yml/task.md#distributed-tasks)).
         In that case, by default, `dstack` will automatically detect the private network. 
         You can specify the [`network`](../reference/dstack.yml/fleet.md#network) parameter manually.
 
