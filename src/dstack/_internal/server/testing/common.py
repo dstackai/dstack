@@ -20,6 +20,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
+from dstack._internal.core.models.placement import PlacementGroupConfiguration, PlacementStrategy
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_NAME,
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
@@ -50,6 +51,7 @@ from dstack._internal.server.models import (
     GatewayModel,
     InstanceModel,
     JobModel,
+    PlacementGroupModel,
     PoolModel,
     ProjectModel,
     RepoModel,
@@ -558,6 +560,46 @@ def get_volume_provisioning_data(
         size_gb=size_gb,
         availability_zone=availability_zone,
         backend_data=backend_data,
+    )
+
+
+async def create_placement_group(
+    session: AsyncSession,
+    project: ProjectModel,
+    fleet: FleetModel,
+    name: str = "test-pg",
+    created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    configuration: Optional[PlacementGroupConfiguration] = None,
+    fleet_deleted: Optional[bool] = False,
+    deleted: Optional[bool] = False,
+    deleted_at: Optional[datetime] = None,
+) -> PlacementGroupModel:
+    if configuration is None:
+        configuration = get_placement_group_configuration()
+    pg = PlacementGroupModel(
+        project=project,
+        fleet=fleet,
+        name=name,
+        created_at=created_at,
+        configuration=configuration.json(),
+        fleet_deleted=fleet_deleted,
+        deleted=deleted,
+        deleted_at=deleted_at,
+    )
+    session.add(pg)
+    await session.commit()
+    return pg
+
+
+def get_placement_group_configuration(
+    backend: BackendType = BackendType.AWS,
+    region: str = "eu-central-1",
+    strategy: PlacementStrategy = PlacementStrategy.CLUSTER,
+) -> PlacementGroupConfiguration:
+    return PlacementGroupConfiguration(
+        backend=backend,
+        region=region,
+        placement_strategy=strategy,
     )
 
 
