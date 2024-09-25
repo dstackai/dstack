@@ -342,7 +342,9 @@ class GatewayModel(BaseModel):
     )
     name: Mapped[str] = mapped_column(String(100))
     region: Mapped[str] = mapped_column(String(100))
-    wildcard_domain: Mapped[str] = mapped_column(String(100), nullable=True)
+    wildcard_domain: Mapped[Optional[str]] = mapped_column(String(100))
+    # `configuration` is optional for compatibility with pre-0.18.2 gateways.
+    # Use `get_gateway_configuration` to construct `configuration` for old gateways.
     configuration: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     status: Mapped[GatewayStatus] = mapped_column(Enum(GatewayStatus))
@@ -374,6 +376,8 @@ class GatewayComputeModel(BaseModel):
     instance_id: Mapped[str] = mapped_column(String(100))
     ip_address: Mapped[str] = mapped_column(String(100))
     hostname: Mapped[Optional[str]] = mapped_column(String(100))
+    # `configuration` is optional for compatibility with pre-0.18.2 gateways.
+    # Use `get_gateway_compute_configuration` to construct `configuration` for old gateways.
     configuration: Mapped[Optional[str]] = mapped_column(Text)
     backend_data: Mapped[Optional[str]] = mapped_column(Text)
     region: Mapped[str] = mapped_column(String(100))
