@@ -1,8 +1,8 @@
 """Add PlacementGroupModel
 
-Revision ID: 875d05b55f42
+Revision ID: a7b46c073fa1
 Revises: e3b7db07727f
-Create Date: 2024-09-24 14:26:28.360182
+Create Date: 2024-09-25 13:52:28.701586
 
 """
 
@@ -13,7 +13,7 @@ from alembic import op
 import dstack._internal.server.models
 
 # revision identifiers, used by Alembic.
-revision = "875d05b55f42"
+revision = "a7b46c073fa1"
 down_revision = "e3b7db07727f"
 branch_labels = None
 depends_on = None
@@ -37,6 +37,7 @@ def upgrade() -> None:
         sa.Column("deleted", sa.Boolean(), nullable=False),
         sa.Column("deleted_at", dstack._internal.server.models.NaiveDateTime(), nullable=True),
         sa.Column("configuration", sa.Text(), nullable=False),
+        sa.Column("provisioning_data", sa.Text(), nullable=True),
         sa.ForeignKeyConstraint(
             ["fleet_id"], ["fleets.id"], name=op.f("fk_placement_groups_fleet_id_fleets")
         ),

@@ -31,7 +31,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     SSHKey,
 )
-from dstack._internal.core.models.placement import PlacementGroup
+from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.resources import Memory, Range
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
@@ -244,7 +244,7 @@ class AWSCompute(Compute):
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
-    ):
+    ) -> PlacementGroupProvisioningData:
         ec2_client = self.session.client("ec2", region_name=placement_group.configuration.region)
         logger.debug("Creating placement group %s...", placement_group.name)
         ec2_client.create_placement_group(
@@ -252,6 +252,10 @@ class AWSCompute(Compute):
             Strategy=placement_group.configuration.placement_strategy.value,
         )
         logger.debug("Created placement group %s", placement_group.name)
+        return PlacementGroupProvisioningData(
+            backend=BackendType.AWS,
+            backend_data=None,
+        )
 
     def delete_placement_group(
         self,

@@ -17,7 +17,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
 )
-from dstack._internal.core.models.placement import PlacementGroup
+from dstack._internal.core.models.placement import PlacementGroup, PlacementGroupProvisioningData
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import (
     Volume,
@@ -99,11 +99,11 @@ class Compute(ABC):
     def create_placement_group(
         self,
         placement_group: PlacementGroup,
-    ):
+    ) -> PlacementGroupProvisioningData:
         """
         Creates a placement group.
         """
-        pass
+        raise NotImplementedError()
 
     def delete_placement_group(
         self,
@@ -113,7 +113,7 @@ class Compute(ABC):
         Deletes a placement group.
         If the group does not exist, it should not raise errors but return silently.
         """
-        pass
+        raise NotImplementedError()
 
     def create_gateway(
         self,

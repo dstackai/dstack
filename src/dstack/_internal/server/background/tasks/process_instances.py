@@ -495,16 +495,20 @@ async def _create_instance(session: AsyncSession, instance: InstanceModel) -> No
             and instance.fleet
             and instance_configuration.placement_group_name
         ):
-            placement_group, created = _get_or_create_placement_group(
+            placement_group_model = _create_placement_group_if_does_not_exist(
                 session=session,
                 fleet_model=instance.fleet,
                 placement_groups=placement_groups,
                 name=instance_configuration.placement_group_name,
-                backend=backend.TYPE,
+                backend=instance_offer.backend,
                 region=instance_offer.region,
             )
-            if created:
-                await run_async(backend.compute().create_placement_group, placement_group)
+            if placement_group_model is not None:
+                placement_group = placement_group_model_to_placement_group(placement_group_model)
+                pgpd = await run_async(backend.compute().create_placement_group, placement_group)
+                placement_group_model.provisioning_data = pgpd.json()
+                session.add(placement_group_model)
+                placement_groups.append(placement_group)
         logger.debug(
             "Trying %s in %s/%s for $%0.4f per hour",
             instance_offer.instance.name,
@@ -818,17 +822,17 @@ def _patch_instance_configuration(instance: InstanceModel) -> InstanceConfigurat
     return instance_configuration
 
 
-def _get_or_create_placement_group(
+def _create_placement_group_if_does_not_exist(
     session: AsyncSession,
     fleet_model: FleetModel,
     placement_groups: List[PlacementGroup],
     name: str,
     backend: BackendType,
     region: str,
-) -> Tuple[PlacementGroup, bool]:
+) -> Optional[PlacementGroupModel]:
     for pg in placement_groups:
         if pg.configuration.backend == backend and pg.configuration.region == region:
-            return pg, False
+            return None
     placement_group_model = PlacementGroupModel(
         name=name,
         project=fleet_model.project,
@@ -839,10 +843,8 @@ def _get_or_create_placement_group(
             placement_strategy=PlacementStrategy.CLUSTER,
         ).json(),
     )
-    placement_group = placement_group_model_to_placement_group(placement_group_model)
     session.add(placement_group_model)
-    placement_groups.append(placement_group)
-    return placement_group, True
+    return placement_group_model
 
 
 def _get_instance_idle_duration(instance: InstanceModel) -> datetime.timedelta:

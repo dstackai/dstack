@@ -1,3 +1,5 @@
+import random
+import string
 import uuid
 from datetime import timezone
 from typing import List, Optional, Union
@@ -163,6 +165,10 @@ async def create_fleet(
                 )
                 fleet_model.instances.append(instances_model)
         else:
+            placement_group_name = _get_placement_group_name(
+                project=project,
+                fleet_spec=spec,
+            )
             for i in range(_get_fleet_nodes_to_provision(spec)):
                 instance_model = await create_fleet_instance_model(
                     session=session,
@@ -170,6 +176,7 @@ async def create_fleet(
                     user=user,
                     pool=pool,
                     spec=spec,
+                    placement_group_name=placement_group_name,
                     instance_num=i,
                 )
                 fleet_model.instances.append(instance_model)
@@ -183,6 +190,7 @@ async def create_fleet_instance_model(
     user: UserModel,
     pool: PoolModel,
     spec: FleetSpec,
+    placement_group_name: Optional[str],
     instance_num: int,
 ) -> InstanceModel:
     profile = spec.merged_profile
@@ -190,10 +198,6 @@ async def create_fleet_instance_model(
         resources=spec.configuration.resources or ResourcesSpec(),
         max_price=profile.max_price,
         spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
-    )
-    placement_group_name = _get_placement_group_name(
-        project=project,
-        fleet_spec=spec,
     )
     instance_model = await pools_services.create_instance_model(
         session=session,
@@ -436,4 +440,10 @@ def _get_placement_group_name(
 ) -> Optional[str]:
     if fleet_spec.configuration.placement != InstanceGroupPlacement.CLUSTER:
         return None
-    return f"{project.name}-{fleet_spec.configuration.name}-pg"
+    # A random suffix to avoid clashing with to-be-deleted placement groups left by old fleets
+    suffix = _generate_random_placement_group_suffix()
+    return f"{project.name}-{fleet_spec.configuration.name}-{suffix}-pg"
+
+
+def _generate_random_placement_group_suffix(length: int = 8) -> str:
+    return "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(length))

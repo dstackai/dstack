@@ -582,3 +582,4 @@ class PlacementGroupModel(BaseModel):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(NaiveDateTime)
 
     configuration: Mapped[str] = mapped_column(Text)
+    provisioning_data: Mapped[Optional[str]] = mapped_column(Text)

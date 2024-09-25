@@ -67,9 +67,14 @@ async def _delete_placement_groups(
 async def _delete_placement_group(placement_group_model: PlacementGroupModel):
     logger.info("Deleting placement group %s", placement_group_model.name)
     placement_group = placement_group_model_to_placement_group(placement_group_model)
+    if placement_group.provisioning_data is None:
+        logger.error(
+            "Failed to delete placement group %s. provisioning_data is None.", placement_group.name
+        )
+        return
     backend = await backends_services.get_project_backend_by_type(
         project=placement_group_model.project,
-        backend_type=placement_group.configuration.backend,
+        backend_type=placement_group.provisioning_data.backend,
     )
     if backend is None:
         logger.error(
