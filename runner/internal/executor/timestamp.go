@@ -9,37 +9,52 @@ import (
 )
 
 type MonotonicTimestamp struct {
-	unix    int64
-	counter int
-	mu      sync.RWMutex
+	initial     time.Time
+	initialUnix int64 // seconds
+	elapsed     int64 // seconds since initial
+	counter     int   // surrogate milliseconds
+	overflow    bool
+	mu          sync.RWMutex
+	getNow      func() time.Time
 }
 
 func NewMonotonicTimestamp() *MonotonicTimestamp {
+	return newMonotonicTimestamp(time.Now)
+}
+
+func newMonotonicTimestamp(getNow func() time.Time) *MonotonicTimestamp {
+	// getNow must return time.Time with monotonic reading
+	now := getNow()
 	return &MonotonicTimestamp{
-		unix:    time.Now().Unix(),
-		counter: 0,
-		mu:      sync.RWMutex{},
+		initial:     now,
+		initialUnix: now.Unix(),
+		mu:          sync.RWMutex{},
+		getNow:      getNow,
 	}
 }
 
 func (t *MonotonicTimestamp) GetLatest() int64 {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.unix*1000 + int64(t.counter)
+	return (t.initialUnix+t.elapsed)*1000 + int64(t.counter)
 }
 
 func (t *MonotonicTimestamp) Next() int64 {
-	// warning: time.Now() is not monotonic in general
 	t.mu.Lock()
-	now := time.Now().Unix()
-	if now == t.unix {
-		t.counter++
-		if t.counter == 1000 {
-			log.Warning(context.TODO(), "Monotonic timestamp counter overflowed", "timestamp", now)
+	now := t.getNow()
+	elapsed := int64(now.Sub(t.initial) / time.Second)
+	if elapsed == t.elapsed {
+		if t.counter < 999 {
+			t.counter++
+		} else if !t.overflow {
+			// warn only once per second to avoid log spamming
+			log.Warning(context.TODO(), "Monotonic timestamp counter overflowed", "unix", t.initialUnix+elapsed)
+			t.overflow = true
 		}
 	} else {
-		t.unix = now
+		t.elapsed = elapsed
 		t.counter = 0
+		t.overflow = false
 	}
 	t.mu.Unlock()
 	return t.GetLatest()
