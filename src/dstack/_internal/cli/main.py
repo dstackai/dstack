@@ -4,6 +4,7 @@ from rich.markup import escape
 from rich_argparse import RichHelpFormatter
 
 from dstack._internal.cli.commands.apply import ApplyCommand
+from dstack._internal.cli.commands.attach import AttachCommand
 from dstack._internal.cli.commands.config import ConfigCommand
 from dstack._internal.cli.commands.delete import DeleteCommand
 from dstack._internal.cli.commands.fleet import FleetCommand
@@ -56,6 +57,7 @@ def main():
 
     subparsers = parser.add_subparsers(metavar="COMMAND")
     ApplyCommand.register(subparsers)
+    AttachCommand.register(subparsers)
     ConfigCommand.register(subparsers)
     DeleteCommand.register(subparsers)
     FleetCommand.register(subparsers)

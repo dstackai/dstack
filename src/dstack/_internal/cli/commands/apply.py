@@ -14,7 +14,7 @@ NOTSET = object()
 
 class ApplyCommand(APIBaseCommand):
     NAME = "apply"
-    DESCRIPTION = "Apply dstack configuration"
+    DESCRIPTION = "Apply a configuration"
     DEFAULT_HELP = False
 
     def _register(self):

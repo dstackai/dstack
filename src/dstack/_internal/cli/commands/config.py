@@ -14,7 +14,7 @@ logger = get_logger(__name__)
 
 class ConfigCommand(BaseCommand):
     NAME = "config"
-    DESCRIPTION = "Configure projects"
+    DESCRIPTION = "Configure CLI"
 
     def _register(self):
         super()._register()

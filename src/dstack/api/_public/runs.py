@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 from websocket import WebSocketApp
 
 import dstack.api as api
-from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
+from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.configurations import AnyRunConfiguration
 from dstack._internal.core.models.pools import Instance
@@ -27,6 +27,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
+    Job,
     JobSpec,
     PoolInstanceOffers,
     Requirements,
@@ -174,10 +175,7 @@ class Run(ABC):
         if diagnose is False and self._ssh_attach is not None:
             yield from self._attached_logs()
         else:
-            job = None
-            for j in self._run.jobs:
-                if j.job_spec.replica_num == replica_num and j.job_spec.job_num == job_num:
-                    job = j
+            job = self._find_job(replica_num=replica_num, job_num=job_num)
             if job is None:
                 return []
             next_start_time = start_time
@@ -222,6 +220,8 @@ class Run(ABC):
         self,
         ssh_identity_file: Optional[PathLike] = None,
         bind_address: Optional[str] = None,
+        replica_num: int = 0,
+        job_num: int = 0,
     ) -> bool:
         """
         Establish an SSH tunnel to the instance and update SSH config
@@ -249,8 +249,13 @@ class Run(ABC):
             if self.status.is_finished() and self.status != RunStatus.DONE:
                 return False
 
-            job = self._run.jobs[0]  # TODO(egor-s): pull logs from all replicas?
+            job = self._find_job(replica_num=replica_num, job_num=job_num)
+            if job is None:
+                raise ClientError(f"Failed to find replica={replica_num} job={job_num}")
+
             provisioning_data = job.job_submissions[-1].job_provisioning_data
+            if provisioning_data is None:
+                raise ClientError("Failed to attach. The run is not provisioned yet.")
 
             ports_lock = SSHAttach.reuse_ports_lock(run_name=self.name)
 
@@ -273,7 +278,7 @@ class Run(ABC):
                 )
 
             self._ssh_attach = SSHAttach(
-                hostname=self.hostname,
+                hostname=provisioning_data.hostname,
                 ssh_port=provisioning_data.ssh_port,
                 user=provisioning_data.username,
                 id_rsa_path=ssh_identity_file,
@@ -298,6 +303,12 @@ class Run(ABC):
             logger.debug("Detaching from %s", self.name)
             self._ssh_attach.detach()
             self._ssh_attach = None
+
+    def _find_job(self, replica_num: int, job_num: int) -> Optional[Job]:
+        for j in self._run.jobs:
+            if j.job_spec.replica_num == replica_num and j.job_spec.job_num == job_num:
+                return j
+        return None
 
     def __str__(self) -> str:
         return f"<Run '{self.name}'>"
