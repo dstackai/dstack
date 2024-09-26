@@ -21,8 +21,10 @@ class TestCheckClientServerCompatibility:
         [
             ("0.12.4", "0.12.4"),
             ("0.12.4", "0.12.5"),
-            ("1.0.5", "1.0.6"),
+            ("0.12.4", "0.13.0"),
+            ("0.12.4", "1.12.0"),
             ("0.12.4", "0.12.5rc1"),
+            ("1.0.5", "1.0.6"),
         ],
     )
     def test_returns_none_if_compatible(
@@ -39,24 +41,6 @@ class TestCheckClientServerCompatibility:
     @pytest.mark.parametrize(
         "client_version,server_version",
         [
-            ("0.12.4", "0.13.0"),
-            ("0.12.0", "1.12.0"),
-        ],
-    )
-    def test_returns_error_if_client_version_smaller(
-        self, client_version: Optional[str], server_version: Optional[str]
-    ):
-        res = check_client_server_compatibility(
-            client_version=client_version,
-            server_version=server_version,
-        )
-        assert res is not None
-
-    @pytest.mark.parametrize(
-        "client_version,server_version",
-        [
-            # no forward-compatibility at all (see https://github.com/dstackai/dstack/issues/1162)
-            ("0.12.5", "0.12.4"),
             ("0.13.0", "0.12.4"),
             ("1.12.0", "0.12.0"),
         ],

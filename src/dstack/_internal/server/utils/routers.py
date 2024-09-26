@@ -82,17 +82,11 @@ def check_client_server_compatibility(
                 )
             },
         )
-    # We preserve backward-compatibility across micro releases,
-    # but do not preserve forward-compatibility.
-    if parsed_client_version < parsed_server_version and (
-        parsed_client_version.major < parsed_server_version.major
-        or parsed_client_version.minor < parsed_server_version.minor
-    ):
-        return error_incompatible_versions(client_version, server_version, ask_cli_update=True)
-    elif parsed_client_version > parsed_server_version and (
+    # We preserve full client backward compatibility across patch releases.
+    # Server is always partially backward-compatible (so no check).
+    if parsed_client_version > parsed_server_version and (
         parsed_client_version.major > parsed_server_version.major
         or parsed_client_version.minor > parsed_server_version.minor
-        or parsed_client_version.micro > parsed_server_version.micro
     ):
         return error_incompatible_versions(client_version, server_version, ask_cli_update=False)
     return None
