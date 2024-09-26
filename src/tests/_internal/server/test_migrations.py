@@ -15,6 +15,8 @@ def test_sqlite_migrations(monkeypatch: pytest.MonkeyPatch):
 
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.attributes["connection"] = create_engine("sqlite://").connect()
+    # disable fileConfig() call in env.py as it breaks pytest.LogCaptureFixture
+    alembic_cfg.attributes["configure_logging"] = False
 
     try:
         upgrade(alembic_cfg, "head")
@@ -29,6 +31,8 @@ def test_sqlite_migrations(monkeypatch: pytest.MonkeyPatch):
 async def test_postgres_migrations(monkeypatch: pytest.MonkeyPatch):
     def f(connection, alembic_cfg):
         alembic_cfg.attributes["connection"] = connection
+        # disable fileConfig() call in env.py as it breaks pytest.LogCaptureFixture
+        alembic_cfg.attributes["configure_logging"] = False
         try:
             upgrade(alembic_cfg, "head")
             check(alembic_cfg)

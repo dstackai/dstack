@@ -1,6 +1,7 @@
 import base64
 import itertools
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List
 from unittest.mock import Mock, call
@@ -9,6 +10,7 @@ from uuid import UUID
 import botocore.exceptions
 import pytest
 import pytest_asyncio
+from freezegun import freeze_time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.logs import LogEvent, LogEventSource
@@ -55,6 +57,9 @@ class TestFileLogStorage:
 
 
 class TestCloudWatchLogStorage:
+    FAKE_NOW = datetime(2023, 10, 6, 10, 1, 54, tzinfo=timezone.utc)
+
+    @freeze_time(FAKE_NOW)
     @pytest_asyncio.fixture
     async def project(self, test_db, session: AsyncSession) -> ProjectModel:
         project = await create_project(session=session, name="test-proj")
@@ -427,6 +432,7 @@ class TestCloudWatchLogStorage:
             log_storage.poll_logs(project, poll_logs_request)
 
     @pytest.mark.asyncio
+    @freeze_time(FAKE_NOW)
     async def test_write_logs(
         self,
         project: ProjectModel,
@@ -478,6 +484,7 @@ class TestCloudWatchLogStorage:
         mock_client.put_log_events.assert_has_calls(expected_put_log_events_calls, any_order=True)
 
     @pytest.mark.asyncio
+    @freeze_time(FAKE_NOW)
     async def test_write_logs_resource_not_found(
         self,
         project: ProjectModel,
@@ -512,6 +519,7 @@ class TestCloudWatchLogStorage:
         assert mock_client.put_log_events.call_count == 2
 
     @pytest.mark.asyncio
+    @freeze_time(FAKE_NOW)
     async def test_write_logs_other_exception(
         self,
         project: ProjectModel,
@@ -530,6 +538,83 @@ class TestCloudWatchLogStorage:
                 ],
                 job_logs=[],
             )
+
+    @pytest.mark.asyncio
+    @freeze_time(FAKE_NOW)
+    async def test_write_logs_not_in_chronological_order(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        mock_ensure_stream_exists: Mock,
+    ):
+        caplog.set_level(logging.ERROR)
+        log_storage.write_logs(
+            project=project,
+            run_name="test-run",
+            job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
+            runner_logs=[
+                RunnerLogEvent(timestamp=1696586513235, message=b"1"),
+                RunnerLogEvent(timestamp=1696586513237, message=b"3"),
+                RunnerLogEvent(timestamp=1696586513237, message=b"4"),
+                RunnerLogEvent(timestamp=1696586513236, message=b"2"),
+                RunnerLogEvent(timestamp=1696586513237, message=b"5"),
+            ],
+            job_logs=[],
+        )
+
+        mock_client.put_log_events.assert_called_once_with(
+            logGroupName="test-group",
+            logStreamName="test-proj/test-run/1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e/runner",
+            logEvents=[
+                {"timestamp": 1696586513235, "message": "MQ=="},
+                {"timestamp": 1696586513236, "message": "Mg=="},
+                {"timestamp": 1696586513237, "message": "Mw=="},
+                {"timestamp": 1696586513237, "message": "NA=="},
+                {"timestamp": 1696586513237, "message": "NQ=="},
+            ],
+        )
+        assert "events are not in chronological order" in caplog.text
+
+    @pytest.mark.asyncio
+    @freeze_time(FAKE_NOW)
+    async def test_write_logs_past_and_future_events(
+        self,
+        caplog: pytest.LogCaptureFixture,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        mock_ensure_stream_exists: Mock,
+    ):
+        def _delta_ms(**kwargs: int) -> int:
+            return int(timedelta(**kwargs).total_seconds() * 1000)
+
+        timestamp = int(self.FAKE_NOW.timestamp() * 1000)
+
+        log_storage.write_logs(
+            project=project,
+            run_name="test-run",
+            job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
+            runner_logs=[
+                RunnerLogEvent(timestamp=timestamp - _delta_ms(days=14), message=b"skipped"),
+                RunnerLogEvent(timestamp=timestamp - _delta_ms(days=13, hours=23), message=b"1"),
+                RunnerLogEvent(timestamp=timestamp, message=b"2"),
+                RunnerLogEvent(timestamp=timestamp + _delta_ms(minutes=90), message=b"3"),
+                RunnerLogEvent(timestamp=timestamp + _delta_ms(minutes=115), message=b"skipped"),
+                RunnerLogEvent(timestamp=timestamp + _delta_ms(hours=2), message=b"skipped"),
+            ],
+            job_logs=[],
+        )
+
+        assert "skipping 1 past event(s)" in caplog.text
+        assert "skipping 2 future event(s)" in caplog.text
+        actual = [
+            base64.b64decode(e["message"]).decode()
+            for c in mock_client.put_log_events.call_args_list
+            for e in c.kwargs["logEvents"]
+        ]
+        assert actual == ["1", "2", "3"]
 
     @pytest.mark.parametrize(
         ["messages", "expected"],
@@ -559,6 +644,7 @@ class TestCloudWatchLogStorage:
         ],
     )
     @pytest.mark.asyncio
+    @freeze_time(FAKE_NOW)
     async def test_write_logs_batching_by_size(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -605,6 +691,7 @@ class TestCloudWatchLogStorage:
         ],
     )
     @pytest.mark.asyncio
+    @freeze_time(FAKE_NOW)
     async def test_write_logs_batching_by_count(
         self,
         monkeypatch: pytest.MonkeyPatch,
@@ -628,6 +715,49 @@ class TestCloudWatchLogStorage:
             ],
             job_logs=[],
         )
+        assert mock_client.put_log_events.call_count == len(expected)
+        actual = [
+            [base64.b64decode(e["message"]).decode() for e in c.kwargs["logEvents"]]
+            for c in mock_client.put_log_events.call_args_list
+        ]
+        assert actual == expected
+
+    @pytest.mark.asyncio
+    @freeze_time(FAKE_NOW)
+    async def test_write_logs_batching_by_timestamp(
+        self,
+        project: ProjectModel,
+        log_storage: CloudWatchLogStorage,
+        mock_client: Mock,
+        mock_ensure_stream_exists: Mock,
+    ):
+        def _delta_ms(**kwargs: int) -> int:
+            return int(timedelta(**kwargs).total_seconds() * 1000)
+
+        timestamp = int(self.FAKE_NOW.timestamp() * 1000) - _delta_ms(days=3)
+
+        log_storage.write_logs(
+            project=project,
+            run_name="test-run",
+            job_submission_id=UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e"),
+            runner_logs=[
+                # empty message, should be ignored
+                RunnerLogEvent(timestamp=timestamp - _delta_ms(days=1), message=b""),
+                # first batch
+                RunnerLogEvent(timestamp=timestamp, message=b"1"),
+                RunnerLogEvent(timestamp=timestamp + _delta_ms(hours=23), message=b"2"),
+                RunnerLogEvent(timestamp=timestamp + _delta_ms(hours=24), message=b"3"),
+                # second batch
+                RunnerLogEvent(timestamp=timestamp + _delta_ms(hours=24, seconds=1), message=b"4"),
+                RunnerLogEvent(timestamp=timestamp + _delta_ms(hours=30), message=b"5"),
+                RunnerLogEvent(timestamp=timestamp + _delta_ms(hours=48), message=b"6"),
+                # third batch
+                RunnerLogEvent(timestamp=timestamp + _delta_ms(hours=50), message=b"7"),
+            ],
+            job_logs=[],
+        )
+
+        expected = [["1", "2", "3"], ["4", "5", "6"], ["7"]]
         assert mock_client.put_log_events.call_count == len(expected)
         actual = [
             [base64.b64decode(e["message"]).decode() for e in c.kwargs["logEvents"]]
