@@ -3,6 +3,7 @@ pre-commit
 httpx>=0.23
 pytest~=7.2
 pytest-asyncio>=0.21
+pytest-httpbin==2.1.0
 freezegun>=1.2.0
 ruff==0.5.3  # Should match .pre-commit-config.yaml
 testcontainers # testcontainers<4 may not work with asyncpg
