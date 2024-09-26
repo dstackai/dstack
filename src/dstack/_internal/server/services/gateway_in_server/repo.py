@@ -13,16 +13,22 @@ from dstack._internal.server.models import JobModel, ProjectModel
 
 
 class DBGatewayRepo(BaseGatewayRepo):
+    """
+    A gateway repo implementation used for gateway-in-server that retrieves data from
+    dstack-server's database. Since the database is populated by dstack-server, all or
+    most writer methods in this implementation are expected to be empty.
+    """
+
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_service(self, project_name: str, name: str) -> Optional[Service]:
+    async def get_service(self, project_name: str, run_name: str) -> Optional[Service]:
         res = await self.session.execute(
             select(JobModel)
             .join(JobModel.project)
             .where(
                 ProjectModel.name == project_name,
-                JobModel.run_name == name,
+                JobModel.run_name == run_name,
                 JobModel.status == JobStatus.RUNNING,
                 JobModel.job_num == 0,
             )
@@ -67,6 +73,9 @@ class DBGatewayRepo(BaseGatewayRepo):
             replicas=replicas,
         )
 
+    async def add_service(self, project_name: str, service: Service) -> None:
+        pass
+
     async def get_project(self, name: str) -> Optional[Project]:
         res = await self.session.execute(select(ProjectModel).where(ProjectModel.name == name))
         project = res.scalar_one_or_none()
@@ -76,3 +85,6 @@ class DBGatewayRepo(BaseGatewayRepo):
             name=project.name,
             ssh_private_key=project.ssh_private_key,
         )
+
+    async def add_project(self, project: Project) -> None:
+        pass

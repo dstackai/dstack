@@ -28,9 +28,17 @@ class Project(BaseModel):
 
 class BaseGatewayRepo(ABC):
     @abstractmethod
-    async def get_service(self, project_name: str, name: str) -> Optional[Service]:
+    async def get_service(self, project_name: str, run_name: str) -> Optional[Service]:
+        pass
+
+    @abstractmethod
+    async def add_service(self, project_name: str, service: Service) -> None:
         pass
 
     @abstractmethod
     async def get_project(self, name: str) -> Optional[Project]:
+        pass
+
+    @abstractmethod
+    async def add_project(self, project: Project) -> None:
         pass

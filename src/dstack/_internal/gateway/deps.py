@@ -8,6 +8,13 @@ from dstack._internal.gateway.repos.base import BaseGatewayRepo
 
 
 class BaseGatewayDependencyInjector(ABC):
+    """
+    The gateway uses different implementations of this injector in different
+    environments: in-serer and on a remote host. An instance with the injector interface
+    stored in FastAPI's app.state.gateway_dependency_injector configures the gateway to
+    use a specific set of dependencies, e.g. a specific repo implementation.
+    """
+
     @abstractmethod
     async def get_repo(self) -> AsyncGenerator[BaseGatewayRepo, None]:
         if False:

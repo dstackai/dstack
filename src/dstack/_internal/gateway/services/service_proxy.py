@@ -5,7 +5,7 @@ import fastapi
 import httpx
 from starlette.requests import ClientDisconnect
 
-from dstack._internal.gateway.repos.base import BaseGatewayRepo
+from dstack._internal.gateway.repos.base import BaseGatewayRepo, Replica, Service
 from dstack._internal.gateway.services.service_connection import service_replica_connection_pool
 from dstack._internal.utils.logging import get_logger
 
@@ -38,15 +38,7 @@ async def proxy(
         )
 
     replica = random.choice(service.replicas)
-
-    connection = await service_replica_connection_pool.get(replica.id)
-    if connection is None:
-        project = await repo.get_project(project_name)
-        if project is None:
-            raise RuntimeError(f"Expected to find project {project_name} but could not")
-        connection = await service_replica_connection_pool.add(project, service, replica)
-
-    client = await connection.client()
+    client = await get_replica_client(project_name, service, replica, repo)
 
     try:
         upstream_request = await build_upstream_request(request, path, client, replica.id)
@@ -68,7 +60,7 @@ async def proxy(
             replica.id,
             e,
         )
-        if isinstance(e, TimeoutError):
+        if isinstance(e, httpx.TimeoutException):
             raise fastapi.HTTPException(fastapi.status.HTTP_504_GATEWAY_TIMEOUT)
         raise fastapi.HTTPException(fastapi.status.HTTP_502_BAD_GATEWAY)
 
@@ -77,6 +69,18 @@ async def proxy(
         status_code=upstream_response.status_code,
         headers=upstream_response.headers,
     )
+
+
+async def get_replica_client(
+    project_name: str, service: Service, replica: Replica, repo: BaseGatewayRepo
+) -> httpx.AsyncClient:
+    connection = await service_replica_connection_pool.get(replica.id)
+    if connection is None:
+        project = await repo.get_project(project_name)
+        if project is None:
+            raise RuntimeError(f"Expected to find project {project_name} but could not")
+        connection = await service_replica_connection_pool.add(project, service, replica)
+    return await connection.client()
 
 
 async def stream_response(
