@@ -257,14 +257,18 @@ class Run(ABC):
             if provisioning_data is None:
                 raise ClientError("Failed to attach. The run is not provisioned yet.")
 
-            ports_lock = SSHAttach.reuse_ports_lock(run_name=self.name)
+            name = self.name
+            if replica_num != 0 or job_num != 0:
+                name = job.job_spec.job_name
+
+            ports_lock = SSHAttach.reuse_ports_lock(run_name=name)
 
             if ports_lock is None:
                 if self._ports_lock is None:
                     self._ports_lock = _reserve_ports(job.job_spec)
                 logger.debug(
                     "Attaching to %s (%s: %s)",
-                    self.name,
+                    name,
                     provisioning_data.hostname,
                     self._ports_lock.dict(),
                 )
@@ -272,7 +276,7 @@ class Run(ABC):
                 self._ports_lock = ports_lock
                 logger.debug(
                     "Reusing the existing tunnel to %s (%s: %s)",
-                    self.name,
+                    name,
                     provisioning_data.hostname,
                     self._ports_lock.dict(),
                 )
@@ -283,7 +287,7 @@ class Run(ABC):
                 user=provisioning_data.username,
                 id_rsa_path=ssh_identity_file,
                 ports_lock=self._ports_lock,
-                run_name=self.name,
+                run_name=name,
                 dockerized=provisioning_data.dockerized,
                 ssh_proxy=provisioning_data.ssh_proxy,
                 local_backend=provisioning_data.backend == BackendType.LOCAL,

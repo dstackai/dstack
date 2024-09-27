@@ -100,13 +100,16 @@ def _print_attached_message(
         bind_address = "localhost"
 
     output = f"Attached to run [code]{run.name}[/] (replica={replica_num} job={job_num})\n"
-    # job = get_or_error(run._find_job(replica_num=replica_num, job_num=job_num))
+    job = get_or_error(run._find_job(replica_num=replica_num, job_num=job_num))
+    name = run.name
+    if replica_num != 0 or job_num != 0:
+        name = job.job_spec.job_name
     ports = get_or_error(run.ports)
     ports = {k: v for k, v in ports.items() if k not in _IGNORED_PORTS}
     if len(ports) > 0:
         output += "Forwarded ports (local -> remote):\n"
         for remote_port, local_port in ports.items():
             output += f"  - {bind_address}:{local_port} -> {remote_port}\n"
-    output += f"To connect to the run container via SSH, use `ssh {run.name}`.\n"
+    output += f"To connect to the run via SSH, use `ssh {name}`.\n"
     output += "Press Ctrl+C to detach..."
     console.print(output)
