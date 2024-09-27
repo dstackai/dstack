@@ -255,7 +255,6 @@ class CloudWatchLogStorage(LogStorage):
                 excessive_event = event
                 break
             if now_timestamp - timestamp > self.PAST_EVENT_MAX_DELTA:
-                print("past", now_timestamp - timestamp, event.message)
                 skipped_past_events += 1
                 continue
             if timestamp - now_timestamp > self.FUTURE_EVENT_MAX_DELTA:
