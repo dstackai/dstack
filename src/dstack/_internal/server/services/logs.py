@@ -1,9 +1,10 @@
 import atexit
 import base64
 import itertools
+import operator
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, List, Optional, Set, Tuple, TypedDict, Union
 from uuid import UUID
@@ -71,6 +72,14 @@ class CloudWatchLogStorage(LogStorage):
     MESSAGE_MAX_SIZE = 262144
     # Message size in bytes = len(message.encode("utf-8")) + MESSAGE_OVERHEAD_SIZE.
     MESSAGE_OVERHEAD_SIZE = 26
+    # "A batch of log events in a single request cannot span more than 24 hours".
+    BATCH_MAX_SPAN = int(timedelta(hours=24).total_seconds()) * 1000
+    # Decrease allowed deltas by possible clock drift between dstack and CloudWatch.
+    CLOCK_DRIFT = int(timedelta(minutes=10).total_seconds()) * 1000
+    # "None of the log events in the batch can be more than 14 days in the past."
+    PAST_EVENT_MAX_DELTA = int((timedelta(days=14)).total_seconds()) * 1000 - CLOCK_DRIFT
+    # "None of the log events in the batch can be more than 2 hours in the future."
+    FUTURE_EVENT_MAX_DELTA = int((timedelta(hours=2)).total_seconds()) * 1000 - CLOCK_DRIFT
 
     def __init__(self, *, group: str, region: Optional[str] = None) -> None:
         with self._wrap_boto_errors():
@@ -194,7 +203,14 @@ class CloudWatchLogStorage(LogStorage):
             self._put_log_events(stream, log_events)
 
     def _put_log_events(self, stream: str, log_events: List[RunnerLogEvent]) -> None:
-        for batch in self._get_batch_iter(stream, log_events):
+        # Python docs: "The built-in sorted() function is guaranteed to be stable."
+        sorted_log_events = sorted(log_events, key=operator.attrgetter("timestamp"))
+        if tuple(map(id, log_events)) != tuple(map(id, sorted_log_events)):
+            logger.error(
+                "Stream %s: events are not in chronological order, something wrong with runner",
+                stream,
+            )
+        for batch in self._get_batch_iter(stream, sorted_log_events):
             self._client.put_log_events(
                 logGroupName=self._group,
                 logStreamName=stream,
@@ -219,12 +235,30 @@ class CloudWatchLogStorage(LogStorage):
     def _get_next_batch(
         self, stream: str, event_iter: Iterator[RunnerLogEvent]
     ) -> Tuple[List[_CloudWatchLogEvent], Optional[RunnerLogEvent]]:
+        now_timestamp = int(datetime.now(timezone.utc).timestamp() * 1000)
         batch: List[_CloudWatchLogEvent] = []
         total_size = 0
         event_count = 0
+        first_timestamp: Optional[int] = None
+        skipped_past_events = 0
+        skipped_future_events = 0
+        # event that doesn't fit in the current batch
+        excessive_event: Optional[RunnerLogEvent] = None
         for event in event_iter:
             # Normally there should not be empty messages.
             if not event.message:
+                continue
+            timestamp = event.timestamp
+            if first_timestamp is None:
+                first_timestamp = timestamp
+            elif timestamp - first_timestamp > self.BATCH_MAX_SPAN:
+                excessive_event = event
+                break
+            if now_timestamp - timestamp > self.PAST_EVENT_MAX_DELTA:
+                skipped_past_events += 1
+                continue
+            if timestamp - now_timestamp > self.FUTURE_EVENT_MAX_DELTA:
+                skipped_future_events += 1
                 continue
             cw_event = self._runner_log_event_to_cloudwatch_event(event)
             # as message is base64-encoded, length in bytes = length in code points.
@@ -236,19 +270,24 @@ class CloudWatchLogStorage(LogStorage):
                 logger.error(
                     "Stream %s: skipping event %d, message exceeds max size: %d > %d",
                     stream,
-                    event.timestamp,
+                    timestamp,
                     message_size,
                     self.MESSAGE_MAX_SIZE,
                 )
                 continue
             if total_size + message_size > self.BATCH_MAX_SIZE:
-                return batch, event
+                excessive_event = event
+                break
             batch.append(cw_event)
             total_size += message_size
             event_count += 1
             if event_count >= self.EVENT_MAX_COUNT_IN_BATCH:
                 break
-        return batch, None
+        if skipped_past_events > 0:
+            logger.error("Stream %s: skipping %d past event(s)", stream, skipped_past_events)
+        if skipped_future_events > 0:
+            logger.error("Stream %s: skipping %d future event(s)", stream, skipped_future_events)
+        return batch, excessive_event
 
     def _runner_log_event_to_cloudwatch_event(
         self, runner_log_event: RunnerLogEvent
