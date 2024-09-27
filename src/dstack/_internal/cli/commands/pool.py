@@ -42,7 +42,7 @@ logger = get_logger(__name__)
 
 class PoolCommand(APIBaseCommand):
     NAME = "pool"
-    DESCRIPTION = "Pool management"
+    DESCRIPTION = "Manage pools"
 
     def _register(self) -> None:
         super()._register()

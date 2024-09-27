@@ -13,9 +13,9 @@ from urllib.parse import urlparse
 from websocket import WebSocketApp
 
 import dstack.api as api
-from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
+from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import AnyRunConfiguration
+from dstack._internal.core.models.configurations import AnyRunConfiguration, PortMapping
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
@@ -27,6 +27,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import (
+    Job,
     JobSpec,
     PoolInstanceOffers,
     Requirements,
@@ -174,10 +175,7 @@ class Run(ABC):
         if diagnose is False and self._ssh_attach is not None:
             yield from self._attached_logs()
         else:
-            job = None
-            for j in self._run.jobs:
-                if j.job_spec.replica_num == replica_num and j.job_spec.job_num == job_num:
-                    job = j
+            job = self._find_job(replica_num=replica_num, job_num=job_num)
             if job is None:
                 return []
             next_start_time = start_time
@@ -222,6 +220,9 @@ class Run(ABC):
         self,
         ssh_identity_file: Optional[PathLike] = None,
         bind_address: Optional[str] = None,
+        ports_overrides: Optional[List[PortMapping]] = None,
+        replica_num: int = 0,
+        job_num: int = 0,
     ) -> bool:
         """
         Establish an SSH tunnel to the instance and update SSH config
@@ -237,6 +238,21 @@ class Run(ABC):
             raise ConfigurationError("SSH identity file is required to attach to the run")
         ssh_identity_file = str(ssh_identity_file)
 
+        job = self._find_job(replica_num=replica_num, job_num=job_num)
+        if job is None:
+            raise ClientError(f"Failed to find replica={replica_num} job={job_num}")
+
+        name = self.name
+        if replica_num != 0 or job_num != 0:
+            name = job.job_spec.job_name
+
+        if self._ssh_attach is not None and name != self._ssh_attach.run_name:
+            # This is only a limitation when using the same Run instance via Python API.
+            # The CLI can attach to different jobs simultaneously.
+            raise ClientError("Cannot attach to different job with active attach. Detach first.")
+
+        # TODO: Check there are no two attaches to the same run with different params
+
         if self._ssh_attach is None:
             while self.status in (
                 RunStatus.SUBMITTED,
@@ -249,17 +265,18 @@ class Run(ABC):
             if self.status.is_finished() and self.status != RunStatus.DONE:
                 return False
 
-            job = self._run.jobs[0]  # TODO(egor-s): pull logs from all replicas?
             provisioning_data = job.job_submissions[-1].job_provisioning_data
+            if provisioning_data is None:
+                raise ClientError("Failed to attach. The run is not provisioned yet.")
 
-            ports_lock = SSHAttach.reuse_ports_lock(run_name=self.name)
+            ports_lock = SSHAttach.reuse_ports_lock(run_name=name)
 
             if ports_lock is None:
                 if self._ports_lock is None:
-                    self._ports_lock = _reserve_ports(job.job_spec)
+                    self._ports_lock = _reserve_ports(job.job_spec, ports_overrides)
                 logger.debug(
                     "Attaching to %s (%s: %s)",
-                    self.name,
+                    name,
                     provisioning_data.hostname,
                     self._ports_lock.dict(),
                 )
@@ -267,18 +284,18 @@ class Run(ABC):
                 self._ports_lock = ports_lock
                 logger.debug(
                     "Reusing the existing tunnel to %s (%s: %s)",
-                    self.name,
+                    name,
                     provisioning_data.hostname,
                     self._ports_lock.dict(),
                 )
 
             self._ssh_attach = SSHAttach(
-                hostname=self.hostname,
+                hostname=provisioning_data.hostname,
                 ssh_port=provisioning_data.ssh_port,
                 user=provisioning_data.username,
                 id_rsa_path=ssh_identity_file,
                 ports_lock=self._ports_lock,
-                run_name=self.name,
+                run_name=name,
                 dockerized=provisioning_data.dockerized,
                 ssh_proxy=provisioning_data.ssh_proxy,
                 local_backend=provisioning_data.backend == BackendType.LOCAL,
@@ -295,9 +312,15 @@ class Run(ABC):
         Stop the SSH tunnel to the instance and update SSH config
         """
         if self._ssh_attach is not None:
-            logger.debug("Detaching from %s", self.name)
+            logger.debug("Detaching from %s", self._ssh_attach.run_name)
             self._ssh_attach.detach()
             self._ssh_attach = None
+
+    def _find_job(self, replica_num: int, job_num: int) -> Optional[Job]:
+        for j in self._run.jobs:
+            if j.job_spec.replica_num == replica_num and j.job_spec.job_num == job_num:
+                return j
+        return None
 
     def __str__(self) -> str:
         return f"<Run '{self.name}'>"
@@ -552,9 +575,21 @@ class RunCollection:
         )
 
 
-def _reserve_ports(job_spec: JobSpec) -> PortsLock:
+def _reserve_ports(
+    job_spec: JobSpec,
+    ports_overrides: Optional[List[PortMapping]] = None,
+) -> PortsLock:
+    if ports_overrides is None:
+        ports_overrides = []
     ports = {10999: 0}  # Runner API
-    for app in job_spec.app_specs:
-        ports[app.port] = app.map_to_port or 0
+    if job_spec.app_specs:
+        for app in job_spec.app_specs:
+            ports[app.port] = app.map_to_port or 0
+    for port_override in ports_overrides:
+        if port_override.container_port not in ports:
+            raise ClientError(
+                f"Cannot override port {port_override.container_port} not exposed by the run"
+            )
+        ports[port_override.container_port] = port_override.local_port or 0
     logger.debug("Reserving ports: %s", ports)
     return PortsLock(ports).acquire()

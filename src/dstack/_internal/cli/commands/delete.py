@@ -10,7 +10,7 @@ from dstack._internal.cli.services.configurators import (
 
 class DeleteCommand(APIBaseCommand):
     NAME = "delete"
-    DESCRIPTION = "Delete resources defined by dstack configuration"
+    DESCRIPTION = "Delete resources"
     ALIASES = ["destroy"]
 
     def _register(self):
