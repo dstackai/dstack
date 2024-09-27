@@ -4,6 +4,9 @@ from pathlib import Path
 
 from dstack._internal.cli.commands import APIBaseCommand
 from dstack._internal.core.errors import CLIError
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class LogsCommand(APIBaseCommand):
@@ -51,6 +54,9 @@ class LogsCommand(APIBaseCommand):
             if run.status.is_finished():
                 raise CLIError(f"Run {args.run_name} is finished")
             else:
+                logger.warning(
+                    "`dstack logs --attach` is deprecated in favor of `dstack attach --logs`"
+                )
                 run.attach(args.ssh_identity_file)
         logs = run.logs(
             diagnose=args.diagnose,

@@ -15,7 +15,7 @@ from websocket import WebSocketApp
 import dstack.api as api
 from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import AnyRunConfiguration
+from dstack._internal.core.models.configurations import AnyRunConfiguration, PortMapping
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
     CreationPolicy,
@@ -220,6 +220,7 @@ class Run(ABC):
         self,
         ssh_identity_file: Optional[PathLike] = None,
         bind_address: Optional[str] = None,
+        ports_overrides: Optional[List[PortMapping]] = None,
         replica_num: int = 0,
         job_num: int = 0,
     ) -> bool:
@@ -237,6 +238,21 @@ class Run(ABC):
             raise ConfigurationError("SSH identity file is required to attach to the run")
         ssh_identity_file = str(ssh_identity_file)
 
+        job = self._find_job(replica_num=replica_num, job_num=job_num)
+        if job is None:
+            raise ClientError(f"Failed to find replica={replica_num} job={job_num}")
+
+        name = self.name
+        if replica_num != 0 or job_num != 0:
+            name = job.job_spec.job_name
+
+        if self._ssh_attach is not None and name != self._ssh_attach.run_name:
+            # This is only a limitation when using the same Run instance via Python API.
+            # The CLI can attach to different jobs simultaneously.
+            raise ClientError("Cannot attach to different job with active attach. Detach first.")
+
+        # TODO: Check there are no two attaches to the same run with different params
+
         if self._ssh_attach is None:
             while self.status in (
                 RunStatus.SUBMITTED,
@@ -249,23 +265,15 @@ class Run(ABC):
             if self.status.is_finished() and self.status != RunStatus.DONE:
                 return False
 
-            job = self._find_job(replica_num=replica_num, job_num=job_num)
-            if job is None:
-                raise ClientError(f"Failed to find replica={replica_num} job={job_num}")
-
             provisioning_data = job.job_submissions[-1].job_provisioning_data
             if provisioning_data is None:
                 raise ClientError("Failed to attach. The run is not provisioned yet.")
-
-            name = self.name
-            if replica_num != 0 or job_num != 0:
-                name = job.job_spec.job_name
 
             ports_lock = SSHAttach.reuse_ports_lock(run_name=name)
 
             if ports_lock is None:
                 if self._ports_lock is None:
-                    self._ports_lock = _reserve_ports(job.job_spec)
+                    self._ports_lock = _reserve_ports(job.job_spec, ports_overrides)
                 logger.debug(
                     "Attaching to %s (%s: %s)",
                     name,
@@ -304,7 +312,7 @@ class Run(ABC):
         Stop the SSH tunnel to the instance and update SSH config
         """
         if self._ssh_attach is not None:
-            logger.debug("Detaching from %s", self.name)
+            logger.debug("Detaching from %s", self._ssh_attach.run_name)
             self._ssh_attach.detach()
             self._ssh_attach = None
 
@@ -567,9 +575,21 @@ class RunCollection:
         )
 
 
-def _reserve_ports(job_spec: JobSpec) -> PortsLock:
+def _reserve_ports(
+    job_spec: JobSpec,
+    ports_overrides: Optional[List[PortMapping]] = None,
+) -> PortsLock:
+    if ports_overrides is None:
+        ports_overrides = []
     ports = {10999: 0}  # Runner API
-    for app in job_spec.app_specs:
-        ports[app.port] = app.map_to_port or 0
+    if job_spec.app_specs:
+        for app in job_spec.app_specs:
+            ports[app.port] = app.map_to_port or 0
+    for port_override in ports_overrides:
+        if port_override.container_port not in ports:
+            raise ClientError(
+                f"Cannot override port {port_override.container_port} not exposed by the run"
+            )
+        ports[port_override.container_port] = port_override.local_port or 0
     logger.debug("Reserving ports: %s", ports)
     return PortsLock(ports).acquire()

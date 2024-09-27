@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from dstack._internal.cli.commands import APIBaseCommand
+from dstack._internal.cli.services.args import port_mapping
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import CLIError
 from dstack._internal.utils.common import get_or_error
@@ -31,8 +32,17 @@ class AttachCommand(APIBaseCommand):
         )
         self._parser.add_argument(
             "--host",
-            help="Local address to bind. Defaults to [code]localhost[/]",
+            help="Local address to bind. Defaults to [code]localhost[/].",
             metavar="HOST",
+        )
+        self._parser.add_argument(
+            "-p",
+            "--port",
+            type=port_mapping,
+            action="append",
+            help="Port mapping overrides",
+            dest="ports",
+            metavar="MAPPING",
         )
         self._parser.add_argument(
             "--replica",
@@ -57,6 +67,7 @@ class AttachCommand(APIBaseCommand):
             run.attach(
                 ssh_identity_file=args.ssh_identity_file,
                 bind_address=args.host,
+                ports_overrides=args.ports,
                 replica_num=args.replica,
                 job_num=args.job,
             )
