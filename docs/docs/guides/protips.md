@@ -180,13 +180,13 @@ This means it streams the logs as they come in and, in the case of a task, forwa
 
 To run in detached mode, use `-d` with `dstack apply`.
 
-> If you detached the CLI, you can always re-attach to a run via `dstack logs -a RUN_NAME`.
+> If you detached the CLI, you can always re-attach to a run via `dstack attach RUN_NAME`.
 
 ## GPU
 
 `dstack` natively supports NVIDIA GPU, AMD GPU, and Google Cloud TPU accelerator chips.
 
-The `gpu` property withing `resources` (or the `--gpu` option with `dstack apply`)
+The `gpu` property within `resources` (or the `--gpu` option with `dstack apply`)
 allows specifying not only memory size but also GPU vendor, names, their memory, and quantity.
 
 Examples:

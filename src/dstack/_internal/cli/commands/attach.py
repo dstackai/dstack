@@ -64,13 +64,15 @@ class AttachCommand(APIBaseCommand):
         if run is None:
             raise CLIError(f"Run {args.run_name} not found")
         try:
-            run.attach(
+            attached = run.attach(
                 ssh_identity_file=args.ssh_identity_file,
                 bind_address=args.host,
                 ports_overrides=args.ports,
                 replica_num=args.replica,
                 job_num=args.job,
             )
+            if not attached:
+                raise CLIError(f"Failed to attach to run {args.run_name}")
             _print_attached_message(
                 run=run,
                 bind_address=args.host,

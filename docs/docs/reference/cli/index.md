@@ -87,7 +87,7 @@ $ dstack ps --help
 
 ### dstack stop
 
-This command stops run(s) within the current repository.
+This command stops run(s).
 
 <div class="termy">
 
@@ -98,9 +98,22 @@ $ dstack stop --help
 
 </div>
 
+### dstack attach
+
+This command attaches to a given run. It establishes the SSH tunnel, forwards ports, and shows real-time run logs.
+
+<div class="termy">
+
+```shell
+$ dstack attach --help
+#GENERATE#
+```
+
+</div>
+
 ### dstack logs
 
-This command shows the output of a given run within the current repository.
+This command shows the output of a given run.
 
 <div class="termy">
 

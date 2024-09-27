@@ -105,7 +105,7 @@ If you attempt to run a service on an SSH fleet, it won't work due to a [known i
 
 When running a dev environment or task with configured ports, `dstack apply` 
 automatically forwards remote ports to `localhost` via SSH for easy and secure access.
-If you interrupt the command, the port forwarding will be disconnected. To reattach, use `dstack logs --attach <run name`.
+If you interrupt the command, the port forwarding will be disconnected. To reattach, use `dstack attach <run name`.
 
 #### Windows
 
