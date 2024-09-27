@@ -5,8 +5,8 @@ import fastapi
 import httpx
 from starlette.requests import ClientDisconnect
 
-from dstack._internal.gateway.repos.base import BaseGatewayRepo, Replica, Service
-from dstack._internal.gateway.services.service_connection import service_replica_connection_pool
+from dstack._internal.proxy.repos.base import BaseProxyRepo, Replica, Service
+from dstack._internal.proxy.services.service_connection import service_replica_connection_pool
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -17,7 +17,7 @@ async def proxy(
     run_name: str,
     path: str,
     request: fastapi.Request,
-    repo: BaseGatewayRepo,
+    repo: BaseProxyRepo,
 ) -> fastapi.responses.Response:
     if "Upgrade" in request.headers:
         raise fastapi.exceptions.HTTPException(
@@ -72,7 +72,7 @@ async def proxy(
 
 
 async def get_replica_client(
-    project_name: str, service: Service, replica: Replica, repo: BaseGatewayRepo
+    project_name: str, service: Service, replica: Replica, repo: BaseProxyRepo
 ) -> httpx.AsyncClient:
     connection = await service_replica_connection_pool.get(replica.id)
     if connection is None:

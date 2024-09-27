@@ -14,4 +14,4 @@ class FeatureFlags:
     development. Feature flags are environment variables of the form DSTACK_FF_*
     """
 
-    GATEWAY_IN_SERVER = bool(os.getenv("DSTACK_FF_GATEWAY_IN_SERVER"))
+    PROXY = bool(os.getenv("DSTACK_FF_PROXY"))

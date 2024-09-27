@@ -1,9 +1,9 @@
 from typing import Dict, Optional
 
-from dstack._internal.gateway.repos.base import BaseGatewayRepo, Project, Service
+from dstack._internal.proxy.repos.base import BaseProxyRepo, Project, Service
 
 
-class InMemoryGatewayRepo(BaseGatewayRepo):
+class InMemoryProxyRepo(BaseProxyRepo):
     def __init__(self) -> None:
         self.services: Dict[str, Dict[str, Service]] = {}
         self.projects: Dict[str, Project] = {}
