@@ -29,7 +29,7 @@ jobs:
           pip install git+https://${{ secrets.GH_TOKEN }}@github.com/squidfunk/mkdocs-material-insiders.git
           mkdocs build
       - name: Deploy
-        uses: JamesIves/github-pages-deploy-action@v4
+        uses: JamesIves/github-pages-deploy-action@v4.6.4
         with:
           repository-name: dstackai/dstackai.github.io
           branch: gh-pages
