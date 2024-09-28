@@ -28,11 +28,12 @@ You can modify it as needed.
 ## Single-node training
 
 The easiest way to run a training script with `dstack` is by creating a task configuration file.
-This file can be found at [`examples/fine-tuning/axolotl/train.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/train.dstack.yml){:target="_blank"}. Below is its content: 
+This file can be found at [`examples/fine-tuning/axolotl/train.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/train.dstack.yml){:target="_blank"}.
+
+<div editor-title="examples/fine-tuning/axolotl/train.dstack.yml">
 
 ```yaml
 type: task
-# The name is optional, if not specified, generated randomly
 name: axolotl-train
 
 # Using the official Axolotl's Docker image
@@ -46,6 +47,9 @@ env:
 commands:
   - accelerate launch -m axolotl.cli.train examples/fine-tuning/axolotl/config.yaml
 
+# Use spot or on-demand instances
+spot_policy: auto
+
 resources:
   gpu:
     # 24GB or more vRAM
@@ -54,16 +58,23 @@ resources:
     count: 2..
 ```
 
+</div>
+
 The task uses Axolotl's Docker image, where Axolotl is already pre-installed.
 
-To run the task, use `dstack apply`:
+!!! info "AMD"
+    The example above uses NVIDIA accelerators. To use it with AMD, check out [AMD](https://dstack.ai/examples/accelerators/amd#axolotl).
+
+## Running a configuration
+
+Once the configuration is ready, run `dstack apply -f <configuration file>`, and `dstack` will automatically provision the
+cloud resources and run the configuration.
 
 <div class="termy">
 
 ```shell
 $ HUGGING_FACE_HUB_TOKEN=...
 $ WANDB_API_KEY=...
-
 $ dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
 ```
 
@@ -75,7 +86,7 @@ $ dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
 > If no `idle` instances meet the requirements, it creates a new fleet using one of the configured backends.
 
 The example folder includes a fleet configuration: 
-[ `examples/fine-tuning/axolotl/fleet.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/fleet.dstack.yml) {:target="_blank"}
+[ `examples/fine-tuning/axolotl/fleet.dstack.yml` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/fine-tuning/axolotl/fleet.dstack.yml){:target="_blank"}
 (a single node with a `24GB` GPU).
 
 You can update the fleet configuration to change the vRAM size, GPU model, number of GPUs per node, or number of nodes. 
@@ -105,7 +116,9 @@ If you'd like to play with the example using a dev environment, run
 <div class="termy">
 
 ```shell
-dstack apply -f examples/fine-tuning/axolotl/.dstack.yaml 
+$ HUGGING_FACE_HUB_TOKEN=...
+$ WANDB_API_KEY=...
+$ dstack apply -f examples/fine-tuning/axolotl/.dstack.yaml 
 ```
 
 </div>
@@ -119,4 +132,5 @@ The source-code of this example can be found in
 
 1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
    [services](https://dstack.ai/docs/services), and [fleets](https://dstack.ai/docs/concepts/fleets).
-2. Browse [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}.
+2. See [AMD](https://dstack.ai/examples/accelerators/amd#axolotl). 
+3. Browse [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"}.

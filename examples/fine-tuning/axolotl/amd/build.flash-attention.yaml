@@ -1,0 +1,37 @@
+type: task
+# The name is optional, if not specified, generated randomly
+name: build-flash-attention
+
+image: runpod/pytorch:2.1.2-py3.10-rocm6.0.2-ubuntu22.04
+
+# Required environment variables
+env:
+  - HUGGING_FACE_HUB_TOKEN
+  - GPU_ARCHS="gfx90a;gfx942"
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - AWS_REGION
+  - BUCKET_NAME
+
+# Commands of the task
+commands:
+  - apt-get update -y
+  - apt-get install awscli -y
+  - aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+  - aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+  - aws configure set region $AWS_REGION
+  - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
+  - pip uninstall torch torchvision torchaudio -y
+  - python3 -m pip install --pre torch==2.3.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.0/
+  - pip install ninja
+  - pip install wheel setuptools
+  - git clone https://github.com/ROCm/flash-attention.git
+  - cd flash-attention
+  - git checkout stride_fix
+  - python setup.py bdist_wheel -d dist/
+  - cd dist
+  - aws s3 cp "$(ls -1 | head -n 1)" s3://$BUCKET_NAME/ --acl public-read
+
+resources:
+  gpu: MI300X
+  disk: 150GB

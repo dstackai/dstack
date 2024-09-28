@@ -1,0 +1,36 @@
+type: task
+# The name is optional, if not specified, generated randomly
+name: axolotl-amd-llama31-train
+
+image: runpod/pytorch:2.1.2-py3.10-rocm6.0.2-ubuntu22.04
+
+# Required environment variables
+env:
+  - HUGGING_FACE_HUB_TOKEN
+# Commands of the task
+commands:
+  - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
+  - pip uninstall torch torchvision torchaudio -y
+  - python3 -m pip install --pre torch==2.3.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/rocm6.0/
+  - git clone https://github.com/OpenAccess-AI-Collective/axolotl
+  - cd axolotl
+  - git checkout d4f6c65
+  - pip install -e .
+  - cd ..
+  - wget https://dstack-binaries.s3.amazonaws.com/flash_attn-2.0.4-cp310-cp310-linux_x86_64.whl
+  - pip install flash_attn-2.0.4-cp310-cp310-linux_x86_64.whl
+  - wget https://dstack-binaries.s3.amazonaws.com/xformers-0.0.26-cp310-cp310-linux_x86_64.whl
+  - pip install xformers-0.0.26-cp310-cp310-linux_x86_64.whl
+  - git clone --recurse https://github.com/ROCm/bitsandbytes
+  - cd bitsandbytes
+  - git checkout rocm_enabled
+  - pip install -r requirements-dev.txt
+  - cmake -DBNB_ROCM_ARCH="gfx942" -DCOMPUTE_BACKEND=hip -S  .
+  - make
+  - pip install .
+  - cd ..
+  - accelerate launch -m axolotl.cli.train axolotl/examples/llama-3/fft-8b.yaml
+
+resources:
+  gpu: MI300X
+  disk: 150GB
