@@ -319,9 +319,7 @@ async def _delete_volume(session: AsyncSession, project: ProjectModel, volume_mo
         return
 
     if volume.provisioning_data is None:
-        logger.error(
-            f"Failed to delete volume {volume_model.name}. volume.provisioning_data is None."
-        )
+        # The volume wasn't provisioned so there is nothing to delete
         return
     if volume.provisioning_data.backend is None:
         logger.error(
