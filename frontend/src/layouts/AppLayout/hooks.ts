@@ -15,6 +15,7 @@ import { useCheckAvailableProjectPermission } from 'pages/Project/hooks/useCheck
 
 import { DISCORD_URL, DOCS_URL } from '../../consts';
 import { goToUrl } from '../../libs';
+import { useGetServerInfoQuery } from '../../services/server';
 
 export const useSideNavigation = () => {
     const { t } = useTranslation();
@@ -22,6 +23,7 @@ export const useSideNavigation = () => {
     const { pathname } = useLocation();
     const { selectedProject, projectsDropdownList } = useProjectDropdown();
     const [isAvailableAdministrationLinks] = usePermissionGuard({ allowedGlobalRoles: [GlobalUserRole.ADMIN] });
+    const { data: serverInfoData } = useGetServerInfoQuery();
 
     const isPoolDetails = Boolean(useMatch(ROUTES.FLEETS.DETAILS.TEMPLATE));
 
@@ -108,6 +110,13 @@ export const useSideNavigation = () => {
                     onClick: () => goToUrl(DISCORD_URL, true),
                 },
             ],
+        },
+
+        { type: 'divider' },
+
+        {
+            type: 'link',
+            text: `dstack version: ${serverInfoData?.server_version}`,
         },
     ].filter(Boolean) as SideNavigationProps['items'];
 

@@ -18,7 +18,6 @@ import {
     TopNavigation,
 } from 'components';
 
-import { DISCORD_URL, DOCS_URL } from 'consts';
 import { useAppDispatch, useAppSelector } from 'hooks';
 import { goToUrl } from 'libs';
 import { ROUTES } from 'routes';

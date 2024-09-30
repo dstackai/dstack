@@ -16,6 +16,17 @@
     }
 }
 
+[class^='awsui_navigation'] {
+    [class^='awsui_list']:last-child {
+        [class^='awsui_list-item']:last-child {
+            a {
+                pointer-events: none;
+                color: awsui.$color-text-status-inactive !important;
+            }
+        }
+    }
+}
+
 .appHeader {
     height: 48px;
     @media (screen and min-width: 913px) {
