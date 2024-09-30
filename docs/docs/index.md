@@ -11,7 +11,9 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ## How does it work?
 
-> Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
+![](https://raw.githubusercontent.com/dstackai/static-assets/refs/heads/main/static-assets/images/dstack-architecture-diagram.svg)
+
+Before using `dstack`, ensure you've [installed](installation/index.md) the server, or signed up for [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
 #### 1. Define configurations
 
@@ -21,23 +23,24 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 * [Tasks](tasks.md) &mdash; for scheduling jobs (incl. distributed jobs) or running web apps
 * [Services](services.md) &mdash; for deployment of models and web apps (with auto-scaling and authorization)
 * [Fleets](concepts/fleets.md) &mdash; for managing cloud and on-prem clusters
-* [Volumes](concepts/volumes.md) &mdash; for managing persisted volumes
-* [Gateways](concepts/volumes.md) &mdash; for configuring the ingress traffic and public endpoints
 
 Configuration can be defined as YAML files within your repo.
 
 #### 2. Apply configurations
 
-Apply the configuration either via the `dstack apply` CLI command or through a programmatic API.
+Apply the configuration either via the `dstack apply` CLI command (or through a programmatic API.)
 
-`dstack` automatically manages provisioning, job queuing, auto-scaling, networking, volumes, run failures,
-out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-prem clusters.
+> `dstack` automatically manages infrastructure provisioning and job scheduling, while also handling auto-scaling,
+port-forwarding, ingress, and more.
 
 ## Why dstack?
 
 `dstack`'s founder and CEO explains the challenges `dstack` addresses for AI and Ops teams.
 
 <iframe width="700" height="394" src="https://www.youtube.com/embed/yzVMp5Q0aPg?si=22QzF2OvtAybBWDg&rel=0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+`dstack` streamlines infrastructure management and container usage, enabling AI teams to work with any frameworks across
+cloud platforms or on-premise servers.
 
 ## Where do I start?
 
