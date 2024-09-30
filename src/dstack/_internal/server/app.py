@@ -14,8 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
-from dstack._internal.gateway.routers import service_proxy
-from dstack._internal.gateway.services.service_connection import service_replica_connection_pool
+from dstack._internal.proxy.routers import service_proxy
+from dstack._internal.proxy.services.service_connection import service_replica_connection_pool
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
 from dstack._internal.server.db import get_db, get_session_ctx, migrate
@@ -34,12 +34,12 @@ from dstack._internal.server.routers import (
     volumes,
 )
 from dstack._internal.server.services.config import ServerConfigManager
-from dstack._internal.server.services.gateway_in_server.deps import (
-    GatewayInServerDependencyInjector,
-)
 from dstack._internal.server.services.gateways import gateway_connections_pool, init_gateways
 from dstack._internal.server.services.locking import advisory_lock_ctx
 from dstack._internal.server.services.projects import get_or_create_default_project
+from dstack._internal.server.services.proxy.deps import (
+    ServerProxyDependencyInjector,
+)
 from dstack._internal.server.services.storage import init_default_storage
 from dstack._internal.server.services.users import get_or_create_admin_user
 from dstack._internal.server.settings import (
@@ -74,7 +74,7 @@ def create_app() -> FastAPI:
         )
 
     app = FastAPI(docs_url="/api/docs", lifespan=lifespan)
-    app.state.gateway_dependency_injector = GatewayInServerDependencyInjector()
+    app.state.proxy_dependency_injector = ServerProxyDependencyInjector()
     return app
 
 
@@ -174,10 +174,8 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(gateways.router)
     app.include_router(volumes.root_router)
     app.include_router(volumes.project_router)
-    if FeatureFlags.GATEWAY_IN_SERVER:
-        app.include_router(
-            service_proxy.router, prefix="/gateway/services", tags=["gateway-in-server"]
-        )
+    if FeatureFlags.PROXY:
+        app.include_router(service_proxy.router, prefix="/services", tags=["service-proxy"])
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):
@@ -243,8 +241,8 @@ def register_routes(app: FastAPI, ui: bool = True):
         async def custom_http_exception_handler(request, exc):
             if (
                 request.url.path.startswith("/api")
-                or FeatureFlags.GATEWAY_IN_SERVER
-                and _is_gateway_in_server_request(request)
+                or FeatureFlags.PROXY
+                and _is_proxied_service_request(request)
             ):
                 return JSONResponse(
                     {"detail": exc.detail},
@@ -264,16 +262,16 @@ def register_routes(app: FastAPI, ui: bool = True):
             return RedirectResponse("/api/docs")
 
 
-def _is_gateway_in_server_request(request: Request) -> bool:
-    if request.url.path.startswith("/gateway"):
+def _is_proxied_service_request(request: Request) -> bool:
+    if request.url.path.startswith("/services"):
         return True
-    # Attempt detecting requests originating from services served by gateway-in-server.
+    # Attempt detecting requests originating from services proxied by dstack-proxy.
     # Such requests can "leak" to dstack server paths if the service does not support
     # running under a path prefix properly.
     referrer = URL(request.headers.get("Referer", ""))
     return (
         referrer.netloc == "" or referrer.netloc == request.url.netloc
-    ) and referrer.path.startswith("/gateway/services")
+    ) and referrer.path.startswith("/services")
 
 
 def _print_dstack_logo():

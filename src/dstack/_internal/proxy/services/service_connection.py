@@ -12,7 +12,7 @@ from dstack._internal.core.services.ssh.tunnel import (
     SSHTunnel,
     UnixSocket,
 )
-from dstack._internal.gateway.repos.base import Project, Replica, Service
+from dstack._internal.proxy.repos.base import Project, Replica, Service
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 

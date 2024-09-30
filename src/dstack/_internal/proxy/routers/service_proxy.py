@@ -3,9 +3,9 @@ from fastapi.datastructures import URL
 from fastapi.responses import RedirectResponse, Response
 from typing_extensions import Annotated
 
-from dstack._internal.gateway.deps import get_gateway_repo
-from dstack._internal.gateway.repos.base import BaseGatewayRepo
-from dstack._internal.gateway.services import service_proxy
+from dstack._internal.proxy.deps import get_proxy_repo
+from dstack._internal.proxy.repos.base import BaseProxyRepo
+from dstack._internal.proxy.services import service_proxy
 
 REDIRECTED_HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"]
 PROXIED_HTTP_METHODS = REDIRECTED_HTTP_METHODS + ["OPTIONS"]
@@ -27,7 +27,7 @@ async def service_reverse_proxy(
     run_name: str,
     path: str,
     request: Request,
-    repo: Annotated[BaseGatewayRepo, Depends(get_gateway_repo)],
+    repo: Annotated[BaseProxyRepo, Depends(get_proxy_repo)],
 ) -> Response:
     return await service_proxy.proxy(project_name, run_name, path, request, repo)
 

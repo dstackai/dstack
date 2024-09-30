@@ -8,15 +8,16 @@ from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobProvisioningData, JobStatus, RunSpec
-from dstack._internal.gateway.repos.base import BaseGatewayRepo, Project, Replica, Service
+from dstack._internal.proxy.repos.base import BaseProxyRepo, Project, Replica, Service
 from dstack._internal.server.models import JobModel, ProjectModel
 
 
-class DBGatewayRepo(BaseGatewayRepo):
+class DBProxyRepo(BaseProxyRepo):
     """
-    A gateway repo implementation used for gateway-in-server that retrieves data from
-    dstack-server's database. Since the database is populated by dstack-server, all or
-    most writer methods in this implementation are expected to be empty.
+    A repo implementation used by dstack-proxy running within dstack-server.
+    Retrieves data from dstack-server's database. Since the database is
+    populated by dstack-server, all or most writer methods in this
+    implementation are expected to be empty.
     """
 
     def __init__(self, session: AsyncSession) -> None:

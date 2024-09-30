@@ -26,7 +26,7 @@ class Project(BaseModel):
     ssh_private_key: str
 
 
-class BaseGatewayRepo(ABC):
+class BaseProxyRepo(ABC):
     @abstractmethod
     async def get_service(self, project_name: str, run_name: str) -> Optional[Service]:
         pass
