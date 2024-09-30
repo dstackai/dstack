@@ -418,7 +418,7 @@ class RunCollection:
     def get_plan(
         self,
         configuration: AnyRunConfiguration,
-        repo: Repo,
+        repo: Optional[Repo] = None,
         configuration_path: Optional[str] = None,
         backends: Optional[List[BackendType]] = None,
         regions: Optional[List[str]] = None,
@@ -442,6 +442,12 @@ class RunCollection:
         # Returns:
         #     run plan
         # """
+
+        if repo is None:
+            repo = configuration.get_repo()
+            if repo is None:
+                raise ConfigurationError("Repo is required for this type of configuration")
+
         if working_dir is None:
             working_dir = "."
         elif repo.repo_dir is not None:
