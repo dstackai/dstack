@@ -40,6 +40,7 @@ from dstack._internal.core.services.logs import URLReplacer
 from dstack._internal.core.services.ssh.attach import SSHAttach
 from dstack._internal.core.services.ssh.ports import PortsLock
 from dstack._internal.server.schemas.logs import PollLogsRequest
+from dstack._internal.utils.common import get_or_error
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import PathLike, path_in_dir
 from dstack.api.server import APIClient
@@ -265,6 +266,8 @@ class Run(ABC):
             if self.status.is_finished() and self.status != RunStatus.DONE:
                 return False
 
+            # Reload job
+            job = get_or_error(self._find_job(replica_num=replica_num, job_num=job_num))
             provisioning_data = job.job_submissions[-1].job_provisioning_data
             if provisioning_data is None:
                 raise ClientError("Failed to attach. The run is not provisioned yet.")
