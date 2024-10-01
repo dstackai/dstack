@@ -45,7 +45,7 @@ class RunpodConfigurator(Configurator):
             return config_values
         self._validate_runpod_api_key(config.creds.api_key)
         config_values.regions = self._get_regions_element(
-            selected=config.regions or [DEFAULT_REGION]
+            selected=config.regions or REGIONS  # Use all regions by default
         )
         return config_values
 
@@ -53,7 +53,7 @@ class RunpodConfigurator(Configurator):
         self, project: ProjectModel, config: RunpodConfigInfoWithCreds
     ) -> BackendModel:
         if config.regions is None:
-            config.regions = REGIONS
+            config.regions = REGIONS  # Use all regions by default
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
