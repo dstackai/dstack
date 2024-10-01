@@ -66,6 +66,7 @@ class GatewayConnection:
             ],
             # reverse_forwarded_sockets are added later in .open()
         )
+        self.tunnel_id = uuid.uuid4()
         self._client = GatewayClient(uds=self.gateway_socket_path)
 
     @staticmethod
@@ -79,7 +80,7 @@ class GatewayConnection:
         async with self._lock.writer_lock:
             if not await self.tunnel.acheck():
                 logger.info("Connection to gateway %s is down, restarting", self.ip_address)
-                await self.tunnel.aopen()
+                await self._open_tunnel()
                 return True
         return False
 
@@ -89,18 +90,26 @@ class GatewayConnection:
                 # Close remaining tunnel if previous server process died w/o graceful shutdown
                 if await self.tunnel.acheck():
                     await self.tunnel.aclose()
+            await self._open_tunnel()
 
-            self.connection_dir.mkdir(parents=True, exist_ok=True)
-            await self.tunnel.aopen()
-            await self.tunnel.aexec(f"mkdir -p {CONNECTIONS_DIR_ON_GATEWAY}")
+    async def _open_tunnel(self) -> None:
+        self.connection_dir.mkdir(parents=True, exist_ok=True)
+        remote_socket_path = f"{CONNECTIONS_DIR_ON_GATEWAY}/{self.tunnel_id}.sock"
 
-            self.tunnel.reverse_forwarded_sockets = [
-                SocketPair(
-                    local=IPSocket(host="localhost", port=self.server_port),
-                    remote=UnixSocket(path=f"{CONNECTIONS_DIR_ON_GATEWAY}/{uuid.uuid4()}.sock"),
-                ),
-            ]
-            await self.tunnel.aopen()  # apply reverse forwarding
+        # open w/o reverse forwarding and make sure reverse forwarding will be possible
+        self.tunnel.reverse_forwarded_sockets = []
+        await self.tunnel.aopen()
+        await self.tunnel.aexec(f"mkdir -p {CONNECTIONS_DIR_ON_GATEWAY}")
+        await self.tunnel.aexec(f"rm -f {remote_socket_path}")
+
+        # add reverse forwarding
+        self.tunnel.reverse_forwarded_sockets = [
+            SocketPair(
+                local=IPSocket(host="localhost", port=self.server_port),
+                remote=UnixSocket(path=remote_socket_path),
+            ),
+        ]
+        await self.tunnel.aopen()
 
     async def close(self) -> None:
         async with self._lock.writer_lock:
