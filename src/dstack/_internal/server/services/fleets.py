@@ -17,6 +17,7 @@ from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     Fleet,
+    FleetPlan,
     FleetSpec,
     FleetStatus,
     InstanceGroupPlacement,
@@ -107,6 +108,40 @@ async def get_project_fleet_model_by_name(
     return res.unique().scalar_one_or_none()
 
 
+async def get_plan(
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    spec: FleetSpec,
+) -> FleetPlan:
+    # TODO: refactor offers logic into a separate module to avoid depending on runs
+    from dstack._internal.server.services.runs import get_create_instance_offers
+
+    offers_with_backends = await get_create_instance_offers(
+        project=project,
+        profile=spec.merged_profile,
+        requirements=_get_fleet_requirements(spec),
+    )
+    offers = [offer for _, offer in offers_with_backends]
+    current_fleet = None
+    if spec.configuration.name is not None:
+        current_fleet = await get_fleet_by_name(
+            session=session,
+            project=project,
+            name=spec.configuration.name,
+        )
+    plan = FleetPlan(
+        project_name=project.name,
+        user=user.name,
+        spec=spec,
+        current_resource=current_fleet,
+        offers=offers[:50],
+        total_offers=len(offers),
+        max_offer_price=max((offer.price for offer in offers), default=None),
+    )
+    return plan
+
+
 async def create_fleet(
     session: AsyncSession,
     project: ProjectModel,
@@ -194,11 +229,7 @@ async def create_fleet_instance_model(
     instance_num: int,
 ) -> InstanceModel:
     profile = spec.merged_profile
-    requirements = Requirements(
-        resources=spec.configuration.resources or ResourcesSpec(),
-        max_price=profile.max_price,
-        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
-    )
+    requirements = _get_fleet_requirements(spec)
     instance_model = await pools_services.create_instance_model(
         session=session,
         project=project,
@@ -432,6 +463,16 @@ def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[
             instance.deleted = True
         else:
             instance.status = InstanceStatus.TERMINATING
+
+
+def _get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
+    profile = fleet_spec.merged_profile
+    requirements = Requirements(
+        resources=fleet_spec.configuration.resources or ResourcesSpec(),
+        max_price=profile.max_price,
+        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
+    )
+    return requirements
 
 
 def _get_placement_group_name(

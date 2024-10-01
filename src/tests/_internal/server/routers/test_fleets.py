@@ -159,6 +159,7 @@ class TestCreateFleet:
             "name": spec.configuration.name,
             "project_name": project.name,
             "spec": {
+                "configuration_path": None,
                 "configuration": {
                     "nodes": {"min": 1, "max": 1},
                     "placement": None,
@@ -261,6 +262,7 @@ class TestCreateFleet:
             "name": spec.configuration.name,
             "project_name": project.name,
             "spec": {
+                "configuration_path": None,
                 "configuration": {
                     "env": {},
                     "ssh_config": {

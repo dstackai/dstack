@@ -3,6 +3,8 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
+from rich.table import Table
+
 from dstack._internal.cli.services.configurators.base import (
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator,
@@ -11,8 +13,13 @@ from dstack._internal.cli.utils.common import confirm_ask, console
 from dstack._internal.cli.utils.fleet import print_fleets_table
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
-from dstack._internal.core.models.fleets import FleetConfiguration, FleetSpec
-from dstack._internal.core.models.instances import SSHKey
+from dstack._internal.core.models.fleets import (
+    FleetConfiguration,
+    FleetPlan,
+    FleetSpec,
+    InstanceGroupPlacement,
+)
+from dstack._internal.core.models.instances import InstanceAvailability, SSHKey
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
 from dstack.api.utils import load_profile
@@ -39,57 +46,58 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         profile = load_profile(Path.cwd(), None)
         spec = FleetSpec(
             configuration=conf,
+            configuration_path=configuration_path,
             profile=profile,
         )
         _preprocess_spec(spec)
-        confirmed = False
-        if conf.name is not None:
-            try:
-                fleet = self.api.client.fleets.get(
-                    project_name=self.api.project,
-                    name=conf.name,
+
+        with console.status("Getting apply plan..."):
+            plan = self.api.client.fleets.get_plan(
+                project_name=self.api.project,
+                spec=spec,
+            )
+        print_plan_header(plan)
+
+        action_message = ""
+        confirm_message = ""
+        if plan.current_resource is None:
+            if plan.spec.configuration.name is not None:
+                action_message += (
+                    f"Fleet [code]{plan.spec.configuration.name}[/] does not exist yet."
                 )
-            except ResourceNotExistsError:
-                pass
-            else:
-                if fleet.spec.configuration == conf:
-                    if not command_args.force:
-                        console.print(
-                            "Fleet configuration has not changed. Use --force to recreate the fleet."
-                        )
-                        return
-                    if not command_args.yes and not confirm_ask(
-                        "Fleet configuration has not changed. Re-create the fleet?"
-                    ):
-                        console.print("\nExiting...")
-                        return
-                elif not command_args.yes and not confirm_ask(
-                    f"Fleet [code]{conf.name}[/] already exists. Re-create the fleet?"
-                ):
-                    console.print("\nExiting...")
+            confirm_message += "Create the fleet?"
+        else:
+            action_message += f"Found fleet [code]{plan.spec.configuration.name}[/]."
+            if plan.current_resource.spec == plan.spec:
+                if command_args.yes and not command_args.force:
                     return
-                confirmed = True
-                with console.status("Deleting fleet..."):
-                    self.api.client.fleets.delete(project_name=self.api.project, names=[conf.name])
-                    # Fleet deletion is async. Wait for fleet to be deleted.
-                    while True:
-                        try:
-                            self.api.client.fleets.get(
-                                project_name=self.api.project, name=conf.name
-                            )
-                        except ResourceNotExistsError:
-                            break
-                        else:
-                            time.sleep(1)
-        if not confirmed and not command_args.yes:
-            confirm_message = "Configuration does not specify the fleet name. Create a new fleet?"
-            if conf.name is not None:
-                confirm_message = (
-                    f"Fleet [code]{conf.name}[/] does not exist yet. Create the fleet?"
+                action_message += " No configuration changes detected."
+                confirm_message += "Re-create the fleet?"
+            else:
+                action_message += " Configuration changes detected."
+                confirm_message += "Re-create the fleet?"
+
+        console.print(action_message)
+        if not command_args.yes and not confirm_ask(confirm_message):
+            console.print("\nExiting...")
+            return
+
+        if plan.current_resource is not None:
+            with console.status("Deleting existing fleet..."):
+                self.api.client.fleets.delete(
+                    project_name=self.api.project, names=[plan.current_resource.name]
                 )
-            if not confirm_ask(confirm_message):
-                console.print("\nExiting...")
-                return
+                # Fleet deletion is async. Wait for fleet to be deleted.
+                while True:
+                    try:
+                        self.api.client.fleets.get(
+                            project_name=self.api.project, name=plan.current_resource.name
+                        )
+                    except ResourceNotExistsError:
+                        break
+                    else:
+                        time.sleep(1)
+
         with console.status("Creating fleet..."):
             fleet = self.api.client.fleets.create(
                 project_name=self.api.project,
@@ -168,3 +176,96 @@ def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:
         logger.debug("Key type is not supported", repr(e))
         console.print("[error]Key type is not supported[/]")
         exit()
+
+
+def print_plan_header(plan: FleetPlan):
+    def th(s: str) -> str:
+        return f"[bold]{s}[/bold]"
+
+    configuration_table = Table(box=None, show_header=False)
+    configuration_table.add_column(no_wrap=True)  # key
+    configuration_table.add_column()  # value
+
+    configuration_table.add_row(th("Project"), plan.project_name)
+    configuration_table.add_row(th("User"), plan.user)
+    configuration_table.add_row(th("Configuration"), plan.spec.configuration_path)
+    configuration_table.add_row(th("Type"), "fleet")
+
+    fleet_type = "cloud"
+    nodes = plan.spec.configuration.nodes or "-"
+    placement = plan.spec.configuration.placement or InstanceGroupPlacement.ANY
+    backends = None
+    if plan.spec.configuration.backends is not None:
+        backends = ", ".join(b.value for b in plan.spec.configuration.backends)
+    regions = None
+    if plan.spec.configuration.regions is not None:
+        regions = ", ".join(plan.spec.configuration.regions)
+    resources = None
+    if plan.spec.configuration.resources is not None:
+        resources = plan.spec.configuration.resources.pretty_format()
+    spot_policy = plan.spec.merged_profile.spot_policy
+    if plan.spec.configuration.ssh_config is not None:
+        fleet_type = "ssh"
+        nodes = len(plan.spec.configuration.ssh_config.hosts)
+        resources = None
+        spot_policy = None
+
+    configuration_table.add_row(th("Fleet type"), fleet_type)
+    configuration_table.add_row(th("Nodes"), str(nodes))
+    configuration_table.add_row(th("Placement"), placement.value)
+    if backends is not None:
+        configuration_table.add_row(th("Backends"), str(backends))
+    if regions is not None:
+        configuration_table.add_row(th("Regions"), str(regions))
+    if resources is not None:
+        configuration_table.add_row(th("Resources"), resources)
+    if spot_policy is not None:
+        configuration_table.add_row(th("Spot policy"), spot_policy)
+
+    offers_table = Table(box=None)
+    offers_table.add_column("#")
+    offers_table.add_column("BACKEND")
+    offers_table.add_column("REGION")
+    offers_table.add_column("INSTANCE")
+    offers_table.add_column("RESOURCES")
+    offers_table.add_column("SPOT")
+    offers_table.add_column("PRICE")
+    offers_table.add_column()
+
+    offers_limit = 3
+    print_offers = plan.offers[:offers_limit]
+
+    for index, offer in enumerate(print_offers, start=1):
+        resources = offer.instance.resources
+
+        availability = ""
+        if offer.availability in {
+            InstanceAvailability.NOT_AVAILABLE,
+            InstanceAvailability.NO_QUOTA,
+        }:
+            availability = offer.availability.value.replace("_", " ").title()
+        offers_table.add_row(
+            f"{index}",
+            offer.backend.replace("remote", "ssh"),
+            offer.region,
+            offer.instance.name,
+            resources.pretty_format(),
+            "yes" if resources.spot else "no",
+            f"${offer.price:g}",
+            availability,
+            style=None if index == 1 else "secondary",
+        )
+    if len(plan.offers) > offers_limit:
+        offers_table.add_row("", "...", style="secondary")
+
+    console.print(configuration_table)
+    console.print()
+
+    if len(print_offers) > 0:
+        console.print(offers_table)
+        if len(plan.offers) > offers_limit:
+            console.print(
+                f"[secondary] Shown {len(print_offers)} of {plan.total_offers} offers, "
+                f"${plan.max_offer_price:g} max[/]"
+            )
+        console.print()

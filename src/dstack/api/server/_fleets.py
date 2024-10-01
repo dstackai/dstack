@@ -2,11 +2,12 @@ from typing import List
 
 from pydantic import parse_obj_as
 
-from dstack._internal.core.models.fleets import Fleet, FleetSpec
+from dstack._internal.core.models.fleets import Fleet, FleetPlan, FleetSpec
 from dstack._internal.server.schemas.fleets import (
     CreateFleetRequest,
     DeleteFleetInstancesRequest,
     DeleteFleetsRequest,
+    GetFleetPlanRequest,
     GetFleetRequest,
 )
 from dstack.api.server._group import APIClientGroup
@@ -21,6 +22,15 @@ class FleetsAPIClient(APIClientGroup):
         body = GetFleetRequest(name=name)
         resp = self._request(f"/api/project/{project_name}/fleets/get", body=body.json())
         return parse_obj_as(Fleet.__response__, resp.json())
+
+    def get_plan(
+        self,
+        project_name: str,
+        spec: FleetSpec,
+    ) -> FleetPlan:
+        body = GetFleetPlanRequest(spec=spec)
+        resp = self._request(f"/api/project/{project_name}/fleets/get_plan", body=body.json())
+        return parse_obj_as(FleetPlan.__response__, resp.json())
 
     def create(
         self,
