@@ -2,21 +2,17 @@ package main
 
 import (
 	"context"
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
-	execute "github.com/alexellis/go-execute/v2"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
@@ -191,29 +187,33 @@ func writeHostInfo() {
 	}
 
 	type Message struct {
-		GpuName   string   `json:"gpu_name"`
-		GpuMemory string   `json:"gpu_memory"`
-		GpuCount  int      `json:"gpu_count"`
-		Adresses  []string `json:"addresses"`
-		DiskSize  uint64   `json:"disk_size"`
-		NumCPUs   int      `json:"cpus"`
-		Memory    uint64   `json:"memory"`
+		GpuVendor shim.GpuVendor `json:"gpu_vendor"`
+		GpuName   string         `json:"gpu_name"`
+		GpuMemory int            `json:"gpu_memory"` // MiB
+		GpuCount  int            `json:"gpu_count"`
+		Addresses []string       `json:"addresses"`
+		DiskSize  uint64         `json:"disk_size"` // bytes
+		NumCPUs   int            `json:"cpus"`
+		Memory    uint64         `json:"memory"` // bytes
 	}
 
+	gpuVendor := shim.NoVendor
 	gpuCount := 0
-	gpuMemory := ""
+	gpuMemory := 0
 	gpuName := ""
-	gpus := getGpuInfo()
+	gpus := shim.GetGpuInfo()
 	if len(gpus) != 0 {
 		gpuCount = len(gpus)
-		gpuMemory = gpus[0][1]
-		gpuName = gpus[0][0]
+		gpuVendor = gpus[0].Vendor
+		gpuMemory = gpus[0].Vram
+		gpuName = gpus[0].Name
 	}
 	m := Message{
+		GpuVendor: gpuVendor,
 		GpuName:   gpuName,
 		GpuMemory: gpuMemory,
 		GpuCount:  gpuCount,
-		Adresses:  getInterfaces(),
+		Addresses: getInterfaces(),
 		DiskSize:  getDiskSize(),
 		NumCPUs:   runtime.NumCPU(),
 		Memory:    getMemory(),
@@ -239,51 +239,6 @@ func writeHostInfo() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func getGpuInfo() [][]string {
-	cmd := execute.ExecTask{
-		Command: "docker",
-		Args: []string{
-			"run",
-			"--rm",
-			"--gpus", "all",
-			"dstackai/base:py3.12-0.5-cuda-12.1",
-			"nvidia-smi", "--query-gpu=gpu_name,memory.total", "--format=csv",
-		},
-		StreamStdio: false,
-	}
-
-	res, err := cmd.Execute(context.Background())
-	if err != nil {
-		return [][]string{} // GPU not found
-	}
-
-	if res.ExitCode != 0 {
-		return [][]string{} // GPU not found
-	}
-
-	r := csv.NewReader(strings.NewReader(res.Stdout))
-
-	var gpus [][]string
-
-	// Skip header
-	if _, err := r.Read(); err != nil {
-		panic("canot read csv")
-	}
-
-	for {
-		record, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		gpus = append(gpus, record)
-	}
-	return gpus
 }
 
 func getInterfaces() []string {

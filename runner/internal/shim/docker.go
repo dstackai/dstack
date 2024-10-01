@@ -445,10 +445,6 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		log.Printf("Cleanup routine: Cannot remove container: %s", err)
 	}
 
-	gpuRequest, err := requestGpuIfAvailable(ctx, client)
-	if err != nil {
-		return "", tracerr.Wrap(err)
-	}
 	mounts, err := dockerParams.DockerMounts(runnerDir)
 	if err != nil {
 		return "", tracerr.Wrap(err)
@@ -497,13 +493,11 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		PortBindings:    bindPorts(dockerParams.DockerPorts()...),
 		PublishAllPorts: true,
 		Sysctls:         map[string]string{},
-		Resources: container.Resources{
-			DeviceRequests: gpuRequest,
-		},
-		Mounts:  mounts,
-		ShmSize: taskConfig.ShmSize,
-		Tmpfs:   tmpfs,
+		Mounts:          mounts,
+		ShmSize:         taskConfig.ShmSize,
+		Tmpfs:           tmpfs,
 	}
+	configureGpuIfAvailable(hostConfig)
 
 	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", taskConfig.ContainerName, containerConfig, hostConfig)
 	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskConfig.ContainerName)
@@ -587,27 +581,44 @@ func getNetworkMode() container.NetworkMode {
 	return "default"
 }
 
-func requestGpuIfAvailable(ctx context.Context, client docker.APIClient) ([]container.DeviceRequest, error) {
-	info, err := client.Info(ctx)
-	if err != nil {
-		return nil, tracerr.Wrap(err)
+func configureGpuIfAvailable(hostConfig *container.HostConfig) {
+	switch gpuVendor := GetGpuVendor(); gpuVendor {
+	case Nvidia:
+		hostConfig.Resources.DeviceRequests = append(
+			hostConfig.Resources.DeviceRequests,
+			container.DeviceRequest{
+				// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
+				// Default capabilities: utility, compute.
+				// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
+				Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
+				Count:        -1, // --gpus=all
+			},
+		)
+	case Amd:
+		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
+		// Only --device are mandatory, other seem to be performance-related.
+		// --device=/dev/kfd --device=/dev/dri
+		hostConfig.Resources.Devices = append(
+			hostConfig.Resources.Devices,
+			container.DeviceMapping{
+				PathOnHost:        "/dev/kfd",
+				PathInContainer:   "/dev/kfd",
+				CgroupPermissions: "rwm",
+			},
+			container.DeviceMapping{
+				PathOnHost:        "/dev/dri",
+				PathInContainer:   "/dev/dri",
+				CgroupPermissions: "rwm",
+			},
+		)
+		// --ipc=host
+		hostConfig.IpcMode = container.IPCModeHost
+		// --cap-add=SYS_PTRACE
+		hostConfig.CapAdd = append(hostConfig.CapAdd, "SYS_PTRACE")
+		// --security-opt=seccomp=unconfined
+		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "seccomp=unconfined")
+		// TODO: in addition, for non-root user, --group-add=video, and possibly --group-add=render, are required.
 	}
-
-	for runtime := range info.Runtimes {
-		if runtime == consts.NVIDIA_RUNTIME {
-			return []container.DeviceRequest{
-				{
-					// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
-					// Default capabilities: utility, compute.
-					// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
-					Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
-					Count:        -1, // --gpus=all
-				},
-			}, nil
-		}
-	}
-
-	return nil, nil
 }
 
 func getVolumeMounts(mountPoints []MountPoint) ([]mount.Mount, error) {
