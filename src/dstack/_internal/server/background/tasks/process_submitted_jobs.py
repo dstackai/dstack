@@ -50,12 +50,12 @@ from dstack._internal.server.services.jobs import (
 )
 from dstack._internal.server.services.locking import get_locker
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
 )
 from dstack._internal.server.services.runs import (
     check_can_attach_run_volumes,
-    get_offers_by_requirements,
     get_run_volume_models,
     run_model_to_run,
 )

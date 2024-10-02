@@ -2,12 +2,14 @@ import random
 import string
 import uuid
 from datetime import timezone
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
+from dstack._internal.core.backends import BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import (
     ForbiddenError,
     ResourceExistsError,
@@ -17,14 +19,27 @@ from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import (
     Fleet,
+    FleetPlan,
     FleetSpec,
     FleetStatus,
     InstanceGroupPlacement,
     SSHHostParams,
     SSHParams,
 )
-from dstack._internal.core.models.instances import InstanceStatus, SSHKey
-from dstack._internal.core.models.profiles import SpotPolicy
+from dstack._internal.core.models.instances import (
+    DockerConfig,
+    InstanceConfiguration,
+    InstanceOfferWithAvailability,
+    InstanceStatus,
+    SSHKey,
+)
+from dstack._internal.core.models.pools import Instance
+from dstack._internal.core.models.profiles import (
+    DEFAULT_POOL_TERMINATION_IDLE_TIME,
+    Profile,
+    SpotPolicy,
+    TerminationPolicy,
+)
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements, get_policy_map
 from dstack._internal.core.models.users import GlobalRole
@@ -37,12 +52,19 @@ from dstack._internal.server.models import (
     ProjectModel,
     UserModel,
 )
+from dstack._internal.server.services import offers as offers_services
 from dstack._internal.server.services import pools as pools_services
+from dstack._internal.server.services.docker import parse_image_name
+from dstack._internal.server.services.jobs.configurators.base import (
+    get_default_image,
+    get_default_python_verison,
+)
 from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
 from dstack._internal.server.services.projects import get_member, get_member_permissions
+from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import pkey_from_str
@@ -105,6 +127,75 @@ async def get_project_fleet_model_by_name(
         select(FleetModel).where(*filters).options(joinedload(FleetModel.instances))
     )
     return res.unique().scalar_one_or_none()
+
+
+async def get_plan(
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    spec: FleetSpec,
+) -> FleetPlan:
+    # TODO: refactor offers logic into a separate module to avoid depending on runs
+
+    offers = []
+    if spec.configuration.ssh_config is None:
+        offers_with_backends = await get_create_instance_offers(
+            project=project,
+            profile=spec.merged_profile,
+            requirements=_get_fleet_requirements(spec),
+        )
+        offers = [offer for _, offer in offers_with_backends]
+    current_fleet = None
+    if spec.configuration.name is not None:
+        current_fleet = await get_fleet_by_name(
+            session=session,
+            project=project,
+            name=spec.configuration.name,
+        )
+    plan = FleetPlan(
+        project_name=project.name,
+        user=user.name,
+        spec=spec,
+        current_resource=current_fleet,
+        offers=offers[:50],
+        total_offers=len(offers),
+        max_offer_price=max((offer.price for offer in offers), default=None),
+    )
+    return plan
+
+
+async def get_create_instance_offers(
+    project: ProjectModel,
+    profile: Profile,
+    requirements: Requirements,
+    exclude_not_available=False,
+    fleet_model: Optional[FleetModel] = None,
+) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
+    multinode = False
+    master_job_provisioning_data = None
+    if fleet_model is not None:
+        fleet = fleet_model_to_fleet(fleet_model)
+        multinode = fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
+        for instance in fleet_model.instances:
+            jpd = pools_services.get_instance_provisioning_data(instance)
+            if jpd is not None:
+                master_job_provisioning_data = jpd
+                break
+
+    offers = await offers_services.get_offers_by_requirements(
+        project=project,
+        profile=profile,
+        requirements=requirements,
+        exclude_not_available=exclude_not_available,
+        multinode=multinode,
+        master_job_provisioning_data=master_job_provisioning_data,
+    )
+    offers = [
+        (backend, offer)
+        for backend, offer in offers
+        if backend.TYPE in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+    ]
+    return offers
 
 
 async def create_fleet(
@@ -194,11 +285,7 @@ async def create_fleet_instance_model(
     instance_num: int,
 ) -> InstanceModel:
     profile = spec.merged_profile
-    requirements = Requirements(
-        resources=spec.configuration.resources or ResourcesSpec(),
-        max_price=profile.max_price,
-        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
-    )
+    requirements = _get_fleet_requirements(spec)
     instance_model = await pools_services.create_instance_model(
         session=session,
         project=project,
@@ -352,6 +439,91 @@ def is_fleet_empty(fleet_model: FleetModel) -> bool:
     return len(active_instances) == 0
 
 
+async def create_instance(
+    session: AsyncSession,
+    project: ProjectModel,
+    user: UserModel,
+    profile: Profile,
+    requirements: Requirements,
+) -> Instance:
+    offers = await get_create_instance_offers(
+        project=project,
+        profile=profile,
+        requirements=requirements,
+        exclude_not_available=True,
+    )
+
+    # Raise error if no backends suppport create_instance
+    backend_types = set((backend.TYPE for backend, _ in offers))
+    if all(
+        (backend_type not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT)
+        for backend_type in backend_types
+    ):
+        backends = ", ".join(sorted(backend_types))
+        raise ServerClientError(
+            f"Backends {backends} do not support create_instance. Try to select other backends."
+        )
+
+    pool = await pools_services.get_or_create_pool_by_name(session, project, profile.pool_name)
+    instance_name = await pools_services.generate_instance_name(
+        session=session,
+        project=project,
+        pool_name=pool.name,
+    )
+
+    termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
+    termination_idle_time = profile.termination_idle_time
+    if termination_idle_time is None:
+        termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
+
+    instance = InstanceModel(
+        id=uuid.uuid4(),
+        name=instance_name,
+        instance_num=0,
+        project=project,
+        pool=pool,
+        created_at=common_utils.get_current_datetime(),
+        status=InstanceStatus.PENDING,
+        unreachable=False,
+        profile=profile.json(),
+        requirements=requirements.json(),
+        instance_configuration=None,
+        termination_policy=termination_policy,
+        termination_idle_time=termination_idle_time,
+    )
+    logger.info(
+        "Added a new instance %s",
+        instance.name,
+        extra={
+            "instance_name": instance.name,
+            "instance_status": InstanceStatus.PENDING.value,
+        },
+    )
+    session.add(instance)
+    await session.commit()
+
+    project_ssh_key = SSHKey(
+        public=project.ssh_public_key.strip(),
+        private=project.ssh_private_key.strip(),
+    )
+    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
+    instance_config = InstanceConfiguration(
+        project_name=project.name,
+        instance_name=instance_name,
+        instance_id=str(instance.id),
+        ssh_keys=[project_ssh_key],
+        job_docker_config=DockerConfig(
+            image=dstack_default_image,
+            registry_auth=None,
+        ),
+        user=user.name,
+    )
+    instance.instance_configuration = instance_config.json()
+    await session.commit()
+
+    return pools_services.instance_model_to_instance(instance)
+
+
 def _check_can_manage_ssh_fleets(user: UserModel, project: ProjectModel):
     if user.global_role == GlobalRole.ADMIN:
         return
@@ -432,6 +604,16 @@ def _terminate_fleet_instances(fleet_model: FleetModel, instance_nums: Optional[
             instance.deleted = True
         else:
             instance.status = InstanceStatus.TERMINATING
+
+
+def _get_fleet_requirements(fleet_spec: FleetSpec) -> Requirements:
+    profile = fleet_spec.merged_profile
+    requirements = Requirements(
+        resources=fleet_spec.configuration.resources or ResourcesSpec(),
+        max_price=profile.max_price,
+        spot=get_policy_map(profile.spot_policy, default=SpotPolicy.ONDEMAND),
+    )
+    return requirements
 
 
 def _get_placement_group_name(

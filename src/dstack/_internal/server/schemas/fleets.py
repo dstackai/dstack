@@ -8,6 +8,10 @@ class GetFleetRequest(CoreModel):
     name: str
 
 
+class GetFleetPlanRequest(CoreModel):
+    spec: FleetSpec
+
+
 class CreateFleetRequest(CoreModel):
     spec: FleetSpec
 

@@ -50,11 +50,11 @@ def print_run_plan(run_plan: RunPlan, offers_limit: int = 3):
     def th(s: str) -> str:
         return f"[bold]{s}[/bold]"
 
-    props.add_row(th("Configuration"), run_plan.run_spec.configuration_path)
     props.add_row(th("Project"), run_plan.project_name)
     props.add_row(th("User"), run_plan.user)
-    props.add_row(th("Pool"), profile.pool_name)
-    props.add_row(th("Min resources"), pretty_req)
+    props.add_row(th("Configuration"), run_plan.run_spec.configuration_path)
+    props.add_row(th("Type"), run_plan.run_spec.configuration.type)
+    props.add_row(th("Resources"), pretty_req)
     props.add_row(th("Max price"), max_price)
     props.add_row(th("Max duration"), max_duration)
     props.add_row(th("Spot policy"), spot_policy)

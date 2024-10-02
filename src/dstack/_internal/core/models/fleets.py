@@ -9,7 +9,7 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.envs import Env
-from dstack._internal.core.models.instances import SSHKey
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability, SSHKey
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
     DEFAULT_POOL_TERMINATION_IDLE_TIME,
@@ -160,6 +160,7 @@ class FleetConfiguration(InstanceGroupParams, FleetProps):
 
 class FleetSpec(CoreModel):
     configuration: FleetConfiguration
+    configuration_path: Optional[str] = None
     profile: Profile
     autocreated: bool = False
     # TODO: make merged_profile a computed field after migrating to pydanticV2
@@ -202,3 +203,13 @@ class Fleet(CoreModel):
     status: FleetStatus
     status_message: Optional[str] = None
     instances: List[Instance]
+
+
+class FleetPlan(CoreModel):
+    project_name: str
+    user: str
+    spec: FleetSpec
+    current_resource: Optional[Fleet]
+    offers: List[InstanceOfferWithAvailability]
+    total_offers: int
+    max_offer_price: Optional[float]

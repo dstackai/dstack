@@ -38,14 +38,20 @@ class ApplyCommand(APIBaseCommand):
             dest="configuration_file",
         )
         self._parser.add_argument(
+            "-y",
+            "--yes",
+            help="Do not ask for confirmation",
+            action="store_true",
+        )
+        self._parser.add_argument(
             "--force",
             help="Force apply when no changes detected",
             action="store_true",
         )
         self._parser.add_argument(
-            "-y",
-            "--yes",
-            help="Do not ask for confirmation",
+            "-d",
+            "--detach",
+            help="Exit immediately after sumbitting configuration",
             action="store_true",
         )
 
