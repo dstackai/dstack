@@ -263,7 +263,7 @@ def get_paramiko_connection(
                 )
             except paramiko.AuthenticationException:
                 logger.debug(
-                    f'Authentication faild to connect to "{conn_url}" and {pkey.fingerprint}'
+                    f'Authentication failed to connect to "{conn_url}" and {pkey.fingerprint}'
                 )
                 continue  # try next key
             except (paramiko.SSHException, OSError) as e:
