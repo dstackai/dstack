@@ -89,4 +89,14 @@ hide:
             Learn how to deploy and fine-tune Llama 3.1.
         </p>
     </a>
+    <a href="/examples/llms/llama32"
+       class="feature-cell sky">
+        <h3>
+            Llama 3.2
+        </h3>
+
+        <p>
+            Learn how to deploy Llama 3.2 Vision Models.
+        </p>
+    </a>
 </div>

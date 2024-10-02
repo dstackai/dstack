@@ -115,6 +115,7 @@ plugins:
         'docs/fleets.md': 'docs/concepts/fleets.md'
         'docs/examples/index.md': 'examples/index.md'
         'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
+        'docs/examples/llms/llama32.md': 'examples/llms/llama32/index.md'
         'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
         'providers.md': 'backends.md'
   - typeset
@@ -240,6 +241,7 @@ nav:
         - TPU: examples/accelerators/tpu/index.md
     - LLMs:
         - Llama 3.1: examples/llms/llama31/index.md
+        - Llama 3.2: examples/llms/llama32/index.md
   - Backends: backends.md
   - Blog:
       - blog/index.md
