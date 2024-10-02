@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from uuid import UUID
 
 import pytest
@@ -9,8 +9,16 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.fleets import FleetConfiguration, FleetStatus, SSHParams
-from dstack._internal.core.models.instances import InstanceStatus, SSHKey
+from dstack._internal.core.models.instances import (
+    InstanceAvailability,
+    InstanceOfferWithAvailability,
+    InstanceStatus,
+    InstanceType,
+    Resources,
+    SSHKey,
+)
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
 from dstack._internal.server.models import FleetModel, InstanceModel
 from dstack._internal.server.services.permissions import DefaultPermissions
@@ -159,7 +167,7 @@ class TestCreateFleet:
             "name": spec.configuration.name,
             "project_name": project.name,
             "spec": {
-                "configuration_path": None,
+                "configuration_path": spec.configuration_path,
                 "configuration": {
                     "nodes": {"min": 1, "max": 1},
                     "placement": None,
@@ -262,7 +270,7 @@ class TestCreateFleet:
             "name": spec.configuration.name,
             "project_name": project.name,
             "spec": {
-                "configuration_path": None,
+                "configuration_path": spec.configuration_path,
                 "configuration": {
                     "env": {},
                     "ssh_config": {
@@ -626,3 +634,57 @@ class TestDeleteFleetInstances:
 
         assert instance.status != InstanceStatus.TERMINATING
         assert fleet.status != FleetStatus.TERMINATING
+
+
+class TestGetPlan:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_40x_if_not_authenticated(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        response = await client.post("/api/project/main/fleets/get_plan")
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_plan(self, test_db, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        offers = [
+            InstanceOfferWithAvailability(
+                backend=BackendType.AWS,
+                instance=InstanceType(
+                    name="instance",
+                    resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+                ),
+                region="us",
+                price=1.0,
+                availability=InstanceAvailability.AVAILABLE,
+            )
+        ]
+        spec = get_fleet_spec()
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock = Mock()
+            m.return_value = [backend_mock]
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.get_offers.return_value = offers
+            response = await client.post(
+                f"/api/project/{project.name}/fleets/get_plan",
+                headers=get_auth_headers(user.token),
+                json={"spec": spec.dict()},
+            )
+            backend_mock.compute.return_value.get_offers.assert_called_once()
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "project_name": project.name,
+            "user": user.name,
+            "spec": spec.dict(),
+            "current_resource": None,
+            "offers": [json.loads(o.json()) for o in offers],
+            "total_offers": len(offers),
+            "max_offer_price": 1.0,
+        }

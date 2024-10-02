@@ -285,9 +285,7 @@ class TestTerminate:
             backend = Mock()
             backend.TYPE = BackendType.DATACRUNCH
             backend.compute.return_value.terminate_instance.return_value = Mock()
-
             get_backends.return_value = [backend]
-
             await process_instances()
 
         await session.refresh(instance)
