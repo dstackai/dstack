@@ -1,6 +1,6 @@
 # Axolotl
 
-This example shows how use [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"} 
+This example shows how to use [Axolotl :material-arrow-top-right-thin:{ .external }](https://github.com/OpenAccess-AI-Collective/axolotl){:target="_blank"} 
 with `dstack` to fine-tune Llama3 8B using FSDP and QLoRA.
 
 ??? info "Prerequisites"
