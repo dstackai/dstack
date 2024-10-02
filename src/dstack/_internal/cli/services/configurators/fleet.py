@@ -3,23 +3,30 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
+from rich.live import Live
 from rich.table import Table
 
 from dstack._internal.cli.services.configurators.base import (
     ApplyEnvVarsConfiguratorMixin,
     BaseApplyConfigurator,
 )
-from dstack._internal.cli.utils.common import confirm_ask, console
-from dstack._internal.cli.utils.fleet import print_fleets_table
+from dstack._internal.cli.utils.common import (
+    LIVE_TABLE_PROVISION_INTERVAL_SECS,
+    LIVE_TABLE_REFRESH_RATE_PER_SEC,
+    confirm_ask,
+    console,
+)
+from dstack._internal.cli.utils.fleet import get_fleets_table
 from dstack._internal.core.errors import ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.configurations import ApplyConfigurationType
 from dstack._internal.core.models.fleets import (
+    Fleet,
     FleetConfiguration,
     FleetPlan,
     FleetSpec,
     InstanceGroupPlacement,
 )
-from dstack._internal.core.models.instances import InstanceAvailability, SSHKey
+from dstack._internal.core.models.instances import InstanceAvailability, InstanceStatus, SSHKey
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
 from dstack.api.utils import load_profile
@@ -56,7 +63,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 project_name=self.api.project,
                 spec=spec,
             )
-        print_plan_header(plan)
+        _print_plan_header(plan)
 
         action_message = ""
         confirm_message = ""
@@ -70,6 +77,11 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             action_message += f"Found fleet [code]{plan.spec.configuration.name}[/]."
             if plan.current_resource.spec == plan.spec:
                 if command_args.yes and not command_args.force:
+                    # --force is required only with --yes,
+                    # otherwise we may ask for force apply interactively.
+                    console.print(
+                        "No configuration changes detected. Use --force to apply anyway."
+                    )
                     return
                 action_message += " No configuration changes detected."
                 confirm_message += "Re-create the fleet?"
@@ -103,7 +115,23 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 project_name=self.api.project,
                 spec=spec,
             )
-        print_fleets_table([fleet])
+        console.print()
+        try:
+            with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:
+                while True:
+                    live.update(get_fleets_table([fleet], verbose=True))
+                    if _finished_provisioning(fleet):
+                        break
+                    time.sleep(LIVE_TABLE_PROVISION_INTERVAL_SECS)
+                    fleet = self.api.client.fleets.get(self.api.project, fleet.name)
+        except KeyboardInterrupt:
+            if confirm_ask("Delete the fleet before exiting?"):
+                with console.status("Deleting fleet..."):
+                    self.api.client.fleets.delete(
+                        project_name=self.api.project, names=[fleet.name]
+                    )
+            else:
+                console.print("Exiting... Fleet provisioning will continue in the background.")
 
     def delete_configuration(
         self,
@@ -178,7 +206,7 @@ def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:
         exit()
 
 
-def print_plan_header(plan: FleetPlan):
+def _print_plan_header(plan: FleetPlan):
     def th(s: str) -> str:
         return f"[bold]{s}[/bold]"
 
@@ -269,3 +297,10 @@ def print_plan_header(plan: FleetPlan):
                 f"${plan.max_offer_price:g} max[/]"
             )
         console.print()
+
+
+def _finished_provisioning(fleet: Fleet) -> bool:
+    for instance in fleet.instances:
+        if instance.status in [InstanceStatus.PENDING, InstanceStatus.PROVISIONING]:
+            return False
+    return True

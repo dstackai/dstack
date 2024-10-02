@@ -64,7 +64,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
         self.api.ssh_identity_file = repo_config.ssh_key_path
         profile = load_profile(Path.cwd(), configurator_args.profile)
-        with console.status("Getting run plan..."):
+        with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_plan(
                 configuration=conf,
                 repo=repo,
