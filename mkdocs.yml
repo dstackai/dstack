@@ -117,7 +117,7 @@ plugins:
         'docs/examples/llms/llama31.md': 'examples/llms/llama31/index.md'
         'docs/examples/accelerators/amd/index.md': 'examples/accelerators/amd/index.md'
         'providers.md': 'backends.md'
-#  - typeset
+  - typeset
   - gen-files:
       scripts:  # always relative to mkdocs.yml
         - scripts/docs/gen_examples.py

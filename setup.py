@@ -103,15 +103,6 @@ LAMBDA_DEPS = AWS_DEPS
 
 OCI_DEPS = ["oci"]
 
-DOCS_DEPS = [
-    "mkdocs",
-    "mkdocs-material",
-    "mkdocs-blog-plugin",
-    "mkdocs-redirects",
-    "mkdocs-gen-files",
-    "mkdocstrings[python]",
-    "mkdocs-render-swagger-plugin",
-]
 
 ALL_DEPS = AWS_DEPS + AZURE_DEPS + GCP_DEPS + DATACRUNCH_DEPS + KUBERNETES_DEPS + OCI_DEPS
 
@@ -149,7 +140,6 @@ setup(
         "kubernetes": KUBERNETES_DEPS,
         "lambda": LAMBDA_DEPS,
         "oci": OCI_DEPS,
-        "docs": DOCS_DEPS,
     },
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
