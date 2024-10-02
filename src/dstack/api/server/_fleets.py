@@ -29,7 +29,12 @@ class FleetsAPIClient(APIClientGroup):
         spec: FleetSpec,
     ) -> FleetPlan:
         body = GetFleetPlanRequest(spec=spec)
-        resp = self._request(f"/api/project/{project_name}/fleets/get_plan", body=body.json())
+        body_json = body.json()
+        if spec.configuration_path is None:
+            # Handle old server versions that do not accept configuration_path
+            # TODO: Can be removed in 0.19
+            body_json = body.json(exclude={"spec": {"configuration_path"}})
+        resp = self._request(f"/api/project/{project_name}/fleets/get_plan", body=body_json)
         return parse_obj_as(FleetPlan.__response__, resp.json())
 
     def create(
@@ -38,7 +43,12 @@ class FleetsAPIClient(APIClientGroup):
         spec: FleetSpec,
     ) -> Fleet:
         body = CreateFleetRequest(spec=spec)
-        resp = self._request(f"/api/project/{project_name}/fleets/create", body=body.json())
+        body_json = body.json()
+        if spec.configuration_path is None:
+            # Handle old server versions that do not accept configuration_path
+            # TODO: Can be removed in 0.19
+            body_json = body.json(exclude={"spec": {"configuration_path"}})
+        resp = self._request(f"/api/project/{project_name}/fleets/create", body=body_json)
         return parse_obj_as(Fleet.__response__, resp.json())
 
     def delete(self, project_name: str, names: List[str]) -> None:

@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
+import requests
 from rich.live import Live
 from rich.table import Table
 
@@ -29,6 +30,7 @@ from dstack._internal.core.models.fleets import (
 from dstack._internal.core.models.instances import InstanceAvailability, InstanceStatus, SSHKey
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import convert_ssh_key_to_pem, generate_public_key, pkey_from_str
+from dstack.api._public import Client
 from dstack.api.utils import load_profile
 
 logger = get_logger(__name__)
@@ -59,10 +61,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         _preprocess_spec(spec)
 
         with console.status("Getting apply plan..."):
-            plan = self.api.client.fleets.get_plan(
-                project_name=self.api.project,
-                spec=spec,
-            )
+            plan = _get_plan(api=self.api, spec=spec)
         _print_plan_header(plan)
 
         action_message = ""
@@ -300,6 +299,41 @@ def _print_plan_header(plan: FleetPlan):
                 f"${plan.max_offer_price:g} max[/]"
             )
         console.print()
+
+
+def _get_plan(api: Client, spec: FleetSpec) -> FleetPlan:
+    try:
+        return api.client.fleets.get_plan(
+            project_name=api.project,
+            spec=spec,
+        )
+    except requests.exceptions.HTTPError as e:
+        # Handle older server versions that do not have /get_plan for fleets
+        # TODO: Can be removed in 0.19
+        if e.response.status_code == 405:
+            logger.warning(
+                "Fleet apply plan is not fully supported before 0.18.17. "
+                "Update the server to view full-featured apply plan."
+            )
+            spec.configuration_path = None
+            current_fleet = None
+            if spec.configuration.name is not None:
+                try:
+                    current_fleet = api.client.fleets.get(
+                        project_name=api.project, name=spec.configuration.name
+                    )
+                except ResourceNotExistsError:
+                    pass
+            return FleetPlan(
+                project_name=api.project,
+                user="?",
+                spec=spec,
+                current_resource=current_fleet,
+                offers=[],
+                total_offers=0,
+                max_offer_price=0,
+            )
+        raise e
 
 
 def _finished_provisioning(fleet: Fleet) -> bool:
