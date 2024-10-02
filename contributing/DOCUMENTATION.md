@@ -17,15 +17,15 @@ source venv/bin/activate
 ## 3. Install `dstack` in editable mode:
 
 ```shell
-pip install -e '.[docs]'
+pip install -e '.[all]'
 ```
-   
+
 ## 4. Install dev dependencies:
 
 ```shell
 pip install -r requirements_doc.txt
 ```
-   
+
 ## 5. (Recommended) Install pre-commits:
 
 ```shell

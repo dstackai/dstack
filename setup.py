@@ -107,12 +107,10 @@ DOCS_DEPS = [
     "mkdocs",
     "mkdocs-material",
     "mkdocs-blog-plugin",
-    "mkdocs-social-plugin",
     "mkdocs-redirects",
     "mkdocs-gen-files",
     "mkdocstrings[python]",
     "mkdocs-render-swagger-plugin",
-    "mkdocs-typeset-plugin",
 ]
 
 ALL_DEPS = (
