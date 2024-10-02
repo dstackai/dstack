@@ -231,6 +231,8 @@ nav:
               - REST API: docs/reference/api/rest/index.md
   - Examples:
     - examples.md
+    - Deployment:
+        - vLLM: examples/deployment/vllm/index.md
     - Fine-tuning:
         - Axolotl: examples/fine-tuning/axolotl/index.md
         - Alignment Handbook: examples/fine-tuning/alignment-handbook/index.md

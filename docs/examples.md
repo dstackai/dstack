@@ -13,6 +13,20 @@ hide:
 }
 </style>
 
+## Deployment
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/deployment/vllm"
+       class="feature-cell sky">
+        <h3>
+            vLLM
+        </h3>
+
+        <p>
+            Learn how to deploy and fine-tune Llama 3.1.
+        </p>
+    </a>
+</div>
+
 ## Fine-tuning
 
 <div class="tx-landing__highlights_grid">
