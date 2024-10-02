@@ -1,7 +1,7 @@
 import re
 
 
-def convert_gpu_name(name: str) -> str:
+def convert_nvidia_gpu_name(name: str) -> str:
     """Convert gpu_name from nvidia-smi to short version"""
     # https://github.com/NVIDIA/open-gpu-kernel-modules/
     name = name.replace("NVIDIA ", "")
@@ -27,3 +27,11 @@ def convert_gpu_name(name: str) -> str:
     if m is not None:
         return m.group(0)
     return name.replace(" ", "")
+
+
+def convert_amd_gpu_name(name: str) -> str:
+    """Convert asic.market_name from amd-smi to short version"""
+    # https://github.com/ROCm/amdsmi/blob/52b3947/src/amd_smi/amd_smi_utils.cc#L558-L593
+    if name == "MI300X-O":
+        return "MI300X"
+    return name
