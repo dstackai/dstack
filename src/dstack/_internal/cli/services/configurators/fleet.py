@@ -115,6 +115,9 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
                 project_name=self.api.project,
                 spec=spec,
             )
+        if command_args.detach:
+            console.print("Fleet configuration submitted. Exiting...")
+            return
         console.print()
         try:
             with Live(console=console, refresh_per_second=LIVE_TABLE_REFRESH_RATE_PER_SEC) as live:

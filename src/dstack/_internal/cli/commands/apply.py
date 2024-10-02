@@ -48,6 +48,12 @@ class ApplyCommand(APIBaseCommand):
             help="Force apply when no changes detected",
             action="store_true",
         )
+        self._parser.add_argument(
+            "-d",
+            "--detach",
+            help="Exit immediately after sumbitting configuration",
+            action="store_true",
+        )
 
     def _command(self, args: argparse.Namespace):
         if args.help is not NOTSET:
