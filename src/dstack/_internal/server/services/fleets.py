@@ -117,12 +117,14 @@ async def get_plan(
     # TODO: refactor offers logic into a separate module to avoid depending on runs
     from dstack._internal.server.services.runs import get_create_instance_offers
 
-    offers_with_backends = await get_create_instance_offers(
-        project=project,
-        profile=spec.merged_profile,
-        requirements=_get_fleet_requirements(spec),
-    )
-    offers = [offer for _, offer in offers_with_backends]
+    offers = []
+    if spec.configuration.ssh_config is None:
+        offers_with_backends = await get_create_instance_offers(
+            project=project,
+            profile=spec.merged_profile,
+            requirements=_get_fleet_requirements(spec),
+        )
+        offers = [offer for _, offer in offers_with_backends]
     current_fleet = None
     if spec.configuration.name is not None:
         current_fleet = await get_fleet_by_name(
