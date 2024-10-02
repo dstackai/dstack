@@ -24,13 +24,19 @@ from dstack._internal.server.services.backends.configurators.base import (
 
 REGIONS = [
     "CA-MTL-1",
+    "CA-MTL-2",
+    "CA-MTL-3",
     "EU-NL-1",
     "EU-RO-1",
     "EU-SE-1",
     "EUR-IS-1",
     "EUR-IS-2",
-    "EUR-NO-1",
+    "US-CA-1",
+    "US-GA-1",
+    "US-GA-2",
+    "US-KS-2",
     "US-OR-1",
+    "US-TX-3",
 ]
 
 DEFAULT_REGION = "CA-MTL-1"
@@ -45,7 +51,7 @@ class RunpodConfigurator(Configurator):
             return config_values
         self._validate_runpod_api_key(config.creds.api_key)
         config_values.regions = self._get_regions_element(
-            selected=config.regions or REGIONS  # Use all regions by default
+            selected=config.regions or [DEFAULT_REGION]
         )
         return config_values
 
@@ -53,7 +59,7 @@ class RunpodConfigurator(Configurator):
         self, project: ProjectModel, config: RunpodConfigInfoWithCreds
     ) -> BackendModel:
         if config.regions is None:
-            config.regions = REGIONS  # Use all regions by default
+            config.regions = REGIONS
         return BackendModel(
             project_id=project.id,
             type=self.TYPE.value,
