@@ -162,83 +162,102 @@ def main() -> None:
     CheckCommandArgs.setup_parser(check_parser)
 
     args = parser.parse_args()
-    args.run_command(args.to_struct(args))
+    try:
+        args.run_command(args.to_struct(args))
+    except ScriptError as e:
+        logging.error(e)
+        sys.exit(1)
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        sys.exit(1)
 
 
 def copy_command(args: CopyCommandArgs) -> None:
-    region_clients = get_region_clients(
-        required_regions=args.target_regions + [args.source_region]
-    )
-    source_region = region_clients[args.source_region]
+    try:
+        region_clients = get_region_clients(
+            required_regions=args.target_regions + [args.source_region]
+        )
+        source_region = region_clients[args.source_region]
 
-    namespace: str = source_region.object_storage_client.get_namespace().data
-    bucket = resources.get_or_create_bucket(
-        namespace, args.image_name, args.compartment_id, source_region.object_storage_client
-    )
-    export_image_to_bucket(args.image_name, bucket, args.compartment_id, source_region)
-    import_image_from_bucket_in_target_regions(
-        args.image_name,
-        bucket,
-        args.compartment_id,
-        source_region,
-        args.target_regions or list(region_clients),
-        region_clients,
-    )
+        namespace: str = source_region.object_storage_client.get_namespace().data
+        bucket = resources.get_or_create_bucket(
+            namespace, args.image_name, args.compartment_id, source_region.object_storage_client
+        )
+        export_image_to_bucket(args.image_name, bucket, args.compartment_id, source_region)
+        import_image_from_bucket_in_target_regions(
+            args.image_name,
+            bucket,
+            args.compartment_id,
+            source_region,
+            args.target_regions or list(region_clients),
+            region_clients,
+        )
 
-    resources.delete_bucket(namespace, bucket.name, source_region.object_storage_client)
+        resources.delete_bucket(namespace, bucket.name, source_region.object_storage_client)
+    except Exception as e:
+        logging.error(f"Error in copy_command: {e}")
+        raise ScriptError("Failed to copy image")
 
 
 def publish_command(args: PublishCommandArgs) -> None:
-    region_clients = get_region_clients(required_regions=args.regions)
-    regions_for_publishing = args.regions or list(region_clients)
-    images = find_image_in_regions(
-        args.image_name, args.compartment_id, regions_for_publishing, region_clients
-    )
-
-    for i, region_name in enumerate(regions_for_publishing, start=1):
-        resources.publish_image_in_marketplace(
-            name=args.image_name,
-            version=args.version,
-            short_description=args.short_description,
-            os_name=args.os_name,
-            eula_text=args.eula_text,
-            contact_name=args.contact_name,
-            contact_email=args.contact_email,
-            image_id=images[region_name].id,
-            compartment_id=args.compartment_id,
-            client=region_clients[region_name].marketplace_client,
+    try:
+        region_clients = get_region_clients(required_regions=args.regions)
+        regions_for_publishing = args.regions or list(region_clients)
+        images = find_image_in_regions(
+            args.image_name, args.compartment_id, regions_for_publishing, region_clients
         )
-        logging.info("Submitted in %s (%d/%d)", region_name, i, len(regions_for_publishing))
 
-    logging.info("Submitted image %s in regions: %s", args.image_name, regions_for_publishing)
-    logging.info(
-        "The publications will now go through OCI's review process that may take a few hours. "
-        "The publications will be unavailable until the review finishes. "
-        "Use `python oci_image_tools.py check` to check publication statuses."
-    )
+        for i, region_name in enumerate(regions_for_publishing, start=1):
+            resources.publish_image_in_marketplace(
+                name=args.image_name,
+                version=args.version,
+                short_description=args.short_description,
+                os_name=args.os_name,
+                eula_text=args.eula_text,
+                contact_name=args.contact_name,
+                contact_email=args.contact_email,
+                image_id=images[region_name].id,
+                compartment_id=args.compartment_id,
+                client=region_clients[region_name].marketplace_client,
+            )
+            logging.info("Submitted in %s (%d/%d)", region_name, i, len(regions_for_publishing))
+
+        logging.info("Submitted image %s in regions: %s", args.image_name, regions_for_publishing)
+        logging.info(
+            "The publications will now go through OCI's review process that may take a few hours. "
+            "The publications will be unavailable until the review finishes. "
+            "Use `python oci_image_tools.py check` to check publication statuses."
+        )
+    except Exception as e:
+        logging.error(f"Error in publish_command: {e}")
+        raise ScriptError("Failed to publish image")
 
 
 def check_command(args: CheckCommandArgs) -> None:
-    region_clients = get_region_clients(required_regions=args.regions)
-    regions_to_check = args.regions or list(region_clients)
-    some_not_published = False
+    try:
+        region_clients = get_region_clients(required_regions=args.regions)
+        regions_to_check = args.regions or list(region_clients)
+        some_not_published = False
 
-    for region in sorted(regions_to_check):
-        if not resources.list_marketplace_listings(
-            args.image_name, region_clients[region].marketplace_client
-        ):
-            some_not_published = True
-            status = "Not published"
-        else:
-            status = "Published"
-        logging.info("%24s: %s", region, status)
+        for region in sorted(regions_to_check):
+            if not resources.list_marketplace_listings(
+                args.image_name, region_clients[region].marketplace_client
+            ):
+                some_not_published = True
+                status = "Not published"
+            else:
+                status = "Published"
+            logging.info("%24s: %s", region, status)
 
-    if some_not_published:
-        raise ScriptError(
-            f"Image {args.image_name} is not published or is still under review in some regions. "
-            "Check the review status by choosing the correct region and compartment here: "
-            "https://cloud.oracle.com/marketplace/community-images"
-        )
+        if some_not_published:
+            raise ScriptError(
+                f"Image {args.image_name} is not published or is still under review in some regions. "
+                "Check the review status by choosing the correct region and compartment here: "
+                "https://cloud.oracle.com/marketplace/community-images"
+            )
+    except Exception as e:
+        logging.error(f"Error in check_command: {e}")
+        raise ScriptError("Failed to check image publication status")
 
 
 def get_region_clients(
