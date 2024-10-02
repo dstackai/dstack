@@ -277,13 +277,21 @@ def get_docker_commands(
 ) -> List[str]:
     authorized_keys_content = "\n".join(authorized_keys).strip()
     commands = [
+        # save and unset ld.so variables
+        "_LD_LIBRARY_PATH=${LD_LIBRARY_PATH-} && unset LD_LIBRARY_PATH",
+        "_LD_PRELOAD=${LD_PRELOAD-} && unset LD_PRELOAD",
+        # common functions
+        '_exists() { command -v "$1" > /dev/null 2>&1; }',
         # TODO(#1535): support non-root images properly
         "mkdir -p /root && chown root:root /root && export HOME=/root",
-        # note: &> redirection doesn't work in /bin/sh
+        # package manager detection/abstraction
+        "_install() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }",
+        'if _exists apt-get; then _install() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi',
+        'if _exists yum; then _install() { yum install -y "$1"; }; fi',
         # check in sshd is here, install if not
-        "if ! command -v sshd >/dev/null 2>&1; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server || yum install -y openssh-server; fi",
+        "if ! _exists sshd; then _install openssh-server; fi",
         # install curl if necessary
-        "if ! command -v curl >/dev/null 2>&1; then apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y curl || yum install -y curl; fi",
+        "if ! _exists curl; then _install curl; fi",
         # prohibit password authentication
         'sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/g" /etc/ssh/sshd_config',
         # create ssh dirs and add public key
@@ -301,6 +309,9 @@ def get_docker_commands(
         "ssh-keygen -A > /dev/null",
         # start sshd
         "/usr/sbin/sshd -p 10022 -o PermitUserEnvironment=yes",
+        # restore ld.so variables
+        'if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi',
+        'if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi',
     ]
 
     runner = "/usr/local/bin/dstack-runner"
