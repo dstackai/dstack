@@ -74,7 +74,7 @@ class FleetConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             confirm_message += "Create the fleet?"
         else:
             action_message += f"Found fleet [code]{plan.spec.configuration.name}[/]."
-            if plan.current_resource.spec == plan.spec:
+            if plan.current_resource.spec.configuration == plan.spec.configuration:
                 if command_args.yes and not command_args.force:
                     # --force is required only with --yes,
                     # otherwise we may ask for force apply interactively.
@@ -208,6 +208,42 @@ def _resolve_ssh_key(ssh_key_path: Optional[str]) -> Optional[SSHKey]:
         exit()
 
 
+def _get_plan(api: Client, spec: FleetSpec) -> FleetPlan:
+    try:
+        return api.client.fleets.get_plan(
+            project_name=api.project,
+            spec=spec,
+        )
+    except requests.exceptions.HTTPError as e:
+        # Handle older server versions that do not have /get_plan for fleets
+        # TODO: Can be removed in 0.19
+        if e.response.status_code == 405:
+            logger.warning(
+                "Fleet apply plan is not fully supported before 0.18.17. "
+                "Update the server to view full-featured apply plan."
+            )
+            user = api.client.users.get_my_user()
+            spec.configuration_path = None
+            current_resource = None
+            if spec.configuration.name is not None:
+                try:
+                    current_resource = api.client.fleets.get(
+                        project_name=api.project, name=spec.configuration.name
+                    )
+                except ResourceNotExistsError:
+                    pass
+            return FleetPlan(
+                project_name=api.project,
+                user=user.username,
+                spec=spec,
+                current_resource=current_resource,
+                offers=[],
+                total_offers=0,
+                max_offer_price=0,
+            )
+        raise e
+
+
 def _print_plan_header(plan: FleetPlan):
     def th(s: str) -> str:
         return f"[bold]{s}[/bold]"
@@ -219,7 +255,7 @@ def _print_plan_header(plan: FleetPlan):
     configuration_table.add_row(th("Project"), plan.project_name)
     configuration_table.add_row(th("User"), plan.user)
     configuration_table.add_row(th("Configuration"), plan.spec.configuration_path)
-    configuration_table.add_row(th("Type"), "fleet")
+    configuration_table.add_row(th("Type"), plan.spec.configuration.type)
 
     fleet_type = "cloud"
     nodes = plan.spec.configuration.nodes or "-"
@@ -299,41 +335,6 @@ def _print_plan_header(plan: FleetPlan):
                 f"${plan.max_offer_price:g} max[/]"
             )
         console.print()
-
-
-def _get_plan(api: Client, spec: FleetSpec) -> FleetPlan:
-    try:
-        return api.client.fleets.get_plan(
-            project_name=api.project,
-            spec=spec,
-        )
-    except requests.exceptions.HTTPError as e:
-        # Handle older server versions that do not have /get_plan for fleets
-        # TODO: Can be removed in 0.19
-        if e.response.status_code == 405:
-            logger.warning(
-                "Fleet apply plan is not fully supported before 0.18.17. "
-                "Update the server to view full-featured apply plan."
-            )
-            spec.configuration_path = None
-            current_fleet = None
-            if spec.configuration.name is not None:
-                try:
-                    current_fleet = api.client.fleets.get(
-                        project_name=api.project, name=spec.configuration.name
-                    )
-                except ResourceNotExistsError:
-                    pass
-            return FleetPlan(
-                project_name=api.project,
-                user="?",
-                spec=spec,
-                current_resource=current_fleet,
-                offers=[],
-                total_offers=0,
-                max_offer_price=0,
-            )
-        raise e
 
 
 def _finished_provisioning(fleet: Fleet) -> bool:
