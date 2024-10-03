@@ -121,4 +121,9 @@ export const API = {
         BASE: () => `${API.BASE()}/server`,
         INFO: () => `${API.SERVER.BASE()}/get_info`,
     },
+
+    VOLUME: {
+        BASE: () => `${API.BASE()}/volumes`,
+        LIST: () => `${API.VOLUME.BASE()}/list`,
+    },
 };

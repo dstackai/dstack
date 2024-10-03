@@ -38,19 +38,6 @@ export const runApi = createApi({
 
             providesTags: (result) =>
                 result ? [...result.map(({ id }) => ({ type: 'Runs' as const, id: id })), 'Runs'] : ['Runs'],
-
-            // transformResponse: (runs: IRun[]) =>
-            //     runs.map((run) => ({
-            //         ...run,
-            //         service: {
-            //             url: 'http://test.test',
-            //             model: {
-            //                 name: 'gpt-3.5-turbo',
-            //                 base_url: 'https://gateway.peterschmidt85.sky.dstack.ai',
-            //                 type: 'test_type',
-            //             },
-            //         },
-            //     })),
         }),
 
         getRun: builder.query<IRun | undefined, { project_name: string; run_name: string }>({
@@ -63,18 +50,6 @@ export const runApi = createApi({
             },
 
             providesTags: (result) => (result ? [{ type: 'Runs' as const, id: result?.id }] : []),
-
-            // transformResponse: (run: IRun) => ({
-            //     ...run,
-            //     service: {
-            //         url: 'http://test.test',
-            //         model: {
-            //             name: 'gpt-3.5-turbo',
-            //             base_url: 'https://gateway.peterschmidt85.sky.dstack.ai',
-            //             type: 'test_type',
-            //         },
-            //     },
-            // }),
         }),
 
         stopRuns: builder.mutation<void, TStopRunsRequestParams>({

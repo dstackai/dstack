@@ -18,6 +18,7 @@ import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pag
 import { UserBilling, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
+import { AdministrationVolumeList, VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
 
 export const router = createBrowserRouter([
@@ -107,7 +108,7 @@ export const router = createBrowserRouter([
                 element: <ModelDetails />,
             },
 
-            // Pools
+            // Fleets
             {
                 path: ROUTES.FLEETS.LIST,
                 element: <FleetsList />,
@@ -115,6 +116,12 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.FLEETS.DETAILS.TEMPLATE,
                 element: <FleetDetails />,
+            },
+
+            // Volumes
+            {
+                path: ROUTES.VOLUMES.LIST,
+                element: <VolumeList />,
             },
 
             // administration
@@ -125,6 +132,10 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.ADMINISTRATION.FLEETS.LIST,
                 element: <AdministrationFleetsList />,
+            },
+            {
+                path: ROUTES.ADMINISTRATION.VOLUMES.LIST,
+                element: <AdministrationVolumeList />,
             },
 
             // Users

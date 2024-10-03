@@ -74,13 +74,20 @@ export const ROUTES = {
         },
     },
 
+    VOLUMES: {
+        LIST: '/volumes',
+    },
+
     ADMINISTRATION: {
         BASE: '/administration',
         RUNS: {
-            LIST: '/administration/runs',
+            LIST: `/administration/runs`,
         },
         FLEETS: {
             LIST: '/administration/fleets',
+        },
+        VOLUMES: {
+            LIST: '/administration/volumes',
         },
     },
 

@@ -1,4 +1,18 @@
-declare type TBackendType = 'aws' | 'gcp' | 'azure' | 'lambda' | 'local' | 'dstack';
+declare type TBackendType = | "aws"
+    |"azure"
+    |"cudo"
+    |"datacrunch"
+    |"dstack"
+    |"gcp"
+    |"kubernetes"
+    |"lambda"
+    |"local"
+    |"remote"
+    |"nebius"
+    |"oci"
+    |"runpod"
+    |"tensordock"
+    |"vastai";
 
 declare type TBackendValueField<TSelectedType = string, TValuesType = { value: string, label: string}[]> = {
     selected?: TSelectedType,

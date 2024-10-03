@@ -67,7 +67,8 @@
     "user_settings": "User settings",
     "account": "User",
     "billing": "Billing",
-    "resources": "Resources"
+    "resources": "Resources",
+    "volumes": "Volumes"
   },
 
   "backend": {
@@ -442,6 +443,28 @@
       "spot": "Spot",
       "started": "Started",
       "price": "Price"
+    }
+  },
+  "volume": {
+    "volumes": "Volumes",
+    "empty_message_title": "No volumes",
+    "empty_message_text": "No volumes to display.",
+    "nomatch_message_title": "No matches",
+    "nomatch_message_text": "We can't find a match.",
+
+    "name": "Name",
+    "project": "Project name",
+    "region": "Region",
+    "backend": "Backend",
+    "status": "Status",
+    "created_at": "Created at",
+    "price": "Price",
+
+    "statuses": {
+      "failed": "Failed",
+      "submitted": "Submitted",
+      "provisioning": "Provisioning",
+      "active":  "Active"
     }
   },
 
