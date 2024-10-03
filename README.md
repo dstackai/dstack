@@ -1,4 +1,4 @@
-<div>
+
 <h2>
   <a target="_blank" href="https://dstack.ai">
     <picture>
@@ -14,14 +14,13 @@
 
 </div>
 
-`dstack` is a streamlined alternative to Kubernetes, specifically designed for AI. It simplifies container orchestration
-for AI workloads both in the cloud and on-prem, speeding up the development, training, and deployment of AI models.
+`dstack` is a streamlined alternative to Kubernetes, specifically designed for AI 🤖. It simplifies container orchestration for AI workloads both in the cloud ☁️ and on-prem, speeding up the development, training, and deployment of AI models 🚀.
 
-`dstack` is easy to use with any cloud provider as well as on-prem servers.
+`dstack` is easy to use with any cloud provider as well as on-prem servers 🖥️.
 
 #### Accelerators
 
-`dstack` supports `NVIDIA GPU`, `AMD GPU`, and `Google Cloud TPU` out of the box.
+`dstack` supports `NVIDIA GPU` 🎮, `AMD GPU` 🕹️, and `Google Cloud TPU` ⚡ out of the box.
 
 ## Major news ✨
 
@@ -40,7 +39,7 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
 [configure backends](https://dstack.ai/docs/reference/server/config.yml). Alternatively, you can configure backends via the control plane UI after you start the server.
 
-You can skip backends configuration if you intend to run containers  only on your on-prem servers. Use [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets) for that.
+You can skip backends configuration if you intend to run containers only on your on-prem servers. Use [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets) for that.
 
 ### Start the server
 
@@ -49,32 +48,26 @@ Once the backends are configured, proceed to start the server:
 <div class="termy">
 
 ```shell
-$ pip install "dstack[all]" -U
-$ dstack server
+$ pip install "dstack[all]" -U 🚀
+$ dstack server 🖥️
 
 Applying ~/.dstack/server/config.yml...
 
-The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da"
-The server is running at http://127.0.0.1:3000/
-```
+The admin token is "bbae0f28-d3dd-4820-bf61-8f4bb40815da" 🔑
+The server is running at http://127.0.0.1:3000/ 🌐
 
 </div>
 
 For more details on server configuration options, see the
 [server deployment guide](https://dstack.ai/docs/guides/server-deployment.md).
 
-### Set up the CLI
-
-To point the CLI to the `dstack` server, configure it
-with the server address, user token, and project name:
-
-```shell
-$ pip install dstack
+$ pip install dstack 💻
 $ dstack config --url http://127.0.0.1:3000 \
     --project main \
     --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
     
-Configuration is updated at ~/.dstack/config.yml
+Configuration is updated at ~/.dstack/config.yml ✅
+
 ```
 
 ## How does it work?
@@ -94,7 +87,7 @@ Configuration can be defined as YAML files within your repo.
 
 ### 2. Apply configurations
 
-Apply the configuration either via the `dstack apply` CLI command or through a programmatic API.
+Apply the configuration either using the dstack apply CLI command or via the programmatic API.
 
 `dstack` automatically manages provisioning, job queuing, auto-scaling, networking, volumes, run failures,
 out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-prem clusters.
