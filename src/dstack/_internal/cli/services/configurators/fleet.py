@@ -254,7 +254,7 @@ def _print_plan_header(plan: FleetPlan):
 
     configuration_table.add_row(th("Project"), plan.project_name)
     configuration_table.add_row(th("User"), plan.user)
-    configuration_table.add_row(th("Configuration"), plan.spec.configuration_path)
+    configuration_table.add_row(th("Configuration"), plan.spec.configuration_path or "?")
     configuration_table.add_row(th("Type"), plan.spec.configuration.type)
 
     fleet_type = "cloud"
