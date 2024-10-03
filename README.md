@@ -17,13 +17,13 @@
 `dstack` is a streamlined alternative to Kubernetes, specifically designed for AI. It simplifies container orchestration
 for AI workloads both in the cloud and on-prem, speeding up the development, training, and deployment of AI models.
 
-`dstack` is easy to use with any cloud providers as well as on-prem servers.
+`dstack` is easy to use with any cloud provider as well as on-prem servers.
 
-#### Accelerators
+#### 🚀 Accelerators
 
 `dstack` supports `NVIDIA GPU`, `AMD GPU`, and `Google Cloud TPU` out of the box.
 
-## Major news ✨
+## 📰 Major news ✨
 
 - [2024/08] [dstack 0.18.11: AMD, encryption, and more](https://github.com/dstackai/dstack/releases/tag/0.18.11) (Release)
 - [2024/08] [dstack 0.18.10: Control plane UI](https://github.com/dstackai/dstack/releases/tag/0.18.10) (Release)
@@ -31,16 +31,16 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 - [2024/05] [dstack 0.18.4: Google Cloud TPU, and more](https://github.com/dstackai/dstack/releases/tag/0.18.4) (Release)
 - [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
 
-## Installation
+## ⬇️ Installation
 
 Before using `dstack` through CLI or API, set up a `dstack` server.
 
-### Configure backends
+### ⚙️ Configure backends
 
 To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
 [configure backends](https://dstack.ai/docs/reference/server/config.yml).
 
-### Start the server
+### ▶️ Start the server
 
 Once backends are configured, proceed to start the server:
 
@@ -61,7 +61,7 @@ The server is running at http://127.0.0.1:3000/
 For more details on server configuration options, see the
 [server deployment](https://dstack.ai/docs/guides/server-deployment.md) guide.
 
-### Set up the CLI
+### 🛠️ Set up the CLI
 
 To point the CLI to the `dstack` server, configure it
 with the server address, user token, and project name:
@@ -75,12 +75,12 @@ $ dstack config --url http://127.0.0.1:3000 \
 Configuration is updated at ~/.dstack/config.yml
 ```
 
-### Create SSH fleets
+### ➕ Create SSH fleets
     
 If you want the `dstack` server to run containers on your on-prem servers,
 use [fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets).
 
-## How does it work?
+## 💡 How does it work?
 
 > Before using `dstack`, [install](https://dstack.ai/docs/installation) the server and configure backends.
 
@@ -113,11 +113,11 @@ For additional information and examples, see the following links:
 * [Providers](https://dstack.ai/providers)
 * [Discord](https://discord.gg/u8SmfwPpMd)
 
-## Contributing
+## 🤝 Contributing
 
 You're very welcome to contribute to `dstack`. 
 Learn more about how to contribute to the project at [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## License
+## 🪪 License
 
-[Mozilla Public License 2.0](LICENSE.md)
+This project is licensed under the **Mozilla Public License 2.0**. You can view the full license [Here](LICENSE.md).
