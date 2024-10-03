@@ -17,7 +17,7 @@
 `dstack` is a streamlined alternative to Kubernetes, specifically designed for AI. It simplifies container orchestration
 for AI workloads both in the cloud and on-prem, speeding up the development, training, and deployment of AI models.
 
-`dstack` is easy to use with any cloud providers as well as on-prem servers.
+`dstack` is easy to use with any cloud provider as well as on-prem servers.
 
 #### Accelerators
 
@@ -33,16 +33,18 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ## Installation
 
-Before using `dstack` through CLI or API, set up a `dstack` server.
+> Before using `dstack` through CLI or API, set up a `dstack` server. If you already have a running `dstack` server, you only need to [set up the CLI](#set-up-the-cli).
 
-### Configure backends
+### (Optional) Configure backends
 
 To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
-[configure backends](https://dstack.ai/docs/reference/server/config.yml).
+[configure backends](https://dstack.ai/docs/reference/server/config.yml). Alternatively, you can configure backends via the control plane UI after you start the server.
+
+You can skip backends configuration if you intend to run containers  only on your on-prem servers. Use [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets) for that.
 
 ### Start the server
 
-Once backends are configured, proceed to start the server:
+Once the backends are configured, proceed to start the server:
 
 <div class="termy">
 
@@ -59,7 +61,7 @@ The server is running at http://127.0.0.1:3000/
 </div>
 
 For more details on server configuration options, see the
-[server deployment](https://dstack.ai/docs/guides/server-deployment.md) guide.
+[server deployment guide](https://dstack.ai/docs/guides/server-deployment.md).
 
 ### Set up the CLI
 
@@ -75,14 +77,7 @@ $ dstack config --url http://127.0.0.1:3000 \
 Configuration is updated at ~/.dstack/config.yml
 ```
 
-### Create SSH fleets
-    
-If you want the `dstack` server to run containers on your on-prem servers,
-use [fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets).
-
 ## How does it work?
-
-> Before using `dstack`, [install](https://dstack.ai/docs/installation) the server and configure backends.
 
 ### 1. Define configurations
 
