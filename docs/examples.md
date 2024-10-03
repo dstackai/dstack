@@ -96,7 +96,7 @@ hide:
         </h3>
 
         <p>
-            Learn how to deploy Llama 3.2 Vision Models.
+            Learn how to deploy Llama 3.2 vision models.
         </p>
     </a>
 </div>

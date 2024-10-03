@@ -29,14 +29,12 @@ name: llama32-task-vllm
 
 # If `image` is not specified, dstack uses its default image
 python: "3.10"
-
 # Required environment variables
 env:
   - HUGGING_FACE_HUB_TOKEN
   - MODEL_ID=meta-llama/Llama-3.2-11B-Vision-Instruct
   - MAX_MODEL_LEN=13488
   - MAX_NUM_SEQS=40
-
 commands:
   - pip install vllm
   - vllm serve $MODEL_ID
@@ -47,25 +45,26 @@ commands:
     --disable-log-requests
     --limit-mm-per-prompt "image=1"
 # Expose the vllm server port
-ports:
+ports: 
   - 8000
-ide: vscode
 # Use either spot or on-demand instances
 spot_policy: auto
-# Uncomment to ensure it doesn't create a new fleet
-#creation_policy: reuse
 
 resources:
   # Required resources
   gpu: 48GB
 ```
 </div>
-Note, maximum size of vLLM’s `KV cache` is 13488, consequently we must set `MAX_MODEL_LEN` to 13488. `MAX_NUM_SEQS` greater than 40 results in an out of memory error.
+
+Note, maximum size of vLLM’s `KV cache` is `13488`, consequently we must set `MAX_MODEL_LEN` to `13488`. `MAX_NUM_SEQS`
+greater than 40 results in an out of memory error.
 
 ### Deploying as a service
 
 If you'd like to deploy Llama 3.2 vision model as public auto-scalable and secure endpoint,
 consider using `dstack` [services](https://dstack.ai/docs/services).
+
+[//]: # (TODO: Service example)
 
 ### Memory requirements
 
@@ -77,7 +76,7 @@ This excludes memory for the model context and CUDA kernel reservations.
 | **11B**    | 40GB  |
 | **90B**    | 180GB |
 
-
+[//]: # (TODO: Quantization mention)
 
 ### Running a configuration
 
