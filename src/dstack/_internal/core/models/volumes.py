@@ -38,6 +38,11 @@ class VolumeConfiguration(CoreModel):
         return int(get_or_error(self.size))
 
 
+class VolumeSpec(CoreModel):
+    configuration: VolumeConfiguration
+    configuration_path: Optional[str] = None
+
+
 class VolumeProvisioningData(CoreModel):
     backend: Optional[BackendType] = None
     volume_id: str
@@ -73,3 +78,10 @@ class Volume(CoreModel):
 class VolumeMountPoint(CoreModel):
     name: Annotated[str, Field(description="The name of the volume to mount")]
     path: Annotated[str, Field(description="The container path to mount the volume at")]
+
+
+class VolumePlan(CoreModel):
+    project_name: str
+    user: str
+    spec: VolumeSpec
+    current_resource: Optional[Volume]
