@@ -323,7 +323,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         internal_ip=internal_ip,
         instance_network=instance_network,
         username=remote_details.ssh_user,
-        ssh_port=22,
+        ssh_port=remote_details.port,
         dockerized=True,
         backend_data=None,
         ssh_proxy=None,
