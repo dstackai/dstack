@@ -21,7 +21,6 @@ import {
     ListEmptyMessage,
     Loader,
     NavigateLink,
-    StatusIndicator,
 } from 'components';
 
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
@@ -114,7 +113,9 @@ export const ModelDetails: React.FC = () => {
         scrollChatToBottom();
     }, [messageForShowing]);
 
-    const { handleSubmit, control, setValue } = useForm<FormValues>();
+    const { handleSubmit, control, setValue, watch } = useForm<FormValues>();
+
+    const messageText = watch('message');
 
     const sendRequest = async (messages: Message[]) => {
         if (!openai.current) return Promise.reject('Model not found');
@@ -233,6 +234,14 @@ export const ModelDetails: React.FC = () => {
         );
     };
 
+    const onKeyDown = (event) => {
+        if (event?.detail?.keyCode === 13 && !event?.detail?.ctrlKey) {
+            handleSubmit(onSubmit)();
+        } else if (event?.detail?.keyCode === 13 && event?.detail?.ctrlKey) {
+            setValue('message', messageText + '\n');
+        }
+    };
+
     return (
         <ContentLayout
             header={
@@ -312,6 +321,7 @@ export const ModelDetails: React.FC = () => {
                                 control={control}
                                 disabled={loading}
                                 name="message"
+                                onKeyDown={onKeyDown}
                             />
 
                             <div className={css.buttons}>
