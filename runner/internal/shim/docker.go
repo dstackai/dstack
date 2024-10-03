@@ -529,11 +529,19 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 
 func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 	return []string{
+		// save and unset ld.so variables
+		`_LD_LIBRARY_PATH=${LD_LIBRARY_PATH-} && unset LD_LIBRARY_PATH`,
+		`_LD_PRELOAD=${LD_PRELOAD-} && unset LD_PRELOAD`,
+		// common functions
+		`_exists() { command -v "$1" > /dev/null 2>&1; }`,
 		// TODO(#1535): support non-root images properly
 		"mkdir -p /root && chown root:root /root && export HOME=/root",
-		// note: &> redirection doesn't work in /bin/sh
+		// package manager detection/abstraction
+		`_install() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }`,
+		`if _exists apt-get; then _install() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi`,
+		`if _exists yum; then _install() { yum install -y "$1"; }; fi`,
 		// check in sshd is here, install if not
-		"if ! command -v sshd >/dev/null 2>&1; then { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server; } || { yum -y install openssh-server; }; fi",
+		`if ! _exists sshd; then _install openssh-server; fi`,
 		// prohibit password authentication
 		"sed -i \"s/.*PasswordAuthentication.*/PasswordAuthentication no/g\" /etc/ssh/sshd_config",
 		// create ssh dirs and add public key
@@ -549,6 +557,9 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		"ssh-keygen -A > /dev/null",
 		// start sshd
 		fmt.Sprintf("/usr/sbin/sshd -p %d -o PermitUserEnvironment=yes", openSSHPort),
+		// restore ld.so variables
+		`if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi`,
+		`if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi`,
 	}
 }
 
