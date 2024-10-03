@@ -1,6 +1,6 @@
 # Contributing to `dstack`
 
-We appreciate your interest in contributing to `dstack`! This document will help you get up to speed with `dstack` codebase and guide you through the contribution process.
+We appreciate your interest in contributing to `dstack`! This document will help you get up to speed with the `dstack` codebase and guide you through the contribution process.
 
 ## Set up your development environment
 
