@@ -59,6 +59,11 @@ class GatewayConfiguration(CoreModel):
     ] = LetsEncryptGatewayCertificate()
 
 
+class GatewaySpec(CoreModel):
+    configuration: GatewayConfiguration
+    configuration_path: Optional[str] = None
+
+
 class Gateway(CoreModel):
     name: str
     configuration: GatewayConfiguration
@@ -77,6 +82,13 @@ class Gateway(CoreModel):
     region: str
     default: bool
     wildcard_domain: Optional[str]
+
+
+class GatewayPlan(CoreModel):
+    project_name: str
+    user: str
+    spec: GatewaySpec
+    current_resource: Optional[Gateway]
 
 
 class GatewayComputeConfiguration(CoreModel):

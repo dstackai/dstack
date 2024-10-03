@@ -975,7 +975,7 @@ class TestCreateInstance:
         )
         instance_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
         with patch(
-            "dstack._internal.server.services.runs.get_offers_by_requirements"
+            "dstack._internal.server.services.offers.get_offers_by_requirements"
         ) as run_plan_by_req, patch("uuid.uuid4") as uuid_mock:
             uuid_mock.return_value = instance_id
             offer = InstanceOfferWithAvailability(
@@ -1047,7 +1047,7 @@ class TestCreateInstance:
             requirements=Requirements(resources=ResourcesSpec(cpu=1)),
         )
         with patch(
-            "dstack._internal.server.services.runs.get_offers_by_requirements"
+            "dstack._internal.server.services.offers.get_offers_by_requirements"
         ) as run_plan_by_req:
             offer = InstanceOfferWithAvailability(
                 backend=BackendType.AZURE,
@@ -1088,7 +1088,7 @@ class TestCreateInstance:
         )
 
         with patch(
-            "dstack._internal.server.services.runs.get_offers_by_requirements"
+            "dstack._internal.server.services.offers.get_offers_by_requirements"
         ) as run_plan_by_req:
             offers = InstanceOfferWithAvailability(
                 backend=BackendType.VASTAI,

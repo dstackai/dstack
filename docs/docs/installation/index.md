@@ -9,10 +9,12 @@ To use the open-source version of `dstack` with your own cloud accounts or on-pr
 > If you don't want to host the `dstack` server (or want to access GPU marketplace),
 > skip installation and proceed to [dstack Sky :material-arrow-top-right-thin:{ .external }](https://sky.dstack.ai){:target="_blank"}.
 
-## Configure backends
+### (Optional) Configure backends
 
 To use `dstack` with your own cloud accounts, create the `~/.dstack/server/config.yml` file and 
-[configure backends](../reference/server/config.yml.md).
+[configure backends](../reference/server/config.yml.md). Alternatively, you can configure backends via the control plane UI after you start the server.
+
+You can skip backends configuration if you intend to run containers  only on your on-prem servers. Use [SSH fleets](../concepts/fleets.md#ssh-fleets) for that.
 
 ## Start the server
 
@@ -55,7 +57,7 @@ Once backends are configured, proceed and start the server:
     </div>
 
 > For more details on server configuration options, see the
-> [server deployment](../guides/server-deployment.md) guide.
+> [server deployment guide](../guides/server-deployment.md).
 
 ## Set up the CLI
 
@@ -91,14 +93,10 @@ Configuration is updated at ~/.dstack/config.yml
 
 This configuration is stored in `~/.dstack/config.yml`.
 
-## Create SSH fleets
-
-If you want the `dstack` server to run containers on your on-prem clusters,
-create [SSH fleets](../concepts/fleets.md#ssh-fleets).
-
 ## What's next?
 
 1. Check the [server/config.yml reference](../reference/server/config.yml.md) on how to configure backends
-2. Follow [quickstart](../quickstart.md)
-3. Browse [examples](/examples)
-4. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)
+2. Check [SSH fleets](../concepts/fleets.md#ssh-fleets) to learn about running on your on-prem servers
+3. Follow [quickstart](../quickstart.md)
+4. Browse [examples](/examples)
+5. Join the community via [Discord :material-arrow-top-right-thin:{ .external }](https://discord.gg/u8SmfwPpMd)

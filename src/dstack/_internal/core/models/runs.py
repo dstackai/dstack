@@ -29,7 +29,7 @@ from dstack._internal.core.models.profiles import (
 from dstack._internal.core.models.repos import AnyRunRepoData
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.utils import common as common_utils
-from dstack._internal.utils.common import format_pretty_duration, pretty_resources
+from dstack._internal.utils.common import format_pretty_duration
 
 
 class AppSpec(CoreModel):
@@ -150,19 +150,7 @@ class Requirements(CoreModel):
     spot: Optional[bool]
 
     def pretty_format(self, resources_only: bool = False):
-        resources = dict(cpus=self.resources.cpu, memory=self.resources.memory)
-        if self.resources.gpu:
-            gpu = self.resources.gpu
-            resources.update(
-                gpu_name=",".join(gpu.name) if gpu.name else None,
-                gpu_count=gpu.count,
-                gpu_memory=gpu.memory,
-                total_gpu_memory=gpu.total_memory,
-                compute_capability=gpu.compute_capability,
-            )
-        if self.resources.disk:
-            resources.update(disk_size=self.resources.disk.size)
-        res = pretty_resources(**resources)
+        res = self.resources.pretty_format()
         if not resources_only:
             if self.spot is not None:
                 res += f", {'spot' if self.spot else 'on-demand'}"

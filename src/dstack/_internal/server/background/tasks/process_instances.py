@@ -69,7 +69,10 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.schemas.runner import HealthcheckResponse
 from dstack._internal.server.services import backends as backends_services
-from dstack._internal.server.services.fleets import fleet_model_to_fleet
+from dstack._internal.server.services.fleets import (
+    fleet_model_to_fleet,
+    get_create_instance_offers,
+)
 from dstack._internal.server.services.jobs import (
     terminate_job_provisioning_data_instance,
 )
@@ -87,7 +90,6 @@ from dstack._internal.server.services.pools import (
 from dstack._internal.server.services.runner import client as runner_client
 from dstack._internal.server.services.runner.client import HealthStatus
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
-from dstack._internal.server.services.runs import get_create_instance_offers
 from dstack._internal.server.utils.common import run_async
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.logging import get_logger
@@ -321,7 +323,7 @@ async def _add_remote(instance: InstanceModel) -> None:
         internal_ip=internal_ip,
         instance_network=instance_network,
         username=remote_details.ssh_user,
-        ssh_port=22,
+        ssh_port=remote_details.port,
         dockerized=True,
         backend_data=None,
         ssh_proxy=None,

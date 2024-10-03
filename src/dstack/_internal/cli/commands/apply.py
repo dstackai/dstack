@@ -38,39 +38,49 @@ class ApplyCommand(APIBaseCommand):
             dest="configuration_file",
         )
         self._parser.add_argument(
-            "--force",
-            help="Force apply when no changes detected",
-            action="store_true",
-        )
-        self._parser.add_argument(
             "-y",
             "--yes",
             help="Do not ask for confirmation",
             action="store_true",
         )
+        self._parser.add_argument(
+            "--force",
+            help="Force apply when no changes detected",
+            action="store_true",
+        )
+        self._parser.add_argument(
+            "-d",
+            "--detach",
+            help="Exit immediately after sumbitting configuration",
+            action="store_true",
+        )
 
     def _command(self, args: argparse.Namespace):
-        if args.help is not NOTSET:
-            if args.help is not None:
-                configurator_class = get_apply_configurator_class(
-                    ApplyConfigurationType(args.help)
-                )
-            else:
-                configurator_class = BaseApplyConfigurator
-            configurator_class.register_args(self._parser)
-            self._parser.print_help()
-            return
+        try:
+            if args.help is not NOTSET:
+                if args.help is not None:
+                    configurator_class = get_apply_configurator_class(
+                        ApplyConfigurationType(args.help)
+                    )
+                else:
+                    configurator_class = BaseApplyConfigurator
+                configurator_class.register_args(self._parser)
+                self._parser.print_help()
+                return
 
-        super()._command(args)
-        configuration_path, configuration = load_apply_configuration(args.configuration_file)
-        configurator_class = get_apply_configurator_class(configuration.type)
-        configurator = configurator_class(api_client=self.api)
-        configurator_parser = configurator.get_parser()
-        known, unknown = configurator_parser.parse_known_args(args.unknown)
-        configurator.apply_configuration(
-            conf=configuration,
-            configuration_path=configuration_path,
-            command_args=args,
-            configurator_args=known,
-            unknown_args=unknown,
-        )
+            super()._command(args)
+            configuration_path, configuration = load_apply_configuration(args.configuration_file)
+            configurator_class = get_apply_configurator_class(configuration.type)
+            configurator = configurator_class(api_client=self.api)
+            configurator_parser = configurator.get_parser()
+            known, unknown = configurator_parser.parse_known_args(args.unknown)
+            configurator.apply_configuration(
+                conf=configuration,
+                configuration_path=configuration_path,
+                command_args=args,
+                configurator_args=known,
+                unknown_args=unknown,
+            )
+        except KeyboardInterrupt:
+            print("\nOperation interrupted by user. Exiting...")
+            exit(0)

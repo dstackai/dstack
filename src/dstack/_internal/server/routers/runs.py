@@ -19,7 +19,7 @@ from dstack._internal.server.schemas.runs import (
     SubmitRunRequest,
 )
 from dstack._internal.server.security.permissions import Authenticated, ProjectMember
-from dstack._internal.server.services import runs
+from dstack._internal.server.services import fleets, runs
 from dstack._internal.server.services.pools import (
     get_or_create_pool_by_name,
 )
@@ -144,7 +144,7 @@ async def get_offers(
 ) -> PoolInstanceOffers:
     _, project = user_project
     pool = await get_or_create_pool_by_name(session, project, body.profile.pool_name)
-    offers = await runs.get_create_instance_offers(
+    offers = await fleets.get_create_instance_offers(
         project=project,
         profile=body.profile,
         requirements=body.requirements,
@@ -162,7 +162,7 @@ async def create_instance(
 ) -> Instance:
     user, project = user_project
     try:
-        instance = await runs.create_instance(
+        instance = await fleets.create_instance(
             session=session,
             project=project,
             user=user,

@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from typing import Any, Dict, Generator, List
 
 import paramiko
-from gpuhunt import correct_gpu_memory_gib
+from gpuhunt import AcceleratorVendor, correct_gpu_memory_gib
 
 # FIXME: ProvisioningError is a subclass of ComputeError and should not be used outside of Compute
 from dstack._internal.core.errors import ProvisioningError
@@ -15,7 +15,7 @@ from dstack._internal.core.models.instances import (
     InstanceType,
     Resources,
 )
-from dstack._internal.utils.gpu import convert_gpu_name
+from dstack._internal.utils.gpu import convert_amd_gpu_name, convert_nvidia_gpu_name
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -210,11 +210,23 @@ def get_shim_healthcheck(client: paramiko.SSHClient) -> str:
 
 
 def host_info_to_instance_type(host_info: Dict[str, Any]) -> InstanceType:
-    gpu_name = convert_gpu_name(host_info["gpu_name"])
-    if host_info.get("gpu_count", 0):
-        gpu_memory_mib = float(host_info["gpu_memory"].lower().replace("mib", "").strip())
+    gpu_count = host_info.get("gpu_count", 0)
+    if gpu_count > 0:
+        gpu_vendor = AcceleratorVendor.cast(host_info.get("gpu_vendor", "nvidia"))
+        gpu_name = host_info["gpu_name"]
+        if gpu_vendor == AcceleratorVendor.NVIDIA:
+            gpu_name = convert_nvidia_gpu_name(gpu_name)
+        elif gpu_vendor == AcceleratorVendor.AMD:
+            gpu_name = convert_amd_gpu_name(gpu_name)
+        gpu_memory_mib = host_info["gpu_memory"]
+        if isinstance(gpu_memory_mib, str):
+            # older shim versions report gpu_memory as a string
+            gpu_memory_mib = float(gpu_memory_mib.lower().replace("mib", "").strip())
+        else:
+            # newer shim versions report gpu_memory as an integer
+            gpu_memory_mib = float(gpu_memory_mib)
         gpu_memory_mib = correct_gpu_memory_gib(gpu_name, gpu_memory_mib) * 1024
-        gpus = [Gpu(name=gpu_name, memory_mib=gpu_memory_mib)] * host_info["gpu_count"]
+        gpus = [Gpu(vendor=gpu_vendor, name=gpu_name, memory_mib=gpu_memory_mib)] * gpu_count
     else:
         gpus = []
     instance_type = InstanceType(
@@ -251,7 +263,7 @@ def get_paramiko_connection(
                 )
             except paramiko.AuthenticationException:
                 logger.debug(
-                    f'Authentication faild to connect to "{conn_url}" and {pkey.fingerprint}'
+                    f'Authentication failed to connect to "{conn_url}" and {pkey.fingerprint}'
                 )
                 continue  # try next key
             except (paramiko.SSHException, OSError) as e:

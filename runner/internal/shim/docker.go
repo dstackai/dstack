@@ -445,10 +445,6 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		log.Printf("Cleanup routine: Cannot remove container: %s", err)
 	}
 
-	gpuRequest, err := requestGpuIfAvailable(ctx, client)
-	if err != nil {
-		return "", tracerr.Wrap(err)
-	}
 	mounts, err := dockerParams.DockerMounts(runnerDir)
 	if err != nil {
 		return "", tracerr.Wrap(err)
@@ -497,13 +493,11 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		PortBindings:    bindPorts(dockerParams.DockerPorts()...),
 		PublishAllPorts: true,
 		Sysctls:         map[string]string{},
-		Resources: container.Resources{
-			DeviceRequests: gpuRequest,
-		},
-		Mounts:  mounts,
-		ShmSize: taskConfig.ShmSize,
-		Tmpfs:   tmpfs,
+		Mounts:          mounts,
+		ShmSize:         taskConfig.ShmSize,
+		Tmpfs:           tmpfs,
 	}
+	configureGpuIfAvailable(hostConfig)
 
 	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", taskConfig.ContainerName, containerConfig, hostConfig)
 	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskConfig.ContainerName)
@@ -535,11 +529,19 @@ func runContainer(ctx context.Context, client docker.APIClient, containerID stri
 
 func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 	return []string{
+		// save and unset ld.so variables
+		`_LD_LIBRARY_PATH=${LD_LIBRARY_PATH-} && unset LD_LIBRARY_PATH`,
+		`_LD_PRELOAD=${LD_PRELOAD-} && unset LD_PRELOAD`,
+		// common functions
+		`_exists() { command -v "$1" > /dev/null 2>&1; }`,
 		// TODO(#1535): support non-root images properly
 		"mkdir -p /root && chown root:root /root && export HOME=/root",
-		// note: &> redirection doesn't work in /bin/sh
+		// package manager detection/abstraction
+		`_install() { NAME=Distribution; test -f /etc/os-release && . /etc/os-release; echo $NAME not supported; exit 11; }`,
+		`if _exists apt-get; then _install() { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y "$1"; }; fi`,
+		`if _exists yum; then _install() { yum install -y "$1"; }; fi`,
 		// check in sshd is here, install if not
-		"if ! command -v sshd >/dev/null 2>&1; then { apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server; } || { yum -y install openssh-server; }; fi",
+		`if ! _exists sshd; then _install openssh-server; fi`,
 		// prohibit password authentication
 		"sed -i \"s/.*PasswordAuthentication.*/PasswordAuthentication no/g\" /etc/ssh/sshd_config",
 		// create ssh dirs and add public key
@@ -555,6 +557,9 @@ func getSSHShellCommands(openSSHPort int, publicSSHKey string) []string {
 		"ssh-keygen -A > /dev/null",
 		// start sshd
 		fmt.Sprintf("/usr/sbin/sshd -p %d -o PermitUserEnvironment=yes", openSSHPort),
+		// restore ld.so variables
+		`if [ -n "$_LD_LIBRARY_PATH" ]; then export LD_LIBRARY_PATH="$_LD_LIBRARY_PATH"; fi`,
+		`if [ -n "$_LD_PRELOAD" ]; then export LD_PRELOAD="$_LD_PRELOAD"; fi`,
 	}
 }
 
@@ -587,27 +592,44 @@ func getNetworkMode() container.NetworkMode {
 	return "default"
 }
 
-func requestGpuIfAvailable(ctx context.Context, client docker.APIClient) ([]container.DeviceRequest, error) {
-	info, err := client.Info(ctx)
-	if err != nil {
-		return nil, tracerr.Wrap(err)
+func configureGpuIfAvailable(hostConfig *container.HostConfig) {
+	switch gpuVendor := GetGpuVendor(); gpuVendor {
+	case Nvidia:
+		hostConfig.Resources.DeviceRequests = append(
+			hostConfig.Resources.DeviceRequests,
+			container.DeviceRequest{
+				// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
+				// Default capabilities: utility, compute.
+				// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
+				Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
+				Count:        -1, // --gpus=all
+			},
+		)
+	case Amd:
+		// All options are listed here: https://hub.docker.com/r/rocm/pytorch
+		// Only --device are mandatory, other seem to be performance-related.
+		// --device=/dev/kfd --device=/dev/dri
+		hostConfig.Resources.Devices = append(
+			hostConfig.Resources.Devices,
+			container.DeviceMapping{
+				PathOnHost:        "/dev/kfd",
+				PathInContainer:   "/dev/kfd",
+				CgroupPermissions: "rwm",
+			},
+			container.DeviceMapping{
+				PathOnHost:        "/dev/dri",
+				PathInContainer:   "/dev/dri",
+				CgroupPermissions: "rwm",
+			},
+		)
+		// --ipc=host
+		hostConfig.IpcMode = container.IPCModeHost
+		// --cap-add=SYS_PTRACE
+		hostConfig.CapAdd = append(hostConfig.CapAdd, "SYS_PTRACE")
+		// --security-opt=seccomp=unconfined
+		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "seccomp=unconfined")
+		// TODO: in addition, for non-root user, --group-add=video, and possibly --group-add=render, are required.
 	}
-
-	for runtime := range info.Runtimes {
-		if runtime == consts.NVIDIA_RUNTIME {
-			return []container.DeviceRequest{
-				{
-					// Request all capabilities to maximize compatibility with all sorts of GPU workloads.
-					// Default capabilities: utility, compute.
-					// https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.16.0/docker-specialized.html
-					Capabilities: [][]string{{"gpu", "utility", "compute", "graphics", "video", "display", "compat32"}},
-					Count:        -1, // --gpus=all
-				},
-			}, nil
-		}
-	}
-
-	return nil, nil
 }
 
 func getVolumeMounts(mountPoints []MountPoint) ([]mount.Mount, error) {

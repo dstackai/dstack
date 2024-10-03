@@ -64,7 +64,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
         self.api.ssh_identity_file = repo_config.ssh_key_path
         profile = load_profile(Path.cwd(), configurator_args.profile)
-        with console.status("Getting run plan..."):
+        with console.status("Getting apply plan..."):
             run_plan = self.api.runs.get_plan(
                 configuration=conf,
                 repo=repo,
@@ -102,12 +102,12 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         try:
             with console.status("Submitting run..."):
                 run = self.api.runs.exec_plan(
-                    run_plan, repo, reserve_ports=not configurator_args.detach
+                    run_plan, repo, reserve_ports=not command_args.detach
                 )
         except ServerClientError as e:
             raise CLIError(e.msg)
 
-        if configurator_args.detach:
+        if command_args.detach:
             console.print(f"Run [code]{run.name}[/] submitted, detaching...")
             return
 
@@ -229,12 +229,6 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             "--name",
             dest="run_name",
             help="The name of the run. If not specified, a random name is assigned",
-        )
-        parser.add_argument(
-            "-d",
-            "--detach",
-            help="Do not poll logs and run status",
-            action="store_true",
         )
         parser.add_argument(
             "--max-offers",

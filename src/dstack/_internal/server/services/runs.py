@@ -2,7 +2,7 @@ import itertools
 import math
 import uuid
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import pydantic
 from sqlalchemy import and_, func, or_, select, update
@@ -11,42 +11,26 @@ from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.server.services.gateways as gateways
 import dstack._internal.utils.common as common_utils
-from dstack._internal.core.backends import (
-    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
-    BACKENDS_WITH_MULTINODE_SUPPORT,
-)
-from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import (
     RepoDoesNotExistError,
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.fleets import InstanceGroupPlacement
 from dstack._internal.core.models.instances import (
-    DockerConfig,
     InstanceAvailability,
-    InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceStatus,
-    SSHKey,
 )
-from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
-    DEFAULT_POOL_TERMINATION_IDLE_TIME,
     CreationPolicy,
-    Profile,
-    TerminationPolicy,
 )
 from dstack._internal.core.models.runs import (
     Job,
     JobPlan,
-    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobSubmission,
     JobTerminationReason,
-    Requirements,
     Run,
     RunPlan,
     RunSpec,
@@ -59,8 +43,6 @@ from dstack._internal.core.models.volumes import Volume, VolumeStatus
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
-    FleetModel,
-    InstanceModel,
     JobModel,
     PoolModel,
     ProjectModel,
@@ -69,12 +51,9 @@ from dstack._internal.server.models import (
     UserModel,
     VolumeModel,
 )
-from dstack._internal.server.services import backends as backends_services
-from dstack._internal.server.services import pools as pools_services
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import volumes as volumes_services
-from dstack._internal.server.services.docker import is_valid_docker_volume_target, parse_image_name
-from dstack._internal.server.services.fleets import fleet_model_to_fleet
+from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
     group_jobs_by_replica_latest,
@@ -82,19 +61,14 @@ from dstack._internal.server.services.jobs import (
     process_terminating_job,
     stop_runner,
 )
-from dstack._internal.server.services.jobs.configurators.base import (
-    get_default_image,
-    get_default_python_verison,
-)
 from dstack._internal.server.services.locking import get_locker, string_to_lock_id
 from dstack._internal.server.services.logging import fmt
+from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
-    generate_instance_name,
     get_instance_offer,
     get_or_create_pool_by_name,
     get_pool_instances,
-    instance_model_to_instance,
 )
 from dstack._internal.server.services.projects import list_project_models, list_user_project_models
 from dstack._internal.server.services.users import get_user_model_by_name
@@ -316,74 +290,6 @@ async def get_run_plan(
     return run_plan
 
 
-async def get_offers_by_requirements(
-    project: ProjectModel,
-    profile: Profile,
-    requirements: Requirements,
-    exclude_not_available=False,
-    multinode: bool = False,
-    master_job_provisioning_data: Optional[JobProvisioningData] = None,
-    volumes: Optional[List[Volume]] = None,
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
-    backends: List[Backend] = await backends_services.get_project_backends(project=project)
-
-    # For backward-compatibility to show offers if users set `backends: [dstack]`
-    if (
-        profile.backends is not None
-        and len(profile.backends) == 1
-        and BackendType.DSTACK in profile.backends
-    ):
-        profile.backends = None
-
-    backend_types = profile.backends
-    regions = profile.regions
-
-    if volumes:
-        volume = volumes[0]
-        backend_types = [volume.configuration.backend]
-        regions = [volume.configuration.region]
-
-    if multinode:
-        if not backend_types:
-            backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
-        backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
-
-    # For multi-node, restrict backend and region.
-    # The default behavior is to provision all nodes in the same backend and region.
-    if master_job_provisioning_data is not None:
-        if not backend_types:
-            backend_types = [master_job_provisioning_data.get_base_backend()]
-        if not regions:
-            regions = [master_job_provisioning_data.region]
-        backend_types = [
-            b for b in backend_types if b == master_job_provisioning_data.get_base_backend()
-        ]
-        regions = [r for r in regions if r == master_job_provisioning_data.region]
-
-    if backend_types is not None:
-        backends = [b for b in backends if b.TYPE in backend_types or b.TYPE == BackendType.DSTACK]
-
-    offers = await backends_services.get_instance_offers(
-        backends=backends,
-        requirements=requirements,
-        exclude_not_available=exclude_not_available,
-    )
-
-    # Filter offers again for backends since a backend
-    # can return offers of different backend types (e.g. BackendType.DSTACK).
-    # The first filter should remain as an optimization.
-    if backend_types is not None:
-        offers = [(b, o) for b, o in offers if o.backend in backend_types]
-
-    if regions is not None:
-        offers = [(b, o) for b, o in offers if o.region in regions]
-
-    if profile.instance_types is not None:
-        offers = [(b, o) for b, o in offers if o.instance.name in profile.instance_types]
-
-    return offers
-
-
 async def submit_run(
     session: AsyncSession,
     user: UserModel,
@@ -571,123 +477,6 @@ async def delete_runs(
             .values(deleted=True)
         )
         await session.commit()
-
-
-async def get_create_instance_offers(
-    project: ProjectModel,
-    profile: Profile,
-    requirements: Requirements,
-    exclude_not_available=False,
-    fleet_model: Optional[FleetModel] = None,
-) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
-    multinode = False
-    master_job_provisioning_data = None
-    if fleet_model is not None:
-        fleet = fleet_model_to_fleet(fleet_model)
-        multinode = fleet.spec.configuration.placement == InstanceGroupPlacement.CLUSTER
-        for instance in fleet_model.instances:
-            jpd = pools_services.get_instance_provisioning_data(instance)
-            if jpd is not None:
-                master_job_provisioning_data = jpd
-                break
-
-    offers = await get_offers_by_requirements(
-        project=project,
-        profile=profile,
-        requirements=requirements,
-        exclude_not_available=exclude_not_available,
-        multinode=multinode,
-        master_job_provisioning_data=master_job_provisioning_data,
-    )
-    offers = [
-        (backend, offer)
-        for backend, offer in offers
-        if backend.TYPE in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
-    ]
-    return offers
-
-
-async def create_instance(
-    session: AsyncSession,
-    project: ProjectModel,
-    user: UserModel,
-    profile: Profile,
-    requirements: Requirements,
-) -> Instance:
-    offers = await get_create_instance_offers(
-        project=project,
-        profile=profile,
-        requirements=requirements,
-        exclude_not_available=True,
-    )
-
-    # Raise error if no backends suppport create_instance
-    backend_types = set((backend.TYPE for backend, _ in offers))
-    if all(
-        (backend_type not in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT)
-        for backend_type in backend_types
-    ):
-        backends = ", ".join(sorted(backend_types))
-        raise ServerClientError(
-            f"Backends {backends} do not support create_instance. Try to select other backends."
-        )
-
-    pool = await pools_services.get_or_create_pool_by_name(session, project, profile.pool_name)
-    instance_name = await generate_instance_name(
-        session=session, project=project, pool_name=pool.name
-    )
-
-    termination_policy = profile.termination_policy or TerminationPolicy.DESTROY_AFTER_IDLE
-    termination_idle_time = profile.termination_idle_time
-    if termination_idle_time is None:
-        termination_idle_time = DEFAULT_POOL_TERMINATION_IDLE_TIME
-
-    instance = InstanceModel(
-        id=uuid.uuid4(),
-        name=instance_name,
-        instance_num=0,
-        project=project,
-        pool=pool,
-        created_at=common_utils.get_current_datetime(),
-        status=InstanceStatus.PENDING,
-        unreachable=False,
-        profile=profile.json(),
-        requirements=requirements.json(),
-        instance_configuration=None,
-        termination_policy=termination_policy,
-        termination_idle_time=termination_idle_time,
-    )
-    logger.info(
-        "Added a new instance %s",
-        instance.name,
-        extra={
-            "instance_name": instance.name,
-            "instance_status": InstanceStatus.PENDING.value,
-        },
-    )
-    session.add(instance)
-    await session.commit()
-
-    project_ssh_key = SSHKey(
-        public=project.ssh_public_key.strip(),
-        private=project.ssh_private_key.strip(),
-    )
-    dstack_default_image = parse_image_name(get_default_image(get_default_python_verison()))
-    instance_config = InstanceConfiguration(
-        project_name=project.name,
-        instance_name=instance_name,
-        instance_id=str(instance.id),
-        ssh_keys=[project_ssh_key],
-        job_docker_config=DockerConfig(
-            image=dstack_default_image,
-            registry_auth=None,
-        ),
-        user=user.name,
-    )
-    instance.instance_configuration = instance_config.json()
-    await session.commit()
-
-    return instance_model_to_instance(instance)
 
 
 def run_model_to_run(

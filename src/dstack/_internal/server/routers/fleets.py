@@ -5,13 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import dstack._internal.server.services.fleets as fleets_services
 from dstack._internal.core.errors import ResourceNotExistsError
-from dstack._internal.core.models.fleets import Fleet
+from dstack._internal.core.models.fleets import Fleet, FleetPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.fleets import (
     CreateFleetRequest,
     DeleteFleetInstancesRequest,
     DeleteFleetsRequest,
+    GetFleetPlanRequest,
     GetFleetRequest,
 )
 from dstack._internal.server.security.permissions import ProjectMember
@@ -41,6 +42,22 @@ async def get_fleet(
     if fleet is None:
         raise ResourceNotExistsError()
     return fleet
+
+
+@router.post("/get_plan")
+async def get_plan(
+    body: GetFleetPlanRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+) -> FleetPlan:
+    user, project = user_project
+    plan = await fleets_services.get_plan(
+        session=session,
+        project=project,
+        user=user,
+        spec=body.spec,
+    )
+    return plan
 
 
 @router.post("/create")

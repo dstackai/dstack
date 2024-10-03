@@ -7,6 +7,7 @@ from pydantic.generics import GenericModel
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.common import CoreModel
+from dstack._internal.utils.common import pretty_resources
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -270,6 +271,22 @@ class ResourcesSpec(CoreModel):
     ] = None
     gpu: Annotated[Optional[GPUSpec], Field(description="The GPU requirements")] = None
     disk: Annotated[Optional[DiskSpec], Field(description="The disk resources")] = DEFAULT_DISK
+
+    def pretty_format(self) -> str:
+        resources: Dict[str, Any] = dict(cpus=self.cpu, memory=self.memory)
+        if self.gpu:
+            gpu = self.gpu
+            resources.update(
+                gpu_name=",".join(gpu.name) if gpu.name else None,
+                gpu_count=gpu.count,
+                gpu_memory=gpu.memory,
+                total_gpu_memory=gpu.total_memory,
+                compute_capability=gpu.compute_capability,
+            )
+        if self.disk:
+            resources.update(disk_size=self.disk.size)
+        res = pretty_resources(**resources)
+        return res
 
 
 IntRangeLike = Union[Range[Union[int, str]], int, str]
