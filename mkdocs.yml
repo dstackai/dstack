@@ -202,11 +202,10 @@ nav:
           - Overview: docs/index.md
           - Installation: docs/installation/index.md
           - Quickstart: docs/quickstart.md
-      - Basics:
+      - Concepts:
           - Dev environments: docs/dev-environments.md
           - Tasks: docs/tasks.md
           - Services: docs/services.md
-      - Concepts:
           - Fleets: docs/concepts/fleets.md
           - Gateways: docs/concepts/gateways.md
           - Volumes: docs/concepts/volumes.md
