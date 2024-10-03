@@ -21,6 +21,7 @@ class TestServerConfigManager:
     class TestInitConfig:
         @pytest.mark.asyncio
         @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+        @pytest.mark.skip(reason="Backends auto init is currently disabled")
         async def test_inits_backend(self, test_db, session: AsyncSession, tmp_path: Path):
             await create_project(session=session, name="main")
             config_filepath = tmp_path / "config.yml"

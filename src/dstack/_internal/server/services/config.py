@@ -347,7 +347,9 @@ class _BackendAPIConfig(CoreModel):
 
 class ProjectConfig(CoreModel):
     name: Annotated[str, Field(description="The name of the project")]
-    backends: Annotated[List[BackendConfig], Field(description="The list of backends")]
+    backends: Annotated[
+        Optional[List[BackendConfig]], Field(description="The list of backends")
+    ] = None
 
 
 EncryptionKeyConfig = Annotated[AnyEncryptionKeyConfig, Field(..., discriminator="type")]
@@ -373,7 +375,14 @@ class ServerConfigManager:
         return self.config is not None
 
     async def init_config(self, session: AsyncSession):
-        self.config = await self._init_config(session=session, init_backends=True)
+        """
+        Initializes the default server/config.yml.
+        The default config is empty or contains an existing `main` project config.
+        """
+        # The backends auto init feature via default creds is currently disabled
+        # so that the backend configuration is always explicit.
+        # Details: https://github.com/dstackai/dstack/issues/1384
+        self.config = await self._init_config(session=session, init_backends=False)
         if self.config is not None:
             self._save_config(self.config)
 
@@ -386,7 +395,7 @@ class ServerConfigManager:
 
     async def apply_encryption(self):
         if self.config is None:
-            logger.warning("server/config.yml not loaded. Skipping encryption configuration.")
+            logger.info("No server/config.yml. Skipping encryption configuration.")
             return
         if self.config.encryption is not None:
             encryption_services.init_encryption_keys(self.config.encryption.keys)
@@ -419,7 +428,7 @@ class ServerConfigManager:
                 session=session, project_name=project_config.name
             )
         backends_to_delete = backends_services.list_available_backend_types()
-        for backend_config in project_config.backends:
+        for backend_config in project_config.backends or []:
             config_info = config_to_internal_config(backend_config)
             backend_type = BackendType(config_info.type)
             try:
