@@ -1,0 +1,37 @@
+name: Run dstack Task on GPU
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  run-dstack-task:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+
+      # uncomment to install dstack if not available already
+      # - name: Install dstack
+      #   run: |
+      #     pip install dstack
+
+  
+      # re work required
+      # - name: Configure dstack
+      #   run: |
+      #     dstack config set server-url ${{ secrets.DSTACK_SERVER_URL }}
+      #     dstack config set api-key ${{ secrets.DSTACK_API_KEY }}
+
+      - name: Submit dstack task
+        run: |
+          dstack submit --gpu my-gpu-machine -- python train.py
+
