@@ -1,6 +1,6 @@
 # Contributing to `dstack`
 
-We appreciate your interest in contributing to `dstack`! This document will help you get up to speed with `dstack` codebase and guide you through the contribution process.
+We appreciate your interest in contributing to `dstack`! This document will help you get up to speed with the `dstack` codebase and guide you through the contribution process.
 
 ## Set up your development environment
 
@@ -8,7 +8,7 @@ Follow [contributing/DEVELOPMENT.md](contributing/DEVELOPMENT.md).
 
 ## Learn dstack internals
 
-If you make a non-trivial change to `dstack`, we recommend you learn about `dstack` internals. A good place to start is [contributing/ARCHITECTURE.md](contributing/ARCHITECTURE.md).
+If you make a non-trivial change to `dstack`, we recommend that you learn about `dstack` internals. A good place to start is [contributing/ARCHITECTURE.md](contributing/ARCHITECTURE.md).
 
 ## Make a PR
 
@@ -31,11 +31,11 @@ We use [`ruff`](https://docs.astral.sh/ruff/) to format Python code and to sort 
 1. `ruff check --fix`
 2. `ruff format`
 
-> There are also helper pre-commits installed for [`ruff`](https://docs.astral.sh/ruff/integrations/#pre-commit) that make commits fail if the code is not formatted or the imports are not sorted. They also change the code as required so that you can review the changes and commit again.
+> There are also helper pre-commits installed for [`ruff`](https://docs.astral.sh/ruff/integrations/#pre-commit) that make commits fail if the code is not formatted or the imports are not sorted. They also modify the code as required so that you can review the changes and commit again.
 
 ## Add a new backend
 
-If you'd like to integrate a new cloud provider to `dstack`, follow [contributing/BACKENDS.md](contributing/BACKENDS.md).
+If you'd like to integrate a new cloud provider into `dstack`, follow [contributing/BACKENDS.md](contributing/BACKENDS.md).
 
 ## Get help
 
