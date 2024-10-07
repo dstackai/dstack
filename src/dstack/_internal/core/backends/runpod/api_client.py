@@ -234,7 +234,7 @@ class RunpodApiClient:
                 method="POST",
                 url=f"{API_URL}?api_key={self.api_key}",
                 json=data,
-                timeout=60,
+                timeout=120,
             )
             response.raise_for_status()
             if "errors" in response.json():
