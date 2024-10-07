@@ -1,9 +1,7 @@
 # AMD
 
-Since [0.18.11 :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/releases/0.18.11rc1){:target="_blank"},
-you can specify an AMD GPU under `resources`. Below are a few examples.
-
-> AMD accelerators are currently supported only with the [`runpod`](https://dstack.ai/docs/reference/server/config.yml/#runpod) backend.
+If you're using the `runpod` backend or have set up an [SSH fleets](https://dstack.ai/docs/concepts/fleets#ssh-fleets) 
+with on-prem AMD GPUs, you can use AMD GPUs.
 
 ## Deployment
 
