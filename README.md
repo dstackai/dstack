@@ -15,13 +15,13 @@
 </div>
 
 `dstack` is a streamlined alternative to Kubernetes, specifically designed for AI. It simplifies container orchestration
-for AI workloads both in the cloud and on-prem, speeding up the development, training, and deployment of AI models.
+for AI workloads, both in the cloud and on-prem, speeding up the development, training, and deployment of AI models.
 
-`dstack` is easy to use with any cloud provider as well as on-prem servers.
+`dstack` is easy to use with any cloud provider, as well as on-prem servers.
 
 #### Accelerators
 
-`dstack` supports `NVIDIA GPU`, `AMD GPU`, and `Google Cloud TPU` out of the box.
+`dstack` supports `NVIDIA GPUs`, `AMD GPUs`, and `Google Cloud TPUs` out of the box.
 
 ## Major news ✨
 
@@ -33,7 +33,7 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ## Installation
 
-> Before using `dstack` through CLI or API, set up a `dstack` server. If you already have a running `dstack` server, you only need to [set up the CLI](#set-up-the-cli).
+> Before using `dstack` through the CLI or API, set up a `dstack` server. If you already have a running `dstack` server, you only need to [set up the CLI](#set-up-the-cli).
 
 ### (Optional) Configure backends
 
@@ -74,7 +74,7 @@ $ dstack config --url http://127.0.0.1:3000 \
     --project main \
     --token bbae0f28-d3dd-4820-bf61-8f4bb40815da
     
-Configuration is updated at ~/.dstack/config.yml
+The configuration is updated at ~/.dstack/config.yml
 ```
 
 ## How does it work?
@@ -101,7 +101,7 @@ out-of-capacity errors, port-forwarding, and more &mdash; across clouds and on-p
 
 ## More information
 
-For additional information and examples, see the following links:
+For additional information and examples, refer to the following links:
 
 * [Docs](https://dstack.ai/docs)
 * [Examples](https://dstack.ai/examples)
@@ -110,7 +110,7 @@ For additional information and examples, see the following links:
 
 ## Contributing
 
-You're very welcome to contribute to `dstack`. 
+You are very welcome to contribute to `dstack`. 
 Learn more about how to contribute to the project at [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
