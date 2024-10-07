@@ -47,22 +47,22 @@ class LambdaAPIClient:
             "name": name,
         }
         resp = self._make_request("POST", "/instance-operations/launch", data)
-        if resp.ok:
-            return resp.json()["data"]["instance_ids"]
-        resp.raise_for_status()
+        if not resp.ok:
+            resp.raise_for_status()
+        return resp.json()["data"]["instance_ids"]
 
     def terminate_instances(self, instance_ids: List[str]) -> List[str]:
         data = {"instance_ids": instance_ids}
         resp = self._make_request("POST", "/instance-operations/terminate", data)
-        if resp.ok:
-            return resp.json()["data"]
-        resp.raise_for_status()
+        if not resp.ok:
+            resp.raise_for_status()
+        return resp.json()["data"]
 
     def list_ssh_keys(self) -> List[Dict]:
         resp = self._make_request("GET", "/ssh-keys")
-        if resp.ok:
-            return resp.json()["data"]
-        resp.raise_for_status()
+        if not resp.ok:
+            resp.raise_for_status()
+        return resp.json()["data"]
 
     def add_ssh_key(self, name: str, public_key: str) -> List[Dict]:
         data = {
@@ -70,17 +70,17 @@ class LambdaAPIClient:
             "public_key": public_key,
         }
         resp = self._make_request("POST", "/ssh-keys", data)
-        if resp.ok:
-            return resp.json()["data"]
-        resp.raise_for_status()
+        if not resp.ok:
+            resp.raise_for_status()
+        return resp.json()["data"]
 
     def _make_request(self, method: str, path: str, data: Any = None):
-        # TODO: fix S113 by setting an adequate timeout here or in every method
-        return requests.request(  # noqa: S113
+        return requests.request(
             method=method,
             url=API_URL + path,
             json=data,
             headers={"Authorization": f"Bearer {self.api_key}"},
+            timeout=120,
         )
 
     def _url(self, path: str) -> str:
