@@ -91,9 +91,17 @@ are both acceptable).
 
     !!! info "Requirements" 
         Hosts should be pre-installed with Docker.
-        Systems with NVIDIA GPUs should also be pre-installed with CUDA 12.1 and
-        [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
-        The user should have `sudo` access.
+
+        === "NVIDIA"
+            Systems with NVIDIA GPUs should also be pre-installed with CUDA 12.1 and
+            [NVIDIA Container Toolkit :material-arrow-top-right-thin:{ .external }](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+
+        === "AMD"
+            Systems with AMD GPUs should also be pre-installed with AMDGPU-DKMS kernel driver (e.g. via
+            [native package manager :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/native-install/index.html)
+            or [AMDGPU installer :material-arrow-top-right-thin:{ .external }](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/amdgpu-install.html).)
+
+        The user should have passwordless `sudo` access.
 
     ??? info "Environment variables"
         For SSH fleets, it's possible to pre-configure environment variables. 
