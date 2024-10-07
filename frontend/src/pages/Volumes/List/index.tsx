@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Header, Pagination, SpaceBetween, Table, Toggle } from 'components';
+import { Button, Header, Pagination, Table, Toggle } from 'components';
 import { useProjectDropdown } from 'layouts/AppLayout/hooks';
 
 import { useCollection } from 'hooks';
@@ -47,7 +47,7 @@ export const VolumeList: React.FC = () => {
                 <div className={styles.filters}>
                     <div className={styles.activeOnly}>
                         <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
-                            {t('fleets.active_only')}
+                            {t('volume.active_only')}
                         </Toggle>
                     </div>
 

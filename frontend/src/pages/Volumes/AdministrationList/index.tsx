@@ -70,7 +70,7 @@ export const AdministrationVolumeList: React.FC = () => {
 
                     <div className={styles.activeOnly}>
                         <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
-                            {t('fleets.active_only')}
+                            {t('volume.active_only')}
                         </Toggle>
                     </div>
 
