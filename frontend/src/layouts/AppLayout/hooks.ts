@@ -34,6 +34,7 @@ export const useSideNavigation = () => {
         { type: 'link', text: t('navigation.runs'), href: ROUTES.RUNS.LIST },
         { type: 'link', text: t('navigation.fleets'), href: ROUTES.FLEETS.LIST },
         { type: 'link', text: t('navigation.models'), href: ROUTES.MODELS.LIST },
+        { type: 'link', text: t('navigation.volumes'), href: ROUTES.VOLUMES.LIST },
 
         mainProjectSettingsUrl && {
             type: 'link',
@@ -46,6 +47,7 @@ export const useSideNavigation = () => {
         { type: 'link', text: t('navigation.runs'), href: ROUTES.ADMINISTRATION.RUNS.LIST },
         { type: 'link', text: t('navigation.fleets'), href: ROUTES.ADMINISTRATION.FLEETS.LIST },
         { type: 'link', text: t('navigation.project_other'), href: ROUTES.PROJECT.LIST },
+        { type: 'link', text: t('navigation.volumes'), href: ROUTES.ADMINISTRATION.VOLUMES.LIST },
 
         {
             type: 'link',

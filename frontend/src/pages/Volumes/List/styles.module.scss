@@ -1,0 +1,20 @@
+.filters {
+    --select-width: calc((688px - 3 * 20px) / 2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 20px;
+
+    .select {
+        width: var(--select-width, 30%);
+    }
+
+    .activeOnly {
+        display: flex;
+        align-items: center;
+        padding-top: 26px;
+    }
+
+    .clear {
+        padding-top: 26px;
+    }
+}
