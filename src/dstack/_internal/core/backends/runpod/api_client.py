@@ -230,11 +230,11 @@ class RunpodApiClient:
 
     def _make_request(self, data: Any = None) -> Response:
         try:
-            # TODO: fix S113 by setting an adequate timeout here or in every method
-            response = requests.request(  # noqa: S113
+            response = requests.request(
                 method="POST",
                 url=f"{API_URL}?api_key={self.api_key}",
                 json=data,
+                timeout=120,
             )
             response.raise_for_status()
             if "errors" in response.json():
