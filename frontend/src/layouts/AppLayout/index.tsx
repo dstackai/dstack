@@ -238,12 +238,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             />
 
             <TallyComponent />
-
-            {data?.server_version && (
-                <div className={styles.dstackVersion}>
-                    <Box color="text-status-inactive">Dstack version: {data?.server_version}</Box>
-                </div>
-            )}
         </AnnotationContext>
     );
 };

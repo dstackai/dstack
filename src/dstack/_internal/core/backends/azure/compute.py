@@ -41,7 +41,7 @@ from dstack._internal.core.backends.base.compute import (
     get_user_data,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
-from dstack._internal.core.errors import NoCapacityError
+from dstack._internal.core.errors import ComputeError, NoCapacityError
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.gateways import (
     GatewayComputeConfiguration,
@@ -460,7 +460,18 @@ def _launch_instance(
             message = e.error.message if e.error.message is not None else ""
             raise NoCapacityError(message)
         raise e
-    vm = poller.result()
+    vm = poller.result(timeout=600)
+    if not poller.done():
+        logger.error(
+            "Timed out waiting for instance {instance_name} launch. "
+            "The instance will be terminated."
+        )
+        _terminate_instance(
+            compute_client=compute_client,
+            resource_group=resource_group,
+            instance_name=instance_name,
+        )
+        raise ComputeError(f"Timed out waiting for instance {instance_name} launch")
     return vm
 
 
