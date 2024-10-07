@@ -52,9 +52,14 @@ export const useColumnsDefinitions = () => {
         {
             id: 'status',
             header: t('volume.status'),
-            cell: (item: IVolume) => (
-                <StatusIndicator type={getStatusIconType(item.status)}>{t(`volume.statuses.${item.status}`)}</StatusIndicator>
-            ),
+            cell: (item: IVolume) =>
+                item.deleted ? (
+                    <StatusIndicator type="error">{t(`volume.statuses.deleted`)}</StatusIndicator>
+                ) : (
+                    <StatusIndicator type={getStatusIconType(item.status)}>
+                        {t(`volume.statuses.${item.status}`)}
+                    </StatusIndicator>
+                ),
         },
         {
             id: 'created_at',

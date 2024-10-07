@@ -451,6 +451,7 @@
     "empty_message_text": "No volumes to display.",
     "nomatch_message_title": "No matches",
     "nomatch_message_text": "We can't find a match.",
+    "active_only": "Active volumes",
 
     "name": "Name",
     "project": "Project name",
@@ -464,7 +465,8 @@
       "failed": "Failed",
       "submitted": "Submitted",
       "provisioning": "Provisioning",
-      "active":  "Active"
+      "active":  "Active",
+      "deleted":  "Deleted"
     }
   },
 
