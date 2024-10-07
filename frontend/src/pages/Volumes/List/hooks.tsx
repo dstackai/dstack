@@ -41,12 +41,12 @@ export const useColumnsDefinitions = () => {
         {
             id: 'backend',
             header: `${t('volume.backend')}`,
-            cell: (item: IVolume) => item.configuration.backend,
+            cell: (item: IVolume) => item.configuration?.backend ?? '-',
         },
         {
             id: 'region',
             header: `${t('volume.region')}`,
-            cell: (item: IVolume) => item.configuration.backend,
+            cell: (item: IVolume) => item.configuration?.backend ?? '-',
         },
 
         {
@@ -65,7 +65,7 @@ export const useColumnsDefinitions = () => {
             id: 'price',
             header: `${t('volume.price')}`,
             cell: (item: IVolume) => {
-                return `$${item.provisioning_data.price}`;
+                return item?.provisioning_data?.price ? `$${item.provisioning_data.price.toFixed(2)}` : '-';
             },
         },
     ];
@@ -89,15 +89,15 @@ export const useVolumesData = ({ project_name, only_active }: TVolumesListReques
         })
             .unwrap()
             .then((result) => {
-                setData(result);
                 return result;
             });
     };
 
     useEffect(() => {
-        getVolumesRequest().then(() => {
+        getVolumesRequest().then((result) => {
             setPagesCount(1);
             setDisabledNext(false);
+            setData(result);
         });
     }, [project_name, only_active]);
 
@@ -114,6 +114,7 @@ export const useVolumesData = ({ project_name, only_active }: TVolumesListReques
 
             if (result.length > 0) {
                 setPagesCount((count) => count + 1);
+                setData(result);
             } else {
                 setDisabledNext(true);
             }
@@ -138,6 +139,7 @@ export const useVolumesData = ({ project_name, only_active }: TVolumesListReques
 
             if (result.length > 0) {
                 setPagesCount((count) => count - 1);
+                setData(result);
             } else {
                 setPagesCount(1);
             }

@@ -24,12 +24,12 @@ export const useColumnsDefinitions = () => {
         {
             id: 'backend',
             header: `${t('volume.backend')}`,
-            cell: (item: IVolume) => item.configuration.backend,
+            cell: (item: IVolume) => item.configuration?.backend ?? '-',
         },
         {
             id: 'region',
             header: `${t('volume.region')}`,
-            cell: (item: IVolume) => item.configuration.backend,
+            cell: (item: IVolume) => item.configuration?.backend ?? '-',
         },
 
         {
@@ -48,7 +48,7 @@ export const useColumnsDefinitions = () => {
             id: 'price',
             header: `${t('volume.price')}`,
             cell: (item: IVolume) => {
-                return `$${item.provisioning_data.price}`;
+                return item?.provisioning_data?.price ? `$${item.provisioning_data.price.toFixed(2)}` : '-';
             },
         },
     ];
