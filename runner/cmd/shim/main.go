@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"time"
 
+	docker "github.com/docker/docker/client"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim"
 	"github.com/dstackai/dstack/runner/internal/shim/api"
@@ -269,12 +270,17 @@ func getInterfaces() []string {
 }
 
 func getDiskSize() uint64 {
-	var stat unix.Statfs_t
-	wd, err := os.Getwd()
+	client, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithAPIVersionNegotiation())
 	if err != nil {
-		panic("cannot get current disk")
+		panic("cannot instantiate Docker client")
 	}
-	err = unix.Statfs(wd, &stat)
+	defer client.Close()
+	info, err := client.Info(context.TODO())
+	if err != nil {
+		panic("cannot get Docker info")
+	}
+	var stat unix.Statfs_t
+	err = unix.Statfs(info.DockerRootDir, &stat)
 	if err != nil {
 		panic("cannot get disk size")
 	}
