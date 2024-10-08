@@ -4,7 +4,7 @@ import botocore.client
 import botocore.exceptions
 
 import dstack.version as version
-from dstack._internal.core.errors import ComputeResourceNotFoundError
+from dstack._internal.core.errors import ComputeError, ComputeResourceNotFoundError
 
 
 def get_image_id(ec2_client: botocore.client.BaseClient, cuda: bool) -> str:
@@ -91,6 +91,15 @@ def create_security_group(
         security_group_id=security_group_id,
         rule={"IpProtocol": "-1"},
     )
+    _add_egress_security_group_rule_if_missing(
+        ec2_client=ec2_client,
+        security_group=security_group,
+        security_group_id=security_group_id,
+        rule={
+            "IpProtocol": "-1",
+            "UserIdGroupPairs": [{"GroupId": security_group_id}],
+        },
+    )
     return security_group_id
 
 
@@ -106,6 +115,7 @@ def create_instances_struct(
     subnet_id: Optional[str] = None,
     allocate_public_ip: bool = True,
     placement_group_name: Optional[str] = None,
+    enable_efa: bool = False,
 ) -> Dict[str, Any]:
     struct: Dict[str, Any] = dict(
         BlockDeviceMappings=[
@@ -139,15 +149,28 @@ def create_instances_struct(
                 "InstanceInterruptionBehavior": "terminate",
             },
         }
+    if enable_efa and not subnet_id:
+        raise ComputeError("EFA requires subnet")
     # AWS allows specifying either NetworkInterfaces for specific subnet_id
     # or instance-level SecurityGroupIds in case of no specific subnet_id, not both.
     if subnet_id is not None:
+        # Even if the instance type supports multiple cards, we always request only one interface
+        # due to the limitation: "AssociatePublicIpAddress [...] You cannot specify more than one
+        # network interface in the request".
+        # Error message: "(InvalidParameterCombination) when calling the RunInstances operation:
+        # The associatePublicIPAddress parameter cannot be specified when launching with
+        # multiple network interfaces".
+        # See: https://stackoverflow.com/questions/49882121
+        # If we need more than one card, we should either use Elastic IP (AWS-recommended way) or
+        # create the instance with one interface and add the rest later (the latter is not tested
+        # and may or may not work).
         struct["NetworkInterfaces"] = [
             {
                 "AssociatePublicIpAddress": allocate_public_ip,
                 "DeviceIndex": 0,
                 "SubnetId": subnet_id,
                 "Groups": [security_group_id],
+                "InterfaceType": "efa" if enable_efa else "interface",
             },
         ]
     else:
