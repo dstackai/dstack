@@ -138,8 +138,11 @@ We conducted same test with larger number of requests (300 to 900). At 900 reque
 ![chart8](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_tgi_vllm.png)
 
 ### vRAM consumption
-#### TGI (rocm-smi)
-```============================================ ROCm System Management Interface ============================================
+
+#### TGI
+
+```
+============================================ ROCm System Management Interface ============================================
 ====================================================== Concise Info ======================================================
 Device  Node  IDs              Temp        Power     Partitions          SCLK    MCLK    Fan  Perf  PwrCap  VRAM%  GPU%  
               (DID,     GUID)  (Junction)  (Socket)  (Mem, Compute, ID)                                                  
@@ -155,9 +158,11 @@ Device  Node  IDs              Temp        Power     Partitions          SCLK   
 ==========================================================================================================================
 ================================================== End of ROCm SMI Log ===================================================
 ```
-#### vLLM (rocm-smi)
 
-```========================================= ROCm System Management Interface =========================================
+#### vLLM
+
+```shell
+========================================= ROCm System Management Interface =========================================
 =================================================== Concise Info ===================================================
 Device  [Model : Revision]    Temp        Power     Partitions      SCLK    MCLK    Fan  Perf  PwrCap  VRAM%  GPU%  
         Name (20 chars)       (Junction)  (Socket)  (Mem, Compute)                                                  
@@ -181,12 +186,6 @@ Device  [Model : Revision]    Temp        Power     Partitions      SCLK    MCLK
 ====================================================================================================================
 =============================================== End of ROCm SMI Log ================================================
 ```
-
-### Notes
-TBA
-
-## Conclusion
-TBA
 
 ## What's next?
 
