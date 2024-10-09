@@ -101,54 +101,89 @@ Here is the spec of the bare metal machine we got:
     ```
 
 ??? info "TGI"
-
     The `ghcr.io/huggingface/text-generation-inference:sha-11d7af7-rocm` Docker image was used.
 
-For conducting the tests, we've been using the [
-`benchmark_serving` :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_serving.py){:target="_blank"} provided by vLLM. 
+For conducting the tests, we've been using the [`benchmark_serving` :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_serving.py){:target="_blank"} provided by vLLM. 
 
 ## Observations
 
 ### Token/sec per batch size
-TGI outperforms vLLM across all batch sizes in terms of token throughput. The performance gap increases as the batch size increases. For batches larger than 64, there is significant difference in performance. The sequence lengths of prompts are kept constant at 80 tokens per prompt.
-![chart1](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_short_seq/throughput_tgi_vllm.png)
+
+TGI consistently exceeds vLLM in token throughput across all batch sizes, with the performance difference growing larger
+as the batch size increases. For batch sizes exceeding 64, the performance disparity becomes quite notable.
+
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_short_seq/throughput_tgi_vllm.png" width="750"/>
+
+The prompts maintain a constant sequence length of 80 tokens each.
 
 ### TTFT per batch size
-TGI outperforms vLLM in Time To First Token across all batch sizes except batch size 2 & 32. Here too the performance gap is significant at larger batches.
-![chart2](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_short_seq/ttft_mean_tgi_vllm.png)
+
+TGI surpasses vLLM in Time to First Token for all batch sizes, except for batch sizes 2 and 32.
+
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_short_seq/ttft_mean_tgi_vllm.png" width="750"/>
+
+The performance difference is considerable for larger batch sizes.
 
 ### Token/sec per context size
-To check the performance in larger prompt sizes we conducted the tests at 10000 tokens per prompt. Here too, in terms of token throughput and TTFT,
-TGI outperformed vLLM significantly.
-![chart3](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_long_seq/throughput_tgi_vllm.png)
-![chart4](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_long_seq/mean_ttft_tgi_vllm.png)
 
-### Token/sec per RPS & TTFT per RPS
-To evaluate the performance scalability of TGI & vLLM we conducted tests with increasing Request Per Second (RPS) and increasing Requests Sent (RS) with same prompt size of 1000 tokens in all runs. In this experiment, we sent requests starting from 
-30 Requests at 1 RPS, 60 Requests at 2 RPS, ...,  to 150 Requests at 5 RPS. Ideally, all the runs should complete within same time frame, however due to limitation in resources as well as resource utilization increasing RPS will
-not proportionally increase the throughout (token/s) and maintain TTFT. Below observations show how both backends behave. 
+To evaluate performance with larger prompt sizes, we conducted tests using prompts of 10,000 tokens.
 
-At low 1 RPS(Request Per Second), vLLM is slightly better than TGI. Between 2 and 4 RPS,  TGI outperforms significantly in both token/s and TTFT.
-However, TGI starts to drop requests after 5 RPS
-![chart5](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/token_per_second_low_tgi_vllm.png)
-![chart6](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_low_tgi_vllm.png)
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_long_seq/throughput_tgi_vllm.png" width="750"/>
 
-We conducted same test with larger number of requests (300 to 900). At 900 requests with 3 RPS, TGI dropped most of the requests, however performed significantly better below 900 Requests.
-![chart7](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/token_per_second_tpi_vllm.png)
-![chart8](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_tgi_vllm.png)
+### TTFT per context size
+
+In this case, TGI demonstrated an advantage over vLLM in both token throughput and time to first token (TTFT).
+
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_long_seq/mean_ttft_tgi_vllm.png" width="750"/>
+
+### Token/sec per per RPS
+
+To assess the performance scalability of TGI and vLLM, we conducted tests by gradually increasing the Requests Per
+Second (RPS) and the total Requests Sent (RS) while keeping the prompt size consistent at 1,000 tokens for all trials. 
+
+In this experiment, we initiated requests beginning with 30 requests at 1 RPS, then increased to 60 requests at 2 RPS,
+and continued this pattern up to 150 requests at 5 RPS. 
+
+Ideally, we would expect all trials to complete within the same time frame. However, due to resource limitations and
+increasing resource utilization, higher RPS does not lead to a proportional increase in throughput (tokens per second)
+or maintain total time from first token (TTFT). The following observations illustrate the performance of both backends. 
+
+At 1 RPS, vLLM performs slightly better than TGI. However, between 2 and 4 RPS, TGI outperforms vLLM in both throughput and TTFT.
+
+Notably, TGI begins to drop requests once it reaches 5 RPS.
+
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/token_per_second_low_tgi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
+
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_low_tgi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
+
+We repeated the test using a higher number of requests, ranging from 300 to 900. At 900 requests with a rate of 3
+requests per second (RPS), TGI dropped a majority of the requests. However, its performance improved notably when the
+number of requests was below 900.
+
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/token_per_second_tpi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
+
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_tgi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
 
 ### vRAM consumption
 
-![chart8](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/gpu_vram_tgi_vllm.png)
+When considering vRAM consumption right after loading model weights, TGI allocates approximately 28% less vRAM compared
+to vLLM.
 
-## Notes
-* Inference backend configurations play a crucial role in determining the efficiency and scalability of both TGI and vLLM backends. The current benchmarks were conducted on a specific server setup, but to gain a comprehensive understanding of the performance capabilities more combinations of server configurations should be explored.
-* While it was observed that TGI consumes less VRAM compared to vLLM on AMD hardware, more investigation is needed to fully understand the VRAM utilization patterns of both backends. 
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/gpu_vram_tgi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
+
+This difference may be related to how vLLM [pre-allocates GPU cache :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/models/performance.html){:target="_blank"}.
 
 ## Conclusion
-TGI is better for moderate to high workloads, handling increasing RPS more effectively up to certain limits. It delivers faster TTFT and higher throughput in these scenarios.
-vLLM performs well at low RPS, but its scalability is limited, making it less effective for higher workloads. TGI's performance advantage lies in its [continuous batching algorithm](https://huggingface.co/blog/martinigoyanes/llm-inference-at-scale-with-tgi), which dynamically adjusts the size of batches, maximizes GPU utilization. 
-When considering VRAM consumption, it's clear that TGI is better optimized for AMD GPUs. This more efficient use of VRAM allows TGI to handle larger workloads and maintain higher throughput and lower latency  
+
+- TGI is highly efficient at handling medium to high workloads, increasing the requests per second (RPS) up to a certain limit.
+  In these cases, it delivers faster time to first token (TTFT) and higher throughput.
+- Conversely, vLLM works well with lower RPS but struggles to scale, making it less ideal for more demanding workloads.
+- TGI's edge comes from
+  its [continuous batching algorithm :material-arrow-top-right-thin:{ .external }](https://huggingface.co/blog/martinigoyanes/llm-inference-at-scale-with-tgi){:
+  target="_blank"} , which dynamically modifies batch sizes to optimize GPU usage.
+
+> To gain a more complete understanding of the performance potential, a wider variety of backend configurations should be tested.
+
 ## What's next?
 
 While we wait for AMD to announce new GPUs and for data centers to offer them, we’re considering tests with NVIDIA GPUs
