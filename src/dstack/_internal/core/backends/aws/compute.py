@@ -141,6 +141,10 @@ class AWSCompute(Compute):
             {"Key": "dstack_user", "Value": instance_config.user},
         ]
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+        max_efa_interfaces = get_maximum_efa_interfaces(
+            ec2_client=ec2_client, instance_type=instance_offer.instance.name
+        )
+        enable_efa = max_efa_interfaces > 0
         try:
             vpc_id, subnet_ids = get_vpc_id_subnet_id_or_error(
                 ec2_client=ec2_client,
@@ -183,6 +187,7 @@ class AWSCompute(Compute):
                         subnet_id=subnet_id,
                         allocate_public_ip=allocate_public_ip,
                         placement_group_name=instance_config.placement_group_name,
+                        enable_efa=enable_efa,
                     )
                 )
                 instance = response[0]
@@ -577,6 +582,23 @@ class AWSCompute(Compute):
             Device=volume.attachment_data.device_name,
         )
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
+
+
+def get_maximum_efa_interfaces(ec2_client: botocore.client.BaseClient, instance_type: str) -> int:
+    try:
+        response = ec2_client.describe_instance_types(
+            InstanceTypes=[instance_type],
+            Filters=[{"Name": "network-info.efa-supported", "Values": ["true"]}],
+        )
+    except botocore.exceptions.ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "InvalidInstanceType":
+            # "The following supplied instance types do not exist: [<instance_type>]"
+            return 0
+        raise
+    instance_types = response["InstanceTypes"]
+    if not instance_types:
+        return 0
+    return instance_types[0]["NetworkInfo"]["EfaInfo"]["MaximumEfaInterfaces"]
 
 
 def get_vpc_id_subnet_id_or_error(

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -24,6 +25,7 @@ import (
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
+	"github.com/docker/go-units"
 	"github.com/dstackai/dstack/runner/consts"
 	"github.com/dstackai/dstack/runner/internal/shim/backends"
 	"github.com/icza/backscanner"
@@ -498,6 +500,7 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		Tmpfs:           tmpfs,
 	}
 	configureGpuIfAvailable(hostConfig)
+	configureHpcNetworkingIfAvailable(hostConfig)
 
 	log.Printf("Creating container %s:\nconfig: %v\nhostConfig:%v", taskConfig.ContainerName, containerConfig, hostConfig)
 	resp, err := client.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, taskConfig.ContainerName)
@@ -629,6 +632,31 @@ func configureGpuIfAvailable(hostConfig *container.HostConfig) {
 		// --security-opt=seccomp=unconfined
 		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "seccomp=unconfined")
 		// TODO: in addition, for non-root user, --group-add=video, and possibly --group-add=render, are required.
+	}
+}
+
+func configureHpcNetworkingIfAvailable(hostConfig *container.HostConfig) {
+	// Although AWS EFA is not InfiniBand, EFA adapters are exposed as /dev/infiniband/uverbsN (N=0,1,...)
+	if _, err := os.Stat("/dev/infiniband"); !errors.Is(err, os.ErrNotExist) {
+		hostConfig.Resources.Devices = append(
+			hostConfig.Resources.Devices,
+			container.DeviceMapping{
+				PathOnHost:        "/dev/infiniband",
+				PathInContainer:   "/dev/infiniband",
+				CgroupPermissions: "rwm",
+			},
+		)
+		// Set max locked memory (ulimit -l) to unlimited. Fixes "Libfabric error: (-12) Cannot allocate memory".
+		// See: https://github.com/ofiwg/libfabric/issues/6437
+		// See: https://aws.amazon.com/blogs/compute/leveraging-efa-to-run-hpc-and-ml-workloads-on-aws-batch/
+		hostConfig.Ulimits = append(
+			hostConfig.Ulimits,
+			&units.Ulimit{
+				Name: "memlock",
+				Soft: -1,
+				Hard: -1,
+			},
+		)
 	}
 }
 
