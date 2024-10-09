@@ -46,7 +46,7 @@ export const useColumnsDefinitions = () => {
         {
             id: 'region',
             header: `${t('volume.region')}`,
-            cell: (item: IVolume) => item.configuration?.backend ?? '-',
+            cell: (item: IVolume) => item.configuration?.region ?? '-',
         },
 
         {
