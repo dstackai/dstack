@@ -183,11 +183,13 @@ Device  [Model : Revision]    Temp        Power     Partitions      SCLK    MCLK
 ```
 
 ### Notes
-TBA
+* Inference backend configurations play a crucial role in determining the efficiency and scalability of both TGI and vLLM backends. The current benchmarks were conducted on a specific server setup, but to gain a comprehensive understanding of the performance capabilities more combinations of server configurations should be explored.
+* While it was observed that TGI consumes less VRAM compared to vLLM on AMD hardware, more investigation is needed to fully understand the VRAM utilization patterns of both backends. 
 
 ## Conclusion
-TBA
-
+TGI is better for moderate to high workloads, handling increasing RPS more effectively up to certain limits. It delivers faster TTFT and higher throughput in these scenarios.
+vLLM performs well at low RPS, but its scalability is limited, making it less effective for higher workloads. TGI's performance advantage lies in its [continuous batching algorithm](https://huggingface.co/blog/martinigoyanes/llm-inference-at-scale-with-tgi), which dynamically adjusts the size of batches, maximizes GPU utilization. 
+When considering VRAM consumption, it's clear that TGI is better optimized for AMD GPUs. This more efficient use of VRAM allows TGI to handle larger workloads and maintain higher throughput and lower latency  
 ## What's next?
 
 While we wait for AMD to announce new GPUs and for data centers to offer them, we’re considering tests with NVIDIA GPUs
