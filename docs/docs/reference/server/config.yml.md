@@ -78,6 +78,7 @@ There are two ways to configure AWS: using an access key or using the default cr
                     "ec2:DescribeImages",
                     "ec2:DescribeInstances",
                     "ec2:DescribeInstanceAttribute",
+                    "ec2:DescribeInstanceTypes",
                     "ec2:DescribeRouteTables",
                     "ec2:DescribeSecurityGroups",
                     "ec2:DescribeSubnets",
