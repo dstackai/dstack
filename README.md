@@ -25,11 +25,12 @@ for AI workloads both in the cloud and on-prem, speeding up the development, tra
 
 ## Major news ✨
 
-- [2024/08] [dstack 0.18.11: AMD, encryption, and more](https://github.com/dstackai/dstack/releases/tag/0.18.11) (Release)
-- [2024/08] [dstack 0.18.10: Control plane UI](https://github.com/dstackai/dstack/releases/tag/0.18.10) (Release)
-- [2024/07] [dstack 0.18.7: Fleets, RunPod volumes, dstack apply, and more](https://github.com/dstackai/dstack/releases/tag/0.18.7) (Release)
-- [2024/05] [dstack 0.18.4: Google Cloud TPU, and more](https://github.com/dstackai/dstack/releases/tag/0.18.4) (Release)
-- [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2) (Release)
+- [2024/10] [dstack 0.18.17: on-prem AMD GPUs, AWS EFA, and more](https://github.com/dstackai/dstack/releases/tag/0.18.17)
+- [2024/08] [dstack 0.18.11: AMD, encryption, and more](https://github.com/dstackai/dstack/releases/tag/0.18.11)
+- [2024/08] [dstack 0.18.10: Control plane UI](https://github.com/dstackai/dstack/releases/tag/0.18.10)
+- [2024/07] [dstack 0.18.7: Fleets, RunPod volumes, dstack apply, and more](https://github.com/dstackai/dstack/releases/tag/0.18.7)
+- [2024/05] [dstack 0.18.4: Google Cloud TPU, and more](https://github.com/dstackai/dstack/releases/tag/0.18.4)
+- [2024/05] [dstack 0.18.2: On-prem clusters, private subnets, and more](https://github.com/dstackai/dstack/releases/tag/0.18.2)
 
 ## Installation
 
