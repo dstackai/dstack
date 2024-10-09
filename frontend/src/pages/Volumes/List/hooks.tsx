@@ -157,7 +157,7 @@ export const useVolumesData = ({ project_name, only_active }: TVolumesListReques
 };
 
 export const useFilters = (storagePrefix?: string) => {
-    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${storagePrefix}volume-list-is-active`, false);
+    const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${storagePrefix}volume-list-is-active`, true);
     const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
 
     const { data: projectsData } = useGetProjectsQuery();
