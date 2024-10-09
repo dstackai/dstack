@@ -258,7 +258,9 @@ resources:
 </div>
 
 If you run the task, `dstack` first provisions the master node and then runs the other nodes of the cluster.
-All nodes are provisioned in the same region.
+All nodes are provisioned in the same region. It is recommended to use a [fleet](../../concepts/fleets.md),
+as in this case all nodes are provisioned into a cluster placement group for better connectivity if the backend
+supports this feature.
 
 > `dstack` is easy to use with `accelerate`, `torchrun`, and other distributed frameworks. All you need to do
 is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, `DSTACK_NODES_NUM`,
@@ -267,6 +269,9 @@ is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, 
 ??? info "Backends"
     Running on multiple nodes is supported only with the `aws`, `gcp`, `azure`, `oci` backends, or
     [SSH fleets](../../concepts/fleets.md#ssh-fleets).
+
+    Additionally, the `aws` backend supports [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}.
+    For a list of instance types with EFA support see [Fleets](../../concepts/fleets.md#cloud-fleets).
 
 ### Web applications
 
