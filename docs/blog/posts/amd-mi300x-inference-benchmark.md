@@ -148,7 +148,7 @@ and continued this pattern up to 150 requests at 5 RPS.
 
 Ideally, we would expect all trials to complete within the same time frame. However, due to resource limitations and
 increasing resource utilization, higher RPS does not lead to a proportional increase in throughput (tokens per second)
-or maintain total time from first token (TTFT). 
+or maintain Time to First Token (TTFT). 
 
 <img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_low_tgi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
 
@@ -181,7 +181,8 @@ This difference may be related to how vLLM [pre-allocates GPU cache :material-ar
   throughput.
 - Conversely, vLLM works well with lower RPS but struggles to scale, making it less ideal for more demanding workloads.
 - TGI's edge comes from
-  its [continuous batching algorithm :material-arrow-top-right-thin:{ .external }](https://huggingface.co/blog/martinigoyanes/llm-inference-at-scale-with-tgi){:target="_blank"} , which dynamically modifies batch sizes to optimize GPU usage.
+  its [continuous batching algorithm :material-arrow-top-right-thin:{ .external }](https://huggingface.co/blog/martinigoyanes/llm-inference-at-scale-with-tgi){:target="_blank"}, which dynamically modifies batch sizes to optimize GPU usage.
+
 
 To gain a more complete understanding of the performance potential, a wider variety of backend configurations should be tested.
 
