@@ -110,16 +110,77 @@ For conducting the tests, we've been using the [
 ## Observations
 
 ### Token/sec per batch size
-TBA
+TGI outperforms vLLM across all batch sizes in terms of token throughput. The performance gap increases as the batch size increases. For batches larger than 64, there is significant difference in performance. The sequence lengths of prompts are kept constant at 80 tokens per prompt.
+![chart1](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_short_seq/throughput_tgi_vllm.png)
 
 ### TTFT per batch size
-TBA
+TGI outperforms vLLM in Time To First Token across all batch sizes except batch size 2 & 32. Here too the performance gap is significant at larger batches.
+![chart2](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_short_seq/ttft_mean_tgi_vllm.png)
 
 ### Token/sec per context size
-TBA
+To check the performance in larger prompt sizes we conducted the tests at 10000 tokens per prompt. Here too, in terms of token throughput and TTFT,
+TGI outperformed vLLM significantly.
+![chart3](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_long_seq/throughput_tgi_vllm.png)
+![chart4](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_long_seq/mean_ttft_tgi_vllm.png)
+
+### Token/sec per RPS & TTFT per RPS
+To evaluate the performance scalability of TGI & vLLM we conducted tests with increasing Request Per Second (RPS) and increasing Requests Sent (RS) with same prompt size of 1000 tokens in all runs. In this experiment, we sent requests starting from 
+30 Requests at 1 RPS, 60 Requests at 2 RPS, ...,  to 150 Requests at 5 RPS. Ideally, all the runs should complete within same time frame, however due to limitation in resources as well as resource utilization increasing RPS will
+not proportionally increase the throughout (token/s) and maintain TTFT. Below observations show how both backends behave. 
+
+At low 1 RPS(Request Per Second), vLLM is slightly better than TGI. Between 2 and 4 RPS,  TGI outperforms significantly in both token/s and TTFT.
+However, TGI starts to drop requests after 5 RPS
+![chart5](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/token_per_second_low_tgi_vllm.png)
+![chart6](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_low_tgi_vllm.png)
+
+We conducted same test with larger number of requests (300 to 900). At 900 requests with 3 RPS, TGI dropped most of the requests, however performed significantly better below 900 Requests.
+![chart7](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/token_per_second_tpi_vllm.png)
+![chart8](https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_tgi_vllm.png)
 
 ### vRAM consumption
-TBA
+#### TGI (rocm-smi)
+```============================================ ROCm System Management Interface ============================================
+====================================================== Concise Info ======================================================
+Device  Node  IDs              Temp        Power     Partitions          SCLK    MCLK    Fan  Perf  PwrCap  VRAM%  GPU%  
+              (DID,     GUID)  (Junction)  (Socket)  (Mem, Compute, ID)                                                  
+==========================================================================================================================
+0       2     0x74a1,   55354  47.0°C      139.0W    NPS1, SPX, 0        132Mhz  900Mhz  0%   auto  750.0W  68%    0%    
+1       3     0x74a1,   41632  40.0°C      135.0W    NPS1, SPX, 0        131Mhz  900Mhz  0%   auto  750.0W  68%    0%    
+2       4     0x74a1,   47045  44.0°C      136.0W    NPS1, SPX, 0        132Mhz  900Mhz  0%   auto  750.0W  68%    0%    
+3       5     0x74a1,   60169  48.0°C      143.0W    NPS1, SPX, 0        132Mhz  900Mhz  0%   auto  750.0W  68%    0%    
+4       6     0x74a1,   56024  46.0°C      139.0W    NPS1, SPX, 0        132Mhz  900Mhz  0%   auto  750.0W  68%    0%    
+5       7     0x74a1,   705    42.0°C      136.0W    NPS1, SPX, 0        131Mhz  900Mhz  0%   auto  750.0W  68%    0%    
+6       8     0x74a1,   59108  51.0°C      144.0W    NPS1, SPX, 0        132Mhz  900Mhz  0%   auto  750.0W  68%    0%    
+7       9     0x74a1,   10985  44.0°C      138.0W    NPS1, SPX, 0        132Mhz  900Mhz  0%   auto  750.0W  68%    0%    
+==========================================================================================================================
+================================================== End of ROCm SMI Log ===================================================
+```
+#### vLLM (rocm-smi)
+
+```========================================= ROCm System Management Interface =========================================
+=================================================== Concise Info ===================================================
+Device  [Model : Revision]    Temp        Power     Partitions      SCLK    MCLK    Fan  Perf  PwrCap  VRAM%  GPU%  
+        Name (20 chars)       (Junction)  (Socket)  (Mem, Compute)                                                  
+====================================================================================================================
+0       [0x74a1 : 0x00]       47.0°C      139.0W    NPS1, SPX       132Mhz  900Mhz  0%   auto  750.0W   97%   0%    
+        AMD Instinct MI300X                                                                                         
+1       [0x74a1 : 0x00]       39.0°C      135.0W    NPS1, SPX       131Mhz  900Mhz  0%   auto  750.0W   95%   0%    
+        AMD Instinct MI300X                                                                                         
+2       [0x74a1 : 0x00]       44.0°C      136.0W    NPS1, SPX       132Mhz  900Mhz  0%   auto  750.0W   95%   0%    
+        AMD Instinct MI300X                                                                                         
+3       [0x74a1 : 0x00]       48.0°C      143.0W    NPS1, SPX       132Mhz  900Mhz  0%   auto  750.0W   95%   0%    
+        AMD Instinct MI300X                                                                                         
+4       [0x74a1 : 0x00]       46.0°C      138.0W    NPS1, SPX       132Mhz  900Mhz  0%   auto  750.0W   95%   0%    
+        AMD Instinct MI300X                                                                                         
+5       [0x74a1 : 0x00]       41.0°C      137.0W    NPS1, SPX       131Mhz  900Mhz  0%   auto  750.0W   95%   0%    
+        AMD Instinct MI300X                                                                                         
+6       [0x74a1 : 0x00]       51.0°C      143.0W    NPS1, SPX       132Mhz  900Mhz  0%   auto  750.0W   95%   0%    
+        AMD Instinct MI300X                                                                                         
+7       [0x74a1 : 0x00]       43.0°C      137.0W    NPS1, SPX       132Mhz  900Mhz  0%   auto  750.0W   95%   0%    
+        AMD Instinct MI300X                                                                                         
+====================================================================================================================
+=============================================== End of ROCm SMI Log ================================================
+```
 
 ### Notes
 TBA
