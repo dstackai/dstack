@@ -170,13 +170,13 @@ performance improved notably when the number of requests was below 900.
 When considering vRAM consumption right after loading model weights, TGI allocates approximately 28% less vRAM compared
 to vLLM.
 
-<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/gpu_vram_tgi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
+<img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/gpu_vram_tgi_vllm.png" width="750" />
 
 This difference may be related to how vLLM [pre-allocates GPU cache :material-arrow-top-right-thin:{ .external }](https://docs.vllm.ai/en/latest/models/performance.html){:target="_blank"}.
 
 ## Conclusion
 
-- TGI is highly efficient at handling medium to high workloads. In our tests on 8 x AMD MI 300x GPU, medium workloads
+- TGI is highly efficient at handling medium to high workloads. In our tests on 8x AMD MI300X GPU, medium workloads
   are defined as RPS between 2 and 4. In these cases, it delivers faster time to first token (TTFT) and higher
   throughput.
 - Conversely, vLLM works well with lower RPS but struggles to scale, making it less ideal for more demanding workloads.
