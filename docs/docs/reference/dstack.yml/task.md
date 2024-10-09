@@ -258,9 +258,12 @@ resources:
 </div>
 
 If you run the task, `dstack` first provisions the master node and then runs the other nodes of the cluster.
-All nodes are provisioned in the same region. It is recommended to use a [fleet](../../concepts/fleets.md),
-as in this case all nodes are provisioned into a cluster placement group for better connectivity if the backend
-supports this feature.
+
+??? info "Network"
+    To ensure all nodes are provisioned into a cluster placement group and to enable the highest level of inter-node 
+    connectivity, it is recommended to manually create a  [fleet](../../concepts/fleets.md) before running a task.
+    This won’t be needed once [this issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1805){:target="_blank"} 
+    is fixed.
 
 > `dstack` is easy to use with `accelerate`, `torchrun`, and other distributed frameworks. All you need to do
 is pass the corresponding environment variables such as `DSTACK_GPUS_PER_NODE`, `DSTACK_NODE_RANK`, `DSTACK_NODES_NUM`,

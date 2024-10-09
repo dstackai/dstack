@@ -49,10 +49,11 @@ are both acceptable).
     to the specified parameters.
 
     !!! info "Network"
-        Set `placement` to `cluster` if the nodes should be interconnected
-        (e.g. if you'd like to use them for [multi-node tasks](../reference/dstack.yml/task.md#distributed-tasks)).
-        In that case, `dstack` will provision all nodes in the same backend and region and configure the optimal
-        connectivity via availability zones, placement groups, etc.
+        To ensure the nodes of the fleet are interconnected (e.g., if you'd like to use them for
+        [multi-node tasks](../reference/dstack.yml/task.md#distributed-tasks)), 
+        set `placement` to `cluster`. 
+        In this case, `dstack` will provision all nodes in the same backend and region and configure optimal 
+        inter-node connectivity.
 
         ??? info "AWS"
             `dstack` automatically enables [Elastic Fabric Adapter :material-arrow-top-right-thin:{ .external }](https://aws.amazon.com/hpc/efa/){:target="_blank"}
@@ -62,7 +63,7 @@ are both acceptable).
             `g6.16xlarge`, `g6.24xlarge`, `g6.48xlarge`, `g6.8xlarge`, `gr6.8xlarge`
 
             Currently, only one EFA interface is enabled regardless of the maximum number of interfaces supported by the instance type.
-            This limitation will be resolved in the future.
+            This limitation will be lifted once [this issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1804){:target="_blank"} is fixed.
 
     Note that cloud fleets aren't supported for the `kubernetes`, `vastai`, and `runpod` backends.
 
