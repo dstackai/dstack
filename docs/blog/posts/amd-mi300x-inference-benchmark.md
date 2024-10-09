@@ -1,0 +1,157 @@
+---
+title: "Benchmarking Llama 3.1 405B on 8x AMD MI300X GPUs"
+date: 2024-10-09
+description: "Exploring how the inference performance of Llama 3.1 405B varies on 8x AMD MI300X GPUs across vLLM and TGI backends in different use cases."  
+slug: amd-mi300x-inference-benchmark
+---
+
+# Benchmarking Llama 3.1 405B on 8x AMD MI300X GPUs
+
+At `dstack`, we've been adding support for AMD GPUs with [SSH fleets](../../docs/concepts/fleets.md#ssh-fleets), 
+so we saw this as a great chance to test our integration by benchmarking AMD GPUs. Our friends at 
+[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}, who build top-tier 
+bare metal compute for AMD GPUs, kindly provided the hardware for the benchmark.
+
+<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v4.png?raw=true" width="750" />
+
+<!-- more -->
+
+With access to a bare metal machine with 8x AMD MI300X GPUs from Hot Aisle, we decided to skip smaller models and went
+with Llama 3.1 405B. To make the benchmark interesting, we tested how inference performance varied across different
+backends (vLLM and TGI) and use cases (real-time vs batch inference, different context sizes, etc.).
+
+## Benchmark setup
+
+Here is the spec of the bare metal machine we got:
+
+- Intel® Xeon® Platinum 8470 2G, 52C/104T, 16GT/s, 105M Cache, Turbo, HT (350W) [x2]
+- AMD MI300X GPU OAM 192GB 750W GPUs [x8]
+- 64GB RDIMM, 4800MT/s Dual Rank [x32]
+
+??? info "Set up an SSH fleet"
+
+    Hot Aisle provided us with SSH access to the machine. To make it accessible via `dstack`,
+    we created an [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets) using the following configuration:
+
+    <div editor-title="hotaisle.dstack.yml"> 
+
+    ```yaml
+    type: fleet
+    name: hotaisle-fleet
+    
+    placement: any
+    
+    ssh_config:
+      user: hotaisle
+      identity_file: ~/.ssh/hotaisle_id_rsa
+    
+      hosts:
+        - hostname: ssh.hotaisle.cloud
+          port: 22013
+    ```
+
+    </div>
+
+    After running `dstack apply -f hotaisle.dstack.yml`, we were ready to run dev environments, tasks, and services on
+    this fleet via `datack`.
+
+??? info "vLLM"
+    
+    ```
+    PyTorch version: 2.4.1+rocm6.1
+    Is debug build: False
+    CUDA used to build PyTorch: N/A
+    ROCM used to build PyTorch: 6.1.40091-a8dbc0c19
+    
+    OS: Ubuntu 22.04.4 LTS (x86_64)
+    GCC version: (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+    Clang version: 17.0.0 (https://github.com/RadeonOpenCompute/llvm-project roc-6.1.0 24103 7db7f5e49612030319346f900c08f474b1f9023a)
+    CMake version: version 3.26.4
+    Libc version: glibc-2.35
+    
+    Python version: 3.10.14 (main, Mar 21 2024, 16:24:04) [GCC 11.2.0] (64-bit runtime)
+    Python platform: Linux-6.8.0-45-generic-x86_64-with-glibc2.35
+    Is CUDA available: True
+    CUDA runtime version: Could not collect
+    CUDA_MODULE_LOADING set to: LAZY
+    GPU models and configuration: AMD Instinct MI300X (gfx942:sramecc+:xnack-)
+    Nvidia driver version: Could not collect
+    cuDNN version: Could not collect
+    HIP runtime version: 6.1.40093
+    MIOpen runtime version: 3.1.0
+    Is XNNPACK available: True
+    
+    Versions of relevant libraries:
+    [pip3] mypy==1.4.1
+    [pip3] mypy-extensions==1.0.0
+    [pip3] numpy==1.26.4
+    [pip3] pytorch-triton-rocm==3.0.0
+    [pip3] pyzmq==24.0.1
+    [pip3] torch==2.4.1+rocm6.1
+    [pip3] torchaudio==2.4.1+rocm6.1
+    [pip3] torchvision==0.16.1+fdea156
+    [pip3] transformers==4.45.1
+    [pip3] triton==3.0.0
+    [conda] No relevant packages
+    ROCM Version: 6.1.40091-a8dbc0c19
+    Neuron SDK Version: N/A
+    vLLM Version: 0.6.3.dev116+g151ef4ef
+    vLLM Build Flags:
+    CUDA Archs: Not Set; ROCm: Disabled; Neuron: Disabled
+    ```
+
+??? info "TGI"
+
+    The `ghcr.io/huggingface/text-generation-inference:sha-11d7af7-rocm` Docker image was used.
+
+For conducting the tests, we've been using the [
+`benchmark_serving` :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-project/vllm/blob/main/benchmarks/benchmark_serving.py){:target="_blank"} provided by vLLM. 
+
+## Observations
+
+### Token/sec per batch size
+TBA
+
+### TTFT per batch size
+TBA
+
+### Token/sec per context size
+TBA
+
+### vRAM consumption
+TBA
+
+### Notes
+TBA
+
+## Conclusion
+TBA
+
+## What's next?
+
+While we wait for AMD to announce new GPUs and for data centers to offer them, we’re considering tests with NVIDIA GPUs
+like the H100 and H200, and possibly Google TPU.
+
+If you’d like to support us in doing more benchmarks, please let us know.
+
+### Source code
+
+The source code used for this benchmark can be found in our 
+[GitHub repo :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/benchmarks/tree/main/amd/inference){:target="_blank"}.
+
+If you have questions, feedback, or want to help improve the benchmark, please reach out to our team.
+
+## Thanks to our friends
+
+### Hot Aisle
+
+[Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"} 
+is the primary sponsor of this benchmark, and we are sincerely grateful for their hardware and support.  
+If you'd like to use top-tier bare metal compute with AMD GPUs, we recommend going
+with Hot Aisle. Once you gain access to a cluster, it can be easily accessed via `dstack`'s [SSH fleet](../../docs/concepts/fleets.md#ssh-fleets) easily.
+
+### RunPod
+If you’d like to use on-demand compute with AMD GPUs at affordable prices, you can configure `dstack` to
+use [RunPod :material-arrow-top-right-thin:{ .external }](https://runpod.io/){:target="_blank"}. In
+this case, `dstack` will be able to provision fleets automatically when you run dev environments, tasks, and
+services.
