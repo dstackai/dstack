@@ -154,14 +154,14 @@ or maintain Time to First Token (TTFT).
 
 At 1 RPS, vLLM performs slightly better than TGI. However, between 2 and 4 RPS, TGI outperforms vLLM in both throughput and TTFT.
 
-Notably, TGI begins to drop requests once it reaches 5 RPS.
+> Notably, TGI begins to drop requests once it reaches 5 RPS.
 
 We repeated the test using a higher number of requests, ranging from 300 to 900.
 
 <img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/token_per_second_tpi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
 
-At 900 requests with a rate of 3 requests per second (RPS), TGI dropped a majority of the requests. However, its
-performance improved notably when the number of requests was below 900.
+> At 900 requests with a rate of 3 requests per second (RPS), TGI dropped a majority of the requests. However, its
+> performance improved notably when the number of requests was below 900.
 
 <img src="https://raw.githubusercontent.com/dstackai/benchmarks/refs/heads/main/amd/inference/charts_rps/mean_ttft_tgi_vllm.png" width="725" style="padding: 0 40px 0 50px"/>
 
@@ -176,22 +176,26 @@ This difference may be related to how vLLM [pre-allocates GPU cache :material-ar
 
 ## Conclusion
 
-- TGI is highly efficient at handling medium to high workloads. In our tests on 8x AMD MI300X GPU, medium workloads
-  are defined as RPS between 2 and 4. In these cases, it delivers faster time to first token (TTFT) and higher
-  throughput.
-- Conversely, vLLM works well with lower RPS but struggles to scale, making it less ideal for more demanding workloads.
-- TGI's edge comes from
-  its [continuous batching algorithm :material-arrow-top-right-thin:{ .external }](https://huggingface.co/blog/martinigoyanes/llm-inference-at-scale-with-tgi){:target="_blank"}, which dynamically modifies batch sizes to optimize GPU usage.
+1. For small sequence lengths, starting with a batch size of 64, TGI significantly outperforms vLLM in terms of throughput and TTFT.
+2. For larger sequence lengths, TGI outperforms vLLM even more in both throughput and TTFT, with the difference increasing as the batch size grows.
+3. At higher request rates, TGI continues to outperform vLLM, likely due to its superior ability to batch requests efficiently.
 
+!!! info "Limitation"
+    * In certain circumstances (e.g., at higher request rates), for unknown reasons, TGI dropped requests, making it
+      impossible to accurately track throughput and TTFT.
+    * With vLLM, we used the default backend configuration. With better tuning, we might have achieved improved performance.
 
-To gain a more complete understanding of the performance potential, a wider variety of backend configurations should be tested.
+In general, the 8x AMD MI300X is a good fit for larger models and allows us to make the most of its vRAM, especially for
+larger batches.
+
+If you’d like to support us in doing more benchmarks, please let us know.
 
 ## What's next?
 
 While we wait for AMD to announce new GPUs and for data centers to offer them, we’re considering tests with NVIDIA GPUs
-like the H100 and H200, and possibly Google TPU.
+like the H100 and H200, as well as possibly Google TPU. 
 
-If you’d like to support us in doing more benchmarks, please let us know.
+> Also, the next step is to measure how the FP8 version of the model would perform on this hardware.
 
 ### Source code
 
