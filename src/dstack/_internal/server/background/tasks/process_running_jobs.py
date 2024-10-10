@@ -319,6 +319,7 @@ async def _wait_for_instance_provisioning_data(job_model: JobModel):
 
 @runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT], retries=1)
 def _process_provisioning_no_shim(
+    ports: Dict[int, int],
     run: Run,
     job_model: JobModel,
     job: Job,
@@ -326,8 +327,6 @@ def _process_provisioning_no_shim(
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
-    *,
-    ports: Dict[int, int],
 ) -> bool:
     """
     Possible next states:
@@ -357,6 +356,7 @@ def _process_provisioning_no_shim(
 
 @runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT], retries=1)
 def _process_provisioning_with_shim(
+    ports: Dict[int, int],
     run: Run,
     job_model: JobModel,
     volumes: List[Volume],
@@ -365,8 +365,6 @@ def _process_provisioning_with_shim(
     public_keys: List[str],
     ssh_user: str,
     ssh_key: str,
-    *,
-    ports: Dict[int, int],
 ) -> bool:
     """
     Possible next states:
@@ -416,6 +414,7 @@ def _process_provisioning_with_shim(
 
 @runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT, client.REMOTE_RUNNER_PORT])
 def _process_pulling_with_shim(
+    ports: Dict[int, int],
     run: Run,
     job_model: JobModel,
     job: Job,
@@ -423,8 +422,6 @@ def _process_pulling_with_shim(
     code: bytes,
     secrets: Dict[str, str],
     repo_credentials: Optional[RemoteRepoCreds],
-    *,
-    ports: Dict[int, int],
 ) -> bool:
     """
     Possible next states:
@@ -478,10 +475,9 @@ def _process_pulling_with_shim(
 
 @runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT])
 def _process_running(
+    ports: Dict[int, int],
     run_model: RunModel,
     job_model: JobModel,
-    *,
-    ports: Dict[int, int],
 ) -> bool:
     """
     Possible next states:

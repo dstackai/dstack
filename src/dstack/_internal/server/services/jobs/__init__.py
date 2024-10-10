@@ -54,6 +54,31 @@ async def get_job_specs_from_run_spec(run_spec: RunSpec, replica_num: int) -> Li
     return job_specs
 
 
+def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
+    for job in jobs:
+        if job.job_spec.replica_num == replica_num and job.job_spec.job_num == job_num:
+            return job
+    raise ResourceNotExistsError(
+        f"Job with replica_num={replica_num} and job_num={job_num} not found"
+    )
+
+
+async def list_run_job_models(
+    session: AsyncSession, project: ProjectModel, run_name: str, replica_num: int, job_num: int
+) -> List[JobModel]:
+    res = await session.execute(
+        select(JobModel)
+        .where(
+            JobModel.project_id == project.id,
+            JobModel.run_name == run_name,
+            JobModel.replica_num == replica_num,
+            JobModel.job_num == job_num,
+        )
+        .order_by(JobModel.submission_num)
+    )
+    return list(res.scalars().all())
+
+
 def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
     job_provisioning_data = None
     if job_model.job_provisioning_data is not None:
@@ -84,15 +109,6 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         termination_reason=job_model.termination_reason,
         termination_reason_message=job_model.termination_reason_message,
         job_provisioning_data=job_provisioning_data,
-    )
-
-
-def find_job(jobs: List[Job], replica_num: int, job_num: int) -> Job:
-    for job in jobs:
-        if job.job_spec.replica_num == replica_num and job.job_spec.job_num == job_num:
-            return job
-    raise ResourceNotExistsError(
-        f"Job with replica_num={replica_num} and job_num={job_num} not found"
     )
 
 
@@ -282,7 +298,7 @@ async def stop_container(
 
 
 @runner_ssh_tunnel(ports=[client.REMOTE_SHIM_PORT])
-def _shim_submit_stop(job_model: JobModel, ports: Dict[int, int]):
+def _shim_submit_stop(ports: Dict[int, int], job_model: JobModel):
     shim_client = client.ShimClient(port=ports[client.REMOTE_SHIM_PORT])
 
     resp = shim_client.healthcheck()
