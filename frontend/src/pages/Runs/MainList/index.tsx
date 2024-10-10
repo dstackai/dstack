@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { sortBy as _sortBy } from 'lodash';
+import { orderBy as _orderBy } from 'lodash';
 
 import { Button, FormField, Header, Pagination, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 import { useProjectDropdown } from 'layouts/AppLayout/hooks';
@@ -101,7 +101,7 @@ export const List: React.FC = () => {
 
             if (result.length > 0) {
                 setPagesCount((count) => count - 1);
-                setData(result);
+                setData(_orderBy(result, ['submitted_at'], ['desc']));
             } else {
                 setPagesCount(1);
             }
@@ -121,13 +121,7 @@ export const List: React.FC = () => {
         clearFilter,
     });
 
-    const sortedData = useMemo(() => {
-        if (!data) return [];
-
-        return _sortBy(data, [(i) => -i.submitted_at]);
-    }, [data]);
-
-    const { items, actions, collectionProps } = useCollection(sortedData ?? [], {
+    const { items, actions, collectionProps } = useCollection(data ?? [], {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(),
