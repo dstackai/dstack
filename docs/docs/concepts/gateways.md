@@ -76,7 +76,7 @@ $ dstack delete -f examples/deployment/gateway.dstack.yml
 
 </div>
 
-[//]: # (TODO: Ellaborate on default)
+[//]: # (TODO: Elaborate on default)
 
 [//]: # (TODO: ## Accessing endpoints)
 

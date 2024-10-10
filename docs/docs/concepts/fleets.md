@@ -239,7 +239,7 @@ To terminate and delete specific instances from a fleet, pass `-i INSTANCE_NUM`.
 
 #### Termination policy
 
-If you want a fleet to be automatically deleted after a certain idle time, you can set the
+If you want a fleet to be automatically deleted after a certain idle time,
 you can set the [`termination_idle_time`](../reference/dstack.yml/fleet.md#termination_idle_time) property.
 
 [//]: # (Add Idle time example to the reference page)
