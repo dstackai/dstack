@@ -1,7 +1,7 @@
 # Services
 
 A service allows you to deploy a web app or a model as a scalable endpoint. It lets you configure
-dependencies, resources, authorizarion, auto-scaling rules, etc.
+dependencies, resources, authorization, auto-scaling rules, etc.
 
 Services are provisioned behind a [gateway](concepts/gateways.md) which provides an HTTPS endpoint mapped to your domain,
 handles authentication, distributes load, and performs auto-scaling.
