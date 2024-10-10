@@ -13,7 +13,7 @@ Make sure to provide clear, detailed steps to reproduce the issue.
 Include server logs, CLI outputs, and configuration samples. Avoid using screenshots for logs or errors—use text instead. 
 
 To get more detailed logs, make sure to set the `DSTACK_CLI_LOG_LEVEL` and `DSTACK_SERVER_LOG_LEVEL` 
-environent variables to `debug` when running the CLI and the server, respectively.
+environment variables to `debug` when running the CLI and the server, respectively.
 
 > See these examples for well-reported issues: [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1640){:target="_blank"}
 and [this :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/1551){:target="_blank"}.
