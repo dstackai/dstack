@@ -7,3 +7,12 @@ pytest-httpbin==2.1.0
 freezegun>=1.2.0
 ruff==0.5.3  # Should match .pre-commit-config.yaml
 testcontainers # testcontainers<4 may not work with asyncpg
+
+# Documentation
+mkdocs-material
+mkdocs-material[imaging]
+mkdocs-material-extensions
+mkdocs-redirects
+mkdocs-gen-files
+mkdocstrings[python]
+mkdocs-render-swagger-plugin
