@@ -149,7 +149,7 @@ Your folder can be a regular local folder or a Git repo.
 === "Service"
 
     A service allows you to deploy a web app or a model as a scalable endpoint. It lets you configure
-    dependencies, resources, authorizarion, auto-scaling rules, etc. 
+    dependencies, resources, authorization, auto-scaling rules, etc. 
 
     ??? info "Prerequisites"
         If you're using the open-source server, you must set up a [gateway](concepts/gateways.md) before you can run a service.
@@ -179,7 +179,7 @@ Your folder can be a regular local folder or a Git repo.
     # Port of the service
     port: 8501
 
-    # Comment to enable authorizartion
+    # Comment to enable authorization
     auth: False
 
     # Use either spot or on-demand instances
@@ -220,7 +220,7 @@ Your folder can be a regular local folder or a Git repo.
     
     </div>
 
-    One the service is up, its endpoint is accessible at `https://<run name>.<gateway domain>`.
+    Once the service is up, its endpoint is accessible at `https://<run name>.<gateway domain>`.
 
 > `dstack apply` automatically uploads the code from the current repo, including your local uncommitted changes.
 
