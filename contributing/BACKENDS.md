@@ -233,9 +233,9 @@ To support it, `dstack` expects the following from the cloud provider:
 
 The examples of container-based backends include: `kubernetes`, `vastai`, etc.
 
-Note: There are two types of compute in dstack:
+Note: There are two types of computing in dstack:
 
-When `dstack` provisions a VM, it launches there `dstack-runner`.
+When `dstack` provisions a VM, it launches their `dstack-runner`.
 
 [//]: # (TODO: Elaborate on what dstack-runner is and how it works)
 
