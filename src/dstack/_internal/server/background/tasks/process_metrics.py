@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
@@ -53,13 +53,18 @@ async def _collect_jobs_metrics(job_models: List[JobModel]):
     tasks = []
     for job_model in job_models:
         tasks.append(_collect_job_metrics(job_model))
-    await asyncio.gather(*tasks)
+    points = await asyncio.gather(*tasks)
+    async with get_session_ctx() as session:
+        for point in points:
+            if point is not None:
+                session.add(point)
+        await session.commit()
 
 
-async def _collect_job_metrics(job_model: JobModel):
+async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]:
     jpd = get_job_provisioning_data(job_model)
     if jpd is None:
-        return
+        return None
     try:
         res = await run_async(
             _pull_runner_metrics,
@@ -68,20 +73,18 @@ async def _collect_job_metrics(job_model: JobModel):
         )
     except Exception:
         logger.exception("Failed to collect job %s metrics", job_model.job_num)
-        return
+        return None
     if isinstance(res, bool):
         logger.error("Failed to connect to job %s to collect metrics", job_model.job_num)
-        return
-    async with get_session_ctx() as session:
-        point = JobMetricsPoint(
-            job_id=job_model.id,
-            timestamp_micro=res.timestamp_micro,
-            cpu_usage_micro=res.cpu_usage_micro,
-            memory_usage_bytes=res.memory_usage_bytes,
-            memory_working_set_bytes=res.memory_working_set_bytes,
-        )
-        session.add(point)
-        await session.commit()
+        return None
+
+    return JobMetricsPoint(
+        job_id=job_model.id,
+        timestamp_micro=res.timestamp_micro,
+        cpu_usage_micro=res.cpu_usage_micro,
+        memory_usage_bytes=res.memory_usage_bytes,
+        memory_working_set_bytes=res.memory_working_set_bytes,
+    )
 
 
 @runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT], retries=1)
