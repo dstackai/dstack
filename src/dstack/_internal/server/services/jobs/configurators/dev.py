@@ -33,7 +33,6 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         commands += self.run_spec.configuration.setup
         commands.append("echo ''")
         commands += self.run_spec.configuration.init
-        commands.append("echo ''")
         commands += self.ide.get_print_readme_commands()
         commands += [
             f"echo 'To connect via SSH, use: `ssh {self.run_spec.run_name}`'",
