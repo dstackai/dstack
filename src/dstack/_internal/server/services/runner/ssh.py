@@ -8,10 +8,10 @@ import requests
 from typing_extensions import Concatenate, ParamSpec
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
 from dstack._internal.server.services.runner import client
-from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 
@@ -41,7 +41,7 @@ def runner_ssh_tunnel(
                 is successful
             """
 
-            if LOCAL_BACKEND_ENABLED:
+            if job_provisioning_data.backend == BackendType.LOCAL:
                 # without SSH
                 port_map = {p: p for p in ports}
                 return func(port_map, *args, **kwargs)

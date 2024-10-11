@@ -590,7 +590,7 @@ class PlacementGroupModel(BaseModel):
 
 
 class JobMetricsPoint(BaseModel):
-    __tablename__ = "job_metrics_point"
+    __tablename__ = "job_metrics_points"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
