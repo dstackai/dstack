@@ -1,10 +1,11 @@
 import asyncio
 from typing import Dict, List
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import selectinload
 
 from dstack._internal.core.models.runs import JobStatus
+from dstack._internal.server import settings
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import JobMetricsPoint, JobModel
 from dstack._internal.server.schemas.runner import MetricsResponse
@@ -12,7 +13,7 @@ from dstack._internal.server.services.jobs import get_job_provisioning_data
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.utils.common import run_async
-from dstack._internal.utils.common import batched
+from dstack._internal.utils.common import batched, get_current_datetime
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -37,6 +38,15 @@ async def collect_metrics():
 
     for batch in batched(job_models, BATCH_SIZE):
         await _collect_jobs_metrics(batch)
+
+
+async def delete_metrics():
+    cutoff = _get_delete_metrics_cutoff()
+    async with get_session_ctx() as session:
+        await session.execute(
+            delete(JobMetricsPoint).where(JobMetricsPoint.timestamp_micro < cutoff)
+        )
+        await session.commit()
 
 
 async def _collect_jobs_metrics(job_models: List[JobModel]):
@@ -80,3 +90,9 @@ def _pull_runner_metrics(
 ) -> MetricsResponse:
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
     return runner_client.get_metrics()
+
+
+def _get_delete_metrics_cutoff() -> int:
+    now = int(get_current_datetime().timestamp() * 1_000_000)
+    cutoff = now - (settings.SERVER_METRICS_TTL_SECONDS * 1_000_000)
+    return cutoff

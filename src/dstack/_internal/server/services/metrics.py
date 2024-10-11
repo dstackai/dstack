@@ -63,16 +63,16 @@ def _calculate_job_metrics(last_point: JobMetricsPoint, prev_point: JobMetricsPo
     )
     metrics.append(
         Metric(
-            name="memory_usage_mib",
+            name="memory_usage_bytes",
             timestamps=[timestamp],
-            values=[last_point.memory_usage_bytes // (1024 * 1024)],
+            values=[last_point.memory_usage_bytes],
         )
     )
     metrics.append(
         Metric(
-            name="memory_working_set_mib",
+            name="memory_working_set_bytes",
             timestamps=[timestamp],
-            values=[last_point.memory_working_set_bytes // (1024 * 1024)],
+            values=[last_point.memory_working_set_bytes],
         )
     )
     return JobMetrics(metrics=metrics)
