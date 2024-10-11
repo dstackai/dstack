@@ -46,8 +46,8 @@ async def _get_job_metrics(
     points = res.scalars().all()
     if len(points) < 2:
         return JobMetrics(metrics=[])
-    last_point = points[-1]
-    prev_point = points[-2]
+    last_point = points[0]
+    prev_point = points[1]
     return _calculate_job_metrics(last_point, prev_point)
 
 
