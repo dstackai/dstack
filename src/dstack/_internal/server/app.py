@@ -24,6 +24,7 @@ from dstack._internal.server.routers import (
     fleets,
     gateways,
     logs,
+    metrics,
     pools,
     projects,
     repos,
@@ -169,6 +170,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(repos.router)
     app.include_router(runs.root_router)
     app.include_router(runs.project_router)
+    app.include_router(metrics.router)
     app.include_router(logs.router)
     app.include_router(secrets.router)
     app.include_router(gateways.router)

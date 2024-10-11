@@ -587,3 +587,19 @@ class PlacementGroupModel(BaseModel):
 
     configuration: Mapped[str] = mapped_column(Text)
     provisioning_data: Mapped[Optional[str]] = mapped_column(Text)
+
+
+class JobMetricsPoint(BaseModel):
+    __tablename__ = "job_metrics_point"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType(binary=False), primary_key=True, default=uuid.uuid4
+    )
+
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("jobs.id"))
+    job: Mapped["JobModel"] = relationship()
+
+    timestamp_micro: Mapped[int] = mapped_column(BigInteger)
+    cpu_usage_micro: Mapped[int] = mapped_column(BigInteger)
+    memory_usage_bytes: Mapped[int] = mapped_column(BigInteger)
+    memory_working_set_bytes: Mapped[int] = mapped_column(BigInteger)

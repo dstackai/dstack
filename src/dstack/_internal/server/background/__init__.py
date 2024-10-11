@@ -1,6 +1,7 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
+from dstack._internal.server.background.tasks.collect_metrics import collect_metrics
 from dstack._internal.server.background.tasks.process_fleets import process_fleets
 from dstack._internal.server.background.tasks.process_gateways import (
     process_gateways_connections,
@@ -31,6 +32,7 @@ def start_background_tasks() -> AsyncIOScheduler:
     # In-memory locking via locksets does not guarantee
     # that the first waiting for the lock will acquire it.
     # The jitter is needed to give all tasks a chance to acquire locks.
+    _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
     _scheduler.add_job(
         process_submitted_jobs, IntervalTrigger(seconds=4, jitter=2), max_instances=5
     )

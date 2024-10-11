@@ -80,11 +80,8 @@ async def list_run_job_models(
 
 
 def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
-    job_provisioning_data = None
-    if job_model.job_provisioning_data is not None:
-        job_provisioning_data = JobProvisioningData.__response__.parse_raw(
-            job_model.job_provisioning_data
-        )
+    job_provisioning_data = get_job_provisioning_data(job_model)
+    if job_provisioning_data is not None:
         # TODO remove after transitioning to computed fields
         job_provisioning_data.instance_type.resources.description = (
             job_provisioning_data.instance_type.resources.pretty_format()
@@ -110,6 +107,12 @@ def job_model_to_job_submission(job_model: JobModel) -> JobSubmission:
         termination_reason_message=job_model.termination_reason_message,
         job_provisioning_data=job_provisioning_data,
     )
+
+
+def get_job_provisioning_data(job_model: JobModel) -> Optional[JobProvisioningData]:
+    if job_model.job_provisioning_data is None:
+        return None
+    return JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
 
 
 async def terminate_job_provisioning_data_instance(
@@ -183,7 +186,9 @@ def _stop_runner(
     job_model: JobModel,
     server_ssh_private_key: str,
 ):
-    jpd = JobProvisioningData.__response__.parse_raw(job_model.job_provisioning_data)
+    jpd = get_job_provisioning_data(job_model)
+    if jpd is None:
+        return
     logger.debug("%s: stopping runner %s", fmt(job_model), jpd.hostname)
     ports = get_runner_ports()
     with SSHTunnel(
