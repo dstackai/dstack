@@ -47,10 +47,6 @@ export const FleetsList: React.FC = () => {
                 acc.push({ fleetName: item.name, ...instance });
             });
 
-            if (index === 1) {
-                acc.push({ fleetName: 'Test' });
-            }
-
             return acc;
         }, []);
     }, [data]);
