@@ -32,13 +32,14 @@ class DevEnvironmentJobConfigurator(JobConfigurator):
         commands.append(INSTALL_IPYKERNEL)
         commands += self.run_spec.configuration.setup
         commands.append("echo ''")
+        commands += self.run_spec.configuration.init
+        commands.append("echo ''")
         commands += self.ide.get_print_readme_commands()
         commands += [
             f"echo 'To connect via SSH, use: `ssh {self.run_spec.run_name}`'",
             "echo ''",
             "echo -n 'To exit, press Ctrl+C.'",
         ]
-        commands += self.run_spec.configuration.init
         commands += ["tail -f /dev/null"]  # idle
         return commands
 
