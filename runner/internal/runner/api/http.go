@@ -12,16 +12,27 @@ import (
 	"github.com/dstackai/dstack/runner/internal/executor"
 	"github.com/dstackai/dstack/runner/internal/gerrors"
 	"github.com/dstackai/dstack/runner/internal/log"
+	"github.com/dstackai/dstack/runner/internal/metrics"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
 func (s *Server) healthcheckGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
-	s.executor.RLock()
-	defer s.executor.RUnlock()
 	return &schemas.HealthcheckResponse{
 		Service: "dstack-runner",
 		Version: s.version,
 	}, nil
+}
+
+func (s *Server) metricsGetHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
+	metricsCollector, err := metrics.NewMetricsCollector()
+	if err != nil {
+		return nil, &api.Error{Status: http.StatusInternalServerError, Err: err}
+	}
+	metrics, err := metricsCollector.GetSystemMetrics()
+	if err != nil {
+		return nil, &api.Error{Status: http.StatusInternalServerError, Err: err}
+	}
+	return metrics, nil
 }
 
 func (s *Server) submitPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
@@ -109,6 +120,5 @@ func (s *Server) pullGetHandler(w http.ResponseWriter, r *http.Request) (interfa
 
 func (s *Server) stopPostHandler(w http.ResponseWriter, r *http.Request) (interface{}, error) {
 	s.stop()
-
 	return nil, nil
 }
