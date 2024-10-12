@@ -1,5 +1,5 @@
 <div>
-<h2>✨
+<h2>
   <a target="_blank" href="https://dstack.ai">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/dstackai/dstack/master/docs/assets/images/dstack-logo-dark.svg"/>
