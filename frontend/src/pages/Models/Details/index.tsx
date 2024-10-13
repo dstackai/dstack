@@ -18,7 +18,11 @@ import {
     Header,
     ListEmptyMessage,
     Loader,
+    Modal,
     NavigateLink,
+    SelectCSD,
+    SelectCSDProps,
+    SpaceBetween,
 } from 'components';
 
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
@@ -28,9 +32,12 @@ import { useGetRunQuery } from 'services/run';
 
 import { selectAuthToken } from 'App/slice';
 
+import { copyToClipboard } from '../../../libs';
+
 import { IModelExtended } from '../List/types';
 import { FormValues, Message, Role } from './types';
 
+import { ReactComponent as SourceIcon } from 'assets/icons/source.svg';
 import css from './styles.module.scss';
 
 const MESSAGE_ROLE_MAP: Record<Role, string> = {
@@ -40,10 +47,17 @@ const MESSAGE_ROLE_MAP: Record<Role, string> = {
     assistant: 'Assistant',
 };
 
+const VIEW_CODE_TYPE_OPTIONS = [
+    { label: 'Python', value: 'python' },
+    { label: 'Curl', value: 'curl' },
+];
+
 export const ModelDetails: React.FC = () => {
     const { t } = useTranslation();
     const token = useAppSelector(selectAuthToken);
     const [messages, setMessages] = useState<Message[]>([]);
+    const [viewCodeVisible, setViewCodeVisible] = useState<boolean>(false);
+    const [selectedCode, setSelectedCode] = useState<SelectCSDProps.Option>(VIEW_CODE_TYPE_OPTIONS[0]);
     const [loading, setLoading] = useState<boolean>(false);
     const params = useParams();
     const paramProjectName = params.projectName ?? '';
@@ -252,6 +266,41 @@ export const ModelDetails: React.FC = () => {
         }
     };
 
+    const pythonCode = `from openai import OpenAI
+client = OpenAI()
+
+response = client.chat.completions.create(
+  model="${modelData?.name ?? ''}",
+  messages=[],
+  stream=True,
+  max_tokens=512,
+  response_format={
+    "type": "text"
+  }
+)`;
+
+    const curlCode = `curl https://api.openai.com/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer $OPENAI_API_KEY" \\
+  -d '{
+  "model": "${modelData?.name ?? ''}",
+  "messages": [],
+  "stream": true,
+  "max_tokens": 512,
+  "response_format": {
+    "type": "text"
+  }
+}'`;
+
+    const onCopyCode = () => {
+        switch (selectedCode.value) {
+            case VIEW_CODE_TYPE_OPTIONS[0].value:
+                return copyToClipboard(pythonCode);
+            case VIEW_CODE_TYPE_OPTIONS[1].value:
+                return copyToClipboard(curlCode);
+        }
+    };
+
     return (
         <ContentLayout
             header={
@@ -271,78 +320,119 @@ export const ModelDetails: React.FC = () => {
             )}
 
             {modelData && (
-                <div className={css.modelDetailsLayout}>
-                    <div className={css.general}>
-                        <Container header={<Header variant="h2">{t('common.general')}</Header>}>
-                            <ColumnLayout columns={4} variant="text-grid">
-                                <div>
-                                    <Box variant="awsui-key-label">{t('models.details.run_name')}</Box>
-                                    <div>{modelData.run_name}</div>
-                                </div>
+                <>
+                    <div className={css.modelDetailsLayout}>
+                        <div className={css.general}>
+                            <Container header={<Header variant="h2">{t('common.general')}</Header>}>
+                                <ColumnLayout columns={4} variant="text-grid">
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('models.details.run_name')}</Box>
+                                        <div>{modelData.run_name}</div>
+                                    </div>
 
-                                <div>
-                                    <Box variant="awsui-key-label">{t('models.model_name')}</Box>
-                                    <div>{modelData.name}</div>
-                                </div>
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('models.model_name')}</Box>
+                                        <div>{modelData.name}</div>
+                                    </div>
 
-                                <div>
-                                    <Box variant="awsui-key-label">{t('models.type')}</Box>
-                                    <div>{modelData.type}</div>
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('models.type')}</Box>
+                                        <div>{modelData.type}</div>
+                                    </div>
+                                </ColumnLayout>
+                            </Container>
+                        </div>
+
+                        <form className={css.modelForm} onSubmit={handleSubmit(onSubmit)}>
+                            <div className={css.buttons}>
+                                <Button iconSvg={<SourceIcon />} disabled={loading} onClick={() => setViewCodeVisible(true)} />
+
+                                <Button iconName="remove" disabled={loading || !messages.length} onClick={clearChat} />
+                            </div>
+
+                            <aside className={css.side}>
+                                <FormTextarea
+                                    disabled={loading}
+                                    label={t('models.details.instructions')}
+                                    constraintText={t('models.details.instructions_description')}
+                                    control={control}
+                                    name="instructions"
+                                />
+                            </aside>
+
+                            <div className={css.chat} ref={chatList}>
+                                {!messageForShowing.length && (
+                                    <ListEmptyMessage
+                                        title={t('models.details.chat_empty_title')}
+                                        message={t('models.details.chat_empty_message')}
+                                    />
+                                )}
+
+                                {messageForShowing.map((message, index) => (
+                                    <div key={index} className={cn(css.message, css[message.role])}>
+                                        <Box variant="h4">
+                                            {MESSAGE_ROLE_MAP[message.role as keyof typeof MESSAGE_ROLE_MAP]}
+                                        </Box>
+                                        {renderMessageBody(message.content || '...')}
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div ref={textAreaRef} className={css.messageForm}>
+                                <FormTextarea
+                                    stretch
+                                    placeholder={t('models.details.message_placeholder')}
+                                    control={control}
+                                    disabled={loading}
+                                    name="message"
+                                    onKeyDown={onKeyDown}
+                                    onChange={onChangeMessage}
+                                />
+
+                                <div className={css.buttons}>
+                                    <Button variant="primary" disabled={loading}>
+                                        {t('common.send')}
+                                    </Button>
                                 </div>
-                            </ColumnLayout>
-                        </Container>
+                            </div>
+                        </form>
                     </div>
 
-                    <form className={css.modelForm} onSubmit={handleSubmit(onSubmit)}>
-                        <div className={css.clear}>
-                            <Button iconName="remove" disabled={loading || !messages.length} onClick={clearChat} />
-                        </div>
-
-                        <aside className={css.side}>
-                            <FormTextarea
-                                disabled={loading}
-                                label={t('models.details.instructions')}
-                                constraintText={t('models.details.instructions_description')}
-                                control={control}
-                                name="instructions"
-                            />
-                        </aside>
-
-                        <div className={css.chat} ref={chatList}>
-                            {!messageForShowing.length && (
-                                <ListEmptyMessage
-                                    title={t('models.details.chat_empty_title')}
-                                    message={t('models.details.chat_empty_message')}
-                                />
-                            )}
-
-                            {messageForShowing.map((message, index) => (
-                                <div key={index} className={cn(css.message, css[message.role])}>
-                                    <Box variant="h4">{MESSAGE_ROLE_MAP[message.role as keyof typeof MESSAGE_ROLE_MAP]}</Box>
-                                    {renderMessageBody(message.content || '...')}
-                                </div>
-                            ))}
-                        </div>
-
-                        <div ref={textAreaRef} className={css.messageForm}>
-                            <FormTextarea
-                                stretch
-                                placeholder={t('models.details.message_placeholder')}
-                                control={control}
-                                disabled={loading}
-                                name="message"
-                                onKeyDown={onKeyDown}
-                                onChange={onChangeMessage}
-                            />
-
-                            <div className={css.buttons}>
-                                <Button variant="primary" disabled={loading}>
-                                    {t('common.send')}
+                    <Modal
+                        visible={viewCodeVisible}
+                        header={t('models.details.view_code')}
+                        size="large"
+                        footer={
+                            <Box float="right">
+                                <Button variant="normal" onClick={() => setViewCodeVisible(false)}>
+                                    {t('common.close')}
                                 </Button>
+                            </Box>
+                        }
+                        onDismiss={() => setViewCodeVisible(false)}
+                    >
+                        <SpaceBetween size="m" direction="vertical">
+                            <Box>{t('models.details.view_code_description')}</Box>
+
+                            <div className={css.viewCodeControls}>
+                                <SelectCSD
+                                    options={VIEW_CODE_TYPE_OPTIONS}
+                                    selectedOption={selectedCode}
+                                    expandToViewport={true}
+                                    onChange={(event) => {
+                                        setSelectedCode(event.detail.selectedOption);
+                                    }}
+                                />
+
+                                <Button iconName="copy" onClick={onCopyCode}></Button>
                             </div>
-                        </div>
-                    </form>
-                </div>
+
+                            {selectedCode.value === VIEW_CODE_TYPE_OPTIONS[0].value && <Code>{pythonCode}</Code>}
+
+                            {selectedCode.value === VIEW_CODE_TYPE_OPTIONS[1].value && <Code>{curlCode}</Code>}
+                        </SpaceBetween>
+                    </Modal>
+                </>
             )}
         </ContentLayout>
     );
