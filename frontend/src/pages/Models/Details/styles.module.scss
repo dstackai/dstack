@@ -15,8 +15,9 @@
     min-height: 0;
     display: grid;
     grid-template-columns: 300px 1fr;
-    grid-template-rows: 1fr auto;
-    grid-template-areas: "sidebar chat"
+    grid-template-rows: 60px 1fr auto;
+    grid-template-areas: "sidebar buttons"
+                          "sidebar chat"
                           "sidebar form";
 }
 
@@ -27,10 +28,21 @@
     padding-top: 20px;
 }
 
+.buttons {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+
+    & > button {
+        flex-shrink: 0;
+    }
+}
+
 .chat {
     overflow-y: auto;
     grid-area: chat;
-    padding: 40px 40px 20px;
+    padding: 0 20px 20px;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -42,13 +54,6 @@
     }
 }
 
-.clear {
-    z-index: 1;
-    position: absolute;
-    top: 24px;
-    right: 0;
-}
-
 .messageForm {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -58,7 +63,18 @@
     margin-right: -20px;
     padding: 20px;
 
+    textarea {
+        max-height: calc(100vh - 400px);
+    }
+
     .buttons {
         align-self: flex-end;
     }
+}
+
+.viewCodeControls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px
 }
