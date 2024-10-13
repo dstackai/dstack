@@ -1,4 +1,4 @@
-<div>
+<div align="center">
 <h2>
   <a target="_blank" href="https://dstack.ai">
     <picture>
