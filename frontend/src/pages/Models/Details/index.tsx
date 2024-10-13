@@ -3,9 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import reactStringReplace from 'react-string-replace';
-import { get as _get } from 'lodash';
 import cn from 'classnames';
-import { format } from 'date-fns';
 import OpenAI from 'openai';
 
 import {
@@ -24,13 +22,11 @@ import {
 } from 'components';
 
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
-import { getExtendedModelFromRun, getStatusIconType } from 'libs/run';
+import { getExtendedModelFromRun } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
 import { selectAuthToken } from 'App/slice';
-
-import { DATE_TIME_FORMAT } from '../../../consts';
 
 import { IModelExtended } from '../List/types';
 import { FormValues, Message, Role } from './types';
@@ -53,6 +49,7 @@ export const ModelDetails: React.FC = () => {
     const paramProjectName = params.projectName ?? '';
     const paramRunName = params.runName ?? '';
     const openai = useRef<OpenAI>();
+    const textAreaRef = useRef<HTMLDivElement>(null);
     const chatList = useRef<HTMLElement>();
     const [pushNotification] = useNotifications();
 
@@ -209,7 +206,7 @@ export const ModelDetails: React.FC = () => {
             [...matches].forEach((l) => l && languages.push(l.replace(/^```/, '')));
         }
 
-        const replacedStrings = reactStringReplace(content, PATTERN, (match, i) => {
+        const replacedStrings = reactStringReplace(content, PATTERN, (match) => {
             if (!match) {
                 return '';
             }
@@ -234,11 +231,24 @@ export const ModelDetails: React.FC = () => {
         );
     };
 
+    const onChangeMessage = () => {
+        if (!textAreaRef.current) return;
+
+        const textAreaElement = textAreaRef.current.querySelector('textarea');
+
+        if (!textAreaElement) return;
+
+        textAreaElement.style.height = 'auto';
+        textAreaElement.style.height = textAreaElement.scrollHeight + 'px';
+    };
+
     const onKeyDown = (event) => {
         if (event?.detail?.keyCode === 13 && !event?.detail?.ctrlKey) {
             handleSubmit(onSubmit)();
         } else if (event?.detail?.keyCode === 13 && event?.detail?.ctrlKey) {
+            event.preventDefault();
             setValue('message', messageText + '\n');
+            setTimeout(onChangeMessage, 0);
         }
     };
 
@@ -314,7 +324,7 @@ export const ModelDetails: React.FC = () => {
                             ))}
                         </div>
 
-                        <div className={css.messageForm}>
+                        <div ref={textAreaRef} className={css.messageForm}>
                             <FormTextarea
                                 stretch
                                 placeholder={t('models.details.message_placeholder')}
@@ -322,6 +332,7 @@ export const ModelDetails: React.FC = () => {
                                 disabled={loading}
                                 name="message"
                                 onKeyDown={onKeyDown}
+                                onChange={onChangeMessage}
                             />
 
                             <div className={css.buttons}>
