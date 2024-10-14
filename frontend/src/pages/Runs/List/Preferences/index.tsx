@@ -24,6 +24,7 @@ export const Preferences: React.FC = () => {
                     { id: 'price', label: t('projects.run.price') },
                     { id: 'submitted_at', label: t('projects.run.submitted_at') },
                     { id: 'status', label: t('projects.run.status') },
+                    { id: 'error', label: t('projects.run.error') },
                     { id: 'cost', label: t('projects.run.cost') },
                     // hidden by default
                     { id: 'project', label: t('projects.run.project') },

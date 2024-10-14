@@ -61,6 +61,11 @@ export const useColumnsDefinitions = () => {
             ),
         },
         {
+            id: 'error',
+            header: t('projects.run.error'),
+            cell: (item: IRun) => item.error ?? '-',
+        },
+        {
             id: 'cost',
             header: `${t('projects.run.cost')}`,
             cell: (item: IRun) => {
