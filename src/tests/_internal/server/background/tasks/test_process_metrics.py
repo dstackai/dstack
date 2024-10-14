@@ -14,7 +14,7 @@ from dstack._internal.server.background.tasks.process_metrics import (
     delete_metrics,
 )
 from dstack._internal.server.models import JobMetricsPoint
-from dstack._internal.server.schemas.runner import MetricsResponse
+from dstack._internal.server.schemas.runner import GPUMetrics, MetricsResponse
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.testing.common import (
     create_job,
@@ -63,6 +63,11 @@ class TestCollectMetrics:
                 cpu_usage_micro=2,
                 memory_usage_bytes=3,
                 memory_working_set_bytes=4,
+                gpu=GPUMetrics(
+                    gpu_detected=False,
+                    gpu_memory_usage_bytes=0,
+                    gpu_util_percent=0,
+                ),
             )
             await collect_metrics()
             SSHTunnelMock.assert_called_once()

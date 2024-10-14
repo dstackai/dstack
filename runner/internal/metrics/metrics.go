@@ -1,12 +1,16 @@
 package metrics
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/dstackai/dstack/runner/internal/log"
 	"github.com/dstackai/dstack/runner/internal/schemas"
 )
 
@@ -39,11 +43,16 @@ func (s *MetricsCollector) GetSystemMetrics() (*schemas.SystemMetrics, error) {
 		return nil, err
 	}
 	memoryWorkingSet := memoryUsage - memoryCache
+	gpuMetrics, err := s.GetGPUMetrics()
+	if err != nil {
+		log.Debug(context.TODO(), "Failed to get gpu metrics", "err", err)
+	}
 	return &schemas.SystemMetrics{
 		Timestamp:        timestamp.UnixMicro(),
 		CpuUsage:         cpuUsage,
 		MemoryUsage:      memoryUsage,
 		MemoryWorkingSet: memoryWorkingSet,
+		GPUMetrics:       gpuMetrics,
 	}, nil
 }
 
@@ -132,6 +141,43 @@ func (s *MetricsCollector) GetMemoryCacheBytes() (uint64, error) {
 		}
 	}
 	return 0, fmt.Errorf("inactive_file not found in cpu.stat")
+}
+
+func (s *MetricsCollector) GetGPUMetrics() (schemas.GPUMetrics, error) {
+	noMetrics := schemas.GPUMetrics{
+		GPUDetected:    false,
+		GPUMemoryUsage: 0,
+		GPUUtil:        0,
+	}
+	cmd := exec.Command("nvidia-smi", "--query-gpu=memory.used,utilization.gpu", "--format=csv,noheader,nounits")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return noMetrics, fmt.Errorf("failed to execute nvidia-smi: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	for _, line := range lines {
+		parts := strings.Split(line, ", ")
+		if len(parts) != 2 {
+			continue
+		}
+		memUsed, err := strconv.ParseUint(strings.TrimSpace(parts[0]), 10, 64)
+		if err != nil {
+			return noMetrics, fmt.Errorf("failed to parse memory used: %v", err)
+		}
+		utilization, err := strconv.ParseUint(strings.TrimSpace(strings.TrimSuffix(parts[1], "%")), 10, 64)
+		if err != nil {
+			return noMetrics, fmt.Errorf("failed to parse GPU utilization: %v", err)
+		}
+		return schemas.GPUMetrics{
+			GPUDetected: true,
+			GPUMemoryUsage: memUsed * 1024 * 1024,
+			GPUUtil:        utilization,
+		}, nil
+	}
+
+	return noMetrics, fmt.Errorf("could not parse gpu metrics")
 }
 
 func getCgroupVersion() (int, error) {

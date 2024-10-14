@@ -84,6 +84,9 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
         cpu_usage_micro=res.cpu_usage_micro,
         memory_usage_bytes=res.memory_usage_bytes,
         memory_working_set_bytes=res.memory_working_set_bytes,
+        gpu_detected=res.gpu.gpu_detected,
+        gpu_memory_usage_bytes=res.gpu.gpu_memory_usage_bytes,
+        gpu_util_percent=res.gpu.gpu_util_percent,
     )
 
 

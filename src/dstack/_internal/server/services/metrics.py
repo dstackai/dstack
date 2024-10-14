@@ -75,6 +75,27 @@ def _calculate_job_metrics(last_point: JobMetricsPoint, prev_point: JobMetricsPo
             values=[last_point.memory_working_set_bytes],
         )
     )
+    metrics.append(
+        Metric(
+            name="gpu_detected",
+            timestamps=[timestamp],
+            values=[last_point.gpu_detected],
+        )
+    )
+    metrics.append(
+        Metric(
+            name="gpu_memory_usage_bytes",
+            timestamps=[timestamp],
+            values=[last_point.gpu_memory_usage_bytes],
+        )
+    )
+    metrics.append(
+        Metric(
+            name="gpu_util_percent",
+            timestamps=[timestamp],
+            values=[last_point.gpu_util_percent],
+        )
+    )
     return JobMetrics(metrics=metrics)
 
 

@@ -603,3 +603,6 @@ class JobMetricsPoint(BaseModel):
     cpu_usage_micro: Mapped[int] = mapped_column(BigInteger)
     memory_usage_bytes: Mapped[int] = mapped_column(BigInteger)
     memory_working_set_bytes: Mapped[int] = mapped_column(BigInteger)
+    gpu_detected: Mapped[bool] = mapped_column(Boolean)
+    gpu_memory_usage_bytes: Mapped[int] = mapped_column(BigInteger)
+    gpu_util_percent: Mapped[int] = mapped_column(BigInteger)

@@ -1,8 +1,8 @@
 """Add JobMetricsPoint
 
-Revision ID: d10a5325d556
+Revision ID: 7f0c5281d374
 Revises: a7b46c073fa1
-Create Date: 2024-10-11 14:22:14.138208
+Create Date: 2024-10-14 10:39:04.415000
 
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy_utils
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "d10a5325d556"
+revision = "7f0c5281d374"
 down_revision = "a7b46c073fa1"
 branch_labels = None
 depends_on = None
@@ -27,6 +27,9 @@ def upgrade() -> None:
         sa.Column("cpu_usage_micro", sa.BigInteger(), nullable=False),
         sa.Column("memory_usage_bytes", sa.BigInteger(), nullable=False),
         sa.Column("memory_working_set_bytes", sa.BigInteger(), nullable=False),
+        sa.Column("gpu_detected", sa.Boolean(), nullable=False),
+        sa.Column("gpu_memory_usage_bytes", sa.BigInteger(), nullable=False),
+        sa.Column("gpu_util_percent", sa.BigInteger(), nullable=False),
         sa.ForeignKeyConstraint(
             ["job_id"], ["jobs.id"], name=op.f("fk_job_metrics_points_job_id_jobs")
         ),

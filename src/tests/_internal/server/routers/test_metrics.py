@@ -66,6 +66,9 @@ class TestGetJobLogs:
             cpu_usage_micro=10 * 1_000_000,
             memory_usage_bytes=1024,
             memory_working_set_bytes=512,
+            gpu_detected=False,
+            gpu_memory_usage_bytes=0,
+            gpu_util_percent=0,
         )
         response = await client.get(
             f"/api/project/{project.name}/metrics/job/{run.run_name}",
@@ -88,6 +91,21 @@ class TestGetJobLogs:
                     "name": "memory_working_set_bytes",
                     "timestamps": ["2023-01-02T03:04:25+00:00"],
                     "values": [512],
+                },
+                {
+                    "name": "gpu_detected",
+                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "values": [False],
+                },
+                {
+                    "name": "gpu_memory_usage_bytes",
+                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "values": [0],
+                },
+                {
+                    "name": "gpu_util_percent",
+                    "timestamps": ["2023-01-02T03:04:25+00:00"],
+                    "values": [0],
                 },
             ]
         }

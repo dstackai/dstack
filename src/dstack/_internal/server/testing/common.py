@@ -626,6 +626,9 @@ async def create_job_metrics_point(
     cpu_usage_micro: int = 1_000_000,
     memory_usage_bytes: int = 1024,
     memory_working_set_bytes: int = 1024,
+    gpu_detected: bool = False,
+    gpu_memory_usage_bytes: int = 0,
+    gpu_util_percent: int = 0,
 ) -> JobMetricsPoint:
     timestamp_micro = int(timestamp.timestamp() * 1_000_000)
     jmp = JobMetricsPoint(
@@ -634,6 +637,9 @@ async def create_job_metrics_point(
         cpu_usage_micro=cpu_usage_micro,
         memory_usage_bytes=memory_usage_bytes,
         memory_working_set_bytes=memory_working_set_bytes,
+        gpu_detected=gpu_detected,
+        gpu_memory_usage_bytes=gpu_memory_usage_bytes,
+        gpu_util_percent=gpu_util_percent,
     )
     session.add(jmp)
     await session.commit()
