@@ -1,4 +1,4 @@
-<div align="center">
+<div style="text-align: center;">
 <h2>
   <a target="_blank" href="https://dstack.ai">
     <picture>
