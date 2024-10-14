@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, Dict, List, Union
 
 from rich.markup import escape
 from rich.table import Table
@@ -135,7 +135,7 @@ def get_runs_table(
         run_error = _get_run_error(run)
         run = run._run  # TODO(egor-s): make public attribute
 
-        run_row = {
+        run_row: Dict[Union[str, int], Any] = {
             "NAME": run.run_spec.run_name,
             "CONFIGURATION": run.run_spec.configuration_path,
             "STATUS": run.status,
@@ -146,7 +146,7 @@ def get_runs_table(
             add_row_from_dict(table, run_row)
 
         for job in run.jobs:
-            job_row = {
+            job_row: Dict[Union[str, int], Any] = {
                 "NAME": f"  replica {job.job_spec.replica_num}\n  job_num {job.job_spec.job_num}",
                 "STATUS": job.job_submissions[-1].status,
                 "SUBMITTED": pretty_date(job.job_submissions[-1].submitted_at),
