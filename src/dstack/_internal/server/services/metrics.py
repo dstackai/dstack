@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -75,27 +76,32 @@ def _calculate_job_metrics(last_point: JobMetricsPoint, prev_point: JobMetricsPo
             values=[last_point.memory_working_set_bytes],
         )
     )
+
+    gpus_memory_usage_bytes = json.loads(last_point.gpus_memory_usage_bytes)
+    gpus_util_percent = json.loads(last_point.gpus_util_percent)
+    gpus_detected_num = len(gpus_memory_usage_bytes)
     metrics.append(
         Metric(
-            name="gpu_detected",
+            name="gpus_detected_num",
             timestamps=[timestamp],
-            values=[last_point.gpu_detected],
+            values=[gpus_detected_num],
         )
     )
-    metrics.append(
-        Metric(
-            name="gpu_memory_usage_bytes",
-            timestamps=[timestamp],
-            values=[last_point.gpu_memory_usage_bytes],
+    for i in range(gpus_detected_num):
+        metrics.append(
+            Metric(
+                name=f"gpu_memory_usage_bytes_gpu{i}",
+                timestamps=[timestamp],
+                values=[gpus_memory_usage_bytes[i]],
+            )
         )
-    )
-    metrics.append(
-        Metric(
-            name="gpu_util_percent",
-            timestamps=[timestamp],
-            values=[last_point.gpu_util_percent],
+        metrics.append(
+            Metric(
+                name=f"gpu_util_percent_gpu{i}",
+                timestamps=[timestamp],
+                values=[gpus_util_percent[i]],
+            )
         )
-    )
     return JobMetrics(metrics=metrics)
 
 

@@ -73,7 +73,6 @@ class HealthcheckResponse(CoreModel):
 
 
 class GPUMetrics(CoreModel):
-    gpu_detected: bool
     gpu_memory_usage_bytes: int
     gpu_util_percent: int
 
@@ -83,7 +82,7 @@ class MetricsResponse(CoreModel):
     cpu_usage_micro: int
     memory_usage_bytes: int
     memory_working_set_bytes: int
-    gpu: GPUMetrics
+    gpus: List[GPUMetrics]
 
 
 class ShimVolumeInfo(CoreModel):

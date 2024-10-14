@@ -90,17 +90,16 @@ type HealthcheckResponse struct {
 }
 
 type GPUMetrics struct {
-	GPUDetected    bool   `json:"gpu_detected"`
 	GPUMemoryUsage uint64 `json:"gpu_memory_usage_bytes"`
 	GPUUtil        uint64 `json:"gpu_util_percent"`
 }
 
 type SystemMetrics struct {
-	Timestamp        int64      `json:"timestamp_micro"`
-	CpuUsage         uint64     `json:"cpu_usage_micro"`
-	MemoryUsage      uint64     `json:"memory_usage_bytes"`
-	MemoryWorkingSet uint64     `json:"memory_working_set_bytes"`
-	GPUMetrics       GPUMetrics `json:"gpu"`
+	Timestamp        int64        `json:"timestamp_micro"`
+	CpuUsage         uint64       `json:"cpu_usage_micro"`
+	MemoryUsage      uint64       `json:"memory_usage_bytes"`
+	MemoryWorkingSet uint64       `json:"memory_working_set_bytes"`
+	GPUMetrics       []GPUMetrics `json:"gpus"`
 }
 
 func (c *RepoCredentials) GetProtocol() string {
