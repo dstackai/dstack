@@ -25,6 +25,20 @@ async def get_job_metrics(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> JobMetrics:
+    """
+    Returns job-level metrics such as hardware utilization
+    given `run_name`, `replica_num`, and `job_num`.
+    If only `run_name` is specified, returns metrics of `(replica_num=0, job_num=0)`.
+
+    Supported metrics: [
+        "cpu_usage_percent",
+        "memory_usage_bytes",
+        "memory_working_set_bytes",
+        "gpus_detected_num",
+        "gpu_memory_usage_bytes_gpu{i}",
+        "gpu_util_percent_gpu{i}"
+    ]
+    """
     _, project = user_project
     return await metrics.get_job_metrics(
         session=session,
