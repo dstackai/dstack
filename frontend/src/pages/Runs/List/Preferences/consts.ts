@@ -9,6 +9,7 @@ export const DEFAULT_PREFERENCES: CollectionPreferencesProps.Preferences = {
         { id: 'price', visible: true },
         { id: 'submitted_at', visible: true },
         { id: 'status', visible: true },
+        { id: 'error', visible: true },
         { id: 'cost', visible: true },
         // hidden by default
         { id: 'project', visible: false },
