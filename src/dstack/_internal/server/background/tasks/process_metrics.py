@@ -22,6 +22,7 @@ logger = get_logger(__name__)
 
 MAX_JOBS_FETCHED = 100
 BATCH_SIZE = 10
+MIN_COLLECT_INTERVAL_SECONDS = 9
 
 
 async def collect_metrics():
@@ -51,8 +52,9 @@ async def delete_metrics():
 
 
 async def _collect_jobs_metrics(job_models: List[JobModel]):
+    filtered_job_models = await _filter_recently_collected_jobs(job_models)
     tasks = []
-    for job_model in job_models:
+    for job_model in filtered_job_models:
         tasks.append(_collect_job_metrics(job_model))
     points = await asyncio.gather(*tasks)
     async with get_session_ctx() as session:
@@ -60,6 +62,28 @@ async def _collect_jobs_metrics(job_models: List[JobModel]):
             if point is not None:
                 session.add(point)
         await session.commit()
+
+
+async def _filter_recently_collected_jobs(job_models: List[JobModel]) -> List[JobModel]:
+    # Skip metrics collection if another replica collected it recently.
+    # Two replicas can still collect metrics simultaneously – that's fine since
+    # we'll just store some extra metric points in the db.
+    async with get_session_ctx() as session:
+        res = await session.execute(
+            select(JobMetricsPoint).where(
+                JobMetricsPoint.job_id.in_([j.id for j in job_models]),
+                JobMetricsPoint.timestamp_micro > _get_recently_collected_metric_cutoff(),
+            )
+        )
+        recent_points = res.scalars().all()
+        recent_job_ids = [p.job_id for p in recent_points]
+    return [j for j in job_models if j.id not in recent_job_ids]
+
+
+def _get_recently_collected_metric_cutoff() -> int:
+    now = int(get_current_datetime().timestamp() * 1_000_000)
+    cutoff = now - (MIN_COLLECT_INTERVAL_SECONDS * 1_000_000)
+    return cutoff
 
 
 async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]:
