@@ -9,6 +9,7 @@ ruff==0.5.3  # Should match .pre-commit-config.yaml
 testcontainers # testcontainers<4 may not work with asyncpg
 
 # Documentation
+mkdocs
 mkdocs-material
 mkdocs-material[imaging]
 mkdocs-material-extensions
