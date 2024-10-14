@@ -97,10 +97,18 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
             jpd,
         )
     except Exception:
-        logger.exception("Failed to collect job %s metrics", job_model.job_num)
+        logger.exception("Failed to collect job %s metrics", job_model.job_name)
         return None
+
     if isinstance(res, bool):
-        logger.error("Failed to connect to job %s to collect metrics", job_model.job_num)
+        logger.error("Failed to connect to job %s to collect metrics", job_model.job_name)
+        return None
+
+    if res is None:
+        logger.warning(
+            "Failed to collect job %s metrics. Runner version does not support metrics API.",
+            job_model.job_name,
+        )
         return None
 
     gpus_memory_usage_bytes = [g.gpu_memory_usage_bytes for g in res.gpus]
@@ -120,7 +128,7 @@ async def _collect_job_metrics(job_model: JobModel) -> Optional[JobMetricsPoint]
 @runner_ssh_tunnel(ports=[client.REMOTE_RUNNER_PORT], retries=1)
 def _pull_runner_metrics(
     ports: Dict[int, int],
-) -> MetricsResponse:
+) -> Optional[MetricsResponse]:
     runner_client = client.RunnerClient(port=ports[client.REMOTE_RUNNER_PORT])
     return runner_client.get_metrics()
 

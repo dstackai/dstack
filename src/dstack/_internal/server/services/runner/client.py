@@ -53,8 +53,10 @@ class RunnerClient:
         except requests.exceptions.RequestException:
             return None
 
-    def get_metrics(self) -> MetricsResponse:
+    def get_metrics(self) -> Optional[MetricsResponse]:
         resp = requests.get(self._url("/api/metrics"), timeout=REQUEST_TIMEOUT)
+        if resp.status_code == 404:
+            return None
         resp.raise_for_status()
         return MetricsResponse.__response__.parse_obj(resp.json())
 
