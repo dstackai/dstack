@@ -124,6 +124,19 @@ $ dstack logs --help
 
 </div>
 
+### dstack stats
+
+This command shows run hardware metrics such as CPU, memory, and GPU utilization.
+
+<div class="termy">
+
+```shell
+$ dstack stats --help
+#GENERATE#
+```
+
+</div>
+
 ### dstack config
 
 Both the CLI and API need to be configured with the server address, user token, and project name

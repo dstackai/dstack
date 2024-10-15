@@ -61,11 +61,12 @@ class ServerCommand(BaseCommand):
         if args.token:
             os.environ["DSTACK_SERVER_ADMIN_TOKEN"] = args.token
         uvicorn_log_level = os.getenv("DSTACK_SERVER_UVICORN_LOG_LEVEL", "ERROR").lower()
+        reload_disabled = os.getenv("DSTACK_SERVER_RELOAD_DISABLED") is not None
         uvicorn.run(
             "dstack._internal.server.main:app",
             host=args.host,
             port=args.port,
-            reload=version.__version__ is None,
+            reload=version.__version__ is None and not reload_disabled,
             log_level=uvicorn_log_level,
             workers=1,
         )

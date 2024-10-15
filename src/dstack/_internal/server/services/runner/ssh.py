@@ -2,45 +2,49 @@ import functools
 import inspect
 import socket
 import time
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, TypeVar, Union
 
 import requests
 from typing_extensions import Concatenate, ParamSpec
 
 from dstack._internal.core.errors import SSHError
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.runs import JobProvisioningData
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
 from dstack._internal.server.services.runner import client
-from dstack._internal.server.settings import LOCAL_BACKEND_ENABLED
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def runner_ssh_tunnel(
     ports: List[int], retries: int = 3, retry_interval: float = 1
-) -> Callable[[Callable[P, bool]], Callable[Concatenate[str, JobProvisioningData, P], bool]]:
+) -> Callable[
+    [Callable[Concatenate[Dict[int, int], P], R]],
+    Callable[Concatenate[str, JobProvisioningData, P], Union[bool, R]],
+]:
     def decorator(
-        func: Callable[P, bool],
-    ) -> Callable[Concatenate[str, JobProvisioningData, P], bool]:
+        func: Callable[Concatenate[Dict[int, int], P], R],
+    ) -> Callable[Concatenate[str, JobProvisioningData, P], Union[bool, R]]:
         @functools.wraps(func)
         def wrapper(
             ssh_private_key: str,
             job_provisioning_data: JobProvisioningData,
             *args: P.args,
             **kwargs: P.kwargs,
-        ) -> bool:
+        ) -> Union[bool, R]:
             """
             Returns:
                 is successful
             """
 
-            if LOCAL_BACKEND_ENABLED:
+            if job_provisioning_data.backend == BackendType.LOCAL:
                 # without SSH
                 port_map = {p: p for p in ports}
-                return func(*args, ports=port_map, **kwargs)
+                return func(port_map, *args, **kwargs)
 
             func_kwargs_names = [
                 p.name
@@ -66,7 +70,7 @@ def runner_ssh_tunnel(
                         identity=FileContent(ssh_private_key),
                         ssh_proxy=job_provisioning_data.ssh_proxy,
                     ):
-                        return func(*args, ports=runner_ports_map, **ssh_kwargs, **kwargs)
+                        return func(runner_ports_map, *args, **ssh_kwargs, **kwargs)
                 except SSHError:
                     pass  # error is logged in the tunnel
                 except requests.RequestException as e:

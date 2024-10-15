@@ -57,6 +57,7 @@ func NewServer(tempDir string, homeDir string, workingDir string, address string
 		version: version,
 	}
 	mux.HandleFunc("/api/healthcheck", api.JSONResponseHandler("GET", s.healthcheckGetHandler))
+	mux.HandleFunc("/api/metrics", api.JSONResponseHandler("GET", s.metricsGetHandler))
 	mux.HandleFunc("/api/submit", api.JSONResponseHandler("POST", s.submitPostHandler))
 	mux.HandleFunc("/api/upload_code", api.JSONResponseHandler("POST", s.uploadCodePostHandler))
 	mux.HandleFunc("/api/run", api.JSONResponseHandler("POST", s.runPostHandler))

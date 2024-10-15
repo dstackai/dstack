@@ -72,6 +72,19 @@ class HealthcheckResponse(CoreModel):
     version: str
 
 
+class GPUMetrics(CoreModel):
+    gpu_memory_usage_bytes: int
+    gpu_util_percent: int
+
+
+class MetricsResponse(CoreModel):
+    timestamp_micro: int
+    cpu_usage_micro: int
+    memory_usage_bytes: int
+    memory_working_set_bytes: int
+    gpus: List[GPUMetrics]
+
+
 class ShimVolumeInfo(CoreModel):
     backend: str
     name: str

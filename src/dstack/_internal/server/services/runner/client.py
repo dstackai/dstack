@@ -11,6 +11,7 @@ from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
 from dstack._internal.core.models.volumes import Volume, VolumeMountPoint
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
+    MetricsResponse,
     PullBody,
     PullResponse,
     ShimVolumeInfo,
@@ -51,6 +52,13 @@ class RunnerClient:
             return HealthcheckResponse.__response__.parse_obj(resp.json())
         except requests.exceptions.RequestException:
             return None
+
+    def get_metrics(self) -> Optional[MetricsResponse]:
+        resp = requests.get(self._url("/api/metrics"), timeout=REQUEST_TIMEOUT)
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return MetricsResponse.__response__.parse_obj(resp.json())
 
     def submit_job(
         self,

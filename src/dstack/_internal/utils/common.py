@@ -1,3 +1,4 @@
+import itertools
 import re
 import time
 from datetime import datetime, timedelta, timezone
@@ -227,3 +228,8 @@ def get_or_error(v: Optional[T]) -> T:
     if v is None:
         raise ValueError("Optional value is None")
     return v
+
+
+def batched(seq: Iterable[T], n: int) -> Iterable[List[T]]:
+    it = iter(seq)
+    return iter(lambda: list(itertools.islice(it, n)), [])

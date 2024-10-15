@@ -9,6 +9,10 @@ from dstack._internal.server.background.tasks.process_gateways import (
 from dstack._internal.server.background.tasks.process_instances import (
     process_instances,
 )
+from dstack._internal.server.background.tasks.process_metrics import (
+    collect_metrics,
+    delete_metrics,
+)
 from dstack._internal.server.background.tasks.process_placement_groups import (
     process_placement_groups,
 )
@@ -31,6 +35,8 @@ def start_background_tasks() -> AsyncIOScheduler:
     # In-memory locking via locksets does not guarantee
     # that the first waiting for the lock will acquire it.
     # The jitter is needed to give all tasks a chance to acquire locks.
+    _scheduler.add_job(collect_metrics, IntervalTrigger(seconds=10), max_instances=1)
+    _scheduler.add_job(delete_metrics, IntervalTrigger(minutes=5), max_instances=1)
     _scheduler.add_job(
         process_submitted_jobs, IntervalTrigger(seconds=4, jitter=2), max_instances=5
     )

@@ -12,6 +12,7 @@ from dstack.api.server._backends import BackendsAPIClient
 from dstack.api.server._fleets import FleetsAPIClient
 from dstack.api.server._gateways import GatewaysAPIClient
 from dstack.api.server._logs import LogsAPIClient
+from dstack.api.server._metrics import MetricsAPIClient
 from dstack.api.server._pools import PoolAPIClient
 from dstack.api.server._projects import ProjectsAPIClient
 from dstack.api.server._repos import ReposAPIClient
@@ -76,6 +77,10 @@ class APIClient:
         return RunsAPIClient(self._request)
 
     @property
+    def metrics(self) -> MetricsAPIClient:
+        return MetricsAPIClient(self._request)
+
+    @property
     def logs(self) -> LogsAPIClient:
         return LogsAPIClient(self._request)
 
@@ -104,6 +109,7 @@ class APIClient:
         path: str,
         body: Optional[str] = None,
         raise_for_status: bool = True,
+        method: str = "POST",
         **kwargs,
     ) -> requests.Response:
         path = path.lstrip("/")
@@ -115,7 +121,7 @@ class APIClient:
         for _ in range(_MAX_RETRIES):
             try:
                 # TODO: set adequate timeout here or everywhere the method is used
-                resp = self._s.post(f"{self._base_url}/{path}", **kwargs)
+                resp = self._s.request(method, f"{self._base_url}/{path}", **kwargs)
                 break
             except requests.exceptions.ConnectionError as e:
                 logger.debug("Could not connect to server: %s", e)

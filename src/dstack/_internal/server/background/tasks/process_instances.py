@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 from datetime import timedelta
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import requests
 from paramiko.pkey import PKey
@@ -599,7 +599,7 @@ async def _check_instance(instance: InstanceModel) -> None:
         ssh_private_key = remote_conn_info.ssh_keys[0].private
 
     # May return False if fails to establish ssh connection
-    health_status_response: Union[Optional[HealthStatus], bool] = await run_async(
+    health_status_response = await run_async(
         _instance_healthcheck, ssh_private_key, job_provisioning_data
     )
     if isinstance(health_status_response, bool) or health_status_response is None:
@@ -729,7 +729,7 @@ async def _wait_for_instance_provisioning_data(
 
 
 @runner_ssh_tunnel(ports=[runner_client.REMOTE_SHIM_PORT], retries=1)
-def _instance_healthcheck(*, ports: Dict[int, int]) -> HealthStatus:
+def _instance_healthcheck(ports: Dict[int, int]) -> HealthStatus:
     shim_client = runner_client.ShimClient(port=ports[runner_client.REMOTE_SHIM_PORT])
     try:
         resp = shim_client.healthcheck(unmask_exeptions=True)

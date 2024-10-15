@@ -2,7 +2,7 @@ import json
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,6 +54,7 @@ from dstack._internal.server.models import (
     GatewayComputeModel,
     GatewayModel,
     InstanceModel,
+    JobMetricsPoint,
     JobModel,
     PlacementGroupModel,
     PoolModel,
@@ -616,6 +617,35 @@ def get_placement_group_provisioning_data(
     backend: BackendType = BackendType.AWS,
 ) -> PlacementGroupProvisioningData:
     return PlacementGroupProvisioningData(backend=backend)
+
+
+async def create_job_metrics_point(
+    session: AsyncSession,
+    job_model: JobModel,
+    timestamp: datetime,
+    cpu_usage_micro: int = 1_000_000,
+    memory_usage_bytes: int = 1024,
+    memory_working_set_bytes: int = 1024,
+    gpus_memory_usage_bytes: Optional[List[int]] = None,
+    gpus_util_percent: Optional[List[int]] = None,
+) -> JobMetricsPoint:
+    timestamp_micro = int(timestamp.timestamp() * 1_000_000)
+    if gpus_memory_usage_bytes is None:
+        gpus_memory_usage_bytes = []
+    if gpus_util_percent is None:
+        gpus_util_percent = []
+    jmp = JobMetricsPoint(
+        job_id=job_model.id,
+        timestamp_micro=timestamp_micro,
+        cpu_usage_micro=cpu_usage_micro,
+        memory_usage_bytes=memory_usage_bytes,
+        memory_working_set_bytes=memory_working_set_bytes,
+        gpus_memory_usage_bytes=json.dumps(gpus_memory_usage_bytes),
+        gpus_util_percent=json.dumps(gpus_util_percent),
+    )
+    session.add(jmp)
+    await session.commit()
+    return jmp
 
 
 def get_private_key_string() -> str:
