@@ -17,7 +17,7 @@ from dstack._internal.server.testing.common import (
 )
 
 
-class TestGetJobLogs:
+class TestGetJobMetrics:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_403_if_not_project_member(
