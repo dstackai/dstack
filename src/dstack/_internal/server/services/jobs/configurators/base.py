@@ -27,10 +27,6 @@ from dstack._internal.server.services.docker import ImageConfig, get_image_confi
 from dstack._internal.server.utils.common import run_async
 
 
-import sys
-from dstack._internal.core.errors import ServerClientError
-from dstack._internal.core.models.configurations import PythonVersion
-
 def get_default_python_version() -> str:
     """
     Detect the default Python version from the user's environment in the CLI.
