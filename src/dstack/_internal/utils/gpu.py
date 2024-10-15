@@ -31,6 +31,7 @@ def convert_nvidia_gpu_name(name: str) -> str:
 
 def convert_amd_gpu_name(name: str) -> str:
     """Convert asic.market_name from amd-smi to short version"""
+    name = name.replace("Instinct ", "")
     # https://github.com/ROCm/amdsmi/blob/52b3947/src/amd_smi/amd_smi_utils.cc#L558-L593
     if name == "MI300X-O":
         return "MI300X"

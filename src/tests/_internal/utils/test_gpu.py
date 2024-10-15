@@ -27,6 +27,7 @@ class TestConvertGpuName:
         ["test_input", "expected"],
         [
             ("MI300X-O", "MI300X"),
+            ("Instinct MI210", "MI210"),
             ("MI300A", "MI300A"),
         ],
     )
