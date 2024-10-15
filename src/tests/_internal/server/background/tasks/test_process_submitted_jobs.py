@@ -20,8 +20,13 @@ from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
 )
+from dstack._internal.core.models.volumes import (
+    VolumeAttachmentData,
+    VolumeMountPoint,
+    VolumeStatus,
+)
 from dstack._internal.server.background.tasks.process_submitted_jobs import process_submitted_jobs
-from dstack._internal.server.models import JobModel
+from dstack._internal.server.models import InstanceModel, JobModel
 from dstack._internal.server.testing.common import (
     create_fleet,
     create_instance,
@@ -31,7 +36,9 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    create_volume,
     get_run_spec,
+    get_volume_provisioning_data,
 )
 
 
@@ -206,6 +213,71 @@ class TestProcessSubmittedJobs:
         assert (
             job.instance_assigned and job.instance is not None and job.instance.id == instance.id
         )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_assigns_job_to_instance_with_volumes(self, test_db, session: AsyncSession):
+        project = await create_project(session)
+        user = await create_user(session)
+        pool = await create_pool(session=session, project=project)
+        repo = await create_repo(
+            session=session,
+            project_id=project.id,
+        )
+        volume = await create_volume(
+            session=session,
+            project=project,
+            status=VolumeStatus.ACTIVE,
+            volume_provisioning_data=get_volume_provisioning_data(),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        instance = await create_instance(
+            session=session,
+            project=project,
+            pool=pool,
+            status=InstanceStatus.IDLE,
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
+        await session.refresh(pool)
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run_spec.configuration.volumes = [VolumeMountPoint(name=volume.name, path="/volume")]
+        run = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name="test-run",
+            run_spec=run_spec,
+        )
+        job = await create_job(
+            session=session,
+            run=run,
+            instance_assigned=False,
+        )
+
+        with patch("dstack._internal.server.services.backends.get_project_backend_by_type") as m:
+            backend_mock = Mock()
+            m.return_value = backend_mock
+            backend_mock.TYPE = BackendType.AWS
+            backend_mock.compute.return_value.attach_volume.return_value = VolumeAttachmentData()
+            # Submitted jobs processing happens in two steps
+            await process_submitted_jobs()
+            await process_submitted_jobs()
+
+        await session.refresh(job)
+        res = await session.execute(
+            select(JobModel).options(
+                joinedload(JobModel.instance).selectinload(InstanceModel.volumes)
+            )
+        )
+        job = res.scalar_one()
+        assert job.status == JobStatus.PROVISIONING
+        assert (
+            job.instance_assigned and job.instance is not None and job.instance.id == instance.id
+        )
+        assert job.instance.volumes == [volume]
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)

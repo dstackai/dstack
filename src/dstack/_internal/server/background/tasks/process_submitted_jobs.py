@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, lazyload
+from sqlalchemy.orm import joinedload, lazyload, selectinload
 
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.errors import BackendError, ServerClientError
@@ -205,7 +205,15 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
 
+    instance: InstanceModel
     if job_model.instance is not None:
+        res = await session.execute(
+            select(InstanceModel)
+            .where(InstanceModel.id == job_model.instance.id)
+            .options(selectinload(InstanceModel.volumes))
+            .execution_options(populate_existing=True)
+        )
+        instance = res.scalar_one()
         job_model.status = JobStatus.PROVISIONING
     else:
         # Assigned no instance, create a new one
