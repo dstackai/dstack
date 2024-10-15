@@ -24,6 +24,7 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    get_run_spec,
 )
 
 
@@ -192,8 +193,9 @@ class TestProcessRunningJobs:
         assert job.runner_timestamp == 2
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("privileged", [False, True])
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_provisioning_shim(self, test_db, session: AsyncSession):
+    async def test_provisioning_shim(self, test_db, session: AsyncSession, privileged: bool):
         project_ssh_pub_key = "__project_ssh_pub_key__"
         project = await create_project(session=session, ssh_public_key=project_ssh_pub_key)
         user = await create_user(session=session)
@@ -201,11 +203,15 @@ class TestProcessRunningJobs:
             session=session,
             project_id=project.id,
         )
+        run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
+        run_spec.configuration.privileged = privileged
         run = await create_run(
             session=session,
             project=project,
             repo=repo,
             user=user,
+            run_name="test-run",
+            run_spec=run_spec,
         )
         job_provisioning_data = get_job_provisioning_data(dockerized=True)
 
@@ -234,6 +240,7 @@ class TestProcessRunningJobs:
                 username="",
                 password="",
                 image_name="dstackai/base:py3.11-0.5-cuda-12.1",
+                privileged=privileged,
                 container_name="test-run-0-0",
                 container_user="root",
                 shm_size=None,

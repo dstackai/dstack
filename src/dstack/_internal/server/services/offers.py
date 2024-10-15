@@ -1,6 +1,9 @@
 from typing import List, Optional, Tuple
 
-from dstack._internal.core.backends import BACKENDS_WITH_MULTINODE_SUPPORT
+from dstack._internal.core.backends import (
+    BACKENDS_WITH_CREATE_INSTANCE_SUPPORT,
+    BACKENDS_WITH_MULTINODE_SUPPORT,
+)
 from dstack._internal.core.backends.base import Backend
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import InstanceOfferWithAvailability
@@ -19,6 +22,7 @@ async def get_offers_by_requirements(
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[Volume]] = None,
+    privileged: bool = False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
@@ -42,6 +46,11 @@ async def get_offers_by_requirements(
         if not backend_types:
             backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
+
+    if privileged:
+        if not backend_types:
+            backend_types = BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
+        backend_types = [b for b in backend_types if b in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]
 
     # For multi-node, restrict backend and region.
     # The default behavior is to provision all nodes in the same backend and region.

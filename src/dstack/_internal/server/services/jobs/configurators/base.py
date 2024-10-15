@@ -88,6 +88,7 @@ class JobConfigurator(ABC):
             env=self._env(),
             home_dir=self._home_dir(),
             image_name=self._image_name(),
+            privileged=self._privileged(),
             max_duration=self._max_duration(),
             registry_auth=self._registry_auth(),
             requirements=self._requirements(),
@@ -146,6 +147,9 @@ class JobConfigurator(ABC):
         if self.run_spec.configuration.image is not None:
             return self.run_spec.configuration.image
         return get_default_image(self._python(), nvcc=bool(self.run_spec.configuration.nvcc))
+
+    def _privileged(self) -> bool:
+        return self.run_spec.configuration.privileged
 
     def _max_duration(self) -> Optional[int]:
         if self.run_spec.merged_profile.max_duration is None:

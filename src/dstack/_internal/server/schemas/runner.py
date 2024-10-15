@@ -83,6 +83,7 @@ class TaskConfigBody(CoreModel):
     username: str
     password: str
     image_name: str
+    privileged: bool
     container_name: str
     container_user: Optional[str]
     shm_size: int

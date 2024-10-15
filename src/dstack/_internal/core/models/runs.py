@@ -180,6 +180,7 @@ class JobSpec(CoreModel):
     env: Dict[str, str]
     home_dir: Optional[str]
     image_name: str
+    privileged: bool = False
     max_duration: Optional[int]
     registry_auth: Optional[RegistryAuth]
     requirements: Requirements
