@@ -93,6 +93,7 @@ func main() {
 						Name:        "privileged",
 						Usage:       "Give extended privileges to the container",
 						Destination: &args.Docker.Privileged,
+						EnvVars:     []string{"DSTACK_DOCKER_PRIVILEGED"},
 					},
 					&cli.StringFlag{
 						Name:        "ssh-key",
