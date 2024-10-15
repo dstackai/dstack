@@ -25,6 +25,7 @@
     "info": "Info",
     "stop": "Stop",
     "abort": "Abort",
+    "close": "Close",
     "clearFilter": "Clear filter",
     "server_error": "Server error: {{error}}",
     "login": "Sign in",
@@ -405,7 +406,9 @@
       "message_placeholder": "Enter your question",
       "chat_empty_title": "No messages yet",
       "chat_empty_message": "Please start a chat",
-      "run_name": "Run name"
+      "run_name": "Run name",
+      "view_code": "View code",
+      "view_code_description": "You can use the following code to start integrating your current prompt and settings into your application."
     }
   },
 

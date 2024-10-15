@@ -829,7 +829,7 @@ body {
     }
 }
 
-.md-sidebar--primary .md-nav__link {
+.md-sidebar--primary .md-nav__link, .md-sidebar--post .md-nav__link {
     padding: 5px 15px 5px;
     margin-top: 0;
 }

@@ -75,8 +75,6 @@ class PortsLock:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if IS_WINDOWS:
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-            else:
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.bind(("", port))
             return sock
         except socket.error as e:

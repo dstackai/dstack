@@ -150,7 +150,8 @@ declare interface IRun {
     project_name: string,
     user: string,
     submitted_at: string,
-    status: TJobStatus
+    status: TJobStatus,
+    error?: string
     jobs: IJob[],
     run_spec: IRunSpec,
     latest_job_submission?: IJobSubmission

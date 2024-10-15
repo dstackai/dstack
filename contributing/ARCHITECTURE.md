@@ -16,7 +16,7 @@ projects, backends, repos, secrets, and gateways.
 
 The Python API consists of the low-level and high-level Python API. The low-level Python API is a Python wrapper around
 the server's HTTP API. It's available as `dstack.api.server`. The high-level API provides a more convenient interface to
-work with `dstack` programatically. It's available as `dstack.api`. The `dstack` CLI is implemented on top of the
+work with `dstack` programmatically. It's available as `dstack.api`. The `dstack` CLI is implemented on top of the
 high-level API.
 
 When the server provisions a cloud instance for a run, it launches a Docker image with the runner inside the image. The

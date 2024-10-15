@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
+import { orderBy as _orderBy } from 'lodash';
 
 import { Button, FormField, Header, Pagination, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
@@ -111,7 +112,7 @@ export const AdministrationList: React.FC = () => {
 
             if (result.length > 0) {
                 setPagesCount((count) => count - 1);
-                setData(result);
+                setData(_orderBy(result, ['submitted_at'], ['desc']));
             } else {
                 setPagesCount(1);
             }

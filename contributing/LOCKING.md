@@ -34,7 +34,7 @@ allow independent locking of different resources.
 ## Postgres locking
 
 Postgres resource locking is implemented via standard SELECT FOR UPDATE.
-SQLAlchemy provides `.with_for_update()` that has not effect if SELECT FOR UPDATE is not supported as in SQLite.
+SQLAlchemy provides `.with_for_update()` that has no effect if SELECT FOR UPDATE is not supported as in SQLite.
 
 There are few places that rely on advisory locks as when generating unique resource names.
 
@@ -85,4 +85,4 @@ the changes may not be visible to another transaction that acquired the lock and
 
 **Don't use joinedload when selecting .with_for_update()**
 
-In fact, using `joinedload` and `.with_for_update()` will trigger and error because `joinedload` produces OUTER LEFT JOIN that cannot be used with SELECT FOR UPDATE. A regular `.join()` can be used to lock related resources but it may lead to no rows if there is no row to join. Usually, you'd select with `selectinload` or first select with  `.with_for_update()` without loading related attributes and then re-selecting with `joinedload` without `.with_for_update()`.
+In fact, using `joinedload` and `.with_for_update()` will trigger an error because `joinedload` produces OUTER LEFT JOIN that cannot be used with SELECT FOR UPDATE. A regular `.join()` can be used to lock related resources but it may lead to no rows if there is no row to join. Usually, you'd select with `selectinload` or first select with  `.with_for_update()` without loading related attributes and then re-selecting with `joinedload` without `.with_for_update()`.

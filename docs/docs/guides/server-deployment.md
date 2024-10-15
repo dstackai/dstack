@@ -92,7 +92,7 @@ To store the state externally, use the `DSTACK_DATABASE_URL` and `DSTACK_SERVER_
 ??? info "Migrate from SQLite to PostgreSQL"
     You can migrate the existing state from SQLite to PostgreSQL using `pgloader`:
 
-    1. Create an new PostgreSQL database
+    1. Create a new PostgreSQL database
     2. Clone the `dstack` repo and [install](https://github.com/dstackai/dstack/blob/master/contributing/DEVELOPMENT.md) `dstack` from source.
        Ensure you've checked out the tag that corresponds to your server version (e.g. `git checkout 0.18.10`).
     3. Apply database migrations to the new database:
@@ -154,7 +154,7 @@ The log group must be created beforehand, `dstack` won't try to create it.
     }
     ```
 
-## Deploying multiple replicase of the server
+## Deploying multiple replicas of the server
 
 If you'd like to deploy multiple server replicas, make sure to configure `dstack` to use [PostgreSQL](#postgresql)
 and [AWS CloudWatch](#aws-cloudwatch).
