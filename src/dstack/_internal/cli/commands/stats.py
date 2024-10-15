@@ -2,6 +2,7 @@ import argparse
 import time
 from typing import Any, Dict, List, Optional, Union
 
+import requests
 from rich.live import Live
 from rich.table import Table
 
@@ -28,7 +29,7 @@ class StatsCommand(APIBaseCommand):
         self._parser.add_argument(
             "-w",
             "--watch",
-            help="Watch statuses of runs in realtime",
+            help="Watch run stats in realtime",
             action="store_true",
         )
 
@@ -62,14 +63,22 @@ class StatsCommand(APIBaseCommand):
 
 def _get_run_jobs_metrics(api: Client, run: Run) -> List[JobMetrics]:
     metrics = []
-    for job in run._run.jobs:
-        job_metrics = api.client.metrics.get_job_metrics(
-            project_name=api.project,
-            run_name=run.name,
-            replica_num=job.job_spec.replica_num,
-            job_num=job.job_spec.job_num,
-        )
-        metrics.append(job_metrics)
+    try:
+        for job in run._run.jobs:
+            job_metrics = api.client.metrics.get_job_metrics(
+                project_name=api.project,
+                run_name=run.name,
+                replica_num=job.job_spec.replica_num,
+                job_num=job.job_spec.job_num,
+            )
+            metrics.append(job_metrics)
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            raise CLIError(
+                "Metrics API is not supported for server versions before 0.18.18. "
+                "Update the server to use `dstack stats`."
+            )
+        raise
     return metrics
 
 
