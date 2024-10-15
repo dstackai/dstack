@@ -27,16 +27,29 @@ from dstack._internal.server.services.docker import ImageConfig, get_image_confi
 from dstack._internal.server.utils.common import run_async
 
 
-def get_default_python_verison() -> str:
+import sys
+from dstack._internal.core.errors import ServerClientError
+from dstack._internal.core.models.configurations import PythonVersion
+
+def get_default_python_version() -> str:
+    """
+    Detect the default Python version from the user's environment in the CLI.
+    This function returns the Python version as a string (e.g., "3.8").
+    """
+   
     version_info = sys.version_info
     python_version_str = f"{version_info.major}.{version_info.minor}"
+    
     try:
+        
         return PythonVersion(python_version_str).value
     except ValueError:
+        
         raise ServerClientError(
-            "Failed to use the system Python version. "
+            f"Failed to use the system Python version. "
             f"Python {python_version_str} is not supported."
         )
+
 
 
 def get_default_image(python_version: str) -> str:
