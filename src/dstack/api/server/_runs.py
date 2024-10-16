@@ -58,12 +58,26 @@ class RunsAPIClient(APIClientGroup):
 
     def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:
         body = GetRunPlanRequest(run_spec=run_spec)
-        resp = self._request(f"/api/project/{project_name}/runs/get_plan", body=body.json())
+        # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
+        if not run_spec.configuration.privileged:
+            exclude = {"run_spec": {"configuration": {"privileged"}}}
+        else:
+            exclude = None
+        resp = self._request(
+            f"/api/project/{project_name}/runs/get_plan", body=body.json(exclude=exclude)
+        )
         return parse_obj_as(RunPlan.__response__, resp.json())
 
     def submit(self, project_name: str, run_spec: RunSpec) -> Run:
         body = SubmitRunRequest(run_spec=run_spec)
-        resp = self._request(f"/api/project/{project_name}/runs/submit", body=body.json())
+        # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
+        if not run_spec.configuration.privileged:
+            exclude = {"run_spec": {"configuration": {"privileged"}}}
+        else:
+            exclude = None
+        resp = self._request(
+            f"/api/project/{project_name}/runs/submit", body=body.json(exclude=exclude)
+        )
         return parse_obj_as(Run.__response__, resp.json())
 
     def stop(self, project_name: str, runs_names: List[str], abort: bool):

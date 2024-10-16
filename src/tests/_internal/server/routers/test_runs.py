@@ -1,3 +1,4 @@
+import copy
 import json
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -191,6 +192,7 @@ def get_dev_env_run_dict(
     submitted_at: str = "2023-01-02T03:04:00+00:00",
     last_processed_at: str = "2023-01-02T03:04:00+00:00",
     finished_at: str = "2023-01-02T03:04:00+00:00",
+    privileged: bool = False,
 ) -> Dict:
     return {
         "id": run_id,
@@ -208,7 +210,7 @@ def get_dev_env_run_dict(
                 "ide": "vscode",
                 "version": None,
                 "image": None,
-                "privileged": False,
+                "privileged": privileged,
                 "init": [],
                 "ports": [],
                 "python": "3.8",
@@ -289,7 +291,7 @@ def get_dev_env_run_dict(
                     "env": {},
                     "home_dir": "/root",
                     "image_name": "dstackai/base:py3.8-0.5-cuda-12.1",
-                    "privileged": False,
+                    "privileged": privileged,
                     "job_name": f"{run_name}-0-0",
                     "replica_num": 0,
                     "job_num": 0,
@@ -533,8 +535,11 @@ class TestGetRunPlan:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("privileged", [None, False])
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_returns_run_plan(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_returns_run_plan_privileged_false(
+        self, test_db, session: AsyncSession, client: AsyncClient, privileged: Optional[bool]
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -568,8 +573,12 @@ class TestGetRunPlan:
             offers=[offer_aws, offer_runpod],
             total_offers=2,
             max_price=2.0,
+            privileged=False,
         )
-        body = {"run_spec": run_plan_dict["run_spec"]}
+        run_spec = copy.deepcopy(run_plan_dict["run_spec"])
+        if privileged is None:
+            del run_spec["configuration"]["privileged"]
+        body = {"run_spec": run_spec}
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:
             backend_mock_aws = Mock()
             backend_mock_aws.TYPE = BackendType.AWS
@@ -662,8 +671,11 @@ class TestSubmitRun:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("privileged", [None, False, True])
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_submits_run(self, test_db, session: AsyncSession, client: AsyncClient):
+    async def test_submits_run(
+        self, test_db, session: AsyncSession, client: AsyncClient, privileged: Optional[bool]
+    ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
         project = await create_project(session=session, owner=user)
         await add_project_member(
@@ -684,8 +696,12 @@ class TestSubmitRun:
             finished_at=None,
             run_name="test-run",
             repo_id=repo.name,
+            privileged=bool(privileged),
         )
-        body = {"run_spec": run_dict["run_spec"]}
+        run_spec = copy.deepcopy(run_dict["run_spec"])
+        if privileged is None:
+            del run_spec["configuration"]["privileged"]
+        body = {"run_spec": run_spec}
         with patch("uuid.uuid4") as uuid_mock, patch(
             "dstack._internal.utils.common.get_current_datetime"
         ) as datetime_mock, patch(
