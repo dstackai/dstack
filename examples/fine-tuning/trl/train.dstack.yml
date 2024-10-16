@@ -12,7 +12,7 @@ env:
 # Commands of the task
 commands:
   - conda install cuda
-  - pip install "transformers>=4.43.2"
+  - pip install git+https://github.com/huggingface/transformers.git
   - pip install bitsandbytes
   - pip install flash-attn --no-build-isolation
   - pip install peft
