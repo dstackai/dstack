@@ -118,9 +118,15 @@ class GCPServiceAccountCreds(CoreModel):
         "service_account"
     )
     filename: Annotated[str, Field(description="The path to the service account file")]
-    # If data is None, it is read from the file
     data: Annotated[
-        Optional[str], Field(description="The contents of the service account file")
+        Optional[str],
+        Field(
+            description=(
+                "The contents of the service account file. "
+                "When configuring via `server/config.yml`, it's automatically filled from `filename`. "
+                "When configuring via UI, it has to be specified explicitly"
+            )
+        ),
     ] = None
 
     @root_validator
@@ -173,12 +179,27 @@ class GCPAPIConfig(CoreModel):
         Optional[str],
         Field(description="The shared VPC hosted project ID. Required for shared VPC only"),
     ] = None
+    public_ips: Annotated[
+        Optional[bool],
+        Field(
+            description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
+        ),
+    ] = None
     creds: AnyGCPAPICreds = Field(..., description="The credentials", discriminator="type")
 
 
 class KubeconfigConfig(CoreModel):
     filename: Annotated[str, Field(description="The path to the kubeconfig file")]
-    data: Annotated[Optional[str], Field(description="The contents of the kubeconfig file")] = None
+    data: Annotated[
+        Optional[str],
+        Field(
+            description=(
+                "The contents of the kubeconfig file. "
+                "When configuring via `server/config.yml`, it's automatically filled from `filename`. "
+                "When configuring via UI, it has to be specified explicitly"
+            )
+        ),
+    ] = None
 
     @root_validator
     def fill_data(cls, values):
