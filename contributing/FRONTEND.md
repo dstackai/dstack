@@ -29,7 +29,7 @@ npm run build
 Copy the contents of the `frontend/build` directory to the backend directory (`src/dstack/_internal/server/statics`):
 
 ```shell
-cp -r build/** ../src/dstack/_internal/server/statics
+cp -r build/ ../src/dstack/_internal/server/statics/
 ```
 
 ### 4. Run the dstack server
