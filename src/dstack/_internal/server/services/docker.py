@@ -11,6 +11,7 @@ from typing_extensions import Annotated
 from dstack._internal.core.errors import DockerRegistryError
 from dstack._internal.core.models.common import CoreModel, RegistryAuth
 from dstack._internal.server.utils.common import join_byte_stream_checked
+from dstack._internal.utils.dxf import PatchedDXF
 
 DEFAULT_PLATFORM = "linux/amd64"
 DEFAULT_REGISTRY = "index.docker.io"
@@ -65,7 +66,7 @@ class ImageManifest(CoreModel):
 def get_image_config(image_name: str, registry_auth: Optional[RegistryAuth]) -> ImageConfigObject:
     image = parse_image_name(image_name)
 
-    registry_client = DXF(
+    registry_client = PatchedDXF(
         host=image.registry or DEFAULT_REGISTRY,
         repo=image.repo,
         auth=DXFAuthAdapter(registry_auth),
