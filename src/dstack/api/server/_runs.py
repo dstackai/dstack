@@ -60,7 +60,7 @@ class RunsAPIClient(APIClientGroup):
         body = GetRunPlanRequest(run_spec=run_spec)
         # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
         if not run_spec.configuration.privileged:
-            exclude = {"run_spec": {"configuration": {"privileged": True}}}
+            exclude = {"run_spec": {"configuration": {"privileged"}}}
         else:
             exclude = None
         resp = self._request(
@@ -72,7 +72,7 @@ class RunsAPIClient(APIClientGroup):
         body = SubmitRunRequest(run_spec=run_spec)
         # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
         if not run_spec.configuration.privileged:
-            exclude = {"run_spec": {"configuration": {"privileged": True}}}
+            exclude = {"run_spec": {"configuration": {"privileged"}}}
         else:
             exclude = None
         resp = self._request(
