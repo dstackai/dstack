@@ -262,6 +262,7 @@ async def get_run_plan(
             exclude_not_available=False,
             multinode=jobs[0].job_spec.jobs_per_replica > 1,
             volumes=volumes,
+            privileged=jobs[0].job_spec.privileged,
         )
 
     job_plans = []

@@ -87,6 +87,7 @@ class BaseRunConfiguration(CoreModel):
     type: Literal["none"]
     name: Annotated[Optional[str], Field(description="The run name")] = None
     image: Annotated[Optional[str], Field(description="The name of the Docker image to run")]
+    privileged: Annotated[bool, Field(description="Run the container in privileged mode")] = False
     entrypoint: Annotated[Optional[str], Field(description="The Docker entrypoint")]
     working_dir: Annotated[
         Optional[str],

@@ -59,6 +59,7 @@ type TaskConfig struct {
 	Username      string       `json:"username"`
 	Password      string       `json:"password"`
 	ImageName     string       `json:"image_name"`
+	Privileged    bool         `json:"privileged"`
 	ContainerName string       `json:"container_name"`
 	ContainerUser string       `json:"container_user"`
 	ShmSize       int64        `json:"shm_size"`

@@ -380,6 +380,7 @@ async def _run_job_on_new_instance(
         multinode=multinode,
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
+        privileged=job.job_spec.privileged,
     )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.

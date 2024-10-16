@@ -490,7 +490,7 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		containerConfig.User = taskConfig.ContainerUser
 	}
 	hostConfig := &container.HostConfig{
-		Privileged:      dockerParams.DockerPrivileged(),
+		Privileged:      taskConfig.Privileged || dockerParams.DockerPrivileged(),
 		NetworkMode:     getNetworkMode(),
 		PortBindings:    bindPorts(dockerParams.DockerPorts()...),
 		PublishAllPorts: true,
