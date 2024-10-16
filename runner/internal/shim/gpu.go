@@ -32,20 +32,14 @@ type GpuInfo struct {
 	Vram   int // MiB
 }
 
-var gpuVendor GpuVendor
-
 func GetGpuVendor() GpuVendor {
-	if gpuVendor != "" {
-		return gpuVendor
-	}
 	if _, err := os.Stat("/dev/kfd"); !errors.Is(err, os.ErrNotExist) {
-		gpuVendor = Amd
-	} else if _, err := exec.LookPath("nvidia-smi"); err == nil {
-		gpuVendor = Nvidia
-	} else {
-		gpuVendor = NoVendor
+		return Amd
 	}
-	return gpuVendor
+	if _, err := exec.LookPath("nvidia-smi"); err == nil {
+		return Nvidia
+	}
+	return NoVendor
 }
 
 func GetGpuInfo() []GpuInfo {
