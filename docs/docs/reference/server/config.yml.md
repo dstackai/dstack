@@ -365,6 +365,7 @@ gcloud projects list --format="json(projectId)"
     compute.networks.updatePolicy
     compute.regions.get
     compute.regions.list
+    compute.routers.list
     compute.subnetworks.list
     compute.subnetworks.use
     compute.subnetworks.useExternalIp
@@ -939,6 +940,13 @@ See the [reference table](#default-permissions) for all configurable permissions
             type:
                 required: true
 
+    ??? info "Specifying `data`"
+        To specify service account file contents as a string, use `jq`:
+
+        ```shell
+        cat my-service-account-file.json | jq -c | jq -R
+        ```
+
 === "Default"
     #SCHEMA# dstack._internal.server.services.config.GCPDefaultCreds
         overrides:
@@ -1052,6 +1060,13 @@ See the [reference table](#default-permissions) for all configurable permissions
 ##SCHEMA# dstack._internal.server.services.config.KubeconfigConfig
     overrides:
         show_root_heading: false
+
+??? info "Specifying `data`"
+    To specify service account file contents as a string, use `jq`:
+
+    ```shell
+    cat my-service-account-file.json | jq -c | jq -R
+    ```
 
 ## `projects[n].backends[type=kubernetes].networking` { #_networking data-toc-label="networking" }
 
