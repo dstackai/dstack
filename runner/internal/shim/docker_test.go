@@ -154,7 +154,9 @@ func (c *dockerParametersMock) DockerShellCommands(publicKeys []string) []string
 
 func (c *dockerParametersMock) DockerPorts() []int {
 	ports := make([]int, 0)
-	ports = append(ports, c.sshPort)
+	if c.sshPort != 0 {
+		ports = append(ports, c.sshPort)
+	}
 	return ports
 }
 
