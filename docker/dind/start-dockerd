@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+mkdir /mnt/_tmp
+if ! mount -t tmpfs none /mnt/_tmp 2> /dev/null; then
+    echo 'docker privileged mode required'
+    rm -r /mnt/_tmp
+    exit 101
+fi
+umount /mnt/_tmp
+rm -r /mnt/_tmp
+
+if ! supervisorctl status > /dev/null; then
+    supervisord -c /etc/supervisord.conf
+    action='started'
+else
+    supervisorctl restart dockerd > /dev/null
+    action='restarted'
+fi
+
+for _i in {1..10}; do
+    if supervisorctl tail dockerd | grep -q 'API listen on'; then
+        echo "dockerd ${action}"
+        exit 0
+    fi
+    sleep 1
+done
+
+supervisorctl stop dockerd > /dev/null
+echo 'failed to start dockerd:'
+supervisorctl tail dockerd
+exit 102
