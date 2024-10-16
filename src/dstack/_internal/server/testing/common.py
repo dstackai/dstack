@@ -424,11 +424,13 @@ async def create_instance(
     instance_id: Optional[UUID] = None,
     job: Optional[JobModel] = None,
     instance_num: int = 0,
+    backend: BackendType = BackendType.DATACRUNCH,
+    region: str = "eu-west",
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
     job_provisioning_data = {
-        "backend": "datacrunch",
+        "backend": backend.value,
         "instance_type": {
             "name": "instance",
             "resources": {
@@ -443,7 +445,7 @@ async def create_instance(
         "instance_id": "running_instance.id",
         "ssh_proxy": None,
         "hostname": "running_instance.ip",
-        "region": "running_instance.location",
+        "region": region,
         "price": 0.1,
         "username": "root",
         "ssh_port": 22,
@@ -451,7 +453,7 @@ async def create_instance(
         "backend_data": None,
     }
     offer = {
-        "backend": "datacrunch",
+        "backend": backend.value,
         "instance": {
             "name": "instance",
             "resources": {
@@ -463,7 +465,7 @@ async def create_instance(
                 "description": "",
             },
         },
-        "region": "en",
+        "region": region,
         "price": 1,
         "availability": "available",
     }
@@ -498,8 +500,8 @@ async def create_instance(
         job_provisioning_data=json.dumps(job_provisioning_data),
         offer=json.dumps(offer),
         price=1,
-        region="eu-west",
-        backend=BackendType.DATACRUNCH,
+        region=region,
+        backend=backend,
         termination_idle_time=DEFAULT_POOL_TERMINATION_IDLE_TIME,
         profile=profile.json(),
         requirements=requirements.json(),
@@ -519,9 +521,11 @@ async def create_volume(
     configuration: Optional[VolumeConfiguration] = None,
     volume_provisioning_data: Optional[VolumeProvisioningData] = None,
     deleted_at: Optional[datetime] = None,
+    backend: BackendType = BackendType.AWS,
+    region: str = "eu-west-1",
 ) -> VolumeModel:
     if configuration is None:
-        configuration = get_volume_configuration()
+        configuration = get_volume_configuration(backend=backend, region=region)
     vm = VolumeModel(
         project=project,
         name=configuration.name,

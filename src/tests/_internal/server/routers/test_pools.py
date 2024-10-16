@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
@@ -292,6 +293,8 @@ class TestShowPool:
             session=session,
             project=project,
             pool=pool,
+            backend=BackendType.DATACRUNCH,
+            region="en",
         )
         response = await client.post(
             f"/api/project/{project.name}/pool/show",
@@ -448,6 +451,8 @@ class TestRemoveInstance:
             session=session,
             project=project,
             pool=pool,
+            backend=BackendType.DATACRUNCH,
+            region="en",
         )
         response = await client.post(
             f"/api/project/{project.name}/pool/remove",
