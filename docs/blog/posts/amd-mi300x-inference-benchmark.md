@@ -3,6 +3,7 @@ title: "Benchmarking Llama 3.1 405B on 8x AMD MI300X GPUs"
 date: 2024-10-09
 description: "Exploring how the inference performance of Llama 3.1 405B varies on 8x AMD MI300X GPUs across vLLM and TGI backends in different use cases."  
 slug: amd-mi300x-inference-benchmark
+image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v5.png?raw=true
 ---
 
 # Benchmarking Llama 3.1 405B on 8x AMD MI300X GPUs
@@ -12,7 +13,7 @@ so we saw this as a great chance to test our integration by benchmarking AMD GPU
 [Hot Aisle :material-arrow-top-right-thin:{ .external }](https://hotaisle.xyz/){:target="_blank"}, who build top-tier 
 bare metal compute for AMD GPUs, kindly provided the hardware for the benchmark.
 
-<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v4.png?raw=true" width="750" />
+<img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v5.png?raw=true" width="750" />
 
 <!-- more -->
 
