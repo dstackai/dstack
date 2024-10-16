@@ -152,6 +152,7 @@ class UserModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     token: Mapped[DecryptedString] = mapped_column(EncryptedString(200), unique=True)
     # token_hash is needed for fast search by token when stored token is encrypted
     token_hash: Mapped[str] = mapped_column(String(2000), unique=True)
@@ -173,6 +174,7 @@ class ProjectModel(BaseModel):
         UUIDType(binary=False), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(50), unique=True)
+    created_at: Mapped[datetime] = mapped_column(NaiveDateTime, default=get_current_datetime)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
