@@ -257,9 +257,11 @@ export const ModelDetails: React.FC = () => {
     };
 
     const onKeyDown = (event) => {
-        if (event?.detail?.keyCode === 13 && !event?.detail?.ctrlKey) {
+        const isCtrlOrShiftKey = event?.detail?.ctrlKey || event?.detail?.shiftKey;
+
+        if (event?.detail?.keyCode === 13 && !isCtrlOrShiftKey) {
             handleSubmit(onSubmit)();
-        } else if (event?.detail?.keyCode === 13 && event?.detail?.ctrlKey) {
+        } else if (event?.detail?.keyCode === 13 && isCtrlOrShiftKey) {
             event.preventDefault();
             setValue('message', messageText + '\n');
             setTimeout(onChangeMessage, 0);
