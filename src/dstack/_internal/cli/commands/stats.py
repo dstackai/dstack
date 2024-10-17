@@ -97,7 +97,7 @@ def _get_stats_table(run: Run, metrics: List[JobMetrics]) -> Table:
         cpu_usage = _get_metric_value(job_metrics, "cpu_usage_percent")
         if cpu_usage is not None:
             cpu_usage = f"{cpu_usage}%"
-        memory_usage = _get_metric_value(job_metrics, "memory_usage_bytes")
+        memory_usage = _get_metric_value(job_metrics, "memory_working_set_bytes")
         if memory_usage is not None:
             memory_usage = f"{round(memory_usage / 1024 / 1024)}MB"
             if job.job_submissions[-1].job_provisioning_data is not None:
