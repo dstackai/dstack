@@ -26,13 +26,15 @@ import {
 } from 'components';
 
 import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
+import { copyToClipboard, riseRouterException } from 'libs';
 import { getExtendedModelFromRun } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
 import { selectAuthToken } from 'App/slice';
+import { runIsStopped } from 'pages/Runs/utils';
 
-import { copyToClipboard } from '../../../libs';
+import { getCurlModelCode, getPythonModelCode } from './helpers';
 
 import { IModelExtended } from '../List/types';
 import { FormValues, Message, Role } from './types';
@@ -99,6 +101,12 @@ export const ModelDetails: React.FC = () => {
         project_name: paramProjectName,
         run_name: paramRunName,
     });
+
+    useEffect(() => {
+        if (runData && runIsStopped(runData.status)) {
+            riseRouterException();
+        }
+    }, [runData]);
 
     const modelData = useMemo<IModelExtended | undefined | null>(() => {
         if (!runData) {
@@ -268,31 +276,9 @@ export const ModelDetails: React.FC = () => {
         }
     };
 
-    const pythonCode = `from openai import OpenAI
-client = OpenAI()
+    const pythonCode = getPythonModelCode(modelData);
 
-response = client.chat.completions.create(
-  model="${modelData?.name ?? ''}",
-  messages=[],
-  stream=True,
-  max_tokens=512,
-  response_format={
-    "type": "text"
-  }
-)`;
-
-    const curlCode = `curl https://api.openai.com/v1/chat/completions \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer $OPENAI_API_KEY" \\
-  -d '{
-  "model": "${modelData?.name ?? ''}",
-  "messages": [],
-  "stream": true,
-  "max_tokens": 512,
-  "response_format": {
-    "type": "text"
-  }
-}'`;
+    const curlCode = getCurlModelCode(modelData);
 
     const onCopyCode = () => {
         switch (selectedCode.value) {

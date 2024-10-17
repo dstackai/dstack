@@ -85,7 +85,7 @@ export const centsToFormattedString = (cents: number, currency?: string): string
     return `${floatValue < 0 ? '-' : ''}${currency}${Math.abs(floatValue).toFixed(2)}`;
 };
 
-export const riseRouterException = (status = 404, json = '{}'): never => {
+export const riseRouterException = (status = 404, json = 'Not Found'): never => {
     // eslint-disable-next-line @typescript-eslint/no-throw-literal
     throw new Response(json, { status });
 };
