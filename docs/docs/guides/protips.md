@@ -97,6 +97,55 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
 production-grade service deployment not offered by tasks, such as HTTPS domains and auto-scaling.
 If you run a web app as a task and it works, go ahead and run it as a service.
 
+## Docker and Docker Compose
+
+It's possible to use Docker inside `dstack` runs. As `dstack` itself executes runs in Docker containers,
+additional configuration steps are required:
+
+1. Set the `privileged` property to `true`.
+2. Use DinD (Docker in Docker) `image` — `dstackai/dind` or your own.
+3. Add `start-dockerd` as the first command to `commands` (for tasks and services) or `init` (for dev-environments).
+Please note that `start-dockerd` script is a part of `dstackai/dind` image, if you use a different `image`,
+replace it with a corresponding command to start Docker daemon.
+
+??? info "task example"
+    ```yaml
+    type: task
+    name: task-dind
+
+    image: dstackai/dind
+    privileged: true
+
+    commands:
+      - start-dockerd
+      - docker compose up
+    ```
+
+??? info "dev-environment example"
+    ```yaml
+    type: dev-environment
+    name: vscode-dind
+
+    image: dstackai/dind
+    privileged: true
+
+    ide: vscode
+
+    init:
+      - start-dockerd
+    ```
+
+To persist Docker data including images, containers, and volumes between runs, create a `dstack` [volume](../concepts/volumes.md)
+and add the following lines to the run configuration to attach it:
+
+```yaml
+volumes:
+  - name: docker-volume
+    path: /var/lib/docker
+```
+
+See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/examples/misc/dind).
+
 ## Environment variables
 
 If a configuration requires an environment variable that you don't want to hardcode in the YAML, you can define it
