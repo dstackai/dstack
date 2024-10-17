@@ -1,0 +1,43 @@
+services:
+  app:
+    image: ghcr.io/huggingface/chat-ui:sha-bf0bc92
+    command:
+      - bash
+      - -c
+      - |
+        echo MONGODB_URL=mongodb://db:27017 > .env.local
+        echo MODELS='`[{
+          "name": "${MODEL_ID?}",
+          "endpoints": [{"type": "tgi", "url": "http://tgi:8000"}]
+        }]`' >> .env.local
+        exec ./entrypoint.sh
+    ports:
+      - 127.0.0.1:9000:3000
+    depends_on:
+      - tgi
+      - db
+
+  tgi:
+    image: ghcr.io/huggingface/text-generation-inference:sha-704a58c
+    volumes:
+      - tgi_data:/data
+    environment:
+      HF_TOKEN: ${HF_TOKEN?}
+      MODEL_ID: ${MODEL_ID?}
+      PORT: 8000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  db:
+    image: mongo:latest
+    volumes:
+      - db_data:/data/db
+
+volumes:
+  tgi_data:
+  db_data:
