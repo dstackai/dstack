@@ -1,32 +1,58 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir /mnt/_tmp
-if ! mount -t tmpfs none /mnt/_tmp 2> /dev/null; then
-    echo 'docker privileged mode required'
-    rm -r /mnt/_tmp
-    exit 101
-fi
-umount /mnt/_tmp
-rm -r /mnt/_tmp
-
-if ! supervisorctl status > /dev/null; then
-    supervisord -c /etc/supervisord.conf
-    action='started'
-else
-    supervisorctl restart dockerd > /dev/null
-    action='restarted'
-fi
-
-for _i in {1..10}; do
-    if supervisorctl tail dockerd | grep -q 'API listen on'; then
-        echo "dockerd ${action}"
-        exit 0
+check_privileged_mode_or_die() {
+    mkdir /mnt/_tmp
+    if ! mount -t tmpfs none /mnt/_tmp 2> /dev/null; then
+        echo 'docker privileged mode required'
+        rm -r /mnt/_tmp
+        exit 101
     fi
-    sleep 1
-done
+    umount /mnt/_tmp
+    rm -r /mnt/_tmp
+}
 
-supervisorctl stop dockerd > /dev/null
-echo 'failed to start dockerd:'
-supervisorctl tail dockerd
-exit 102
+start_restart_dockerd() {
+    if ! supervisorctl status > /dev/null; then
+        supervisord -c /etc/supervisord.conf
+        echo 'started'
+    else
+        supervisorctl restart dockerd > /dev/null
+        echo 'restarted'
+    fi
+}
+
+move_processes_to_nested_cgroup() {
+    # detect cgroups v2
+    if [[ -f /sys/fs/cgroup/cgroup.controllers ]]; then
+        local group=/sys/fs/cgroup/dind
+        mkdir -p ${group}
+        xargs -rn1 < /sys/fs/cgroup/cgroup.procs > ${group}/cgroup.procs || true
+    fi
+}
+
+wait_dockerd_started() {
+    for _i in {1..10}; do
+        if supervisorctl tail dockerd | grep -q 'API listen on'; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+show_dockerd_log_and_die() {
+    supervisorctl stop dockerd > /dev/null
+    echo 'failed to start dockerd:'
+    supervisorctl tail dockerd
+    exit 102
+}
+
+
+check_privileged_mode_or_die
+event=$(start_restart_dockerd)
+if ! wait_dockerd_started; then
+    show_dockerd_log_and_die
+fi
+move_processes_to_nested_cgroup
+echo "dockerd ${event}"
