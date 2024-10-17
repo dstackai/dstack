@@ -26,6 +26,10 @@
     border-right: 1px solid #b6bec9;
     padding-right: 20px;
     padding-top: 20px;
+
+    textarea {
+        resize: none !important;
+    }
 }
 
 .buttons {
@@ -64,7 +68,8 @@
     padding: 20px;
 
     textarea {
-        max-height: calc(100vh - 400px);
+        resize: none !important;
+        max-height: calc(100vh - 550px);
     }
 
     .buttons {

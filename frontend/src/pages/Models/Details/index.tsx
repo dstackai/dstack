@@ -354,6 +354,7 @@ response = client.chat.completions.create(
 
                             <aside className={css.side}>
                                 <FormTextarea
+                                    rows="4"
                                     disabled={loading}
                                     label={t('models.details.instructions')}
                                     constraintText={t('models.details.instructions_description')}
