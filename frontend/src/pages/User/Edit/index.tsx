@@ -5,11 +5,11 @@ import { pick } from 'lodash';
 
 import { Box, ConfirmationDialog, Container, ContentLayout, Header, Loader } from 'components';
 
-import { useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
+import { useAppDispatch, useAppSelector, useBreadcrumbs, useNotifications } from 'hooks';
 import { ROUTES } from 'routes';
 import { useGetUserQuery, useRefreshTokenMutation, useUpdateUserMutation } from 'services/user';
 
-import { selectUserData } from 'App/slice';
+import { selectUserData, setAuthData } from 'App/slice';
 
 import { UserForm } from '../Form';
 
@@ -20,8 +20,9 @@ export const UserEdit: React.FC = () => {
     const userData = useAppSelector(selectUserData);
     const userGlobalRole = userData?.global_role ?? '';
     const paramUserName = params.userName ?? '';
+    const dispatch = useAppDispatch();
     const [showRefreshConfirm, setShowRefreshConfirm] = useState(false);
-    const { isLoading, data } = useGetUserQuery({ name: paramUserName }, { skip: !params.userName });
+    const { isLoading, data } = useGetUserQuery({ name: paramUserName }, { skip: !paramUserName });
     const [updateUser, { isLoading: isUserUpdating }] = useUpdateUserMutation();
     const [refreshToken, { isLoading: isTokenRefreshing }] = useRefreshTokenMutation();
 
@@ -56,7 +57,13 @@ export const UserEdit: React.FC = () => {
         try {
             await refreshToken({
                 username: paramUserName,
-            }).unwrap();
+            })
+                .unwrap()
+                .then(({ creds: { token } }) => {
+                    if (paramUserName === userData?.username) {
+                        dispatch(setAuthData({ token }));
+                    }
+                });
 
             pushNotification({
                 type: 'success',

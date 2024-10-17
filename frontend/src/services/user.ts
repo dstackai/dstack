@@ -101,7 +101,21 @@ export const userApi = createApi({
                 body: { username },
             }),
 
-            invalidatesTags: (result, error, { username }) => [{ type: 'User' as const, id: username }],
+            // invalidatesTags: (result, error, { username }) => [{ type: 'User' as const, id: username }],
+
+            async onQueryStarted({ username }, { dispatch, queryFulfilled }) {
+                try {
+                    const { data } = await queryFulfilled;
+
+                    dispatch(
+                        userApi.util.updateQueryData('getUser', { name: username }, (draft) => {
+                            Object.assign(draft, data);
+                        }),
+                    );
+                } catch (e) {
+                    console.log(e);
+                }
+            },
         }),
 
         deleteUsers: builder.mutation<void, IUser['username'][]>({
