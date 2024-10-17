@@ -1,7 +1,9 @@
+from datetime import datetime, timezone
 from unittest.mock import patch
 from uuid import UUID
 
 import pytest
+from freezegun import freeze_time
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,13 +23,17 @@ class TestListUsers:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_users(self, test_db, session: AsyncSession, client: AsyncClient):
-        user = await create_user(session=session)
+        user = await create_user(
+            session=session,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
         response = await client.post("/api/users/list", headers=get_auth_headers(user.token))
         assert response.status_code in [200]
         assert response.json() == [
             {
                 "id": str(user.id),
                 "username": user.name,
+                "created_at": "2023-01-02T03:04:00+00:00",
                 "global_role": user.global_role,
                 "email": None,
                 "active": True,
@@ -67,7 +73,10 @@ class TestGetMyUser:
     async def test_returns_logged_in_user(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        user = await create_user(session=session)
+        user = await create_user(
+            session=session,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
         response = await client.post(
             "/api/users/get_my_user", headers=get_auth_headers(user.token)
         )
@@ -75,6 +84,7 @@ class TestGetMyUser:
         assert response.json() == {
             "id": str(user.id),
             "username": user.name,
+            "created_at": "2023-01-02T03:04:00+00:00",
             "global_role": user.global_role,
             "email": None,
             "active": True,
@@ -111,7 +121,12 @@ class TestGetUser:
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
         user = await create_user(session=session, global_role=GlobalRole.ADMIN)
-        other_user = await create_user(session=session, name="other_user", token="1234")
+        other_user = await create_user(
+            session=session,
+            name="other_user",
+            token="1234",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
         response = await client.post(
             "/api/users/get_user",
             headers=get_auth_headers(user.token),
@@ -121,6 +136,7 @@ class TestGetUser:
         assert response.json() == {
             "id": str(other_user.id),
             "username": other_user.name,
+            "created_at": "2023-01-02T03:04:00+00:00",
             "global_role": other_user.global_role,
             "email": None,
             "creds": {"token": "1234"},
@@ -140,6 +156,7 @@ class TestCreateUser:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
     async def test_creates_user(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(name="admin", session=session)
         with patch("uuid.uuid4") as uuid_mock:
@@ -158,6 +175,7 @@ class TestCreateUser:
         assert response.json() == {
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "test",
+            "created_at": "2023-01-02T03:04:00+00:00",
             "global_role": "user",
             "email": "test@example.com",
             "active": True,
@@ -170,10 +188,14 @@ class TestCreateUser:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
     async def test_return_400_if_username_taken(
         self, test_db, session: AsyncSession, client: AsyncClient
     ):
-        user = await create_user(name="admin", session=session)
+        user = await create_user(
+            name="admin",
+            session=session,
+        )
         with patch("uuid.uuid4") as uuid_mock:
             uuid_mock.return_value = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
             response = await client.post(
@@ -188,6 +210,7 @@ class TestCreateUser:
         assert response.json() == {
             "id": "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
             "username": "Test",
+            "created_at": "2023-01-02T03:04:00+00:00",
             "global_role": "user",
             "email": None,
             "active": True,

@@ -52,12 +52,16 @@ def upgrade() -> None:
             sa.Column("created_at", dstack._internal.server.models.NaiveDateTime(), nullable=True)
         )
 
-    start_date = get_current_datetime()
+    # Set created_at on existing rows.
+    # The absolute value does not matter since it cannot be recovered.
+    # Just ensure that created_at order matches the insertion order.
+    # SELECT should fetch the rows in the insertion order when there are no additional conditions.
+    last_created_at = get_current_datetime()
 
     users_update_params = []
-    users = op.get_bind().execute(sa.select(users_table.c.id))
-    for i, row in enumerate(users):
-        created_at = start_date - timedelta(seconds=i)
+    users = op.get_bind().execute(sa.select(users_table))
+    for i, row in enumerate(reversed(users.all())):
+        created_at = last_created_at - timedelta(seconds=i)
         users_update_params.append({"_id": row.id, "created_at": created_at})
     update_stmt = (
         users_table.update()
@@ -68,9 +72,9 @@ def upgrade() -> None:
         op.get_bind().execute(update_stmt, users_update_params)
 
     projects_update_params = []
-    projects = op.get_bind().execute(sa.select(projects_table.c.id))
-    for i, row in enumerate(projects):
-        created_at = start_date - timedelta(seconds=i)
+    projects = op.get_bind().execute(sa.select(projects_table))
+    for i, row in enumerate(reversed(projects.all())):
+        created_at = last_created_at - timedelta(seconds=i)
         projects_update_params.append({"_id": row.id, "created_at": created_at})
     update_stmt = (
         projects_table.update()

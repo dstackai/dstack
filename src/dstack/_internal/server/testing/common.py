@@ -82,6 +82,7 @@ def get_auth_headers(token: Union[DecryptedString, str]) -> Dict:
 async def create_user(
     session: AsyncSession,
     name: str = "test_user",
+    created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     global_role: GlobalRole = GlobalRole.ADMIN,
     token: Optional[str] = None,
     email: Optional[str] = None,
@@ -91,6 +92,7 @@ async def create_user(
         token = str(uuid.uuid4())
     user = UserModel(
         name=name,
+        created_at=created_at,
         global_role=global_role,
         token=DecryptedString(plaintext=token),
         token_hash=get_token_hash(token),
@@ -106,6 +108,7 @@ async def create_project(
     session: AsyncSession,
     owner: Optional[UserModel] = None,
     name: str = "test_project",
+    created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     ssh_private_key: str = "",
     ssh_public_key: str = "",
 ) -> ProjectModel:
@@ -114,6 +117,7 @@ async def create_project(
     project = ProjectModel(
         name=name,
         owner_id=owner.id,
+        created_at=created_at,
         ssh_private_key=ssh_private_key,
         ssh_public_key=ssh_public_key,
     )

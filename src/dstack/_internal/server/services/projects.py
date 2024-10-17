@@ -1,4 +1,5 @@
 import uuid
+from datetime import timezone
 from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import delete, select, update
@@ -55,6 +56,7 @@ async def list_user_projects(
         projects = await list_project_models(session=session)
     else:
         projects = await list_user_project_models(session=session, user=user)
+    projects = sorted(projects, key=lambda p: p.created_at)
     return [
         project_model_to_project(p, include_backends=False, include_members=False)
         for p in projects
@@ -393,6 +395,7 @@ def project_model_to_project(
         project_id=project_model.id,
         project_name=project_model.name,
         owner=users.user_model_to_user(project_model.owner),
+        created_at=project_model.created_at.replace(tzinfo=timezone.utc),
         backends=backends,
         members=members,
     )

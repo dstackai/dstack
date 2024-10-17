@@ -1,5 +1,6 @@
 import hashlib
 import uuid
+from datetime import timezone
 from typing import Awaitable, Callable, List, Optional, Tuple
 
 from sqlalchemy import delete, select, update
@@ -48,6 +49,7 @@ async def list_all_users(
 ) -> List[User]:
     res = await session.execute(select(UserModel))
     user_models = res.scalars().all()
+    user_models = sorted(user_models, key=lambda u: u.created_at)
     return [user_model_to_user(u) for u in user_models]
 
 
@@ -184,6 +186,7 @@ def user_model_to_user(user_model: UserModel) -> User:
     return User(
         id=user_model.id,
         username=user_model.name,
+        created_at=user_model.created_at.replace(tzinfo=timezone.utc),
         global_role=user_model.global_role,
         email=user_model.email,
         active=user_model.active,
@@ -195,6 +198,7 @@ def user_model_to_user_with_creds(user_model: UserModel) -> UserWithCreds:
     return UserWithCreds(
         id=user_model.id,
         username=user_model.name,
+        created_at=user_model.created_at.replace(tzinfo=timezone.utc),
         global_role=user_model.global_role,
         email=user_model.email,
         active=user_model.active,

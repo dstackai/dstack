@@ -1,7 +1,9 @@
+from datetime import datetime, timezone
 from unittest.mock import patch
 from uuid import UUID
 
 import pytest
+from freezegun import freeze_time
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,8 +39,15 @@ class TestListProjects:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_projects(self, test_db, session: AsyncSession, client: AsyncClient):
-        user = await create_user(session=session)
-        project = await create_project(session=session, owner=user)
+        user = await create_user(
+            session=session,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        project = await create_project(
+            session=session,
+            owner=user,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -55,6 +64,7 @@ class TestListProjects:
                 "owner": {
                     "id": str(user.id),
                     "username": user.name,
+                    "created_at": "2023-01-02T03:04:00+00:00",
                     "global_role": user.global_role,
                     "email": None,
                     "active": True,
@@ -62,6 +72,7 @@ class TestListProjects:
                         "can_create_projects": True,
                     },
                 },
+                "created_at": "2023-01-02T03:04:00+00:00",
                 "backends": [],
                 "members": [],
             }
@@ -77,6 +88,7 @@ class TestCreateProject:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    @freeze_time(datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc))
     async def test_creates_project(self, test_db, session: AsyncSession, client: AsyncClient):
         user = await create_user(session=session)
         project_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
@@ -96,6 +108,7 @@ class TestCreateProject:
             "owner": {
                 "id": str(user.id),
                 "username": user.name,
+                "created_at": "2023-01-02T03:04:00+00:00",
                 "global_role": user.global_role,
                 "email": None,
                 "active": True,
@@ -103,12 +116,14 @@ class TestCreateProject:
                     "can_create_projects": True,
                 },
             },
+            "created_at": "2023-01-02T03:04:00+00:00",
             "backends": [],
             "members": [
                 {
                     "user": {
                         "id": str(user.id),
                         "username": user.name,
+                        "created_at": "2023-01-02T03:04:00+00:00",
                         "global_role": user.global_role,
                         "email": None,
                         "active": True,
@@ -321,8 +336,15 @@ class TestGetProject:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_returns_project(self, test_db, session: AsyncSession, client: AsyncClient):
-        user = await create_user(session=session)
-        project = await create_project(session=session, owner=user)
+        user = await create_user(
+            session=session,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        project = await create_project(
+            session=session,
+            owner=user,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
         await add_project_member(
             session=session, project=project, user=user, project_role=ProjectRole.ADMIN
         )
@@ -337,6 +359,7 @@ class TestGetProject:
             "owner": {
                 "id": str(user.id),
                 "username": user.name,
+                "created_at": "2023-01-02T03:04:00+00:00",
                 "global_role": user.global_role,
                 "email": None,
                 "active": True,
@@ -344,12 +367,14 @@ class TestGetProject:
                     "can_create_projects": True,
                 },
             },
+            "created_at": "2023-01-02T03:04:00+00:00",
             "backends": [],
             "members": [
                 {
                     "user": {
                         "id": str(user.id),
                         "username": user.name,
+                        "created_at": "2023-01-02T03:04:00+00:00",
                         "global_role": user.global_role,
                         "email": None,
                         "active": True,
@@ -376,16 +401,30 @@ class TestSetProjectMembers:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
     async def test_sets_project_members(self, test_db, session: AsyncSession, client: AsyncClient):
-        project = await create_project(session=session)
-        admin = await create_user(session=session)
+        project = await create_project(
+            session=session,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        admin = await create_user(
+            session=session,
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
         await add_project_member(
             session=session,
             project=project,
             user=admin,
             project_role=ProjectRole.ADMIN,
         )
-        user1 = await create_user(session=session, name="user1")
-        user2 = await create_user(session=session, name="user2")
+        user1 = await create_user(
+            session=session,
+            name="user1",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
+        user2 = await create_user(
+            session=session,
+            name="user2",
+            created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+        )
         members = [
             {
                 "username": admin.name,
@@ -412,6 +451,7 @@ class TestSetProjectMembers:
                 "user": {
                     "id": str(admin.id),
                     "username": admin.name,
+                    "created_at": "2023-01-02T03:04:00+00:00",
                     "global_role": admin.global_role,
                     "email": None,
                     "active": True,
@@ -428,6 +468,7 @@ class TestSetProjectMembers:
                 "user": {
                     "id": str(user1.id),
                     "username": user1.name,
+                    "created_at": "2023-01-02T03:04:00+00:00",
                     "global_role": user1.global_role,
                     "email": None,
                     "active": True,
@@ -444,6 +485,7 @@ class TestSetProjectMembers:
                 "user": {
                     "id": str(user2.id),
                     "username": user2.name,
+                    "created_at": "2023-01-02T03:04:00+00:00",
                     "global_role": user2.global_role,
                     "email": None,
                     "active": True,

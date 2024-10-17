@@ -1,4 +1,5 @@
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
 from pydantic import UUID4
 
@@ -21,5 +22,6 @@ class Project(CoreModel):
     project_id: UUID4
     project_name: str
     owner: User
+    created_at: Optional[datetime] = None
     backends: List[BackendInfo]
     members: List[Member]

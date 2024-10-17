@@ -1,4 +1,5 @@
 import enum
+from datetime import datetime
 from typing import Optional
 
 from pydantic import UUID4
@@ -24,6 +25,7 @@ class UserPermissions(CoreModel):
 class User(CoreModel):
     id: UUID4
     username: str
+    created_at: Optional[datetime] = None
     global_role: GlobalRole
     email: Optional[str]
     active: bool
