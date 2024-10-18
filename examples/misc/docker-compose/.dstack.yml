@@ -1,0 +1,13 @@
+type: dev-environment
+name: vscode-dind
+
+privileged: true
+image: dstackai/dind
+ide: vscode
+init:
+  - start-dockerd
+
+spot_policy: auto
+
+resources:
+  gpu: 1

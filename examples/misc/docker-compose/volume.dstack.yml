@@ -1,0 +1,8 @@
+type: volume
+name: my-dind-volume
+
+backend: aws
+region: eu-west-1
+
+# Required size
+size: 100GB

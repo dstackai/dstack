@@ -1040,9 +1040,9 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
 
 .md-typeset .tabbed-labels--linked>label>a code {
     /*MKDocs Insiders fix*/
-    /*background: initial;*/
-    font-weight: 600;
-    color: var(--md-primary-fg-color);
+    background: initial;
+    font-weight: 700;
+    color: var(--md-typeset-color);
 }
 
 .md-typeset .highlight :is(.nd,.ni,.nl,.nt),

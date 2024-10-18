@@ -97,6 +97,76 @@ This allows you to access the remote `8501` port on `localhost:8501` while the C
 production-grade service deployment not offered by tasks, such as HTTPS domains and auto-scaling.
 If you run a web app as a task and it works, go ahead and run it as a service.
 
+## Docker and Docker Compose
+
+All backends except `runpod`, `vastai` and `kubernetes` allow to use Docker and Docker Compose 
+inside `dstack` runs. To do that, additional configuration steps are required:
+
+1. Set the `privileged` property to `true`.
+2. Set the `image` property to `dstackai/dind` (or another DinD image).
+3. For tasks and services, add `start-dockerd` as the first command. For dev environments, add `start-dockerd` as the first comand
+   in the `init` property.
+Note, `start-dockerd` is a part of `dstackai/dind` image, if you use a different DinD image,
+replace it with a corresponding command to start Docker daemon.
+
+=== "Task"
+    <div editor-title="examples/misc/dind/task.dstack.yml">
+
+    ```yaml
+    type: task
+    name: task-dind
+
+    privileged: true
+    image: dstackai/dind
+
+    commands:
+      - start-dockerd
+      - docker compose up
+    ```
+
+    </div>
+
+=== "Dev environment"
+    <div editor-title="examples/misc/dind/.dstack.yml">
+
+    ```yaml
+    type: dev-environment
+    name: vscode-dind
+
+    privileged: true
+    image: dstackai/dind
+
+    ide: vscode
+
+    init:
+      - start-dockerd
+    ```
+
+    </div>
+
+??? info "Volumes"
+
+    To persist Docker data between runs (e.g. images, containers, volumes, etc), create a `dstack` [volume](../concepts/volumes.md)
+    and add attach it in your run configuration:
+    
+    ```yaml
+        type: dev-environment
+        name: vscode-dind
+    
+        privileged: true
+        image: dstackai/dind
+        ide: vscode
+    
+        init:
+          - start-dockerd
+    
+        volumes:
+          - name: docker-volume
+            path: /var/lib/docker
+    ```
+
+See more Docker examples [here](https://github.com/dstackai/dstack/tree/master/examples/misc/docker-compose).
+
 ## Environment variables
 
 If a configuration requires an environment variable that you don't want to hardcode in the YAML, you can define it
