@@ -46,7 +46,9 @@ ide: vscode
     ide: vscode
     ```
 
-### Docker image
+### Docker
+
+If you want, you can specify your own Docker image via `image`.
 
 <div editor-title=".dstack.yml"> 
 
@@ -81,6 +83,10 @@ ide: vscode
     
     ide: vscode
     ```
+
+!!! info "Docker and Docker Compose"
+    All backends except `runpod`, `vastai` and `kubernetes` also allow to use [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) 
+    inside `dstack` runs.
 
 ### Resources { #_resources }
 

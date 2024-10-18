@@ -82,7 +82,9 @@ When running it, `dstack run` forwards `6000` port to `localhost:6000`, enabling
 
 [//]: # (See [tasks]&#40;../../tasks.md#configure-ports&#41; for more detail.)
 
-### Docker image
+### Docker
+
+If you want, you can specify your own Docker image via `image`.
 
 <div editor-title=".dstack.yml"> 
 
@@ -122,6 +124,10 @@ commands:
       - pip install -r fine-tuning/qlora/requirements.txt
       - python fine-tuning/qlora/train.py
     ```
+
+!!! info "Docker and Docker Compose"
+    All backends except `runpod`, `vastai` and `kubernetes` also allow to use [Docker and Docker Compose](../../guides/protips.md#docker-and-docker-compose) 
+    inside `dstack` runs.
 
 ### Resources { #_resources }
 
