@@ -26,6 +26,9 @@ move_processes_to_separate_cgroup() {
     # Move processes to a separate cgroup to prevent the root cgroup from becoming
     # threaded -- "Once you have a threaded controller you can not create cgroups
     # below it that reference non-threaded controllers like the memory controller".
+    # "A domain cgroup is turned into a threaded domain when [...] threaded controllers
+    # are enabled in the “cgroup.subtree_control” file while there are processes
+    # in the cgroup."
     # Fixes "cannot enter cgroupv2 "/sys/fs/cgroup/docker" with domain controllers --
     # it is in threaded mode" when starting containers with resource constraints,
     # see https://github.com/dstackai/dstack/issues/1854
