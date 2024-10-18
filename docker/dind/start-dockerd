@@ -64,5 +64,7 @@ event=$(start_restart_dockerd)
 if ! wait_dockerd_started; then
     show_dockerd_log_and_die
 fi
-move_processes_to_separate_cgroup
+if [[ ${event} = 'started' ]]; then
+    move_processes_to_separate_cgroup
+fi
 echo "dockerd ${event}"
