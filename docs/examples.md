@@ -100,3 +100,18 @@ hide:
         </p>
     </a>
 </div>
+
+## Misc
+
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/misc/docker-compose"
+       class="feature-cell sky">
+        <h3>
+            Docker Compose
+        </h3>
+
+        <p>
+            Learn how to use Docker and Docker Compose inside runs.
+        </p>
+    </a>
+</div>
