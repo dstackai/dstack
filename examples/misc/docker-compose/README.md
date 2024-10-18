@@ -1,6 +1,7 @@
 # Docker Compose
 
-All backends except `runpod`, `vastai` and `kubernetes` allow to use Docker and Docker Compose 
+All backends except `runpod`, `vastai` and `kubernetes` allow to
+use [Docker and Docker Compose](https://dstack.ai/docs/guides/protips#docker-and-docker-compose)
 inside `dstack` runs.
 
 This example shows how to deploy Hugging Face [Chat UI :material-arrow-top-right-thin:{ .external }](https://huggingface.co/docs/chat-ui/index){:target="_blank"}
@@ -118,7 +119,7 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 <div class="termy">
 
 ```shell
-$ HUGGING_FACE_HUB_TOKEN=...
+$ HF_TOKEN=...
 
 $ dstack apply -f examples/examples/misc/docker-compose/task.dstack.yml
 
