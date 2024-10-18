@@ -1,0 +1,10 @@
+pillow
+cairosvg 
+mkdocs
+mkdocs-material
+mkdocs-material[imaging]
+mkdocs-material-extensions
+mkdocs-redirects 
+mkdocs-gen-files
+mkdocstrings[python]
+mkdocs-render-swagger-plugin
