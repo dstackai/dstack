@@ -596,12 +596,10 @@ def config_to_internal_config(
 ) -> AnyConfigInfoWithCreds:
     backend_config_dict = backend_config.dict()
     # Allow to not specify networking
-    if backend_config.type == "kubernetes":
-        if backend_config.networking is None:
-            backend_config_dict["networking"] = {}
+    if backend_config.type == "kubernetes" and backend_config.networking is None:
+        backend_config_dict["networking"] = {}
     if backend_config.type == "azure":
-        backend_config_dict["locations"] = backend_config_dict["regions"]
-        del backend_config_dict["regions"]
+        backend_config_dict["locations"] = backend_config_dict.pop("regions", None)
     config_info = _ConfigInfoWithCreds.parse_obj(backend_config_dict)
     return config_info.__root__
 
