@@ -595,7 +595,7 @@ def config_to_internal_config(
     backend_config: Union[BackendConfig, BackendAPIConfig],
 ) -> AnyConfigInfoWithCreds:
     backend_config_dict = backend_config.dict()
-    # Allow to not specify networking
+    # Allow not to specify networking
     if backend_config.type == "kubernetes":
         if backend_config.networking is None:
             backend_config_dict["networking"] = {}
