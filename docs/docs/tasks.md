@@ -34,9 +34,9 @@ commands:
 resources:
   gpu:
     # 24GB or more vRAM
-    memory: 24GB..
-    # Two or more GPU
-    count: 2..
+    memory: 24GB
+    # Two or more GPUs
+    count: 2
 ```
 
 </div>
