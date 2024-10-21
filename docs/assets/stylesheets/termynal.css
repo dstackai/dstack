@@ -22,6 +22,8 @@
 }
 
 [data-termynal] {
+    margin-block-start: 1em;
+    margin-block-end: 1em;
     overflow-x: scroll;
     /*white-space: pre;*/
     /*width: 750px;*/
