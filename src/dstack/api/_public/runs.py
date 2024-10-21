@@ -100,7 +100,7 @@ class Run(ABC):
     def service_url(self) -> str:
         if self._run.run_spec.configuration.type != "service":
             raise ValueError("The run is not a service")
-        return self._run.service.url
+        return self._run.service.full_url(server_base_url=self._api_client.base_url)
 
     def _attached_logs(
         self,
@@ -124,25 +124,28 @@ class Run(ABC):
         )
         threading.Thread(target=ws_thread).start()
 
-        ports = self.ports
         hostname = "127.0.0.1"
         secure = False
+        ports = self.ports
+        path_prefix = ""
         if self._run.service is not None:
-            url = urlparse(self._run.service.url)
+            url = urlparse(self.service_url)
+            hostname = url.hostname
+            secure = url.scheme == "https"
             service_port = url.port
             if service_port is None:
-                service_port = 443 if self._run.run_spec.configuration.https else 80
+                service_port = 443 if secure else 80
             ports = {
                 **ports,
                 self._run.run_spec.configuration.port.container_port: service_port,
             }
-            hostname = url.hostname
-            secure = url.scheme == "https"
+            path_prefix = url.path
         replace_urls = URLReplacer(
             ports=ports,
             app_specs=self._run.jobs[0].job_spec.app_specs,
             hostname=hostname,
             secure=secure,
+            path_prefix=path_prefix,
             ip_address=self.hostname,
         )
 

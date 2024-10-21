@@ -191,7 +191,9 @@ class ProjectModel(BaseModel):
     default_gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateways.id", use_alter=True, ondelete="SET NULL"), nullable=True
     )
-    default_gateway: Mapped["GatewayModel"] = relationship(foreign_keys=[default_gateway_id])
+    default_gateway: Mapped[Optional["GatewayModel"]] = relationship(
+        foreign_keys=[default_gateway_id]
+    )
 
     default_pool_id: Mapped[Optional[UUIDType]] = mapped_column(
         ForeignKey("pools.id", use_alter=True, ondelete="SET NULL"), nullable=True

@@ -233,3 +233,23 @@ def get_or_error(v: Optional[T]) -> T:
 def batched(seq: Iterable[T], n: int) -> Iterable[List[T]]:
     it = iter(seq)
     return iter(lambda: list(itertools.islice(it, n)), [])
+
+
+StrT = TypeVar("StrT", str, bytes)
+
+
+def lstrip_one(string: StrT, substring: StrT) -> StrT:
+    """Remove at most one occurrence of `substring` at the start of `string`"""
+    return string[len(substring) :] if substring and string.startswith(substring) else string
+
+
+def rstrip_one(string: StrT, substring: StrT) -> StrT:
+    """Remove at most one occurrence of `substring` at the end of `string`"""
+    return string[: -len(substring)] if substring and string.endswith(substring) else string
+
+
+def concat_url_path(a: StrT, b: StrT) -> StrT:
+    if not b:
+        return a
+    sep = "/" if isinstance(a, str) else b"/"
+    return rstrip_one(a, sep) + sep + lstrip_one(b, sep)

@@ -3,6 +3,7 @@ import urllib.parse
 from typing import Dict, List, Optional
 
 from dstack._internal.core.models.runs import AppSpec
+from dstack._internal.utils.common import concat_url_path
 
 
 class URLReplacer:
@@ -12,12 +13,14 @@ class URLReplacer:
         ports: Dict[int, int],
         hostname: str,
         secure: bool,
+        path_prefix: str = "",
         ip_address: Optional[str] = None,
     ):
         self.app_specs = {app_spec.port: app_spec for app_spec in app_specs}
         self.ports = ports
         self.hostname = hostname
         self.secure = secure
+        self.path_prefix = path_prefix.encode()
 
         hosts = ["localhost", "0.0.0.0", "127.0.0.1"]
         if ip_address and ip_address not in hosts:
@@ -43,6 +46,7 @@ class URLReplacer:
         url = url._replace(
             scheme=("https" if self.secure else "http").encode(),
             netloc=(self.hostname if omit_port else f"{self.hostname}:{local_port}").encode(),
+            path=concat_url_path(self.path_prefix, url.path),
             query=urllib.parse.urlencode(qs).encode(),
         )
         return url.geturl()

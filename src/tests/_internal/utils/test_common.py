@@ -4,7 +4,14 @@ from typing import Any, Iterable, List
 import pytest
 from freezegun import freeze_time
 
-from dstack._internal.utils.common import parse_memory, pretty_date, split_chunks
+from dstack._internal.utils.common import (
+    concat_url_path,
+    lstrip_one,
+    parse_memory,
+    pretty_date,
+    rstrip_one,
+    split_chunks,
+)
 
 
 @freeze_time(datetime(2023, 10, 4, 12, 0, tzinfo=timezone.utc))
@@ -109,3 +116,51 @@ class TestSplitChunks:
     def test_raises_on_invalid_chunk_size(self, chunk_size: int) -> None:
         with pytest.raises(ValueError):
             list(split_chunks([1, 2, 3], chunk_size))
+
+
+@pytest.mark.parametrize(
+    ("string", "substring", "result"),
+    [
+        ("ababc", "ab", "abc"),
+        ("ababc", "bc", "ababc"),
+        ("ababc", "", "ababc"),
+        ("", "a", ""),
+        ("", "", ""),
+    ],
+)
+def test_lstrip_one(string: str, substring: str, result: str) -> None:
+    assert lstrip_one(string, substring) == result
+    assert lstrip_one(string.encode(), substring.encode()) == result.encode()
+
+
+@pytest.mark.parametrize(
+    ("string", "substring", "result"),
+    [
+        ("abcbc", "bc", "abc"),
+        ("abcbc", "ab", "abcbc"),
+        ("abcbc", "", "abcbc"),
+        ("", "a", ""),
+        ("", "", ""),
+    ],
+)
+def test_rstrip_one(string: str, substring: str, result: str) -> None:
+    assert rstrip_one(string, substring) == result
+    assert rstrip_one(string.encode(), substring.encode()) == result.encode()
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "result"),
+    [
+        ("/a/b", "c/d", "/a/b/c/d"),
+        ("/a/b/", "/c/d", "/a/b/c/d"),
+        ("/a/b//", "//c/d", "/a/b///c/d"),
+        ("/a", "", "/a"),
+        ("/a", "/", "/a/"),
+        ("", "a", "/a"),
+        ("/", "a", "/a"),
+        ("", "", ""),
+    ],
+)
+def test_concat_url_path(a: str, b: str, result: str) -> None:
+    assert concat_url_path(a, b) == result
+    assert concat_url_path(a.encode(), b.encode()) == result.encode()
