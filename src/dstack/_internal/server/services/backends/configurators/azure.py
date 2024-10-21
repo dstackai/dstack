@@ -18,10 +18,10 @@ from azure.mgmt.network.models import (
 )
 from azure.mgmt.resource.resources.models import ResourceGroup
 
-from dstack._internal.core.backends.azure import AzureBackend, auth
+from dstack._internal.core.backends.azure import AzureBackend, auth, resources
 from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.config import AzureConfig
-from dstack._internal.core.errors import BackendAuthError, ServerClientError
+from dstack._internal.core.errors import BackendAuthError, ComputeError, ServerClientError
 from dstack._internal.core.models.backends.azure import (
     AnyAzureConfigInfo,
     AzureClientCreds,
@@ -43,6 +43,7 @@ from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
+    TAGS_MAX_NUM,
     Configurator,
     raise_invalid_credentials_error,
 )
@@ -138,6 +139,7 @@ class AzureConfigurator(Configurator):
         config_values.locations = self._get_locations_element(
             selected=config.locations or DEFAULT_LOCATIONS
         )
+        self._check_config(config)
         return config_values
 
     def create_backend(
@@ -308,6 +310,18 @@ class AzureConfigurator(Configurator):
         with ThreadPoolExecutor(max_workers=8) as executor:
             for location in locations:
                 executor.submit(func, location)
+
+    def _check_config(self, config: AzureConfigInfoWithCredsPartial):
+        if not config.tags:
+            return
+        if len(config.tags) > TAGS_MAX_NUM:
+            raise ServerClientError(
+                f"Maximum number of tags exceeded. Up to {TAGS_MAX_NUM} tags is allowed."
+            )
+        try:
+            resources.validate_tags(config.tags)
+        except ComputeError as e:
+            raise ServerClientError(e.args[0])
 
 
 class ResourceManager:

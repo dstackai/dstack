@@ -14,7 +14,7 @@ class TestIsValidTagKey:
         [
             "Environment",
             "Project123",
-            "service-name@123",
+            "special-chars-+/@=:",
             "a" * 128,
         ],
     )
@@ -25,6 +25,7 @@ class TestIsValidTagKey:
         "key",
         [
             "aws:reserved",
+            "key\twith\nweird\nspaces",
             "",
             "a" * 129,
             "Invalid#Char",

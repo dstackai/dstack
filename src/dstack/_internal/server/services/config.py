@@ -100,7 +100,13 @@ class AzureConfig(CoreModel):
     type: Annotated[Literal["azure"], Field(description="The type of the backend")] = "azure"
     tenant_id: Annotated[str, Field(description="The tenant ID")]
     subscription_id: Annotated[str, Field(description="The subscription ID")]
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]], Field(description="The list of Azure regions (locations)")
+    ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(description="The tags that will be assigned to resources created by `dstack`"),
+    ] = None
     creds: AnyAzureCreds = Field(..., description="The credentials", discriminator="type")
 
 

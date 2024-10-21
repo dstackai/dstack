@@ -235,7 +235,7 @@ class GCPConfigurator(Configurator):
             return
         if len(config.tags) > TAGS_MAX_NUM:
             raise ServerClientError(
-                f"Exceed maximum number of tags. Up to {TAGS_MAX_NUM} tags is allowed."
+                f"Maximum number of tags exceeded. Up to {TAGS_MAX_NUM} tags is allowed."
             )
         try:
             resources.validate_labels(config.tags)

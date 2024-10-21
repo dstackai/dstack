@@ -417,8 +417,8 @@ def _is_valid_tag(key: str, value: str) -> bool:
     return _is_valid_tag_key(key) and _is_valid_tag_value(value)
 
 
-TAG_KEY_PATTERN = re.compile(r"^[\w\s.:/=\-+@]{1,128}$")
-TAG_VALUE_PATTERN = re.compile(r"^[\w\s.:/=\-+@]{0,256}$")
+TAG_KEY_PATTERN = re.compile(r"^[\w .:/=\-+@]{1,128}$")
+TAG_VALUE_PATTERN = re.compile(r"^[\w .:/=\-+@]{0,256}$")
 
 
 def _is_valid_tag_key(key: str) -> bool:
