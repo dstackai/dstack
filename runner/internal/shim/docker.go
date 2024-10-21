@@ -173,7 +173,7 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 			if container_.ID == containerID {
 				continue
 			}
-			err := d.client.ContainerRemove(ctx, container_.ID, container.RemoveOptions{Force: true})
+			err := d.client.ContainerRemove(ctx, container_.ID, container.RemoveOptions{Force: true, RemoveVolumes: true})
 			if err != nil {
 				log.Printf("ContainerRemove error: %s\n", err.Error())
 			}
@@ -441,7 +441,7 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 		log.Printf("Cleanup routine: Cannot stop container: %s", err)
 	}
 
-	removeOptions := container.RemoveOptions{Force: true}
+	removeOptions := container.RemoveOptions{Force: true, RemoveVolumes: true}
 	err = client.ContainerRemove(ctx, taskConfig.ContainerName, removeOptions)
 	if err != nil {
 		log.Printf("Cleanup routine: Cannot remove container: %s", err)
