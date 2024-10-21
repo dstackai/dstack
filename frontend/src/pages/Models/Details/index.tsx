@@ -103,9 +103,9 @@ export const ModelDetails: React.FC = () => {
     });
 
     useEffect(() => {
-        if (runData && runIsStopped(runData.status)) {
-            riseRouterException();
-        }
+        // if (runData && runIsStopped(runData.status)) {
+        //     riseRouterException();
+        // }
     }, [runData]);
 
     const modelData = useMemo<IModelExtended | undefined | null>(() => {
@@ -178,6 +178,7 @@ export const ModelDetails: React.FC = () => {
             ]);
 
             setValue('message', '');
+            setTimeout(onChangeMessage, 0);
 
             for await (const chunk of stream) {
                 setMessages((oldMessages) => {
@@ -211,10 +212,12 @@ export const ModelDetails: React.FC = () => {
     };
 
     const clearChat = () => {
+        console.log('clearChat');
         setValue('message', '');
         setValue('instructions', '');
 
         setMessages([]);
+        setTimeout(onChangeMessage, 10);
     };
 
     const renderMessageBody = (content: Message['content']) => {
@@ -258,6 +261,8 @@ export const ModelDetails: React.FC = () => {
 
         const textAreaElement = textAreaRef.current.querySelector('textarea');
 
+        console.log('message', textAreaElement.value);
+
         if (!textAreaElement) return;
 
         textAreaElement.style.height = 'auto';
@@ -288,6 +293,8 @@ export const ModelDetails: React.FC = () => {
                 return copyToClipboard(curlCode);
         }
     };
+
+    console.log({ modelData, runData });
 
     return (
         <ContentLayout
