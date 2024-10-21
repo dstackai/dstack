@@ -15,9 +15,11 @@ from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.volumes import VolumeConfiguration, VolumeMountPoint
+from dstack._internal.settings import FeatureFlags
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
+SERVICE_HTTPS_DEFAULT = True
 
 
 class RunConfigurationType(str, Enum):
@@ -203,7 +205,14 @@ class ServiceConfigurationParams(CoreModel):
         Optional[AnyModel],
         Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
     ] = None
-    https: Annotated[bool, Field(description="Enable HTTPS")] = True
+    https: Annotated[
+        bool,
+        Field(
+            description="Enable HTTPS"
+            if not FeatureFlags.PROXY
+            else "Enable HTTPS if running with a gateway"
+        ),
+    ] = SERVICE_HTTPS_DEFAULT
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
     replicas: Annotated[
         Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],

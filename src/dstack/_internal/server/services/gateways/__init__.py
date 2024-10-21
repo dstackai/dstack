@@ -28,6 +28,7 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT
 from dstack._internal.core.models.gateways import (
     Gateway,
     GatewayComputeConfiguration,
@@ -68,6 +69,7 @@ from dstack._internal.server.utils.common import (
     gather_map_async,
     run_async,
 )
+from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
@@ -352,20 +354,23 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
 
 
 async def register_service(session: AsyncSession, run_model: RunModel):
-    run_spec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    gateway = run_model.project.default_gateway
 
-    # TODO(egor-s): allow to configure gateway name
-    gateway_name: Optional[str] = None
-    if gateway_name is None:
-        gateway = run_model.project.default_gateway
-        if gateway is None:
-            raise ResourceNotExistsError("Default gateway is not set")
+    if gateway is not None:
+        service_spec = await _register_service_in_gateway(session, run_model, gateway)
+        run_model.gateway = gateway
+    elif FeatureFlags.PROXY:
+        service_spec = _register_service_in_server(run_model)
     else:
-        gateway = await get_project_gateway_model_by_name(
-            session=session, project=run_model.project, name=gateway_name
-        )
-        if gateway is None:
-            raise ResourceNotExistsError("Gateway does not exist")
+        raise ResourceNotExistsError("Default gateway is not set")
+    run_model.service_spec = service_spec.json()
+
+
+async def _register_service_in_gateway(
+    session: AsyncSession, run_model: RunModel, gateway: GatewayModel
+) -> ServiceSpec:
+    run_spec: RunSpec = RunSpec.__response__.parse_raw(run_model.run_spec)
+
     if gateway.gateway_compute is None:
         raise ServerClientError("Gateway has no instance associated with it")
 
@@ -396,9 +401,6 @@ async def register_service(session: AsyncSession, run_model: RunModel):
         )
         service_spec.options = get_service_options(run_spec.configuration)
 
-    run_model.gateway = gateway
-    run_model.service_spec = service_spec.json()
-
     conn = await get_or_add_gateway_connection(session, gateway.id)
     try:
         logger.debug("%s: registering service as %s", fmt(run_model), service_spec.url)
@@ -420,10 +422,36 @@ async def register_service(session: AsyncSession, run_model: RunModel):
         logger.debug("Gateway request failed", exc_info=True)
         raise GatewayError(f"Gateway is not working: {e!r}")
 
+    return service_spec
+
+
+def _register_service_in_server(run_model: RunModel) -> ServiceSpec:
+    run_spec: RunSpec = RunSpec.__response__.parse_raw(run_model.run_spec)
+    if run_spec.configuration.https != SERVICE_HTTPS_DEFAULT:
+        # Note: if the user sets `https: <default-value>`, it will be ignored silently
+        # TODO: in 0.19, make `https` Optional to be able to tell if it was set or omitted
+        raise ServerClientError(
+            "The `https` configuration property is not applicable when running services without a gateway. "
+            "Please configure a gateway or remove the `https` property from the service configuration"
+        )
+    if run_spec.configuration.model is not None:
+        raise ServerClientError(
+            "Model mappings are not yet supported when running services without a gateway. "
+            "Please configure a gateway or remove the `model` property from the service configuration"
+        )
+    if run_spec.configuration.replicas.min != run_spec.configuration.replicas.max:
+        raise ServerClientError(
+            "Auto-scaling is not yet supported when running services without a gateway. "
+            "Please configure a gateway or set `replicas` to a fixed value in the service configuration"
+        )
+    return ServiceSpec(url=f"/services/{run_model.project.name}/{run_model.run_name}/")
+
 
 async def register_replica(
-    session: AsyncSession, gateway_id: uuid.UUID, run: Run, job_model: JobModel
+    session: AsyncSession, gateway_id: Optional[uuid.UUID], run: Run, job_model: JobModel
 ):
+    if gateway_id is None:  # in-server proxy
+        return
     conn = await get_or_add_gateway_connection(session, gateway_id)
     job_submission = jobs_services.job_model_to_job_submission(job_model)
     try:
@@ -440,10 +468,7 @@ async def register_replica(
 
 
 async def unregister_service(session: AsyncSession, run_model: RunModel):
-    if run_model.gateway_id is None:
-        logger.error(
-            "Failed to unregister service. run_model.gateway_id is None for %s", run_model.run_name
-        )
+    if run_model.gateway_id is None:  # in-server proxy
         return
     conn = await get_or_add_gateway_connection(session, run_model.gateway_id)
     res = await session.execute(
@@ -474,7 +499,7 @@ async def unregister_replica(session: AsyncSession, job_model: JobModel):
     )
     run_model = res.unique().scalar_one()
     if run_model.gateway_id is None:
-        # The run is not a service
+        # not a service or served by in-server proxy
         return
 
     conn = await get_or_add_gateway_connection(session, run_model.gateway_id)

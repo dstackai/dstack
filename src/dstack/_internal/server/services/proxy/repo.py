@@ -9,7 +9,7 @@ from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobProvisioningData, JobStatus, RunSpec
 from dstack._internal.proxy.repos.base import BaseProxyRepo, Project, Replica, Service
-from dstack._internal.server.models import JobModel, ProjectModel
+from dstack._internal.server.models import JobModel, ProjectModel, RunModel
 
 
 class DBProxyRepo(BaseProxyRepo):
@@ -27,8 +27,10 @@ class DBProxyRepo(BaseProxyRepo):
         res = await self.session.execute(
             select(JobModel)
             .join(JobModel.project)
+            .join(JobModel.run)
             .where(
                 ProjectModel.name == project_name,
+                RunModel.gateway_id.is_(None),
                 JobModel.run_name == run_name,
                 JobModel.status == JobStatus.RUNNING,
                 JobModel.job_num == 0,

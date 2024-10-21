@@ -125,3 +125,17 @@ class TestServiceURLReplacer:
             ports={8000: 443}, app_specs=[], hostname="secure.host.com", secure=True
         )
         assert replacer(b"http://0.0.0.0:8000/qwerty") == b"https://secure.host.com/qwerty"
+
+    def test_in_server_proxy(self):
+        replacer = URLReplacer(
+            ports={8888: 3000},
+            app_specs=[],
+            hostname="0.0.0.0",
+            secure=False,
+            path_prefix="/services/main/service/",
+        )
+        assert replacer(b"http://0.0.0.0:8888") == b"http://0.0.0.0:3000/services/main/service/"
+        assert (
+            replacer(b"http://0.0.0.0:8888/qwerty")
+            == b"http://0.0.0.0:3000/services/main/service/qwerty"
+        )

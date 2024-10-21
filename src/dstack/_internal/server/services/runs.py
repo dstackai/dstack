@@ -714,7 +714,7 @@ async def process_terminating_run(session: AsyncSession, run: RunModel):
         job.last_processed_at = common_utils.get_current_datetime()
 
     if unfinished_jobs_count == 0:
-        if run.gateway_id is not None:
+        if run.service_spec is not None:
             try:
                 await gateways.unregister_service(session, run)
             except Exception as e:

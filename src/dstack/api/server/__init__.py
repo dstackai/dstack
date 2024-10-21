@@ -57,6 +57,10 @@ class APIClient:
             self._s.headers.update({"X-API-VERSION": client_api_version})
 
     @property
+    def base_url(self) -> str:
+        return self._base_url
+
+    @property
     def users(self) -> UsersAPIClient:
         return UsersAPIClient(self._request)
 
