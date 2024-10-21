@@ -4,7 +4,7 @@ from typing import List
 
 from boto3.session import Session
 
-from dstack._internal.core.backends.aws import AWSBackend, auth, compute
+from dstack._internal.core.backends.aws import AWSBackend, auth, compute, resources
 from dstack._internal.core.backends.aws.config import AWSConfig
 from dstack._internal.core.errors import BackendAuthError, ComputeError, ServerClientError
 from dstack._internal.core.models.backends.aws import (
@@ -27,6 +27,7 @@ from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
+    TAGS_MAX_NUM,
     Configurator,
     raise_invalid_credentials_error,
 )
@@ -93,10 +94,7 @@ class AWSConfigurator(Configurator):
         config_values.regions = self._get_regions_element(
             selected=config.regions or DEFAULT_REGIONS
         )
-        self._check_vpc_config(
-            session=session,
-            config=config,
-        )
+        self._check_config(session=session, config=config)
         return config_values
 
     def create_backend(
@@ -132,6 +130,22 @@ class AWSConfigurator(Configurator):
         for r in REGION_VALUES:
             element.values.append(ConfigElementValue(value=r, label=r))
         return element
+
+    def _check_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
+        self._check_tags_config(config)
+        self._check_vpc_config(session=session, config=config)
+
+    def _check_tags_config(self, config: AWSConfigInfoWithCredsPartial):
+        if not config.tags:
+            return
+        if len(config.tags) > TAGS_MAX_NUM:
+            raise ServerClientError(
+                f"Exceed maximum number of tags. Up to {TAGS_MAX_NUM} tags is allowed."
+            )
+        try:
+            resources.validate_tags(config.tags)
+        except ComputeError as e:
+            raise ServerClientError(e.args[0])
 
     def _check_vpc_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
         allocate_public_ip = config.public_ips if config.public_ips is not None else True

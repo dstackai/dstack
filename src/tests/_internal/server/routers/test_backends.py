@@ -1209,6 +1209,7 @@ class TestGetConfigInfo:
             "vpc_ids": None,
             "default_vpcs": None,
             "public_ips": None,
+            "tags": None,
             "creds": json.loads(backend.auth.plaintext),
         }
 

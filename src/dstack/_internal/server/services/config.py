@@ -89,6 +89,10 @@ class AWSConfig(CoreModel):
             description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
         ),
     ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(description="The tags that will be assigned to resources created by `dstack`"),
+    ] = None
     creds: AnyAWSCreds = Field(..., description="The credentials", discriminator="type")
 
 
