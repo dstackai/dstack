@@ -12,6 +12,10 @@ from dstack._internal.core.models.backends import (
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.server.models import BackendModel, ProjectModel
 
+# Most clouds allow ~ 40-60 tags/labels per resource.
+# We'll introduce our own base limit that can be customized per backend if required.
+TAGS_MAX_NUM = 25
+
 
 class Configurator(ABC):
     TYPE: BackendType

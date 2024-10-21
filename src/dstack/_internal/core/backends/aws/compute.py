@@ -14,6 +14,7 @@ from dstack._internal.core.backends.base.compute import (
     get_gateway_user_data,
     get_instance_name,
     get_user_data,
+    merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import ComputeError, NoCapacityError, PlacementGroupInUseError
@@ -134,12 +135,14 @@ class AWSCompute(Compute):
         if instance_config.availability_zone is not None:
             availability_zones = [instance_config.availability_zone]
 
-        tags = [
-            {"Key": "Name", "Value": instance_config.instance_name},
-            {"Key": "owner", "Value": "dstack"},
-            {"Key": "dstack_project", "Value": project_name},
-            {"Key": "dstack_user", "Value": instance_config.user},
-        ]
+        tags = {
+            "Name": instance_config.instance_name,
+            "owner": "dstack",
+            "dstack_project": project_name,
+            "dstack_user": instance_config.user,
+        }
+        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
+
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
         max_efa_interfaces = get_maximum_efa_interfaces(
             ec2_client=ec2_client, instance_type=instance_offer.instance.name
@@ -177,7 +180,7 @@ class AWSCompute(Compute):
                         instance_type=instance_offer.instance.name,
                         iam_instance_profile_arn=None,
                         user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
-                        tags=tags,
+                        tags=aws_resources.make_tags(tags),
                         security_group_id=aws_resources.create_security_group(
                             ec2_client=ec2_client,
                             project_id=project_name,
@@ -288,13 +291,15 @@ class AWSCompute(Compute):
         ec2_resource = self.session.resource("ec2", region_name=configuration.region)
         ec2_client = self.session.client("ec2", region_name=configuration.region)
 
-        tags = [
-            {"Key": "Name", "Value": configuration.instance_name},
-            {"Key": "owner", "Value": "dstack"},
-            {"Key": "dstack_project", "Value": configuration.project_name},
-        ]
+        tags = {
+            "Name": configuration.instance_name,
+            "owner": "dstack",
+            "dstack_project": configuration.project_name,
+        }
         if settings.DSTACK_VERSION is not None:
-            tags.append({"Key": "dstack_version", "Value": settings.DSTACK_VERSION})
+            tags["dstack_version"] = settings.DSTACK_VERSION
+        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
+        tags = aws_resources.make_tags(tags)
 
         vpc_id, subnets_ids = get_vpc_id_subnet_id_or_error(
             ec2_client=ec2_client,
@@ -479,11 +484,12 @@ class AWSCompute(Compute):
     def create_volume(self, volume: Volume) -> VolumeProvisioningData:
         ec2_client = self.session.client("ec2", region_name=volume.configuration.region)
 
-        tags = [
-            {"Key": "Name", "Value": volume.configuration.name},
-            {"Key": "owner", "Value": "dstack"},
-            {"Key": "dstack_project", "Value": volume.project_name},
-        ]
+        tags = {
+            "Name": volume.configuration.name,
+            "owner": "dstack",
+            "dstack_project": volume.project_name,
+        }
+        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
 
         zone = aws_resources.get_availability_zone(
             ec2_client=ec2_client, region=volume.configuration.region
@@ -503,7 +509,7 @@ class AWSCompute(Compute):
             TagSpecifications=[
                 {
                     "ResourceType": "volume",
-                    "Tags": tags,
+                    "Tags": aws_resources.make_tags(tags),
                 }
             ],
         )

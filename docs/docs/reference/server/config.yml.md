@@ -350,6 +350,7 @@ gcloud projects list --format="json(projectId)"
     compute.disks.delete
     compute.disks.get
     compute.disks.list
+    compute.disks.setLabels
     compute.disks.use
     compute.firewalls.create
     compute.images.useReadOnly

@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, List, Optional
 
 import botocore.client
@@ -394,6 +395,42 @@ def list_instance_device_names(
     for mapping in block_device_mappings:
         device_names.append(mapping["DeviceName"])
     return device_names
+
+
+def make_tags(tags: Dict[str, str]) -> List[Dict[str, str]]:
+    tags_list = []
+    for k, v in tags.items():
+        tags_list.append({"Key": k, "Value": v})
+    return tags_list
+
+
+def validate_tags(tags: Dict[str, str]):
+    for k, v in tags.items():
+        if not _is_valid_tag(k, v):
+            raise ComputeError(
+                "Invalid resource tags. "
+                "See tags restrictions: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html#tag-restrictions"
+            )
+
+
+def _is_valid_tag(key: str, value: str) -> bool:
+    return _is_valid_tag_key(key) and _is_valid_tag_value(value)
+
+
+TAG_KEY_PATTERN = re.compile(r"^[\w .:/=\-+@]{1,128}$")
+TAG_VALUE_PATTERN = re.compile(r"^[\w .:/=\-+@]{0,256}$")
+
+
+def _is_valid_tag_key(key: str) -> bool:
+    if key.startswith("aws:"):
+        return False
+    match = re.match(TAG_KEY_PATTERN, key)
+    return match is not None
+
+
+def _is_valid_tag_value(value: str) -> bool:
+    match = re.match(TAG_VALUE_PATTERN, value)
+    return match is not None
 
 
 def _list_possible_device_names() -> List[str]:

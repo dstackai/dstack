@@ -311,8 +311,20 @@ def get_accelerators(
     return [accelerator_config]
 
 
-NAME_PATTERN = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
+def validate_labels(labels: Dict[str, str]):
+    for k, v in labels.items():
+        if not _is_valid_label(k, v):
+            raise ComputeError(
+                "Invalid resource labels. "
+                "See labels restrictions: https://cloud.google.com/compute/docs/labeling-resources#requirements"
+            )
 
+
+def _is_valid_label(key: str, value: str) -> bool:
+    return is_valid_resource_name(key) and is_valid_label_value(value)
+
+
+NAME_PATTERN = re.compile(r"^[a-z]([-a-z0-9]*[a-z0-9])?$")
 LABEL_VALUE_PATTERN = re.compile(r"^[-a-z0-9]{0,63}$")
 
 

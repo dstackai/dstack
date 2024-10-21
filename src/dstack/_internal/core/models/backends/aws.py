@@ -14,6 +14,7 @@ class AWSConfigInfo(CoreModel):
     vpc_ids: Optional[Dict[str, str]] = None
     default_vpcs: Optional[bool] = None
     public_ips: Optional[bool] = None
+    tags: Optional[Dict[str, str]] = None
 
 
 class AWSAccessKeyCreds(CoreModel):
@@ -50,6 +51,7 @@ class AWSConfigInfoWithCredsPartial(CoreModel):
     vpc_ids: Optional[Dict[str, str]]
     default_vpcs: Optional[bool]
     public_ips: Optional[bool]
+    tags: Optional[Dict[str, str]]
 
 
 class AWSConfigValues(CoreModel):

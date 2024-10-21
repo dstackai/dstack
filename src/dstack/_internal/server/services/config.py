@@ -89,6 +89,10 @@ class AWSConfig(CoreModel):
             description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
         ),
     ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(description="The tags that will be assigned to resources created by `dstack`"),
+    ] = None
     creds: AnyAWSCreds = Field(..., description="The credentials", discriminator="type")
 
 
@@ -96,7 +100,13 @@ class AzureConfig(CoreModel):
     type: Annotated[Literal["azure"], Field(description="The type of the backend")] = "azure"
     tenant_id: Annotated[str, Field(description="The tenant ID")]
     subscription_id: Annotated[str, Field(description="The subscription ID")]
-    regions: Optional[List[str]] = None
+    regions: Annotated[
+        Optional[List[str]], Field(description="The list of Azure regions (locations)")
+    ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(description="The tags that will be assigned to resources created by `dstack`"),
+    ] = None
     creds: AnyAzureCreds = Field(..., description="The credentials", discriminator="type")
 
 
@@ -167,6 +177,12 @@ class GCPConfig(CoreModel):
             description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
         ),
     ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description="The tags (labels) that will be assigned to resources created by `dstack`"
+        ),
+    ] = None
     creds: AnyGCPCreds = Field(..., description="The credentials", discriminator="type")
 
 
@@ -183,6 +199,12 @@ class GCPAPIConfig(CoreModel):
         Optional[bool],
         Field(
             description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
+        ),
+    ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description="The tags (labels) that will be assigned to resources created by `dstack`"
         ),
     ] = None
     creds: AnyGCPAPICreds = Field(..., description="The credentials", discriminator="type")

@@ -1,3 +1,5 @@
+from typing import Dict
+
 from pydantic import Field
 from typing_extensions import Annotated, List, Literal, Optional, Union
 
@@ -10,6 +12,7 @@ class AzureConfigInfo(CoreModel):
     tenant_id: str
     subscription_id: str
     locations: Optional[List[str]] = None
+    tags: Optional[Dict[str, str]] = None
 
 
 class AzureClientCreds(CoreModel):
@@ -44,6 +47,7 @@ class AzureConfigInfoWithCredsPartial(CoreModel):
     tenant_id: Optional[str]
     subscription_id: Optional[str]
     locations: Optional[List[str]]
+    tags: Optional[Dict[str, str]]
 
 
 class AzureConfigValues(CoreModel):

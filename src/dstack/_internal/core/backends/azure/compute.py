@@ -1,7 +1,7 @@
 import base64
 import enum
 import re
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
 from azure.core.exceptions import ResourceExistsError
@@ -32,6 +32,7 @@ from azure.mgmt.compute.models import (
 )
 
 from dstack import version
+from dstack._internal import settings
 from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.base.compute import (
@@ -39,6 +40,7 @@ from dstack._internal.core.backends.base.compute import (
     get_gateway_user_data,
     get_instance_name,
     get_user_data,
+    merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.errors import ComputeError, NoCapacityError
@@ -107,6 +109,14 @@ class AzureCompute(Compute):
         )
         ssh_pub_keys = instance_config.get_public_keys()
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
+
+        tags = {
+            "owner": "dstack",
+            "dstack_project": instance_config.project_name,
+            "dstack_user": instance_config.user,
+        }
+        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
+
         vm = _launch_instance(
             compute_client=self._compute_client,
             subscription_id=self.config.subscription_id,
@@ -139,6 +149,7 @@ class AzureCompute(Compute):
             spot=instance_offer.instance.resources.spot,
             disk_size=disk_size,
             computer_name="runnervm",
+            tags=tags,
         )
         logger.info("Request succeeded")
         public_ip, private_ip = _get_vm_public_private_ips(
@@ -199,6 +210,16 @@ class AzureCompute(Compute):
             configuration.instance_name,
             configuration.region,
         )
+
+        tags = {
+            "Name": configuration.instance_name,
+            "owner": "dstack",
+            "dstack_project": configuration.project_name,
+        }
+        if settings.DSTACK_VERSION is not None:
+            tags["dstack_version"] = settings.DSTACK_VERSION
+        tags = merge_tags(tags=tags, backend_tags=self.config.tags)
+
         vm = _launch_instance(
             compute_client=self._compute_client,
             subscription_id=self.config.subscription_id,
@@ -225,6 +246,7 @@ class AzureCompute(Compute):
             spot=False,
             disk_size=30,
             computer_name="gatewayvm",
+            tags=tags,
         )
         logger.info("Request succeeded")
         public_ip, _ = _get_vm_public_private_ips(
@@ -374,7 +396,10 @@ def _launch_instance(
     spot: bool,
     disk_size: int,
     computer_name: str,
+    tags: Optional[Dict[str, str]] = None,
 ) -> VirtualMachine:
+    if tags is None:
+        tags = {}
     try:
         poller = compute_client.virtual_machines.begin_create_or_update(
             resource_group,
@@ -452,6 +477,7 @@ def _launch_instance(
                     },
                 ),
                 user_data=base64.b64encode(user_data.encode()).decode(),
+                tags=tags,
             ),
         )
     except ResourceExistsError as e:

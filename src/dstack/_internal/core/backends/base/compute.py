@@ -393,3 +393,11 @@ def get_dstack_gateway_commands() -> List[str]:
         f"/home/ubuntu/dstack/blue/bin/pip install {get_dstack_gateway_wheel(build)}",
         "sudo /home/ubuntu/dstack/blue/bin/python -m dstack.gateway.systemd install --run",
     ]
+
+
+def merge_tags(tags: Dict[str, str], backend_tags: Optional[Dict[str, str]]) -> Dict[str, str]:
+    res = tags.copy()
+    if backend_tags is not None:
+        for k, v in backend_tags.items():
+            res.setdefault(k, v)
+    return res
