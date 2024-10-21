@@ -171,6 +171,12 @@ class GCPConfig(CoreModel):
             description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
         ),
     ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description="The tags (labels) that will be assigned to resources created by `dstack`"
+        ),
+    ] = None
     creds: AnyGCPCreds = Field(..., description="The credentials", discriminator="type")
 
 
@@ -187,6 +193,12 @@ class GCPAPIConfig(CoreModel):
         Optional[bool],
         Field(
             description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
+        ),
+    ] = None
+    tags: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description="The tags (labels) that will be assigned to resources created by `dstack`"
         ),
     ] = None
     creds: AnyGCPAPICreds = Field(..., description="The credentials", discriminator="type")

@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from pydantic import Field
 from typing_extensions import Literal
@@ -14,6 +14,7 @@ class GCPConfigInfo(CoreModel):
     vpc_name: Optional[str] = None
     vpc_project_id: Optional[str] = None
     public_ips: Optional[bool] = None
+    tags: Optional[Dict[str, str]] = None
 
 
 class GCPServiceAccountCreds(CoreModel):
@@ -48,6 +49,7 @@ class GCPConfigInfoWithCredsPartial(CoreModel):
     vpc_name: Optional[str] = None
     vpc_project_id: Optional[str] = None
     public_ips: Optional[bool]
+    tags: Optional[Dict[str, str]] = None
 
 
 class GCPConfigValues(CoreModel):

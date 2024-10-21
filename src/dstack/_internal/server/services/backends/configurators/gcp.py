@@ -2,6 +2,7 @@ import json
 from typing import List
 
 import google.cloud.compute_v1 as compute_v1
+from google.auth.credentials import Credentials
 
 from dstack._internal.core.backends.gcp import GCPBackend, auth, resources
 from dstack._internal.core.backends.gcp.config import GCPConfig
@@ -27,6 +28,7 @@ from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.server import settings
 from dstack._internal.server.models import BackendModel, DecryptedString, ProjectModel
 from dstack._internal.server.services.backends.configurators.base import (
+    TAGS_MAX_NUM,
     Configurator,
     raise_invalid_credentials_error,
 )
@@ -168,13 +170,7 @@ class GCPConfigurator(Configurator):
         )
         if config.project_id is None:
             return config_values
-        network_client = compute_v1.NetworksClient(credentials=credentials)
-        routers_client = compute_v1.RoutersClient(credentials=credentials)
-        self._check_vpc_config(
-            network_client=network_client,
-            routers_client=routers_client,
-            config=config,
-        )
+        self._check_config(config=config, credentials=credentials)
         return config_values
 
     def create_backend(
@@ -224,11 +220,33 @@ class GCPConfigurator(Configurator):
             element.values.append(ConfigElementValue(value=region_name, label=region_name))
         return element
 
+    def _check_config(self, config: GCPConfigInfoWithCredsPartial, credentials: Credentials):
+        network_client = compute_v1.NetworksClient(credentials=credentials)
+        routers_client = compute_v1.RoutersClient(credentials=credentials)
+        self._check_tags_config(config)
+        self._check_vpc_config(
+            network_client=network_client,
+            routers_client=routers_client,
+            config=config,
+        )
+
+    def _check_tags_config(self, config: GCPConfigInfoWithCredsPartial):
+        if not config.tags:
+            return
+        if len(config.tags) > TAGS_MAX_NUM:
+            raise ServerClientError(
+                f"Exceed maximum number of tags. Up to {TAGS_MAX_NUM} tags is allowed."
+            )
+        try:
+            resources.validate_labels(config.tags)
+        except ComputeError as e:
+            raise ServerClientError(e.args[0])
+
     def _check_vpc_config(
         self,
+        config: GCPConfigInfoWithCredsPartial,
         network_client: compute_v1.NetworksClient,
         routers_client: compute_v1.RoutersClient,
-        config: GCPConfigInfoWithCredsPartial,
     ):
         allocate_public_ip = config.public_ips if config.public_ips is not None else True
         try:

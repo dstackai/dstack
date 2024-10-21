@@ -16,6 +16,7 @@ from dstack._internal.core.backends.base.compute import (
     get_instance_name,
     get_shim_commands,
     get_user_data,
+    merge_tags,
 )
 from dstack._internal.core.backends.base.offers import get_catalog_offers
 from dstack._internal.core.backends.gcp.config import GCPConfig
@@ -178,6 +179,7 @@ class GCPCompute(Compute):
             "dstack_user": instance_config.user.lower(),
         }
         labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
+        labels = merge_tags(tags=labels, backend_tags=self.config.tags)
         tpu = (
             _is_tpu(instance_offer.instance.resources.gpus[0].name)
             if instance_offer.instance.resources.gpus
@@ -414,6 +416,13 @@ class GCPCompute(Compute):
             region=configuration.region,
         )
 
+        labels = {
+            "owner": "dstack",
+            "dstack_project": configuration.project_name.lower(),
+        }
+        labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
+        labels = merge_tags(tags=labels, backend_tags=self.config.tags)
+
         request = compute_v1.InsertInstanceRequest()
         request.zone = zone
         request.project = self.config.project_id
@@ -425,10 +434,7 @@ class GCPCompute(Compute):
             spot=False,
             user_data=get_gateway_user_data(configuration.ssh_key_pub),
             authorized_keys=[configuration.ssh_key_pub],
-            labels={
-                "owner": "dstack",
-                "dstack_project": configuration.project_name,
-            },
+            labels=labels,
             tags=[gcp_resources.DSTACK_GATEWAY_TAG],
             instance_name=configuration.instance_name,
             zone=zone,
@@ -503,10 +509,18 @@ class GCPCompute(Compute):
                 f"Failed to find availability zone in region {volume.configuration.region}"
             )
 
+        labels = {
+            "owner": "dstack",
+            "dstack_project": volume.project_name.lower(),
+        }
+        labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
+        labels = merge_tags(tags=labels, backend_tags=self.config.tags)
+
         disk = compute_v1.Disk()
         disk.name = volume.name
         disk.size_gb = volume.configuration.size_gb
         disk.type_ = f"zones/{zone}/diskTypes/pd-balanced"
+        disk.labels = labels
 
         logger.debug("Creating persistent disk for volume %s", volume.name)
         try:
