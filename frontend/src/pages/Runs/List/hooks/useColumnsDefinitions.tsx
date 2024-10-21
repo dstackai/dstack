@@ -1,6 +1,5 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { get as _get } from 'lodash';
 import { format } from 'date-fns';
 
 import { NavigateLink, StatusIndicator } from 'components';
@@ -8,6 +7,15 @@ import { NavigateLink, StatusIndicator } from 'components';
 import { DATE_TIME_FORMAT } from 'consts';
 import { getRepoNameFromRun, getStatusIconType } from 'libs/run';
 import { ROUTES } from 'routes';
+
+import {
+    getRunListItemBackend,
+    getRunListItemInstance,
+    getRunListItemPrice,
+    getRunListItemRegion,
+    getRunListItemResources,
+    getRunListItemSpotLabelKey,
+} from '../helpers';
 
 export const useColumnsDefinitions = () => {
     const { t } = useTranslation();
@@ -75,47 +83,32 @@ export const useColumnsDefinitions = () => {
         {
             id: 'resources',
             header: `${t('projects.run.resources')}`,
-            cell: (item: IRun) => item.latest_job_submission?.job_provisioning_data?.instance_type?.resources?.description,
+            cell: getRunListItemResources,
         },
         {
             id: 'spot',
             header: `${t('projects.run.spot')}`,
-            cell: (item: IRun) => {
-                if (item.latest_job_submission?.job_provisioning_data?.instance_type?.resources?.spot) {
-                    return t('common.yes');
-                }
-
-                return t('common.no');
-            },
+            cell: (item: IRun) => t(getRunListItemSpotLabelKey(item)),
         },
         {
             id: 'price',
             header: `${t('projects.run.price')}`,
-            cell: (item: IRun) => {
-                return item.latest_job_submission?.job_provisioning_data?.price
-                    ? `$${item.latest_job_submission?.job_provisioning_data?.price}`
-                    : null;
-            },
+            cell: getRunListItemPrice,
         },
         {
             id: 'instance',
             header: `${t('projects.run.instance')}`,
-            cell: (item: IRun) => item.latest_job_submission?.job_provisioning_data?.instance_type?.name,
-        },
-        {
-            id: 'instance',
-            header: `${t('projects.run.instance')}`,
-            cell: (item: IRun) => item.latest_job_submission?.job_provisioning_data?.instance_type?.name,
+            cell: getRunListItemInstance,
         },
         {
             id: 'region',
             header: `${t('projects.run.region')}`,
-            cell: (item: IRun) => item.latest_job_submission?.job_provisioning_data?.region,
+            cell: getRunListItemRegion,
         },
         {
             id: 'backend',
             header: `${t('projects.run.backend')}`,
-            cell: (item: IRun) => item.latest_job_submission?.job_provisioning_data?.backend,
+            cell: getRunListItemBackend,
         },
     ];
 
