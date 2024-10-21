@@ -25,7 +25,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     
     image: dstackai/optimum-tpu:llama31
     env:
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
       - MAX_TOTAL_TOKENS=4096
       - MAX_BATCH_PREFILL_TOKENS=4095
@@ -61,7 +61,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
 
     env:
       - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
       - DATE=20240828
       - TORCH_VERSION=2.5.0
       - VLLM_TARGET_DEVICE=tpu
@@ -135,7 +135,7 @@ name: optimum-tpu-llama-train
 python: "3.11"
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 commands:
   - git clone -b add_llama_31_support https://github.com/dstackai/optimum-tpu.git
   - mkdir -p optimum-tpu/examples/custom/

@@ -7,7 +7,7 @@ python: "3.10"
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 ide: vscode
 
 # Use either spot or on-demand instances

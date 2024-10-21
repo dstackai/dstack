@@ -11,8 +11,6 @@ ide: vscode
 # Use either spot or on-demand instances
 spot_policy: auto
 
+# Required resources
 resources:
-   memory: 16MB..
-   shm_size: 8MB
-#  gpu: A10
-#  disk: 100GB..
+  gpu: 24GB

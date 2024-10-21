@@ -3,7 +3,7 @@ type: task
 image: ghcr.io/predibase/lorax:latest
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - MODEL_ID=mistralai/Mistral-7B-Instruct-v0.1
 
 commands:

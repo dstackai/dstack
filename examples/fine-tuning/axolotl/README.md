@@ -41,7 +41,7 @@ image: winglian/axolotl-cloud:main-20240429-py3.11-cu121-2.2.1
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - WANDB_API_KEY
 # Commands of the task
 commands:
@@ -73,7 +73,7 @@ cloud resources and run the configuration.
 <div class="termy">
 
 ```shell
-$ HUGGING_FACE_HUB_TOKEN=...
+$ HF_TOKEN=...
 $ WANDB_API_KEY=...
 $ dstack apply -f examples/fine-tuning/axolotl/train.dstack.yml
 ```
@@ -116,7 +116,7 @@ If you'd like to play with the example using a dev environment, run
 <div class="termy">
 
 ```shell
-$ HUGGING_FACE_HUB_TOKEN=...
+$ HF_TOKEN=...
 $ WANDB_API_KEY=...
 $ dstack apply -f examples/fine-tuning/axolotl/.dstack.yaml 
 ```

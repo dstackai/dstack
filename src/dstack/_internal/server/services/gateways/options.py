@@ -35,9 +35,9 @@ def get_tokenizer_config(model_id: str, hf_token: Optional[str] = None) -> dict:
         if resp.status_code == 403:
             raise ServerClientError("Private HF models are not supported")
         if resp.status_code == 401:
-            message = "Failed to access gated model. Specify HUGGING_FACE_HUB_TOKEN env."
+            message = "Failed to access gated model. Specify HF_TOKEN env."
             if hf_token is not None:
-                message = "Failed to access gated model. Invalid HUGGING_FACE_HUB_TOKEN env."
+                message = "Failed to access gated model. Invalid HF_TOKEN env."
             raise ServerClientError(message)
         resp.raise_for_status()
     except requests.RequestException as e:

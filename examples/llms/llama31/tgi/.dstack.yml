@@ -7,7 +7,7 @@ image: ghcr.io/huggingface/text-generation-inference:latest
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 ide: vscode
 
 # Use either spot or on-demand instances

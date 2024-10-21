@@ -7,7 +7,7 @@ python: "3.11"
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 
 # Refer to Note section in examples/gpus/tpu/README.md for more information about the optimum-tpu repository.
 # Uncomment if you want the environment to be pre-installed

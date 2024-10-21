@@ -4,7 +4,7 @@ name: llama31-service-vllm-amd
 image: runpod/pytorch:2.4.0-py3.10-rocm6.1.0-ubuntu22.04
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
   - MAX_MODEL_LEN=126192
 

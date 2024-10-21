@@ -6,7 +6,7 @@ image: runpod/pytorch:2.1.2-py3.10-rocm6.0.2-ubuntu22.04
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - GPU_ARCHS="gfx90a;gfx942"
   - AWS_ACCESS_KEY_ID
   - AWS_SECRET_ACCESS_KEY

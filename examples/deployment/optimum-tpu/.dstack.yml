@@ -7,7 +7,7 @@ name: vscode-optimum-tpu
 image: dstackai/optimum-tpu:llama31
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 ide: vscode
 
 resources:

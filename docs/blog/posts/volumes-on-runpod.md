@@ -31,7 +31,7 @@ scaling:
   
 image: ghcr.io/huggingface/text-generation-inference:latest
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
   - MAX_INPUT_LENGTH=4000
   - MAX_TOTAL_TOKENS=4096
@@ -108,7 +108,7 @@ volumes:
   
 image: ghcr.io/huggingface/text-generation-inference:latest
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
   - MAX_INPUT_LENGTH=4000
   - MAX_TOTAL_TOKENS=4096

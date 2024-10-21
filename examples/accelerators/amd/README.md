@@ -21,7 +21,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
 
     # Required environment variables
     env:
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
       - TRUST_REMOTE_CODE=true
       - ROCM_USE_FLASH_ATTN_V2_TRITON=true
@@ -61,7 +61,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
     
     # Required environment variables
     env:
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
       - MAX_MODEL_LEN=126192
     # Commands of the task
@@ -135,7 +135,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
 
     # Required environment variables
     env:
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
     # Commands of the task
     commands:
       - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
@@ -177,7 +177,7 @@ To request multiple GPUs, specify the quantity after the GPU name, separated by 
     image: runpod/pytorch:2.1.2-py3.10-rocm6.0.2-ubuntu22.04
     # Required environment variables
     env:
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
     # Commands of the task
     commands:
       - export PATH=/opt/conda/envs/py_3.10/bin:$PATH
@@ -224,7 +224,7 @@ cloud resources and run the configuration.
 <div class="termy">
 
 ```shell
-$ HUGGING_FACE_HUB_TOKEN=...
+$ HF_TOKEN=...
 $ dstack apply -f examples/deployment/vllm/amd/service.dstack.yml
 ```
 

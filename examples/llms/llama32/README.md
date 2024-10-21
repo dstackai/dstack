@@ -31,7 +31,7 @@ name: llama32-task-vllm
 python: "3.10"
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - MODEL_ID=meta-llama/Llama-3.2-11B-Vision-Instruct
   - MAX_MODEL_LEN=13488
   - MAX_NUM_SEQS=40
@@ -85,7 +85,7 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 <div class="termy">
 
 ```shell
-$ HUGGING_FACE_HUB_TOKEN=...
+$ HF_TOKEN=...
 
 $ dstack apply -f examples/llms/llama32/vllm/task.dstack.yml
 
