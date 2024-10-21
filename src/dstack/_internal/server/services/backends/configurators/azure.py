@@ -312,6 +312,9 @@ class AzureConfigurator(Configurator):
                 executor.submit(func, location)
 
     def _check_config(self, config: AzureConfigInfoWithCredsPartial):
+        self._check_tags_config(config)
+
+    def _check_tags_config(self, config: AzureConfigInfoWithCredsPartial):
         if not config.tags:
             return
         if len(config.tags) > TAGS_MAX_NUM:
