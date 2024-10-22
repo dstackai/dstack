@@ -152,7 +152,7 @@ func (s *MetricsCollector) GetGPUMetrics() ([]schemas.GPUMetrics, error) {
 	if err == nil {
 		return metrics, nil
 	}
-	return nil, err
+	return []schemas.GPUMetrics{}, err
 }
 
 func (s *MetricsCollector) GetNVIDIAGPUMetrics() ([]schemas.GPUMetrics, error) {
