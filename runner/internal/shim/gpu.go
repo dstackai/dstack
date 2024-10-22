@@ -15,7 +15,7 @@ import (
 	execute "github.com/alexellis/go-execute/v2"
 )
 
-const nvidiaSmiImage = "dstackai/base:py3.12-0.5-cuda-12.1"
+const nvidiaSmiImage = "dstackai/base:py3.13-0.6-cuda-12.1"
 const amdSmiImage = "un1def/amd-smi:6.2.2-0"
 
 type GpuVendor string

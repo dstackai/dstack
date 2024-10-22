@@ -29,11 +29,12 @@ class RunConfigurationType(str, Enum):
 
 
 class PythonVersion(str, Enum):
-    PY38 = "3.8"
+    PY38 = "3.8"  # TODO(0.19 or earlier): drop 3.8, stop building Docker images with 3.8
     PY39 = "3.9"
     PY310 = "3.10"
     PY311 = "3.11"
     PY312 = "3.12"
+    PY313 = "3.13"
 
 
 class PortMapping(CoreModel):

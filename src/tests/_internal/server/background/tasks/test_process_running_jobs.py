@@ -218,7 +218,7 @@ class TestProcessRunningJobs:
         with patch(
             "dstack._internal.server.services.jobs.configurators.base.get_default_python_verison"
         ) as PyVersion:
-            PyVersion.return_value = "3.11"
+            PyVersion.return_value = "3.13"
             job = await create_job(
                 session=session,
                 run=run,
@@ -239,7 +239,7 @@ class TestProcessRunningJobs:
             ShimClientMock.return_value.submit.assert_called_once_with(
                 username="",
                 password="",
-                image_name="dstackai/base:py3.11-0.5-cuda-12.1",
+                image_name="dstackai/base:py3.13-0.6-cuda-12.1",
                 privileged=privileged,
                 container_name="test-run-0-0",
                 container_user="root",
