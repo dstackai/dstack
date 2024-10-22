@@ -70,7 +70,7 @@ If you want, you can specify your own Docker image via `image`.
     name: http-server-service
 
     # Any custom Docker image
-    image: dstackai/base:py3.10-0.5-cuda-12.1
+    image: dstackai/base:py3.13-0.6-cuda-12.1
     
     # Commands of the service
     commands:
@@ -91,7 +91,7 @@ If you want, you can specify your own Docker image via `image`.
     name: http-server-service
     
     # Any private Docker iamge
-    image: dstackai/base:py3.10-0.5-cuda-12.1
+    image: dstackai/base:py3.13-0.6-cuda-12.1
     # Credentials of the private registry
     registry_auth:
       username: peterschmidt85
