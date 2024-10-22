@@ -10,7 +10,7 @@ from dstack._internal.core.models.gateways import AnyModel
 def complete_service_model(model_info: AnyModel, env: Dict[str, str]):
     if model_info.type == "chat" and model_info.format == "tgi":
         if model_info.chat_template is None or model_info.eos_token is None:
-            hf_token = env.get("HUGGING_FACE_HUB_TOKEN", None)
+            hf_token = env.get("HF_TOKEN", env.get("HUGGING_FACE_HUB_TOKEN"))
             tokenizer_config = get_tokenizer_config(model_info.name, hf_token=hf_token)
             if model_info.chat_template is None:
                 model_info.chat_template = tokenizer_config[
