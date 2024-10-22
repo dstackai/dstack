@@ -3,6 +3,8 @@ title: Using TPUs for fine-tuning and deploying LLMs
 date: 2024-09-10
 description: "Learn how to use TPUs with dstack for fine-tuning and deploying LLMs, leveraging open-source tools like Hugging Face’s Optimum TPU and vLLM."  
 slug: tpu-on-gcp
+categories:
+  - TPU
 ---
 
 # Using TPUs for fine-tuning and deploying LLMs

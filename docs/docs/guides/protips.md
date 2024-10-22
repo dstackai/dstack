@@ -250,13 +250,13 @@ This means it streams the logs as they come in and, in the case of a task, forwa
 
 To run in detached mode, use `-d` with `dstack apply`.
 
-> If you detached the CLI, you can always re-attach to a run via `dstack attach RUN_NAME`.
+> If you detached the CLI, you can always re-attach to a run via [`dstack attach`](../reference/cli#dstack-attach).
 
 ## GPU
 
 `dstack` natively supports NVIDIA GPU, AMD GPU, and Google Cloud TPU accelerator chips.
 
-The `gpu` property within `resources` (or the `--gpu` option with `dstack apply`)
+The `gpu` property within [`resources`](../reference/dstack.yml/dev-environment.md#resources) (or the `--gpu` option with `dstack apply`)
 allows specifying not only memory size but also GPU vendor, names, their memory, and quantity.
 
 Examples:
@@ -285,6 +285,12 @@ The GPU vendor is indicated by one of the following case-insensitive values:
 
 ??? info "AMD"
     Currently, when an AMD GPU is specified, either by name or by vendor, the `image` property must be specified as well.
+
+## Monitoring metrics
+
+While `dstack` allows the use of any third-party monitoring tools (e.g., Weights and Biases), you can also
+monitor container metrics such as CPU, memory, and GPU usage using the [built-in
+`dstack stats` CLI command](../../blog/posts/monitoring-gpu-usage.md) or the corresponding API.
 
 ## Service quotas
 

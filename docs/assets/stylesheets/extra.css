@@ -1586,6 +1586,10 @@ html .md-footer-meta.md-typeset a:is(:focus,:hover) {
     color: black !important;
 }*/
 
+.md-post__title {
+    padding: 5px 15px 5px;
+}
+
 .md-post .md-nav__title {
     font-weight: 500;
 }

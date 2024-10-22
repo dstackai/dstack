@@ -3,6 +3,8 @@ title: Supporting AMD accelerators on RunPod
 date: 2024-08-21
 description: "dstack, the open-source AI container orchestration platform, adds support for AMD accelerators, with RunPod as the first supported cloud provider."  
 slug: amd-on-runpod
+categories:
+  - AMD
 ---
 
 # Supporting AMD accelerators on RunPod
