@@ -30,6 +30,7 @@ from dstack._internal.core.models.configurations import (
     BaseRunConfigurationWithPorts,
     DevEnvironmentConfiguration,
     PortMapping,
+    PythonVersion,
     RunConfigurationType,
     ServiceConfiguration,
     TaskConfiguration,
@@ -37,6 +38,7 @@ from dstack._internal.core.models.configurations import (
 from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
+from dstack._internal.utils.logging import get_logger
 from dstack.api._public.runs import Run
 from dstack.api.utils import load_profile
 
@@ -45,6 +47,8 @@ _KNOWN_NVIDIA_GPUS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_NVIDIA_GPUS}
 _KNOWN_TPU_VERSIONS = {gpu.name.lower() for gpu in gpuhunt.KNOWN_TPUS}
 
 _BIND_ADDRESS_ARG = "bind_address"
+
+logger = get_logger(__name__)
 
 
 class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
@@ -60,6 +64,12 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
     ):
         self.apply_args(conf, configurator_args, unknown_args)
         self.validate_gpu_vendor_and_image(conf)
+        if conf.python == PythonVersion.PY38:
+            logger.warning(
+                "Specifying [code]python: 3.8[/] in run configurations is deprecated"
+                " and will be forbidden in a future [code]dstack[/] release."
+                " Please upgrade your configuration to a newer Python version"
+            )
         repo = self.api.repos.load(Path.cwd())
         repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
         self.api.ssh_identity_file = repo_config.ssh_key_path
