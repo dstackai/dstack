@@ -554,7 +554,8 @@ def _is_private_subnet_with_internet_egress(
                 if any(route.get(k) for k in _PRIVATE_SUBNET_EGRESS_ROUTE_KEYS):
                     return True
 
-    # If no explicitly associated route tables, check the main route table
+    # Main route table controls the routing of all subnetes
+    # that are not explicitly associated with any other route table.
     if len(response["RouteTables"]) > 0:
         return False
 
