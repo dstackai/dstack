@@ -4,6 +4,9 @@ date: 2024-10-09
 description: "Exploring how the inference performance of Llama 3.1 405B varies on 8x AMD MI300X GPUs across vLLM and TGI backends in different use cases."  
 slug: amd-mi300x-inference-benchmark
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-hotaisle-amd-mi300x-prompt-v5.png?raw=true
+categories:
+  - AMD
+  - Benchmarks
 ---
 
 # Benchmarking Llama 3.1 405B on 8x AMD MI300X GPUs

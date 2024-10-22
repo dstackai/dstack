@@ -1,6 +1,6 @@
 # What is dstack?
 
-`dstack` is a streamlined alternative to Kubernetes, specifically designed for AI. It simplifies container orchestration
+`dstack` is a streamlined alternative to Kubernetes and Slurm, specifically designed for AI. It simplifies container orchestration
 for AI workloads both in the cloud and on-prem, speeding up the development, training, and deployment of AI models.
 
 `dstack` is easy to use with any cloud providers as well as on-prem servers. 

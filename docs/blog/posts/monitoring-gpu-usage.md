@@ -1,9 +1,13 @@
 ---
 title: "Monitoring GPU usage and other container metrics"
 date: 2024-10-22
-description: "dstack introduces a new CLI command (and API) for monitoring GPU usage and other container metrics out of the box"  
+description: "dstack introduces a new CLI command (and API) for monitoring container metrics, incl. GPU usage for NVIDIA, AMD, and other accelerators."  
 slug: monitoring-gpu-usage
 image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-stats-v2.png?raw=true
+categories:
+  - AMD
+  - NVIDIA
+  - Observability
 ---
 
 # Monitoring GPU usage and other container metrics
@@ -12,7 +16,7 @@ image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/
 
 While it's possible to use third-party monitoring tools with `dstack`, it is often more convenient to debug your run and
 track metrics out of the box. That's why, with the latest release, `dstack` introduced [`dstack stats`](../../docs/reference/cli#dstack-stats), a new CLI (and API)
-for monitoring container metrics.
+for monitoring container metrics, including GPU usage for `NVIDIA`, `AMD`, and other accelerators.
 
 <img src="https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-stats-v2.png?raw=true" width="725"/>
 
@@ -21,8 +25,8 @@ for monitoring container metrics.
 The command is similar to `kubectl top` (in terms of semantics) and `docker stats` (in terms of the CLI interface). The key
 difference is that `dstack stats` includes GPU VRAM usage and GPU utilization percentage. 
 
->It works out of the box for all supported accelerators, including `NVIDIA`, `AMD`, and `TPU`, regardless of
-> whether you’re running a dev environment, task, or service.
+>The feature works right away with `NVIDIA` and `AMD`, whether you're running a development environment, task, or service.
+> `TPU` support is coming soon.
 
 Similar to `kubectl top`, if a run consists of multiple jobs (such as distributed training or an auto-scalable service),
 `dstack stats` will display metrics per job.
@@ -50,10 +54,11 @@ evenly across GPUs.
 
 Monitoring is a critical part of observability, and we have many more features on our roadmap:
 
-* A simple way to export metrics to Prometheus.
-* Displaying historical metrics within the control plane UI.
-* Potentially adding more metrics, including disk usage, I/O, network, etc.
-* Also tracking deployment metrics, including LLM-related metrics.
+* Potentially adding more metrics, including disk usage, I/O, network, etc
+* Support for the TPU accelerator
+* Displaying historical metrics within the control plane UI
+* Tracking deployment metrics, including LLM-related metrics
+* A simple way to export metrics to Prometheus
 
 ## Feedback
 

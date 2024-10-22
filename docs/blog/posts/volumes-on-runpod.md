@@ -3,6 +3,8 @@ title: Using volumes to optimize cold starts on RunPod
 date: 2024-08-13
 description: "Learn how to use volumes with dstack to optimize model inference cold start times on RunPod."  
 slug: volumes-on-runpod
+categories:
+  - Volumes 
 ---
 
 # Using volumes to optimize cold starts on RunPod
