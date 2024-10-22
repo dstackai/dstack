@@ -144,6 +144,18 @@ func (s *MetricsCollector) GetMemoryCacheBytes() (uint64, error) {
 }
 
 func (s *MetricsCollector) GetGPUMetrics() ([]schemas.GPUMetrics, error) {
+	metrics, err := s.GetNVIDIAGPUMetrics()
+	if err == nil {
+		return metrics, nil
+	}
+	metrics, err = s.GetAMDGPUMetrics()
+	if err == nil {
+		return metrics, nil
+	}
+	return nil, err
+}
+
+func (s *MetricsCollector) GetNVIDIAGPUMetrics() ([]schemas.GPUMetrics, error) {
 	metrics := []schemas.GPUMetrics{}
 
 	cmd := exec.Command("nvidia-smi", "--query-gpu=memory.used,utilization.gpu", "--format=csv,noheader,nounits")
@@ -169,6 +181,39 @@ func (s *MetricsCollector) GetGPUMetrics() ([]schemas.GPUMetrics, error) {
 		}
 		metrics = append(metrics, schemas.GPUMetrics{
 			GPUMemoryUsage: memUsed * 1024 * 1024, // Convert MiB to bytes
+			GPUUtil:        utilization,
+		})
+	}
+
+	return metrics, nil
+}
+
+func (s *MetricsCollector) GetAMDGPUMetrics() ([]schemas.GPUMetrics, error) {
+	metrics := []schemas.GPUMetrics{}
+
+	cmd := exec.Command("amd-smi", "monitor", "-vu", "--csv")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to execute amd-smi: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	for _, line := range lines[1:] {
+		fields := strings.Split(line, ",")
+		if len(fields) != 5 {
+			return nil, fmt.Errorf("unexpected number of columns in amd-smi output")
+		}
+		memUsed, err := strconv.ParseUint(strings.TrimSpace(fields[3]), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse VRAM used: %v", err)
+		}
+		utilization, err := strconv.ParseUint(strings.TrimSpace(fields[1]), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse GPU utilization: %v", err)
+		}
+		metrics = append(metrics, schemas.GPUMetrics{
+			GPUMemoryUsage: memUsed * 1024 * 1024,
 			GPUUtil:        utilization,
 		})
 	}
