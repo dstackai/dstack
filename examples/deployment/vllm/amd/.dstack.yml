@@ -4,7 +4,7 @@ name: dev-vLLM-amd
 image: runpod/pytorch:2.4.0-py3.10-rocm6.1.0-ubuntu22.04
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 
 ide: vscode
 

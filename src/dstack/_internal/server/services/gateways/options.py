@@ -10,7 +10,7 @@ from dstack._internal.core.models.gateways import AnyModel
 def complete_service_model(model_info: AnyModel, env: Dict[str, str]):
     if model_info.type == "chat" and model_info.format == "tgi":
         if model_info.chat_template is None or model_info.eos_token is None:
-            hf_token = env.get("HUGGING_FACE_HUB_TOKEN", None)
+            hf_token = env.get("HF_TOKEN", env.get("HUGGING_FACE_HUB_TOKEN"))
             tokenizer_config = get_tokenizer_config(model_info.name, hf_token=hf_token)
             if model_info.chat_template is None:
                 model_info.chat_template = tokenizer_config[
@@ -35,9 +35,9 @@ def get_tokenizer_config(model_id: str, hf_token: Optional[str] = None) -> dict:
         if resp.status_code == 403:
             raise ServerClientError("Private HF models are not supported")
         if resp.status_code == 401:
-            message = "Failed to access gated model. Specify HUGGING_FACE_HUB_TOKEN env."
+            message = "Failed to access gated model. Specify HF_TOKEN env."
             if hf_token is not None:
-                message = "Failed to access gated model. Invalid HUGGING_FACE_HUB_TOKEN env."
+                message = "Failed to access gated model. Invalid HF_TOKEN env."
             raise ServerClientError(message)
         resp.raise_for_status()
     except requests.RequestException as e:

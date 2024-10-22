@@ -151,7 +151,7 @@ name: vscode
 
 # Environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - HF_HUB_ENABLE_HF_TRANSFER=1
 
 ide: vscode
@@ -159,7 +159,7 @@ ide: vscode
 
 </div>
 
-> If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above), 
+> If you don't assign a value to an environment variable (see `HF_TOKEN` above), 
 `dstack` will require the value to be passed via the CLI or set in the current process.
 
 For instance, you can define environment variables in a `.envrc` file and utilize tools like `direnv`.

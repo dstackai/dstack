@@ -3,7 +3,7 @@ type: service
 
 python: "3.11"
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 commands:
   - pip install vllm
   - python -m vllm.entrypoints.openai.api_server

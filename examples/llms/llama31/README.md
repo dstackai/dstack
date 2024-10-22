@@ -34,7 +34,7 @@ Below is the configuration file for the task.
     python: "3.10"
     
     env:
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
       - MAX_MODEL_LEN=4096
     commands:
@@ -67,7 +67,7 @@ Below is the configuration file for the task.
     image: ghcr.io/huggingface/text-generation-inference:latest
     
     env:
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-8B-Instruct
       - MAX_INPUT_LENGTH=4000
       - MAX_TOTAL_TOKENS=4096
@@ -161,7 +161,7 @@ To run a configuration, use the [`dstack apply`](https://dstack.ai/docs/referenc
 <div class="termy">
 
 ```shell
-$ HUGGING_FACE_HUB_TOKEN=...
+$ HF_TOKEN=...
 
 $ dstack apply -f examples/llms/llama31/vllm/task.dstack.yml
 
@@ -226,7 +226,7 @@ python: "3.10"
 nvcc: true
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - WANDB_API_KEY
 commands:
   - pip install "transformers>=4.43.2"
@@ -312,7 +312,7 @@ python: "3.10"
 nvcc: true
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - WANDB_API_KEY
 commands:
   - pip install "transformers>=4.43.2"

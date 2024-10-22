@@ -7,7 +7,7 @@ image: runpod/pytorch:2.1.2-py3.10-rocm6.1-ubuntu22.04
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 
 commands:
   - export PATH=/opt/conda/envs/py_3.10/bin:$PATH

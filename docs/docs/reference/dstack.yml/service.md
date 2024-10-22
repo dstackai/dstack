@@ -312,7 +312,7 @@ python: "3.10"
 
 # Environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - MODEL=NousResearch/Llama-2-7b-chat-hf
 # Commands of the service
 commands:
@@ -328,7 +328,7 @@ resources:
 
 </div>
 
-If you don't assign a value to an environment variable (see `HUGGING_FACE_HUB_TOKEN` above),
+If you don't assign a value to an environment variable (see `HF_TOKEN` above),
 `dstack` will require the value to be passed via the CLI or set in the current process.
 
 For instance, you can define environment variables in a `.envrc` file and utilize tools like `direnv`.

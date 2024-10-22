@@ -7,7 +7,7 @@ python: "3.10"
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - ACCELERATE_LOG_LEVEL=info
   - WANDB_API_KEY
 # Commands of the task (dstack runs it on each node)

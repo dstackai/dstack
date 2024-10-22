@@ -50,7 +50,7 @@ you can now specify an AMD GPU under `resources`. Below are a few examples.
     
     image: ghcr.io/huggingface/text-generation-inference:sha-a379d55-rocm
     env:
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
       - MODEL_ID=meta-llama/Meta-Llama-3.1-70B-Instruct
       - TRUST_REMOTE_CODE=true
       - ROCM_USE_FLASH_ATTN_V2_TRITON=true
@@ -83,7 +83,7 @@ you can now specify an AMD GPU under `resources`. Below are a few examples.
     
     image: ghcr.io/huggingface/text-generation-inference:sha-a379d55-rocm
     env:
-      - HUGGING_FACE_HUB_TOKEN
+      - HF_TOKEN
       - ROCM_USE_FLASH_ATTN_V2_TRITON=true
     ide: vscode
     

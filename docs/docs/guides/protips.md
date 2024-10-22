@@ -181,7 +181,7 @@ name: vscode
 python: "3.10"
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 ide: vscode
 ```
 
@@ -190,20 +190,20 @@ ide: vscode
 Then, you can pass the environment variable either via the shell:
 
 ```shell
-HUGGING_FACE_HUB_TOKEN=... dstack apply -f .dstack.yml
+HF_TOKEN=... dstack apply -f .dstack.yml
 ```
 
 Or via the `-e` option of the `dstack apply` command:
 
 ```shell
-dstack apply -f .dstack.yml -e HUGGING_FACE_HUB_TOKEN=...
+dstack apply -f .dstack.yml -e HF_TOKEN=...
 ```
 
 ??? info ".env"
     A better way to configure environment variables not hardcoded in YAML is by specifying them in a `.env` file:
 
     ```
-    HUGGING_FACE_HUB_TOKEN=...
+    HF_TOKEN=...
     ```
     
     If you install [`direnv` :material-arrow-top-right-thin:{ .external }](https://direnv.net/){:target="_blank"},

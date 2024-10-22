@@ -6,7 +6,7 @@ python: "3.11"
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 
 # Commands of the task
 commands:

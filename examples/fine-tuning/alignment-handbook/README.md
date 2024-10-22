@@ -44,7 +44,7 @@ nvcc: true
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - ACCELERATE_LOG_LEVEL=info
   - WANDB_API_KEY
 # Commands of the task
@@ -79,7 +79,7 @@ To run the task, use `dstack apply`:
 <div class="termy">
 
 ```shell
-$ HUGGING_FACE_HUB_TOKEN=...
+$ HF_TOKEN=...
 $ WANDB_API_KEY=...
 
 $ dstack apply -f examples/fine-tuning/alignment-handbook/train.dstack.yml
@@ -109,7 +109,7 @@ nodes: 2
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - ACCELERATE_LOG_LEVEL=info
   - WANDB_API_KEY
 # Commands of the task (dstack runs it on each node)

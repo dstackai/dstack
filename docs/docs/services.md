@@ -30,7 +30,7 @@ python: "3.10"
 
 # Required environment variables
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
 commands:
   - pip install vllm
   - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
@@ -72,7 +72,7 @@ To run a configuration, use the [`dstack apply`](reference/cli/index.md#dstack-a
 <div class="termy">
 
 ```shell
-$ HUGGING_FACE_HUB_TOKEN=...
+$ HF_TOKEN=...
 
 $ dstack apply -f service.dstack.yml
 

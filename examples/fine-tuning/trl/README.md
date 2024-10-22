@@ -32,7 +32,7 @@ python: "3.10"
 nvcc: true
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - WANDB_API_KEY
 commands:
   - pip install "transformers>=4.43.2"
@@ -108,7 +108,7 @@ python: "3.10"
 nvcc: true
 
 env:
-  - HUGGING_FACE_HUB_TOKEN
+  - HF_TOKEN
   - WANDB_API_KEY
 commands:
   - pip install "transformers>=4.43.2"
