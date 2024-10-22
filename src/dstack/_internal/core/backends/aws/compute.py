@@ -630,7 +630,11 @@ def get_vpc_id_subnet_id_or_error(
                 return vpc_id, subnets_ids
             if allocate_public_ip:
                 raise ComputeError(f"Failed to find public subnets for VPC {vpc_id}")
-            raise ComputeError(f"Failed to find private subnets for VPC {vpc_id}")
+            raise ComputeError(
+                f"Failed to find private subnets for VPC {vpc_id} with outbound internet access. "
+                "Ensure you've setup NAT Gateway, Transit Gateway, or other mechanism "
+                "to provide outbound internet access from private subnets."
+            )
         if not config.use_default_vpcs:
             raise ComputeError(f"No VPC ID configured for region {region}")
 

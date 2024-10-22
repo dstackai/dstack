@@ -326,13 +326,14 @@ def get_subnets_ids_for_vpc(
             if is_public_subnet:
                 subnets_ids.append(subnet_id)
         else:
-            subnet_behind_nat = _is_subnet_behind_nat(
+            is_eligible_private_subnet = _is_private_subnet_with_internet_egress(
                 ec2_client=ec2_client,
                 vpc_id=vpc_id,
                 subnet_id=subnet_id,
             )
-            if subnet_behind_nat:
+            if is_eligible_private_subnet:
                 subnets_ids.append(subnet_id)
+
     return subnets_ids
 
 
@@ -535,7 +536,10 @@ def _is_public_subnet(
     return False
 
 
-def _is_subnet_behind_nat(
+_PRIVATE_SUBNET_EGRESS_ROUTE_KEYS = ["NatGatewayId", "TransitGatewayId", "VpcPeeringConnectionId"]
+
+
+def _is_private_subnet_with_internet_egress(
     ec2_client: botocore.client.BaseClient,
     vpc_id: str,
     subnet_id: str,
@@ -546,8 +550,9 @@ def _is_subnet_behind_nat(
     )
     for route_table in response["RouteTables"]:
         for route in route_table["Routes"]:
-            if "NatGatewayId" in route and route["NatGatewayId"].startswith("nat-"):
-                return True
+            if route.get("DestinationCidrBlock") == "0.0.0.0/0":
+                if any(route.get(k) for k in _PRIVATE_SUBNET_EGRESS_ROUTE_KEYS):
+                    return True
 
     # Main route table controls the routing of all subnetes
     # that are not explicitly associated with any other route table.
@@ -563,7 +568,8 @@ def _is_subnet_behind_nat(
     )
     for route_table in response["RouteTables"]:
         for route in route_table["Routes"]:
-            if "NatGatewayId" in route and route["NatGatewayId"].startswith("nat-"):
-                return True
+            if route.get("DestinationCidrBlock") == "0.0.0.0/0":
+                if any(route.get(k) for k in _PRIVATE_SUBNET_EGRESS_ROUTE_KEYS):
+                    return True
 
     return False
