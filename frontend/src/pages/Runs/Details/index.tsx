@@ -1,25 +1,31 @@
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { get as _get } from 'lodash';
 import { format } from 'date-fns';
 import Button from '@cloudscape-design/components/button';
 
-import { Box, Code, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, StatusIndicator } from 'components';
+import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, StatusIndicator } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
 import { useBreadcrumbs, useNotifications } from 'hooks';
+import { riseRouterException } from 'libs';
 import { getStatusIconType } from 'libs/run';
 import { ROUTES } from 'routes';
 import { useDeleteRunsMutation, useGetRunQuery, useStopRunsMutation } from 'services/run';
 
-import { riseRouterException } from '../../../libs';
+import { JobList } from './Jobs/List';
+import { getJobSubmissionId } from './Logs/helpers';
 import {
-    getRunProvisioningData,
-    isAvailableAbortingForRun,
-    isAvailableDeletingForRun,
-    isAvailableStoppingForRun,
-} from '../utils';
+    getRunListItemBackend,
+    getRunListItemInstanceId,
+    getRunListItemPrice,
+    getRunListItemRegion,
+    getRunListItemResources,
+    getRunListItemSpot,
+} from '../List/helpers';
+import { isAvailableAbortingForRun, isAvailableDeletingForRun, isAvailableStoppingForRun } from '../utils';
+import { Logs } from './Logs';
 
 import styles from './styles.module.scss';
 
@@ -120,7 +126,6 @@ export const RunDetails: React.FC = () => {
     const isDisabledAbortButton = !runData || !isAvailableAbortingForRun(runData.status) || isStopping || isDeleting;
     const isDisabledStopButton = !runData || !isAvailableStoppingForRun(runData.status) || isStopping || isDeleting;
     const isDisabledDeleteButton = !runData || !isAvailableDeletingForRun(runData.status) || isStopping || isDeleting;
-    const runProvisioningData = runData && getRunProvisioningData(runData);
 
     return (
         <div className={styles.page}>
@@ -153,95 +158,101 @@ export const RunDetails: React.FC = () => {
                 )}
 
                 {runData && (
-                    <Container header={<Header variant="h2">{t('common.general')}</Header>}>
-                        <ColumnLayout columns={4} variant="text-grid">
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.project')}</Box>
-                                <div>{runData.project_name}</div>
-                            </div>
-
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.repo')}</Box>
+                    <>
+                        <Container header={<Header variant="h2">{t('common.general')}</Header>}>
+                            <ColumnLayout columns={4} variant="text-grid">
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.project')}</Box>
+                                    <div>{runData.project_name}</div>
+                                </div>
 
                                 <div>
-                                    {_get(
-                                        runData.run_spec.repo_data,
-                                        'repo_name',
-                                        _get(runData.run_spec.repo_data, 'repo_dir', '-'),
-                                    )}
+                                    <Box variant="awsui-key-label">{t('projects.run.repo')}</Box>
+
+                                    <div>
+                                        {_get(
+                                            runData.run_spec.repo_data,
+                                            'repo_name',
+                                            _get(runData.run_spec.repo_data, 'repo_dir', '-'),
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.hub_user_name')}</Box>
-                                <div>{runData.user}</div>
-                            </div>
-
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.configuration')}</Box>
-                                <div>{runData.run_spec.configuration_path}</div>
-                            </div>
-
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.submitted_at')}</Box>
-                                <div>{format(new Date(runData.submitted_at), DATE_TIME_FORMAT)}</div>
-                            </div>
-
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
                                 <div>
-                                    <StatusIndicator type={getStatusIconType(runData.status)}>
-                                        {t(`projects.run.statuses.${runData.status}`)}
-                                    </StatusIndicator>
+                                    <Box variant="awsui-key-label">{t('projects.run.hub_user_name')}</Box>
+                                    <div>{runData.user}</div>
                                 </div>
-                            </div>
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
-                                <div>{runProvisioningData?.backend ?? '-'}</div>
-                            </div>
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.configuration')}</Box>
+                                    <div>{runData.run_spec.configuration_path}</div>
+                                </div>
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.region')}</Box>
-                                <div>{runProvisioningData?.region ?? '-'}</div>
-                            </div>
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.submitted_at')}</Box>
+                                    <div>{format(new Date(runData.submitted_at), DATE_TIME_FORMAT)}</div>
+                                </div>
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.instance_id')}</Box>
-                                <div>{runProvisioningData?.instance_id ?? '-'}</div>
-                            </div>
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
+                                    <div>
+                                        <StatusIndicator type={getStatusIconType(runData.status)}>
+                                            {t(`projects.run.statuses.${runData.status}`)}
+                                        </StatusIndicator>
+                                    </div>
+                                </div>
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.resources')}</Box>
-                                <div>{runProvisioningData?.instance_type.resources.description}</div>
-                            </div>
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
+                                    <div>{getRunListItemBackend(runData)}</div>
+                                </div>
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.spot')}</Box>
-                                <div>{runProvisioningData?.instance_type.resources.spot.toString() ?? '-'}</div>
-                            </div>
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.region')}</Box>
+                                    <div>{getRunListItemRegion(runData)}</div>
+                                </div>
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.price')}</Box>
-                                <div>{runProvisioningData?.price ?? '-'}</div>
-                            </div>
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.instance_id')}</Box>
+                                    <div>{getRunListItemInstanceId(runData)}</div>
+                                </div>
 
-                            <div>
-                                <Box variant="awsui-key-label">{t('projects.run.cost')}</Box>
-                                <div>${runData.cost}</div>
-                            </div>
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.resources')}</Box>
+                                    <div>{getRunListItemResources(runData)}</div>
+                                </div>
 
-                            {/*{runData.run_head.job_heads?.[0].error_code && (*/}
-                            {/*    <div>*/}
-                            {/*        <Box variant="awsui-key-label">{t('projects.run.error')}</Box>*/}
-                            {/*        <div>{runData.run_head.job_heads?.[0].error_code}</div>*/}
-                            {/*    </div>*/}
-                            {/*)}*/}
-                        </ColumnLayout>
-                    </Container>
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.spot')}</Box>
+                                    <div>{getRunListItemSpot(runData)}</div>
+                                </div>
+
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.price')}</Box>
+                                    <div>{getRunListItemPrice(runData)}</div>
+                                </div>
+
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.cost')}</Box>
+                                    <div>${runData.cost}</div>
+                                </div>
+                            </ColumnLayout>
+                        </Container>
+
+                        {runData.jobs.length === 1 && (
+                            <Logs
+                                projectName={paramProjectName}
+                                runName={paramRunName}
+                                jobSubmissionId={getJobSubmissionId(runData)}
+                                className={styles.logs}
+                            />
+                        )}
+
+                        {runData.jobs.length > 1 && (
+                            <JobList projectName={paramProjectName} runName={paramRunName} jobs={runData.jobs} />
+                        )}
+                    </>
                 )}
-
-                <Outlet />
             </ContentLayout>
         </div>
     );
