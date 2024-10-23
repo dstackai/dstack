@@ -30,6 +30,14 @@ export const UserList: React.FC = () => {
     const navigate = useNavigate();
     const [pushNotification] = useNotifications();
 
+    const sortedData = useMemo<IUser[]>(() => {
+        if (!data) return [];
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        return [...data].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }, [data]);
+
     useBreadcrumbs([
         {
             text: t('navigation.account'),
@@ -81,7 +89,7 @@ export const UserList: React.FC = () => {
         );
     };
 
-    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(data ?? [], {
+    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(sortedData, {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(() => actions.setFiltering('')),

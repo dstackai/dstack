@@ -32,6 +32,14 @@ export const ProjectList: React.FC = () => {
     const { deleteProject, deleteProjects, isDeleting } = useDeleteProject();
     const navigate = useNavigate();
 
+    const sortedData = useMemo<IProject[]>(() => {
+        if (!data) return [];
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        return [...data].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }, [data]);
+
     useBreadcrumbs([
         {
             text: t('navigation.project_other'),
@@ -59,7 +67,7 @@ export const ProjectList: React.FC = () => {
         );
     };
 
-    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(data ?? [], {
+    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(sortedData, {
         filtering: {
             empty: renderEmptyMessage(),
             noMatch: renderNoMatchMessage(() => actions.setFiltering('')),
