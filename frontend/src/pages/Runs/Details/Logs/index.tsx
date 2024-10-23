@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
 import classNames from 'classnames';
 import { Mode } from '@cloudscape-design/global-styles';
 import { FitAddon } from '@xterm/addon-fit';
@@ -10,11 +9,8 @@ import { Container, Header, ListEmptyMessage, Loader, TextContent } from 'compon
 
 import { useAppSelector } from 'hooks';
 import { useGetProjectLogsQuery } from 'services/project';
-import { useGetRunQuery } from 'services/run';
 
 import { selectSystemMode } from 'App/slice';
-
-import { getJobSubmissionId } from './helpers';
 
 import { IProps } from './types';
 
@@ -22,13 +18,8 @@ import styles from './styles.module.scss';
 
 const LIMIT_LOG_ROWS = 1000;
 
-export const Logs: React.FC<IProps> = ({ className, ...props }) => {
+export const Logs: React.FC<IProps> = ({ className, projectName, runName, jobSubmissionId }) => {
     const { t } = useTranslation();
-    const params = useParams();
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    const paramProjectName: string = props.name ?? params.projectName ?? '';
-    const paramRunName = props.run_name ?? params.runName ?? '';
     const appliedTheme = useAppSelector(selectSystemMode);
 
     const terminalInstance = useRef<Terminal>(new Terminal());
@@ -64,29 +55,22 @@ export const Logs: React.FC<IProps> = ({ className, ...props }) => {
         };
     }, []);
 
-    const { data: runData, isLoading: isLoadingRun } = useGetRunQuery({
-        project_name: paramProjectName,
-        run_name: paramRunName,
-    });
-
     const {
         data: fetchData,
-        isLoading: isLoadingLogs,
+        isLoading,
         isFetching: isFetchingLogs,
     } = useGetProjectLogsQuery(
         {
-            project_name: paramProjectName,
-            run_name: paramRunName,
+            project_name: projectName,
+            run_name: runName,
             descending: true,
-            job_submission_id: getJobSubmissionId(runData) ?? '',
+            job_submission_id: jobSubmissionId ?? '',
             limit: LIMIT_LOG_ROWS,
         },
         {
-            skip: !runData,
+            skip: !jobSubmissionId,
         },
     );
-
-    const isLoading = isLoadingRun || isLoadingLogs;
 
     useEffect(() => {
         if (fetchData) {

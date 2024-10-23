@@ -25,6 +25,17 @@ export const ROUTES = {
                     TEMPLATE: `/projects/:projectName/runs/:runName`,
                     FORMAT: (projectName: string, runName: string) =>
                         buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE, { projectName, runName }),
+                    JOBS: {
+                        DETAILS: {
+                            TEMPLATE: `/projects/:projectName/runs/:runName/jobs/:jobName`,
+                            FORMAT: (projectName: string, runName: string, jobName: string) =>
+                                buildRoute(ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.TEMPLATE, {
+                                    projectName,
+                                    runName,
+                                    jobName,
+                                }),
+                        },
+                    },
                 },
             },
         },

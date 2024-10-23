@@ -331,6 +331,8 @@
       "provider_name": "Provider",
       "status": "Status",
       "submitted_at": "Submitted",
+      "jobs": "Jobs",
+      "job_name": "Job Name",
       "cost": "Cost",
       "backend": "Backend",
       "region": "Region",

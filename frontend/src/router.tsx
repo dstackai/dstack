@@ -13,7 +13,8 @@ import { ModelDetails } from 'pages/Models/Details';
 import { ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
-import { AdministrationList, List as MainRunList, Logs as RunLogs, RunDetails } from 'pages/Runs';
+import { AdministrationList, List as MainRunList, RunDetails } from 'pages/Runs';
+import { JobDetails } from 'pages/Runs/Details/Jobs/Details';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 import { UserBilling, UserSettings } from 'pages/User/Details';
 
@@ -78,13 +79,10 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.TEMPLATE,
                 element: <RunDetails />,
-
-                children: [
-                    {
-                        index: true,
-                        element: <RunLogs />,
-                    },
-                ],
+            },
+            {
+                path: ROUTES.PROJECT.DETAILS.RUNS.DETAILS.JOBS.DETAILS.TEMPLATE,
+                element: <JobDetails />,
             },
 
             {
