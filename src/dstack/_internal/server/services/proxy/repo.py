@@ -10,6 +10,7 @@ from dstack._internal.core.models.instances import SSHConnectionParams
 from dstack._internal.core.models.runs import JobProvisioningData, JobStatus, RunSpec
 from dstack._internal.proxy.repos.base import BaseProxyRepo, Project, Replica, Service
 from dstack._internal.server.models import JobModel, ProjectModel, RunModel
+from dstack._internal.server.security.permissions import is_project_member
 
 
 class DBProxyRepo(BaseProxyRepo):
@@ -91,3 +92,6 @@ class DBProxyRepo(BaseProxyRepo):
 
     async def add_project(self, project: Project) -> None:
         pass
+
+    async def is_project_member(self, project_name: str, token: str) -> bool:
+        return await is_project_member(self.session, project_name, token)

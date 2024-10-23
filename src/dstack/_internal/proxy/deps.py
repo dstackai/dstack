@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from typing_extensions import Annotated
 
 from dstack._internal.proxy.repos.base import BaseProxyRepo
@@ -34,3 +35,41 @@ async def get_proxy_repo(
 ) -> AsyncGenerator[BaseProxyRepo, None]:
     async for repo in injector.get_repo():
         yield repo
+
+
+class ProxyAuthContext:
+    def __init__(self, project_name: str, token: Optional[str], repo: BaseProxyRepo):
+        self._project_name = project_name
+        self._token = token
+        self._repo = repo
+
+    async def enforce(self) -> None:
+        if self._token is None or not await self._repo.is_project_member(
+            self._project_name, self._token
+        ):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                f"Unauthenticated or unauthorized to access project {self._project_name}",
+            )
+
+
+class ProxyAuth:
+    def __init__(self, auto_enforce: bool):
+        self._auto_enforce = auto_enforce
+
+    async def __call__(
+        self,
+        project_name: str,
+        token: Annotated[
+            Optional[HTTPAuthorizationCredentials], Security(HTTPBearer(auto_error=False))
+        ],
+        repo: Annotated[BaseProxyRepo, Depends(get_proxy_repo)],
+    ) -> ProxyAuthContext:
+        context = ProxyAuthContext(
+            project_name=project_name,
+            token=token.credentials if token is not None else None,
+            repo=repo,
+        )
+        if self._auto_enforce:
+            await context.enforce()
+        return context

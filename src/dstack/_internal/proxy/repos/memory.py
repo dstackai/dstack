@@ -19,3 +19,8 @@ class InMemoryProxyRepo(BaseProxyRepo):
 
     async def add_project(self, project: Project) -> None:
         self.projects[project.name] = project
+
+    async def is_project_member(self, project_name: str, token: str) -> bool:
+        # TODO(#1595): when this class is used for gateways,
+        # implement a network request to dstack-server to check authorization
+        raise NotImplementedError
