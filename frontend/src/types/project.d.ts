@@ -8,6 +8,7 @@ declare interface IProject {
     members: IProjectMember[],
     backends: TProjectBackend[]
     owner: IUser | {username: string},
+    created_at: string
 }
 
 declare interface IProjectMember {

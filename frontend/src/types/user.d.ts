@@ -16,6 +16,7 @@ declare interface IUser {
     global_role: TUserRole
     email: string | null,
     permissions: TUserPermission[],
+    created_at: string
 }
 
 declare interface IUserWithCreds extends IUser {
