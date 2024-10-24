@@ -42,3 +42,7 @@ class BaseProxyRepo(ABC):
     @abstractmethod
     async def add_project(self, project: Project) -> None:
         pass
+
+    @abstractmethod
+    async def is_project_member(self, project_name: str, token: str) -> bool:
+        pass

@@ -1,6 +1,6 @@
 from typing import Tuple
 
-from fastapi import Depends, Security
+from fastapi import Depends, HTTPException, Security
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -96,15 +96,29 @@ class ProjectMember:
         project_name: str,
         token: HTTPAuthorizationCredentials = Security(HTTPBearer()),
     ) -> Tuple[UserModel, ProjectModel]:
-        user = await log_in_with_token(session=session, token=token.credentials)
-        if user is None:
-            raise error_invalid_token()
-        project = await get_project_model_by_name(session=session, project_name=project_name)
-        if project is None:
-            raise error_not_found()
-        if user.global_role == GlobalRole.ADMIN:
-            return user, project
-        project_role = get_user_project_role(user=user, project=project)
-        if project_role is not None:
-            return user, project
-        raise error_forbidden()
+        return await get_project_member(session, project_name, token.credentials)
+
+
+async def get_project_member(
+    session: AsyncSession, project_name: str, token: str
+) -> Tuple[UserModel, ProjectModel]:
+    user = await log_in_with_token(session=session, token=token)
+    if user is None:
+        raise error_invalid_token()
+    project = await get_project_model_by_name(session=session, project_name=project_name)
+    if project is None:
+        raise error_not_found()
+    if user.global_role == GlobalRole.ADMIN:
+        return user, project
+    project_role = get_user_project_role(user=user, project=project)
+    if project_role is not None:
+        return user, project
+    raise error_forbidden()
+
+
+async def is_project_member(session: AsyncSession, project_name: str, token: str) -> bool:
+    try:
+        await get_project_member(session, project_name, token)
+        return True
+    except HTTPException:
+        return False
