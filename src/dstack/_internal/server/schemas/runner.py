@@ -7,7 +7,7 @@ from typing_extensions import Annotated
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.runs import ClusterInfo, JobSpec, JobStatus, RunSpec
-from dstack._internal.core.models.volumes import VolumeMountPoint
+from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint
 
 
 class JobStateEvent(CoreModel):
@@ -105,6 +105,7 @@ class TaskConfigBody(CoreModel):
     ssh_key: str
     mounts: List[VolumeMountPoint]
     volumes: List[ShimVolumeInfo]
+    instance_mounts: List[InstanceMountPoint]
 
 
 class StopBody(CoreModel):

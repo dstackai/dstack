@@ -14,7 +14,11 @@ from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
-from dstack._internal.core.models.volumes import VolumeConfiguration, VolumeMountPoint
+from dstack._internal.core.models.volumes import (
+    InstanceMountPoint,
+    VolumeConfiguration,
+    VolumeMountPoint,
+)
 from dstack._internal.settings import FeatureFlags
 
 CommandsList = List[str]
@@ -129,7 +133,10 @@ class BaseRunConfiguration(CoreModel):
     resources: Annotated[
         ResourcesSpec, Field(description="The resources requirements to run the configuration")
     ] = ResourcesSpec()
-    volumes: Annotated[List[VolumeMountPoint], Field(description="The volumes mount points")] = []
+    volumes: Annotated[
+        List[Union[VolumeMountPoint, InstanceMountPoint, str]],
+        Field(description="The volumes mount points"),
+    ] = []
 
     @validator("python", pre=True, always=True)
     def convert_python(cls, v, values) -> Optional[PythonVersion]:
@@ -141,6 +148,14 @@ class BaseRunConfiguration(CoreModel):
                 v = "3.10"
         if isinstance(v, str):
             return PythonVersion(v)
+        return v
+
+    @validator("volumes", each_item=True)
+    def convert_volumes(cls, v) -> Union[VolumeMountPoint, InstanceMountPoint]:
+        if isinstance(v, str):
+            if v.startswith("/"):
+                return InstanceMountPoint.parse(v)
+            return VolumeMountPoint.parse(v)
         return v
 
     def get_repo(self) -> Repo:
