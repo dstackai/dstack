@@ -295,6 +295,14 @@
     border-color: black !important;
 }
 
+.providers a.feature-cell:hover h3:after {
+    content: url('data:image/svg+xml,<svg fill="rgba(0, 0, 0, 0.87)" xmlns="http://www.w3.org/2000/svg" width="18px" height="18px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
+    margin-left: 5px;
+    position: relative;
+    top: 3px;
+    margin-right: -7px;
+}
+
 .md-button-secondary.external:after {
     content: url('data:image/svg+xml,<svg fill="rgba(0, 0, 0, 0.87)" xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 16 16"><polygon points="5 4.31 5 5.69 9.33 5.69 2.51 12.51 3.49 13.49 10.31 6.67 10.31 11 11.69 11 11.69 4.31 5 4.31" data-v-e1bdab2c=""></polygon></svg>');
     line-height: 14px;
