@@ -8,7 +8,7 @@ from sqlalchemy.orm import joinedload
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import GatewayError
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.common import RegistryAuth, is_core_model_instance
 from dstack._internal.core.models.instances import InstanceStatus, RemoteConnectionInfo
 from dstack._internal.core.models.repos import RemoteRepoCreds
 from dstack._internal.core.models.runs import (
@@ -19,7 +19,7 @@ from dstack._internal.core.models.runs import (
     JobTerminationReason,
     Run,
 )
-from dstack._internal.core.models.volumes import Volume
+from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.db import get_session_ctx
 from dstack._internal.server.models import (
     JobModel,
@@ -391,6 +391,16 @@ def _process_provisioning_with_shim(
         username = interpolate(registry_auth.username)
         password = interpolate(registry_auth.password)
 
+    volume_mounts: List[VolumeMountPoint] = []
+    instance_mounts: List[InstanceMountPoint] = []
+    for mount in run.run_spec.configuration.volumes:
+        if is_core_model_instance(mount, VolumeMountPoint):
+            volume_mounts.append(mount)
+        elif is_core_model_instance(mount, InstanceMountPoint):
+            instance_mounts.append(mount)
+        else:
+            assert False, f"unexpected mount point: {mount!r}"
+
     shim_client.submit(
         username=username,
         password=password,
@@ -404,8 +414,9 @@ def _process_provisioning_with_shim(
         public_keys=public_keys,
         ssh_user=ssh_user,
         ssh_key=ssh_key,
-        mounts=run.run_spec.configuration.volumes,
+        mounts=volume_mounts,
         volumes=volumes,
+        instance_mounts=instance_mounts,
     )
 
     job_model.status = JobStatus.PULLING

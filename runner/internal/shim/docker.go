@@ -115,6 +115,15 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
 		return tracerr.Wrap(err)
 	}
+	err = prepareInstanceMountPoints(cfg)
+	if err != nil {
+		d.state = Pending
+		errMessage := fmt.Sprintf("prepareInstanceMountPoints error: %s", err.Error())
+		d.containerStatus.Error = errMessage
+		log.Println(errMessage)
+		d.jobResult = JobResult{Reason: "EXECUTOR_ERROR", ReasonMessage: errMessage}
+		return tracerr.Wrap(err)
+	}
 
 	d.containerStatus = ContainerStatus{
 		ContainerName: cfg.ContainerName,
@@ -290,6 +299,19 @@ func getVolumeMountPoint(volumeName string) string {
 	return fmt.Sprintf("/dstack-volumes/%s", volumeName)
 }
 
+func prepareInstanceMountPoints(taskConfig TaskConfig) error {
+	for _, mountPoint := range taskConfig.InstanceMounts {
+		if _, err := os.Stat(mountPoint.InstancePath); errors.Is(err, os.ErrNotExist) {
+			if err = os.MkdirAll(mountPoint.InstancePath, 0777); err != nil {
+				return tracerr.Wrap(err)
+			}
+		} else if err != nil {
+			return tracerr.Wrap(err)
+		}
+	}
+	return nil
+}
+
 // initFileSystem creates an ext4 file system on a disk only if the disk is not already has a file system.
 // Returns true if the file system is created.
 func initFileSystem(deviceName string, errorIfNotExists bool) (bool, error) {
@@ -451,11 +473,16 @@ func createContainer(ctx context.Context, client docker.APIClient, runnerDir str
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
-	volumeMounts, err := getVolumeMounts(taskConfig.Mounts)
+	volumeMounts, err := getVolumeMounts(taskConfig.VolumeMounts)
 	if err != nil {
 		return "", tracerr.Wrap(err)
 	}
 	mounts = append(mounts, volumeMounts...)
+	instanceMounts, err := getInstanceMounts(taskConfig.InstanceMounts)
+	if err != nil {
+		return "", tracerr.Wrap(err)
+	}
+	mounts = append(mounts, instanceMounts...)
 
 	//Set the environment variables
 	envVars := []string{}
@@ -660,11 +687,19 @@ func configureHpcNetworkingIfAvailable(hostConfig *container.HostConfig) {
 	}
 }
 
-func getVolumeMounts(mountPoints []MountPoint) ([]mount.Mount, error) {
+func getVolumeMounts(mountPoints []VolumeMountPoint) ([]mount.Mount, error) {
 	mounts := []mount.Mount{}
 	for _, mountPoint := range mountPoints {
 		source := getVolumeMountPoint(mountPoint.Name)
 		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: source, Target: mountPoint.Path})
+	}
+	return mounts, nil
+}
+
+func getInstanceMounts(mountPoints []InstanceMountPoint) ([]mount.Mount, error) {
+	mounts := []mount.Mount{}
+	for _, mountPoint := range mountPoints {
+		mounts = append(mounts, mount.Mount{Type: mount.TypeBind, Source: mountPoint.InstancePath, Target: mountPoint.Path})
 	}
 	return mounts, nil
 }

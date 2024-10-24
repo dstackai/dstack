@@ -16,6 +16,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -39,7 +40,12 @@ from dstack._internal.core.models.runs import (
     ServiceSpec,
 )
 from dstack._internal.core.models.users import GlobalRole
-from dstack._internal.core.models.volumes import Volume, VolumeStatus
+from dstack._internal.core.models.volumes import (
+    InstanceMountPoint,
+    Volume,
+    VolumeMountPoint,
+    VolumeStatus,
+)
 from dstack._internal.core.services import validate_dstack_resource_name
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
@@ -263,6 +269,7 @@ async def get_run_plan(
             multinode=jobs[0].job_spec.jobs_per_replica > 1,
             volumes=volumes,
             privileged=jobs[0].job_spec.privileged,
+            instance_mounts=check_run_spec_has_instance_mounts(run_spec),
         )
 
     job_plans = []
@@ -626,6 +633,8 @@ async def get_run_volume_models(
         return []
     volume_models = []
     for mount_point in run_spec.configuration.volumes:
+        if not is_core_model_instance(mount_point, VolumeMountPoint):
+            continue
         volume_model = await volumes_services.get_project_volume_model_by_name(
             session=session,
             project=project,
@@ -655,6 +664,12 @@ def check_can_attach_run_volumes(
             raise ServerClientError("Cannot mount volumes from different regions")
         if volume.status != VolumeStatus.ACTIVE:
             raise ServerClientError("Cannot mount volumes that are not active")
+
+
+def check_run_spec_has_instance_mounts(run_spec: RunSpec) -> bool:
+    return any(
+        is_core_model_instance(mp, InstanceMountPoint) for mp in run_spec.configuration.volumes
+    )
 
 
 def _get_run_cost(run: Run) -> float:

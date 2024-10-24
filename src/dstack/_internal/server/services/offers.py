@@ -23,6 +23,7 @@ async def get_offers_by_requirements(
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
     volumes: Optional[List[Volume]] = None,
     privileged: bool = False,
+    instance_mounts: bool = False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
     backends: List[Backend] = await backends_services.get_project_backends(project=project)
 
@@ -47,7 +48,7 @@ async def get_offers_by_requirements(
             backend_types = BACKENDS_WITH_MULTINODE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_MULTINODE_SUPPORT]
 
-    if privileged:
+    if privileged or instance_mounts:
         if not backend_types:
             backend_types = BACKENDS_WITH_CREATE_INSTANCE_SUPPORT
         backend_types = [b for b in backend_types if b in BACKENDS_WITH_CREATE_INSTANCE_SUPPORT]

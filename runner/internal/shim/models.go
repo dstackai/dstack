@@ -43,9 +43,14 @@ type CLIArgs struct {
 	}
 }
 
-type MountPoint struct {
+type VolumeMountPoint struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
+}
+
+type InstanceMountPoint struct {
+	InstancePath string `json:"instance_path"`
+	Path         string `json:"path"`
 }
 
 type VolumeInfo struct {
@@ -56,18 +61,19 @@ type VolumeInfo struct {
 }
 
 type TaskConfig struct {
-	Username      string       `json:"username"`
-	Password      string       `json:"password"`
-	ImageName     string       `json:"image_name"`
-	Privileged    bool         `json:"privileged"`
-	ContainerName string       `json:"container_name"`
-	ContainerUser string       `json:"container_user"`
-	ShmSize       int64        `json:"shm_size"`
-	PublicKeys    []string     `json:"public_keys"`
-	SshUser       string       `json:"ssh_user"`
-	SshKey        string       `json:"ssh_key"`
-	Mounts        []MountPoint `json:"mounts"`
-	Volumes       []VolumeInfo `json:"volumes"`
+	Username       string               `json:"username"`
+	Password       string               `json:"password"`
+	ImageName      string               `json:"image_name"`
+	Privileged     bool                 `json:"privileged"`
+	ContainerName  string               `json:"container_name"`
+	ContainerUser  string               `json:"container_user"`
+	ShmSize        int64                `json:"shm_size"`
+	PublicKeys     []string             `json:"public_keys"`
+	SshUser        string               `json:"ssh_user"`
+	SshKey         string               `json:"ssh_key"`
+	VolumeMounts   []VolumeMountPoint   `json:"mounts"`
+	Volumes        []VolumeInfo         `json:"volumes"`
+	InstanceMounts []InstanceMountPoint `json:"instance_mounts"`
 }
 
 func (ra TaskConfig) EncodeRegistryAuth() (string, error) {

@@ -13,9 +13,17 @@ from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
 )
+from dstack._internal.core.models.volumes import (
+    InstanceMountPoint,
+    VolumeMountPoint,
+    VolumeStatus,
+)
 from dstack._internal.server import settings
 from dstack._internal.server.background.tasks.process_running_jobs import process_running_jobs
 from dstack._internal.server.schemas.runner import HealthcheckResponse, JobStateEvent, PullResponse
+from dstack._internal.server.services.volumes import (
+    volume_model_to_volume,
+)
 from dstack._internal.server.testing.common import (
     create_instance,
     create_job,
@@ -24,7 +32,9 @@ from dstack._internal.server.testing.common import (
     create_repo,
     create_run,
     create_user,
+    create_volume,
     get_run_spec,
+    get_volume_configuration,
 )
 
 
@@ -195,7 +205,9 @@ class TestProcessRunningJobs:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("privileged", [False, True])
     @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
-    async def test_provisioning_shim(self, test_db, session: AsyncSession, privileged: bool):
+    async def test_provisioning_shim_with_volumes(
+        self, test_db, session: AsyncSession, privileged: bool
+    ):
         project_ssh_pub_key = "__project_ssh_pub_key__"
         project = await create_project(session=session, ssh_public_key=project_ssh_pub_key)
         user = await create_user(session=session)
@@ -203,8 +215,22 @@ class TestProcessRunningJobs:
             session=session,
             project_id=project.id,
         )
+        volume = await create_volume(
+            session=session,
+            project=project,
+            status=VolumeStatus.ACTIVE,
+            configuration=get_volume_configuration(
+                name="my-vol", backend=BackendType.AWS, region="us-east-1"
+            ),
+            backend=BackendType.AWS,
+            region="us-east-1",
+        )
         run_spec = get_run_spec(run_name="test-run", repo_id=repo.name)
         run_spec.configuration.privileged = privileged
+        run_spec.configuration.volumes = [
+            VolumeMountPoint(name="my-vol", path="/volume"),
+            InstanceMountPoint(instance_path="/root/.cache", path="/cache"),
+        ]
         run = await create_run(
             session=session,
             project=project,
@@ -247,8 +273,9 @@ class TestProcessRunningJobs:
                 public_keys=[project_ssh_pub_key, "user_ssh_key"],
                 ssh_user="ubuntu",
                 ssh_key="user_ssh_key",
-                mounts=[],
-                volumes=[],
+                mounts=[VolumeMountPoint(name="my-vol", path="/volume")],
+                volumes=[volume_model_to_volume(volume)],
+                instance_mounts=[InstanceMountPoint(instance_path="/root/.cache", path="/cache")],
             )
         await session.refresh(job)
         assert job is not None

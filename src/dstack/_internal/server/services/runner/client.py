@@ -8,7 +8,7 @@ from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.repos.remote import RemoteRepoCreds
 from dstack._internal.core.models.resources import Memory
 from dstack._internal.core.models.runs import ClusterInfo, JobSpec, RunSpec
-from dstack._internal.core.models.volumes import Volume, VolumeMountPoint
+from dstack._internal.core.models.volumes import InstanceMountPoint, Volume, VolumeMountPoint
 from dstack._internal.server.schemas.runner import (
     HealthcheckResponse,
     MetricsResponse,
@@ -152,6 +152,7 @@ class ShimClient:
         ssh_key: str,
         mounts: List[VolumeMountPoint],
         volumes: List[Volume],
+        instance_mounts: List[InstanceMountPoint],
     ):
         _shm_size = int(shm_size * 1024 * 1024 * 1024) if shm_size else 0
         volume_infos = [_volume_to_shim_volume_info(v) for v in volumes]
@@ -168,6 +169,7 @@ class ShimClient:
             ssh_key=ssh_key,
             mounts=mounts,
             volumes=volume_infos,
+            instance_mounts=instance_mounts,
         ).dict()
         resp = requests.post(
             self._url("/api/submit"),

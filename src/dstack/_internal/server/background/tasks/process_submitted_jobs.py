@@ -56,6 +56,7 @@ from dstack._internal.server.services.pools import (
 )
 from dstack._internal.server.services.runs import (
     check_can_attach_run_volumes,
+    check_run_spec_has_instance_mounts,
     get_run_volume_models,
     run_model_to_run,
 )
@@ -381,6 +382,7 @@ async def _run_job_on_new_instance(
         master_job_provisioning_data=master_job_provisioning_data,
         volumes=volumes,
         privileged=job.job_spec.privileged,
+        instance_mounts=check_run_spec_has_instance_mounts(run.run_spec),
     )
     # Limit number of offers tried to prevent long-running processing
     # in case all offers fail.
