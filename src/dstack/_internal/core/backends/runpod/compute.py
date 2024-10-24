@@ -91,20 +91,25 @@ class RunpodCompute(Compute):
         container_registry_auth_id = self._generate_container_registry_auth_id(
             job.job_spec.registry_auth
         )
+        gpu_count = len(instance_offer.instance.resources.gpus)
+        bid_per_gpu = None
+        if instance_offer.instance.resources.spot and gpu_count:
+            bid_per_gpu = instance_offer.price / gpu_count
+
         resp = self.api_client.create_pod(
             name=instance_config.instance_name,
             image_name=job.job_spec.image_name,
             gpu_type_id=instance_offer.instance.name,
-            cloud_type="ALL",  # ["ALL", "COMMUNITY", "SECURE"]:
+            cloud_type="SECURE",  # ["ALL", "COMMUNITY", "SECURE"]:
             data_center_id=instance_offer.region,
-            gpu_count=len(instance_offer.instance.resources.gpus),
+            gpu_count=gpu_count,
             container_disk_in_gb=disk_size,
             min_vcpu_count=instance_offer.instance.resources.cpus,
             min_memory_in_gb=memory_size,
             support_public_ip=True,
             docker_args=_get_docker_args(authorized_keys),
             ports="10022/tcp",
-            bid_per_gpu=instance_offer.price if instance_offer.instance.resources.spot else None,
+            bid_per_gpu=bid_per_gpu,
             network_volume_id=network_volume_id,
             volume_mount_path=volume_mount_path,
         )
