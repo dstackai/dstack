@@ -165,6 +165,7 @@ class AzureConfigurator(Configurator):
             subscription_id=config.subscription_id,
             resource_group=resource_group,
             locations=config.locations,
+            create_default_network=config.vpc_ids is None,
         )
         return BackendModel(
             project_id=project.id,
@@ -289,17 +290,19 @@ class AzureConfigurator(Configurator):
         subscription_id: str,
         resource_group: str,
         locations: List[str],
+        create_default_network: bool,
     ):
         def func(location: str):
             network_manager = NetworkManager(
                 credential=credential, subscription_id=subscription_id
             )
-            network_manager.create_virtual_network(
-                resource_group=resource_group,
-                location=location,
-                name=azure_utils.get_default_network_name(resource_group, location),
-                subnet_name=azure_utils.get_default_subnet_name(resource_group, location),
-            )
+            if create_default_network:
+                network_manager.create_virtual_network(
+                    resource_group=resource_group,
+                    location=location,
+                    name=azure_utils.get_default_network_name(resource_group, location),
+                    subnet_name=azure_utils.get_default_subnet_name(resource_group, location),
+                )
             network_manager.create_network_security_group(
                 resource_group=resource_group,
                 location=location,
