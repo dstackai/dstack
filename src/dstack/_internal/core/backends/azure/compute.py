@@ -226,7 +226,7 @@ class AzureCompute(Compute):
             resource_group=self.config.resource_group,
             vpc_ids=self.config.vpc_ids,
             location=configuration.region,
-            allocate_public_ip=self.config.allocate_public_ips,
+            allocate_public_ip=True,
         )
         network_security_group = azure_utils.get_default_network_security_group_name(
             resource_group=self.config.resource_group,
@@ -252,7 +252,7 @@ class AzureCompute(Compute):
             subnet=subnet,
             managed_identity=None,
             image_reference=_get_gateway_image_ref(),
-            vm_size="Standard_B1s",
+            vm_size="Standard_B1ms",
             instance_name=configuration.instance_name,
             user_data=get_gateway_user_data(configuration.ssh_key_pub),
             ssh_pub_keys=[configuration.ssh_key_pub],
