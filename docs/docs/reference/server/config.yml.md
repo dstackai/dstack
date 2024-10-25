@@ -162,8 +162,8 @@ There are two ways to configure AWS: using an access key or using the default cr
         For the regions without configured `vpc_ids`, enable default VPCs by setting `default_vpcs` to `true`.
 
 ??? info "Private subnets"
-    By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.
-    If you want `dstack` to use private subnets, set `public_ips` to `false`.
+    By default, `dstack` provisions instances with public IPs and permits inbound SSH traffic.
+    If you want `dstack` to use private subnets and provision instances without public IPs, set `public_ips` to `false`.
 
     ```yaml
     projects:
@@ -176,8 +176,8 @@ There are two ways to configure AWS: using an access key or using the default cr
             public_ips: false
     ```
     
-    Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets 
-    (e.g., through VPC peering).
+    Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
+    Additionally, private subnets must have outbound internet connectivity provided by NAT Gateway, Transit Gateway, or other mechanism.
 
 #### Azure
 
@@ -286,6 +286,44 @@ There are two ways to configure Azure: using a client secret or using the defaul
         }
     }
     ```
+
+??? info "VPC"
+    By default, `dstack` creates new Azure networks and subnets for every configured region.
+    It's possible to use custom networks by specifying `vpc_ids`:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: azure
+            creds:
+              type: default
+        regions: [westeurope]
+        vpc_ids:
+          westeurope: myNetworkResourceGroup/myNetworkName
+    ```
+
+
+??? info "Private subnets"
+    By default, `dstack` provisions instances with public IPs and permits inbound SSH traffic.
+    If you want `dstack` to use private subnets and provision instances without public IPs,
+    specify custom networks using `vpc_ids` and set `public_ips` to `false`.
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: azure
+            creds:
+              type: default
+            regions: [westeurope]
+            vpc_ids:
+              westeurope: myNetworkResourceGroup/myNetworkName
+            public_ips: false
+    ```
+    
+    Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
+    Additionally, private subnets must have outbound internet connectivity provided by [NAT Gateway or other mechanism](https://learn.microsoft.com/en-us/azure/nat-gateway/nat-overview).
 
 #### GCP
 
@@ -441,8 +479,8 @@ gcloud projects list --format="json(projectId)"
         * Allow `INGRESS` traffic on ports `22`, `80`, `443`, with the target tag `dstack-gateway-instance`
 
 ??? info "Private subnets"
-    By default, `dstack` utilizes public subnets and permits inbound SSH traffic exclusively for any provisioned instances.
-    If you want `dstack` to use private subnets, set `public_ips` to `false`.
+    By default, `dstack` provisions instances with public IPs and permits inbound SSH traffic.
+    If you want `dstack` to use private subnets and provision instances without public IPs, set `public_ips` to `false`.
 
     ```yaml
     projects:
@@ -455,7 +493,8 @@ gcloud projects list --format="json(projectId)"
             public_ips: false
     ```
     
-    Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets (e.g., through VPC peering). Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
+    Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
+    Additionally, [Cloud NAT](https://cloud.google.com/nat/docs/overview) must be configured to provide access to external resources for provisioned instances.
 
 #### Lambda
 

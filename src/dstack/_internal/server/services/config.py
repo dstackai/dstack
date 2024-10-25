@@ -65,7 +65,12 @@ class AWSConfig(CoreModel):
     regions: Annotated[Optional[List[str]], Field(description="The list of AWS regions")] = None
     vpc_name: Annotated[
         Optional[str],
-        Field(description="The VPC name. All configured regions must have a VPC with this name"),
+        Field(
+            description=(
+                "The name of custom VPCs. All configured regions must have a VPC with this name."
+                " If your custom VPCs don't have names or have different names in different regions, use `vpc_ids` instead."
+            )
+        ),
     ] = None
     vpc_ids: Annotated[
         Optional[Dict[str, str]],
@@ -91,7 +96,7 @@ class AWSConfig(CoreModel):
         Field(
             description=(
                 "A flag to enable/disable public IP assigning on instances."
-                " `public_ips: false` requires at least one private subnet with outbound internet connection"
+                " `public_ips: false` requires at least one private subnet with outbound internet connectivity"
                 " provided by a NAT Gateway or a Transit Gateway."
                 " Defaults to `true`"
             )
@@ -127,7 +132,8 @@ class AzureConfig(CoreModel):
         Field(
             description=(
                 "A flag to enable/disable public IP assigning on instances."
-                " `public_ips: false` requires `vpc_ids` that specifies custom networks with NAT gateway."
+                " `public_ips: false` requires `vpc_ids` that specifies custom networks with outbound internet connectivity"
+                " provided by NAT Gateway or other mechanism."
                 " Defaults to `true`"
             )
         ),
@@ -195,7 +201,7 @@ class GCPConfig(CoreModel):
     type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
-    vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    vpc_name: Annotated[Optional[str], Field(description="The name of a custom VPC")] = None
     vpc_project_id: Annotated[
         Optional[str],
         Field(description="The shared VPC hosted project ID. Required for shared VPC only"),
@@ -219,7 +225,7 @@ class GCPAPIConfig(CoreModel):
     type: Annotated[Literal["gcp"], Field(description="The type of backend")] = "gcp"
     project_id: Annotated[str, Field(description="The project ID")]
     regions: Optional[List[str]] = None
-    vpc_name: Annotated[Optional[str], Field(description="The VPC name")] = None
+    vpc_name: Annotated[Optional[str], Field(description="The name of a custom VPC")] = None
     vpc_project_id: Annotated[
         Optional[str],
         Field(description="The shared VPC hosted project ID. Required for shared VPC only"),
