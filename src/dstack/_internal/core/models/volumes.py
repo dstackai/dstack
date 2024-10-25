@@ -103,8 +103,8 @@ def _validate_mount_point_path(path: str) -> str:
 
 
 class VolumeMountPoint(CoreModel):
-    name: Annotated[str, Field(description="The name of the volume to mount")]
-    path: Annotated[str, Field(description="The container path to mount the volume at")]
+    name: Annotated[str, Field(description="The name of the network volume to mount")]
+    path: Annotated[str, Field(description="The absolute container path to mount the volume at")]
 
     _validate_path = validator("path", allow_reuse=True)(_validate_mount_point_path)
 
@@ -115,8 +115,8 @@ class VolumeMountPoint(CoreModel):
 
 
 class InstanceMountPoint(CoreModel):
-    instance_path: Annotated[str, Field(description="The path on the instance (host)")]
-    path: Annotated[str, Field(description="The path in the container")]
+    instance_path: Annotated[str, Field(description="The absolute path on the instance (host)")]
+    path: Annotated[str, Field(description="The absolute path in the container")]
 
     _validate_instance_path = validator("instance_path", allow_reuse=True)(
         _validate_mount_point_path
