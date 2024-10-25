@@ -5,7 +5,7 @@ from dstack._internal.core.backends.aws.resources import (
     _is_valid_tag_value,
     validate_tags,
 )
-from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.errors import BackendError
 
 
 class TestIsValidTagKey:
@@ -69,5 +69,5 @@ class TestValidateTags:
 
     def test_validate_invalid_tags(self):
         tags = {"aws:ReservedKey": "SomeValue", "ValidKey": "Invalid#Value"}
-        with pytest.raises(ComputeError, match="Invalid resource tags"):
+        with pytest.raises(BackendError, match="Invalid resource tags"):
             validate_tags(tags)

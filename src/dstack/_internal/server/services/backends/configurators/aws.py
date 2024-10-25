@@ -6,7 +6,11 @@ from boto3.session import Session
 
 from dstack._internal.core.backends.aws import AWSBackend, auth, compute, resources
 from dstack._internal.core.backends.aws.config import AWSConfig
-from dstack._internal.core.errors import BackendAuthError, ComputeError, ServerClientError
+from dstack._internal.core.errors import (
+    BackendAuthError,
+    BackendError,
+    ServerClientError,
+)
 from dstack._internal.core.models.backends.aws import (
     AnyAWSConfigInfo,
     AWSAccessKeyCreds,
@@ -144,7 +148,7 @@ class AWSConfigurator(Configurator):
             )
         try:
             resources.validate_tags(config.tags)
-        except ComputeError as e:
+        except BackendError as e:
             raise ServerClientError(e.args[0])
 
     def _check_vpc_config(self, session: Session, config: AWSConfigInfoWithCredsPartial):
@@ -188,5 +192,5 @@ class AWSConfigurator(Configurator):
             for future in concurrent.futures.as_completed(futures):
                 try:
                     future.result()
-                except ComputeError as e:
+                except BackendError as e:
                     raise ServerClientError(e.args[0])

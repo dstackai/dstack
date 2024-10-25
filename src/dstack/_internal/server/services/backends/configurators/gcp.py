@@ -6,7 +6,7 @@ from google.auth.credentials import Credentials
 
 from dstack._internal.core.backends.gcp import GCPBackend, auth, resources
 from dstack._internal.core.backends.gcp.config import GCPConfig
-from dstack._internal.core.errors import BackendAuthError, ComputeError, ServerClientError
+from dstack._internal.core.errors import BackendAuthError, BackendError, ServerClientError
 from dstack._internal.core.models.backends.base import (
     BackendType,
     ConfigElement,
@@ -239,7 +239,7 @@ class GCPConfigurator(Configurator):
             )
         try:
             resources.validate_labels(config.tags)
-        except ComputeError as e:
+        except BackendError as e:
             raise ServerClientError(e.args[0])
 
     def _check_vpc_config(
@@ -259,5 +259,5 @@ class GCPConfigurator(Configurator):
                 shared_vpc_project_id=config.vpc_project_id,
                 allocate_public_ip=allocate_public_ip,
             )
-        except ComputeError as e:
+        except BackendError as e:
             raise ServerClientError(e.args[0])

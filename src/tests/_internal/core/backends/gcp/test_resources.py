@@ -1,7 +1,7 @@
 import pytest
 
 from dstack._internal.core.backends.gcp import resources as gcp_resources
-from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.errors import BackendError
 
 
 class TestValidateLabels:
@@ -17,7 +17,7 @@ class TestValidateLabels:
             "InvalidName": "validvalue",
             "valid-name": "invalid_value!",
         }
-        with pytest.raises(ComputeError, match="Invalid resource label"):
+        with pytest.raises(BackendError, match="Invalid resource label"):
             gcp_resources.validate_labels(labels)
 
 

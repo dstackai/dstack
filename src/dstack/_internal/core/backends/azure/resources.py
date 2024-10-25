@@ -4,7 +4,7 @@ from typing import Dict, List
 from azure.mgmt import network as network_mgmt
 from azure.mgmt.network.models import Subnet
 
-from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.errors import BackendError
 
 
 def get_network_subnets(
@@ -78,7 +78,7 @@ def _is_eligible_private_subnet(
 def validate_tags(tags: Dict[str, str]):
     for k, v in tags.items():
         if not _is_valid_tag(k, v):
-            raise ComputeError(
+            raise BackendError(
                 "Invalid Azure resource tags. "
                 "See tags restrictions: https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/tag-resources#limitations"
             )

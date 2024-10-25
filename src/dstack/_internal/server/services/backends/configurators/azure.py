@@ -18,15 +18,12 @@ from azure.mgmt.network.models import (
 )
 from azure.mgmt.resource.resources.models import ResourceGroup
 
-from dstack._internal.core.backends.azure import AzureBackend, auth, resources
+from dstack._internal.core.backends.azure import AzureBackend, auth, compute, resources
 from dstack._internal.core.backends.azure import utils as azure_utils
-from dstack._internal.core.backends.azure.auth import AzureCredential
-from dstack._internal.core.backends.azure.compute import get_resource_group_network_subnet_or_error
 from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.errors import (
     BackendAuthError,
     BackendError,
-    ComputeError,
     ServerClientError,
 )
 from dstack._internal.core.models.backends.azure import (
@@ -318,7 +315,9 @@ class AzureConfigurator(Configurator):
             for location in locations:
                 executor.submit(func, location)
 
-    def _check_config(self, config: AzureConfigInfoWithCredsPartial, credential: AzureCredential):
+    def _check_config(
+        self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
+    ):
         self._check_tags_config(config)
         self._check_vpc_config(config=config, credential=credential)
 
@@ -331,11 +330,11 @@ class AzureConfigurator(Configurator):
             )
         try:
             resources.validate_tags(config.tags)
-        except ComputeError as e:
+        except BackendError as e:
             raise ServerClientError(e.args[0])
 
     def _check_vpc_config(
-        self, config: AzureConfigInfoWithCredsPartial, credential: AzureCredential
+        self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
     ):
         if config.subscription_id is None:
             return None
@@ -366,7 +365,7 @@ class AzureConfigurator(Configurator):
                 futures = []
                 for location in locations:
                     future = executor.submit(
-                        get_resource_group_network_subnet_or_error,
+                        compute.get_resource_group_network_subnet_or_error,
                         network_client=network_client,
                         resource_group=None,
                         vpc_ids=config.vpc_ids,
