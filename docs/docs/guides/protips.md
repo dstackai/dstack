@@ -104,7 +104,7 @@ inside `dstack` runs. To do that, additional configuration steps are required:
 
 1. Set the `privileged` property to `true`.
 2. Set the `image` property to `dstackai/dind` (or another DinD image).
-3. For tasks and services, add `start-dockerd` as the first command. For dev environments, add `start-dockerd` as the first comand
+3. For tasks and services, add `start-dockerd` as the first command. For dev environments, add `start-dockerd` as the first command
    in the `init` property.
 Note, `start-dockerd` is a part of `dstackai/dind` image, if you use a different DinD image,
 replace it with a corresponding command to start Docker daemon.

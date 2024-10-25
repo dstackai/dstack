@@ -5,7 +5,7 @@
 When you encounter a problem and need help, it's essential to report it as
 a [GitHub issue :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/issues/new/choose){:target="_blank"}.
 
-> When brining up issues on Discord, please include the steps to reproduce.
+> When bringing up issues on Discord, please include the steps to reproduce.
 
 ### Steps to reproduce
 
