@@ -54,7 +54,6 @@ from dstack._internal.server.services.backends.configurators.base import (
     Configurator,
     raise_invalid_credentials_error,
 )
-from dstack._internal.utils.common import get_or_error
 
 LOCATIONS = [
     ("(US) Central US", "centralus"),
@@ -338,7 +337,8 @@ class AzureConfigurator(Configurator):
     def _check_vpc_config(
         self, config: AzureConfigInfoWithCredsPartial, credential: AzureCredential
     ):
-        subscription_id = get_or_error(config.subscription_id)
+        if config.subscription_id is None:
+            return None
         allocate_public_ip = config.public_ips if config.public_ips is not None else True
         if config.public_ips is False and config.vpc_ids is None:
             raise ServerClientError(msg="`vpc_ids` must be specified if `public_ips: false`.")
@@ -360,7 +360,7 @@ class AzureConfigurator(Configurator):
                 )
             network_client = network_mgmt.NetworkManagementClient(
                 credential=credential,
-                subscription_id=subscription_id,
+                subscription_id=config.subscription_id,
             )
             with ThreadPoolExecutor(max_workers=8) as executor:
                 futures = []

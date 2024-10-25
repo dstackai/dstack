@@ -309,7 +309,9 @@ class TestGetBackendConfigValuesAzure:
             "dstack._internal.core.backends.azure.auth.authenticate"
         ) as authenticate_mock, patch(
             "azure.mgmt.subscription.SubscriptionClient"
-        ) as SubscriptionClientMock:
+        ) as SubscriptionClientMock, patch(
+            "dstack._internal.core.backends.azure.compute.get_resource_group_network_subnet_or_error"
+        ):
             default_creds_available_mock.return_value = False
             authenticate_mock.return_value = None, "test_tenant"
             client_mock = SubscriptionClientMock.return_value
