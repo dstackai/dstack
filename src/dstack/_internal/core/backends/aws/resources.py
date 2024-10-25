@@ -5,7 +5,7 @@ import botocore.client
 import botocore.exceptions
 
 import dstack.version as version
-from dstack._internal.core.errors import ComputeError, ComputeResourceNotFoundError
+from dstack._internal.core.errors import BackendError, ComputeError, ComputeResourceNotFoundError
 
 
 def get_image_id(ec2_client: botocore.client.BaseClient, cuda: bool) -> str:
@@ -408,7 +408,7 @@ def make_tags(tags: Dict[str, str]) -> List[Dict[str, str]]:
 def validate_tags(tags: Dict[str, str]):
     for k, v in tags.items():
         if not _is_valid_tag(k, v):
-            raise ComputeError(
+            raise BackendError(
                 "Invalid resource tags. "
                 "See tags restrictions: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html#tag-restrictions"
             )

@@ -5,7 +5,7 @@ from dstack._internal.core.backends.azure.resources import (
     _is_valid_tag_value,
     validate_tags,
 )
-from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.errors import BackendError
 
 
 class TestValidateTags:
@@ -15,7 +15,7 @@ class TestValidateTags:
 
     def test_invalid_tags(self):
         tags = {"Invalid<key": "SomeValue"}
-        with pytest.raises(ComputeError, match="Invalid Azure resource tags"):
+        with pytest.raises(BackendError, match="Invalid Azure resource tags"):
             validate_tags(tags)
 
 

@@ -11,7 +11,7 @@ from google.api_core.operation import Operation
 from google.cloud import tpu_v2
 
 import dstack.version as version
-from dstack._internal.core.errors import ComputeError
+from dstack._internal.core.errors import BackendError, ComputeError
 from dstack._internal.core.models.instances import Gpu
 from dstack._internal.utils.common import remove_prefix
 from dstack._internal.utils.logging import get_logger
@@ -314,7 +314,7 @@ def get_accelerators(
 def validate_labels(labels: Dict[str, str]):
     for k, v in labels.items():
         if not _is_valid_label(k, v):
-            raise ComputeError(
+            raise BackendError(
                 "Invalid resource labels. "
                 "See labels restrictions: https://cloud.google.com/compute/docs/labeling-resources#requirements"
             )

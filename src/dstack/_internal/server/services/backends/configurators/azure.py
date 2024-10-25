@@ -1,5 +1,5 @@
 import json
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
@@ -18,10 +18,14 @@ from azure.mgmt.network.models import (
 )
 from azure.mgmt.resource.resources.models import ResourceGroup
 
-from dstack._internal.core.backends.azure import AzureBackend, auth, resources
+from dstack._internal.core.backends.azure import AzureBackend, auth, compute, resources
 from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.config import AzureConfig
-from dstack._internal.core.errors import BackendAuthError, ComputeError, ServerClientError
+from dstack._internal.core.errors import (
+    BackendAuthError,
+    BackendError,
+    ServerClientError,
+)
 from dstack._internal.core.models.backends.azure import (
     AnyAzureConfigInfo,
     AzureClientCreds,
@@ -139,7 +143,7 @@ class AzureConfigurator(Configurator):
         config_values.locations = self._get_locations_element(
             selected=config.locations or DEFAULT_LOCATIONS
         )
-        self._check_config(config)
+        self._check_config(config=config, credential=credential)
         return config_values
 
     def create_backend(
@@ -161,6 +165,7 @@ class AzureConfigurator(Configurator):
             subscription_id=config.subscription_id,
             resource_group=resource_group,
             locations=config.locations,
+            create_default_network=config.vpc_ids is None,
         )
         return BackendModel(
             project_id=project.id,
@@ -285,17 +290,19 @@ class AzureConfigurator(Configurator):
         subscription_id: str,
         resource_group: str,
         locations: List[str],
+        create_default_network: bool,
     ):
         def func(location: str):
             network_manager = NetworkManager(
                 credential=credential, subscription_id=subscription_id
             )
-            network_manager.create_virtual_network(
-                resource_group=resource_group,
-                location=location,
-                name=azure_utils.get_default_network_name(resource_group, location),
-                subnet_name=azure_utils.get_default_subnet_name(resource_group, location),
-            )
+            if create_default_network:
+                network_manager.create_virtual_network(
+                    resource_group=resource_group,
+                    location=location,
+                    name=azure_utils.get_default_network_name(resource_group, location),
+                    subnet_name=azure_utils.get_default_subnet_name(resource_group, location),
+                )
             network_manager.create_network_security_group(
                 resource_group=resource_group,
                 location=location,
@@ -311,8 +318,11 @@ class AzureConfigurator(Configurator):
             for location in locations:
                 executor.submit(func, location)
 
-    def _check_config(self, config: AzureConfigInfoWithCredsPartial):
+    def _check_config(
+        self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
+    ):
         self._check_tags_config(config)
+        self._check_vpc_config(config=config, credential=credential)
 
     def _check_tags_config(self, config: AzureConfigInfoWithCredsPartial):
         if not config.tags:
@@ -323,8 +333,58 @@ class AzureConfigurator(Configurator):
             )
         try:
             resources.validate_tags(config.tags)
-        except ComputeError as e:
+        except BackendError as e:
             raise ServerClientError(e.args[0])
+
+    def _check_vpc_config(
+        self, config: AzureConfigInfoWithCredsPartial, credential: auth.AzureCredential
+    ):
+        if config.subscription_id is None:
+            return None
+        allocate_public_ip = config.public_ips if config.public_ips is not None else True
+        if config.public_ips is False and config.vpc_ids is None:
+            raise ServerClientError(msg="`vpc_ids` must be specified if `public_ips: false`.")
+        locations = config.locations
+        if locations is None:
+            locations = DEFAULT_LOCATIONS
+        if config.vpc_ids is not None:
+            vpc_ids_locations = list(config.vpc_ids.keys())
+            not_configured_locations = [loc for loc in locations if loc not in vpc_ids_locations]
+            if len(not_configured_locations) > 0:
+                if config.locations is None:
+                    raise ServerClientError(
+                        f"`vpc_ids` not configured for regions {not_configured_locations}. "
+                        "Configure `vpc_ids` for all regions or specify `regions`."
+                    )
+                raise ServerClientError(
+                    f"`vpc_ids` not configured for regions {not_configured_locations}. "
+                    "Configure `vpc_ids` for all regions specified in `regions`."
+                )
+            network_client = network_mgmt.NetworkManagementClient(
+                credential=credential,
+                subscription_id=config.subscription_id,
+            )
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                futures = []
+                for location in locations:
+                    future = executor.submit(
+                        compute.get_resource_group_network_subnet_or_error,
+                        network_client=network_client,
+                        resource_group=None,
+                        vpc_ids=config.vpc_ids,
+                        location=location,
+                        allocate_public_ip=allocate_public_ip,
+                    )
+                    futures.append(future)
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except BackendError as e:
+                        raise ServerClientError(e.args[0])
+
+
+def _get_resource_group_name(project_name: str) -> str:
+    return f"dstack-{project_name}"
 
 
 class ResourceManager:
@@ -345,10 +405,6 @@ class ResourceManager:
             ),
         )
         return resource_group.name
-
-
-def _get_resource_group_name(project_name: str) -> str:
-    return f"dstack-{project_name}"
 
 
 class NetworkManager:
