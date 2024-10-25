@@ -12,6 +12,8 @@ class AzureConfigInfo(CoreModel):
     tenant_id: str
     subscription_id: str
     locations: Optional[List[str]] = None
+    vpc_ids: Optional[Dict[str, str]] = None
+    public_ips: Optional[bool] = None
     tags: Optional[Dict[str, str]] = None
 
 
@@ -47,6 +49,8 @@ class AzureConfigInfoWithCredsPartial(CoreModel):
     tenant_id: Optional[str]
     subscription_id: Optional[str]
     locations: Optional[List[str]]
+    vpc_ids: Optional[Dict[str, str]]
+    public_ips: Optional[bool]
     tags: Optional[Dict[str, str]]
 
 

@@ -1,7 +1,78 @@
 import re
-from typing import Dict
+from typing import Dict, List
+
+from azure.mgmt import network as network_mgmt
+from azure.mgmt.network.models import Subnet
 
 from dstack._internal.core.errors import ComputeError
+
+
+def get_network_subnets(
+    network_client: network_mgmt.NetworkManagementClient,
+    resource_group: str,
+    network_name: str,
+    private: bool,
+) -> List[str]:
+    res = []
+    subnets = network_client.subnets.list(
+        resource_group_name=resource_group, virtual_network_name=network_name
+    )
+    for subnet in subnets:
+        if private:
+            if _is_eligible_private_subnet(
+                network_client=network_client,
+                resource_group=resource_group,
+                network_name=network_name,
+                subnet=subnet,
+            ):
+                res.append(subnet.name)
+        else:
+            if _is_eligible_public_subnet(
+                network_client=network_client,
+                resource_group=resource_group,
+                network_name=network_name,
+                subnet=subnet,
+            ):
+                res.append(subnet.name)
+    return res
+
+
+def _is_eligible_public_subnet(
+    network_client: network_mgmt.NetworkManagementClient,
+    resource_group: str,
+    network_name: str,
+    subnet: Subnet,
+) -> bool:
+    # Apparently, in Azure practically any subnet can be used
+    # to provision instances with public IPs
+    return True
+
+
+def _is_eligible_private_subnet(
+    network_client: network_mgmt.NetworkManagementClient,
+    resource_group: str,
+    network_name: str,
+    subnet: Subnet,
+) -> bool:
+    # Azure provides default outbound connectivity but it's deprecated
+    # and does not work with Flexible orchestration used in dstack,
+    # so we require an explicit outbound method such as NAT Gateway.
+
+    if subnet.nat_gateway is not None:
+        return True
+
+    vnet_peerings = list(
+        network_client.virtual_network_peerings.list(
+            resource_group_name=resource_group,
+            virtual_network_name=network_name,
+        )
+    )
+    if len(vnet_peerings) > 0:
+        # We currently assume that any peering can provide outbound connectivity.
+        # There can be a more elaborate check of the peering configuration.
+        return True
+
+    return False
 
 
 def validate_tags(tags: Dict[str, str]):

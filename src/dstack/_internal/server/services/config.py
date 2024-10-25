@@ -70,7 +70,10 @@ class AWSConfig(CoreModel):
     vpc_ids: Annotated[
         Optional[Dict[str, str]],
         Field(
-            description="The mapping from AWS regions to VPC IDs. If `default_vpcs: true`, omitted regions will use default VPCs"
+            description=(
+                "The mapping from AWS regions to VPC IDs."
+                " If `default_vpcs: true`, omitted regions will use default VPCs"
+            )
         ),
     ] = None
     default_vpcs: Annotated[
@@ -86,7 +89,12 @@ class AWSConfig(CoreModel):
     public_ips: Annotated[
         Optional[bool],
         Field(
-            description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
+            description=(
+                "A flag to enable/disable public IP assigning on instances."
+                " `public_ips: false` requires at least one private subnet with outbound internet connection"
+                " provided by a NAT Gateway or a Transit Gateway."
+                " Defaults to `true`"
+            )
         ),
     ] = None
     tags: Annotated[
@@ -101,7 +109,28 @@ class AzureConfig(CoreModel):
     tenant_id: Annotated[str, Field(description="The tenant ID")]
     subscription_id: Annotated[str, Field(description="The subscription ID")]
     regions: Annotated[
-        Optional[List[str]], Field(description="The list of Azure regions (locations)")
+        Optional[List[str]],
+        Field(description="The list of Azure regions (locations)"),
+    ] = None
+    vpc_ids: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description=(
+                "The mapping from configured Azure locations to network IDs."
+                " A network ID must have a format `networkResourceGroup/networkName`"
+                " If not specified, `dstack` will create a new network for every configured region"
+            )
+        ),
+    ] = None
+    public_ips: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "A flag to enable/disable public IP assigning on instances."
+                " `public_ips: false` requires `vpc_ids` that specifies custom networks with NAT gateway."
+                " Defaults to `true`"
+            )
+        ),
     ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
@@ -132,9 +161,9 @@ class GCPServiceAccountCreds(CoreModel):
         Optional[str],
         Field(
             description=(
-                "The contents of the service account file. "
-                "When configuring via `server/config.yml`, it's automatically filled from `filename`. "
-                "When configuring via UI, it has to be specified explicitly"
+                "The contents of the service account file."
+                " When configuring via `server/config.yml`, it's automatically filled from `filename`."
+                " When configuring via UI, it has to be specified explicitly"
             )
         ),
     ] = None
@@ -216,9 +245,9 @@ class KubeconfigConfig(CoreModel):
         Optional[str],
         Field(
             description=(
-                "The contents of the kubeconfig file. "
-                "When configuring via `server/config.yml`, it's automatically filled from `filename`. "
-                "When configuring via UI, it has to be specified explicitly"
+                "The contents of the kubeconfig file."
+                " When configuring via `server/config.yml`, it's automatically filled from `filename`."
+                " When configuring via UI, it has to be specified explicitly"
             )
         ),
     ] = None
@@ -312,8 +341,8 @@ class OCIConfig(CoreModel):
         Optional[str],
         Field(
             description=(
-                "Compartment where `dstack` will create all resources. "
-                "Omit to instruct `dstack` to create a new compartment"
+                "Compartment where `dstack` will create all resources."
+                " Omit to instruct `dstack` to create a new compartment"
             )
         ),
     ] = None

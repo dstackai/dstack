@@ -4,7 +4,7 @@ import re
 from typing import Dict, List, Optional, Tuple
 
 from azure.core.credentials import TokenCredential
-from azure.core.exceptions import ResourceExistsError
+from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.mgmt import compute as compute_mgmt
 from azure.mgmt import network as network_mgmt
 from azure.mgmt.compute.models import (
@@ -33,6 +33,7 @@ from azure.mgmt.compute.models import (
 
 from dstack import version
 from dstack._internal import settings
+from dstack._internal.core.backends.azure import resources as azure_resources
 from dstack._internal.core.backends.azure import utils as azure_utils
 from dstack._internal.core.backends.azure.config import AzureConfig
 from dstack._internal.core.backends.base.compute import (
@@ -110,6 +111,19 @@ class AzureCompute(Compute):
         ssh_pub_keys = instance_config.get_public_keys()
         disk_size = round(instance_offer.instance.resources.disk.size_mib / 1024)
 
+        allocate_public_ip = self.config.allocate_public_ips
+        network_resource_group, network, subnet = get_resource_group_network_subnet_or_error(
+            network_client=self._network_client,
+            resource_group=self.config.resource_group,
+            vpc_ids=self.config.vpc_ids,
+            location=location,
+            allocate_public_ip=allocate_public_ip,
+        )
+        network_security_group = azure_utils.get_default_network_security_group_name(
+            resource_group=self.config.resource_group,
+            location=location,
+        )
+
         tags = {
             "owner": "dstack",
             "dstack_project": instance_config.project_name,
@@ -122,18 +136,9 @@ class AzureCompute(Compute):
             subscription_id=self.config.subscription_id,
             location=location,
             resource_group=self.config.resource_group,
-            network_security_group=azure_utils.get_default_network_security_group_name(
-                resource_group=self.config.resource_group,
-                location=location,
-            ),
-            network=azure_utils.get_default_network_name(
-                resource_group=self.config.resource_group,
-                location=location,
-            ),
-            subnet=azure_utils.get_default_subnet_name(
-                resource_group=self.config.resource_group,
-                location=location,
-            ),
+            network_security_group=network_security_group,
+            network=network,
+            subnet=subnet,
             managed_identity=None,
             image_reference=_get_image_ref(
                 compute_client=self._compute_client,
@@ -149,6 +154,8 @@ class AzureCompute(Compute):
             spot=instance_offer.instance.resources.spot,
             disk_size=disk_size,
             computer_name="runnervm",
+            allocate_public_ip=allocate_public_ip,
+            network_resource_group=network_resource_group,
             tags=tags,
         )
         logger.info("Request succeeded")
@@ -157,11 +164,14 @@ class AzureCompute(Compute):
             resource_group=self.config.resource_group,
             vm=vm,
         )
+        hostname = public_ip
+        if allocate_public_ip:
+            hostname = private_ip
         return JobProvisioningData(
             backend=instance_offer.backend,
             instance_type=instance_offer.instance,
             instance_id=vm.name,
-            hostname=public_ip,
+            hostname=hostname,
             internal_ip=private_ip,
             region=location,
             price=instance_offer.price,
@@ -211,6 +221,18 @@ class AzureCompute(Compute):
             configuration.region,
         )
 
+        network_resource_group, network, subnet = get_resource_group_network_subnet_or_error(
+            network_client=self._network_client,
+            resource_group=self.config.resource_group,
+            vpc_ids=self.config.vpc_ids,
+            location=configuration.region,
+            allocate_public_ip=self.config.allocate_public_ips,
+        )
+        network_security_group = azure_utils.get_default_network_security_group_name(
+            resource_group=self.config.resource_group,
+            location=configuration.region,
+        )
+
         tags = {
             "Name": configuration.instance_name,
             "owner": "dstack",
@@ -225,18 +247,9 @@ class AzureCompute(Compute):
             subscription_id=self.config.subscription_id,
             location=configuration.region,
             resource_group=self.config.resource_group,
-            network_security_group=azure_utils.get_gateway_network_security_group_name(
-                resource_group=self.config.resource_group,
-                location=configuration.region,
-            ),
-            network=azure_utils.get_default_network_name(
-                resource_group=self.config.resource_group,
-                location=configuration.region,
-            ),
-            subnet=azure_utils.get_default_subnet_name(
-                resource_group=self.config.resource_group,
-                location=configuration.region,
-            ),
+            network_security_group=network_security_group,
+            network=network,
+            subnet=subnet,
             managed_identity=None,
             image_reference=_get_gateway_image_ref(),
             vm_size="Standard_B1s",
@@ -246,6 +259,7 @@ class AzureCompute(Compute):
             spot=False,
             disk_size=30,
             computer_name="gatewayvm",
+            network_resource_group=network_resource_group,
             tags=tags,
         )
         logger.info("Request succeeded")
@@ -271,6 +285,57 @@ class AzureCompute(Compute):
             region=configuration.region,
             backend_data=backend_data,
         )
+
+
+def get_resource_group_network_subnet_or_error(
+    network_client: network_mgmt.NetworkManagementClient,
+    resource_group: Optional[str],
+    vpc_ids: Optional[Dict[str, str]],
+    location: str,
+    allocate_public_ip: bool,
+) -> Tuple[str, str, str]:
+    if vpc_ids is not None:
+        vpc_id = vpc_ids.get(location)
+        if vpc_id is None:
+            raise ComputeError(f"Network not configured for location {location}")
+        try:
+            resource_group, network_name = _parse_config_vpc_id(vpc_id)
+        except Exception:
+            raise ComputeError(
+                "Network specified in incorrect format."
+                " Supported format for `vps_ids` values: 'networkResourceGroupName/networkName'"
+            )
+    elif resource_group is not None:
+        network_name = azure_utils.get_default_network_name(resource_group, location)
+    else:
+        raise ComputeError("`resource_group` or `vpc_ids` must be specified")
+
+    try:
+        subnets = azure_resources.get_network_subnets(
+            network_client=network_client,
+            resource_group=resource_group,
+            network_name=network_name,
+            private=not allocate_public_ip,
+        )
+    except ResourceNotFoundError:
+        raise ComputeError(
+            f"Network {network_name} not found in location {location} in resource group {resource_group}"
+        )
+
+    if len(subnets) == 0:
+        if not allocate_public_ip:
+            raise ComputeError(
+                f"Failed to find private subnets with outbound internet connectivity in network {network_name}"
+            )
+        raise ComputeError(f"Failed to find subnets in network {network_name}")
+
+    subnet_name = subnets[0]
+    return resource_group, network_name, subnet_name
+
+
+def _parse_config_vpc_id(vpc_id: str) -> Tuple[str, str]:
+    resource_group, network_name = vpc_id.split("/")
+    return resource_group, network_name
 
 
 class VMImageVariant(enum.Enum):
@@ -396,10 +461,19 @@ def _launch_instance(
     spot: bool,
     disk_size: int,
     computer_name: str,
+    allocate_public_ip: bool = True,
+    network_resource_group: Optional[str] = None,
     tags: Optional[Dict[str, str]] = None,
 ) -> VirtualMachine:
     if tags is None:
         tags = {}
+    if network_resource_group is None:
+        network_resource_group = resource_group
+    public_ip_address_configuration = None
+    if allocate_public_ip:
+        public_ip_address_configuration = VirtualMachinePublicIPAddressConfiguration(
+            name="public_ip_config",
+        )
     try:
         poller = compute_client.virtual_machines.begin_create_or_update(
             resource_group,
@@ -451,14 +525,12 @@ def _launch_instance(
                                     subnet=SubResource(
                                         id=azure_utils.get_subnet_id(
                                             subscription_id,
-                                            resource_group,
+                                            network_resource_group,
                                             network,
                                             subnet,
                                         )
                                     ),
-                                    public_ip_address_configuration=VirtualMachinePublicIPAddressConfiguration(
-                                        name="public_ip_config",
-                                    ),
+                                    public_ip_address_configuration=public_ip_address_configuration,
                                 )
                             ],
                         )
@@ -505,18 +577,21 @@ def _get_vm_public_private_ips(
     network_client: network_mgmt.NetworkManagementClient,
     resource_group: str,
     vm: VirtualMachine,
-) -> Tuple[str, str]:
+) -> Tuple[Optional[str], str]:
     nic_id = vm.network_profile.network_interfaces[0].id
     nic_name = azure_utils.get_resource_name_from_resource_id(nic_id)
     nic = network_client.network_interfaces.get(
         resource_group_name=resource_group,
         network_interface_name=nic_name,
     )
+
+    private_ip = nic.ip_configurations[0].private_ip_address
+    if nic.ip_configurations[0].public_ip_address is None:
+        return None, private_ip
+
     public_ip_id = nic.ip_configurations[0].public_ip_address.id
     public_ip_name = azure_utils.get_resource_name_from_resource_id(public_ip_id)
     public_ip = network_client.public_ip_addresses.get(resource_group, public_ip_name)
-
-    private_ip = nic.ip_configurations[0].private_ip_address
     return public_ip.ip_address, private_ip
 
 
