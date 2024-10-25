@@ -5,6 +5,7 @@ import fastapi
 import httpx
 from starlette.requests import ClientDisconnect
 
+from dstack._internal.proxy.deps import ProxyAuthContext
 from dstack._internal.proxy.repos.base import BaseProxyRepo, Replica, Service
 from dstack._internal.proxy.services.service_connection import service_replica_connection_pool
 from dstack._internal.utils.logging import get_logger
@@ -17,6 +18,7 @@ async def proxy(
     run_name: str,
     path: str,
     request: fastapi.Request,
+    auth: ProxyAuthContext,
     repo: BaseProxyRepo,
 ) -> fastapi.responses.Response:
     if "Upgrade" in request.headers:
@@ -31,11 +33,7 @@ async def proxy(
             f"Service {project_name}/{run_name} not found",
         )
     if service.auth:
-        # TODO(#1595): support auth
-        raise fastapi.HTTPException(
-            fastapi.status.HTTP_400_BAD_REQUEST,
-            f"Service {project_name}/{run_name} requires auth, which is not yet supported",
-        )
+        await auth.enforce()
 
     replica = random.choice(service.replicas)
     client = await get_replica_client(project_name, service, replica, repo)
