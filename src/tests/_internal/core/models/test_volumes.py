@@ -1,7 +1,11 @@
 import pytest
 from pydantic import ValidationError, parse_obj_as
 
-from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint
+from dstack._internal.core.models.volumes import (
+    InstanceMountPoint,
+    VolumeMountPoint,
+    parse_mount_point,
+)
 
 
 class TestVolumeMountPoint:
@@ -15,13 +19,7 @@ class TestVolumeMountPoint:
             VolumeMountPoint, {"name": "my-vol", "path": "/path/./to///dir/"}
         ) == VolumeMountPoint(name="my-vol", path="/path/to/dir")
 
-    @pytest.mark.parametrize(
-        "value",
-        [
-            "vol",
-            "vol:/path/to:ro",
-        ],
-    )
+    @pytest.mark.parametrize("value", ["my-vol", "my-vol:/run:ro"])
     def test_parse_error_invalid_format(self, value: str):
         with pytest.raises(ValueError, match="invalid mount point format"):
             VolumeMountPoint.parse(value)
@@ -50,13 +48,7 @@ class TestInstanceBindMountPoint:
             InstanceMountPoint, {"instance_path": "/host/.//path/", "path": "/run//./path"}
         ) == InstanceMountPoint(instance_path="/host/path", path="/run/path")
 
-    @pytest.mark.parametrize(
-        "value",
-        [
-            "/path",
-            "/host/path:/run/path:ro",
-        ],
-    )
+    @pytest.mark.parametrize("value", ["/path", "/host/path:/run/path:ro"])
     def test_parse_error_invalid_format(self, value: str):
         with pytest.raises(ValueError, match="invalid mount point format"):
             InstanceMountPoint.parse(value)
@@ -81,3 +73,27 @@ class TestInstanceBindMountPoint:
         data[field] = "/path/../to"
         with pytest.raises(ValidationError, match=r"\.\. are not allowed"):
             parse_obj_as(InstanceMountPoint, data)
+
+
+class TestParseMountPoint:
+    def test_parse_volume_mount(self):
+        assert parse_mount_point("my-vol:/path//to") == VolumeMountPoint(
+            name="my-vol", path="/path/to"
+        )
+
+    def test_parse_instance_mount(self):
+        assert parse_mount_point("/host:/run/") == InstanceMountPoint(
+            instance_path="/host", path="/run"
+        )
+
+    @pytest.mark.parametrize(
+        "value", ["my-vol", "my-vol:/run:ro", "/path", "/host/path:/run/path:ro"]
+    )
+    def test_parse_error_invalid_format(self, value: str):
+        with pytest.raises(ValueError, match="invalid mount point format"):
+            parse_mount_point(value)
+
+    @pytest.mark.parametrize("value", ["path/to:/run", "./path:/run", "path/:/run"])
+    def test_validation_error_rel_local_path(self, value: str):
+        with pytest.raises(ValidationError, match="path must be absolute"):
+            parse_mount_point(value)

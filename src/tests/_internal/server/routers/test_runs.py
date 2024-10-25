@@ -1,7 +1,7 @@
 import copy
 import json
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 from unittest.mock import Mock, patch
 from uuid import UUID
 
@@ -31,7 +31,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
-from dstack._internal.core.models.volumes import InstanceMountPoint, VolumeMountPoint
+from dstack._internal.core.models.volumes import InstanceMountPoint, MountPoint
 from dstack._internal.server.background.tasks.process_instances import process_instances
 from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
@@ -59,7 +59,7 @@ def get_dev_env_run_plan_dict(
     total_offers: int = 0,
     max_price: Optional[float] = None,
     privileged: bool = False,
-    volumes: List[Union[VolumeMountPoint, InstanceMountPoint]] = [],
+    volumes: List[MountPoint] = [],
 ) -> Dict:
     return {
         "project_name": project_name,

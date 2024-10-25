@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Literal, Optional, Tuple
+from typing import Literal, Optional, Tuple, Union
 
 from pydantic import Field, validator
 from typing_extensions import Annotated, Self
@@ -127,3 +127,13 @@ class InstanceMountPoint(CoreModel):
     def parse(cls, v: str) -> Self:
         instance_path, path = _split_mount_point(v)
         return cls(instance_path=instance_path, path=path)
+
+
+MountPoint = Union[VolumeMountPoint, InstanceMountPoint]
+
+
+def parse_mount_point(v: str) -> MountPoint:
+    src, dest = _split_mount_point(v)
+    if "/" in src:
+        return InstanceMountPoint(instance_path=src, path=dest)
+    return VolumeMountPoint(name=src, path=dest)
