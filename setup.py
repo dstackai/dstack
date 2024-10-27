@@ -47,7 +47,7 @@ BASE_DEPS = [
     "uvicorn",
     "pydantic>=1.10.10,<2.0.0",
     # https://github.com/zmievsa/pydantic-duality/issues/21
-    "pydantic-duality==1.2.2",
+    "pydantic-duality<=1.2.2",
     "sqlalchemy[asyncio]>=2.0.0",
     "sqlalchemy_utils>=0.40.0",
     "alembic>=1.10.2",
