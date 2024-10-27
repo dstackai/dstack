@@ -56,7 +56,7 @@ BASE_DEPS = [
     "aiohttp",
     "websocket-client",
     "watchfiles",
-    "python-multipart",
+    "python-multipart>=0.0.16",
     "filelock",
     "docker>=6.0.0",
     "python-dxf==12.1.0",
