@@ -19,4 +19,3 @@ build/
 .DS_Store
 .fleet
 .env
-.venv
