@@ -62,7 +62,7 @@ The server is running at http://127.0.0.1:3000/
 </div>
 
 For more details on server configuration options, see the
-[server deployment guide](https://dstack.ai/docs/guides/server-deployment.md).
+[server deployment guide](https://dstack.ai/docs/guides/server-deployment).
 
 ### Set up the CLI
 
