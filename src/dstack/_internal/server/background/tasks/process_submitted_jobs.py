@@ -144,7 +144,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         volumes = [volume_model_to_volume(v) for v in volume_models]
         check_can_attach_run_volumes(run_spec=run_spec, volumes=volumes)
     except ServerClientError as e:
-        logger.error("%s: ", fmt(job_model))
+        logger.warning("%s: failed to prepare run volumes: %s", fmt(job_model), repr(e))
         job_model.status = JobStatus.TERMINATING
         # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
         job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
