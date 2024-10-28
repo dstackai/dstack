@@ -18,7 +18,7 @@ This tutorial uses [`meta/llama3-8b-instruct`](https://catalog.ngc.nvidia.com/or
 
 ### Serving LLM with NIM
 
-Below shows an example of `service.dstack.yml` to serve an LLM within LLM on dstack. There are two fields to note:
+Below shows an example of [`service.dstack.yml`](service.dstack.yml) to serve an LLM within LLM on dstack. There are two fields to note:
 
 - `image`: specify the docker image tag that you found from the previous step. NIM docker image has its own `ENTRYPOINT`, hence you don't need to specify `commands` field. With only `image` field, the serving will get started and run.
 
@@ -40,11 +40,11 @@ port: 8000
 spot_policy: auto
 
 resources:
-  gpu: 48GB
+  gpu: 24GB
 
 backends: ["aws", "azure", "cudo", "datacrunch", "gcp", "lambda", "oci", "tensordock"]
 ```
-2
+
 ??? info "Supported Backends"
     Currently, running NIM is supported on every backends except RunPod and Vast.ai.
 
@@ -110,3 +110,14 @@ response = client.chat.completions.create(
 completion = response.choices[0].message.content
 print(completion)
 ```
+
+## Source code
+
+The source-code of this example can be found in 
+[`examples/deployment/nim` :material-arrow-top-right-thin:{ .external }](https://github.com/dstackai/dstack/blob/master/examples/deployment/nim).
+
+## What's next?
+
+1. Check [dev environments](https://dstack.ai/docs/dev-environments), [tasks](https://dstack.ai/docs/tasks), 
+   [services](https://dstack.ai/docs/services), and [protips](https://dstack.ai/docs/protips).
+2. Browse [Available models in NGC Catalog :material-arrow-top-right-thin:{ .external }](https://catalog.ngc.nvidia.com/containers?filters=nvidia_nim%7CNVIDIA+NIM%7Cnimmcro_nvidia_nim&orderBy=scoreDESC&query=&page=&pageSize=).
