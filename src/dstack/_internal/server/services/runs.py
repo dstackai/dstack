@@ -423,8 +423,9 @@ async def stop_runs(
     job_models = res.scalars().all()
     job_ids = sorted([j.id for j in job_models])
     await session.commit()
-    async with get_locker().lock_ctx(RunModel.__tablename__, run_ids), get_locker().lock_ctx(
-        JobModel.__tablename__, job_ids
+    async with (
+        get_locker().lock_ctx(RunModel.__tablename__, run_ids),
+        get_locker().lock_ctx(JobModel.__tablename__, job_ids),
     ):
         for run_model in run_models:
             await stop_run(session=session, run_model=run_model, abort=abort)

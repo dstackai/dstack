@@ -83,13 +83,13 @@ class TestProcessRunningJobs:
             submitted_at=datetime(2023, 1, 2, 5, 12, 30, 5, tzinfo=timezone.utc),
             job_provisioning_data=job_provisioning_data,
         )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
-            "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock, patch(
-            "dstack._internal.utils.common.get_current_datetime"
-        ) as datetime_mock:
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+            patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
+        ):
             datetime_mock.return_value = datetime(2023, 1, 2, 5, 12, 30, 10, tzinfo=timezone.utc)
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.healthcheck = Mock()
@@ -123,11 +123,12 @@ class TestProcessRunningJobs:
             status=JobStatus.PROVISIONING,
             job_provisioning_data=job_provisioning_data,
         )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
-            "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock:
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+        ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.healthcheck.return_value = HealthcheckResponse(
                 service="dstack-runner", version="0.0.1.dev2"
@@ -164,11 +165,13 @@ class TestProcessRunningJobs:
             status=JobStatus.RUNNING,
             job_provisioning_data=job_provisioning_data,
         )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
-            "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock, patch.object(settings, "SERVER_DIR_PATH", tmp_path):
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+            patch.object(settings, "SERVER_DIR_PATH", tmp_path),
+        ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
                 job_states=[JobStateEvent(timestamp=1, state=JobStatus.RUNNING)],
@@ -182,11 +185,12 @@ class TestProcessRunningJobs:
         assert job is not None
         assert job.status == JobStatus.RUNNING
         assert job.runner_timestamp == 1
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
-            "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock:
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+        ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.pull.return_value = PullResponse(
                 job_states=[JobStateEvent(timestamp=1, state=JobStatus.DONE)],
@@ -251,11 +255,10 @@ class TestProcessRunningJobs:
                 status=JobStatus.PROVISIONING,
                 job_provisioning_data=job_provisioning_data,
             )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
-            "dstack._internal.server.services.runner.client.ShimClient"
-        ) as ShimClientMock:
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch("dstack._internal.server.services.runner.client.ShimClient") as ShimClientMock,
+        ):
             ShimClientMock.return_value.healthcheck.return_value = HealthcheckResponse(
                 service="dstack-shim", version="0.0.1.dev2"
             )
@@ -303,13 +306,13 @@ class TestProcessRunningJobs:
             status=JobStatus.PULLING,
             job_provisioning_data=job_provisioning_data,
         )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
-            "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock, patch(
-            "dstack._internal.server.services.runner.client.ShimClient"
-        ) as ShimClientMock:
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+            patch("dstack._internal.server.services.runner.client.ShimClient") as ShimClientMock,
+        ):
             RunnerClientMock.return_value.healthcheck.return_value = HealthcheckResponse(
                 service="dstack-runner", version="0.0.1.dev2"
             )
@@ -355,9 +358,10 @@ class TestProcessRunningJobs:
             job_provisioning_data=job_provisioning_data,
             instance=instance,
         )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch("dstack._internal.server.services.runner.ssh.time.sleep"):
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch("dstack._internal.server.services.runner.ssh.time.sleep"),
+        ):
             SSHTunnelMock.side_effect = SSHError
             await process_running_jobs()
             assert SSHTunnelMock.call_count == 3

@@ -52,11 +52,12 @@ class TestCollectMetrics:
             status=JobStatus.RUNNING,
             job_provisioning_data=get_job_provisioning_data(),
         )
-        with patch(
-            "dstack._internal.server.services.runner.ssh.SSHTunnel"
-        ) as SSHTunnelMock, patch(
-            "dstack._internal.server.services.runner.client.RunnerClient"
-        ) as RunnerClientMock:
+        with (
+            patch("dstack._internal.server.services.runner.ssh.SSHTunnel") as SSHTunnelMock,
+            patch(
+                "dstack._internal.server.services.runner.client.RunnerClient"
+            ) as RunnerClientMock,
+        ):
             runner_client_mock = RunnerClientMock.return_value
             runner_client_mock.get_metrics.return_value = MetricsResponse(
                 timestamp_micro=1,

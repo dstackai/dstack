@@ -104,11 +104,12 @@ class TestGetBackendConfigValuesAWS:
                 "secret_key": "1234",
             },
         }
-        with patch(
-            "dstack._internal.core.backends.aws.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:
+        with (
+            patch(
+                "dstack._internal.core.backends.aws.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.aws.auth.authenticate") as authenticate_mock,
+        ):
             authenticate_mock.side_effect = BackendAuthError()
             response = await client.post(
                 "/api/backends/config_values",
@@ -147,12 +148,12 @@ class TestGetBackendConfigValuesAWS:
                 "secret_key": "1234",
             },
         }
-        with patch(
-            "dstack._internal.core.backends.aws.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock, patch(
-            "dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"
+        with (
+            patch(
+                "dstack._internal.core.backends.aws.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.aws.auth.authenticate") as authenticate_mock,
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
         ):
             default_creds_available_mock.return_value = True
             response = await client.post(
@@ -239,11 +240,12 @@ class TestGetBackendConfigValuesAzure:
                 "client_secret": "1234",
             },
         }
-        with patch(
-            "dstack._internal.core.backends.azure.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.azure.auth.authenticate"
-        ) as authenticate_mock:
+        with (
+            patch(
+                "dstack._internal.core.backends.azure.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.azure.auth.authenticate") as authenticate_mock,
+        ):
             default_creds_available_mock.return_value = False
             authenticate_mock.side_effect = BackendAuthError()
             response = await client.post(
@@ -303,14 +305,15 @@ class TestGetBackendConfigValuesAzure:
         self, test_db, session: AsyncSession, client: AsyncClient, body
     ):
         user = await create_user(session=session, global_role=GlobalRole.USER)
-        with patch(
-            "dstack._internal.core.backends.azure.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.azure.auth.authenticate"
-        ) as authenticate_mock, patch(
-            "azure.mgmt.subscription.SubscriptionClient"
-        ) as SubscriptionClientMock, patch(
-            "dstack._internal.core.backends.azure.compute.get_resource_group_network_subnet_or_error"
+        with (
+            patch(
+                "dstack._internal.core.backends.azure.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.azure.auth.authenticate") as authenticate_mock,
+            patch("azure.mgmt.subscription.SubscriptionClient") as SubscriptionClientMock,
+            patch(
+                "dstack._internal.core.backends.azure.compute.get_resource_group_network_subnet_or_error"
+            ),
         ):
             default_creds_available_mock.return_value = False
             authenticate_mock.return_value = None, "test_tenant"
@@ -427,11 +430,12 @@ class TestGetBackendConfigValuesGCP:
                 "data": "1234",
             },
         }
-        with patch(
-            "dstack._internal.core.backends.gcp.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.gcp.auth.authenticate"
-        ) as authenticate_mock:
+        with (
+            patch(
+                "dstack._internal.core.backends.gcp.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.gcp.auth.authenticate") as authenticate_mock,
+        ):
             default_creds_available_mock.return_value = False
             authenticate_mock.side_effect = BackendAuthError()
             response = await client.post(
@@ -466,13 +470,13 @@ class TestGetBackendConfigValuesGCP:
             },
             "project_id": "test_project",
         }
-        with patch(
-            "dstack._internal.core.backends.gcp.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.gcp.auth.authenticate"
-        ) as authenticate_mock, patch(
-            "dstack._internal.core.backends.gcp.resources.check_vpc"
-        ) as check_vpc_mock:
+        with (
+            patch(
+                "dstack._internal.core.backends.gcp.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.gcp.auth.authenticate") as authenticate_mock,
+            patch("dstack._internal.core.backends.gcp.resources.check_vpc") as check_vpc_mock,
+        ):
             default_creds_available_mock.return_value = False
             authenticate_mock.return_value = {}, "test_project"
             response = await client.post(
@@ -737,11 +741,14 @@ class TestGetBackendConfigValuesOCI:
             "type": "oci",
             "creds": FAKE_OCI_CLIENT_CREDS,
         }
-        with patch(
-            "dstack._internal.core.backends.oci.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
-        ) as get_regions_mock:
+        with (
+            patch(
+                "dstack._internal.core.backends.oci.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch(
+                "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
+            ) as get_regions_mock,
+        ):
             default_creds_available_mock.return_value = True
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
             response = await client.post(
@@ -804,11 +811,13 @@ class TestCreateBackend:
             },
             "regions": ["us-west-1"],
         }
-        with patch(
-            "dstack._internal.core.backends.aws.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.aws.auth.authenticate"
-        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
+        with (
+            patch(
+                "dstack._internal.core.backends.aws.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.aws.auth.authenticate"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+        ):
             default_creds_available_mock.return_value = False
             response = await client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -837,13 +846,13 @@ class TestCreateBackend:
             "project_id": "test_project",
             "regions": ["us-east1"],
         }
-        with patch(
-            "dstack._internal.core.backends.gcp.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.gcp.auth.authenticate"
-        ) as authenticate_mock, patch(
-            "dstack._internal.core.backends.gcp.resources.check_vpc"
-        ) as check_vpc_mock:
+        with (
+            patch(
+                "dstack._internal.core.backends.gcp.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.gcp.auth.authenticate") as authenticate_mock,
+            patch("dstack._internal.core.backends.gcp.resources.check_vpc") as check_vpc_mock,
+        ):
             default_creds_available_mock.return_value = False
             credentials_mock = Mock()
             authenticate_mock.return_value = credentials_mock, "test_project"
@@ -899,13 +908,17 @@ class TestCreateBackend:
             "type": "oci",
             "creds": FAKE_OCI_CLIENT_CREDS,
         }
-        with patch(
-            "dstack._internal.core.backends.oci.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
-        ) as get_regions_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci._create_resources"
-        ) as create_resources_mock:
+        with (
+            patch(
+                "dstack._internal.core.backends.oci.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch(
+                "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
+            ) as get_regions_mock,
+            patch(
+                "dstack._internal.server.services.backends.configurators.oci._create_resources"
+            ) as create_resources_mock,
+        ):
             default_creds_available_mock.return_value = False
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
             create_resources_mock.return_value = SAMPLE_OCI_COMPARTMENT_ID, SAMPLE_OCI_SUBNETS
@@ -933,11 +946,14 @@ class TestCreateBackend:
             "creds": FAKE_OCI_CLIENT_CREDS,
             "regions": ["me-dubai-1", "eu-frankfurt-1", "us-ashburn-1"],
         }
-        with patch(
-            "dstack._internal.core.backends.oci.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
-        ) as get_regions_mock:
+        with (
+            patch(
+                "dstack._internal.core.backends.oci.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch(
+                "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
+            ) as get_regions_mock,
+        ):
             default_creds_available_mock.return_value = False
             # us-ashburn-1 not subscribed
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
@@ -970,15 +986,12 @@ class TestCreateBackend:
             "subscription_id": "test_subscription",
             "locations": ["eastus"],
         }
-        with patch(
-            "dstack._internal.core.backends.azure.auth.authenticate"
-        ) as authenticate_mock, patch(
-            "azure.mgmt.subscription.SubscriptionClient"
-        ) as SubscriptionClientMock, patch(
-            "azure.mgmt.resource.ResourceManagementClient"
-        ) as ResourceManagementClientMock, patch(
-            "azure.mgmt.network.NetworkManagementClient"
-        ) as NetworkManagementClientMock:
+        with (
+            patch("dstack._internal.core.backends.azure.auth.authenticate") as authenticate_mock,
+            patch("azure.mgmt.subscription.SubscriptionClient") as SubscriptionClientMock,
+            patch("azure.mgmt.resource.ResourceManagementClient") as ResourceManagementClientMock,
+            patch("azure.mgmt.network.NetworkManagementClient") as NetworkManagementClientMock,
+        ):
             authenticate_mock.return_value = None, "test_tenant"
             subscription_client_mock = SubscriptionClientMock.return_value
             tenant_mock = Mock()
@@ -1026,11 +1039,13 @@ class TestCreateBackend:
             },
             "regions": ["us-west-1"],
         }
-        with patch(
-            "dstack._internal.core.backends.aws.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.aws.auth.authenticate"
-        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
+        with (
+            patch(
+                "dstack._internal.core.backends.aws.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.aws.auth.authenticate"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+        ):
             default_creds_available_mock.return_value = False
             response = await client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -1040,11 +1055,12 @@ class TestCreateBackend:
         assert response.status_code == 200, response.json()
         res = await session.execute(select(BackendModel))
         assert len(res.scalars().all()) == 1
-        with patch(
-            "dstack._internal.core.backends.aws.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.aws.auth.authenticate"
-        ) as authenticate_mock:  # noqa: F841
+        with (
+            patch(
+                "dstack._internal.core.backends.aws.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.aws.auth.authenticate") as authenticate_mock,  # noqa: F841
+        ):
             default_creds_available_mock.return_value = False
             response = await client.post(
                 f"/api/project/{project.name}/backends/create",
@@ -1094,11 +1110,13 @@ class TestUpdateBackend:
             },
             "regions": ["us-east-1"],
         }
-        with patch(
-            "dstack._internal.core.backends.aws.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.aws.auth.authenticate"
-        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
+        with (
+            patch(
+                "dstack._internal.core.backends.aws.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.aws.auth.authenticate"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+        ):
             default_creds_available_mock.return_value = False
             response = await client.post(
                 f"/api/project/{project.name}/backends/update",
@@ -1252,11 +1270,13 @@ class TestCreateBackendYAML:
             "regions": ["us-west-1"],
         }
         body = {"config_yaml": yaml.dump(config_dict)}
-        with patch(
-            "dstack._internal.core.backends.aws.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.aws.auth.authenticate"
-        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
+        with (
+            patch(
+                "dstack._internal.core.backends.aws.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.aws.auth.authenticate"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+        ):
             default_creds_available_mock.return_value = False
             response = await client.post(
                 f"/api/project/{project.name}/backends/create_yaml",
@@ -1280,13 +1300,17 @@ class TestCreateBackendYAML:
             "creds": FAKE_OCI_CLIENT_CREDS,
         }
         body = {"config_yaml": yaml.dump(config_dict)}
-        with patch(
-            "dstack._internal.core.backends.oci.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
-        ) as get_regions_mock, patch(
-            "dstack._internal.server.services.backends.configurators.oci._create_resources"
-        ) as create_resources_mock:
+        with (
+            patch(
+                "dstack._internal.core.backends.oci.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch(
+                "dstack._internal.server.services.backends.configurators.oci.get_subscribed_regions"
+            ) as get_regions_mock,
+            patch(
+                "dstack._internal.server.services.backends.configurators.oci._create_resources"
+            ) as create_resources_mock,
+        ):
             default_creds_available_mock.return_value = False
             get_regions_mock.return_value = SAMPLE_OCI_SUBSCRIBED_REGIONS
             create_resources_mock.return_value = SAMPLE_OCI_COMPARTMENT_ID, SAMPLE_OCI_SUBNETS
@@ -1342,11 +1366,13 @@ class TestUpdateBackendYAML:
             "regions": ["us-east-1"],
         }
         body = {"config_yaml": yaml.dump(config_dict)}
-        with patch(
-            "dstack._internal.core.backends.aws.auth.default_creds_available"
-        ) as default_creds_available_mock, patch(
-            "dstack._internal.core.backends.aws.auth.authenticate"
-        ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
+        with (
+            patch(
+                "dstack._internal.core.backends.aws.auth.default_creds_available"
+            ) as default_creds_available_mock,
+            patch("dstack._internal.core.backends.aws.auth.authenticate"),
+            patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+        ):
             default_creds_available_mock.return_value = False
             response = await client.post(
                 f"/api/project/{project.name}/backends/update_yaml",

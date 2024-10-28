@@ -128,7 +128,7 @@ setup(
     description="dstack is an open-source orchestration engine for running AI workloads on any cloud or on-premises.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     install_requires=BASE_DEPS,
     extras_require={
         "all": ALL_DEPS,

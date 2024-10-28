@@ -25,13 +25,18 @@ class TestServerConfigManager:
         async def test_inits_backend(self, test_db, session: AsyncSession, tmp_path: Path):
             await create_project(session=session, name="main")
             config_filepath = tmp_path / "config.yml"
-            with patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath), patch(
-                "dstack._internal.server.services.backends.list_available_backend_types"
-            ) as list_available_backend_types_mock, patch(
-                "dstack._internal.server.services.backends.get_configurator"
-            ) as get_configurator_mock, patch(
-                "dstack._internal.server.services.backends.create_backend"
-            ) as create_backend_mock:
+            with (
+                patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath),
+                patch(
+                    "dstack._internal.server.services.backends.list_available_backend_types"
+                ) as list_available_backend_types_mock,
+                patch(
+                    "dstack._internal.server.services.backends.get_configurator"
+                ) as get_configurator_mock,
+                patch(
+                    "dstack._internal.server.services.backends.create_backend"
+                ) as create_backend_mock,
+            ):
                 list_available_backend_types_mock.return_value = [BackendType.AZURE]
                 default_config = AzureConfigInfoWithCreds(
                     tenant_id="test_tenant",
@@ -95,9 +100,11 @@ class TestServerConfigManager:
             }
             with open(config_filepath, "w+") as f:
                 yaml.dump(config, f)
-            with patch("boto3.session.Session"), patch.object(
-                settings, "SERVER_CONFIG_FILE_PATH", config_filepath
-            ), patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"):
+            with (
+                patch("boto3.session.Session"),
+                patch.object(settings, "SERVER_CONFIG_FILE_PATH", config_filepath),
+                patch("dstack._internal.core.backends.aws.compute.get_vpc_id_subnet_id_or_error"),
+            ):
                 manager = ServerConfigManager()
                 manager.load_config()
                 await manager.apply_config(session, owner)
