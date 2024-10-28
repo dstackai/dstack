@@ -31,6 +31,7 @@ from dstack._internal.core.models.runs import (
     RunTerminationReason,
 )
 from dstack._internal.core.models.users import GlobalRole, ProjectRole
+from dstack._internal.core.models.volumes import InstanceMountPoint, MountPoint
 from dstack._internal.server.background.tasks.process_instances import process_instances
 from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
@@ -58,6 +59,7 @@ def get_dev_env_run_plan_dict(
     total_offers: int = 0,
     max_price: Optional[float] = None,
     privileged: bool = False,
+    volumes: List[MountPoint] = [],
 ) -> Dict:
     return {
         "project_name": project_name,
@@ -87,7 +89,7 @@ def get_dev_env_run_plan_dict(
                     "gpu": None,
                     "shm_size": None,
                 },
-                "volumes": [],
+                "volumes": [json.loads(v.json()) for v in volumes],
                 "backends": ["local", "aws", "azure", "gcp", "lambda", "runpod"],
                 "regions": ["us"],
                 "instance_types": None,
@@ -637,6 +639,66 @@ class TestGetRunPlan:
             total_offers=1,
             max_price=1.0,
             privileged=True,
+        )
+        body = {"run_spec": run_plan_dict["run_spec"]}
+        with patch("dstack._internal.server.services.backends.get_project_backends") as m:
+            backend_mock_aws = Mock()
+            backend_mock_aws.TYPE = BackendType.AWS
+            backend_mock_aws.compute.return_value.get_offers.return_value = [offer_aws]
+            backend_mock_runpod = Mock()
+            backend_mock_runpod.TYPE = BackendType.RUNPOD
+            backend_mock_runpod.compute.return_value.get_offers.return_value = [offer_runpod]
+            m.return_value = [backend_mock_aws, backend_mock_runpod]
+            response = await client.post(
+                f"/api/project/{project.name}/runs/get_plan",
+                headers=get_auth_headers(user.token),
+                json=body,
+            )
+        assert response.status_code == 200, response.json()
+        assert response.json() == run_plan_dict
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_run_plan_instance_volumes(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        offer_aws = InstanceOfferWithAvailability(
+            backend=BackendType.AWS,
+            instance=InstanceType(
+                name="instance",
+                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+            ),
+            region="us",
+            price=1.0,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        offer_runpod = InstanceOfferWithAvailability(
+            backend=BackendType.RUNPOD,
+            instance=InstanceType(
+                name="instance",
+                resources=Resources(cpus=1, memory_mib=512, spot=False, gpus=[]),
+            ),
+            region="us",
+            price=2.0,
+            availability=InstanceAvailability.AVAILABLE,
+        )
+        run_plan_dict = get_dev_env_run_plan_dict(
+            project_name=project.name,
+            username=user.name,
+            repo_id=repo.name,
+            offers=[offer_aws],
+            total_offers=1,
+            max_price=1.0,
+            volumes=[InstanceMountPoint.parse("/data:/data")],
         )
         body = {"run_spec": run_plan_dict["run_spec"]}
         with patch("dstack._internal.server.services.backends.get_project_backends") as m:

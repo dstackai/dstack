@@ -433,6 +433,10 @@ volumes:
 Once you run this configuration, the contents of the volume will be attached to `/volume_data` inside the task, 
 and its contents will persist across runs.
 
+??? Info "Instance volumes"
+    If data persistence is not a strict requirement, use can also use
+    ephemeral [instance volumes](../../concepts/volumes.md#instance-volumes).
+
 !!! info "Limitations"
     When you're running a dev environment, task, or service with `dstack`, it automatically mounts the project folder contents
     to `/workflow` (and sets that as the current working directory). Right now, `dstack` doesn't allow you to 
@@ -490,10 +494,27 @@ The `task` configuration type supports many other options. See below.
       type:
         required: true
 
-## `volumes[n]`
+## `volumes[n]` { #_volumes data-toc-label="volumes" }
 
-#SCHEMA# dstack._internal.core.models.volumes.VolumeMountPoint
-    overrides:
-      show_root_heading: false
-      type:
-        required: true
+=== "Network volumes"
+
+    #SCHEMA# dstack._internal.core.models.volumes.VolumeMountPoint
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
+=== "Instance volumes"
+
+    #SCHEMA# dstack._internal.core.models.volumes.InstanceMountPoint
+        overrides:
+          show_root_heading: false
+          type:
+            required: true
+
+??? info "Short syntax"
+
+    The short syntax for volumes is a colon-separated string in the form of `source:destination`
+
+    * `volume-name:/container/path` for network volumes
+    * `/instance/path:/container/path` for instance volumes
