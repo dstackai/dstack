@@ -1,10 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# constants
+
+DOCKERD_LOG='/tmp/dockerd.log'
+DEFAULT_TIMEOUT=60
+
+# options
+
+verbose=false
+quiet=false
+logs=false
+timeout=${DEFAULT_TIMEOUT}
+
+# functions
+
+is_true() {
+    [[ ${1} = true ]]
+}
+
+say() {
+    echo "${@}" >&2
+}
+
+say_verbose() {
+    if is_true ${verbose}; then
+        say "${@}"
+    fi
+}
+
 check_privileged_mode_or_die() {
     mkdir /mnt/_tmp
     if ! mount -t tmpfs none /mnt/_tmp 2> /dev/null; then
-        echo 'docker privileged mode required'
+        say 'docker privileged mode required'
         rm -r /mnt/_tmp
         exit 101
     fi
@@ -14,10 +42,14 @@ check_privileged_mode_or_die() {
 
 start_restart_dockerd() {
     if ! supervisorctl status > /dev/null; then
+        say_verbose "starting dockerd"
         supervisord -c /etc/supervisord.conf
         echo 'started'
     else
-        supervisorctl restart dockerd > /dev/null
+        say_verbose "restarting dockerd"
+        supervisorctl stop dockerd > /dev/null
+        rm ${DOCKERD_LOG}
+        supervisorctl start dockerd > /dev/null
         echo 'restarted'
     fi
 }
@@ -42,29 +74,104 @@ move_processes_to_separate_cgroup() {
 }
 
 wait_dockerd_started() {
-    for _i in {1..10}; do
-        if supervisorctl tail dockerd | grep -q 'API listen on'; then
+    local counter=1
+    while true; do
+        if grep -qs 'API listen on' ${DOCKERD_LOG}; then
             return 0
         fi
+        if [[ ${counter} -gt ${timeout} ]]; then
+            break
+        fi
+        say_verbose "waiting for dockerd to start (${counter}/${timeout})"
+        ((counter++))
         sleep 1
     done
     return 1
 }
 
-show_dockerd_log_and_die() {
+stop_dockerd_and_die() {
     supervisorctl stop dockerd > /dev/null
-    echo 'failed to start dockerd:'
-    supervisorctl tail dockerd
+    if is_true ${quiet}; then
+        say 'failed to start dockerd'
+    else
+        say 'failed to start dockerd:'
+        cat ${DOCKERD_LOG} >&2
+    fi
     exit 102
 }
 
+usage() {
+    echo 'usage: start-dockerd [-v|-q] [-l] [-t SECONDS]'
+    echo '  -v, --verbose           get more output, mutually exclusive with -q'
+    echo '  -q, --quiet             get less output, mutually exclusive with -v'
+    echo '  -l, --logs              follow dockerd log output'
+    echo '  -t, --timeout SECONDS   wait for dockerd to start the specified amount'
+    echo '                          of seconds before failing with error, '
+    echo "                          ${DEFAULT_TIMEOUT} seconds by default"
+}
+
+# main
 
 check_privileged_mode_or_die
+
+while [[ ${#} -gt 0 ]]; do
+    option=${1}
+    shift
+    case ${option} in
+        --verbose|-v)
+            verbose=true
+            ;;
+        --quiet|-q)
+            quiet=true
+            ;;
+        --logs|-l)
+            logs=true
+            ;;
+        --timeout|-t)
+            if [[ ${#} -eq 0 ]]; then
+                say "${option}: value expected"
+                exit 103
+            fi
+            timeout=${1}
+            shift
+            # single brackets are intentional, compare to:
+            # set -u; [[ "foo" -gt 0 ]]
+            # bash: foo: unbound variable
+            if ! [ "${timeout}" -gt 0 ] 2> /dev/null; then
+                say "${option}: invalid value"
+                exit 103
+            fi
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            say "${option}: invalid option"
+            usage
+            exit 103
+            ;;
+    esac
+done
+
+if is_true ${verbose} && is_true ${quiet}; then
+    say '--verbose and --quiet are mutually exclusive'
+    exit 103
+fi
+
 event=$(start_restart_dockerd)
 if ! wait_dockerd_started; then
-    show_dockerd_log_and_die
+    stop_dockerd_and_die
 fi
+
 if [[ ${event} = 'started' ]]; then
     move_processes_to_separate_cgroup
 fi
-echo "dockerd ${event}"
+
+if ! is_true ${quiet}; then
+    say "dockerd ${event}"
+fi
+
+if is_true ${logs}; then
+    tail -f ${DOCKERD_LOG}
+fi

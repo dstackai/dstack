@@ -17,7 +17,7 @@ RUN \
     sed -i -e '/nodaemon/d' -e '/program:entrypoint/,/^[[:space:]]*$/d' /etc/supervisord.conf
 
 ENTRYPOINT []
-CMD ["sh", "-c", "start-dockerd && tail -f /tmp/dockerd.log"]
+CMD ["/usr/local/bin/start-dockerd", "-v", "-l"]
 
 LABEL org.opencontainers.image.title="${IMAGE_NAME}"
 LABEL org.opencontainers.image.version="${BASE_VERSION}-${DSTACK_REVISION}"
