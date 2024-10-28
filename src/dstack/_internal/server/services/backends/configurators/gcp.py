@@ -249,6 +249,7 @@ class GCPConfigurator(Configurator):
         routers_client: compute_v1.RoutersClient,
     ):
         allocate_public_ip = config.public_ips if config.public_ips is not None else True
+        nat_check = config.nat_check if config.nat_check is not None else True
         try:
             resources.check_vpc(
                 network_client=network_client,
@@ -258,6 +259,7 @@ class GCPConfigurator(Configurator):
                 vpc_name=config.vpc_name,
                 shared_vpc_project_id=config.vpc_project_id,
                 allocate_public_ip=allocate_public_ip,
+                nat_check=nat_check,
             )
         except BackendError as e:
             raise ServerClientError(e.args[0])
