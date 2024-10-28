@@ -158,6 +158,7 @@ class Compute(ABC):
     def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
         """
         Attaches a volume to the instance.
+        If the volume is not found, it should raise `ComputeError()` instead of a thrid-party exception.
         """
         raise NotImplementedError()
 
