@@ -63,6 +63,7 @@ def check_vpc(
     allocate_public_ip: bool,
     vpc_name: Optional[str] = None,
     shared_vpc_project_id: Optional[str] = None,
+    nat_check: bool = True,
 ):
     if vpc_name is None:
         vpc_name = "default"
@@ -77,15 +78,19 @@ def check_vpc(
     if allocate_public_ip:
         return
 
-    regions_without_nat = []
-    for region in regions:
-        if not has_vpc_nat_access(routers_client, vpc_project_id, vpc_name, region):
-            regions_without_nat.append(region)
+    if nat_check:
+        regions_without_nat = []
+        for region in regions:
+            if not has_vpc_nat_access(routers_client, vpc_project_id, vpc_name, region):
+                regions_without_nat.append(region)
 
-    if regions_without_nat:
-        raise ComputeError(
-            f"VPC {vpc_name} in project {vpc_project_id} does not have Cloud NAT configured for external internet access in regions: {regions_without_nat}"
-        )
+        if regions_without_nat:
+            raise ComputeError(
+                f"VPC {vpc_name} in project {vpc_project_id} does not have Cloud NAT configured"
+                f" for outbound internet connectivity in regions: {regions_without_nat}."
+                " Specify `nat_check: false` if you use a different mechanism"
+                " for outbound internet connectivity such as a third-part NAT appliance."
+            )
 
 
 def has_vpc_nat_access(

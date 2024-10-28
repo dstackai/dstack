@@ -14,6 +14,7 @@ class GCPConfigInfo(CoreModel):
     vpc_name: Optional[str] = None
     vpc_project_id: Optional[str] = None
     public_ips: Optional[bool] = None
+    nat_check: Optional[bool] = None
     tags: Optional[Dict[str, str]] = None
 
 
@@ -49,6 +50,7 @@ class GCPConfigInfoWithCredsPartial(CoreModel):
     vpc_name: Optional[str] = None
     vpc_project_id: Optional[str] = None
     public_ips: Optional[bool]
+    nat_check: Optional[bool] = None
     tags: Optional[Dict[str, str]] = None
 
 

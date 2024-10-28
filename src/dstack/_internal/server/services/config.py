@@ -212,6 +212,17 @@ class GCPConfig(CoreModel):
             description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
         ),
     ] = None
+    nat_check: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "A flag to enable/disable a check that Cloud NAT is configured for the VPC."
+                " This should be set to `false` when `public_ips: false` and outbound internet connectivity"
+                " is provided by a mechanism other than Cloud NAT such as a third-part NAT appliance."
+                " Defaults to `true`"
+            )
+        ),
+    ] = None
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(
@@ -234,6 +245,17 @@ class GCPAPIConfig(CoreModel):
         Optional[bool],
         Field(
             description="A flag to enable/disable public IP assigning on instances. Defaults to `true`"
+        ),
+    ] = None
+    nat_check: Annotated[
+        Optional[bool],
+        Field(
+            description=(
+                "A flag to enable/disable a check that Cloud NAT is configured for the VPC."
+                " This should be set to `false` when `public_ips: false` and outbound internet connectivity"
+                " is provided by a mechanism other than Cloud NAT such as a third-part NAT appliance."
+                " Defaults to `true`"
+            )
         ),
     ] = None
     tags: Annotated[
