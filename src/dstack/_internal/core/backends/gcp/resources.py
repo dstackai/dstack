@@ -89,7 +89,7 @@ def check_vpc(
                 f"VPC {vpc_name} in project {vpc_project_id} does not have Cloud NAT configured"
                 f" for outbound internet connectivity in regions: {regions_without_nat}."
                 " Specify `nat_check: false` if you use a different mechanism"
-                " for outbound internet connectivity such as a third-part NAT appliance."
+                " for outbound internet connectivity such as a third-party NAT appliance."
             )
 
 

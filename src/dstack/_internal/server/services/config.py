@@ -218,7 +218,7 @@ class GCPConfig(CoreModel):
             description=(
                 "A flag to enable/disable a check that Cloud NAT is configured for the VPC."
                 " This should be set to `false` when `public_ips: false` and outbound internet connectivity"
-                " is provided by a mechanism other than Cloud NAT such as a third-part NAT appliance."
+                " is provided by a mechanism other than Cloud NAT such as a third-party NAT appliance."
                 " Defaults to `true`"
             )
         ),
@@ -253,7 +253,7 @@ class GCPAPIConfig(CoreModel):
             description=(
                 "A flag to enable/disable a check that Cloud NAT is configured for the VPC."
                 " This should be set to `false` when `public_ips: false` and outbound internet connectivity"
-                " is provided by a mechanism other than Cloud NAT such as a third-part NAT appliance."
+                " is provided by a mechanism other than Cloud NAT such as a third-party NAT appliance."
                 " Defaults to `true`"
             )
         ),
