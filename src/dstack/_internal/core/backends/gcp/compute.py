@@ -567,28 +567,34 @@ class GCPCompute(Compute):
 
     def attach_volume(self, volume: Volume, instance_id: str) -> VolumeAttachmentData:
         zone = get_or_error(volume.provisioning_data).availability_zone
-        disk = self.disk_client.get(
-            project=self.config.project_id,
-            zone=zone,
-            disk=volume.volume_id,
-        )
-        disk_url = disk.self_link
+        try:
+            disk = self.disk_client.get(
+                project=self.config.project_id,
+                zone=zone,
+                disk=volume.volume_id,
+            )
 
-        attached_disk = compute_v1.AttachedDisk()
-        attached_disk.source = disk_url
-        attached_disk.auto_delete = False
-        attached_disk.device_name = f"pd-{volume.volume_id}"
+            disk_url = disk.self_link
 
-        logger.debug(
-            "Attaching persistent disk for volume %s to instance %s", volume.volume_id, instance_id
-        )
-        operation = self.instances_client.attach_disk(
-            project=self.config.project_id,
-            zone=zone,
-            instance=instance_id,
-            attached_disk_resource=attached_disk,
-        )
-        gcp_resources.wait_for_extended_operation(operation, "persistent disk attachment")
+            attached_disk = compute_v1.AttachedDisk()
+            attached_disk.source = disk_url
+            attached_disk.auto_delete = False
+            attached_disk.device_name = f"pd-{volume.volume_id}"
+
+            logger.debug(
+                "Attaching persistent disk for volume %s to instance %s",
+                volume.volume_id,
+                instance_id,
+            )
+            operation = self.instances_client.attach_disk(
+                project=self.config.project_id,
+                zone=zone,
+                instance=instance_id,
+                attached_disk_resource=attached_disk,
+            )
+            gcp_resources.wait_for_extended_operation(operation, "persistent disk attachment")
+        except google.api_core.exceptions.NotFound:
+            raise ComputeError("Persistent disk not found")
         logger.debug(
             "Attached persistent disk for volume %s to instance %s", volume.volume_id, instance_id
         )
