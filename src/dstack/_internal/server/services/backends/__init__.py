@@ -1,6 +1,6 @@
 import asyncio
 import heapq
-from typing import Callable, Coroutine, Dict, List, Optional, Tuple, Type, Union
+from typing import Callable, Coroutine, Dict, Iterable, List, Optional, Tuple, Type, Union
 from uuid import UUID
 
 from sqlalchemy import delete, update
@@ -229,7 +229,7 @@ async def get_config_info(
 async def delete_backends(
     session: AsyncSession,
     project: ProjectModel,
-    backends_types: List[BackendType],
+    backends_types: Iterable[BackendType],
 ):
     if BackendType.DSTACK in backends_types:
         raise ServerClientError("Cannot delete dstack backend")
