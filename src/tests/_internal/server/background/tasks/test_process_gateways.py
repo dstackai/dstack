@@ -25,11 +25,14 @@ class TestProcessSubmittedGateways:
             project_id=project.id,
             backend_id=backend.id,
         )
-        with patch(
-            "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
-        ) as m, patch(
-            "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
-        ) as pool_add:
+        with (
+            patch(
+                "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
+            ) as m,
+            patch(
+                "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
+            ) as pool_add,
+        ):
             aws = Mock()
             m.return_value = (backend, aws)
             pool_add.return_value = MagicMock()
@@ -85,11 +88,14 @@ class TestProcessSubmittedGateways:
             project_id=project.id,
             backend_id=backend.id,
         )
-        with patch(
-            "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
-        ) as m, patch(
-            "dstack._internal.server.services.gateways.connect_to_gateway_with_retry"
-        ) as connect_to_gateway_with_retry_mock:
+        with (
+            patch(
+                "dstack._internal.server.services.backends.get_project_backend_with_model_by_type_or_error"
+            ) as m,
+            patch(
+                "dstack._internal.server.services.gateways.connect_to_gateway_with_retry"
+            ) as connect_to_gateway_with_retry_mock,
+        ):
             aws = Mock()
             m.return_value = (backend, aws)
             connect_to_gateway_with_retry_mock.return_value = None
