@@ -39,6 +39,7 @@ using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs
     env:
       - MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
       - HF_TOKEN
+    working_dir: examples/misc/docker-compose
     commands:
       - start-dockerd
       - docker compose up
@@ -50,14 +51,14 @@ using [Docker Compose :material-arrow-top-right-thin:{ .external }](https://docs
     
     resources:
       # Required resources
-      gpu: "NVIDIA:16GB.."
+      gpu: "NVIDIA:24GB"
     ```
     
     </div>
 
-=== "`compose.yml`"
+=== "`compose.yaml`"
 
-    <div editor-title="examples/misc/docker-compose/compose.yml"> 
+    <div editor-title="examples/misc/docker-compose/compose.yaml"> 
 
     ```yaml
     services:
@@ -152,6 +153,7 @@ image: dstackai/dind
 env:
   - MODEL_ID=meta-llama/Llama-3.2-3B-Instruct
   - HF_TOKEN
+working_dir: examples/misc/docker-compose
 commands:
   - start-dockerd
   - docker compose up
@@ -163,7 +165,7 @@ spot_policy: auto
 
 resources:
   # Required resources
-  gpu: "NVIDIA:16GB.."
+  gpu: "NVIDIA:24GB"
 
 volumes:
   - name: my-dind-volume

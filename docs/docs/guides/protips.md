@@ -127,7 +127,7 @@ replace it with a corresponding command to start Docker daemon.
     </div>
 
 === "Dev environment"
-    <div editor-title="examples/misc/dind/.dstack.yml">
+    <div editor-title="examples/misc/docker-compose/.dstack.yml">
 
     ```yaml
     type: dev-environment
