@@ -6,22 +6,45 @@ import botocore.exceptions
 
 import dstack.version as version
 from dstack._internal.core.errors import BackendError, ComputeError, ComputeResourceNotFoundError
+from dstack._internal.core.models.backends.aws import AWSOSImageConfig
+from dstack._internal.utils.logging import get_logger
+
+logger = get_logger(__name__)
+
+DSTACK_ACCOUNT_ID = "142421590066"
 
 
-def get_image_id(ec2_client: botocore.client.BaseClient, cuda: bool) -> str:
-    image_name = (
-        f"dstack-{version.base_image}" if not cuda else f"dstack-cuda-{version.base_image}"
+def get_image_id_and_username(
+    ec2_client: botocore.client.BaseClient,
+    cuda: bool,
+    image_config: Optional[AWSOSImageConfig] = None,
+) -> tuple[str, str]:
+    if image_config is not None:
+        image = image_config.nvidia if cuda else image_config.cpu
+        if image is None:
+            logger.warning("%s image not configured", "nvidia" if cuda else "cpu")
+            raise ComputeResourceNotFoundError()
+        image_name = image.name
+        image_owner = image.owner
+        username = image.user
+    else:
+        image_name = (
+            f"dstack-{version.base_image}" if not cuda else f"dstack-cuda-{version.base_image}"
+        )
+        image_owner = DSTACK_ACCOUNT_ID
+        username = "ubuntu"
+    response = ec2_client.describe_images(
+        Filters=[{"Name": "name", "Values": [image_name]}], Owners=[image_owner]
     )
-
-    response = ec2_client.describe_images(Filters=[{"Name": "name", "Values": [image_name]}])
     images = sorted(
         (i for i in response["Images"] if i["State"] == "available"),
         key=lambda i: i["CreationDate"],
         reverse=True,
     )
     if not images:
+        logger.warning("image '%s' not found", image_name)
         raise ComputeResourceNotFoundError()
-    return images[0]["ImageId"]
+    return images[0]["ImageId"], username
 
 
 def create_security_group(

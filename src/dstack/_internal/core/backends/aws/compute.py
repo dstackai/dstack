@@ -170,13 +170,15 @@ class AWSCompute(Compute):
             tried_availability_zones.add(az)
             try:
                 logger.debug("Trying provisioning %s in %s", instance_offer.instance.name, az)
+                image_id, username = aws_resources.get_image_id_and_username(
+                    ec2_client=ec2_client,
+                    cuda=len(instance_offer.instance.resources.gpus) > 0,
+                    image_config=self.config.os_images,
+                )
                 response = ec2_resource.create_instances(
                     **aws_resources.create_instances_struct(
                         disk_size=disk_size,
-                        image_id=aws_resources.get_image_id(
-                            ec2_client=ec2_client,
-                            cuda=len(instance_offer.instance.resources.gpus) > 0,
-                        ),
+                        image_id=image_id,
                         instance_type=instance_offer.instance.name,
                         iam_instance_profile_arn=None,
                         user_data=get_user_data(authorized_keys=instance_config.get_public_keys()),
@@ -211,7 +213,7 @@ class AWSCompute(Compute):
                     region=instance_offer.region,
                     availability_zone=az,
                     price=instance_offer.price,
-                    username="ubuntu",
+                    username=username,
                     ssh_port=22,
                     dockerized=True,  # because `dstack-shim docker` is used
                     ssh_proxy=None,

@@ -179,6 +179,42 @@ There are two ways to configure AWS: using an access key or using the default cr
     Using private subnets assumes that both the `dstack` server and users can access the configured VPC's private subnets.
     Additionally, private subnets must have outbound internet connectivity provided by NAT Gateway, Transit Gateway, or other mechanism.
 
+??? info "OS images"
+    By default, `dstack` uses its own [AMI :material-arrow-top-right-thin:{ .external }](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/AMIs.html)
+    optimized for `dstack`.
+    To use your own or other third-party images, set the `os_images` property:
+
+    ```yaml
+    projects:
+      - name: main
+        backends:
+          - type: aws
+            creds:
+              type: default
+
+            os_images:
+              cpu:
+                name: my-ami-for-cpu-instances
+                owner: self
+                user: dstack
+              nvidia:
+                name: 'Some ThirdParty CUDA image'
+                owner: 123456789012
+                user: ubuntu
+    ```
+
+    Here, both `cpu` and `nvidia` properties are optional, but if the property is not set, you won´t be able to use the corresponding instance types.
+
+    The `name` is an AMI name.
+    The `owner` is either an AWS account ID (a 12-digit number) or a special value `self` indicating the current account.
+    The `user` specifies an OS user for instance provisioning.
+
+    !!! info "Image requirements"
+        * SSH server listening on port 22
+        * `user` with passwordless sudo access
+        * Docker is installed
+        * (For NVIDIA instances) NVIDIA/CUDA drivers are installed
+
 #### Azure
 
 There are two ways to configure Azure: using a client secret or using the default credentials.
@@ -919,6 +955,22 @@ See the [reference table](#default-permissions) for all configurable permissions
             show_root_heading: false
             type:
                 required: true
+
+## `projects[n].backends[type=aws].os_images` { #_aws-os-images data-toc-label="backends[type=aws].os_images" }
+
+#SCHEMA# dstack._internal.core.models.backends.aws.AWSOSImageConfig
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
+
+## `projects[n].backends[type=aws].os_images.*` { #_aws-os-image data-toc-label="backends[type=aws].os_images.*" }
+
+#SCHEMA# dstack._internal.core.models.backends.aws.AWSOSImage
+    overrides:
+        show_root_heading: false
+        type:
+            required: true
 
 ## `projects[n].backends[type=azure]` { #_azure data-toc-label="backends[type=azure]" }
 
