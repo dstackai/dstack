@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Controller, FieldValues } from 'react-hook-form';
 import ace from 'ace-builds';
 import CodeEditor, { CodeEditorProps } from '@cloudscape-design/components/code-editor';
@@ -8,7 +8,17 @@ import { CODE_EDITOR_I18N_STRINGS } from './constants';
 
 import { FormCodeEditorProps } from './types';
 
+ace.config.set('useWorker', false);
+
+import { Mode } from '@cloudscape-design/global-styles';
+
+import { selectSystemMode } from '../../../App/slice';
+import { useAppSelector } from '../../../hooks';
+
+import 'ace-builds/src-noconflict/theme-cloud_editor';
+import 'ace-builds/src-noconflict/theme-cloud_editor_dark';
 import 'ace-builds/src-noconflict/mode-yaml';
+import 'ace-builds/src-noconflict/ext-language_tools';
 
 export const FormCodeEditor = <T extends FieldValues>({
     name,
@@ -23,9 +33,22 @@ export const FormCodeEditor = <T extends FieldValues>({
     onChange: onChangeProp,
     ...props
 }: FormCodeEditorProps<T>) => {
-    const [codeEditorPreferences, setCodeEditorPreferences] = useState<CodeEditorProps['preferences']>({
-        theme: 'tomorrow_night_bright',
-    });
+    const systemMode = useAppSelector(selectSystemMode) ?? '';
+
+    const [codeEditorPreferences, setCodeEditorPreferences] = useState<CodeEditorProps['preferences']>(() => ({
+        theme: systemMode === Mode.Dark ? 'cloud_editor_dark' : 'cloud_editor',
+    }));
+
+    useEffect(() => {
+        if (systemMode === Mode.Dark)
+            setCodeEditorPreferences({
+                theme: 'cloud_editor_dark',
+            });
+        else
+            setCodeEditorPreferences({
+                theme: 'cloud_editor',
+            });
+    }, [systemMode]);
 
     const onCodeEditorPreferencesChange: CodeEditorProps['onPreferencesChange'] = (e) => {
         setCodeEditorPreferences(e.detail);
@@ -56,7 +79,7 @@ export const FormCodeEditor = <T extends FieldValues>({
                                 onChange(event.detail.value);
                                 onChangeProp && onChangeProp(event);
                             }}
-                            themes={{ light: ['tomorrow_night_bright'], dark: ['tomorrow_night_bright'] }}
+                            themes={{ light: [], dark: [] }}
                             preferences={codeEditorPreferences}
                             onPreferencesChange={onCodeEditorPreferencesChange}
                         />
