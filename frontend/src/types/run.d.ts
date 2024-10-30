@@ -104,7 +104,9 @@ declare interface IJobSubmission {
     error_code?: TJobErrorCode | null,
     submission_num: number
     status: TJobStatus,
-    submitted_at: number
+    submitted_at: number,
+    termination_reason?: string | null
+    termination_reason_message?: string | null
 }
 
 declare interface IJob {

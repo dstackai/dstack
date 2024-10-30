@@ -26,7 +26,7 @@ export const getRunListItemSpotLabelKey = (run: IRun) => {
 
 export const getRunListItemSpot = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '-';
+        return '';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.instance_type?.resources?.spot?.toString() ?? '-';
@@ -34,7 +34,7 @@ export const getRunListItemSpot = (run: IRun) => {
 
 export const getRunListItemPrice = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return `${run.jobs.reduce<number>((acc, job) => {
+        return `$${run.jobs.reduce<number>((acc, job) => {
             const price = job.job_submissions?.[0]?.job_provisioning_data?.price;
 
             if (price) acc += price;
@@ -50,7 +50,7 @@ export const getRunListItemPrice = (run: IRun) => {
 
 export const getRunListItemInstance = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '-';
+        return '';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.instance_type?.name;
@@ -58,7 +58,7 @@ export const getRunListItemInstance = (run: IRun) => {
 
 export const getRunListItemInstanceId = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '-';
+        return '';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.instance_id ?? '-';
@@ -66,7 +66,7 @@ export const getRunListItemInstanceId = (run: IRun) => {
 
 export const getRunListItemRegion = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '-';
+        return '';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.region ?? '-';
@@ -74,7 +74,7 @@ export const getRunListItemRegion = (run: IRun) => {
 
 export const getRunListItemBackend = (run: IRun) => {
     if (run.jobs.length > 1) {
-        return '-';
+        return '';
     }
 
     return run.latest_job_submission?.job_provisioning_data?.backend ?? '-';
