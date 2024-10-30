@@ -11,6 +11,13 @@ definitions:
       {{ page.meta.get("title", page.title) }}
     {%- endif -%}
 
+  - &page_image >-
+    {% if page and page.meta.image %}
+      {{ page.meta.image }}
+    {%- else -%}
+      {{ image.url }}
+    {%- endif -%}
+
   # Page title with site name
   - &page_title_with_site_name >-
     {%- if not page.is_homepage -%}
@@ -78,7 +85,7 @@ tags:
   og:type: website
   og:title: *page_title_with_site_name
   og:description: *page_description
-  og:image: "{{ image.url }}"
+  og:image: *page_image
   og:image:type: "{{ image.type }}"
   og:image:width: "{{ image.width }}"
   og:image:height: "{{ image.height }}"
@@ -88,4 +95,4 @@ tags:
   twitter:card: summary_large_image
   twitter.title: *page_title_with_site_name
   twitter:description: *page_description
-  twitter:image: "{{ image.url }}"
+  twitter:image: *page_image

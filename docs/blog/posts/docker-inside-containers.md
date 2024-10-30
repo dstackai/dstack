@@ -1,11 +1,12 @@
 ---
-title: "Using Docker and Docker Compose inside containers"
-date: 2024-10-25
-description: "The latest release of dstack allows for the direct use of Docker and Docker Compose within run configurations."   
+title: "Using Docker and Docker Compose inside GPU-enabled containers"
+date: 2024-10-30
+description: "The latest release of dstack allows for the direct use of Docker and Docker Compose within run configurations."
+image: https://github.com/dstackai/static-assets/blob/main/static-assets/images/dstack-docker-inside-containers.png?raw=true
 slug: docker-inside-containers
 ---
 
-# Using Docker and Docker Compose inside containers
+# Using Docker and Docker Compose inside GPU-enabled containers
 
 To run containers with `dstack`, you can use your own Docker image (or the default one) without a need to interact
 directly with Docker. However, some legacy code may require direct use of Docker or Docker Compose. That's why,
