@@ -9,7 +9,7 @@ slug: docker-inside-containers
 # Using Docker and Docker Compose inside GPU-enabled containers
 
 To run containers with `dstack`, you can use your own Docker image (or the default one) without a need to interact
-directly with Docker. However, some legacy code may require direct use of Docker or Docker Compose. That's why,
+directly with Docker. However, some existing code may require direct use of Docker or Docker Compose. That's why,
 in our latest release, we've added this option.
 
 <div editor-title="examples/misc/docker-compose/task.dstack.yml"> 
@@ -90,7 +90,7 @@ Another use case for this feature is when you need to build a custom Docker imag
 
 ### docker run
 
-Last but not least, you can, of course, use the `docker run` command, for example, if your legacy code requires it.
+Last but not least, you can, of course, use the `docker run` command, for example, if your existing code requires it.
 
 ## Examples
 
