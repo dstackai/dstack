@@ -111,7 +111,7 @@ class Run(ABC):
         def ws_thread():
             try:
                 logger.debug("Starting WebSocket logs for %s", self.name)
-                ws.run_forever()
+                ws.run_forever(ping_interval=60)
             finally:
                 logger.debug("WebSocket logs are done for %s", self.name)
                 q.put(_done)
@@ -119,7 +119,11 @@ class Run(ABC):
         ws = WebSocketApp(
             f"ws://localhost:{self.ports[10999]}/logs_ws",
             on_open=lambda _: logger.debug("WebSocket logs are connected to %s", self.name),
-            on_close=lambda _, __, ___: logger.debug("WebSocket logs are disconnected"),
+            on_close=lambda _, status_code, msg: logger.debug(
+                "WebSocket logs are disconnected. status_code: %s; message: %s",
+                status_code,
+                msg,
+            ),
             on_message=lambda _, message: q.put(message),
         )
         threading.Thread(target=ws_thread).start()
