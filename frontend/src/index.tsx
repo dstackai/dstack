@@ -9,7 +9,8 @@ import { store } from './store';
 
 import '@cloudscape-design/global-styles/index.css';
 import 'ace-builds/css/ace.css';
-import 'ace-builds/css/theme/tomorrow_night_bright.css';
+import 'ace-builds/css/theme/cloud_editor.css';
+import 'ace-builds/css/theme/cloud_editor_dark.css';
 import 'assets/css/index.css';
 import '@xterm/xterm/css/xterm.css';
 

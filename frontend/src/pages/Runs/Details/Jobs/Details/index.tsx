@@ -2,13 +2,14 @@ import React, { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 
-import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader } from 'components';
+import { Box, ColumnLayout, Container, ContentLayout, DetailsHeader, Header, Loader, StatusIndicator } from 'components';
 
 import { useBreadcrumbs } from 'hooks';
 import { riseRouterException } from 'libs';
 import { ROUTES } from 'routes';
 import { useGetRunQuery } from 'services/run';
 
+import { getStatusIconType } from '../../../../../libs/run';
 import { Logs } from '../../Logs';
 import {
     getJobListItemBackend,
@@ -17,6 +18,9 @@ import {
     getJobListItemRegion,
     getJobListItemResources,
     getJobListItemSpot,
+    getJobStatus,
+    getJobSubmittedAt,
+    getJobTerminationReason,
 } from '../List/helpers';
 
 import styles from './styles.module.scss';
@@ -97,6 +101,25 @@ export const JobDetails: React.FC = () => {
                     <>
                         <Container header={<Header variant="h2">{t('common.general')}</Header>}>
                             <ColumnLayout columns={4} variant="text-grid">
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.submitted_at')}</Box>
+                                    <div>{getJobSubmittedAt(jobData)}</div>
+                                </div>
+
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.status')}</Box>
+                                    <div>
+                                        <StatusIndicator type={getStatusIconType(getJobStatus(jobData))}>
+                                            {t(`projects.run.statuses.${getJobStatus(jobData)}`)}
+                                        </StatusIndicator>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <Box variant="awsui-key-label">{t('projects.run.termination_reason')}</Box>
+                                    <div>{getJobTerminationReason(jobData)}</div>
+                                </div>
+
                                 <div>
                                     <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
                                     <div>{getJobListItemBackend(jobData)}</div>

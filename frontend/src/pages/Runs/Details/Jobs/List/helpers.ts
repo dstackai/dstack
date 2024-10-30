@@ -1,3 +1,7 @@
+import { format } from 'date-fns';
+
+import { DATE_TIME_FORMAT } from 'consts';
+
 export const getJobListItemResources = (job: IJob) => {
     return job.job_submissions?.[0]?.job_provisioning_data?.instance_type?.resources?.description;
 };
@@ -22,4 +26,18 @@ export const getJobListItemRegion = (job: IJob) => {
 
 export const getJobListItemBackend = (job: IJob) => {
     return job.job_submissions?.[0]?.job_provisioning_data?.backend ?? '-';
+};
+
+export const getJobSubmittedAt = (job: IJob) => {
+    return job.job_submissions?.[0].submitted_at
+        ? format(new Date(job.job_submissions?.[0].submitted_at), DATE_TIME_FORMAT)
+        : '';
+};
+
+export const getJobStatus = (job: IJob) => {
+    return job.job_submissions?.[0].status;
+};
+
+export const getJobTerminationReason = (job: IJob) => {
+    return job.job_submissions?.[0].termination_reason ?? '-';
 };

@@ -339,6 +339,7 @@
       "instance_id": "Instance ID",
       "resources": "Resources",
       "spot": "Spot",
+      "termination_reason": "Termination reason",
       "price": "Price",
       "error": "Error",
       "artifacts": "Artifacts",

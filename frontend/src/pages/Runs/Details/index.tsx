@@ -202,35 +202,47 @@ export const RunDetails: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
-                                    <div>{getRunListItemBackend(runData)}</div>
-                                </div>
+                                {getRunListItemBackend(runData) && (
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('projects.run.backend')}</Box>
+                                        <div>{getRunListItemBackend(runData)}</div>
+                                    </div>
+                                )}
 
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.region')}</Box>
-                                    <div>{getRunListItemRegion(runData)}</div>
-                                </div>
+                                {getRunListItemRegion(runData) && (
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('projects.run.region')}</Box>
+                                        <div>{getRunListItemRegion(runData)}</div>
+                                    </div>
+                                )}
 
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.instance_id')}</Box>
-                                    <div>{getRunListItemInstanceId(runData)}</div>
-                                </div>
+                                {getRunListItemInstanceId(runData) && (
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('projects.run.instance_id')}</Box>
+                                        <div>{getRunListItemInstanceId(runData)}</div>
+                                    </div>
+                                )}
 
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.resources')}</Box>
-                                    <div>{getRunListItemResources(runData)}</div>
-                                </div>
+                                {getRunListItemResources(runData) && (
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('projects.run.resources')}</Box>
+                                        <div>{getRunListItemResources(runData)}</div>
+                                    </div>
+                                )}
 
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.spot')}</Box>
-                                    <div>{getRunListItemSpot(runData)}</div>
-                                </div>
+                                {getRunListItemSpot(runData) && (
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('projects.run.spot')}</Box>
+                                        <div>{getRunListItemSpot(runData)}</div>
+                                    </div>
+                                )}
 
-                                <div>
-                                    <Box variant="awsui-key-label">{t('projects.run.price')}</Box>
-                                    <div>{getRunListItemPrice(runData)}</div>
-                                </div>
+                                {getRunListItemPrice(runData) && (
+                                    <div>
+                                        <Box variant="awsui-key-label">{t('projects.run.price')}</Box>
+                                        <div>{getRunListItemPrice(runData)}</div>
+                                    </div>
+                                )}
 
                                 <div>
                                     <Box variant="awsui-key-label">{t('projects.run.cost')}</Box>

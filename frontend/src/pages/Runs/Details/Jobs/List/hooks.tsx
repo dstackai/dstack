@@ -1,8 +1,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { NavigateLink } from 'components';
+import { NavigateLink, StatusIndicator } from 'components';
 
+import { getStatusIconType } from 'libs/run';
 import { ROUTES } from 'routes';
 
 import {
@@ -12,6 +13,8 @@ import {
     getJobListItemRegion,
     getJobListItemResources,
     getJobListItemSpot,
+    getJobStatus,
+    getJobSubmittedAt,
 } from './helpers';
 
 export const useColumnsDefinitions = ({ projectName, runName }: { projectName: string; runName: string }) => {
@@ -28,6 +31,24 @@ export const useColumnsDefinitions = ({ projectName, runName }: { projectName: s
                     {item.job_spec.job_name}
                 </NavigateLink>
             ),
+        },
+        {
+            id: 'submitted_at',
+            header: t('projects.run.submitted_at'),
+            cell: getJobSubmittedAt,
+        },
+        {
+            id: 'status',
+            header: t('projects.run.status'),
+            cell: (item: IJob) => {
+                const status = getJobStatus(item);
+
+                if (!status) return '';
+
+                return (
+                    <StatusIndicator type={getStatusIconType(status)}>{t(`projects.run.statuses.${status}`)}</StatusIndicator>
+                );
+            },
         },
         {
             id: 'resources',
