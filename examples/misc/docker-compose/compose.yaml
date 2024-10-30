@@ -1,16 +1,13 @@
 services:
   app:
     image: ghcr.io/huggingface/chat-ui:sha-bf0bc92
-    command:
-      - bash
-      - -c
-      - |
-        echo MONGODB_URL=mongodb://db:27017 > .env.local
-        echo MODELS='`[{
+    environment:
+      MONGODB_URL: mongodb://db:27017
+      MODELS: |
+        [{
           "name": "${MODEL_ID?}",
           "endpoints": [{"type": "tgi", "url": "http://tgi:8000"}]
-        }]`' >> .env.local
-        exec ./entrypoint.sh
+        }]
     ports:
       - 127.0.0.1:9000:3000
     depends_on:
