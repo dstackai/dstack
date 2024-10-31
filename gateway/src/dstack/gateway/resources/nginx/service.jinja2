@@ -11,6 +11,7 @@ server {
     server_name {{ domain }};
 
     access_log /var/log/nginx/dstack.access.log dstack_stat;
+    client_max_body_size {{ client_max_body_size }};
 
     location / {
         {% if auth %}

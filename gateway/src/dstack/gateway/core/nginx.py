@@ -37,6 +37,8 @@ class ServiceConfig(SiteConfig):
     project: str
     service_id: str
     auth: bool
+    # Default for compatibility with older state.json. TODO: remove after a few releases
+    client_max_body_size: int = 1024 * 1024
     servers: Dict[str, str] = {}
 
 
@@ -75,7 +77,13 @@ class Nginx(BaseModel):
             )
 
     async def register_service(
-        self, project: str, service_id: str, domain: str, https: bool, auth: bool
+        self,
+        project: str,
+        service_id: str,
+        domain: str,
+        https: bool,
+        auth: bool,
+        client_max_body_size: int,
     ):
         config_name = self.get_config_name(domain)
         conf = ServiceConfig(
@@ -84,6 +92,7 @@ class Nginx(BaseModel):
             domain=domain,
             https=https,
             auth=auth,
+            client_max_body_size=client_max_body_size,
         )
 
         async with self._lock:

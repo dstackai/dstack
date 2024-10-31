@@ -412,6 +412,7 @@ async def _register_service_in_gateway(
                 service_https=service_https,
                 gateway_https=gateway_https,
                 auth=run_spec.configuration.auth,
+                client_max_body_size=settings.DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE,
                 options=service_spec.options,
                 ssh_private_key=run_model.project.ssh_private_key,
             )
