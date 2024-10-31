@@ -585,6 +585,18 @@ async def list_user_pool_instances(
     return instances
 
 
+async def list_active_remote_instances(
+    session: AsyncSession,
+) -> List[InstanceModel]:
+    filters: List = [InstanceModel.deleted == False, InstanceModel.backend == BackendType.REMOTE]
+
+    res = await session.execute(
+        select(InstanceModel).where(*filters).order_by(InstanceModel.created_at.asc())
+    )
+    instance_models = list(res.scalars().all())
+    return instance_models
+
+
 async def create_instance_model(
     session: AsyncSession,
     project: ProjectModel,
