@@ -221,11 +221,11 @@ class GCPConfigurator(Configurator):
         return element
 
     def _check_config(self, config: GCPConfigInfoWithCredsPartial, credentials: Credentials):
-        network_client = compute_v1.NetworksClient(credentials=credentials)
+        subnetworks_client = compute_v1.SubnetworksClient(credentials=credentials)
         routers_client = compute_v1.RoutersClient(credentials=credentials)
         self._check_tags_config(config)
         self._check_vpc_config(
-            network_client=network_client,
+            subnetworks_client=subnetworks_client,
             routers_client=routers_client,
             config=config,
         )
@@ -245,14 +245,14 @@ class GCPConfigurator(Configurator):
     def _check_vpc_config(
         self,
         config: GCPConfigInfoWithCredsPartial,
-        network_client: compute_v1.NetworksClient,
+        subnetworks_client: compute_v1.SubnetworksClient,
         routers_client: compute_v1.RoutersClient,
     ):
         allocate_public_ip = config.public_ips if config.public_ips is not None else True
         nat_check = config.nat_check if config.nat_check is not None else True
         try:
             resources.check_vpc(
-                network_client=network_client,
+                subnetworks_client=subnetworks_client,
                 routers_client=routers_client,
                 project_id=config.project_id,
                 regions=config.regions or DEFAULT_REGIONS,
