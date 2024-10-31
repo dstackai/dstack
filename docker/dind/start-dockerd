@@ -3,8 +3,14 @@ set -euo pipefail
 
 # constants
 
+SUPERVISORD_LOG='/tmp/supervisord.log'
 DOCKERD_LOG='/tmp/dockerd.log'
 DEFAULT_TIMEOUT=60
+
+ERR_INSUFFICIENT_PRIVILEGES=101
+ERR_DOCKERD_FAILED=102
+ERR_INVALID_ARGS=103
+ERR_SUPERVISORD_FAILED=104
 
 # options
 
@@ -19,12 +25,20 @@ is_true() {
     [[ ${1} = true ]]
 }
 
+is_verbose() {
+    is_true ${verbose}
+}
+
+is_quiet() {
+    is_true ${quiet}
+}
+
 say() {
     echo "${@}" >&2
 }
 
 say_verbose() {
-    if is_true ${verbose}; then
+    if is_verbose; then
         say "${@}"
     fi
 }
@@ -34,23 +48,35 @@ check_privileged_mode_or_die() {
     if ! mount -t tmpfs none /mnt/_tmp 2> /dev/null; then
         say 'docker privileged mode required'
         rm -r /mnt/_tmp
-        exit 101
+        exit ${ERR_INSUFFICIENT_PRIVILEGES}
     fi
     umount /mnt/_tmp
     rm -r /mnt/_tmp
 }
 
 start_restart_dockerd() {
-    if ! supervisorctl status > /dev/null; then
-        say_verbose "starting dockerd"
-        supervisord -c /etc/supervisord.conf
-        echo 'started'
-    else
+    if supervisorctl pid > /dev/null; then
         say_verbose "restarting dockerd"
         supervisorctl stop dockerd > /dev/null
-        rm ${DOCKERD_LOG}
+        if [[ -f ${DOCKERD_LOG} ]]; then
+            rm ${DOCKERD_LOG}
+        fi
         supervisorctl start dockerd > /dev/null
         echo 'restarted'
+    else
+        local ctl_status=${?}
+        # LSBInitExitStatuses.NOT_RUNNING = 7
+        if [[ ${ctl_status} -eq 7 ]]; then
+            say_verbose "starting dockerd"
+            supervisord -c /etc/supervisord.conf
+            echo 'started'
+        else
+            say "supervisorctl exited with status ${ctl_status}"
+            if ! is_quiet && [[ -f ${SUPERVISORD_LOG} ]]; then
+                cat ${SUPERVISORD_LOG} >&2
+            fi
+            exit ${ERR_SUPERVISORD_FAILED}
+        fi
     fi
 }
 
@@ -91,13 +117,11 @@ wait_dockerd_started() {
 
 stop_dockerd_and_die() {
     supervisorctl stop dockerd > /dev/null
-    if is_true ${quiet}; then
-        say 'failed to start dockerd'
-    else
-        say 'failed to start dockerd:'
+    say 'failed to start dockerd'
+    if ! is_quiet; then
         cat ${DOCKERD_LOG} >&2
     fi
-    exit 102
+    exit ${ERR_DOCKERD_FAILED}
 }
 
 usage() {
@@ -130,7 +154,7 @@ while [[ ${#} -gt 0 ]]; do
         --timeout|-t)
             if [[ ${#} -eq 0 ]]; then
                 say "${option}: value expected"
-                exit 103
+                exit ${ERR_INVALID_ARGS}
             fi
             timeout=${1}
             shift
@@ -139,7 +163,7 @@ while [[ ${#} -gt 0 ]]; do
             # bash: foo: unbound variable
             if ! [ "${timeout}" -gt 0 ] 2> /dev/null; then
                 say "${option}: invalid value"
-                exit 103
+                exit ${ERR_INVALID_ARGS}
             fi
             ;;
         --help|-h)
@@ -149,14 +173,14 @@ while [[ ${#} -gt 0 ]]; do
         *)
             say "${option}: invalid option"
             usage
-            exit 103
+            exit ${ERR_INVALID_ARGS}
             ;;
     esac
 done
 
-if is_true ${verbose} && is_true ${quiet}; then
+if is_verbose && is_quiet; then
     say '--verbose and --quiet are mutually exclusive'
-    exit 103
+    exit ${ERR_INVALID_ARGS}
 fi
 
 event=$(start_restart_dockerd)
@@ -168,7 +192,7 @@ if [[ ${event} = 'started' ]]; then
     move_processes_to_separate_cgroup
 fi
 
-if ! is_true ${quiet}; then
+if ! is_quiet; then
     say "dockerd ${event}"
 fi
 
