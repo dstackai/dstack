@@ -56,7 +56,7 @@ def get_availability_zones(
 
 
 def check_vpc(
-    network_client: compute_v1.NetworksClient,
+    subnetworks_client: compute_v1.SubnetworksClient,
     routers_client: compute_v1.RoutersClient,
     project_id: str,
     regions: List[str],
@@ -71,14 +71,21 @@ def check_vpc(
     if shared_vpc_project_id:
         vpc_project_id = shared_vpc_project_id
     try:
-        network_client.get(project=vpc_project_id, network=vpc_name)
+        for region in regions:
+            get_vpc_subnet_or_error(
+                subnetworks_client=subnetworks_client,
+                vpc_project_id=vpc_project_id,
+                vpc_name=vpc_name,
+                region=region,
+            )
     except google.api_core.exceptions.NotFound:
-        raise ComputeError(f"Failed to find VPC {vpc_name} in project {vpc_project_id}")
+        raise ComputeError(f"Failed to find Shared VPC project {vpc_project_id}")
 
     if allocate_public_ip:
         return
 
-    if nat_check:
+    # We may have no permissions to check NAT in a shared VPC
+    if nat_check and shared_vpc_project_id is None:
         regions_without_nat = []
         for region in regions:
             if not has_vpc_nat_access(routers_client, vpc_project_id, vpc_name, region):
@@ -230,7 +237,8 @@ def get_vpc_subnet_or_error(
         if network_name == vpc_name and subnet_region == region:
             return subnet_resource_name
     raise ComputeError(
-        f"No usable subnetwork found in region {region} for VPC {vpc_name} in project {vpc_project_id}"
+        f"No usable subnetwork found in region {region} for VPC {vpc_name} in project {vpc_project_id}."
+        f" Ensure that VPC {vpc_name} exists and has usable subnetworks."
     )
 
 
