@@ -213,7 +213,7 @@ There are two ways to configure AWS: using an access key or using the default cr
         * SSH server listening on port 22
         * `user` with passwordless sudo access
         * Docker is installed
-        * (For NVIDIA instances) NVIDIA/CUDA drivers are installed
+        * (For NVIDIA instances) NVIDIA/CUDA drivers and NVIDIA Container Toolkit are installed
 
 #### Azure
 
