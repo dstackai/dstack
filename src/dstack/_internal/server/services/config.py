@@ -12,7 +12,7 @@ from dstack._internal.core.errors import (
     ServerClientError,
 )
 from dstack._internal.core.models.backends import AnyConfigInfoWithCreds, BackendInfoYAML
-from dstack._internal.core.models.backends.aws import AnyAWSCreds
+from dstack._internal.core.models.backends.aws import AnyAWSCreds, AWSOSImageConfig
 from dstack._internal.core.models.backends.azure import AnyAzureCreds
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.backends.cudo import AnyCudoCreds
@@ -106,6 +106,12 @@ class AWSConfig(CoreModel):
     tags: Annotated[
         Optional[Dict[str, str]],
         Field(description="The tags that will be assigned to resources created by `dstack`"),
+    ] = None
+    os_images: Annotated[
+        Optional[AWSOSImageConfig],
+        Field(
+            description="The mapping of instance categories (CPU, NVIDIA GPU) to AMI configurations"
+        ),
     ] = None
     creds: AnyAWSCreds = Field(..., description="The credentials", discriminator="type")
 

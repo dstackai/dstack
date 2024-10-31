@@ -7,6 +7,22 @@ from dstack._internal.core.models.backends.base import ConfigMultiElement
 from dstack._internal.core.models.common import CoreModel
 
 
+class AWSOSImage(CoreModel):
+    name: Annotated[str, Field(description="AMI name")]
+    owner: Annotated[
+        str,
+        Field(regex=r"^(\d{12}|self)$", description="AMI owner, account ID or `self`"),
+    ] = "self"
+    user: Annotated[str, Field(description="OS user for provisioning")]
+
+
+class AWSOSImageConfig(CoreModel):
+    cpu: Annotated[Optional[AWSOSImage], Field(description="AMI used for CPU instances")] = None
+    nvidia: Annotated[
+        Optional[AWSOSImage], Field(description="AMI used for NVIDIA GPU instances")
+    ] = None
+
+
 class AWSConfigInfo(CoreModel):
     type: Literal["aws"] = "aws"
     regions: Optional[List[str]] = None
@@ -15,6 +31,7 @@ class AWSConfigInfo(CoreModel):
     default_vpcs: Optional[bool] = None
     public_ips: Optional[bool] = None
     tags: Optional[Dict[str, str]] = None
+    os_images: Optional[AWSOSImageConfig] = None
 
 
 class AWSAccessKeyCreds(CoreModel):
@@ -52,6 +69,7 @@ class AWSConfigInfoWithCredsPartial(CoreModel):
     default_vpcs: Optional[bool]
     public_ips: Optional[bool]
     tags: Optional[Dict[str, str]]
+    os_images: Optional["AWSOSImageConfig"]
 
 
 class AWSConfigValues(CoreModel):
