@@ -74,5 +74,40 @@ The `local` backend will submit the run to the locally started shim and runner. 
     ...                                                                              
  Shown 3 of 4041 offers, $56.6266 max
 
-Continue? [y/n]: 
+Continue? [y/n]:
 ```
+
+## Dependencies (WIP)
+
+These are nonexhaustive lists of external dependencies (executables, libraries) of the `dstack-*` binaries.
+
+**TODO**: inspect codebase, add missing dependencies.
+
+### `dstack-shim`
+
+#### Libraries
+
+* libc
+* ...
+
+#### Executables
+
+* `mount`
+* `umount`
+* `mountpoint`
+* `lsblk`
+* `mkfs.ext4`
+* ...
+
+Debian/Ubuntu packages: `mount` (`mount`, `umount`), `util-linux` (`mountpoint`, `lsblk`), `e2fsprogs` (`mkfs.ext4`)
+
+### `dstack-runner`
+
+#### Libraries
+
+* libc
+* ...
+
+#### Executables
+
+* ...
