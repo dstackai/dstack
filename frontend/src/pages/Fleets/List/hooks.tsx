@@ -2,66 +2,13 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
-import { ListEmptyMessage, StatusIndicator, TableProps } from 'components';
+import { Icon, ListEmptyMessage, StatusIndicator, TableProps } from 'components';
+import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
+import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { getStatusIconType } from 'libs/fleet';
-
-import { SelectCSDProps } from '../../../components';
-import { useLocalStorageState } from '../../../hooks/useLocalStorageState';
-
-import { TFleetInstance } from './types';
-
-export const useColumnsDefinitions = () => {
-    const { t } = useTranslation();
-
-    const columns: TableProps.ColumnDefinition<TFleetInstance>[] = [
-        {
-            id: 'fleet',
-            header: t('fleets.fleet'),
-            cell: (item) =>
-                // <NavigateLink href={ROUTES.FLEETS.DETAILS.FORMAT(item.project_name, item.name)}>{item.name}</NavigateLink>
-                item.fleetName,
-        },
-        {
-            id: 'instance',
-            header: `${t('fleets.instances.instance_name')}`,
-            cell: (item) => item?.instance_type?.name,
-        },
-        {
-            id: 'backend',
-            header: `${t('fleets.instances.backend')}`,
-            cell: (item) => item?.backend,
-        },
-        {
-            id: 'resources',
-            header: `${t('fleets.instances.resources')}`,
-            cell: (item) => item?.instance_type?.resources.description,
-        },
-        {
-            id: 'price',
-            header: `${t('fleets.instances.price')}`,
-            cell: (item) => item?.price && `$${item.price}`,
-        },
-        {
-            id: 'created',
-            header: t('fleets.instances.created'),
-            cell: (item) => item?.created && format(new Date(item.created), DATE_TIME_FORMAT),
-        },
-        {
-            id: 'status',
-            header: `${t('fleets.instances.status')}`,
-            cell: (item) =>
-                item?.status && (
-                    <StatusIndicator type={getStatusIconType(item.status)}>
-                        {t(`fleets.instances.statuses.${item.status}`)}
-                    </StatusIndicator>
-                ),
-        },
-    ];
-
-    return { columns } as const;
-};
+import { useGetProjectsQuery } from 'services/project';
 
 export const useEmptyMessages = () => {
     const { t } = useTranslation();
@@ -77,50 +24,98 @@ export const useEmptyMessages = () => {
     return { renderEmptyMessage, renderNoMatchMessage } as const;
 };
 
-export const useFilters = ({ fleets }: { fleets?: IFleet[] }) => {
+export const useColumnsDefinitions = () => {
+    const { t } = useTranslation();
+
+    const columns: TableProps.ColumnDefinition<IInstanceListItem>[] = [
+        {
+            id: 'instance_name',
+            header: t('fleets.instances.instance_name'),
+            cell: (item) => item.name,
+        },
+        {
+            id: 'status',
+            header: t('fleets.instances.status'),
+            cell: (item) => (
+                <StatusIndicator type={getStatusIconType(item.status)}>
+                    {t(`fleets.instances.statuses.${item.status}`)}
+                </StatusIndicator>
+            ),
+        },
+        {
+            id: 'project',
+            header: t('fleets.instances.project'),
+            cell: (item) => item.project_name,
+        },
+        {
+            id: 'resources',
+            header: t('fleets.instances.resources'),
+            cell: (item) => item.instance_type?.resources.description,
+        },
+        {
+            id: 'backend',
+            header: t('fleets.instances.backend'),
+            cell: (item) => item.backend,
+        },
+        {
+            id: 'region',
+            header: t('fleets.instances.region'),
+            cell: (item) => item.region,
+        },
+        {
+            id: 'spot',
+            header: t('fleets.instances.spot'),
+            cell: (item) => item.instance_type?.resources.spot && <Icon name={'check'} />,
+        },
+        {
+            id: 'started',
+            header: t('fleets.instances.started'),
+            cell: (item) => format(new Date(item.created), DATE_TIME_FORMAT),
+        },
+        {
+            id: 'price',
+            header: t('fleets.instances.price'),
+            cell: (item) => item.price && `$${item.price}`,
+        },
+    ];
+
+    return { columns } as const;
+};
+
+export const useFilters = () => {
     const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>('administration-fleet-list-is-active', false);
-    const [selectedFleet, setSelectedFleet] = useState<SelectCSDProps.Option | null>(null);
+    const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
 
-    const fleetOptions = useMemo<SelectCSDProps.Options>(() => {
-        if (!fleets?.length) return [];
+    const { data: projectsData } = useGetProjectsQuery();
 
-        return fleets.map((fleet) => ({ label: fleet.name, value: fleet.name }));
-    }, [fleets]);
+    const projectOptions = useMemo<SelectCSDProps.Options>(() => {
+        if (!projectsData?.length) return [];
+
+        return projectsData.map((project) => ({ label: project.project_name, value: project.project_name }));
+    }, [projectsData]);
 
     const clearFilters = () => {
         setOnlyActive(false);
-        setSelectedFleet(null);
+        setSelectedProject(null);
     };
 
-    const filteringFunction = useCallback<(instance: TFleetInstance) => boolean>(
-        (instance: TFleetInstance) => {
-            let isMatch = true;
-
-            if (selectedFleet) {
-                isMatch = isMatch && instance.fleetName === selectedFleet.value;
-            }
-
-            if (onlyActive) {
-                isMatch =
-                    isMatch &&
-                    ['creating', 'starting', 'provisioning', 'terminating', 'busy', 'idle'].includes(instance.status ?? '');
-            }
-
-            return isMatch;
+    const filteringFunction = useCallback<(pool: IPoolListItem) => boolean>(
+        (pool: IPoolListItem) => {
+            return !(onlyActive && pool.total_instances === 0);
         },
-        [onlyActive, selectedFleet],
+        [onlyActive],
     );
 
-    const isDisabledClearFilter = !selectedFleet && !onlyActive;
+    const isDisabledClearFilter = !selectedProject && !onlyActive;
 
     return {
+        projectOptions,
+        selectedProject,
+        setSelectedProject,
         onlyActive,
         setOnlyActive,
-        selectedFleet,
-        setSelectedFleet,
-        fleetOptions,
-        isDisabledClearFilter,
-        clearFilters,
         filteringFunction,
+        clearFilters,
+        isDisabledClearFilter,
     } as const;
 };

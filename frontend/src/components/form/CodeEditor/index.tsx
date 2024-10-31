@@ -12,8 +12,9 @@ ace.config.set('useWorker', false);
 
 import { Mode } from '@cloudscape-design/global-styles';
 
-import { selectSystemMode } from '../../../App/slice';
-import { useAppSelector } from '../../../hooks';
+import { useAppSelector } from 'hooks';
+
+import { selectSystemMode } from 'App/slice';
 
 import 'ace-builds/src-noconflict/theme-cloud_editor';
 import 'ace-builds/src-noconflict/theme-cloud_editor_dark';

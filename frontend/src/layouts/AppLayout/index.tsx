@@ -35,7 +35,7 @@ import {
 } from 'App/slice';
 
 import { AnnotationContext } from './AnnotationContext';
-import { useProjectDropdown, useSideNavigation } from './hooks';
+import { useSideNavigation } from './hooks';
 import { TallyComponent } from './Tally';
 import { DarkThemeIcon, LightThemeIcon } from './themeIcons';
 import { TutorialPanel } from './TutorialPanel';
@@ -69,7 +69,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { isOpen: toolsIsOpen, tab: toolsActiveTab } = useAppSelector(selectToolsPanelState);
     const helpPanelContent = useAppSelector(selectHelpPanelContent);
     const dispatch = useAppDispatch();
-    const { projectsDropdownList, selectedProject, onFollowProject, isAvailableProjectDropdown } = useProjectDropdown();
     const { navLinks, activeHref } = useSideNavigation();
 
     const onFollowHandler: SideNavigationProps['onFollow'] = (event) => {
@@ -159,13 +158,6 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                 type: 'button',
                                 iconSvg: <ThemeIcon />,
                                 onClick: onChangeSystemModeToggle,
-                            },
-                            isAvailableProjectDropdown && {
-                                type: 'menu-dropdown',
-                                iconName: 'share',
-                                text: selectedProject,
-                                items: projectsDropdownList,
-                                onItemFollow: onFollowProject,
                             },
                             {
                                 'data-class': 'user-menu',

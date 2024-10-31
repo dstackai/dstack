@@ -1,12 +1,13 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 
-import { ListEmptyMessage, NavigateLink, TableProps } from 'components';
+import { Button, ListEmptyMessage, NavigateLink, SelectCSDProps, TableProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
-
-import { ROUTES } from '../../../routes';
+import { ROUTES } from 'routes';
+import { useGetProjectsQuery } from 'services/project';
 
 import { IModelExtended } from './types';
 
@@ -81,16 +82,88 @@ export const useColumnsDefinitions = () => {
     return { columns } as const;
 };
 
-export const useEmptyMessages = () => {
+export const useEmptyMessages = ({
+    clearFilter,
+    isDisabledClearFilter,
+}: {
+    clearFilter?: () => void;
+    isDisabledClearFilter?: boolean;
+}) => {
     const { t } = useTranslation();
 
     const renderEmptyMessage = useCallback<() => React.ReactNode>(() => {
-        return <ListEmptyMessage title={t('models.empty_message_title')} message={t('models.empty_message_text')} />;
+        return (
+            <ListEmptyMessage title={t('models.empty_message_title')} message={t('models.empty_message_text')}>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilter}>
+                    {t('common.clearFilter')}
+                </Button>
+            </ListEmptyMessage>
+        );
     }, []);
 
     const renderNoMatchMessage = useCallback<() => React.ReactNode>(() => {
-        return <ListEmptyMessage title={t('models.nomatch_message_title')} message={t('models.nomatch_message_text')} />;
+        return (
+            <ListEmptyMessage title={t('models.nomatch_message_title')} message={t('models.nomatch_message_text')}>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilter}>
+                    {t('common.clearFilter')}
+                </Button>
+            </ListEmptyMessage>
+        );
     }, []);
 
     return { renderEmptyMessage, renderNoMatchMessage } as const;
+};
+
+type Args = {
+    projectSearchKey?: string;
+};
+
+export const useFilters = ({ projectSearchKey }: Args) => {
+    const [searchParams] = useSearchParams();
+    const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
+
+    const { data: projectsData } = useGetProjectsQuery();
+
+    const projectOptions = useMemo<SelectCSDProps.Options>(() => {
+        if (!projectsData?.length) return [];
+
+        return projectsData.map((project) => ({ label: project.project_name, value: project.project_name }));
+    }, [projectsData]);
+
+    const setSelectedOptionFromParams = (
+        searchKey: string,
+        options: SelectCSDProps.Options | null,
+        set: (option: SelectCSDProps.Option) => void,
+    ) => {
+        const searchValue = searchParams.get(searchKey);
+
+        if (!searchValue || !options?.length) return;
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        const selectedOption = options.find((option) => option?.value === searchValue);
+
+        if (selectedOption) set(selectedOption);
+    };
+
+    useEffect(() => {
+        if (!projectSearchKey) return;
+
+        setSelectedOptionFromParams(projectSearchKey, projectOptions, setSelectedProject);
+    }, [searchParams, projectSearchKey, projectOptions]);
+
+    const clearSelected = () => {
+        setSelectedProject(null);
+    };
+
+    const setSelectedProjectHandle = (project: SelectCSDProps.Option | null) => {
+        setSelectedProject(project);
+    };
+
+    return {
+        projectOptions,
+        selectedProject,
+        setSelectedProject: setSelectedProjectHandle,
+        clearSelected,
+    } as const;
 };

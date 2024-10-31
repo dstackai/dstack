@@ -39,6 +39,11 @@ export const useColumnsDefinitions = () => {
             cell: (item: IVolume) => item.name,
         },
         {
+            id: 'project',
+            header: `${t('volume.project')}`,
+            cell: (item: IVolume) => item.project_name,
+        },
+        {
             id: 'backend',
             header: `${t('volume.backend')}`,
             cell: (item: IVolume) => item.configuration?.backend ?? '-',
@@ -77,7 +82,6 @@ export const useColumnsDefinitions = () => {
 
     return { columns } as const;
 };
-
 export const useVolumesData = ({ project_name, only_active }: TVolumesListRequestParams) => {
     const [data, setData] = useState<IVolume[]>([]);
     const [pagesCount, setPagesCount] = useState<number>(1);
