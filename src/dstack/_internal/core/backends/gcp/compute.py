@@ -235,18 +235,6 @@ class GCPCompute(Compute):
                 )
             raise NoCapacityError()
 
-        if not allocate_public_ip and not gcp_resources.has_vpc_nat_access(
-            routers_client=self.routers_client,
-            project_id=self.config.vpc_project_id or self.config.project_id,
-            vpc_name=self.config.vpc_resource_name,
-            region=instance_offer.region,
-        ):
-            raise ComputeError(
-                "VPC does not have access to the external internet through Cloud NAT. "
-                f"Region: {instance_offer.region}, VPC name: {self.config.vpc_resource_name}, "
-                f"Project ID: {self.config.vpc_project_id or self.config.project_id}."
-            )
-
         for zone in zones:
             request = compute_v1.InsertInstanceRequest()
             request.zone = zone
