@@ -8,6 +8,7 @@ class RegisterServiceRequest(BaseModel):
     domain: str
     https: bool = True
     auth: bool = True
+    client_max_body_size: int
     options: dict = {}
     ssh_private_key: str
 

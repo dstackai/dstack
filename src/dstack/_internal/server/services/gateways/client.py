@@ -47,6 +47,7 @@ class GatewayClient:
         service_https: bool,
         gateway_https: bool,
         auth: bool,
+        client_max_body_size: int,
         options: dict,
         ssh_private_key: str,
     ):
@@ -59,6 +60,7 @@ class GatewayClient:
             "domain": domain,
             "https": service_https,
             "auth": auth,
+            "client_max_body_size": client_max_body_size,
             "options": options,
             "ssh_private_key": ssh_private_key,
         }

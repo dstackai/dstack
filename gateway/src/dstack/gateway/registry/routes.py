@@ -24,6 +24,7 @@ async def post_register_service(
             https=body.https,
             auth=body.auth,
             options=body.options,
+            client_max_body_size=body.client_max_body_size,
         ),
         body.ssh_private_key,
     )

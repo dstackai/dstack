@@ -38,6 +38,8 @@ class Service(BaseModel):
     domain: str
     https: bool = True
     auth: bool
+    # Default for compatibility with older state.json. TODO: remove after a few releases
+    client_max_body_size: int = 1024 * 1024
     options: dict
     replicas: List[Replica] = []
 
@@ -107,6 +109,7 @@ class Store(PersistentModel):
                     service.domain,
                     service.https,
                     service.auth,
+                    service.client_max_body_size,
                 )
                 stack.push_async_callback(
                     supress_exc_async(self.nginx.unregister_domain, service.domain)
