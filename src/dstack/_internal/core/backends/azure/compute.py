@@ -165,7 +165,7 @@ class AzureCompute(Compute):
             vm=vm,
         )
         hostname = public_ip
-        if allocate_public_ip:
+        if not allocate_public_ip:
             hostname = private_ip
         return JobProvisioningData(
             backend=instance_offer.backend,
