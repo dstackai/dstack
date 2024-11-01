@@ -7,7 +7,7 @@ from pydantic import UUID4, Field, root_validator
 from typing_extensions import Annotated
 
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.common import CoreModel, RegistryAuth
+from dstack._internal.core.models.common import ApplyAction, CoreModel, RegistryAuth
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     RunConfiguration,
@@ -377,6 +377,15 @@ class RunPlan(CoreModel):
     user: str
     run_spec: RunSpec
     job_plans: List[JobPlan]
+    current_resource: Optional[Run] = None
+    # Optional for backward-compatibility with 0.18.x servers
+    # TODO: make required in 0.19
+    action: Optional[ApplyAction] = None
+
+
+class ApplyRunPlanInput(CoreModel):
+    run_spec: RunSpec
+    current_resource: Optional[Run] = None
 
 
 class PoolInstanceOffers(CoreModel):

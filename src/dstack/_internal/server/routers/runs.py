@@ -9,6 +9,7 @@ from dstack._internal.core.models.runs import PoolInstanceOffers, Run, RunPlan
 from dstack._internal.server.db import get_session
 from dstack._internal.server.models import ProjectModel, UserModel
 from dstack._internal.server.schemas.runs import (
+    ApplyRunPlanRequest,
     CreateInstanceRequest,
     DeleteRunsRequest,
     GetOffersRequest,
@@ -80,19 +81,35 @@ async def get_run(
 
 
 @project_router.post("/get_plan")
-async def get_run_plan(
+async def get_plan(
     body: GetRunPlanRequest,
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> RunPlan:
     user, project = user_project
-    run_plan = await runs.get_run_plan(
+    run_plan = await runs.get_plan(
         session=session,
         project=project,
         user=user,
         run_spec=body.run_spec,
     )
     return run_plan
+
+
+@project_router.post("/apply")
+async def apply_plan(
+    body: ApplyRunPlanRequest,
+    session: AsyncSession = Depends(get_session),
+    user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
+) -> Run:
+    user, project = user_project
+    return await runs.apply_plan(
+        session=session,
+        user=user,
+        project=project,
+        plan=body.plan,
+        force=body.force,
+    )
 
 
 @project_router.post("/submit")

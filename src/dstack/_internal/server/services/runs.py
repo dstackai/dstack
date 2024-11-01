@@ -16,7 +16,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import is_core_model_instance
+from dstack._internal.core.models.common import ApplyAction, is_core_model_instance
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -26,6 +26,7 @@ from dstack._internal.core.models.profiles import (
     CreationPolicy,
 )
 from dstack._internal.core.models.runs import (
+    ApplyRunPlanInput,
     Job,
     JobPlan,
     JobSpec,
@@ -59,6 +60,7 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import volumes as volumes_services
+from dstack._internal.server.services.diff import diff_models
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
@@ -226,7 +228,7 @@ async def get_run(
     return run_model_to_run(run_model, return_in_api=True)
 
 
-async def get_run_plan(
+async def get_plan(
     session: AsyncSession,
     project: ProjectModel,
     user: UserModel,
@@ -236,6 +238,19 @@ async def get_run_plan(
 
     profile = run_spec.merged_profile
     creation_policy = profile.creation_policy
+
+    current_resource = None
+    action = ApplyAction.CREATE
+    if run_spec.run_name is not None:
+        current_resource = await get_run(
+            session=session,
+            project=project,
+            run_name=run_spec.run_name,
+        )
+        if current_resource is not None and _can_update_run_spec(
+            current_resource.run_spec, run_spec
+        ):
+            action = ApplyAction.UPDATE
 
     # TODO(egor-s): do we need to generate all replicas here?
     jobs = await get_jobs_from_run_spec(run_spec, replica_num=0)
@@ -287,15 +302,72 @@ async def get_run_plan(
         )
         job_plans.append(job_plan)
 
-    run_spec.profile.pool_name = pool.name  # write pool name back for the client
     run_spec.run_name = run_name  # restore run_name
     run_plan = RunPlan(
         project_name=project.name,
         user=user.name,
         run_spec=run_spec,
         job_plans=job_plans,
+        current_resource=current_resource,
+        action=action,
     )
     return run_plan
+
+
+async def apply_plan(
+    session: AsyncSession,
+    user: UserModel,
+    project: ProjectModel,
+    plan: ApplyRunPlanInput,
+    force: bool,
+) -> Run:
+    if plan.run_spec.run_name is None:
+        return await submit_run(
+            session=session,
+            user=user,
+            project=project,
+            run_spec=plan.run_spec,
+        )
+    current_resource = await get_run(
+        session=session,
+        project=project,
+        run_name=plan.run_spec.run_name,
+    )
+    if current_resource is None or current_resource.status.is_finished():
+        return await submit_run(
+            session=session,
+            user=user,
+            project=project,
+            run_spec=plan.run_spec,
+        )
+    try:
+        _check_can_update_run_spec(current_resource.run_spec, plan.run_spec)
+    except ServerClientError:
+        # The except is only needed to raise an appropriate error if run is active
+        if not current_resource.status.is_finished():
+            raise ServerClientError("Cannot override active run. Stop the run first.")
+        raise
+    if not force:
+        if (
+            plan.current_resource is None
+            or plan.current_resource.id != current_resource.id
+            or plan.current_resource.run_spec != current_resource.run_spec
+        ):
+            raise ServerClientError(
+                "Failed to apply plan. Resource has been changed." " Try again or use force apply."
+            )
+
+    await session.execute(
+        update(RunModel)
+        .where(RunModel.id == current_resource.id)
+        .values(run_spec=plan.run_spec.json())
+    )
+    run = await get_run(
+        session=session,
+        project=project,
+        run_name=plan.run_spec.run_name,
+    )
+    return common_utils.get_or_error(run)
 
 
 async def submit_run(
@@ -697,6 +769,36 @@ def _validate_run_spec(run_spec: RunSpec):
             raise ServerClientError(f"Invalid volume mount path: {mount_point.path}")
         if mount_point.path.startswith("/workflow"):
             raise ServerClientError("Mounting volumes inside /workflow is not supported")
+
+
+_UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
+_UPDATABLE_CONFIGURATION_FIELDS = ["replicas", "scaling"]
+
+
+def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bool:
+    try:
+        _check_can_update_run_spec(current_run_spec, new_run_spec)
+    except ServerClientError as e:
+        logger.debug("Run cannot be updated: %s", repr(e))
+        return False
+    return True
+
+
+def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
+    spec_diff = diff_models(current_run_spec, new_run_spec)
+    for key in spec_diff.keys():
+        if key not in _UPDATABLE_SPEC_FIELDS:
+            raise ServerClientError(
+                f"Failed to update fields {list(spec_diff.keys())}."
+                f" Can only update {_UPDATABLE_SPEC_FIELDS}."
+            )
+    configuration_diff = diff_models(current_run_spec.configuration, new_run_spec.configuration)
+    for key in configuration_diff.keys():
+        if key not in _UPDATABLE_CONFIGURATION_FIELDS:
+            raise ServerClientError(
+                f"Failed to update fields {list(configuration_diff.keys())}."
+                f" Can only update {_UPDATABLE_CONFIGURATION_FIELDS}"
+            )
 
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):

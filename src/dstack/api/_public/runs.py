@@ -528,8 +528,9 @@ class RunCollection:
             self._api_client.repos.upload_code(
                 self._project, repo.repo_id, run_plan.run_spec.repo_code_hash, fp
             )
-        logger.debug("Submitting run spec")
-        run = self._api_client.runs.submit(self._project, run_plan.run_spec)
+        # TODO: call self._api_client.runs.submit when action is CREATE
+        # since apply is not backward-compatible
+        run = self._api_client.runs.apply_plan(self._project, run_plan)
         return self._model_to_submitted_run(run, ports_lock)
 
     def list(self, all: bool = False) -> List[Run]:

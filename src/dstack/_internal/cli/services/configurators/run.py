@@ -22,7 +22,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.common import ApplyAction, RegistryAuth
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     ApplyConfigurationType,
@@ -68,7 +68,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             logger.warning(
                 "Specifying [code]python: 3.8[/] in run configurations is deprecated"
                 " and will be forbidden in a future [code]dstack[/] release."
-                " Please upgrade your configuration to a newer Python version"
+                " Please upgrade your configuration to a newer Python version."
             )
         repo = self.api.repos.load(Path.cwd())
         repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
@@ -99,9 +99,17 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
 
         confirm_message = "Submit a new run?"
         if conf.name:
-            old_run = self.api.runs.get(run_name=conf.name)
-            if old_run is not None:
-                confirm_message = f"Run [code]{conf.name}[/] already exists. Override the run?"
+            if run_plan.current_resource is not None:
+                if run_plan.action == ApplyAction.UPDATE:
+                    confirm_message = (
+                        f"Run [code]{conf.name}[/] already exists and can be updated in-place."
+                        " Update the run?"
+                    )
+                else:
+                    confirm_message = (
+                        f"Run [code]{conf.name}[/] already exists and cannot be updated in-place."
+                        " Override the run?"
+                    )
             else:
                 confirm_message = f"Submit the run [code]{conf.name}[/]?"
 
@@ -110,7 +118,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             return
 
         try:
-            with console.status("Submitting run..."):
+            with console.status("Applying plan..."):
                 run = self.api.runs.exec_plan(
                     run_plan, repo, reserve_ports=not command_args.detach
                 )
@@ -118,7 +126,10 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             raise CLIError(e.msg)
 
         if command_args.detach:
-            console.print(f"Run [code]{run.name}[/] submitted, detaching...")
+            detach_message = f"Run [code]{run.name}[/] submitted, detaching..."
+            if run_plan.action == ApplyAction.UPDATE:
+                detach_message = f"Run [code]{run.name}[/] updated, detaching..."
+            console.print(detach_message)
             return
 
         abort_at_exit = False

@@ -1,4 +1,5 @@
 import re
+from enum import Enum
 from typing import Any, Type, TypeVar, Union
 
 from pydantic import Field
@@ -63,6 +64,11 @@ class RegistryAuth(CoreModel):
 
     username: Annotated[str, Field(description="The username")]
     password: Annotated[str, Field(description="The password or access token")]
+
+
+class ApplyAction(str, Enum):
+    CREATE = "create"  # resource created or overridden
+    UPDATE = "update"  # resource can be updated in place
 
 
 _CM = TypeVar("_CM", bound=CoreModel)
