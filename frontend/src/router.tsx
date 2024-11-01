@@ -7,19 +7,19 @@ import App from 'App';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
 import { LoginByTokenForm } from 'App/Login/LoginByTokenForm';
 import { Logout } from 'App/Logout';
-import { AdministrationFleetsList, FleetDetails, FleetsList } from 'pages/Fleets';
+import { FleetDetails, FleetList } from 'pages/Fleets';
 import { ModelsList } from 'pages/Models';
 import { ModelDetails } from 'pages/Models/Details';
 import { ProjectAdd, ProjectDetails, ProjectList, ProjectSettings } from 'pages/Project';
 import { BackendAdd, BackendEdit } from 'pages/Project/Backends';
 import { AddGateway, EditGateway } from 'pages/Project/Gateways';
-import { AdministrationList, List as MainRunList, RunDetails } from 'pages/Runs';
+import { RunDetails, RunList } from 'pages/Runs';
 import { JobDetails } from 'pages/Runs/Details/Jobs/Details';
 import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pages/User';
 import { UserBilling, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
-import { AdministrationVolumeList, VolumeList } from './pages/Volumes';
+import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
 
 export const router = createBrowserRouter([
@@ -93,7 +93,7 @@ export const router = createBrowserRouter([
             // Runs
             {
                 path: ROUTES.RUNS.LIST,
-                element: <MainRunList />,
+                element: <RunList />,
             },
 
             // Models
@@ -109,7 +109,7 @@ export const router = createBrowserRouter([
             // Fleets
             {
                 path: ROUTES.FLEETS.LIST,
-                element: <FleetsList />,
+                element: <FleetList />,
             },
             {
                 path: ROUTES.FLEETS.DETAILS.TEMPLATE,
@@ -120,20 +120,6 @@ export const router = createBrowserRouter([
             {
                 path: ROUTES.VOLUMES.LIST,
                 element: <VolumeList />,
-            },
-
-            // administration
-            {
-                path: ROUTES.ADMINISTRATION.RUNS.LIST,
-                element: <AdministrationList />,
-            },
-            {
-                path: ROUTES.ADMINISTRATION.FLEETS.LIST,
-                element: <AdministrationFleetsList />,
-            },
-            {
-                path: ROUTES.ADMINISTRATION.VOLUMES.LIST,
-                element: <AdministrationVolumeList />,
             },
 
             // Users

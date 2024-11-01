@@ -3,64 +3,27 @@ import { useSearchParams } from 'react-router-dom';
 
 import { SelectCSDProps } from 'components';
 
-import { useGetProjectReposQuery, useGetProjectsQuery } from 'services/project';
-import { useGetUserListQuery } from 'services/user';
-
-import { useLocalStorageState } from '../../../../hooks/useLocalStorageState';
+import { useLocalStorageState } from 'hooks/useLocalStorageState';
+import { useGetProjectsQuery } from 'services/project';
 
 type Args = {
     localStorePrefix: string;
-    repoSearchKey?: string;
     projectSearchKey?: string;
-    userSearchKey?: string;
     selectedProject?: string;
 };
 
-export const useFilters = ({
-    localStorePrefix,
-    repoSearchKey,
-    projectSearchKey,
-    userSearchKey,
-    selectedProject: selectedProjectProp,
-}: Args) => {
-    const [searchParams, setSearchParams] = useSearchParams();
+export const useFilters = ({ localStorePrefix, projectSearchKey }: Args) => {
+    const [searchParams] = useSearchParams();
     const [selectedProject, setSelectedProject] = useState<SelectCSDProps.Option | null>(null);
-    const [selectedRepo, setSelectedRepo] = useState<SelectCSDProps.Option | null>(null);
-    const [selectedUser, setSelectedUser] = useState<SelectCSDProps.Option | null>(null);
     const [onlyActive, setOnlyActive] = useLocalStorageState<boolean>(`${localStorePrefix}-is-active`, false);
 
-    useEffect(() => {
-        setSelectedRepo(null);
-    }, [selectedProjectProp]);
-
     const { data: projectsData } = useGetProjectsQuery();
-    const { data: usersData } = useGetUserListQuery();
-    const { data: reposData } = useGetProjectReposQuery(
-        {
-            project_name: selectedProjectProp ?? selectedProject?.value ?? '',
-        },
-        {
-            skip: !selectedProject && !selectedProjectProp,
-        },
-    );
 
     const projectOptions = useMemo<SelectCSDProps.Options>(() => {
         if (!projectsData?.length) return [];
 
         return projectsData.map((project) => ({ label: project.project_name, value: project.project_name }));
     }, [projectsData]);
-
-    const userOptions = useMemo<SelectCSDProps.Options>(() => {
-        if (!usersData?.length) return [];
-
-        return usersData.map((user) => ({ label: user.username, value: user.username }));
-    }, [usersData]);
-
-    const repoOptions = useMemo<SelectCSDProps.Options>(() => {
-        if (!reposData?.length) return [];
-
-        return reposData.map((repo) => ({ label: repo.repo_id, value: repo.repo_id }));
-    }, [reposData]);
 
     const setSelectedOptionFromParams = (
         searchKey: string,
@@ -84,28 +47,13 @@ export const useFilters = ({
         setSelectedOptionFromParams(projectSearchKey, projectOptions, setSelectedProject);
     }, [searchParams, projectSearchKey, projectOptions]);
 
-    useEffect(() => {
-        if (!repoSearchKey) return;
-
-        setSelectedOptionFromParams(repoSearchKey, repoOptions, setSelectedRepo);
-    }, [searchParams, repoSearchKey, repoOptions]);
-
-    useEffect(() => {
-        if (!userSearchKey) return;
-
-        setSelectedOptionFromParams(userSearchKey, userOptions, setSelectedUser);
-    }, [searchParams, userSearchKey, userOptions]);
-
     const clearSelected = () => {
         setSelectedProject(null);
-        setSelectedRepo(null);
-        setSelectedUser(null);
         setOnlyActive(false);
     };
 
     const setSelectedProjectHandle = (project: SelectCSDProps.Option | null) => {
         setSelectedProject(project);
-        setSelectedRepo(null);
         setOnlyActive(false);
     };
 
@@ -113,12 +61,6 @@ export const useFilters = ({
         projectOptions,
         selectedProject,
         setSelectedProject: setSelectedProjectHandle,
-        repoOptions,
-        selectedRepo,
-        setSelectedRepo,
-        userOptions,
-        selectedUser,
-        setSelectedUser,
         onlyActive,
         setOnlyActive,
         clearSelected,

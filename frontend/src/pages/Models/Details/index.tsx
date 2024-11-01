@@ -103,9 +103,9 @@ export const ModelDetails: React.FC = () => {
     });
 
     useEffect(() => {
-        // if (runData && runIsStopped(runData.status)) {
-        //     riseRouterException();
-        // }
+        if (runData && runIsStopped(runData.status)) {
+            riseRouterException();
+        }
     }, [runData]);
 
     const modelData = useMemo<IModelExtended | undefined | null>(() => {
@@ -260,8 +260,6 @@ export const ModelDetails: React.FC = () => {
         if (!textAreaRef.current) return;
 
         const textAreaElement = textAreaRef.current.querySelector('textarea');
-
-        console.log('message', textAreaElement.value);
 
         if (!textAreaElement) return;
 

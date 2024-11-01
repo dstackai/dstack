@@ -89,19 +89,6 @@ export const ROUTES = {
         LIST: '/volumes',
     },
 
-    ADMINISTRATION: {
-        BASE: '/administration',
-        RUNS: {
-            LIST: `/administration/runs`,
-        },
-        FLEETS: {
-            LIST: '/administration/fleets',
-        },
-        VOLUMES: {
-            LIST: '/administration/volumes',
-        },
-    },
-
     USER: {
         LIST: '/users',
         ADD: '/users/add',

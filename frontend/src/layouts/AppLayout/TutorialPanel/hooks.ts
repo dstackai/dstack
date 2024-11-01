@@ -23,7 +23,7 @@ import { ITutorialItem } from 'App/types';
 export const useTutorials = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
-    const { mainProjectSettingsUrl, billingUrl } = useSideNavigation();
+    const { billingUrl } = useSideNavigation();
     const useName = useAppSelector(selectUserName);
     const { billingCompleted, configureCLICompleted, discordCompleted, tallyCompleted, quickStartCompleted } =
         useAppSelector(selectTutorialPanel);
@@ -60,9 +60,7 @@ export const useTutorials = () => {
         dispatch(updateTutorialPanelState({ billingCompleted: true }));
     }, []);
 
-    const startConfigCliTutorial = useCallback(() => {
-        navigate(mainProjectSettingsUrl);
-    }, [billingUrl]);
+    const startConfigCliTutorial = useCallback(() => {}, [billingUrl]);
 
     const finishConfigCliTutorial = useCallback(() => {
         dispatch(updateTutorialPanelState({ configureCLICompleted: true }));
@@ -128,7 +126,6 @@ export const useTutorials = () => {
             },
         ];
     }, [
-        mainProjectSettingsUrl,
         billingUrl,
         quickStartCompleted,
         discordCompleted,

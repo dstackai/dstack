@@ -1,4 +1,4 @@
-import { CollectionPreferencesProps } from '../../../../components';
+import { CollectionPreferencesProps } from 'components';
 
 export const DEFAULT_PREFERENCES: CollectionPreferencesProps.Preferences = {
     pageSize: 30,

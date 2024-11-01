@@ -11,17 +11,31 @@ import { getStatusIconType } from 'libs/volumes';
 import { useGetProjectsQuery } from 'services/project';
 import { useLazyGetAllVolumesQuery } from 'services/volume';
 
-export const useVolumesTableEmptyMessages = () => {
+export const useVolumesTableEmptyMessages = ({
+    clearFilters,
+    isDisabledClearFilter,
+}: {
+    clearFilters?: () => void;
+    isDisabledClearFilter?: boolean;
+}) => {
     const { t } = useTranslation();
 
     const renderEmptyMessage = (): React.ReactNode => {
-        return <ListEmptyMessage title={t('volume.empty_message_title')} message={t('volume.empty_message_text')} />;
+        return (
+            <ListEmptyMessage title={t('volume.empty_message_title')} message={t('volume.empty_message_text')}>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilters}>
+                    {t('common.clearFilter')}
+                </Button>
+            </ListEmptyMessage>
+        );
     };
 
-    const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
+    const renderNoMatchMessage = (): React.ReactNode => {
         return (
             <ListEmptyMessage title={t('volume.nomatch_message_title')} message={t('volume.nomatch_message_text')}>
-                <Button onClick={onClearFilter}>{t('common.clearFilter')}</Button>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilters}>
+                    {t('common.clearFilter')}
+                </Button>
             </ListEmptyMessage>
         );
     };
@@ -37,6 +51,11 @@ export const useColumnsDefinitions = () => {
             id: 'name',
             header: t('volume.name'),
             cell: (item: IVolume) => item.name,
+        },
+        {
+            id: 'project',
+            header: `${t('volume.project')}`,
+            cell: (item: IVolume) => item.project_name,
         },
         {
             id: 'backend',
@@ -77,7 +96,6 @@ export const useColumnsDefinitions = () => {
 
     return { columns } as const;
 };
-
 export const useVolumesData = ({ project_name, only_active }: TVolumesListRequestParams) => {
     const [data, setData] = useState<IVolume[]>([]);
     const [pagesCount, setPagesCount] = useState<number>(1);

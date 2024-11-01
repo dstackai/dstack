@@ -1,52 +1,152 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
+import { orderBy as _orderBy } from 'lodash';
 
-import { Button, Header, ListEmptyMessage, Pagination, SpaceBetween, Table, TextFilter } from 'components';
+import { Button, FormField, Header, Pagination, SelectCSD, SpaceBetween, Table, Toggle } from 'components';
 
-import { useCollection } from 'hooks';
-import { useGetRunsQuery } from 'services/run';
+import { DEFAULT_TABLE_PAGE_SIZE } from 'consts';
+import { useBreadcrumbs, useCollection } from 'hooks';
+import { ROUTES } from 'routes';
+import { useLazyGetRunsQuery } from 'services/run';
 
-import { useAbortRuns, useColumnsDefinitions, useDeleteRuns, useDisabledStatesForButtons, useStopRuns } from './hooks';
+import { useRunListPreferences } from './Preferences/useRunListPreferences';
+import {
+    useAbortRuns,
+    useColumnsDefinitions,
+    useDeleteRuns,
+    useDisabledStatesForButtons,
+    useEmptyMessages,
+    useFilters,
+    useStopRuns,
+} from './hooks';
+import { Preferences } from './Preferences';
+
+import styles from './styles.module.scss';
 
 export const RunList: React.FC = () => {
     const { t } = useTranslation();
-    const params = useParams();
-    const paramProjectName = params.projectName ?? '';
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [preferences] = useRunListPreferences();
+    const [data, setData] = useState<IRun[]>([]);
+    const [pagesCount, setPagesCount] = useState<number>(1);
+    const [disabledNext, setDisabledNext] = useState(false);
 
-    const { data, isLoading } = useGetRunsQuery({
-        project_name: paramProjectName,
+    useBreadcrumbs([
+        {
+            text: t('projects.runs'),
+            href: ROUTES.RUNS.LIST,
+        },
+    ]);
+
+    const { projectOptions, selectedProject, setSelectedProject, onlyActive, setOnlyActive, clearSelected } = useFilters({
+        projectSearchKey: 'project',
+        localStorePrefix: 'administration-run-list-page',
     });
+
+    const [getRuns, { isLoading, isFetching }] = useLazyGetRunsQuery();
+
+    const isDisabledPagination = isLoading || isFetching || data.length === 0;
+
+    const getRunsRequest = (params?: Partial<TRunsRequestParams>) => {
+        return getRuns({
+            project_name: selectedProject?.value,
+            only_active: onlyActive,
+            limit: DEFAULT_TABLE_PAGE_SIZE,
+            ...params,
+        }).unwrap();
+    };
+
+    useEffect(() => {
+        getRunsRequest().then((result) => {
+            setPagesCount(1);
+            setDisabledNext(false);
+            setData(result);
+        });
+    }, [selectedProject?.value, onlyActive]);
+
+    const isDisabledClearFilter = !selectedProject && !onlyActive;
 
     const { stopRuns, isStopping } = useStopRuns();
     const { abortRuns, isAborting } = useAbortRuns();
     const { deleteRuns, isDeleting } = useDeleteRuns();
 
     const { columns } = useColumnsDefinitions();
-    const renderEmptyMessage = (): React.ReactNode => {
-        return (
-            <ListEmptyMessage title={t('projects.run.empty_message_title')} message={t('projects.run.empty_message_text')} />
-        );
+
+    const nextPage = async () => {
+        if (data.length === 0 || disabledNext) {
+            return;
+        }
+
+        try {
+            const result = await getRunsRequest({
+                prev_submitted_at: data[data.length - 1].submitted_at,
+                prev_run_id: data[data.length - 1].id,
+            });
+
+            if (result.length > 0) {
+                setPagesCount((count) => count + 1);
+                setData(result);
+            } else {
+                setDisabledNext(true);
+            }
+        } catch (e) {
+            console.log(e);
+        }
     };
 
-    const renderNoMatchMessage = (onClearFilter: () => void): React.ReactNode => {
-        return (
-            <ListEmptyMessage title={t('projects.run.nomatch_message_title')} message={t('projects.run.nomatch_message_text')}>
-                <Button onClick={onClearFilter}>{t('common.clearFilter')}</Button>
-            </ListEmptyMessage>
-        );
+    const prevPage = async () => {
+        if (pagesCount === 1) {
+            return;
+        }
+
+        try {
+            const result = await getRunsRequest({
+                prev_submitted_at: data[0].submitted_at,
+                prev_run_id: data[0].id,
+                ascending: true,
+            });
+
+            setDisabledNext(false);
+
+            if (result.length > 0) {
+                setPagesCount((count) => count - 1);
+                setData(_orderBy(result, ['submitted_at'], ['desc']));
+            } else {
+                setPagesCount(1);
+            }
+        } catch (e) {
+            console.log(e);
+        }
     };
 
-    const { items, actions, filteredItemsCount, collectionProps, filterProps, paginationProps } = useCollection(data ?? [], {
+    const clearFilter = () => {
+        clearSelected();
+        setOnlyActive(false);
+        setSearchParams({});
+    };
+
+    const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({
+        isDisabledClearFilter,
+        clearFilter,
+    });
+
+    const { items, actions, collectionProps } = useCollection(data ?? [], {
         filtering: {
             empty: renderEmptyMessage(),
-            noMatch: renderNoMatchMessage(() => actions.setFiltering('')),
+            noMatch: renderNoMatchMessage(),
         },
-        pagination: { pageSize: 20 },
         selection: {},
     });
 
     const { selectedItems } = collectionProps;
+
+    const { isDisabledAbortButton, isDisabledStopButton, isDisabledDeleteButton } = useDisabledStatesForButtons({
+        selectedRuns: selectedItems,
+        isStopping,
+        isAborting,
+        isDeleting,
+    });
 
     const abortClickHandle = () => {
         if (!selectedItems?.length) return;
@@ -66,24 +166,21 @@ export const RunList: React.FC = () => {
         deleteRuns([...selectedItems]).catch(console.log);
     };
 
-    const { isDisabledAbortButton, isDisabledStopButton, isDisabledDeleteButton } = useDisabledStatesForButtons({
-        selectedRuns: selectedItems,
-        isStopping,
-        isAborting,
-        isDeleting,
-    });
-
     return (
         <Table
             {...collectionProps}
+            variant="full-page"
             columnDefinitions={columns}
             items={items}
-            loading={isLoading}
+            loading={isLoading || isFetching}
             loadingText={t('common.loading')}
             selectionType="multi"
             stickyHeader={true}
+            columnDisplay={preferences.contentDisplay}
+            preferences={<Preferences />}
             header={
                 <Header
+                    variant="awsui-h1-sticky"
                     actions={
                         <SpaceBetween size="xs" direction="horizontal">
                             <Button formAction="none" onClick={abortClickHandle} disabled={isDisabledAbortButton}>
@@ -104,14 +201,46 @@ export const RunList: React.FC = () => {
                 </Header>
             }
             filter={
-                <TextFilter
-                    {...filterProps}
-                    filteringPlaceholder={t('projects.run.search_placeholder')}
-                    countText={t('common.match_count_with_value', { count: filteredItemsCount })}
-                    disabled={isLoading}
+                <div className={styles.selectFilters}>
+                    <div className={styles.select}>
+                        <FormField label={t('projects.run.project')}>
+                            <SelectCSD
+                                disabled={!projectOptions?.length}
+                                options={projectOptions}
+                                selectedOption={selectedProject}
+                                onChange={(event) => {
+                                    setSelectedProject(event.detail.selectedOption);
+                                }}
+                                placeholder={t('projects.run.project_placeholder')}
+                                expandToViewport={true}
+                                filteringType="auto"
+                            />
+                        </FormField>
+                    </div>
+
+                    <div className={styles.activeOnly}>
+                        <Toggle onChange={({ detail }) => setOnlyActive(detail.checked)} checked={onlyActive}>
+                            {t('projects.run.active_only')}
+                        </Toggle>
+                    </div>
+
+                    <div className={styles.clear}>
+                        <Button formAction="none" onClick={clearFilter} disabled={isDisabledClearFilter}>
+                            {t('common.clearFilter')}
+                        </Button>
+                    </div>
+                </div>
+            }
+            pagination={
+                <Pagination
+                    currentPageIndex={pagesCount}
+                    pagesCount={pagesCount}
+                    openEnd={!disabledNext}
+                    disabled={isDisabledPagination}
+                    onPreviousPageClick={prevPage}
+                    onNextPageClick={nextPage}
                 />
             }
-            pagination={<Pagination {...paginationProps} disabled={isLoading} />}
         />
     );
 };

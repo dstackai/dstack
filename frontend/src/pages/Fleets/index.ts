@@ -1,3 +1,2 @@
-export { FleetsList } from './List';
-export { AdministrationFleetsList } from './AdministrationList';
+export { FleetList } from './List';
 export { FleetDetails } from './Details';
