@@ -40,18 +40,18 @@ def test_service_spec_full_url_from_full_url():
     [
         (
             "http://localhost:3000",
-            "/services/main/service/",
-            "http://localhost:3000/services/main/service/",
+            "/proxy/services/main/service/",
+            "http://localhost:3000/proxy/services/main/service/",
         ),
         (
             "http://localhost:3000/",
-            "/services/main/service/",
-            "http://localhost:3000/services/main/service/",
+            "/proxy/services/main/service/",
+            "http://localhost:3000/proxy/services/main/service/",
         ),
         (
             "http://localhost:3000/prefix",
-            "/services/main/service/",
-            "http://localhost:3000/prefix/services/main/service/",
+            "/proxy/services/main/service/",
+            "http://localhost:3000/prefix/proxy/services/main/service/",
         ),
     ],
 )
