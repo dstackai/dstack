@@ -1,18 +1,9 @@
 import enum
 from typing import List, Optional
 
-from fastapi.exceptions import HTTPException
-
 
 class DstackError(Exception):
     pass
-
-
-class DstackHTTPError(HTTPException):
-    status_code = None
-
-    def __init__(self, detail=None):
-        super().__init__(self.status_code, detail)
 
 
 class ServerError(DstackError):
@@ -141,7 +132,3 @@ class SSHPortInUseError(SSHError):
 
 class DockerRegistryError(DstackError):
     pass
-
-
-class ConfigurationValidationError(DstackHTTPError):
-    status_code = 422
