@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { format } from 'date-fns';
 
-import { Icon, ListEmptyMessage, StatusIndicator, TableProps } from 'components';
+import { Button, Icon, ListEmptyMessage, StatusIndicator, TableProps } from 'components';
 import { SelectCSDProps } from 'components';
 
 import { DATE_TIME_FORMAT } from 'consts';
@@ -10,16 +10,34 @@ import { useLocalStorageState } from 'hooks/useLocalStorageState';
 import { getStatusIconType } from 'libs/fleet';
 import { useGetProjectsQuery } from 'services/project';
 
-export const useEmptyMessages = () => {
+export const useEmptyMessages = ({
+    clearFilters,
+    isDisabledClearFilter,
+}: {
+    clearFilters?: () => void;
+    isDisabledClearFilter?: boolean;
+}) => {
     const { t } = useTranslation();
 
     const renderEmptyMessage = useCallback<() => React.ReactNode>(() => {
-        return <ListEmptyMessage title={t('fleets.empty_message_title')} message={t('fleets.empty_message_text')} />;
-    }, []);
+        return (
+            <ListEmptyMessage title={t('fleets.empty_message_title')} message={t('fleets.empty_message_text')}>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilters}>
+                    {t('common.clearFilter')}
+                </Button>
+            </ListEmptyMessage>
+        );
+    }, [clearFilters, isDisabledClearFilter]);
 
     const renderNoMatchMessage = useCallback<() => React.ReactNode>(() => {
-        return <ListEmptyMessage title={t('fleets.nomatch_message_title')} message={t('fleets.nomatch_message_text')} />;
-    }, []);
+        return (
+            <ListEmptyMessage title={t('fleets.nomatch_message_title')} message={t('fleets.nomatch_message_text')}>
+                <Button disabled={isDisabledClearFilter} onClick={clearFilters}>
+                    {t('common.clearFilter')}
+                </Button>
+            </ListEmptyMessage>
+        );
+    }, [clearFilters, isDisabledClearFilter]);
 
     return { renderEmptyMessage, renderNoMatchMessage } as const;
 };

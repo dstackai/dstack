@@ -26,7 +26,7 @@ import styles from './styles.module.scss';
 
 export const RunList: React.FC = () => {
     const { t } = useTranslation();
-    const [setSearchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [preferences] = useRunListPreferences();
     const [data, setData] = useState<IRun[]>([]);
     const [pagesCount, setPagesCount] = useState<number>(1);

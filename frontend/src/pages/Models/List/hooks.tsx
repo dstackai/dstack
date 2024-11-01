@@ -99,7 +99,7 @@ export const useEmptyMessages = ({
                 </Button>
             </ListEmptyMessage>
         );
-    }, []);
+    }, [clearFilter, isDisabledClearFilter]);
 
     const renderNoMatchMessage = useCallback<() => React.ReactNode>(() => {
         return (
@@ -109,7 +109,7 @@ export const useEmptyMessages = ({
                 </Button>
             </ListEmptyMessage>
         );
-    }, []);
+    }, [clearFilter, isDisabledClearFilter]);
 
     return { renderEmptyMessage, renderNoMatchMessage } as const;
 };

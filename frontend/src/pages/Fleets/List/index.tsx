@@ -56,7 +56,7 @@ export const FleetList: React.FC = () => {
     }, [onlyActive, selectedProject?.value]);
 
     const { columns } = useColumnsDefinitions();
-    const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages();
+    const { renderEmptyMessage, renderNoMatchMessage } = useEmptyMessages({ clearFilters, isDisabledClearFilter });
 
     const nextPage = async () => {
         if (data.length === 0 || disabledNext) {

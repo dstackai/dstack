@@ -12,8 +12,6 @@ import styles from './styles.module.scss';
 
 export const VolumeList: React.FC = () => {
     const { t } = useTranslation();
-    const { renderEmptyMessage, renderNoMatchMessage } = useVolumesTableEmptyMessages();
-
     const {
         onlyActive,
         setOnlyActive,
@@ -23,6 +21,11 @@ export const VolumeList: React.FC = () => {
         selectedProject,
         setSelectedProject,
     } = useFilters();
+
+    const { renderEmptyMessage, renderNoMatchMessage } = useVolumesTableEmptyMessages({
+        clearFilters,
+        isDisabledClearFilter,
+    });
 
     const { data, isLoading, pagesCount, disabledNext, prevPage, nextPage } = useVolumesData({
         project_name: selectedProject?.value ?? undefined,
@@ -38,10 +41,10 @@ export const VolumeList: React.FC = () => {
         },
     ]);
 
-    const { items, actions, collectionProps } = useCollection(data, {
+    const { items, collectionProps } = useCollection(data, {
         filtering: {
             empty: renderEmptyMessage(),
-            noMatch: renderNoMatchMessage(() => actions.setFiltering('')),
+            noMatch: renderNoMatchMessage(),
         },
         pagination: { pageSize: 20 },
         selection: {},
