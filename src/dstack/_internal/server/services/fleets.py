@@ -2,7 +2,7 @@ import random
 import string
 import uuid
 from datetime import timezone
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +31,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceOfferWithAvailability,
     InstanceStatus,
+    RemoteConnectionInfo,
     SSHKey,
 )
 from dstack._internal.core.models.pools import Instance
@@ -63,6 +64,7 @@ from dstack._internal.server.services.locking import (
     get_locker,
     string_to_lock_id,
 )
+from dstack._internal.server.services.pools import list_active_remote_instances
 from dstack._internal.server.services.projects import get_member, get_member_permissions
 from dstack._internal.utils import common as common_utils
 from dstack._internal.utils import random_names
@@ -136,6 +138,7 @@ async def get_plan(
     spec: FleetSpec,
 ) -> FleetPlan:
     # TODO: refactor offers logic into a separate module to avoid depending on runs
+    await _check_ssh_hosts_not_yet_added(session, spec)
 
     offers = []
     if spec.configuration.ssh_config is None:
@@ -535,6 +538,30 @@ def _check_can_manage_ssh_fleets(user: UserModel, project: ProjectModel):
     if permissions.can_manage_ssh_fleets:
         return
     raise ForbiddenError()
+
+
+async def _check_ssh_hosts_not_yet_added(session: AsyncSession, spec: FleetSpec):
+    if spec.configuration.ssh_config and spec.configuration.ssh_config.hosts:
+        # there are manually listed hosts, need to check them for existence
+        active_instances = await list_active_remote_instances(session=session)
+
+        existing_hosts = set()
+        for instance in active_instances:
+            instance_conn_info = RemoteConnectionInfo.parse_raw(
+                cast(str, instance.remote_connection_info)
+            )
+            existing_hosts.add(instance_conn_info.host)
+
+        instances_already_in_fleet = []
+        for new_instance in spec.configuration.ssh_config.hosts:
+            hostname = new_instance if isinstance(new_instance, str) else new_instance.hostname
+            if hostname in existing_hosts:
+                instances_already_in_fleet.append(hostname)
+
+        if instances_already_in_fleet:
+            raise ServerClientError(
+                msg=f"Instances [{', '.join(instances_already_in_fleet)}] are already assigned to a fleet."
+            )
 
 
 def _remove_fleet_spec_sensitive_info(spec: FleetSpec):
