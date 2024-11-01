@@ -177,7 +177,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(volumes.root_router)
     app.include_router(volumes.project_router)
     if FeatureFlags.PROXY:
-        app.include_router(service_proxy.router, prefix="/services", tags=["service-proxy"])
+        app.include_router(service_proxy.router, prefix="/proxy/services", tags=["service-proxy"])
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):
@@ -244,7 +244,7 @@ def register_routes(app: FastAPI, ui: bool = True):
             if (
                 request.url.path.startswith("/api")
                 or FeatureFlags.PROXY
-                and _is_proxied_service_request(request)
+                and _is_proxy_request(request)
             ):
                 return JSONResponse(
                     {"detail": exc.detail},
@@ -264,8 +264,8 @@ def register_routes(app: FastAPI, ui: bool = True):
             return RedirectResponse("/api/docs")
 
 
-def _is_proxied_service_request(request: Request) -> bool:
-    if request.url.path.startswith("/services"):
+def _is_proxy_request(request: Request) -> bool:
+    if request.url.path.startswith("/proxy"):
         return True
     # Attempt detecting requests originating from services proxied by dstack-proxy.
     # Such requests can "leak" to dstack server paths if the service does not support
@@ -273,7 +273,7 @@ def _is_proxied_service_request(request: Request) -> bool:
     referrer = URL(request.headers.get("Referer", ""))
     return (
         referrer.netloc == "" or referrer.netloc == request.url.netloc
-    ) and referrer.path.startswith("/services")
+    ) and referrer.path.startswith("/proxy")
 
 
 def _print_dstack_logo():

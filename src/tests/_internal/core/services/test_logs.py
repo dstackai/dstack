@@ -132,10 +132,12 @@ class TestServiceURLReplacer:
             app_specs=[],
             hostname="0.0.0.0",
             secure=False,
-            path_prefix="/services/main/service/",
+            path_prefix="/proxy/services/main/service/",
         )
-        assert replacer(b"http://0.0.0.0:8888") == b"http://0.0.0.0:3000/services/main/service/"
+        assert (
+            replacer(b"http://0.0.0.0:8888") == b"http://0.0.0.0:3000/proxy/services/main/service/"
+        )
         assert (
             replacer(b"http://0.0.0.0:8888/qwerty")
-            == b"http://0.0.0.0:3000/services/main/service/qwerty"
+            == b"http://0.0.0.0:3000/proxy/services/main/service/qwerty"
         )

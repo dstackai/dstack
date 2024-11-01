@@ -445,7 +445,7 @@ def _register_service_in_server(run_model: RunModel) -> ServiceSpec:
             "Auto-scaling is not yet supported when running services without a gateway. "
             "Please configure a gateway or set `replicas` to a fixed value in the service configuration"
         )
-    return ServiceSpec(url=f"/services/{run_model.project.name}/{run_model.run_name}/")
+    return ServiceSpec(url=f"/proxy/services/{run_model.project.name}/{run_model.run_name}/")
 
 
 async def register_replica(
