@@ -97,6 +97,7 @@ These are nonexhaustive lists of external dependencies (executables, libraries) 
 * `mountpoint`
 * `lsblk`
 * `mkfs.ext4`
+* (NVIDIA GPU SSH fleet instances only) `nvidia-smi`
 * ...
 
 Debian/Ubuntu packages: `mount` (`mount`, `umount`), `util-linux` (`mountpoint`, `lsblk`), `e2fsprogs` (`mkfs.ext4`)
