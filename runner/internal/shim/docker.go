@@ -106,6 +106,10 @@ func (d *DockerRunner) Run(ctx context.Context, cfg TaskConfig) error {
 	}
 
 	log.Println("Preparing volumes")
+	// defer unmountVolumes() before calling prepareVolumes(), as the latter
+	// may fail when some volumes are already mounted; if the volume is not mounted,
+	// unmountVolumes() simply skips it
+	defer func() { _ = unmountVolumes(cfg) }()
 	err = prepareVolumes(cfg)
 	if err != nil {
 		d.state = Pending
@@ -270,6 +274,33 @@ func prepareVolumes(taskConfig TaskConfig) error {
 		if err != nil {
 			return tracerr.Wrap(err)
 		}
+	}
+	return nil
+}
+
+func unmountVolumes(taskConfig TaskConfig) error {
+	if len(taskConfig.Volumes) == 0 {
+		return nil
+	}
+	log.Println("Unmounting volumes...")
+	var failed []string
+	for _, volume := range taskConfig.Volumes {
+		mountPoint := getVolumeMountPoint(volume.Name)
+		cmd := exec.Command("mountpoint", mountPoint)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			log.Printf("Skipping %s: %s", mountPoint, output)
+			continue
+		}
+		cmd = exec.Command("umount", "-qf", mountPoint)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			log.Printf("Failed to unmount %s: %s", mountPoint, output)
+			failed = append(failed, mountPoint)
+		} else {
+			log.Printf("Unmounted: %s\n", mountPoint)
+		}
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("Failed to unmount volume(s): %v", failed)
 	}
 	return nil
 }
