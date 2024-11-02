@@ -2,6 +2,13 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'CloudFormation template for deploying a dstack server'
 
 Parameters:
+  VpcId:
+    Description: ID of an existing Virtual Private Cloud (VPC).
+    Type: 'AWS::EC2::VPC::Id'
+  PrivateSubnetIds:
+    Description: IDs of existing private subnets within the specified VPC.
+    Type: 'List<AWS::EC2::Subnet::Id>'
+
   DstackVersion:
     Type: String
     Description: The version of dstack server
@@ -98,63 +105,6 @@ Resources:
                   - !Sub 'arn:aws:s3:::${LitestreamBucket}'
                   - !Sub 'arn:aws:s3:::${LitestreamBucket}/*'
 
-  VPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: 10.0.0.0/16
-      EnableDnsHostnames: true
-      EnableDnsSupport: true
-
-  PublicSubnet1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
-      CidrBlock: 10.0.1.0/24
-      MapPublicIpOnLaunch: true
-
-  PublicSubnet2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref VPC
-      AvailabilityZone: !Select [ 1, !GetAZs '' ]
-      CidrBlock: 10.0.2.0/24
-      MapPublicIpOnLaunch: true
-
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-
-  AttachGateway:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref VPC
-      InternetGatewayId: !Ref InternetGateway
-
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref VPC
-
-  PublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: AttachGateway
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
-
-  PublicSubnet1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnet1
-      RouteTableId: !Ref PublicRouteTable
-
-  PublicSubnet2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnet2
-      RouteTableId: !Ref PublicRouteTable
-
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -219,7 +169,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Access to the public facing load balancer
-      VpcId: !Ref 'VPC'
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - CidrIp: 0.0.0.0/0
           FromPort: 80
@@ -229,10 +179,9 @@ Resources:
   LoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
+      Scheme: internal
       SecurityGroups: [ !Ref 'LoadBalancerSecurityGroup' ]
-      Subnets:
-        - !Ref PublicSubnet1
-        - !Ref PublicSubnet2
+      Subnets: !Split [',', !Join [',', !Ref PrivateSubnetIds]]
       Type: application
 
   ListenerHTTP:
@@ -249,7 +198,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Security group for container
-      VpcId: !Ref VPC
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 8000
@@ -271,12 +220,9 @@ Resources:
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
-          Subnets:
-            - !Ref PublicSubnet1
-            - !Ref PublicSubnet2
+          Subnets: !Split [',', !Join [',', !Ref PrivateSubnetIds]]
           SecurityGroups:
             - !Ref ContainerSecurityGroup
-          AssignPublicIp: ENABLED
       LoadBalancers:
         - ContainerName: dstack-server
           ContainerPort: 8000
@@ -288,7 +234,7 @@ Resources:
       TargetType: ip
       Port: 8000
       Protocol: HTTP
-      VpcId: !Ref VPC
+      VpcId: !Ref VpcId
       HealthCheckPath: /
       HealthCheckIntervalSeconds: 30
       Matcher:
