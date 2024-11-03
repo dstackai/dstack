@@ -500,6 +500,7 @@ class GCPCompute(Compute):
         labels = {
             "owner": "dstack",
             "dstack_project": volume.project_name.lower(),
+            "dstack_user": volume.user,
         }
         labels = {k: v for k, v in labels.items() if gcp_resources.is_valid_label_value(v)}
         labels = merge_tags(tags=labels, backend_tags=self.config.tags)
