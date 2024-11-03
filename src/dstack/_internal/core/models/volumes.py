@@ -64,6 +64,7 @@ class VolumeAttachmentData(CoreModel):
 class Volume(CoreModel):
     id: uuid.UUID
     name: str
+    user: str
     project_name: str
     configuration: VolumeConfiguration
     external: bool
