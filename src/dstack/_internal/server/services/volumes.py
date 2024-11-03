@@ -164,6 +164,7 @@ async def get_project_volume_model_by_name(
 async def create_volume(
     session: AsyncSession,
     project: ProjectModel,
+    user: UserModel,
     configuration: VolumeConfiguration,
 ) -> Volume:
     _validate_volume_configuration(configuration)
@@ -193,6 +194,7 @@ async def create_volume(
         volume_model = VolumeModel(
             id=uuid.uuid4(),
             name=configuration.name,
+            user_id=user.id,
             project=project,
             status=VolumeStatus.SUBMITTED,
             configuration=configuration.json(),
@@ -263,6 +265,7 @@ def volume_model_to_volume(volume_model: VolumeModel) -> Volume:
     return Volume(
         name=volume_model.name,
         project_name=volume_model.project.name,
+        user=volume_model.user.name,
         configuration=configuration,
         external=configuration.volume_id is not None,
         created_at=volume_model.created_at.replace(tzinfo=timezone.utc),
