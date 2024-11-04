@@ -8,6 +8,8 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 
+# TODO(#1595): refactor into different modules: gateway-specific and proxy-specific
+
 
 class GatewayStatus(str, Enum):
     SUBMITTED = "submitted"
@@ -111,6 +113,8 @@ class GatewayProvisioningData(CoreModel):
 
 
 class BaseChatModel(CoreModel):
+    # Adding more model types might require rethinking this class,
+    # since pydantic doesn't work with two discriminators (type and format) at once
     type: Annotated[Literal["chat"], Field(description="The type of the model")]
     name: Annotated[str, Field(description="The name of the model")]
     format: Annotated[
@@ -151,4 +155,4 @@ class OpenAIChatModel(BaseChatModel):
 
 
 ChatModel = Annotated[Union[TGIChatModel, OpenAIChatModel], Field(discriminator="format")]
-AnyModel = Annotated[Union[ChatModel], Field(discriminator="type")]  # embeddings and etc.
+AnyModel = Union[ChatModel]  # embeddings and etc.

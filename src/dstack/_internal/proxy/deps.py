@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Optional
 
-from fastapi import Depends, HTTPException, Request, Security, status
+from fastapi import Depends, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from typing_extensions import Annotated
 
+from dstack._internal.proxy.errors import ProxyError, UnexpectedProxyError
 from dstack._internal.proxy.repos.base import BaseProxyRepo
 
 
@@ -26,7 +27,7 @@ class BaseProxyDependencyInjector(ABC):
 async def get_injector(request: Request) -> BaseProxyDependencyInjector:
     injector = request.app.state.proxy_dependency_injector
     if not isinstance(injector, BaseProxyDependencyInjector):
-        raise RuntimeError(f"Wrong BaseProxyDependencyInjector type {type(injector)}")
+        raise UnexpectedProxyError(f"Unexpected proxy_dependency_injector type {type(injector)}")
     return injector
 
 
@@ -47,9 +48,9 @@ class ProxyAuthContext:
         if self._token is None or not await self._repo.is_project_member(
             self._project_name, self._token
         ):
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
+            raise ProxyError(
                 f"Unauthenticated or unauthorized to access project {self._project_name}",
+                status.HTTP_403_FORBIDDEN,
             )
 
 

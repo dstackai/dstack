@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from datetime import datetime
+from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing_extensions import Annotated
 
 from dstack._internal.core.models.instances import SSHConnectionParams
 
@@ -26,6 +28,27 @@ class Project(BaseModel):
     ssh_private_key: str
 
 
+class TGIChatModelFormat(BaseModel):
+    format: Literal["tgi"]
+    chat_template: str
+    eos_token: str
+
+
+class OpenAIChatModelFormat(BaseModel):
+    format: Literal["openai"]
+    prefix: str
+
+
+AnyModelFormat = Union[TGIChatModelFormat, OpenAIChatModelFormat]
+
+
+class ChatModel(BaseModel):
+    name: str
+    created_at: datetime
+    run_name: str
+    format_spec: Annotated[AnyModelFormat, Field(discriminator="format")]
+
+
 class BaseProxyRepo(ABC):
     @abstractmethod
     async def get_service(self, project_name: str, run_name: str) -> Optional[Service]:
@@ -33,6 +56,18 @@ class BaseProxyRepo(ABC):
 
     @abstractmethod
     async def add_service(self, project_name: str, service: Service) -> None:
+        pass
+
+    @abstractmethod
+    async def list_models(self, project_name: str) -> List[ChatModel]:
+        pass
+
+    @abstractmethod
+    async def get_model(self, project_name: str, name: str) -> Optional[ChatModel]:
+        pass
+
+    @abstractmethod
+    async def add_model(self, project_name: str, model: ChatModel) -> None:
         pass
 
     @abstractmethod
