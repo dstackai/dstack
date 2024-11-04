@@ -8,14 +8,12 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
 	execute "github.com/alexellis/go-execute/v2"
 )
 
-const nvidiaSmiImage = "dstackai/base:py3.13-0.6-cuda-12.1"
 const amdSmiImage = "un1def/amd-smi:6.2.2-0"
 
 type GpuVendor string
@@ -36,7 +34,7 @@ func GetGpuVendor() GpuVendor {
 	if _, err := os.Stat("/dev/kfd"); !errors.Is(err, os.ErrNotExist) {
 		return Amd
 	}
-	if _, err := exec.LookPath("nvidia-smi"); err == nil {
+	if _, err := os.Stat("/dev/nvidiactl"); !errors.Is(err, os.ErrNotExist) {
 		return Nvidia
 	}
 	return NoVendor
@@ -56,14 +54,8 @@ func getNvidiaGpuInfo() []GpuInfo {
 	gpus := []GpuInfo{}
 
 	cmd := execute.ExecTask{
-		Command: "docker",
-		Args: []string{
-			"run",
-			"--rm",
-			"--gpus", "all",
-			nvidiaSmiImage,
-			"nvidia-smi", "--query-gpu=gpu_name,memory.total", "--format=csv,nounits",
-		},
+		Command:     "nvidia-smi",
+		Args:        []string{"--query-gpu=gpu_name,memory.total", "--format=csv,nounits"},
 		StreamStdio: false,
 	}
 	res, err := cmd.Execute(context.Background())
