@@ -138,7 +138,16 @@ async def get_plan(
     spec: FleetSpec,
 ) -> FleetPlan:
     # TODO: refactor offers logic into a separate module to avoid depending on runs
-    await _check_ssh_hosts_not_yet_added(session, spec)
+    current_fleet: Optional[Fleet] = None
+    current_fleet_id: Optional[uuid.UUID] = None
+    if spec.configuration.name is not None:
+        current_fleet_model = await get_project_fleet_model_by_name(
+            session=session, project=project, name=spec.configuration.name
+        )
+        if current_fleet_model is not None:
+            current_fleet = fleet_model_to_fleet(current_fleet_model)
+            current_fleet_id = current_fleet_model.id
+    await _check_ssh_hosts_not_yet_added(session, spec, current_fleet_id)
 
     offers = []
     if spec.configuration.ssh_config is None:
@@ -148,13 +157,6 @@ async def get_plan(
             requirements=_get_fleet_requirements(spec),
         )
         offers = [offer for _, offer in offers_with_backends]
-    current_fleet = None
-    if spec.configuration.name is not None:
-        current_fleet = await get_fleet_by_name(
-            session=session,
-            project=project,
-            name=spec.configuration.name,
-        )
     plan = FleetPlan(
         project_name=project.name,
         user=user.name,
@@ -540,13 +542,18 @@ def _check_can_manage_ssh_fleets(user: UserModel, project: ProjectModel):
     raise ForbiddenError()
 
 
-async def _check_ssh_hosts_not_yet_added(session: AsyncSession, spec: FleetSpec):
+async def _check_ssh_hosts_not_yet_added(
+    session: AsyncSession, spec: FleetSpec, current_fleet_id: Optional[uuid.UUID] = None
+):
     if spec.configuration.ssh_config and spec.configuration.ssh_config.hosts:
         # there are manually listed hosts, need to check them for existence
         active_instances = await list_active_remote_instances(session=session)
 
         existing_hosts = set()
         for instance in active_instances:
+            # ignore instances belonging to the same fleet -- in-place update/recreate
+            if current_fleet_id is not None and instance.fleet_id == current_fleet_id:
+                continue
             instance_conn_info = RemoteConnectionInfo.parse_raw(
                 cast(str, instance.remote_connection_info)
             )

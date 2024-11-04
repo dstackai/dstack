@@ -18,6 +18,7 @@ from dstack._internal.core.models.instances import (
     InstanceConfiguration,
     InstanceStatus,
     InstanceType,
+    RemoteConnectionInfo,
     Resources,
 )
 from dstack._internal.core.models.placement import (
@@ -418,6 +419,7 @@ async def create_instance(
     session: AsyncSession,
     project: ProjectModel,
     pool: PoolModel,
+    fleet: Optional[FleetModel] = None,
     status: InstanceStatus = InstanceStatus.IDLE,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     finished_at: Optional[datetime] = None,
@@ -430,6 +432,7 @@ async def create_instance(
     instance_num: int = 0,
     backend: BackendType = BackendType.DATACRUNCH,
     region: str = "eu-west",
+    remote_connection_info: Optional[RemoteConnectionInfo] = None,
 ) -> InstanceModel:
     if instance_id is None:
         instance_id = uuid.uuid4()
@@ -495,6 +498,7 @@ async def create_instance(
         name="test_instance",
         instance_num=instance_num,
         pool=pool,
+        fleet=fleet,
         project=project,
         status=status,
         unreachable=False,
@@ -510,6 +514,7 @@ async def create_instance(
         profile=profile.json(),
         requirements=requirements.json(),
         instance_configuration=instance_configuration.json(),
+        remote_connection_info=remote_connection_info.json() if remote_connection_info else None,
         job=job,
     )
     session.add(im)
