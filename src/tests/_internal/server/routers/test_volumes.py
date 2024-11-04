@@ -108,6 +108,7 @@ class TestListVolumes:
                 "id": str(volume1.id),
                 "name": volume1.name,
                 "project_name": project1.name,
+                "user": user.name,
                 "configuration": json.loads(volume1.configuration),
                 "external": False,
                 "created_at": "2023-01-02T03:04:00+00:00",

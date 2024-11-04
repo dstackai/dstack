@@ -392,6 +392,7 @@ class TestProcessSubmittedJobs:
         volume = await create_volume(
             session=session,
             project=project,
+            user=user,
             status=VolumeStatus.ACTIVE,
             volume_provisioning_data=get_volume_provisioning_data(),
             backend=BackendType.AWS,

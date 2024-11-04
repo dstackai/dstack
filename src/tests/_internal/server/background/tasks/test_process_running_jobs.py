@@ -222,6 +222,7 @@ class TestProcessRunningJobs:
         volume = await create_volume(
             session=session,
             project=project,
+            user=user,
             status=VolumeStatus.ACTIVE,
             configuration=get_volume_configuration(
                 name="my-vol", backend=BackendType.AWS, region="us-east-1"
