@@ -536,7 +536,7 @@ class VolumeModel(BaseModel):
     name: Mapped[str] = mapped_column(String(100))
 
     user_id: Mapped["UserModel"] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    user: Mapped["UserModel"] = relationship(lazy="joined")
+    user: Mapped["UserModel"] = relationship()
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     project: Mapped["ProjectModel"] = relationship(foreign_keys=[project_id])
