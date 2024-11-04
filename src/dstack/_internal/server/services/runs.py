@@ -48,6 +48,7 @@ from dstack._internal.core.models.volumes import (
     VolumeStatus,
 )
 from dstack._internal.core.services import validate_dstack_resource_name
+from dstack._internal.core.services.diff import diff_models
 from dstack._internal.server.db import get_db
 from dstack._internal.server.models import (
     JobModel,
@@ -60,7 +61,6 @@ from dstack._internal.server.models import (
 )
 from dstack._internal.server.services import repos as repos_services
 from dstack._internal.server.services import volumes as volumes_services
-from dstack._internal.server.services.diff import diff_models
 from dstack._internal.server.services.docker import is_valid_docker_volume_target
 from dstack._internal.server.services.jobs import (
     get_jobs_from_run_spec,
@@ -247,8 +247,10 @@ async def get_plan(
             project=project,
             run_name=run_spec.run_name,
         )
-        if current_resource is not None and _can_update_run_spec(
-            current_resource.run_spec, run_spec
+        if (
+            current_resource is not None
+            and not current_resource.status.is_finished()
+            and _can_update_run_spec(current_resource.run_spec, run_spec)
         ):
             action = ApplyAction.UPDATE
 
