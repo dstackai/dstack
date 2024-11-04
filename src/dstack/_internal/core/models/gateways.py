@@ -113,8 +113,6 @@ class GatewayProvisioningData(CoreModel):
 
 
 class BaseChatModel(CoreModel):
-    # Adding more model types might require rethinking this class,
-    # since pydantic doesn't work with two discriminators (type and format) at once
     type: Annotated[Literal["chat"], Field(description="The type of the model")]
     name: Annotated[str, Field(description="The name of the model")]
     format: Annotated[
