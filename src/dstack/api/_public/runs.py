@@ -15,6 +15,7 @@ from websocket import WebSocketApp
 import dstack.api as api
 from dstack._internal.core.errors import ClientError, ConfigurationError, ResourceNotExistsError
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import AnyRunConfiguration, PortMapping
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import (
@@ -498,7 +499,12 @@ class RunCollection:
             ssh_key_pub=Path(self._client.ssh_identity_file + ".pub").read_text().strip(),
         )
         logger.debug("Getting run plan")
-        return self._api_client.runs.get_plan(self._project, run_spec)
+        run_plan = self._api_client.runs.get_plan(self._project, run_spec)
+        if run_plan.current_resource is None and run_name is not None:
+            # If run_plan.current_resource is missing, this can mean old (0.18.x) server.
+            # TODO: Remove in 0.19
+            run_plan.current_resource = self._api_client.runs.get(self._project, run_name)
+        return run_plan
 
     def exec_plan(
         self,
@@ -528,9 +534,13 @@ class RunCollection:
             self._api_client.repos.upload_code(
                 self._project, repo.repo_id, run_plan.run_spec.repo_code_hash, fp
             )
-        # TODO: call self._api_client.runs.submit when action is CREATE
-        # since apply is not backward-compatible
-        run = self._api_client.runs.apply_plan(self._project, run_plan)
+        # Calling submit when action is CREATE since apply_plan is not backward-compatible.
+        # Otherwise, apply_plan can replace submit, i.e. it creates the run if it does not exist.
+        # TODO: Remove in 0.19
+        if run_plan.action == ApplyAction.UPDATE:
+            run = self._api_client.runs.apply_plan(self._project, run_plan)
+        else:
+            run = self._api_client.runs.submit(self._project, run_plan.run_spec)
         return self._model_to_submitted_run(run, ports_lock)
 
     def list(self, all: bool = False) -> List[Run]:
