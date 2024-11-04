@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -26,6 +27,7 @@ from dstack._internal.core.models.runs import (
     JobStatus,
     JobTerminationReason,
     Requirements,
+    Run,
     RunSpec,
     RunStatus,
     RunTerminationReason,
@@ -58,6 +60,8 @@ def get_dev_env_run_plan_dict(
     offers: List[InstanceOfferWithAvailability] = [],
     total_offers: int = 0,
     max_price: Optional[float] = None,
+    action: ApplyAction = ApplyAction.CREATE,
+    current_resource: Optional[Run] = None,
     privileged: bool = False,
     volumes: List[MountPoint] = [],
 ) -> Dict:
@@ -181,6 +185,8 @@ def get_dev_env_run_plan_dict(
                 "max_price": max_price,
             }
         ],
+        "current_resource": current_resource.dict() if current_resource else None,
+        "action": action,
     }
 
 

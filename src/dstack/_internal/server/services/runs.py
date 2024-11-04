@@ -356,9 +356,8 @@ async def apply_plan(
             or plan.current_resource.run_spec != current_resource.run_spec
         ):
             raise ServerClientError(
-                "Failed to apply plan. Resource has been changed." " Try again or use force apply."
+                "Failed to apply plan. Resource has been changed. Try again or use force apply."
             )
-
     await session.execute(
         update(RunModel)
         .where(RunModel.id == current_resource.id)
@@ -774,7 +773,7 @@ def _validate_run_spec(run_spec: RunSpec):
 
 
 _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
-_UPDATABLE_CONFIGURATION_FIELDS = ["replicas", "scaling"]
+_UPDATABLE_CONFIGURATION_FIELDS = ["replicas", "scaling", "commands"]
 
 
 def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bool:
@@ -787,20 +786,38 @@ def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bo
 
 
 def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec):
+    if current_run_spec.configuration.type != "service":
+        raise ServerClientError("Can only update service run configuration")
     spec_diff = diff_models(current_run_spec, new_run_spec)
-    for key in spec_diff.keys():
+    changed_spec_fields = list(spec_diff.keys())
+    for key in changed_spec_fields:
         if key not in _UPDATABLE_SPEC_FIELDS:
             raise ServerClientError(
-                f"Failed to update fields {list(spec_diff.keys())}."
+                f"Failed to update fields {changed_spec_fields}."
                 f" Can only update {_UPDATABLE_SPEC_FIELDS}."
             )
     configuration_diff = diff_models(current_run_spec.configuration, new_run_spec.configuration)
-    for key in configuration_diff.keys():
+    changed_configuration_fields = list(configuration_diff.keys())
+    for key in changed_configuration_fields:
         if key not in _UPDATABLE_CONFIGURATION_FIELDS:
             raise ServerClientError(
-                f"Failed to update fields {list(configuration_diff.keys())}."
+                f"Failed to update fields {changed_configuration_fields}."
                 f" Can only update {_UPDATABLE_CONFIGURATION_FIELDS}"
             )
+    if (
+        changed_configuration_fields == ["commands"]
+        or changed_spec_fields == ["repo_code_hash"]
+        or (
+            changed_spec_fields == ["repo_code_hash", "configuration"]
+            and changed_configuration_fields == ["commands"]
+        )
+    ):
+        # TODO: Remove this check once services support updates for rolling deployement.
+        # Currently, the check is needed since updating commands/code won't trigger
+        # automatic deployment of the new version. Manual service scaling is required.
+        raise ServerClientError(
+            "Cannot update repo_code_hash and commands without updating other fields"
+        )
 
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):
