@@ -49,6 +49,7 @@ async def _process_submitted_volume(session: AsyncSession, volume_model: VolumeM
         select(VolumeModel)
         .where(VolumeModel.id == volume_model.id)
         .options(joinedload(VolumeModel.project).joinedload(ProjectModel.backends))
+        .options(joinedload(VolumeModel.user))
         .execution_options(populate_existing=True)
     )
     volume_model = res.unique().scalar_one()
