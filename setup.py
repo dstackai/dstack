@@ -69,6 +69,7 @@ BASE_DEPS = [
     "python-json-logger",
     "alembic-postgresql-enum",
     "asyncpg",
+    "jinja2",
 ]
 
 AWS_DEPS = [
