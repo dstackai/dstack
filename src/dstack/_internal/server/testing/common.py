@@ -238,6 +238,7 @@ async def create_run(
         status=status,
         run_spec=run_spec.json(),
         last_processed_at=submitted_at,
+        jobs=[],
     )
     session.add(run)
     await session.commit()

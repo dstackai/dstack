@@ -284,22 +284,24 @@ class RunModel(BaseModel):
     fleet_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("fleets.id"))
     fleet: Mapped[Optional["FleetModel"]] = relationship(back_populates="runs")
 
-    submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     run_name: Mapped[str] = mapped_column(String(100))
+    submitted_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+    last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
     status: Mapped[RunStatus] = mapped_column(Enum(RunStatus))
+    termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
+        Enum(RunTerminationReason)
+    )
     run_spec: Mapped[str] = mapped_column(Text)
+    service_spec: Mapped[Optional[str]] = mapped_column(Text)
+
     jobs: Mapped[List["JobModel"]] = relationship(
         back_populates="run", lazy="selectin", order_by="[JobModel.replica_num, JobModel.job_num]"
     )
-    last_processed_at: Mapped[datetime] = mapped_column(NaiveDateTime)
+
     gateway_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("gateways.id", ondelete="SET NULL")
     )
     gateway: Mapped[Optional["GatewayModel"]] = relationship()
-    termination_reason: Mapped[Optional[RunTerminationReason]] = mapped_column(
-        Enum(RunTerminationReason)
-    )
-    service_spec: Mapped[Optional[str]] = mapped_column(Text)
 
     __table_args__ = (Index("ix_submitted_at_id", submitted_at.desc(), id),)
 

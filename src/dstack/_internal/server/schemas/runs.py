@@ -7,7 +7,7 @@ from pydantic import Field
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.core.models.instances import SSHKey
 from dstack._internal.core.models.profiles import Profile
-from dstack._internal.core.models.runs import Requirements, RunSpec
+from dstack._internal.core.models.runs import ApplyRunPlanInput, Requirements, RunSpec
 
 
 class ListRunsRequest(CoreModel):
@@ -52,6 +52,11 @@ class AddRemoteInstanceRequest(CoreModel):
 
 class SubmitRunRequest(CoreModel):
     run_spec: RunSpec
+
+
+class ApplyRunPlanRequest(CoreModel):
+    plan: ApplyRunPlanInput
+    force: bool
 
 
 class StopRunsRequest(CoreModel):

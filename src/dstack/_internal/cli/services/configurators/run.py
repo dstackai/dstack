@@ -22,7 +22,7 @@ from dstack._internal.core.errors import (
     ResourceNotExistsError,
     ServerClientError,
 )
-from dstack._internal.core.models.common import RegistryAuth
+from dstack._internal.core.models.common import ApplyAction, RegistryAuth
 from dstack._internal.core.models.configurations import (
     AnyRunConfiguration,
     ApplyConfigurationType,
@@ -37,6 +37,7 @@ from dstack._internal.core.models.configurations import (
 )
 from dstack._internal.core.models.runs import JobSubmission, JobTerminationReason, RunStatus
 from dstack._internal.core.services.configs import ConfigManager
+from dstack._internal.core.services.diff import diff_models
 from dstack._internal.utils.interpolator import InterpolatorError, VariablesInterpolator
 from dstack._internal.utils.logging import get_logger
 from dstack.api._public.runs import Run
@@ -68,7 +69,7 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             logger.warning(
                 "Specifying [code]python: 3.8[/] in run configurations is deprecated"
                 " and will be forbidden in a future [code]dstack[/] release."
-                " Please upgrade your configuration to a newer Python version"
+                " Please upgrade your configuration to a newer Python version."
             )
         repo = self.api.repos.load(Path.cwd())
         repo_config = ConfigManager().get_repo_config_or_error(repo.get_repo_dir_or_error())
@@ -98,19 +99,56 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
         print_run_plan(run_plan, offers_limit=configurator_args.max_offers)
 
         confirm_message = "Submit a new run?"
-        if conf.name:
-            old_run = self.api.runs.get(run_name=conf.name)
-            if old_run is not None:
-                confirm_message = f"Run [code]{conf.name}[/] already exists. Override the run?"
+        stop_run_name = None
+        if run_plan.current_resource is not None:
+            diff = diff_models(
+                run_plan.run_spec.configuration, run_plan.current_resource.run_spec.configuration
+            )
+            changed_fields = list(diff.keys())
+            if run_plan.action == ApplyAction.UPDATE and len(changed_fields) > 0:
+                console.print(
+                    f"Active run [code]{conf.name}[/] already exists."
+                    " Detected configuration changes that can be updated in-place:"
+                    f" {changed_fields}"
+                )
+                confirm_message = "Update the run?"
+            elif run_plan.action == ApplyAction.UPDATE and len(changed_fields) == 0:
+                stop_run_name = run_plan.current_resource.run_spec.run_name
+                console.print(
+                    f"Active run [code]{conf.name}[/] already exists."
+                    " Detected no configuration changes."
+                )
+                if command_args.yes and not command_args.force:
+                    console.print("Use --force to apply anyway.")
+                    return
+                confirm_message = "Stop and override the run?"
+            elif not run_plan.current_resource.status.is_finished():
+                stop_run_name = run_plan.current_resource.run_spec.run_name
+                console.print(
+                    f"Active run [code]{conf.name}[/] already exists and cannot be updated in-place."
+                )
+                confirm_message = "Stop and override the run?"
             else:
-                confirm_message = f"Submit the run [code]{conf.name}[/]?"
+                console.print(f"Finished run [code]{conf.name}[/] already exists.")
+                confirm_message = "Override the run?"
+        elif conf.name:
+            confirm_message = f"Submit the run [code]{conf.name}[/]?"
 
         if not command_args.yes and not confirm_ask(confirm_message):
             console.print("\nExiting...")
             return
 
+        if stop_run_name is not None:
+            with console.status("Stopping run..."):
+                self.api.client.runs.stop(self.api.project, [stop_run_name], abort=False)
+                while True:
+                    run = self.api.runs.get(stop_run_name)
+                    if run is None or run.status.is_finished():
+                        break
+                    time.sleep(1)
+
         try:
-            with console.status("Submitting run..."):
+            with console.status("Applying plan..."):
                 run = self.api.runs.exec_plan(
                     run_plan, repo, reserve_ports=not command_args.detach
                 )
@@ -118,7 +156,10 @@ class BaseRunConfigurator(ApplyEnvVarsConfiguratorMixin, BaseApplyConfigurator):
             raise CLIError(e.msg)
 
         if command_args.detach:
-            console.print(f"Run [code]{run.name}[/] submitted, detaching...")
+            detach_message = f"Run [code]{run.name}[/] submitted, detaching..."
+            if run_plan.action == ApplyAction.UPDATE:
+                detach_message = f"Run [code]{run.name}[/] updated, detaching..."
+            console.print(detach_message)
             return
 
         abort_at_exit = False

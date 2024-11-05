@@ -133,13 +133,13 @@ async def _process_pending_run(session: AsyncSession, run_model: RunModel):
     replicas = 1
     if run.run_spec.configuration.type == "service":
         replicas = run.run_spec.configuration.replicas.min or 0  # new default
-        scaler = autoscalers.get_service_autoscaler(run.run_spec.configuration)
-        if scaler is not None:
+        scaler = autoscalers.get_service_scaler(run.run_spec.configuration)
+        stats = None
+        if run_model.gateway_id is not None:
             conn = await gateways.get_or_add_gateway_connection(session, run_model.gateway_id)
             stats = await conn.get_stats(run_model.id)
-            if stats:
-                # replicas info doesn't matter for now
-                replicas = scaler.scale([], stats)
+        # replicas info doesn't matter for now
+        replicas = scaler.scale([], stats)
     if replicas == 0:
         # stay zero scaled
         return
@@ -314,17 +314,17 @@ async def _process_active_run(session: AsyncSession, run_model: RunModel):
             )
 
         if run_spec.configuration.type == "service":
-            scaler = autoscalers.get_service_autoscaler(run_spec.configuration)
-            if scaler is not None:
+            scaler = autoscalers.get_service_scaler(run_spec.configuration)
+            stats = None
+            if run_model.gateway_id is not None:
                 conn = await gateways.get_or_add_gateway_connection(session, run_model.gateway_id)
                 stats = await conn.get_stats(run_model.id)
-                if stats:
-                    # use replicas_info from before retrying
-                    replicas_diff = scaler.scale(replicas_info, stats)
-                    if replicas_diff != 0:
-                        await session.flush()
-                        await session.refresh(run_model)
-                        await scale_run_replicas(session, run_model, replicas_diff)
+            # use replicas_info from before retrying
+            replicas_diff = scaler.scale(replicas_info, stats)
+            if replicas_diff != 0:
+                await session.flush()
+                await session.refresh(run_model)
+                await scale_run_replicas(session, run_model, replicas_diff)
 
     if run_model.status != new_status:
         logger.info(

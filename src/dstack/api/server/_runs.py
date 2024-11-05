@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Union
 from uuid import UUID
 
 from pydantic import parse_obj_as
@@ -7,6 +7,7 @@ from pydantic import parse_obj_as
 from dstack._internal.core.models.pools import Instance
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.runs import (
+    ApplyRunPlanInput,
     PoolInstanceOffers,
     Requirements,
     Run,
@@ -14,6 +15,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.server.schemas.runs import (
+    ApplyRunPlanRequest,
     CreateInstanceRequest,
     DeleteRunsRequest,
     GetOffersRequest,
@@ -67,6 +69,17 @@ class RunsAPIClient(APIClientGroup):
             f"/api/project/{project_name}/runs/get_plan", body=body.json(exclude=exclude)
         )
         return parse_obj_as(RunPlan.__response__, resp.json())
+
+    def apply_plan(
+        self,
+        project_name: str,
+        plan: Union[RunPlan, ApplyRunPlanInput],
+        force: bool = False,
+    ) -> Run:
+        plan_input: ApplyRunPlanInput = ApplyRunPlanInput.__response__.parse_obj(plan)
+        body = ApplyRunPlanRequest(plan=plan_input, force=force)
+        resp = self._request(f"/api/project/{project_name}/runs/apply", body=body.json())
+        return parse_obj_as(Run.__response__, resp.json())
 
     def submit(self, project_name: str, run_spec: RunSpec) -> Run:
         body = SubmitRunRequest(run_spec=run_spec)

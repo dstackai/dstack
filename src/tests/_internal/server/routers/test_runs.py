@@ -12,6 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import ApplyAction
+from dstack._internal.core.models.configurations import ServiceConfiguration
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -19,13 +21,15 @@ from dstack._internal.core.models.instances import (
     Resources,
 )
 from dstack._internal.core.models.profiles import DEFAULT_POOL_NAME, Profile
-from dstack._internal.core.models.resources import ResourcesSpec
+from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.runs import (
+    ApplyRunPlanInput,
     JobProvisioningData,
     JobSpec,
     JobStatus,
     JobTerminationReason,
     Requirements,
+    Run,
     RunSpec,
     RunStatus,
     RunTerminationReason,
@@ -35,8 +39,9 @@ from dstack._internal.core.models.volumes import InstanceMountPoint, MountPoint
 from dstack._internal.server.background.tasks.process_instances import process_instances
 from dstack._internal.server.main import app
 from dstack._internal.server.models import JobModel, RunModel
-from dstack._internal.server.schemas.runs import CreateInstanceRequest
+from dstack._internal.server.schemas.runs import ApplyRunPlanRequest, CreateInstanceRequest
 from dstack._internal.server.services.projects import add_project_member
+from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.testing.common import (
     create_job,
     create_project,
@@ -45,6 +50,7 @@ from dstack._internal.server.testing.common import (
     create_user,
     get_auth_headers,
     get_job_provisioning_data,
+    get_run_spec,
 )
 
 client = TestClient(app)
@@ -58,6 +64,8 @@ def get_dev_env_run_plan_dict(
     offers: List[InstanceOfferWithAvailability] = [],
     total_offers: int = 0,
     max_price: Optional[float] = None,
+    action: ApplyAction = ApplyAction.CREATE,
+    current_resource: Optional[Run] = None,
     privileged: bool = False,
     volumes: List[MountPoint] = [],
 ) -> Dict:
@@ -181,6 +189,8 @@ def get_dev_env_run_plan_dict(
                 "max_price": max_price,
             }
         ],
+        "current_resource": current_resource.dict() if current_resource else None,
+        "action": action,
     }
 
 
@@ -189,11 +199,11 @@ def get_dev_env_run_dict(
     job_id: str = "1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e",
     project_name: str = "test_project",
     username: str = "test_user",
-    run_name: str = "run_name",
+    run_name: Optional[str] = "run_name",
     repo_id: str = "test_repo",
     submitted_at: str = "2023-01-02T03:04:00+00:00",
     last_processed_at: str = "2023-01-02T03:04:00+00:00",
-    finished_at: str = "2023-01-02T03:04:00+00:00",
+    finished_at: Optional[str] = "2023-01-02T03:04:00+00:00",
     privileged: bool = False,
 ) -> Dict:
     return {
@@ -717,6 +727,203 @@ class TestGetRunPlan:
         assert response.status_code == 200, response.json()
         assert response.json() == run_plan_dict
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_update_action_when_changing_updatable_fields(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            run_name="test-service",
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                type="service",
+                commands=["one", "two"],
+                port=80,
+                replicas=1,
+            ),
+        )
+        run_model = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_spec.run_name,
+            run_spec=run_spec,
+        )
+        run = run_model_to_run(run_model)
+        run_spec.configuration.replicas = 2
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get_plan",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec.dict()},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert response_json["action"] == "update"
+        assert response_json["current_resource"] == json.loads(run.json())
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_create_action_when_changing_non_updatable_fields(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            run_name="test-service",
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                type="service",
+                commands=["one", "two"],
+                port=80,
+                replicas=1,
+            ),
+        )
+        run_model = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_spec.run_name,
+            run_spec=run_spec,
+        )
+        run = run_model_to_run(run_model)
+        run_spec.configuration.port = 8080
+        response = await client.post(
+            f"/api/project/{project.name}/runs/get_plan",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec.dict()},
+        )
+        assert response.status_code == 200
+        response_json = response.json()
+        assert response_json["action"] == "create"
+        assert response_json["current_resource"] == json.loads(run.json())
+
+
+class TestApplyPlan:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_returns_403_if_not_project_member(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        response = await client.post(
+            f"/api/project/{project.name}/runs/apply",
+            headers=get_auth_headers(user.token),
+        )
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_submits_new_run_if_no_current_resource(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        run_id = UUID("1b0e1b45-2f8c-4ab6-8010-a0d1a3e44e0e")
+        submitted_at = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc)
+        submitted_at_formatted = "2023-01-02T03:04:00+00:00"
+        last_processed_at_formatted = submitted_at_formatted
+        repo = await create_repo(session=session, project_id=project.id)
+        run_dict = get_dev_env_run_dict(
+            run_id=str(run_id),
+            job_id=str(run_id),
+            project_name=project.name,
+            username=user.name,
+            submitted_at=submitted_at_formatted,
+            last_processed_at=last_processed_at_formatted,
+            finished_at=None,
+            run_name="test-run",
+            repo_id=repo.name,
+        )
+        with (
+            patch("uuid.uuid4") as uuid_mock,
+            patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
+        ):
+            uuid_mock.return_value = run_id
+            datetime_mock.return_value = submitted_at
+            response = await client.post(
+                f"/api/project/{project.name}/runs/apply",
+                headers=get_auth_headers(user.token),
+                json={
+                    "plan": {
+                        "run_spec": run_dict["run_spec"],
+                        "current_resource": None,
+                    },
+                    "force": False,
+                },
+            )
+        assert response.status_code == 200, response.json()
+        assert response.json() == run_dict
+        res = await session.execute(select(RunModel))
+        run = res.scalar()
+        assert run is not None
+        res = await session.execute(select(JobModel))
+        job = res.scalar()
+        assert job is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+    async def test_updates_run(self, test_db, session: AsyncSession, client: AsyncClient):
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_run_spec(
+            run_name="test-service",
+            repo_id=repo.name,
+            configuration=ServiceConfiguration(
+                type="service",
+                commands=["one", "two"],
+                port=80,
+                replicas=1,
+            ),
+        )
+        run_model = await create_run(
+            session=session,
+            project=project,
+            repo=repo,
+            user=user,
+            run_name=run_spec.run_name,
+            run_spec=run_spec,
+        )
+        run = run_model_to_run(run_model)
+        run_spec.configuration.replicas = 2
+        response = await client.post(
+            f"/api/project/{project.name}/runs/apply",
+            headers=get_auth_headers(user.token),
+            # Call json.loads to serialize UUID
+            json=json.loads(
+                ApplyRunPlanRequest(
+                    plan=ApplyRunPlanInput(
+                        run_spec=run_spec,
+                        current_resource=run,
+                    ),
+                    force=False,
+                ).json()
+            ),
+        )
+        assert response.status_code == 200, response.json()
+        await session.refresh(run_model)
+        updated_run = run_model_to_run(run_model)
+        assert updated_run.run_spec.configuration.replicas == Range(min=2, max=2)
+
 
 class TestSubmitRun:
     @pytest.mark.asyncio
@@ -767,11 +974,7 @@ class TestSubmitRun:
         with (
             patch("uuid.uuid4") as uuid_mock,
             patch("dstack._internal.utils.common.get_current_datetime") as datetime_mock,
-            patch(
-                "dstack._internal.server.services.backends.get_project_backends"
-            ) as get_project_backends_mock,
         ):
-            get_project_backends_mock.return_value = [Mock()]
             uuid_mock.return_value = run_id
             datetime_mock.return_value = submitted_at
             response = await client.post(
@@ -806,13 +1009,7 @@ class TestSubmitRun:
             repo_id=repo.name,
         )
         body = {"run_spec": run_dict["run_spec"]}
-        with (
-            patch("uuid.uuid4") as uuid_mock,
-            patch(
-                "dstack._internal.server.services.backends.get_project_backends"
-            ) as get_project_backends_mock,
-        ):
-            get_project_backends_mock.return_value = [Mock()]
+        with patch("uuid.uuid4") as uuid_mock:
             uuid_mock.return_value = run_dict["id"]
             response = await client.post(
                 f"/api/project/{project.name}/runs/submit",
@@ -854,13 +1051,7 @@ class TestSubmitRun:
             repo_id=repo.name,
         )
         body = {"run_spec": run_dict["run_spec"]}
-        with (
-            patch("uuid.uuid4") as uuid_mock,
-            patch(
-                "dstack._internal.server.services.backends.get_project_backends"
-            ) as get_project_backends_mock,
-        ):
-            get_project_backends_mock.return_value = [Mock()]
+        with patch("uuid.uuid4") as uuid_mock:
             uuid_mock.return_value = run_dict["id"]
             response = await client.post(
                 f"/api/project/{project.name}/runs/submit",

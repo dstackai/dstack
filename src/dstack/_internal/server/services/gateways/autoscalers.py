@@ -21,9 +21,9 @@ class ReplicaInfo(BaseModel):
     timestamp: datetime.datetime
 
 
-class BaseAutoscaler(ABC):
+class BaseServiceScaler(ABC):
     @abstractmethod
-    def scale(self, replicas: List[ReplicaInfo], stats: Dict[int, Stat]) -> int:
+    def scale(self, replicas: List[ReplicaInfo], stats: Optional[Dict[int, Stat]]) -> int:
         """
         Args:
             replicas: list of all replicas
@@ -35,7 +35,29 @@ class BaseAutoscaler(ABC):
         pass
 
 
-class RPSAutoscaler(BaseAutoscaler):
+class ManualScaler(BaseServiceScaler):
+    """
+    Scales replicas to keep it between `min_replicas` and `max_replicas`
+    in case `min_replicas` or `max_replicas` change.
+    """
+
+    def __init__(
+        self,
+        min_replicas: int,
+        max_replicas: int,
+    ):
+        self.min_replicas = min_replicas
+        self.max_replicas = max_replicas
+
+    def scale(self, replicas: List[ReplicaInfo], stats: Optional[Dict[int, Stat]]) -> int:
+        active_replicas = [r for r in replicas if r.active]
+        target_replicas = len(active_replicas)
+        # clip the target replicas to the min and max values
+        target_replicas = min(max(target_replicas, self.min_replicas), self.max_replicas)
+        return target_replicas - len(active_replicas)
+
+
+class RPSAutoscaler(BaseServiceScaler):
     def __init__(
         self,
         min_replicas: int,
@@ -50,7 +72,10 @@ class RPSAutoscaler(BaseAutoscaler):
         self.scale_up_delay = scale_up_delay
         self.scale_down_delay = scale_down_delay
 
-    def scale(self, replicas: List[ReplicaInfo], stats: Dict[int, Stat]) -> int:
+    def scale(self, replicas: List[ReplicaInfo], stats: Optional[Dict[int, Stat]]) -> int:
+        if not stats:
+            return 0
+
         now = common_utils.get_current_datetime()
         active_replicas = [r for r in replicas if r.active]
         last_scaled_at = max((r.timestamp for r in replicas), default=None)
@@ -83,9 +108,12 @@ class RPSAutoscaler(BaseAutoscaler):
         return 0
 
 
-def get_service_autoscaler(conf: ServiceConfiguration) -> Optional[BaseAutoscaler]:
+def get_service_scaler(conf: ServiceConfiguration) -> BaseServiceScaler:
     if conf.scaling is None:
-        return None
+        return ManualScaler(
+            min_replicas=conf.replicas.min,
+            max_replicas=conf.replicas.max,
+        )
     if conf.scaling.metric == "rps":
         return RPSAutoscaler(
             # replicas count validated by configuration model
@@ -95,3 +123,4 @@ def get_service_autoscaler(conf: ServiceConfiguration) -> Optional[BaseAutoscale
             scale_up_delay=conf.scaling.scale_up_delay,
             scale_down_delay=conf.scaling.scale_down_delay,
         )
+    raise ValueError(f"No scaler found for scaling parameters {conf.scaling}")
