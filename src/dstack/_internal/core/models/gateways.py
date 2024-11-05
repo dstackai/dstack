@@ -8,6 +8,8 @@ from typing_extensions import Annotated, Literal
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import CoreModel
 
+# TODO(#1595): refactor into different modules: gateway-specific and proxy-specific
+
 
 class GatewayStatus(str, Enum):
     SUBMITTED = "submitted"
@@ -151,4 +153,4 @@ class OpenAIChatModel(BaseChatModel):
 
 
 ChatModel = Annotated[Union[TGIChatModel, OpenAIChatModel], Field(discriminator="format")]
-AnyModel = Annotated[Union[ChatModel], Field(discriminator="type")]  # embeddings and etc.
+AnyModel = Union[ChatModel]  # embeddings and etc.

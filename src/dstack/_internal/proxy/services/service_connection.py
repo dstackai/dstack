@@ -1,9 +1,11 @@
 import asyncio
+import random
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Dict, Optional
 
-from httpx import AsyncClient, AsyncHTTPTransport
+import httpx
+from httpx import AsyncHTTPTransport
 
 from dstack._internal.core.services.ssh.tunnel import (
     SSH_DEFAULT_OPTIONS,
@@ -12,12 +14,19 @@ from dstack._internal.core.services.ssh.tunnel import (
     SSHTunnel,
     UnixSocket,
 )
-from dstack._internal.proxy.repos.base import Project, Replica, Service
+from dstack._internal.proxy.errors import UnexpectedProxyError
+from dstack._internal.proxy.repos.base import BaseProxyRepo, Project, Replica, Service
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.path import FileContent
 
 logger = get_logger(__name__)
 OPEN_TUNNEL_TIMEOUT = 10
+
+
+class ServiceReplicaClient(httpx.AsyncClient):
+    def build_request(self, *args, **kwargs) -> httpx.Request:
+        self.cookies.clear()  # the client is shared by all users, don't leak cookies
+        return super().build_request(*args, **kwargs)
 
 
 class ServiceReplicaConnection:
@@ -40,11 +49,12 @@ class ServiceReplicaConnection:
                 "ConnectTimeout": str(OPEN_TUNNEL_TIMEOUT),
             },
         )
-        self._client = AsyncClient(
+        self._client = ServiceReplicaClient(
             transport=AsyncHTTPTransport(uds=str(app_socket_path)),
-            # The hostname in base_url is normally a placeholder, it will be overwritten
-            # by proxied requests' Host header unless they don't have it (HTTP/1.0)
-            base_url="http://service/",
+            # The hostname in base_url is there for troubleshooting, as it may appear in
+            # logs and in the Host header. The actual destination is the Unix socket.
+            base_url=f"http://{replica.id}-{service.run_name}/",
+            timeout=60,  # Same as default Nginx proxy timeout
         )
         self._is_open = asyncio.locks.Event()
 
@@ -57,7 +67,7 @@ class ServiceReplicaConnection:
         await self._client.aclose()
         await self._tunnel.aclose()
 
-    async def client(self) -> AsyncClient:
+    async def client(self) -> ServiceReplicaClient:
         await asyncio.wait_for(self._is_open.wait(), timeout=OPEN_TUNNEL_TIMEOUT)
         return self._client
 
@@ -100,6 +110,23 @@ class ServiceReplicaConnectionPool:
                 logger.error(
                     "Error removing connection to service replica %s: %s", replica_ids[i], exc
                 )
+
+
+async def get_service_replica_client(
+    project_name: str, service: Service, repo: BaseProxyRepo
+) -> ServiceReplicaClient:
+    """
+    `service` must have at least one replica
+    """
+    # TODO(#1595): consider trying different replicas if the first one doesn't respond
+    replica = random.choice(service.replicas)
+    connection = await service_replica_connection_pool.get(replica.id)
+    if connection is None:
+        project = await repo.get_project(project_name)
+        if project is None:
+            raise UnexpectedProxyError(f"Expected to find project {project_name} but could not")
+        connection = await service_replica_connection_pool.add(project, service, replica)
+    return await connection.client()
 
 
 service_replica_connection_pool: ServiceReplicaConnectionPool = ServiceReplicaConnectionPool()

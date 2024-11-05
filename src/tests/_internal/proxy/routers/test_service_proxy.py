@@ -1,57 +1,17 @@
-from typing import AsyncGenerator, Generator, Tuple
+from typing import Generator
 from unittest.mock import patch
 
-import httpx
 import pytest
-from fastapi import FastAPI
 
-from dstack._internal.proxy.deps import BaseProxyDependencyInjector
-from dstack._internal.proxy.repos.base import BaseProxyRepo, Project, Replica, Service
-from dstack._internal.proxy.routers.service_proxy import router
+from dstack._internal.proxy.services.service_connection import ServiceReplicaClient
+from dstack._internal.proxy.testing.common import (
+    make_app,
+    make_app_client,
+    make_client,
+    make_project,
+    make_service,
+)
 from dstack._internal.proxy.testing.repo import ProxyTestRepo
-
-
-def make_app(repo: BaseProxyRepo) -> FastAPI:
-    class DependencyInjector(BaseProxyDependencyInjector):
-        async def get_repo(self) -> AsyncGenerator[BaseProxyRepo, None]:
-            yield repo
-
-    app = FastAPI()
-    app.state.proxy_dependency_injector = DependencyInjector()
-    app.include_router(router, prefix="/proxy/services")
-    return app
-
-
-def make_client(app: FastAPI) -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app))
-
-
-def make_app_client(repo: BaseProxyRepo) -> Tuple[FastAPI, httpx.AsyncClient]:
-    app = make_app(repo)
-    client = make_client(app)
-    return app, client
-
-
-def make_project(name: str) -> Project:
-    return Project(name=name, ssh_private_key="secret")
-
-
-def make_service(run_name: str, auth: bool = False) -> Service:
-    return Service(
-        id="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        run_name=run_name,
-        auth=auth,
-        app_port=80,
-        replicas=[
-            Replica(
-                id="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-                ssh_destination="ubuntu@server",
-                ssh_port=22,
-                ssh_proxy=None,
-            )
-        ],
-    )
-
 
 MOCK_REPLICA_CLIENT_TIMEOUT = 8
 
@@ -59,9 +19,9 @@ MOCK_REPLICA_CLIENT_TIMEOUT = 8
 @pytest.fixture
 def mock_replica_client_httpbin(httpbin) -> Generator[None, None, None]:
     with patch(
-        "dstack._internal.proxy.services.service_proxy.get_replica_client"
-    ) as get_replica_client_mock:
-        get_replica_client_mock.return_value = httpx.AsyncClient(
+        "dstack._internal.proxy.services.service_connection.ServiceReplicaConnectionPool.add"
+    ) as add_connection_mock:
+        add_connection_mock.return_value.client.return_value = ServiceReplicaClient(
             base_url=httpbin.url, timeout=MOCK_REPLICA_CLIENT_TIMEOUT
         )
         yield
@@ -159,7 +119,7 @@ async def test_proxy_gateway_timeout(mock_replica_client_httpbin) -> None:
     assert MOCK_REPLICA_CLIENT_TIMEOUT < 10
     resp = await client.get("http://test-host/proxy/services/test-proj/httpbin/delay/10")
     assert resp.status_code == 504
-    assert resp.json()["detail"] == "Gateway Timeout"
+    assert resp.json()["detail"] == "Timed out requesting upstream"
 
 
 @pytest.mark.asyncio
@@ -204,10 +164,7 @@ async def test_auth(mock_replica_client_httpbin, token: str, status: int) -> Non
     repo = ProxyTestRepo(project_to_tokens={"test-proj": {"correct-token"}})
     await repo.add_project(make_project("test-proj"))
     await repo.add_service(project_name="test-proj", service=make_service("httpbin", auth=True))
-    _, client = make_app_client(repo)
+    _, client = make_app_client(repo, auth_token=token)
     url = "http://test-host/proxy/services/test-proj/httpbin/"
-    headers = {}
-    if token is not None:
-        headers["Authorization"] = f"Bearer {token}"
-    resp = await client.get(url, headers=headers)
+    resp = await client.get(url)
     assert resp.status_code == status

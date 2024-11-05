@@ -28,7 +28,7 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
-from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT
+from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.gateways import (
     Gateway,
     GatewayComputeConfiguration,
@@ -73,6 +73,8 @@ from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
+
+# TODO(#1595): refactor into different modules: gateway-specific and proxy-specific
 
 logger = get_logger(__name__)
 
@@ -392,14 +394,11 @@ async def _register_service_in_gateway(
     wildcard_domain = gateway.wildcard_domain.lstrip("*.") if gateway.wildcard_domain else None
     if wildcard_domain is None:
         raise ServerClientError("Domain is required for gateway")
-    service_spec = ServiceSpec(url=f"{service_protocol}://{run_model.run_name}.{wildcard_domain}")
-    if run_spec.configuration.model is not None:
-        service_spec.model = ServiceModelSpec(
-            name=run_spec.configuration.model.name,
-            base_url=f"{gateway_protocol}://gateway.{wildcard_domain}",
-            type=run_spec.configuration.model.type,
-        )
-        service_spec.options = get_service_options(run_spec.configuration)
+    service_spec = get_service_spec(
+        configuration=run_spec.configuration,
+        service_url=f"{service_protocol}://{run_model.run_name}.{wildcard_domain}",
+        model_url=f"{gateway_protocol}://gateway.{wildcard_domain}",
+    )
 
     conn = await get_or_add_gateway_connection(session, gateway.id)
     try:
@@ -435,17 +434,30 @@ def _register_service_in_server(run_model: RunModel) -> ServiceSpec:
             "The `https` configuration property is not applicable when running services without a gateway. "
             "Please configure a gateway or remove the `https` property from the service configuration"
         )
-    if run_spec.configuration.model is not None:
-        raise ServerClientError(
-            "Model mappings are not yet supported when running services without a gateway. "
-            "Please configure a gateway or remove the `model` property from the service configuration"
-        )
     if run_spec.configuration.replicas.min != run_spec.configuration.replicas.max:
         raise ServerClientError(
             "Auto-scaling is not yet supported when running services without a gateway. "
             "Please configure a gateway or set `replicas` to a fixed value in the service configuration"
         )
-    return ServiceSpec(url=f"/proxy/services/{run_model.project.name}/{run_model.run_name}/")
+    return get_service_spec(
+        configuration=run_spec.configuration,
+        service_url=f"/proxy/services/{run_model.project.name}/{run_model.run_name}/",
+        model_url=f"/proxy/models/{run_model.project.name}/",
+    )
+
+
+def get_service_spec(
+    configuration: ServiceConfiguration, service_url: str, model_url: str
+) -> ServiceSpec:
+    service_spec = ServiceSpec(url=service_url)
+    if configuration.model is not None:
+        service_spec.model = ServiceModelSpec(
+            name=configuration.model.name,
+            base_url=model_url,
+            type=configuration.model.type,
+        )
+        service_spec.options = get_service_options(configuration)
+    return service_spec
 
 
 async def register_replica(

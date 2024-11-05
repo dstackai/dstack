@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from dstack._internal.cli.utils.common import console
 from dstack._internal.core.errors import ForbiddenError, ServerClientError
 from dstack._internal.core.services.configs import update_default_project
-from dstack._internal.proxy.routers import service_proxy
+from dstack._internal.proxy.routers import model_proxy, service_proxy
 from dstack._internal.proxy.services.service_connection import service_replica_connection_pool
 from dstack._internal.server import settings
 from dstack._internal.server.background import start_background_tasks
@@ -178,6 +178,7 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(volumes.project_router)
     if FeatureFlags.PROXY:
         app.include_router(service_proxy.router, prefix="/proxy/services", tags=["service-proxy"])
+        app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):

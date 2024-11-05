@@ -1,13 +1,14 @@
-import random
 from typing import AsyncGenerator, AsyncIterator, Optional
 
 import fastapi
 import httpx
+from fastapi import status
 from starlette.requests import ClientDisconnect
 
 from dstack._internal.proxy.deps import ProxyAuthContext
-from dstack._internal.proxy.repos.base import BaseProxyRepo, Replica, Service
-from dstack._internal.proxy.services.service_connection import service_replica_connection_pool
+from dstack._internal.proxy.errors import ProxyError
+from dstack._internal.proxy.repos.base import BaseProxyRepo
+from dstack._internal.proxy.services.service_connection import get_service_replica_client
 from dstack._internal.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -22,98 +23,69 @@ async def proxy(
     repo: BaseProxyRepo,
 ) -> fastapi.responses.Response:
     if "Upgrade" in request.headers:
-        raise fastapi.exceptions.HTTPException(
-            fastapi.status.HTTP_400_BAD_REQUEST, "Upgrading connections is not supported"
-        )
+        raise ProxyError("Upgrading connections is not supported", status.HTTP_400_BAD_REQUEST)
 
     service = await repo.get_service(project_name, run_name)
     if service is None or not service.replicas:
-        raise fastapi.HTTPException(
-            fastapi.status.HTTP_404_NOT_FOUND,
-            f"Service {project_name}/{run_name} not found",
-        )
+        raise ProxyError(f"Service {project_name}/{run_name} not found", status.HTTP_404_NOT_FOUND)
     if service.auth:
         await auth.enforce()
 
-    replica = random.choice(service.replicas)
-    client = await get_replica_client(project_name, service, replica, repo)
+    client = await get_service_replica_client(project_name, service, repo)
 
     try:
-        upstream_request = await build_upstream_request(request, path, client, replica.id)
+        upstream_request = await build_upstream_request(request, path, client)
     except ClientDisconnect:
         logger.debug(
             "Downstream client disconnected before response was sent for %s %s",
             request.method,
             request.url,
         )
-        raise fastapi.HTTPException(fastapi.status.HTTP_400_BAD_REQUEST, "Client disconnected")
+        raise ProxyError("Client disconnected")
 
     try:
         upstream_response = await client.send(upstream_request, stream=True)
     except httpx.RequestError as e:
         logger.debug(
-            "Error requesting %s %s for replica %s: %r",
-            upstream_request.method,
-            upstream_request.url,
-            replica.id,
-            e,
+            "Error requesting %s %s: %r", upstream_request.method, upstream_request.url, e
         )
         if isinstance(e, httpx.TimeoutException):
-            raise fastapi.HTTPException(fastapi.status.HTTP_504_GATEWAY_TIMEOUT)
-        raise fastapi.HTTPException(fastapi.status.HTTP_502_BAD_GATEWAY)
+            raise ProxyError("Timed out requesting upstream", status.HTTP_504_GATEWAY_TIMEOUT)
+        raise ProxyError("Error requesting upstream", status.HTTP_502_BAD_GATEWAY)
 
     return fastapi.responses.StreamingResponse(
-        stream_response(upstream_response, replica.id),
+        stream_response(upstream_response),
         status_code=upstream_response.status_code,
         headers=upstream_response.headers,
     )
 
 
-async def get_replica_client(
-    project_name: str, service: Service, replica: Replica, repo: BaseProxyRepo
-) -> httpx.AsyncClient:
-    connection = await service_replica_connection_pool.get(replica.id)
-    if connection is None:
-        project = await repo.get_project(project_name)
-        if project is None:
-            raise RuntimeError(f"Expected to find project {project_name} but could not")
-        connection = await service_replica_connection_pool.add(project, service, replica)
-    return await connection.client()
-
-
-async def stream_response(
-    response: httpx.Response, replica_id: str
-) -> AsyncGenerator[bytes, None]:
+async def stream_response(response: httpx.Response) -> AsyncGenerator[bytes, None]:
     try:
         async for chunk in response.aiter_raw():
             yield chunk
     except httpx.RequestError as e:
         logger.debug(
-            "Error streaming response %s %s for replica %s: %r",
-            response.request.method,
-            response.request.url,
-            replica_id,
-            e,
+            "Error streaming response %s %s: %r", response.request.method, response.request.url, e
         )
 
     try:
         await response.aclose()
     except httpx.RequestError as e:
         logger.debug(
-            "Error closing response %s %s for replica %s: %r",
+            "Error closing response %s %s: %r",
             response.request.method,
             response.request.url,
-            replica_id,
             e,
         )
 
 
 async def build_upstream_request(
-    downstream_request: fastapi.Request, path: str, client: httpx.AsyncClient, replica_id: str
+    downstream_request: fastapi.Request, path: str, client: httpx.AsyncClient
 ) -> httpx.Request:
     url = httpx.URL(path=path, query=downstream_request.url.query.encode("utf-8"))
     request_stream = await FastAPIToHttpxRequestStreamAdaptor(
-        downstream_request.stream(), replica_id
+        downstream_request.stream(), downstream_request.url
     ).get_stream()
     client.cookies.clear()  # the client is shared by all users, don't leak cookies
 
@@ -130,9 +102,9 @@ class FastAPIToHttpxRequestStreamAdaptor:
     considers them actual request bodies, which can lead to unexpected behavior.
     """
 
-    def __init__(self, stream: AsyncIterator[bytes], replica_id: str) -> None:
+    def __init__(self, stream: AsyncIterator[bytes], url: fastapi.datastructures.URL) -> None:
         self._stream = stream
-        self._replica_id = replica_id
+        self._url = url
 
     async def get_stream(self) -> Optional[AsyncGenerator[bytes, None]]:
         try:
@@ -140,9 +112,7 @@ class FastAPIToHttpxRequestStreamAdaptor:
         except StopAsyncIteration:
             return None
         except ClientDisconnect:
-            logger.debug(
-                "Downstream client disconnected when requesting replica %s", self._replica_id
-            )
+            logger.debug("Downstream client disconnected when requesting %s", self._url)
             return None
         if first_chunk == b"":
             return None
@@ -154,6 +124,4 @@ class FastAPIToHttpxRequestStreamAdaptor:
             async for chunk in self._stream:
                 yield chunk
         except ClientDisconnect:
-            logger.debug(
-                "Downstream client disconnected when requesting replica %s", self._replica_id
-            )
+            logger.debug("Downstream client disconnected when requesting %s", self._url)
