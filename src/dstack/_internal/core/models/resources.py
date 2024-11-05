@@ -129,7 +129,10 @@ DEFAULT_GPU_COUNT = Range[int](min=1, max=1)
 
 class GPUSpec(CoreModel):
     vendor: Annotated[
-        Optional[gpuhunt.AcceleratorVendor], Field(description="The vendor of the GPU/accelerator")
+        Optional[gpuhunt.AcceleratorVendor],
+        Field(
+            description="The vendor of the GPU/accelerator, one of: `nvidia`, `amd`, `google` (alias: `tpu`)"
+        ),
     ] = None
     name: Annotated[
         Optional[List[str]], Field(description="The name of the GPU (e.g., `A100` or `H100`)")
@@ -298,6 +301,12 @@ ComputeCapabilityLike = Union[ComputeCapability, float, str]
 
 
 class GPUSpecSchema(CoreModel):
+    vendor: Annotated[
+        Optional[gpuhunt.AcceleratorVendor],
+        Field(
+            description="The vendor of the GPU/accelerator, one of: `nvidia`, `amd`, `google` (alias: `tpu`)"
+        ),
+    ] = None
     name: Annotated[
         Optional[Union[List[str], str]], Field(description="The GPU name or list of names")
     ] = None
