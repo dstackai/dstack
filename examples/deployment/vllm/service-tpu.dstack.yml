@@ -34,7 +34,4 @@ resources:
   gpu: v5litepod-4
 
 # (Optional) Enable the OpenAI-compatible endpoint
-model:
-  format: openai
-  type: chat
-  name: meta-llama/Meta-Llama-3.1-8B-Instruct
+model: meta-llama/Meta-Llama-3.1-8B-Instruct

@@ -87,10 +87,7 @@ and [vLLM :material-arrow-top-right-thin:{ .external }](https://github.com/vllm-
     resources:
       gpu: v5litepod-4
 
-    model:
-      format: openai
-      type: chat
-      name: meta-llama/Meta-Llama-3.1-8B-Instruct
+    model: meta-llama/Meta-Llama-3.1-8B-Instruct
     ```
     </div>
 

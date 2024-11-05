@@ -9,7 +9,7 @@ from dstack._internal.core.errors import ConfigurationError
 from dstack._internal.core.models.common import CoreModel, Duration, RegistryAuth
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.fleets import FleetConfiguration
-from dstack._internal.core.models.gateways import AnyModel, GatewayConfiguration
+from dstack._internal.core.models.gateways import AnyModel, GatewayConfiguration, OpenAIChatModel
 from dstack._internal.core.models.profiles import ProfileParams
 from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
@@ -211,8 +211,15 @@ class ServiceConfigurationParams(CoreModel):
         Field(description="The port, that application listens on or the mapping"),
     ]
     model: Annotated[
-        Optional[AnyModel],
-        Field(description="Mapping of the model for the OpenAI-compatible endpoint"),
+        Optional[Union[AnyModel, str]],
+        Field(
+            description=(
+                "Mapping of the model for the model gateway."
+                " Can be a full model format definition or just a model name."
+                " If it's a name, the service is expected to expose an OpenAI-compatible"
+                " API at the `/v1` path"
+            )
+        ),
     ] = None
     https: Annotated[
         bool,
@@ -241,6 +248,12 @@ class ServiceConfigurationParams(CoreModel):
             return PortMapping(local_port=80, container_port=v)
         elif isinstance(v, str):
             return PortMapping.parse(v)
+        return v
+
+    @validator("model")
+    def convert_model(cls, v: Optional[Union[AnyModel, str]]) -> Optional[AnyModel]:
+        if isinstance(v, str):
+            return OpenAIChatModel(type="chat", name=v, format="openai")
         return v
 
     @validator("replicas")

@@ -46,10 +46,7 @@ spot_policy: auto
 resources:
   gpu: 24GB
 
-model:
-  format: openai
-  type: chat
-  name: meta-llama/Meta-Llama-3.1-8B-Instruct
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 </div>
@@ -123,10 +120,7 @@ spot_policy: auto
 resources:
   gpu: 24GB
   
-model:
-  format: openai
-  type: chat
-  name: meta-llama/Meta-Llama-3.1-8B-Instruct
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 </div>
