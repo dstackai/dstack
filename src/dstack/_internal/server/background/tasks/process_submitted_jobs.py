@@ -290,7 +290,10 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     # Take lock to prevent attaching volumes that are to be deleted.
     # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
     await session.execute(
-        select(VolumeModel).where(VolumeModel.id.in_(volumes_ids)).with_for_update()
+        select(VolumeModel)
+        .where(VolumeModel.id.in_(volumes_ids))
+        .options(joinedload(VolumeModel.user))
+        .with_for_update()
     )
     async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):
         if len(volume_models) > 0:

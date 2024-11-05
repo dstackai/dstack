@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from dstack._internal.core.backends import BACKENDS_WITH_VOLUMES_SUPPORT
 from dstack._internal.core.errors import (
@@ -102,7 +102,11 @@ async def list_projects_volume_models(
     if ascending:
         order_by = (VolumeModel.created_at.asc(), VolumeModel.id.desc())
     res = await session.execute(
-        select(VolumeModel).where(*filters).order_by(*order_by).limit(limit)
+        select(VolumeModel)
+        .where(*filters)
+        .order_by(*order_by)
+        .limit(limit)
+        .options(joinedload(VolumeModel.user))
     )
     volume_models = list(res.scalars().all())
     return volume_models
@@ -130,7 +134,9 @@ async def list_project_volume_models(
         filters.append(VolumeModel.name.in_(names))
     if not include_deleted:
         filters.append(VolumeModel.deleted == False)
-    res = await session.execute(select(VolumeModel).where(*filters))
+    res = await session.execute(
+        select(VolumeModel).where(*filters).options(joinedload(VolumeModel.user))
+    )
     return list(res.scalars().all())
 
 
@@ -157,7 +163,9 @@ async def get_project_volume_model_by_name(
     ]
     if not include_deleted:
         filters.append(VolumeModel.deleted == False)
-    res = await session.execute(select(VolumeModel).where(*filters))
+    res = await session.execute(
+        select(VolumeModel).where(*filters).options(joinedload(VolumeModel.user))
+    )
     return res.scalar_one_or_none()
 
 
@@ -226,6 +234,7 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
                 VolumeModel.name.in_(names),
                 VolumeModel.deleted == False,
             )
+            .options(joinedload(VolumeModel.user))
             .options(selectinload(VolumeModel.instances))
             .execution_options(populate_existing=True)
             .with_for_update()
