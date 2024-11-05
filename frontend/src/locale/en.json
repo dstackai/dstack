@@ -388,6 +388,7 @@
 
   "models": {
     "model_name": "Name",
+    "url": "URL",
     "gateway": "Gateway",
     "type": "Type",
     "run": "Run",

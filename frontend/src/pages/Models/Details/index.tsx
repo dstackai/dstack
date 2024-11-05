@@ -210,10 +210,13 @@ export const ModelDetails: React.FC = () => {
         }
 
         setLoading(false);
+
+        setTimeout(() => {
+            textAreaRef.current?.querySelector('textarea')?.focus();
+        }, 10);
     };
 
     const clearChat = () => {
-        console.log('clearChat');
         setValue('message', '');
         setValue('instructions', '');
 
@@ -292,8 +295,6 @@ export const ModelDetails: React.FC = () => {
                 return copyToClipboard(curlCode);
         }
     };
-
-    console.log({ modelData, runData });
 
     return (
         <ContentLayout

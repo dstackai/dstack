@@ -35,7 +35,7 @@ export const useColumnsDefinitions = () => {
         },
         {
             id: 'gateway',
-            header: `${t('models.gateway')}`,
+            header: `${t('models.url')}`,
             cell: (item) => getModelGateway(item.base_url),
         },
         {
