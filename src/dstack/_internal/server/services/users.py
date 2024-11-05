@@ -1,4 +1,5 @@
 import hashlib
+import os
 import uuid
 from datetime import timezone
 from typing import Awaitable, Callable, List, Optional, Tuple
@@ -30,7 +31,10 @@ async def get_or_create_admin_user(session: AsyncSession) -> Tuple[UserModel, bo
     if admin is not None:
         return admin, False
     admin = await create_user(
-        session=session, username=_ADMIN_USERNAME, global_role=GlobalRole.ADMIN
+        session=session,
+        username=_ADMIN_USERNAME,
+        global_role=GlobalRole.ADMIN,
+        token=os.getenv("DSTACK_SERVER_ADMIN_TOKEN"),
     )
     return admin, True
 
@@ -72,11 +76,13 @@ async def create_user(
     global_role: GlobalRole,
     email: Optional[str] = None,
     active: bool = True,
+    token: Optional[str] = None,
 ) -> UserModel:
     user_model = await get_user_model_by_name(session=session, username=username, ignore_case=True)
     if user_model is not None:
         raise ResourceExistsError()
-    token = str(uuid.uuid4())
+    if token is None:
+        token = str(uuid.uuid4())
     user = UserModel(
         id=uuid.uuid4(),
         name=username,
