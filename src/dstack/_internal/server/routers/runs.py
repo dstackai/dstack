@@ -102,6 +102,12 @@ async def apply_plan(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Run:
+    """
+    Creates a new run or updates an existing run.
+    Errors if the expected current resource from the plan does not match the current resource.
+    Use `force: true` to apply even if the current resource does not match.
+    If the existing run is active and cannot be updated, it must be stopped first.
+    """
     user, project = user_project
     return await runs.apply_plan(
         session=session,
@@ -112,6 +118,8 @@ async def apply_plan(
     )
 
 
+# apply_plan replaces submit_run since it can create new runs.
+# submit_run can be deprecated in the future.
 @project_router.post("/submit")
 async def submit_run(
     body: SubmitRunRequest,

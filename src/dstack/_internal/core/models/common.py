@@ -67,8 +67,8 @@ class RegistryAuth(CoreModel):
 
 
 class ApplyAction(str, Enum):
-    CREATE = "create"  # resource created or overridden
-    UPDATE = "update"  # resource can be updated in place
+    CREATE = "create"  # resource is to be created or overridden
+    UPDATE = "update"  # resource is to be updated in-place
 
 
 _CM = TypeVar("_CM", bound=CoreModel)

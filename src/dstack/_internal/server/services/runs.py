@@ -773,7 +773,9 @@ def _validate_run_spec(run_spec: RunSpec):
 
 
 _UPDATABLE_SPEC_FIELDS = ["repo_code_hash", "configuration"]
-_UPDATABLE_CONFIGURATION_FIELDS = ["replicas", "scaling", "commands"]
+# Most service fields can be updated via replica redeployment.
+# TODO: Allow updating other fields when a rolling deployment is supported.
+_UPDATABLE_CONFIGURATION_FIELDS = ["replicas", "scaling"]
 
 
 def _can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec) -> bool:
@@ -804,20 +806,6 @@ def _check_can_update_run_spec(current_run_spec: RunSpec, new_run_spec: RunSpec)
                 f"Failed to update fields {changed_configuration_fields}."
                 f" Can only update {_UPDATABLE_CONFIGURATION_FIELDS}"
             )
-    if (
-        changed_configuration_fields == ["commands"]
-        or changed_spec_fields == ["repo_code_hash"]
-        or (
-            changed_spec_fields == ["repo_code_hash", "configuration"]
-            and changed_configuration_fields == ["commands"]
-        )
-    ):
-        # TODO: Remove this check once services support updates for rolling deployement.
-        # Currently, the check is needed since updating commands/code won't trigger
-        # automatic deployment of the new version. Manual service scaling is required.
-        raise ServerClientError(
-            "Cannot update repo_code_hash and commands without updating other fields"
-        )
 
 
 async def process_terminating_run(session: AsyncSession, run: RunModel):
