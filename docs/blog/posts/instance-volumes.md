@@ -29,7 +29,7 @@ commands:
 ports: [8000]
 
 volumes:
-  - /root/.dstack/cache:/root/.cache/pip
+  - /root/.dstack/cache:/root/.cache
 
 resources:
   gpu: 16GB..
@@ -39,7 +39,7 @@ resources:
 
 <!-- more -->
 
-> Instance fleets work with both [SSH fleets](../../docs/concepts/fleets.md#ssh)
+> Instance volumes work with both [SSH fleets](../../docs/concepts/fleets.md#ssh)
 > and [cloud fleets](../../docs/concepts/fleets.md#cloud), and it is possible to mount any folders on the instance,
 > whether they are regular folders or NFS share mounts.
 
