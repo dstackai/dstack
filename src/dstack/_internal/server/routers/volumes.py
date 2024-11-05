@@ -68,10 +68,11 @@ async def create_volume(
     session: AsyncSession = Depends(get_session),
     user_project: Tuple[UserModel, ProjectModel] = Depends(ProjectMember()),
 ) -> Volume:
-    _, project = user_project
+    user, project = user_project
     return await volumes_services.create_volume(
         session=session,
         project=project,
+        user=user,
         configuration=body.configuration,
     )
 

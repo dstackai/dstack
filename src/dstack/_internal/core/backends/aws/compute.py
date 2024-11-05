@@ -489,6 +489,7 @@ class AWSCompute(Compute):
         tags = {
             "Name": volume.configuration.name,
             "owner": "dstack",
+            "dstack_user": volume.user,
             "dstack_project": volume.project_name,
         }
         tags = merge_tags(tags=tags, backend_tags=self.config.tags)

@@ -44,6 +44,7 @@ class TestListVolumes:
         volume1 = await create_volume(
             session=session,
             project=project1,
+            user=user,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             configuration=get_volume_configuration(name="volume1"),
         )
@@ -51,6 +52,7 @@ class TestListVolumes:
         volume2 = await create_volume(
             session=session,
             project=project2,
+            user=user,
             created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
             configuration=get_volume_configuration(name="volume2"),
         )
@@ -65,6 +67,7 @@ class TestListVolumes:
                 "id": str(volume2.id),
                 "name": volume2.name,
                 "project_name": project2.name,
+                "user": user.name,
                 "configuration": json.loads(volume2.configuration),
                 "external": False,
                 "created_at": "2023-01-02T03:05:00+00:00",
@@ -79,6 +82,7 @@ class TestListVolumes:
                 "id": str(volume1.id),
                 "name": volume1.name,
                 "project_name": project1.name,
+                "user": user.name,
                 "configuration": json.loads(volume1.configuration),
                 "external": False,
                 "created_at": "2023-01-02T03:04:00+00:00",
@@ -104,6 +108,7 @@ class TestListVolumes:
                 "id": str(volume1.id),
                 "name": volume1.name,
                 "project_name": project1.name,
+                "user": user.name,
                 "configuration": json.loads(volume1.configuration),
                 "external": False,
                 "created_at": "2023-01-02T03:04:00+00:00",
@@ -134,12 +139,14 @@ class TestListVolumes:
         volume1 = await create_volume(
             session=session,
             project=project1,
+            user=user1,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
             configuration=get_volume_configuration(name="volume1"),
         )
         await create_volume(
             session=session,
             project=project2,
+            user=user2,
             created_at=datetime(2023, 1, 2, 3, 5, tzinfo=timezone.utc),
             configuration=get_volume_configuration(name="volume2"),
         )
@@ -154,6 +161,7 @@ class TestListVolumes:
                 "id": str(volume1.id),
                 "name": volume1.name,
                 "project_name": project1.name,
+                "user": user1.name,
                 "configuration": json.loads(volume1.configuration),
                 "external": False,
                 "created_at": "2023-01-02T03:04:00+00:00",
@@ -187,6 +195,7 @@ class TestListProjectVolumes:
         volume = await create_volume(
             session=session,
             project=project,
+            user=user,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
         response = await client.post(
@@ -199,6 +208,7 @@ class TestListProjectVolumes:
                 "id": str(volume.id),
                 "name": volume.name,
                 "project_name": project.name,
+                "user": user.name,
                 "configuration": json.loads(volume.configuration),
                 "external": False,
                 "created_at": "2023-01-02T03:04:00+00:00",
@@ -232,6 +242,7 @@ class TestGetVolume:
         volume = await create_volume(
             session=session,
             project=project,
+            user=user,
             created_at=datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
         )
         response = await client.post(
@@ -244,6 +255,7 @@ class TestGetVolume:
             "id": str(volume.id),
             "name": volume.name,
             "project_name": project.name,
+            "user": user.name,
             "configuration": json.loads(volume.configuration),
             "external": False,
             "created_at": "2023-01-02T03:04:00+00:00",
@@ -305,6 +317,7 @@ class TestCreateVolume:
             "name": configuration.name,
             "project_name": project.name,
             "configuration": configuration,
+            "user": user.name,
             "external": False,
             "created_at": "2023-01-02T03:04:00+00:00",
             "status": "submitted",
@@ -338,6 +351,7 @@ class TestDeleteVolumes:
         volume = await create_volume(
             session=session,
             project=project,
+            user=user,
             volume_provisioning_data=get_volume_provisioning_data(),
         )
         with patch(
@@ -369,6 +383,7 @@ class TestDeleteVolumes:
         volume = await create_volume(
             session=session,
             project=project,
+            user=user,
             volume_provisioning_data=get_volume_provisioning_data(),
         )
         instance = await create_instance(

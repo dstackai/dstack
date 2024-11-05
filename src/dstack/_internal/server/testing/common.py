@@ -526,6 +526,7 @@ async def create_instance(
 async def create_volume(
     session: AsyncSession,
     project: ProjectModel,
+    user: UserModel,
     status: VolumeStatus = VolumeStatus.SUBMITTED,
     created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
     configuration: Optional[VolumeConfiguration] = None,
@@ -538,6 +539,7 @@ async def create_volume(
         configuration = get_volume_configuration(backend=backend, region=region)
     vm = VolumeModel(
         project=project,
+        user_id=user.id,
         name=configuration.name,
         status=status,
         created_at=created_at,
