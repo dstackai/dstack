@@ -292,7 +292,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
     await session.execute(
         select(VolumeModel)
         .where(VolumeModel.id.in_(volumes_ids))
-        .options(joinedload(VolumeModel.user))
+        .options(selectinload(VolumeModel.user))
         .with_for_update()
     )
     async with get_locker().lock_ctx(VolumeModel.__tablename__, volumes_ids):

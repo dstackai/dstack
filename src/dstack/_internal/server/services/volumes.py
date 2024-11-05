@@ -234,7 +234,7 @@ async def delete_volumes(session: AsyncSession, project: ProjectModel, names: Li
                 VolumeModel.name.in_(names),
                 VolumeModel.deleted == False,
             )
-            .options(joinedload(VolumeModel.user))
+            .options(selectinload(VolumeModel.user))
             .options(selectinload(VolumeModel.instances))
             .execution_options(populate_existing=True)
             .with_for_update()
