@@ -34,9 +34,15 @@ def upgrade() -> None:
     # ### end Alembic commands ###
 
     # update any existing volumes and set the user_id equal to the project_owner.id which created the volume
-    op.execute(
-        "UPDATE volumes SET user_id = (SELECT owner_id FROM projects JOIN volumes ON projects.id = volumes.project_id) WHERE user_id IS NULL"
-    )
+    op.execute("""
+        UPDATE volumes AS v
+        SET user_id = (
+            SELECT owner_id FROM projects
+            JOIN volumes ON projects.id = volumes.project_id
+            WHERE volumes.id = v.id
+        )
+        WHERE user_id IS NULL
+    """)
 
     # set volumes.user_id to non-nullable
     with op.batch_alter_table("volumes", schema=None) as batch_op:
