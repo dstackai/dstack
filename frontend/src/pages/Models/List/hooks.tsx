@@ -9,6 +9,8 @@ import { DATE_TIME_FORMAT } from 'consts';
 import { ROUTES } from 'routes';
 import { useGetProjectsQuery } from 'services/project';
 
+import { getModelGateway } from '../helpers';
+
 import { IModelExtended } from './types';
 
 export const useColumnsDefinitions = () => {
@@ -33,8 +35,8 @@ export const useColumnsDefinitions = () => {
         },
         {
             id: 'gateway',
-            header: `${t('models.gateway')}`,
-            cell: (item) => item.base_url,
+            header: `${t('models.url')}`,
+            cell: (item) => getModelGateway(item.base_url),
         },
         {
             id: 'run',

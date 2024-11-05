@@ -34,6 +34,7 @@ import { useGetRunQuery } from 'services/run';
 import { selectAuthToken } from 'App/slice';
 import { runIsStopped } from 'pages/Runs/utils';
 
+import { getModelGateway } from '../helpers';
 import { getCurlModelCode, getPythonModelCode } from './helpers';
 
 import { IModelExtended } from '../List/types';
@@ -122,7 +123,7 @@ export const ModelDetails: React.FC = () => {
         }
 
         openai.current = new OpenAI({
-            baseURL: modelData.base_url,
+            baseURL: getModelGateway(modelData.base_url),
             apiKey: token,
             dangerouslyAllowBrowser: true,
         });
@@ -209,10 +210,13 @@ export const ModelDetails: React.FC = () => {
         }
 
         setLoading(false);
+
+        setTimeout(() => {
+            textAreaRef.current?.querySelector('textarea')?.focus();
+        }, 10);
     };
 
     const clearChat = () => {
-        console.log('clearChat');
         setValue('message', '');
         setValue('instructions', '');
 
@@ -291,8 +295,6 @@ export const ModelDetails: React.FC = () => {
                 return copyToClipboard(curlCode);
         }
     };
-
-    console.log({ modelData, runData });
 
     return (
         <ContentLayout
