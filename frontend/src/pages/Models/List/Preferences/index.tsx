@@ -29,7 +29,7 @@ export const Preferences: React.FC = () => {
                     { id: 'repository', label: `${t('models.repository')}` },
                     { id: 'backend', label: `${t('models.backend')}` },
                     // hidden by default
-                    { id: 'gateway', label: `${t('models.gateway')}` },
+                    { id: 'url', label: `${t('models.url')}` },
                 ],
             }}
         />

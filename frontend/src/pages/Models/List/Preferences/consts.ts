@@ -13,7 +13,7 @@ export const DEFAULT_PREFERENCES: CollectionPreferencesProps.Preferences = {
         { id: 'repository', visible: true },
         { id: 'backend', visible: true },
         // hidden by default
-        { id: 'gateway', visible: false },
+        { id: 'url', visible: false },
     ],
     wrapLines: false,
     stripedRows: false,
