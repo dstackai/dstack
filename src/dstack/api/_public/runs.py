@@ -503,7 +503,10 @@ class RunCollection:
         if run_plan.current_resource is None and run_name is not None:
             # If run_plan.current_resource is missing, this can mean old (0.18.x) server.
             # TODO: Remove in 0.19
-            run_plan.current_resource = self._api_client.runs.get(self._project, run_name)
+            try:
+                run_plan.current_resource = self._api_client.runs.get(self._project, run_name)
+            except ResourceNotExistsError:
+                pass
         return run_plan
 
     def exec_plan(
