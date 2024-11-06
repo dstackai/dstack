@@ -1,8 +1,8 @@
 import copy
 import json
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
-from unittest.mock import Mock, patch
+from typing import Dict, Generator, List, Optional, Tuple, Union
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID
 
 import pytest
@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.common import ApplyAction
 from dstack._internal.core.models.configurations import ServiceConfiguration
+from dstack._internal.core.models.gateways import GatewayStatus
 from dstack._internal.core.models.instances import (
     InstanceAvailability,
     InstanceOfferWithAvailability,
@@ -43,6 +44,9 @@ from dstack._internal.server.schemas.runs import ApplyRunPlanRequest, CreateInst
 from dstack._internal.server.services.projects import add_project_member
 from dstack._internal.server.services.runs import run_model_to_run
 from dstack._internal.server.testing.common import (
+    create_backend,
+    create_gateway,
+    create_gateway_compute,
     create_job,
     create_project,
     create_repo,
@@ -355,6 +359,32 @@ def get_dev_env_run_dict(
         "service": None,
         "termination_reason": None,
         "error": "",
+    }
+
+
+def get_service_run_spec(
+    repo_id: str,
+    run_name: Optional[str] = None,
+    gateway: Optional[Union[bool, str]] = None,
+) -> dict:
+    return {
+        "configuration": {
+            "type": "service",
+            "commands": ["python -m http.server"],
+            "port": 8000,
+            "gateway": gateway,
+            "model": "test-model",
+        },
+        "configuration_path": "dstack.yaml",
+        "profile": {
+            "name": "string",
+        },
+        "repo_code_hash": None,
+        "repo_data": {"repo_dir": "/repo", "repo_type": "local"},
+        "repo_id": repo_id,
+        "run_name": run_name,
+        "ssh_key_pub": "ssh_key",
+        "working_dir": ".",
     }
 
 
@@ -1481,3 +1511,144 @@ class TestCreateInstance:
                 ]
             }
             assert result == expected
+
+
+@pytest.mark.parametrize("test_db", ["sqlite", "postgres"], indirect=True)
+class TestSubmitService:
+    @pytest.fixture(autouse=True)
+    def mock_gateway_connections(self) -> Generator[None, None, None]:
+        with patch(
+            "dstack._internal.server.services.gateways.gateway_connections_pool.get_or_add"
+        ) as get_conn_mock:
+            get_conn_mock.return_value.client = Mock()
+            get_conn_mock.return_value.client.return_value = AsyncMock()
+            yield
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        (
+            "existing_gateways",
+            "specified_gateway_in_run_conf",
+            "expected_service_url",
+            "expected_model_url",
+        ),
+        [
+            pytest.param(
+                [("default-gateway", True), ("non-default-gateway", False)],
+                None,
+                "https://test-service.default-gateway.example",
+                "https://gateway.default-gateway.example",
+                id="submits-to-default-gateway",
+            ),
+            pytest.param(
+                [("default-gateway", True), ("non-default-gateway", False)],
+                "non-default-gateway",
+                "https://test-service.non-default-gateway.example",
+                "https://gateway.non-default-gateway.example",
+                id="submits-to-specified-gateway",
+            ),
+            pytest.param(
+                [("non-default-gateway", False)],
+                None,
+                "/proxy/services/test-project/test-service/",
+                "/proxy/models/test-project/",
+                id="submits-in-server-when-no-default-gateway",
+            ),
+            pytest.param(
+                [("default-gateway", True)],
+                False,
+                "/proxy/services/test-project/test-service/",
+                "/proxy/models/test-project/",
+                id="submits-in-server-when-specified",
+            ),
+        ],
+    )
+    async def test_submit_to_correct_proxy(
+        self,
+        test_db,
+        session: AsyncSession,
+        client: AsyncClient,
+        existing_gateways: List[Tuple[str, bool]],
+        specified_gateway_in_run_conf: str,
+        expected_service_url: str,
+        expected_model_url: str,
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user, name="test-project")
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        backend = await create_backend(session=session, project_id=project.id)
+        for gateway_name, is_default in existing_gateways:
+            gateway_compute = await create_gateway_compute(
+                session=session,
+                backend_id=backend.id,
+            )
+            gateway = await create_gateway(
+                session=session,
+                project_id=project.id,
+                backend_id=backend.id,
+                gateway_compute_id=gateway_compute.id,
+                status=GatewayStatus.RUNNING,
+                name=gateway_name,
+                wildcard_domain=f"{gateway_name}.example",
+            )
+            if is_default:
+                project.default_gateway_id = gateway.id
+                await session.commit()
+        run_spec = get_service_run_spec(
+            repo_id=repo.name,
+            run_name="test-service",
+            gateway=specified_gateway_in_run_conf,
+        )
+        response = await client.post(
+            f"/api/project/{project.name}/runs/submit",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec},
+        )
+        assert response.status_code == 200
+        assert response.json()["service"]["url"] == expected_service_url
+        assert response.json()["service"]["model"]["base_url"] == expected_model_url
+
+    @pytest.mark.asyncio
+    async def test_return_error_if_specified_gateway_not_exists(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_service_run_spec(repo_id=repo.name, gateway="nonexistent")
+        response = await client.post(
+            f"/api/project/{project.name}/runs/submit",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec},
+        )
+        assert response.status_code == 400
+        assert response.json() == {
+            "detail": [
+                {"msg": "Gateway nonexistent does not exist", "code": "resource_not_exists"}
+            ]
+        }
+
+    @pytest.mark.asyncio
+    async def test_return_error_if_specified_gateway_is_true(
+        self, test_db, session: AsyncSession, client: AsyncClient
+    ) -> None:
+        user = await create_user(session=session, global_role=GlobalRole.USER)
+        project = await create_project(session=session, owner=user)
+        await add_project_member(
+            session=session, project=project, user=user, project_role=ProjectRole.USER
+        )
+        repo = await create_repo(session=session, project_id=project.id)
+        run_spec = get_service_run_spec(repo_id=repo.name, gateway=True)
+        response = await client.post(
+            f"/api/project/{project.name}/runs/submit",
+            headers=get_auth_headers(user.token),
+            json={"run_spec": run_spec},
+        )
+        assert response.status_code == 422
+        assert "must be a string or boolean `false`, not boolean `true`" in response.text

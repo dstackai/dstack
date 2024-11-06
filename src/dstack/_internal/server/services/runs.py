@@ -431,7 +431,7 @@ async def submit_run(
         replicas = 1
         if run_spec.configuration.type == "service":
             replicas = run_spec.configuration.replicas.min
-            await gateways.register_service(session, run_model)
+            await gateways.register_service(session, run_model, run_spec)
 
         for replica_num in range(replicas):
             jobs = await get_jobs_from_run_spec(run_spec, replica_num=replica_num)

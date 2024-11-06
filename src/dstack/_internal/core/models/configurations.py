@@ -209,6 +209,15 @@ class ServiceConfigurationParams(CoreModel):
         Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
         Field(description="The port, that application listens on or the mapping"),
     ]
+    gateway: Annotated[
+        Optional[Union[bool, str]],
+        Field(
+            description=(
+                "The name of the gateway. Specify boolean `false` to run without a gateway."
+                " Omit to run with the default gateway"
+            ),
+        ),
+    ] = None
     model: Annotated[
         Optional[Union[AnyModel, str]],
         Field(
@@ -264,6 +273,16 @@ class ServiceConfigurationParams(CoreModel):
         if v.max < v.min:
             raise ValueError(
                 "The maximum number of replicas must be greater than or equal to the minium number of replicas"
+            )
+        return v
+
+    @validator("gateway")
+    def validate_gateway(
+        cls, v: Optional[Union[bool, str]]
+    ) -> Optional[Union[Literal[False], str]]:
+        if v == True:
+            raise ValueError(
+                "The `gateway` property must be a string or boolean `false`, not boolean `true`"
             )
         return v
 
