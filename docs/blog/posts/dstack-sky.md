@@ -115,10 +115,7 @@ resources:
   gpu: 48GB..80GB
 
 # Enable OpenAI compatible endpoint
-model:
-  type: chat
-  name: mixtral
-  format: openai
+model: mixtral
 ```
 </div>
 

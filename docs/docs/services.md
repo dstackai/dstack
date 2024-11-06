@@ -44,11 +44,8 @@ resources:
   # Change to what is required
   gpu: 24GB
 
-# Comment if you don't to access the model via https://gateway.<gateway domain>
-model:
-  type: chat
-  name: meta-llama/Meta-Llama-3.1-8B-Instruct
-  format: openai
+# Comment out if you won't access the model via https://gateway.<gateway domain>
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
 ```
 
 </div>

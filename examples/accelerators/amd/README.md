@@ -39,10 +39,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
     spot_policy: auto
 
     # Register the model    
-    model:
-      type: chat
-      name: meta-llama/Meta-Llama-3.1-70B-Instruct
-      format: openai
+    model: meta-llama/Meta-Llama-3.1-70B-Instruct
     ```
     
     </div>
@@ -98,10 +95,7 @@ Llama 3.1 70B in FP16 using [TGI :material-arrow-top-right-thin:{ .external }](h
       disk: 200GB
     
     # Register the model
-    model:
-      format: openai
-      type: chat
-      name: meta-llama/Meta-Llama-3.1-70B-Instruct
+    model: meta-llama/Meta-Llama-3.1-70B-Instruct
     ```
     </div>
 

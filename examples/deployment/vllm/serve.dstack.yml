@@ -13,7 +13,4 @@ resources:
   gpu: 24GB
 
 # (Optional) Enable the OpenAI-compatible endpoint
-model:
-  format: openai
-  type: chat
-  name: NousResearch/Llama-2-7b-chat-hf
+model: NousResearch/Llama-2-7b-chat-hf

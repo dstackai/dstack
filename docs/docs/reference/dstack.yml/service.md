@@ -112,8 +112,9 @@ If you want, you can specify your own Docker image via `image`.
 
 By default, if you run a service, its endpoint is accessible at `https://<run name>.<gateway domain>`.
 
-If you run a model, you can optionally configure the mapping to make it accessible via the 
-OpenAI-compatible interface.
+If you are running a chat model with an OpenAI-compatible interface,
+you can optionally set the [`model`](#model) property to make the model accessible via
+the model gateway provided by `dstack`.
 
 <div editor-title="service.dstack.yml"> 
 
@@ -124,7 +125,9 @@ name: llama31-service
 
 python: "3.10"
 
-# Commands of the service
+# Required environment variables
+env:
+  - HF_TOKEN
 commands:
   - pip install vllm
   - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
@@ -135,57 +138,21 @@ resources:
   # Change to what is required
   gpu: 24GB
 
-# Comment if you don't want to access the model via https://gateway.<gateway domain>
-model:
-  type: chat
-  name: meta-llama/Meta-Llama-3.1-8B-Instruct
-  format: openai
+# Make the model accessible at https://gateway.<gateway domain>
+model: meta-llama/Meta-Llama-3.1-8B-Instruct
+
+# Alternatively, use this syntax to set more model settings:
+# model:
+#   type: chat
+#   name: meta-llama/Meta-Llama-3.1-8B-Instruct
+#   format: openai
+#   prefix: /v1
 ```
 
 </div>
 
-In this case, with such a configuration, once the service is up, you'll be able to access the model at
+With such a configuration, once the service is up, you'll be able to access the model at
 `https://gateway.<gateway domain>` via the OpenAI-compatible interface.
-
-The `format` supports only `tgi` (Text Generation Inference)
-and `openai` (if you are using Text Generation Inference or vLLM with OpenAI-compatible mode).
-
-??? info "Chat template"
-
-    By default, `dstack` loads the [chat template](https://huggingface.co/docs/transformers/main/en/chat_templating)
-    from the model's repository. If it is not present there, manual configuration is required.
-
-    ```yaml
-    type: service
-
-    image: ghcr.io/huggingface/text-generation-inference:latest
-    env:
-      - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ
-    commands:
-      - text-generation-launcher --port 8000 --trust-remote-code --quantize gptq
-    port: 8000
-
-    resources:
-      gpu: 80GB
-
-    # Enable the OpenAI-compatible endpoint
-    model:
-      type: chat
-      name: TheBloke/Llama-2-13B-chat-GPTQ
-      format: tgi
-      chat_template: "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ '<s>[INST] ' + content.strip() + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content.strip() + ' </s>' }}{% endif %}{% endfor %}"
-      eos_token: "</s>"
-    ```
-
-    ##### Limitations
-
-    Please note that model mapping is an experimental feature with the following limitations:
-
-    1. Doesn't work if your `chat_template` uses `bos_token`. As a workaround, replace `bos_token` inside `chat_template` with the token content itself.
-    2. Doesn't work if `eos_token` is defined in the model repository as a dictionary. As a workaround, set `eos_token` manually, as shown in the example above (see Chat template).
-
-    If you encounter any other issues, please make sure to file a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
-
 
 ### Auto-scaling
 
@@ -201,7 +168,9 @@ name: llama31-service
 
 python: "3.10"
 
-# Commands of the service
+# Required environment variables
+env:
+  - HF_TOKEN
 commands:
   - pip install vllm
   - vllm serve meta-llama/Meta-Llama-3.1-8B-Instruct --max-model-len 4096
@@ -461,13 +430,60 @@ The `service` configuration type supports many other options. See below.
       type:
         required: true
 
-## `model`
+## `model[format=openai]`
 
-#SCHEMA# dstack._internal.core.models.gateways.BaseChatModel
+#SCHEMA# dstack._internal.core.models.gateways.OpenAIChatModel
     overrides:
       show_root_heading: false
       type:
         required: true
+
+## `model[format=tgi]`
+
+> TGI provides an OpenAI-compatible API starting with version 1.4.0,
+so models served by TGI can be defined with `format: openai` too.
+
+#SCHEMA# dstack._internal.core.models.gateways.TGIChatModel
+    overrides:
+      show_root_heading: false
+      type:
+        required: true
+
+??? info "Chat template"
+
+    By default, `dstack` loads the [chat template](https://huggingface.co/docs/transformers/main/en/chat_templating)
+    from the model's repository. If it is not present there, manual configuration is required.
+
+    ```yaml
+    type: service
+
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    env:
+      - MODEL_ID=TheBloke/Llama-2-13B-chat-GPTQ
+    commands:
+      - text-generation-launcher --port 8000 --trust-remote-code --quantize gptq
+    port: 8000
+
+    resources:
+      gpu: 80GB
+
+    # Enable the OpenAI-compatible endpoint
+    model:
+      type: chat
+      name: TheBloke/Llama-2-13B-chat-GPTQ
+      format: tgi
+      chat_template: "{% if messages[0]['role'] == 'system' %}{% set loop_messages = messages[1:] %}{% set system_message = messages[0]['content'] %}{% else %}{% set loop_messages = messages %}{% set system_message = false %}{% endif %}{% for message in loop_messages %}{% if (message['role'] == 'user') != (loop.index0 % 2 == 0) %}{{ raise_exception('Conversation roles must alternate user/assistant/user/assistant/...') }}{% endif %}{% if loop.index0 == 0 and system_message != false %}{% set content = '<<SYS>>\\n' + system_message + '\\n<</SYS>>\\n\\n' + message['content'] %}{% else %}{% set content = message['content'] %}{% endif %}{% if message['role'] == 'user' %}{{ '<s>[INST] ' + content.strip() + ' [/INST]' }}{% elif message['role'] == 'assistant' %}{{ ' '  + content.strip() + ' </s>' }}{% endif %}{% endfor %}"
+      eos_token: "</s>"
+    ```
+
+    ##### Limitations
+
+    Please note that model mapping is an experimental feature with the following limitations:
+
+    1. Doesn't work if your `chat_template` uses `bos_token`. As a workaround, replace `bos_token` inside `chat_template` with the token content itself.
+    2. Doesn't work if `eos_token` is defined in the model repository as a dictionary. As a workaround, set `eos_token` manually, as shown in the example above (see Chat template).
+
+    If you encounter any other issues, please make sure to file a [GitHub issue](https://github.com/dstackai/dstack/issues/new/choose).
 
 ## `scaling`
 
@@ -486,7 +502,7 @@ The `service` configuration type supports many other options. See below.
         required: true
       item_id_prefix: resources-
 
-## `resouces.gpu` { #resources-gpu data-toc-label="resources.gpu" } 
+## `resouces.gpu` { #resources-gpu data-toc-label="resources.gpu" }
 
 #SCHEMA# dstack._internal.core.models.resources.GPUSpecSchema
     overrides:
