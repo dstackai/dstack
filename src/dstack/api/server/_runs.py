@@ -60,13 +60,9 @@ class RunsAPIClient(APIClientGroup):
 
     def get_plan(self, project_name: str, run_spec: RunSpec) -> RunPlan:
         body = GetRunPlanRequest(run_spec=run_spec)
-        # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
-        if not run_spec.configuration.privileged:
-            exclude = {"run_spec": {"configuration": {"privileged"}}}
-        else:
-            exclude = None
         resp = self._request(
-            f"/api/project/{project_name}/runs/get_plan", body=body.json(exclude=exclude)
+            f"/api/project/{project_name}/runs/get_plan",
+            body=body.json(exclude=_get_run_spec_excludes(run_spec)),
         )
         return parse_obj_as(RunPlan.__response__, resp.json())
 
@@ -83,13 +79,9 @@ class RunsAPIClient(APIClientGroup):
 
     def submit(self, project_name: str, run_spec: RunSpec) -> Run:
         body = SubmitRunRequest(run_spec=run_spec)
-        # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
-        if not run_spec.configuration.privileged:
-            exclude = {"run_spec": {"configuration": {"privileged"}}}
-        else:
-            exclude = None
         resp = self._request(
-            f"/api/project/{project_name}/runs/submit", body=body.json(exclude=exclude)
+            f"/api/project/{project_name}/runs/submit",
+            body=body.json(exclude=_get_run_spec_excludes(run_spec)),
         )
         return parse_obj_as(Run.__response__, resp.json())
 
@@ -119,3 +111,16 @@ class RunsAPIClient(APIClientGroup):
         body = CreateInstanceRequest(profile=profile, requirements=requirements)
         resp = self._request(f"/api/project/{project_name}/runs/create_instance", body=body.json())
         return parse_obj_as(Instance.__response__, resp.json())
+
+
+def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
+    exclude = {}
+    # client >= 0.18.18 / server <= 0.18.17 compatibility tweak
+    if not run_spec.configuration.privileged:
+        exclude = {"run_spec": {"configuration": {"privileged"}}}
+    # client >= 0.18.23 / server <= 0.18.22 compatibility tweak
+    if run_spec.configuration.type == "service" and run_spec.configuration.gateway is None:
+        exclude.setdefault("run_spec", {})
+        exclude["run_spec"].setdefault("configuration", set())
+        exclude["run_spec"]["configuration"].add("gateway")
+    return exclude or None
