@@ -6,7 +6,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 import dstack._internal.server.services.gateways as gateways
 from dstack._internal.core.errors import BackendError, ResourceNotExistsError, SSHError
@@ -22,7 +22,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
-from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel
+from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, VolumeModel
 from dstack._internal.server.services.backends import get_project_backend_by_type
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
@@ -247,6 +247,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
                 if len(instance.volumes) > 0:
                     logger.info("Detaching volumes: %s", [v.name for v in instance.volumes])
                     await detach_volumes_from_instance(
+                        session=session,
                         project=instance.project,
                         instance=instance,
                         jpd=jpd,
@@ -337,6 +338,7 @@ def group_jobs_by_replica_latest(jobs: List[JobModel]) -> Iterable[Tuple[int, Li
 
 
 async def detach_volumes_from_instance(
+    session: AsyncSession,
     project: ProjectModel,
     instance: InstanceModel,
     jpd: JobProvisioningData,
@@ -350,7 +352,18 @@ async def detach_volumes_from_instance(
         return
 
     detached_volumes = []
+
     for volume_model in instance.volumes:
+        # reload volume_model with user
+        # this could likely be handled better
+        res = await session.execute(
+            select(VolumeModel)
+            .where(VolumeModel.id == volume_model.id)
+            .options(joinedload(VolumeModel.user))
+        )
+
+        volume_model = res.unique().scalar_one()
+
         volume = volume_model_to_volume(volume_model)
         try:
             if volume.provisioning_data is not None and volume.provisioning_data.detachable:
