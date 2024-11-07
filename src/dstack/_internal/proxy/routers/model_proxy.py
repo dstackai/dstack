@@ -1,4 +1,4 @@
-from typing import AsyncIterator
+from typing import AsyncIterator, Optional
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
@@ -55,13 +55,44 @@ async def post_chat_completions(
         return await client.generate(body)
     else:
         return StreamingResponse(
-            stream_chunks(client.stream(body)),
+            await StreamingAdaptor(client.stream(body)).get_stream(),
             media_type="text/event-stream",
             headers={"X-Accel-Buffering": "no"},
         )
 
 
-async def stream_chunks(chunks: AsyncIterator[ChatCompletionsChunk]) -> AsyncIterator[bytes]:
-    async for chunk in chunks:
-        yield f"data:{chunk.json()}\n\n".encode()
-    yield "data: [DONE]\n\n".encode()
+class StreamingAdaptor:
+    """
+    Converts a stream of ChatCompletionsChunk to an SSE stream.
+    Also pre-fetches the first chunk **before** starting streaming to downstream,
+    so that upstream request errors can propagate to the downstream client.
+    """
+
+    def __init__(self, stream: AsyncIterator[ChatCompletionsChunk]) -> None:
+        self._stream = stream
+
+    async def get_stream(self) -> AsyncIterator[bytes]:
+        try:
+            first_chunk = await self._stream.__anext__()
+        except StopAsyncIteration:
+            first_chunk = None
+        return self._adaptor(first_chunk)
+
+    async def _adaptor(self, first_chunk: Optional[ChatCompletionsChunk]) -> AsyncIterator[bytes]:
+        if first_chunk is not None:
+            yield self._encode_chunk(first_chunk)
+
+            try:
+                async for chunk in self._stream:
+                    yield self._encode_chunk(chunk)
+            except ProxyError as e:
+                # No standard way to report errors while streaming,
+                # but we'll at least send them as comments
+                yield f": {e.detail!r}\n\n".encode()  # !r to avoid line breaks
+                return
+
+        yield "data: [DONE]\n\n".encode()
+
+    @staticmethod
+    def _encode_chunk(chunk: ChatCompletionsChunk) -> bytes:
+        return f"data:{chunk.json()}\n\n".encode()
