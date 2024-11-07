@@ -69,7 +69,6 @@ from dstack._internal.server.utils.common import (
     gather_map_async,
     run_async,
 )
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
@@ -361,10 +360,13 @@ async def register_service(session: AsyncSession, run_model: RunModel):
     if gateway is not None:
         service_spec = await _register_service_in_gateway(session, run_model, gateway)
         run_model.gateway = gateway
-    elif FeatureFlags.PROXY:
+    elif not settings.FORBID_SERVICES_WITHOUT_GATEWAY:
         service_spec = _register_service_in_server(run_model)
     else:
-        raise ResourceNotExistsError("Default gateway is not set")
+        raise ResourceNotExistsError(
+            "This dstack-server installation forbids services without a gateway."
+            " Please configure a default gateway."
+        )
     run_model.service_spec = service_spec.json()
 
 

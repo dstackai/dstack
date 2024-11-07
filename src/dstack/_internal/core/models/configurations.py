@@ -15,7 +15,6 @@ from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
-from dstack._internal.settings import FeatureFlags
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -221,14 +220,9 @@ class ServiceConfigurationParams(CoreModel):
             )
         ),
     ] = None
-    https: Annotated[
-        bool,
-        Field(
-            description="Enable HTTPS"
-            if not FeatureFlags.PROXY
-            else "Enable HTTPS if running with a gateway"
-        ),
-    ] = SERVICE_HTTPS_DEFAULT
+    https: Annotated[bool, Field(description="Enable HTTPS if running with a gateway")] = (
+        SERVICE_HTTPS_DEFAULT
+    )
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
     replicas: Annotated[
         Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],
