@@ -22,7 +22,7 @@ from dstack._internal.core.models.runs import (
     RunSpec,
 )
 from dstack._internal.core.services.ssh.tunnel import SSHTunnel, ports_to_forwarded_sockets
-from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel
+from dstack._internal.server.models import InstanceModel, JobModel, ProjectModel, VolumeModel
 from dstack._internal.server.services.backends import get_project_backend_by_type
 from dstack._internal.server.services.jobs.configurators.base import JobConfigurator
 from dstack._internal.server.services.jobs.configurators.dev import DevEnvironmentJobConfigurator
@@ -221,7 +221,7 @@ async def process_terminating_job(session: AsyncSession, job_model: JobModel):
             .where(InstanceModel.id == job_model.used_instance_id)
             .options(
                 selectinload(InstanceModel.project).joinedload(ProjectModel.backends),
-                selectinload(InstanceModel.volumes),
+                selectinload(InstanceModel.volumes).joinedload(VolumeModel.user),
                 selectinload(InstanceModel.job),
             )
             .with_for_update()
