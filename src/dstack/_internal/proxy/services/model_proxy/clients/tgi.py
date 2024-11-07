@@ -6,6 +6,7 @@ from typing import AsyncIterator, Dict, List
 import httpx
 import jinja2
 import jinja2.sandbox
+from fastapi import status
 
 from dstack._internal.proxy.errors import ProxyError
 from dstack._internal.proxy.schemas.model_proxy import (
@@ -38,9 +39,12 @@ class TGIChatCompletions(ChatCompletionsClient):
 
     async def generate(self, request: ChatCompletionsRequest) -> ChatCompletionsResponse:
         payload = self.get_payload(request)
-        resp = await self.client.post("/generate", json=payload)
-        if resp.status_code != 200:
-            raise ProxyError(resp.text)  # TODO(egor-s)
+        try:
+            resp = await self.client.post("/generate", json=payload)
+            await self.propagate_error(resp)
+        except httpx.RequestError as e:
+            raise ProxyError(f"Error requesting model: {e!r}", status.HTTP_502_BAD_GATEWAY)
+
         data = resp.json()
 
         choices = [
@@ -91,38 +95,51 @@ class TGIChatCompletions(ChatCompletionsClient):
         created = int(datetime.datetime.utcnow().timestamp())
 
         payload = self.get_payload(request)
-        async with self.client.stream("POST", "/generate_stream", json=payload) as resp:
-            async for line in resp.aiter_lines():
-                if line.startswith("data:"):
-                    data = json.loads(line[len("data:") :].strip("\n"))
-                    if "error" in data:
-                        raise ProxyError(data["error"])
-                    chunk = ChatCompletionsChunk(
-                        id=completion_id,
-                        choices=[],
-                        created=created,
-                        model=request.model,
-                        system_fingerprint="",
-                    )
-                    if data["details"] is not None:
-                        chunk.choices = [
-                            ChatCompletionsChunkChoice(
-                                delta={},
-                                logprobs=None,
-                                finish_reason=self.finish_reason(data["details"]["finish_reason"]),
-                                index=0,
-                            )
-                        ]
-                    else:
-                        chunk.choices = [
-                            ChatCompletionsChunkChoice(
-                                delta={"content": data["token"]["text"], "role": "assistant"},
-                                logprobs=None,
-                                finish_reason=None,
-                                index=0,
-                            )
-                        ]
-                    yield chunk
+        try:
+            async with self.client.stream("POST", "/generate_stream", json=payload) as resp:
+                await self.propagate_error(resp)
+                async for line in resp.aiter_lines():
+                    if line.startswith("data:"):
+                        yield self.parse_chunk(
+                            data=json.loads(line[len("data:") :].strip("\n")),
+                            model=request.model,
+                            completion_id=completion_id,
+                            created=created,
+                        )
+        except httpx.RequestError as e:
+            raise ProxyError(f"Error requesting model: {e!r}", status.HTTP_502_BAD_GATEWAY)
+
+    def parse_chunk(
+        self, data: dict, model: str, completion_id: str, created: int
+    ) -> ChatCompletionsChunk:
+        if "error" in data:
+            raise ProxyError(data["error"])
+        chunk = ChatCompletionsChunk(
+            id=completion_id,
+            choices=[],
+            created=created,
+            model=model,
+            system_fingerprint="",
+        )
+        if data["details"] is not None:
+            chunk.choices = [
+                ChatCompletionsChunkChoice(
+                    delta={},
+                    logprobs=None,
+                    finish_reason=self.finish_reason(data["details"]["finish_reason"]),
+                    index=0,
+                )
+            ]
+        else:
+            chunk.choices = [
+                ChatCompletionsChunkChoice(
+                    delta={"content": data["token"]["text"], "role": "assistant"},
+                    logprobs=None,
+                    finish_reason=None,
+                    index=0,
+                )
+            ]
+        return chunk
 
     def get_payload(self, request: ChatCompletionsRequest) -> Dict:
         try:
@@ -176,6 +193,16 @@ class TGIChatCompletions(ChatCompletionsClient):
             if text.endswith(stop_token):
                 return text[: -len(stop_token)]
         return text
+
+    @staticmethod
+    async def propagate_error(resp: httpx.Response) -> None:
+        """
+        Propagates HTTP error by raising ProxyError if status is not 200.
+        May also raise httpx.RequestError if there are issues reading the response.
+        """
+        if resp.status_code != 200:
+            resp_body = await resp.aread()
+            raise ProxyError(resp_body.decode(errors="replace"), code=resp.status_code)
 
 
 def raise_exception(message: str):
