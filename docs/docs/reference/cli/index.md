@@ -422,6 +422,7 @@ $ dstack pool delete --help
  * `DSTACK_SERVER_CLOUDWATCH_LOG_GROUP` – (Optional) The CloudWatch Logs group for workloads logs. If not set, the default file-based log storage is used.
  * `DSTACK_SERVER_CLOUDWATCH_LOG_REGION` — (Optional) The CloudWatch Logs region. Defaults to `None`.
  * `DSTACK_DEFAULT_SERVICE_CLIENT_MAX_BODY_SIZE` – (Optional) Request body size limit for services, in bytes. Defaults to 64 MiB.
+ * `DSTACK_FORBID_SERVICES_WITHOUT_GATEWAY` - (Optional) Forbids registering new services without a gateway if set to any value.
  * `DSTACK_SERVER_DIR` – (Optional) Sets path to store data and server configs. Defaults to `~/.dstack/server`.
 
 ??? info "Internal environment variables"

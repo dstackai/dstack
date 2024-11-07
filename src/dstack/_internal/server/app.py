@@ -56,7 +56,7 @@ from dstack._internal.server.utils.routers import (
     error_detail,
     get_server_client_error_details,
 )
-from dstack._internal.settings import DSTACK_VERSION, FeatureFlags
+from dstack._internal.settings import DSTACK_VERSION
 from dstack._internal.utils.logging import get_logger
 from dstack._internal.utils.ssh import check_required_ssh_version
 
@@ -176,9 +176,8 @@ def register_routes(app: FastAPI, ui: bool = True):
     app.include_router(gateways.router)
     app.include_router(volumes.root_router)
     app.include_router(volumes.project_router)
-    if FeatureFlags.PROXY:
-        app.include_router(service_proxy.router, prefix="/proxy/services", tags=["service-proxy"])
-        app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
+    app.include_router(service_proxy.router, prefix="/proxy/services", tags=["service-proxy"])
+    app.include_router(model_proxy.router, prefix="/proxy/models", tags=["model-proxy"])
 
     @app.exception_handler(ForbiddenError)
     async def forbidden_error_handler(request: Request, exc: ForbiddenError):
@@ -242,11 +241,7 @@ def register_routes(app: FastAPI, ui: bool = True):
 
         @app.exception_handler(404)
         async def custom_http_exception_handler(request, exc):
-            if (
-                request.url.path.startswith("/api")
-                or FeatureFlags.PROXY
-                and _is_proxy_request(request)
-            ):
+            if request.url.path.startswith("/api") or _is_proxy_request(request):
                 return JSONResponse(
                     {"detail": exc.detail},
                     status_code=status.HTTP_404_NOT_FOUND,
