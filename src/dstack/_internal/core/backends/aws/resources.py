@@ -140,6 +140,7 @@ def create_instances_struct(
     allocate_public_ip: bool = True,
     placement_group_name: Optional[str] = None,
     enable_efa: bool = False,
+    reservation_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     struct: Dict[str, Any] = dict(
         BlockDeviceMappings=[
@@ -203,6 +204,11 @@ def create_instances_struct(
     if placement_group_name is not None:
         struct["Placement"] = {
             "GroupName": placement_group_name,
+        }
+
+    if reservation_id is not None:
+        struct["CapacityReservationSpecification"] = {
+            "CapacityReservationTarget": {"CapacityReservationId": reservation_id}
         }
 
     return struct

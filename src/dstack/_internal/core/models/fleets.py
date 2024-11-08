@@ -100,6 +100,10 @@ class InstanceGroupParams(CoreModel):
         Optional[InstanceGroupPlacement],
         Field(description="The placement of instances: `any` or `cluster`"),
     ] = None
+    reservation: Annotated[
+        Optional[str],
+        Field(description="The existing reservation for the instances"),
+    ] = None
     resources: Annotated[
         Optional[ResourcesSpec],
         Field(description="The resources requirements"),
