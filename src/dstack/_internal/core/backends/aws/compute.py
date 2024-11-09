@@ -72,12 +72,37 @@ class AWSCompute(Compute):
     def get_offers(
         self, requirements: Optional[Requirements] = None
     ) -> List[InstanceOfferWithAvailability]:
+        filter = _supported_instances
+
+        # filter = _supported_instances
+        # if requirements and requirements.reservation:
+        #     region_to_reservation = {}
+        #     for region in self.config.regions:
+        #         reservation = _get_reservation(
+        #             ec2_client=self.session.client("ec2", region_name=region),
+        #             reservation_id=requirements.reservation,
+        #             instance_types=[],  # TODO find a way to enable instance type filtering
+        #             instance_count=1,  # TODO find a way to pass instance count
+        #             is_capacity_block=False  # TODO Check with maintainers whether should be set to True
+        #         )
+        #         if reservation:
+        #             region_to_reservation[region] = reservation
+        #
+        #     def _supported_instances_with_reservation(offer: InstanceOffer) -> bool:
+        #         if not _supported_instances(offer):
+        #             return False
+        #         region = offer.region
+        #         reservation = region_to_reservation.get(region)
+        #         return bool(reservation and offer.instance.name == reservation["InstanceType"])
+        #
+        #     filter = _supported_instances_with_reservation
+
         offers = get_catalog_offers(
             backend=BackendType.AWS,
             locations=self.config.regions,
             requirements=requirements,
             configurable_disk_size=CONFIGURABLE_DISK_SIZE,
-            extra_filter=_supported_instances,
+            extra_filter=filter,
         )
         regions = set(i.region for i in offers)
 
@@ -193,6 +218,7 @@ class AWSCompute(Compute):
                         allocate_public_ip=allocate_public_ip,
                         placement_group_name=instance_config.placement_group_name,
                         enable_efa=enable_efa,
+                        reservation_id=instance_config.reservation,
                     )
                 )
                 instance = response[0]
@@ -591,6 +617,35 @@ class AWSCompute(Compute):
             Device=volume.attachment_data.device_name,
         )
         logger.debug("Detached EBS volume %s from instance %s", volume.volume_id, instance_id)
+
+
+def _get_reservation(
+    ec2_client: botocore.client.BaseClient,
+    reservation_id: str,
+    instance_count: int,
+    instance_types: Optional[List[str]] = None,
+    is_capacity_block: Optional[bool] = False,
+) -> Optional[str]:
+    filters = [{"Name": "state", "Values": ["active"]}]
+    if instance_types:
+        filters.append({"Name": "instance-type", "Values": instance_types})
+    try:
+        response = ec2_client.describe_capacity_reservations(
+            CapacityReservationIds=[reservation_id], Filters=filters
+        )
+    except botocore.exceptions.ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "InvalidCapacityReservationId.NotFound":
+            return None
+        raise
+    reservation = response["CapacityReservations"][0]
+
+    if reservation["AvailableInstanceCount"] < instance_count:
+        return None
+
+    if is_capacity_block and reservation["ReservationType"] != "capacity-block":
+        return None
+
+    return reservation
 
 
 def get_maximum_efa_interfaces(ec2_client: botocore.client.BaseClient, instance_type: str) -> int:

@@ -260,6 +260,7 @@ def _print_plan_header(plan: FleetPlan):
     fleet_type = "cloud"
     nodes = plan.spec.configuration.nodes or "-"
     placement = plan.spec.configuration.placement or InstanceGroupPlacement.ANY
+    reservation = plan.spec.configuration.reservation
     backends = None
     if plan.spec.configuration.backends is not None:
         backends = ", ".join(b.value for b in plan.spec.configuration.backends)
@@ -287,6 +288,8 @@ def _print_plan_header(plan: FleetPlan):
         configuration_table.add_row(th("Resources"), resources)
     if spot_policy is not None:
         configuration_table.add_row(th("Spot policy"), spot_policy)
+    if reservation is not None:
+        configuration_table.add_row(th("Reservation"), reservation)
 
     offers_table = Table(box=None)
     offers_table.add_column("#")

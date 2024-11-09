@@ -105,6 +105,7 @@ class InstanceConfiguration(CoreModel):
     instance_id: Optional[str] = None
     availability_zone: Optional[str] = None
     placement_group_name: Optional[str] = None
+    reservation: Optional[str] = None
     job_docker_config: Optional[DockerConfig]  # FIXME: cannot find any usages – remove?
 
     def get_public_keys(self) -> List[str]:
