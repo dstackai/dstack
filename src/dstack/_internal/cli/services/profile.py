@@ -67,13 +67,6 @@ def register_profile_args(parser: argparse.ArgumentParser, pool_add: bool = Fals
         dest="instance_types",
         help="The cloud-specific instance types that will be tried for provisioning",
     )
-    profile_group.add_argument(
-        "--reservation",
-        action="append",
-        metavar="NAME",
-        dest="reservation",
-        help="The existing reservation for the instances",
-    )
     if pool_add:
         pools_group_exc = parser
     else:
