@@ -625,7 +625,7 @@ def _get_pool_offers(
     pool: PoolModel,
     run_spec: RunSpec,
     job: Job,
-    volumes: List[Volume],
+    volumes: List[List[Volume]],
 ) -> List[InstanceOfferWithAvailability]:
     pool_filtered_instances = filter_pool_instances(
         pool_instances=get_pool_instances(pool),
@@ -770,6 +770,9 @@ async def get_job_volumes(
     run_spec: RunSpec,
     job_provisioning_data: JobProvisioningData,
 ) -> List[Volume]:
+    """
+    Returns volumes attached to the job.
+    """
     run_volumes = await get_run_volumes(
         session=session,
         project=project,
@@ -777,14 +780,17 @@ async def get_job_volumes(
     )
     job_volumes = []
     for mount_point_volumes in run_volumes:
-        job_volumes.append(get_mount_point_volume(mount_point_volumes, job_provisioning_data))
+        job_volumes.append(get_job_mount_point_volume(mount_point_volumes, job_provisioning_data))
     return job_volumes
 
 
-def get_mount_point_volume(
+def get_job_mount_point_volume(
     volumes: List[Volume],
     job_provisioning_data: JobProvisioningData,
 ) -> Volume:
+    """
+    Returns the volume attached to the job among the list of possible mount point volumes.
+    """
     for volume in volumes:
         if (
             volume.configuration.backend != job_provisioning_data.backend
@@ -797,6 +803,36 @@ def get_mount_point_volume(
             and job_provisioning_data.availability_zone is not None
             and volume.provisioning_data.availability_zone
             != job_provisioning_data.availability_zone
+        ):
+            continue
+        return volume
+    raise ServerClientError("Failed to find an eligible volume for the mount point")
+
+
+def get_offer_volumes(
+    volumes: List[List[Volume]],
+    offer: InstanceOfferWithAvailability,
+) -> List[Volume]:
+    """
+    Returns volumes suitable for the offer for each mount point.
+    """
+    offer_volumes = []
+    for mount_point_volumes in volumes:
+        offer_volumes.append(get_offer_mount_point_volume(mount_point_volumes, offer))
+    return offer_volumes
+
+
+def get_offer_mount_point_volume(
+    volumes: List[Volume],
+    offer: InstanceOfferWithAvailability,
+) -> Volume:
+    """
+    Returns the first suitable volume for the offer among possible mount point volumes.
+    """
+    for volume in volumes:
+        if (
+            volume.configuration.backend != offer.backend
+            or volume.configuration.region != offer.region
         ):
             continue
         return volume

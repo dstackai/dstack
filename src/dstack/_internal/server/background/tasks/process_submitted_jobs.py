@@ -58,6 +58,7 @@ from dstack._internal.server.services.pools import (
 from dstack._internal.server.services.runs import (
     check_can_attach_run_volumes,
     check_run_spec_has_instance_mounts,
+    get_offer_volumes,
     get_run_volume_models,
     get_run_volumes,
     run_model_to_run,
@@ -403,6 +404,7 @@ async def _run_job_on_new_instance(
             offer.region,
             offer.price,
         )
+        offer_volumes = get_offer_volumes(volumes, offer)
         try:
             job_provisioning_data = await run_async(
                 backend.compute().run_job,
@@ -411,7 +413,7 @@ async def _run_job_on_new_instance(
                 offer,
                 project_ssh_public_key,
                 project_ssh_private_key,
-                volumes,
+                offer_volumes,
             )
             return job_provisioning_data, offer
         except BackendError as e:
