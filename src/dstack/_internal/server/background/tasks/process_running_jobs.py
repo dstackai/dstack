@@ -38,7 +38,7 @@ from dstack._internal.server.services.repos import get_code_model, repo_model_to
 from dstack._internal.server.services.runner import client
 from dstack._internal.server.services.runner.ssh import runner_ssh_tunnel
 from dstack._internal.server.services.runs import (
-    get_run_volumes,
+    get_job_volumes,
     run_model_to_run,
 )
 from dstack._internal.server.services.storage import get_default_storage
@@ -127,10 +127,11 @@ async def _process_running_job(session: AsyncSession, job_model: JobModel):
         gpus_per_job=len(job_provisioning_data.instance_type.resources.gpus),
     )
 
-    volumes = await get_run_volumes(
+    volumes = await get_job_volumes(
         session=session,
         project=project,
         run_spec=run.run_spec,
+        job_provisioning_data=job_provisioning_data,
     )
 
     server_ssh_private_key = project.ssh_private_key
@@ -395,11 +396,16 @@ def _process_provisioning_with_shim(
     instance_mounts: List[InstanceMountPoint] = []
     for mount in run.run_spec.configuration.volumes:
         if is_core_model_instance(mount, VolumeMountPoint):
-            volume_mounts.append(mount)
+            volume_mounts.append(mount.copy())
         elif is_core_model_instance(mount, InstanceMountPoint):
             instance_mounts.append(mount)
         else:
             assert False, f"unexpected mount point: {mount!r}"
+
+    # Run configuration may specify list of possible volume names.
+    # We should resolve in to the actual volume attached.
+    for volume, volume_mount in zip(volumes, volume_mounts):
+        volume_mount.name = volume.name
 
     shim_client.submit(
         username=username,

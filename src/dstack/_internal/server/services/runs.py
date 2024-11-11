@@ -29,6 +29,7 @@ from dstack._internal.core.models.runs import (
     ApplyRunPlanInput,
     Job,
     JobPlan,
+    JobProvisioningData,
     JobSpec,
     JobStatus,
     JobSubmission,
@@ -689,55 +690,117 @@ async def get_run_volumes(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
-) -> List[Volume]:
+) -> List[List[Volume]]:
+    """
+    Returns list of run volumes grouped by mount points.
+    """
     volume_models = await get_run_volume_models(
         session=session,
         project=project,
         run_spec=run_spec,
     )
-    return [volumes_services.volume_model_to_volume(v) for v in volume_models]
+    return [
+        [volumes_services.volume_model_to_volume(v) for v in mount_point_volume_models]
+        for mount_point_volume_models in volume_models
+    ]
 
 
 async def get_run_volume_models(
     session: AsyncSession,
     project: ProjectModel,
     run_spec: RunSpec,
-) -> List[VolumeModel]:
+) -> List[List[VolumeModel]]:
+    """
+    Returns list of run volume models grouped by mount points.
+    """
     if len(run_spec.configuration.volumes) == 0:
         return []
     volume_models = []
     for mount_point in run_spec.configuration.volumes:
         if not is_core_model_instance(mount_point, VolumeMountPoint):
             continue
-        volume_model = await volumes_services.get_project_volume_model_by_name(
-            session=session,
-            project=project,
-            name=mount_point.name,
-        )
-        if volume_model is None:
-            raise ResourceNotExistsError(f"Volume {mount_point.name} not found")
-        volume_models.append(volume_model)
+        if isinstance(mount_point.name, str):
+            names = [mount_point.name]
+        else:
+            names = mount_point.name
+        mount_point_volume_models = []
+        for name in names:
+            volume_model = await volumes_services.get_project_volume_model_by_name(
+                session=session,
+                project=project,
+                name=name,
+            )
+            if volume_model is None:
+                raise ResourceNotExistsError(f"Volume {mount_point.name} not found")
+            mount_point_volume_models.append(volume_model)
+        volume_models.append(mount_point_volume_models)
     return volume_models
 
 
 def check_can_attach_run_volumes(
     run_spec: RunSpec,
-    volumes: List[Volume],
+    volumes: List[List[Volume]],
 ):
     if len(volumes) == 0:
         return
     # Perform basic checks if volumes can be attached.
     # This is useful to show error ASAP (when user submits the run).
     # If the attachment is to fail anyway, the error will be handled when proccessing submitted jobs.
-    backend = volumes[0].configuration.backend
-    region = volumes[0].configuration.region
+    expected_backends = {v.configuration.backend for v in volumes[0]}
+    expected_regions = {v.configuration.region for v in volumes[0]}
+    for mount_point_volumes in volumes:
+        backends = {v.configuration.backend for v in mount_point_volumes}
+        regions = {v.configuration.region for v in mount_point_volumes}
+        if backends != expected_backends:
+            raise ServerClientError(
+                "Volumes from different backends specified for different mount points"
+            )
+        if regions != expected_regions:
+            raise ServerClientError(
+                "Volumes from different regions specified for different mount points"
+            )
+        for volume in mount_point_volumes:
+            if volume.status != VolumeStatus.ACTIVE:
+                raise ServerClientError(f"Cannot mount volumes that are not active: {volume.name}")
+
+
+async def get_job_volumes(
+    session: AsyncSession,
+    project: ProjectModel,
+    run_spec: RunSpec,
+    job_provisioning_data: JobProvisioningData,
+) -> List[Volume]:
+    run_volumes = await get_run_volumes(
+        session=session,
+        project=project,
+        run_spec=run_spec,
+    )
+    job_volumes = []
+    for mount_point_volumes in run_volumes:
+        job_volumes.append(get_mount_point_volume(mount_point_volumes, job_provisioning_data))
+    return job_volumes
+
+
+def get_mount_point_volume(
+    volumes: List[Volume],
+    job_provisioning_data: JobProvisioningData,
+) -> Volume:
     for volume in volumes:
-        if backend != volume.configuration.backend:
-            raise ServerClientError("Cannot mount volumes from different backends")
-        if region != volume.configuration.region:
-            raise ServerClientError("Cannot mount volumes from different regions")
-        if volume.status != VolumeStatus.ACTIVE:
-            raise ServerClientError("Cannot mount volumes that are not active")
+        if (
+            volume.configuration.backend != job_provisioning_data.backend
+            or volume.configuration.region != job_provisioning_data.region
+        ):
+            continue
+        if (
+            volume.provisioning_data is not None
+            and volume.provisioning_data.availability_zone is not None
+            and job_provisioning_data.availability_zone is not None
+            and volume.provisioning_data.availability_zone
+            != job_provisioning_data.availability_zone
+        ):
+            continue
+        return volume
+    raise ServerClientError("Failed to find an eligible volume for the mount point")
 
 
 def check_run_spec_has_instance_mounts(run_spec: RunSpec) -> bool:
