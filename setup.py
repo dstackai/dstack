@@ -36,7 +36,7 @@ BASE_DEPS = [
     "python-dateutil",
     "gitpython",
     "jsonschema",
-    "paramiko",
+    "paramiko>=3.2.0",
     "cursor",
     "rich",
     "rich-argparse",
