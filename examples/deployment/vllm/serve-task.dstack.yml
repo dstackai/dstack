@@ -10,5 +10,5 @@ commands:
 ports:
   - 8000
 
-resources:
-  gpu: 24GB
+#resources:
+#  gpu: 24GB

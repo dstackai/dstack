@@ -13,6 +13,37 @@ hide:
 }
 </style>
 
+## Deployment
+<div class="tx-landing__highlights_grid">
+    <a href="/examples/deployment/vllm" 
+       class="feature-cell">
+       <h3>
+           vLLM
+       </h3>
+       <p>
+            Deploy Llama with vLLM
+        </p>
+    </a>
+    <a href="/examples/deployment/tgi" 
+       class="feature-cell">
+       <h3>
+           TGI
+       </h3>
+       <p>
+            Deploy Mistral with TGI
+        </p>
+    </a>
+    <a href="/examples/deployment/nim" 
+       class="feature-cell">
+       <h3>
+           NIM
+       </h3>
+       <p>
+            Deploy Llama3-8b-instruct with Nvidia NIM
+        </p>
+    </a>
+</div>
+
 ## Fine-tuning
 
 <div class="tx-landing__highlights_grid">
@@ -24,17 +55,6 @@ hide:
 
         <p>
             Fine-tune Llama 3 on a custom dataset using Axolotl.
-        </p>
-    </a>
-
-    <a href="/examples/fine-tuning/alignment-handbook"
-       class="feature-cell">
-        <h3>
-            Alignment Handbook
-        </h3>
-
-        <p>
-            Fine-tune Gemma 7B on a custom dataset.
         </p>
     </a>
 
