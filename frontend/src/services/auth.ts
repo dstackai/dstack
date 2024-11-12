@@ -28,11 +28,13 @@ export const authApi = createApi({
             }),
         }),
 
-        oktaInfo: builder.query<{ enabled: boolean }, void>({
-            query: () => ({
-                url: API.AUTH.OKTA.INFO(),
-                method: 'POST',
-            }),
+        getOktaInfo: builder.query<{ data: { enabled: boolean } }, void>({
+            query: () => {
+                return {
+                    url: API.AUTH.OKTA.INFO(),
+                    method: 'POST',
+                };
+            },
         }),
 
         oktaAuthorize: builder.mutation<{ authorization_url: string }, void>({
@@ -55,7 +57,7 @@ export const authApi = createApi({
 export const {
     useGithubAuthorizeMutation,
     useGithubCallbackMutation,
-    useOktaInfoQuery,
+    useGetOktaInfoQuery,
     useOktaAuthorizeMutation,
     useOktaCallbackMutation,
 } = authApi;
