@@ -229,6 +229,7 @@ The following environment variables are available in any run and are passed by `
 | `DSTACK_NODES_NUM`      | The number of nodes in the run          |
 | `DSTACK_NODE_RANK`      | The rank of the node                    |
 | `DSTACK_MASTER_NODE_IP` | The internal IP address the master node |
+| `DSTACK_NODES_IPS`      | The list of internal IP addresses of all nodes delimited by "\n" |
 
 ### Distributed tasks
 
