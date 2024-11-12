@@ -741,11 +741,13 @@ def check_can_attach_run_volumes(
     run_spec: RunSpec,
     volumes: List[List[Volume]],
 ):
+    """
+    Performs basic checks if volumes can be attached.
+    This is useful to show error ASAP (when user submits the run).
+    If the attachment is to fail anyway, the error will be handled when proccessing submitted jobs.
+    """
     if len(volumes) == 0:
         return
-    # Perform basic checks if volumes can be attached.
-    # This is useful to show error ASAP (when user submits the run).
-    # If the attachment is to fail anyway, the error will be handled when proccessing submitted jobs.
     expected_backends = {v.configuration.backend for v in volumes[0]}
     expected_regions = {v.configuration.region for v in volumes[0]}
     for mount_point_volumes in volumes:
@@ -762,6 +764,9 @@ def check_can_attach_run_volumes(
         for volume in mount_point_volumes:
             if volume.status != VolumeStatus.ACTIVE:
                 raise ServerClientError(f"Cannot mount volumes that are not active: {volume.name}")
+    volumes_names = [v.name for vs in volumes for v in vs]
+    if len(volumes_names) != len(set(volumes_names)):
+        raise ServerClientError("Cannot attach the same volume at different mount points")
 
 
 async def get_job_volumes(
