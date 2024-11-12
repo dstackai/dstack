@@ -5,6 +5,7 @@ import { Navigate } from 'react-router-dom';
 
 import App from 'App';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
+import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
 import { LoginByTokenForm } from 'App/Login/LoginByTokenForm';
 import { Logout } from 'App/Logout';
 import { FleetDetails, FleetList } from 'pages/Fleets';
@@ -19,6 +20,7 @@ import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pag
 import { UserBilling, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
+import { UnauthorizedLayout } from './layouts/UnauthorizedLayout';
 import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
 
@@ -34,8 +36,16 @@ export const router = createBrowserRouter([
                 element: <LoginByGithubCallback />,
             },
             {
+                path: ROUTES.AUTH.OKTA_CALLBACK,
+                element: <LoginByOktaCallback />,
+            },
+            {
                 path: ROUTES.AUTH.TOKEN,
-                element: <LoginByTokenForm />,
+                element: (
+                    <UnauthorizedLayout>
+                        <LoginByTokenForm />
+                    </UnauthorizedLayout>
+                ),
             },
             // hubs
             {

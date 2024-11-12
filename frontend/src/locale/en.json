@@ -30,6 +30,7 @@
     "server_error": "Server error: {{error}}",
     "login": "Sign in",
     "login_github": "Sign in with GitHub",
+    "login_okta": "Sign in with Okta",
     "general": "General",
     "test": "Test",
     "local_storage_unavailable": "Local Storage is unavailable",

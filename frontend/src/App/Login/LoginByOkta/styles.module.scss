@@ -1,0 +1,15 @@
+@use '@cloudscape-design/design-tokens/index' as awsui;
+
+.signIn {
+    display: flex;
+    justify-content: center;
+
+    button {
+        .loginButtonInner {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+    }
+}
