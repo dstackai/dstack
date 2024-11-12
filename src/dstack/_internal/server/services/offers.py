@@ -21,7 +21,7 @@ async def get_offers_by_requirements(
     exclude_not_available=False,
     multinode: bool = False,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
-    volumes: Optional[List[Volume]] = None,
+    volumes: Optional[List[List[Volume]]] = None,
     privileged: bool = False,
     instance_mounts: bool = False,
 ) -> List[Tuple[Backend, InstanceOfferWithAvailability]]:
@@ -39,9 +39,9 @@ async def get_offers_by_requirements(
     regions = profile.regions
 
     if volumes:
-        volume = volumes[0]
-        backend_types = [volume.configuration.backend]
-        regions = [volume.configuration.region]
+        mount_point_volumes = volumes[0]
+        backend_types = [v.configuration.backend for v in mount_point_volumes]
+        regions = [v.configuration.region for v in mount_point_volumes]
 
     if multinode:
         if not backend_types:

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple, Union
 
 from pydantic import Field, validator
 from typing_extensions import Annotated, Self
@@ -106,7 +106,16 @@ def _validate_mount_point_path(path: str) -> str:
 
 
 class VolumeMountPoint(CoreModel):
-    name: Annotated[str, Field(description="The name of the network volume to mount")]
+    name: Annotated[
+        Union[str, List[str]],
+        Field(
+            description=(
+                "The network volume name or the list of network volume names to mount."
+                " If a list is specified, one of the volumes in the list will be mounted."
+                " Specify volumes from different backends/regions to increase availability."
+            )
+        ),
+    ]
     path: Annotated[str, Field(description="The absolute container path to mount the volume at")]
 
     _validate_path = validator("path", allow_reuse=True)(_validate_mount_point_path)
