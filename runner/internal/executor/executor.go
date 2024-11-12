@@ -200,6 +200,7 @@ func (ex *RunExecutor) execJob(ctx context.Context, jobLogFile io.Writer) error 
 		"REPO_ID":               ex.run.RepoId,  // deprecated, remove in 0.19
 		"DSTACK_RUN_NAME":       ex.run.RunName,
 		"DSTACK_REPO_ID":        ex.run.RepoId,
+		"DSTACK_NODES_IPS":      strings.Join(ex.clusterInfo.JobIPs, "\n"),
 		"DSTACK_MASTER_NODE_IP": ex.clusterInfo.MasterJobIP,
 		"DSTACK_NODE_RANK":      strconv.Itoa(node_rank),
 		"DSTACK_NODES_NUM":      strconv.Itoa(nodes_num),
