@@ -607,10 +607,10 @@ def _is_private_subnet_with_internet_egress(
 def get_reservation(
     ec2_client: botocore.client.BaseClient,
     reservation_id: str,
-    instance_count: Optional[int] = 0,
-    instance_types: Optional[List[str]] = None,
-    is_capacity_block: Optional[bool] = False,
-) -> Optional[str]:
+    instance_count: int = 0,
+    instance_types: List[str] = None,
+    is_capacity_block: bool = False,
+) -> Optional[Dict[str, Any]]:
     filters = [{"Name": "state", "Values": ["active"]}]
     if instance_types:
         filters.append({"Name": "instance-type", "Values": instance_types})

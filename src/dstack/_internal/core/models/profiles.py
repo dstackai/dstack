@@ -112,7 +112,7 @@ class ProfileParams(CoreModel):
     reservation: Annotated[
         Optional[str],
         Field(description="The existing reservation for the instances"),
-    ] = None
+    ]
     spot_policy: Annotated[
         Optional[SpotPolicy],
         Field(
