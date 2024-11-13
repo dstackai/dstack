@@ -28,7 +28,7 @@ export const authApi = createApi({
             }),
         }),
 
-        getOktaInfo: builder.query<{ data: { enabled: boolean } }, void>({
+        getOktaInfo: builder.query<{ enabled: boolean }, void>({
             query: () => {
                 return {
                     url: API.AUTH.OKTA.INFO(),
