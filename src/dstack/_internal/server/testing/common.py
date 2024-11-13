@@ -44,6 +44,8 @@ from dstack._internal.core.models.runs import (
 )
 from dstack._internal.core.models.users import GlobalRole
 from dstack._internal.core.models.volumes import (
+    Volume,
+    VolumeAttachmentData,
     VolumeConfiguration,
     VolumeProvisioningData,
     VolumeStatus,
@@ -553,6 +555,42 @@ async def create_volume(
     session.add(vm)
     await session.commit()
     return vm
+
+
+def get_volume(
+    id_: Optional[UUID] = None,
+    name: str = "test_volume",
+    user: str = "test_user",
+    project_name: str = "test_project",
+    configuration: Optional[VolumeConfiguration] = None,
+    external: bool = False,
+    created_at: datetime = datetime(2023, 1, 2, 3, 4, tzinfo=timezone.utc),
+    status: VolumeStatus = VolumeStatus.ACTIVE,
+    status_message: Optional[str] = None,
+    deleted: bool = False,
+    volume_id: Optional[str] = None,
+    provisioning_data: Optional[VolumeProvisioningData] = None,
+    attachment_data: Optional[VolumeAttachmentData] = None,
+) -> Volume:
+    if id_ is None:
+        id_ = uuid.uuid4()
+    if configuration is None:
+        configuration = get_volume_configuration()
+    return Volume(
+        id=id_,
+        name=name,
+        user=user,
+        project_name=project_name,
+        configuration=configuration,
+        external=external,
+        created_at=created_at,
+        status=status,
+        status_message=status_message,
+        deleted=deleted,
+        volume_id=volume_id,
+        provisioning_data=provisioning_data,
+        attachment_data=attachment_data,
+    )
 
 
 def get_volume_configuration(

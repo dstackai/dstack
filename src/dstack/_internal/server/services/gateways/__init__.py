@@ -28,6 +28,7 @@ from dstack._internal.core.errors import (
     SSHError,
 )
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.common import is_core_model_instance
 from dstack._internal.core.models.configurations import SERVICE_HTTPS_DEFAULT, ServiceConfiguration
 from dstack._internal.core.models.gateways import (
     Gateway,
@@ -69,7 +70,6 @@ from dstack._internal.server.utils.common import (
     gather_map_async,
     run_async,
 )
-from dstack._internal.settings import FeatureFlags
 from dstack._internal.utils.common import get_current_datetime
 from dstack._internal.utils.crypto import generate_rsa_key_pair_bytes
 from dstack._internal.utils.logging import get_logger
@@ -355,24 +355,38 @@ async def generate_gateway_name(session: AsyncSession, project: ProjectModel) ->
             return name
 
 
-async def register_service(session: AsyncSession, run_model: RunModel):
-    gateway = run_model.project.default_gateway
+async def register_service(session: AsyncSession, run_model: RunModel, run_spec: RunSpec):
+    assert is_core_model_instance(run_spec.configuration, ServiceConfiguration)
+
+    if isinstance(run_spec.configuration.gateway, str):
+        gateway = await get_project_gateway_model_by_name(
+            session=session, project=run_model.project, name=run_spec.configuration.gateway
+        )
+        if gateway is None:
+            raise ResourceNotExistsError(
+                f"Gateway {run_spec.configuration.gateway} does not exist"
+            )
+    elif run_spec.configuration.gateway == False:
+        gateway = None
+    else:
+        gateway = run_model.project.default_gateway
 
     if gateway is not None:
-        service_spec = await _register_service_in_gateway(session, run_model, gateway)
+        service_spec = await _register_service_in_gateway(session, run_model, run_spec, gateway)
         run_model.gateway = gateway
-    elif FeatureFlags.PROXY:
-        service_spec = _register_service_in_server(run_model)
+    elif not settings.FORBID_SERVICES_WITHOUT_GATEWAY:
+        service_spec = _register_service_in_server(run_model, run_spec)
     else:
-        raise ResourceNotExistsError("Default gateway is not set")
+        raise ResourceNotExistsError(
+            "This dstack-server installation forbids services without a gateway."
+            " Please configure a gateway."
+        )
     run_model.service_spec = service_spec.json()
 
 
 async def _register_service_in_gateway(
-    session: AsyncSession, run_model: RunModel, gateway: GatewayModel
+    session: AsyncSession, run_model: RunModel, run_spec: RunSpec, gateway: GatewayModel
 ) -> ServiceSpec:
-    run_spec: RunSpec = RunSpec.__response__.parse_raw(run_model.run_spec)
-
     if gateway.gateway_compute is None:
         raise ServerClientError("Gateway has no instance associated with it")
 
@@ -425,8 +439,7 @@ async def _register_service_in_gateway(
     return service_spec
 
 
-def _register_service_in_server(run_model: RunModel) -> ServiceSpec:
-    run_spec: RunSpec = RunSpec.__response__.parse_raw(run_model.run_spec)
+def _register_service_in_server(run_model: RunModel, run_spec: RunSpec) -> ServiceSpec:
     if run_spec.configuration.https != SERVICE_HTTPS_DEFAULT:
         # Note: if the user sets `https: <default-value>`, it will be ignored silently
         # TODO: in 0.19, make `https` Optional to be able to tell if it was set or omitted

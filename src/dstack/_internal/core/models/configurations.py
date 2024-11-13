@@ -15,7 +15,6 @@ from dstack._internal.core.models.repos.base import Repo
 from dstack._internal.core.models.repos.virtual import VirtualRepo
 from dstack._internal.core.models.resources import Range, ResourcesSpec
 from dstack._internal.core.models.volumes import MountPoint, VolumeConfiguration, parse_mount_point
-from dstack._internal.settings import FeatureFlags
 
 CommandsList = List[str]
 ValidPort = conint(gt=0, le=65536)
@@ -210,6 +209,15 @@ class ServiceConfigurationParams(CoreModel):
         Union[ValidPort, constr(regex=r"^[0-9]+:[0-9]+$"), PortMapping],
         Field(description="The port, that application listens on or the mapping"),
     ]
+    gateway: Annotated[
+        Optional[Union[bool, str]],
+        Field(
+            description=(
+                "The name of the gateway. Specify boolean `false` to run without a gateway."
+                " Omit to run with the default gateway"
+            ),
+        ),
+    ] = None
     model: Annotated[
         Optional[Union[AnyModel, str]],
         Field(
@@ -221,14 +229,9 @@ class ServiceConfigurationParams(CoreModel):
             )
         ),
     ] = None
-    https: Annotated[
-        bool,
-        Field(
-            description="Enable HTTPS"
-            if not FeatureFlags.PROXY
-            else "Enable HTTPS if running with a gateway"
-        ),
-    ] = SERVICE_HTTPS_DEFAULT
+    https: Annotated[bool, Field(description="Enable HTTPS if running with a gateway")] = (
+        SERVICE_HTTPS_DEFAULT
+    )
     auth: Annotated[bool, Field(description="Enable the authorization")] = True
     replicas: Annotated[
         Union[conint(ge=1), constr(regex=r"^[0-9]+..[1-9][0-9]*$"), Range[int]],
@@ -270,6 +273,16 @@ class ServiceConfigurationParams(CoreModel):
         if v.max < v.min:
             raise ValueError(
                 "The maximum number of replicas must be greater than or equal to the minium number of replicas"
+            )
+        return v
+
+    @validator("gateway")
+    def validate_gateway(
+        cls, v: Optional[Union[bool, str]]
+    ) -> Optional[Union[Literal[False], str]]:
+        if v == True:
+            raise ValueError(
+                "The `gateway` property must be a string or boolean `false`, not boolean `true`"
             )
         return v
 

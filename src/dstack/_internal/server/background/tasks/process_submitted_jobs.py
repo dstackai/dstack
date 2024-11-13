@@ -53,11 +53,14 @@ from dstack._internal.server.services.logging import fmt
 from dstack._internal.server.services.offers import get_offers_by_requirements
 from dstack._internal.server.services.pools import (
     filter_pool_instances,
+    get_instance_provisioning_data,
 )
 from dstack._internal.server.services.runs import (
     check_can_attach_run_volumes,
     check_run_spec_has_instance_mounts,
+    get_offer_volumes,
     get_run_volume_models,
+    get_run_volumes,
     run_model_to_run,
 )
 from dstack._internal.server.services.volumes import (
@@ -141,7 +144,11 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             project=project,
             run_spec=run_spec,
         )
-        volumes = [volume_model_to_volume(v) for v in volume_models]
+        volumes = await get_run_volumes(
+            session=session,
+            project=project,
+            run_spec=run_spec,
+        )
         check_can_attach_run_volumes(run_spec=run_spec, volumes=volumes)
     except ServerClientError as e:
         logger.warning("%s: failed to prepare run volumes: %s", fmt(job_model), repr(e))
@@ -206,7 +213,6 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
             await session.commit()
             return
 
-    instance: InstanceModel
     if job_model.instance is not None:
         res = await session.execute(
             select(InstanceModel)
@@ -285,7 +291,7 @@ async def _process_submitted_job(session: AsyncSession, job_model: JobModel):
         await session.flush()  # to get im.id
         job_model.used_instance_id = instance.id
 
-    volumes_ids = sorted([v.id for v in volume_models])
+    volumes_ids = sorted([v.id for vs in volume_models for v in vs])
     # TODO: lock instances for attaching volumes?
     # Take lock to prevent attaching volumes that are to be deleted.
     # If the volume was deleted before the lock, the volume will fail to attach and the job will fail.
@@ -316,7 +322,7 @@ async def _assign_job_to_pool_instance(
     job: Job,
     fleet_model: Optional[FleetModel],
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
-    volumes: Optional[List[Volume]] = None,
+    volumes: Optional[List[List[Volume]]] = None,
 ) -> Optional[InstanceModel]:
     profile = run_spec.merged_profile
     relevant_instances = filter_pool_instances(
@@ -365,7 +371,7 @@ async def _run_job_on_new_instance(
     project_ssh_public_key: str,
     project_ssh_private_key: str,
     master_job_provisioning_data: Optional[JobProvisioningData] = None,
-    volumes: Optional[List[Volume]] = None,
+    volumes: Optional[List[List[Volume]]] = None,
     fleet_model: Optional[FleetModel] = None,
 ) -> Optional[Tuple[JobProvisioningData, InstanceOfferWithAvailability]]:
     if volumes is None:
@@ -398,6 +404,7 @@ async def _run_job_on_new_instance(
             offer.region,
             offer.price,
         )
+        offer_volumes = get_offer_volumes(volumes, offer)
         try:
             job_provisioning_data = await run_async(
                 backend.compute().run_job,
@@ -406,7 +413,7 @@ async def _run_job_on_new_instance(
                 offer,
                 project_ssh_public_key,
                 project_ssh_private_key,
-                volumes,
+                offer_volumes,
             )
             return job_provisioning_data, offer
         except BackendError as e:
@@ -526,42 +533,47 @@ async def _attach_volumes(
     project: ProjectModel,
     job_model: JobModel,
     instance: InstanceModel,
-    volume_models: List[VolumeModel],
+    volume_models: List[List[VolumeModel]],
 ):
-    job_provisioning_data = JobProvisioningData.__response__.parse_raw(
-        instance.job_provisioning_data
-    )
+    job_provisioning_data = common_utils.get_or_error(get_instance_provisioning_data(instance))
     backend = await get_project_backend_by_type_or_error(
         project=project,
         backend_type=job_provisioning_data.backend,
     )
-    logger.info("Attaching volumes: %s", [v.name for v in volume_models])
-    for volume_model in volume_models:
-        volume = volume_model_to_volume(volume_model)
-        try:
-            if volume.provisioning_data is not None and volume.provisioning_data.attachable:
-                await _attach_volume(
-                    session=session,
-                    backend=backend,
-                    volume_model=volume_model,
-                    instance=instance,
-                    instance_id=job_provisioning_data.instance_id,
+    logger.info("Attaching volumes: %s", [[v.name for v in vs] for vs in volume_models])
+    for mount_point_volume_models in volume_models:
+        for volume_model in mount_point_volume_models:
+            volume = volume_model_to_volume(volume_model)
+            try:
+                if (
+                    job_provisioning_data.backend != volume.configuration.backend
+                    or job_provisioning_data.region != volume.configuration.region
+                ):
+                    continue
+                if volume.provisioning_data is not None and volume.provisioning_data.attachable:
+                    await _attach_volume(
+                        session=session,
+                        backend=backend,
+                        volume_model=volume_model,
+                        instance=instance,
+                        instance_id=job_provisioning_data.instance_id,
+                    )
+                    break  # attach next mount point
+            except (ServerClientError, BackendError) as e:
+                logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
+                job_model.status = JobStatus.TERMINATING
+                # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
+                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+                job_model.termination_reason_message = "Failed to attach volume"
+            except Exception:
+                logger.exception(
+                    "%s: got exception when attaching volume",
+                    fmt(job_model),
                 )
-        except (ServerClientError, BackendError) as e:
-            logger.warning("%s: failed to attached volume: %s", fmt(job_model), repr(e))
-            job_model.status = JobStatus.TERMINATING
-            # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
-            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-            job_model.termination_reason_message = "Failed to attach volume"
-        except Exception:
-            logger.exception(
-                "%s: got exception when attaching volume",
-                fmt(job_model),
-            )
-            job_model.status = JobStatus.TERMINATING
-            # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
-            job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
-            job_model.termination_reason_message = "Failed to attach volume"
+                job_model.status = JobStatus.TERMINATING
+                # TODO: Replace with JobTerminationReason.VOLUME_ERROR in 0.19
+                job_model.termination_reason = JobTerminationReason.TERMINATED_BY_SERVER
+                job_model.termination_reason_message = "Failed to attach volume"
 
 
 async def _attach_volume(
