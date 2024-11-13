@@ -30,6 +30,7 @@
     "server_error": "Server error: {{error}}",
     "login": "Sign in",
     "login_github": "Sign in with GitHub",
+    "login_okta": "Sign in with Okta",
     "general": "General",
     "test": "Test",
     "local_storage_unavailable": "Local Storage is unavailable",
@@ -53,7 +54,9 @@
     "sign_in_to_dstack": "Welcome to dstack Sky",
     "sign_in_to_dstack_enterprise": "Welcome to dstack",
     "authorization_failed": "Authorization is failed",
-    "try_again": "Please try again"
+    "try_again": "Please try again",
+    "login_by_token": "Sign in via a token",
+    "another_login_methods": "Other sign in options"
   },
 
   "navigation": {

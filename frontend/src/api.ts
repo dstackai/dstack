@@ -10,6 +10,12 @@ export const API = {
             AUTHORIZE: () => `${API.AUTH.GITHUB.BASE()}/authorize`,
             CALLBACK: () => `${API.AUTH.GITHUB.BASE()}/callback`,
         },
+        OKTA: {
+            BASE: () => `${API.AUTH.BASE()}/okta`,
+            INFO: () => `${API.AUTH.OKTA.BASE()}/info`,
+            AUTHORIZE: () => `${API.AUTH.OKTA.BASE()}/authorize`,
+            CALLBACK: () => `${API.AUTH.OKTA.BASE()}/callback`,
+        },
     },
 
     USERS: {
