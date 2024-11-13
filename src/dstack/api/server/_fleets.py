@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import parse_obj_as
 
@@ -29,11 +29,7 @@ class FleetsAPIClient(APIClientGroup):
         spec: FleetSpec,
     ) -> FleetPlan:
         body = GetFleetPlanRequest(spec=spec)
-        body_json = body.json()
-        if spec.configuration_path is None:
-            # Handle old server versions that do not accept configuration_path
-            # TODO: Can be removed in 0.19
-            body_json = body.json(exclude={"spec": {"configuration_path"}})
+        body_json = body.json(exclude=_get_fleet_spec_excludes(spec))
         resp = self._request(f"/api/project/{project_name}/fleets/get_plan", body=body_json)
         return parse_obj_as(FleetPlan.__response__, resp.json())
 
@@ -43,11 +39,7 @@ class FleetsAPIClient(APIClientGroup):
         spec: FleetSpec,
     ) -> Fleet:
         body = CreateFleetRequest(spec=spec)
-        body_json = body.json()
-        if spec.configuration_path is None:
-            # Handle old server versions that do not accept configuration_path
-            # TODO: Can be removed in 0.19
-            body_json = body.json(exclude={"spec": {"configuration_path"}})
+        body_json = body.json(exclude=_get_fleet_spec_excludes(spec))
         resp = self._request(f"/api/project/{project_name}/fleets/create", body=body_json)
         return parse_obj_as(Fleet.__response__, resp.json())
 
@@ -58,3 +50,21 @@ class FleetsAPIClient(APIClientGroup):
     def delete_instances(self, project_name: str, name: str, instance_nums: List[int]) -> None:
         body = DeleteFleetInstancesRequest(name=name, instance_nums=instance_nums)
         self._request(f"/api/project/{project_name}/fleets/delete_instances", body=body.json())
+
+
+def _get_fleet_spec_excludes(fleet_spec: FleetSpec) -> Optional[dict]:
+    exclude = {}
+    # Handle old server versions that do not accept configuration_path
+    # TODO: Can be removed in 0.19
+    if fleet_spec.configuration_path is None:
+        exclude = {"spec": {"configuration_path"}}
+
+    # client >= 0.18.26 / server <= 0.18.25 compatibility tweak
+    if not fleet_spec.configuration.reservation:
+        exclude.setdefault("spec", {})
+        exclude["spec"].setdefault("configuration", set())
+        exclude["spec"]["configuration"].add("reservation")
+        exclude["spec"].setdefault("profile", set())
+        exclude["spec"]["profile"].add("reservation")
+
+    return exclude or None

@@ -123,4 +123,12 @@ def _get_run_spec_excludes(run_spec: RunSpec) -> Optional[dict]:
         exclude.setdefault("run_spec", {})
         exclude["run_spec"].setdefault("configuration", set())
         exclude["run_spec"]["configuration"].add("gateway")
+    # client >= 0.18.26 / server <= 0.18.25 compatibility tweak
+    if not run_spec.configuration.reservation:
+        exclude.setdefault("run_spec", {})
+        exclude["run_spec"].setdefault("configuration", set())
+        exclude["run_spec"]["configuration"].add("reservation")
+        exclude["run_spec"].setdefault("profile", set())
+        exclude["run_spec"]["profile"].add("reservation")
+
     return exclude or None
