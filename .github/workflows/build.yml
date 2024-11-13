@@ -116,10 +116,7 @@ jobs:
           go-version-file: runner/go.mod
           cache-dependency-path: runner/go.sum
       - name: Check if go.mod and go.sum are up-to-date
-        # Replace with `go mod tidy -diff` when migrating to Go 1.23
-        run: |
-          go mod tidy
-          git diff --exit-code
+        run: go mod tidy -diff
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:

@@ -1,8 +1,6 @@
 module github.com/dstackai/dstack/runner
 
-go 1.21
-
-toolchain go1.21.9
+go 1.23
 
 require (
 	github.com/alexellis/go-execute/v2 v2.2.1
