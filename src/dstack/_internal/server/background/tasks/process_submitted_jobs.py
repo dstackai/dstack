@@ -452,6 +452,7 @@ def _get_or_create_fleet_model_for_job(
         configuration=FleetConfiguration(
             name=run.run_spec.run_name,
             placement=placement,
+            reservation=run.run_spec.configuration.reservation,
         ),
         profile=run.run_spec.merged_profile,
         autocreated=True,

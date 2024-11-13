@@ -17,6 +17,8 @@ def print_fleets_table(fleets: List[Fleet], verbose: bool = False) -> None:
 def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
     table = Table(box=None)
     table.add_column("FLEET", no_wrap=True)
+    if verbose:
+        table.add_column("RESERVATION")
     table.add_column("INSTANCE")
     table.add_column("BACKEND")
     table.add_column("RESOURCES")
@@ -51,6 +53,7 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
 
             row = [
                 fleet.name if i == 0 else "",
+                fleet.spec.configuration.reservation if i == 0 else "",
                 str(instance.instance_num),
                 backend,
                 resources,
