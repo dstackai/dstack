@@ -6,7 +6,7 @@ import { Navigate } from 'react-router-dom';
 import App from 'App';
 import { LoginByGithubCallback } from 'App/Login/LoginByGithubCallback';
 import { LoginByOktaCallback } from 'App/Login/LoginByOktaCallback';
-import { LoginByTokenForm } from 'App/Login/LoginByTokenForm';
+import { TokenLogin } from 'App/Login/TokenLogin';
 import { Logout } from 'App/Logout';
 import { FleetDetails, FleetList } from 'pages/Fleets';
 import { ModelsList } from 'pages/Models';
@@ -20,7 +20,6 @@ import { CreditsHistoryAdd, UserAdd, UserDetails, UserEdit, UserList } from 'pag
 import { UserBilling, UserSettings } from 'pages/User/Details';
 
 import { AuthErrorMessage } from './App/AuthErrorMessage';
-import { UnauthorizedLayout } from './layouts/UnauthorizedLayout';
 import { VolumeList } from './pages/Volumes';
 import { ROUTES } from './routes';
 
@@ -41,11 +40,7 @@ export const router = createBrowserRouter([
             },
             {
                 path: ROUTES.AUTH.TOKEN,
-                element: (
-                    <UnauthorizedLayout>
-                        <LoginByTokenForm />
-                    </UnauthorizedLayout>
-                ),
+                element: <TokenLogin />,
             },
             // hubs
             {

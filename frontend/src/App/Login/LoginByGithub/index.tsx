@@ -1,10 +1,11 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Box, Button, Link } from 'components';
+import { Box, Button, Link, NavigateLink, SpaceBetween } from 'components';
 import { UnauthorizedLayout } from 'layouts/UnauthorizedLayout';
 
 import { goToUrl } from 'libs';
+import { ROUTES } from 'routes';
 import { useGithubAuthorizeMutation } from 'services/auth';
 
 import { ReactComponent as GithubIcon } from 'assets/icons/github.svg';
@@ -38,16 +39,21 @@ export const LoginByGithub: React.FC = () => {
                     </Button>
 
                     <div className={styles.links}>
-                        <Box color="text-body-secondary">
-                            By clicking you agree to{' '}
-                            <Link href="https://dstack.ai/terms/" target="_blank">
-                                Terms of service
-                            </Link>{' '}
-                            and{' '}
-                            <Link href="https://dstack.ai/privacy/" target="_blank">
-                                Privacy policy
-                            </Link>
-                        </Box>
+                        <SpaceBetween size="xl" alignItems="center">
+                            <Box color="text-body-secondary">
+                                By clicking you agree to{' '}
+                                <Link href="https://dstack.ai/terms/" target="_blank">
+                                    Terms of service
+                                </Link>{' '}
+                                and{' '}
+                                <Link href="https://dstack.ai/privacy/" target="_blank">
+                                    Privacy policy
+                                </Link>
+                            </Box>
+                            <Box color="text-body-secondary">
+                                <NavigateLink href={ROUTES.AUTH.TOKEN}>{t('auth.login_by_token')}</NavigateLink>
+                            </Box>
+                        </SpaceBetween>
                     </div>
                 </div>
             </Box>
