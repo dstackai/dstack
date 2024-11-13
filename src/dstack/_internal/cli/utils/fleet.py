@@ -53,7 +53,6 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
 
             row = [
                 fleet.name if i == 0 else "",
-                fleet.spec.configuration.reservation if i == 0 else "",
                 str(instance.instance_num),
                 backend,
                 resources,
@@ -61,6 +60,12 @@ def get_fleets_table(fleets: List[Fleet], verbose: bool = False) -> Table:
                 status,
                 pretty_date(instance.created),
             ]
+
+            if verbose and i == 0:
+                row.insert(
+                    1,
+                    fleet.spec.configuration.reservation if i == 0 else "",
+                )
 
             if verbose:
                 error = ""
